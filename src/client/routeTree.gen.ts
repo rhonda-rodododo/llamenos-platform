@@ -16,6 +16,7 @@ import { Route as ProfileSetupRouteImport } from './routes/profile-setup'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as NotesRouteImport } from './routes/notes'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ConversationsRouteImport } from './routes/conversations'
 import { Route as CallsRouteImport } from './routes/calls'
 import { Route as BansRouteImport } from './routes/bans'
 import { Route as AuditRouteImport } from './routes/audit'
@@ -58,6 +59,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConversationsRoute = ConversationsRouteImport.update({
+  id: '/conversations',
+  path: '/conversations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CallsRoute = CallsRouteImport.update({
   id: '/calls',
   path: '/calls',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AuditRoute
   '/bans': typeof BansRoute
   '/calls': typeof CallsRoute
+  '/conversations': typeof ConversationsRoute
   '/login': typeof LoginRoute
   '/notes': typeof NotesRoute
   '/onboarding': typeof OnboardingRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AuditRoute
   '/bans': typeof BansRoute
   '/calls': typeof CallsRoute
+  '/conversations': typeof ConversationsRoute
   '/login': typeof LoginRoute
   '/notes': typeof NotesRoute
   '/onboarding': typeof OnboardingRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/audit': typeof AuditRoute
   '/bans': typeof BansRoute
   '/calls': typeof CallsRoute
+  '/conversations': typeof ConversationsRoute
   '/login': typeof LoginRoute
   '/notes': typeof NotesRoute
   '/onboarding': typeof OnboardingRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/bans'
     | '/calls'
+    | '/conversations'
     | '/login'
     | '/notes'
     | '/onboarding'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/bans'
     | '/calls'
+    | '/conversations'
     | '/login'
     | '/notes'
     | '/onboarding'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/bans'
     | '/calls'
+    | '/conversations'
     | '/login'
     | '/notes'
     | '/onboarding'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   AuditRoute: typeof AuditRoute
   BansRoute: typeof BansRoute
   CallsRoute: typeof CallsRoute
+  ConversationsRoute: typeof ConversationsRoute
   LoginRoute: typeof LoginRoute
   NotesRoute: typeof NotesRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/conversations': {
+      id: '/conversations'
+      path: '/conversations'
+      fullPath: '/conversations'
+      preLoaderRoute: typeof ConversationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/calls': {
       id: '/calls'
       path: '/calls'
@@ -300,6 +320,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuditRoute: AuditRoute,
   BansRoute: BansRoute,
   CallsRoute: CallsRoute,
+  ConversationsRoute: ConversationsRoute,
   LoginRoute: LoginRoute,
   NotesRoute: NotesRoute,
   OnboardingRoute: OnboardingRoute,

@@ -1,7 +1,7 @@
 import { createRootRoute, Outlet, Link, useNavigate, useLocation } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
-import { useConfig } from '@/lib/config'
+import { useConfig, useHasMessaging } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
 import { useEffect, useState, useCallback, type ReactNode } from 'react'
 import { connectWebSocket, disconnectWebSocket } from '@/lib/ws'
@@ -18,6 +18,7 @@ import {
   Users,
   ShieldBan,
   PhoneIncoming,
+  MessageSquare,
   ScrollText,
   Settings,
   LogOut,
@@ -112,7 +113,8 @@ const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frid
 function AuthenticatedLayout() {
   const { t } = useTranslation()
   const { isAdmin, signOut, name, role, sessionExpiring, sessionExpired, renewSession } = useAuth()
-  const { hotlineName, hotlineNumber } = useConfig()
+  const { hotlineName, hotlineNumber, channels } = useConfig()
+  const hasMessaging = useHasMessaging()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -200,6 +202,11 @@ function AuthenticatedLayout() {
         <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3">
           <NavLink to="/" icon={<LayoutDashboard className="h-4 w-4" />}>{t('nav.dashboard')}</NavLink>
           <NavLink to="/notes" icon={<StickyNote className="h-4 w-4" />}>{t('nav.notes')}</NavLink>
+          {hasMessaging && (
+            <NavLink to="/conversations" icon={<MessageSquare className="h-4 w-4" />}>
+              {t('nav.conversations', { defaultValue: 'Conversations' })}
+            </NavLink>
+          )}
 
           {isAdmin && (
             <>

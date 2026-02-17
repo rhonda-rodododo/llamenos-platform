@@ -55,14 +55,18 @@ export class ApiError extends Error {
 
 export async function getConfig() {
   const res = await fetch(`${API_BASE}/config`)
-  if (!res.ok) return { hotlineName: 'Hotline', hotlineNumber: '' }
-  return res.json() as Promise<{ hotlineName: string; hotlineNumber: string }>
+  if (!res.ok) return { hotlineName: 'Hotline', hotlineNumber: '', channels: undefined }
+  return res.json() as Promise<{
+    hotlineName: string
+    hotlineNumber: string
+    channels?: import('@shared/types').EnabledChannels
+  }>
 }
 
 // --- Auth ---
 
 export async function login(pubkey: string, token: string) {
-  return request<{ ok: true; role: 'volunteer' | 'admin' }>('/auth/login', {
+  return request<{ ok: true; role: UserRole }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ pubkey, token }),
   })
@@ -456,11 +460,13 @@ export async function updateWebAuthnSettings(data: Partial<WebAuthnSettings>) {
 
 // --- Types ---
 
+export type UserRole = 'volunteer' | 'admin' | 'reporter'
+
 export interface Volunteer {
   pubkey: string
   name: string
   phone: string
-  role: 'volunteer' | 'admin'
+  role: UserRole
   active: boolean
   createdAt: string
   transcriptionEnabled: boolean
@@ -540,9 +546,120 @@ export interface InviteCode {
   code: string
   name: string
   phone: string
-  role: 'volunteer' | 'admin'
+  role: UserRole
   createdBy: string
   createdAt: string
   expiresAt: string
   usedAt?: string
+}
+
+// --- Conversations ---
+
+export interface Conversation {
+  id: string
+  channelType: string
+  contactIdentifierHash: string
+  contactLast4?: string
+  assignedTo?: string
+  status: 'active' | 'waiting' | 'closed'
+  createdAt: string
+  updatedAt: string
+  lastMessageAt: string
+  messageCount: number
+  metadata?: {
+    linkedCallId?: string
+    reportId?: string
+    type?: 'report'
+    reportTitle?: string
+    reportCategory?: string
+  }
+}
+
+export interface ConversationMessage {
+  id: string
+  conversationId: string
+  direction: 'inbound' | 'outbound'
+  authorPubkey: string
+  encryptedContent: string
+  ephemeralPubkey: string
+  encryptedContentAdmin: string
+  ephemeralPubkeyAdmin: string
+  hasAttachments: boolean
+  attachmentIds?: string[]
+  createdAt: string
+  externalId?: string
+}
+
+export async function listConversations(params?: {
+  status?: string
+  channel?: string
+  page?: number
+  limit?: number
+}) {
+  const qs = new URLSearchParams()
+  if (params?.status) qs.set('status', params.status)
+  if (params?.channel) qs.set('channel', params.channel)
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  return request<{
+    conversations: Conversation[]
+    total?: number
+    assignedCount?: number
+    waitingCount?: number
+  }>(`/conversations?${qs}`)
+}
+
+export async function getConversation(id: string) {
+  return request<Conversation>(`/conversations/${id}`)
+}
+
+export async function getConversationMessages(id: string, params?: { page?: number; limit?: number }) {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  return request<{ messages: ConversationMessage[]; total: number }>(`/conversations/${id}/messages?${qs}`)
+}
+
+export async function sendConversationMessage(id: string, data: {
+  encryptedContent: string
+  ephemeralPubkey: string
+  encryptedContentAdmin: string
+  ephemeralPubkeyAdmin: string
+  plaintextForSending?: string
+}) {
+  return request<ConversationMessage>(`/conversations/${id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function claimConversation(id: string) {
+  return request<Conversation>(`/conversations/${id}/claim`, { method: 'POST' })
+}
+
+export async function updateConversation(id: string, data: { status?: string; assignedTo?: string }) {
+  return request<Conversation>(`/conversations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function getConversationStats() {
+  return request<{ waiting: number; active: number; closed: number; today: number; total: number }>('/conversations/stats')
+}
+
+// --- Messaging Config ---
+
+export type { MessagingConfig, EnabledChannels } from '@shared/types'
+import type { MessagingConfig } from '@shared/types'
+
+export async function getMessagingConfig() {
+  return request<MessagingConfig>('/settings/messaging')
+}
+
+export async function updateMessagingConfig(data: Partial<MessagingConfig>) {
+  return request<MessagingConfig>('/settings/messaging', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
 }

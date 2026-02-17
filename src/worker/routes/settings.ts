@@ -202,6 +202,42 @@ settings.post('/telephony-provider/test', adminGuard, async (c) => {
   }
 })
 
+// --- Messaging config: admin only ---
+settings.get('/messaging', adminGuard, async (c) => {
+  const dos = getDOs(c.env)
+  return dos.settings.fetch(new Request('http://do/settings/messaging'))
+})
+
+settings.patch('/messaging', adminGuard, async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const body = await c.req.json()
+  const res = await dos.settings.fetch(new Request('http://do/settings/messaging', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }))
+  if (res.ok) await audit(dos.records, 'messagingConfigUpdated', pubkey, body as Record<string, unknown>)
+  return res
+})
+
+// --- Setup state: admin only ---
+settings.get('/setup', adminGuard, async (c) => {
+  const dos = getDOs(c.env)
+  return dos.settings.fetch(new Request('http://do/settings/setup'))
+})
+
+settings.patch('/setup', adminGuard, async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const body = await c.req.json()
+  const res = await dos.settings.fetch(new Request('http://do/settings/setup', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }))
+  if (res.ok) await audit(dos.records, 'setupStateUpdated', pubkey, body as Record<string, unknown>)
+  return res
+})
+
 settings.get('/ivr-audio', adminGuard, async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/ivr-audio'))

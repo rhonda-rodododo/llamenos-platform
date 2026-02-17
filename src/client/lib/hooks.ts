@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { onMessage, sendMessage } from './ws'
 import { startRinging, stopRinging } from './notifications'
-import { getMyShiftStatus, listActiveCalls, type ActiveCall, type ShiftStatus } from './api'
+import { getMyShiftStatus, listActiveCalls, listConversations, type ActiveCall, type ShiftStatus, type Conversation } from './api'
 
 /**
  * Hook to manage real-time call state via WebSocket.
@@ -141,6 +141,87 @@ export function useShiftStatus() {
   }, [])
 
   return { ...status, loading }
+}
+
+/**
+ * Hook to manage real-time conversation state via WebSocket.
+ */
+export function useConversations() {
+  const [conversations, setConversations] = useState<Conversation[]>([])
+
+  useEffect(() => {
+    // Initial sync from WebSocket
+    const unsubSync = onMessage('conversations:sync', (data) => {
+      const { conversations: syncConvs } = data as { conversations: Conversation[] }
+      setConversations(syncConvs)
+    })
+
+    // New conversation waiting
+    const unsubNew = onMessage('conversation:new', (data) => {
+      const conv = data as Conversation
+      setConversations(prev => {
+        if (prev.some(c => c.id === conv.id)) return prev
+        return [...prev, conv]
+      })
+    })
+
+    // Conversation assigned
+    const unsubAssigned = onMessage('conversation:assigned', (data) => {
+      const { conversationId, assignedTo } = data as { conversationId: string; assignedTo: string }
+      setConversations(prev =>
+        prev.map(c => c.id === conversationId ? { ...c, assignedTo, status: 'active' as const } : c)
+      )
+    })
+
+    // Conversation closed
+    const unsubClosed = onMessage('conversation:closed', (data) => {
+      const { conversationId } = data as { conversationId: string }
+      setConversations(prev => prev.filter(c => c.id !== conversationId))
+    })
+
+    // New message in conversation
+    const unsubMessage = onMessage('message:new', (data) => {
+      const { conversationId } = data as { conversationId: string }
+      setConversations(prev =>
+        prev.map(c => c.id === conversationId
+          ? { ...c, lastMessageAt: new Date().toISOString(), messageCount: c.messageCount + 1 }
+          : c
+        )
+      )
+    })
+
+    return () => {
+      unsubSync()
+      unsubNew()
+      unsubAssigned()
+      unsubClosed()
+      unsubMessage()
+    }
+  }, [])
+
+  // Polling fallback
+  useEffect(() => {
+    let mounted = true
+    const poll = () => {
+      listConversations()
+        .then(({ conversations: polled }) => {
+          if (mounted) setConversations(polled)
+        })
+        .catch(() => {})
+    }
+    poll()
+    const interval = setInterval(poll, 30_000)
+    return () => { mounted = false; clearInterval(interval) }
+  }, [])
+
+  const waitingConversations = conversations.filter(c => c.status === 'waiting')
+  const activeConversations = conversations.filter(c => c.status === 'active')
+
+  return {
+    conversations,
+    waitingConversations,
+    activeConversations,
+  }
 }
 
 /**

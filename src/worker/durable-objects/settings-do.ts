@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, SpamSettings, CallSettings } from '../types'
-import type { CustomFieldDefinition, TelephonyProviderConfig } from '../../shared/types'
-import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS } from '../../shared/types'
+import type { CustomFieldDefinition, TelephonyProviderConfig, MessagingConfig, SetupState, EnabledChannels } from '../../shared/types'
+import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS, DEFAULT_MESSAGING_CONFIG, DEFAULT_SETUP_STATE } from '../../shared/types'
 import { IVR_LANGUAGES } from '../../shared/languages'
 import { DORouter } from '../lib/do-router'
 
@@ -54,6 +54,17 @@ export class SettingsDO extends DurableObject<Env> {
       this.getIvrAudio(promptType, language))
     this.router.delete('/settings/ivr-audio/:promptType/:language', (_req, { promptType, language }) =>
       this.deleteIvrAudio(promptType, language))
+
+    // --- Messaging Config ---
+    this.router.get('/settings/messaging', () => this.getMessagingConfig())
+    this.router.patch('/settings/messaging', async (req) => this.updateMessagingConfig(await req.json()))
+
+    // --- Setup State ---
+    this.router.get('/settings/setup', () => this.getSetupState())
+    this.router.patch('/settings/setup', async (req) => this.updateSetupState(await req.json()))
+
+    // --- Enabled Channels (computed) ---
+    this.router.get('/settings/enabled-channels', () => this.getEnabledChannels())
 
     // --- Fallback Group ---
     this.router.get('/fallback', () => this.getFallbackGroup())
@@ -284,6 +295,66 @@ export class SettingsDO extends DurableObject<Env> {
     const normalized = fields.map((f, i) => ({ ...f, order: i }))
     await this.ctx.storage.put('customFields', normalized)
     return Response.json({ fields: normalized })
+  }
+
+  // --- Messaging Config ---
+
+  private async getMessagingConfig(): Promise<Response> {
+    const config = await this.ctx.storage.get<MessagingConfig>('messagingConfig')
+    return Response.json(config || DEFAULT_MESSAGING_CONFIG)
+  }
+
+  private async updateMessagingConfig(data: Partial<MessagingConfig>): Promise<Response> {
+    const current = await this.ctx.storage.get<MessagingConfig>('messagingConfig') || { ...DEFAULT_MESSAGING_CONFIG }
+    const updated = { ...current, ...data }
+
+    // Validate
+    if (updated.inactivityTimeout < 5 || updated.inactivityTimeout > 1440) {
+      return new Response(JSON.stringify({ error: 'Inactivity timeout must be between 5 and 1440 minutes' }), { status: 400 })
+    }
+    if (updated.maxConcurrentPerVolunteer < 1 || updated.maxConcurrentPerVolunteer > 20) {
+      return new Response(JSON.stringify({ error: 'Max concurrent must be between 1 and 20' }), { status: 400 })
+    }
+
+    await this.ctx.storage.put('messagingConfig', updated)
+    return Response.json(updated)
+  }
+
+  // --- Setup State ---
+
+  private async getSetupState(): Promise<Response> {
+    const state = await this.ctx.storage.get<SetupState>('setupState')
+    return Response.json(state || DEFAULT_SETUP_STATE)
+  }
+
+  private async updateSetupState(data: Partial<SetupState>): Promise<Response> {
+    const current = await this.ctx.storage.get<SetupState>('setupState') || { ...DEFAULT_SETUP_STATE }
+    const updated = { ...current, ...data }
+    await this.ctx.storage.put('setupState', updated)
+    return Response.json(updated)
+  }
+
+  // --- Enabled Channels ---
+
+  private async getEnabledChannels(): Promise<Response> {
+    const telephonyConfig = await this.ctx.storage.get<TelephonyProviderConfig>('telephonyProvider')
+    const messagingConfig = await this.ctx.storage.get<MessagingConfig>('messagingConfig')
+    const setupState = await this.ctx.storage.get<SetupState>('setupState')
+
+    // Voice is enabled if a telephony provider is configured OR env vars are set
+    const voiceEnabled = !!telephonyConfig || (
+      !!(this.env.TWILIO_ACCOUNT_SID && this.env.TWILIO_AUTH_TOKEN && this.env.TWILIO_PHONE_NUMBER)
+    )
+
+    const channels: EnabledChannels = {
+      voice: voiceEnabled,
+      sms: messagingConfig?.enabledChannels.includes('sms') ?? false,
+      whatsapp: messagingConfig?.enabledChannels.includes('whatsapp') ?? false,
+      signal: messagingConfig?.enabledChannels.includes('signal') ?? false,
+      reports: setupState?.selectedChannels.includes('reports') ?? false,
+    }
+
+    return Response.json(channels)
   }
 
   // --- Telephony Provider ---

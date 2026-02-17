@@ -17,6 +17,14 @@ telephony.use('*', async (c, next) => {
   const env = c.env
   const dos = getDOs(env)
   const adapter = await getTelephony(env, dos)
+
+  // If no telephony provider is configured, return a helpful error
+  if (!adapter) {
+    return c.json({
+      error: 'Telephony is not configured. Set up a voice provider in Admin Settings or the Setup Wizard.',
+    }, 404)
+  }
+
   const isDev = env.ENVIRONMENT === 'development'
   const isLocal = isDev && (c.req.header('CF-Connecting-IP') === '127.0.0.1' || url.hostname === 'localhost')
   if (!isLocal) {
@@ -32,7 +40,7 @@ telephony.use('*', async (c, next) => {
 // --- Step 1: Incoming call -> ban check -> language menu ---
 telephony.post('/incoming', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const { callSid, callerNumber } = await adapter.parseIncomingWebhook(c.req.raw)
   console.log(`[telephony] /incoming callSid=${callSid} caller=***${callerNumber.slice(-4)}`)
 
@@ -57,7 +65,7 @@ telephony.post('/incoming', async (c) => {
 // --- Step 2: Language selected -> spam check -> greeting + hold/captcha ---
 telephony.post('/language-selected', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const { callSid, callerNumber, digits } = await adapter.parseLanguageWebhook(c.req.raw)
   const url = new URL(c.req.url)
   const isAuto = url.searchParams.get('auto') === '1'
@@ -108,7 +116,7 @@ telephony.post('/language-selected', async (c) => {
 // --- Step 3: CAPTCHA response ---
 telephony.post('/captcha', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const { digits, callerNumber } = await adapter.parseCaptchaWebhook(c.req.raw)
   const url = new URL(c.req.url)
   const expected = url.searchParams.get('expected') || ''
@@ -128,7 +136,7 @@ telephony.post('/captcha', async (c) => {
 // --- Step 4: Volunteer answered -> bridge via queue ---
 telephony.post('/volunteer-answer', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const url = new URL(c.req.url)
   const parentCallSid = url.searchParams.get('parentCallSid') || ''
   const pubkey = url.searchParams.get('pubkey') || ''
@@ -157,7 +165,7 @@ telephony.post('/volunteer-answer', async (c) => {
 // --- Step 5: Call status callback ---
 telephony.post('/call-status', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const { status: callStatus } = await adapter.parseCallStatusWebhook(c.req.raw)
   const url = new URL(c.req.url)
   const parentCallSid = url.searchParams.get('parentCallSid') || ''
@@ -194,7 +202,7 @@ telephony.post('/call-status', async (c) => {
 // --- Step 6: Wait music for queued callers ---
 telephony.all('/wait-music', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const url = new URL(c.req.url)
   const lang = url.searchParams.get('lang') || DEFAULT_LANGUAGE
   const queueTime = c.req.method === 'POST'
@@ -210,7 +218,7 @@ telephony.all('/wait-music', async (c) => {
 // --- Step 7: Queue exit -> voicemail if no one answered ---
 telephony.post('/queue-exit', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const { result: queueResult } = await adapter.parseQueueExitWebhook(c.req.raw)
   const url = new URL(c.req.url)
   const callSid = url.searchParams.get('callSid') || ''
@@ -244,7 +252,7 @@ telephony.post('/queue-exit', async (c) => {
 // --- Step 8: Voicemail recording complete ---
 telephony.post('/voicemail-complete', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const url = new URL(c.req.url)
   const lang = url.searchParams.get('lang') || DEFAULT_LANGUAGE
   return telephonyResponse(adapter.handleVoicemailComplete(lang))
@@ -253,7 +261,7 @@ telephony.post('/voicemail-complete', async (c) => {
 // --- Step 9: Call recording status callback (bridged call recording) ---
 telephony.post('/call-recording', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const { status: recordingStatus, recordingSid } = await adapter.parseRecordingWebhook(c.req.raw)
   const url = new URL(c.req.url)
   const parentCallSid = url.searchParams.get('parentCallSid') || ''
@@ -289,7 +297,7 @@ telephony.post('/call-recording', async (c) => {
 // --- Step 10: Voicemail recording status callback ---
 telephony.post('/voicemail-recording', async (c) => {
   const dos = getDOs(c.env)
-  const adapter = await getTelephony(c.env, dos)
+  const adapter = (await getTelephony(c.env, dos))!
   const { status: recordingStatus } = await adapter.parseRecordingWebhook(c.req.raw)
   const url = new URL(c.req.url)
   const callSid = url.searchParams.get('callSid') || ''

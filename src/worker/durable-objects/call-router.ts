@@ -68,6 +68,20 @@ export class CallRouterDO extends DurableObject<Env> {
         })),
       })
     })
+    // Broadcast arbitrary messages via WebSocket (used by conversation routes)
+    this.router.post('/broadcast', async (req) => {
+      const message = await req.json() as Record<string, unknown>
+      this.broadcastAll(message)
+      return Response.json({ ok: true })
+    })
+
+    // Broadcast to specific pubkeys
+    this.router.post('/broadcast/targeted', async (req) => {
+      const { pubkeys, message } = await req.json() as { pubkeys: string[]; message: Record<string, unknown> }
+      await this.broadcast(pubkeys, message)
+      return Response.json({ ok: true })
+    })
+
     this.router.post('/reset', async () => {
       for (const ws of this.ctx.getWebSockets()) {
         try { ws.close() } catch {}
@@ -104,6 +118,9 @@ export class CallRouterDO extends DurableObject<Env> {
         server.send(JSON.stringify({ type: 'calls:sync', calls: redacted }))
       }
     })
+
+    // Sync conversations state for this user
+    this.syncConversations(server, pubkey, role)
 
     // Broadcast presence update to all (new volunteer came online)
     this.broadcastPresenceUpdate()
@@ -194,6 +211,58 @@ export class CallRouterDO extends DurableObject<Env> {
 
   async webSocketError(_ws: WebSocket): Promise<void> {
     this.broadcastPresenceUpdate()
+  }
+
+  // --- Conversation Sync ---
+
+  private async syncConversations(ws: WebSocket, pubkey: string, role: string) {
+    try {
+      const convDO = this.env.CONVERSATION_DO.get(
+        this.env.CONVERSATION_DO.idFromName('global-conversations')
+      )
+
+      // Admins get all active/waiting; volunteers get assigned + waiting
+      const params = new URLSearchParams()
+      if (role !== 'admin') {
+        // Fetch assigned conversations
+        const assignedRes = await convDO.fetch(
+          new Request(`http://do/conversations?assignedTo=${pubkey}`)
+        )
+        const assigned = await assignedRes.json() as { conversations: unknown[] }
+
+        // Fetch waiting conversations
+        const waitingRes = await convDO.fetch(
+          new Request('http://do/conversations?status=waiting')
+        )
+        const waiting = await waitingRes.json() as { conversations: unknown[] }
+
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'conversations:sync',
+            conversations: [...assigned.conversations, ...waiting.conversations],
+          }))
+        }
+      } else {
+        // Admin sees all non-closed conversations
+        const activeRes = await convDO.fetch(
+          new Request('http://do/conversations?status=active')
+        )
+        const active = await activeRes.json() as { conversations: unknown[] }
+        const waitingRes = await convDO.fetch(
+          new Request('http://do/conversations?status=waiting')
+        )
+        const waiting = await waitingRes.json() as { conversations: unknown[] }
+
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'conversations:sync',
+            conversations: [...active.conversations, ...waiting.conversations],
+          }))
+        }
+      }
+    } catch (err) {
+      console.error('[ws] Failed to sync conversations:', err)
+    }
   }
 
   // --- Helpers ---

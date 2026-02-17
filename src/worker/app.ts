@@ -18,6 +18,8 @@ import auditRoutes from './routes/audit'
 import settingsRoutes from './routes/settings'
 import telephonyRoutes from './routes/telephony'
 import webrtcRoutes from './routes/webrtc'
+import messagingRoutes from './messaging/router'
+import conversationsRoutes from './routes/conversations'
 import { getDOs } from './lib/do-access'
 
 const app = new Hono<AppEnv>()
@@ -36,6 +38,9 @@ api.route('/', websocketRoutes)
 
 // Telephony webhooks (validated by Twilio signature, not our auth)
 api.route('/telephony', telephonyRoutes)
+
+// Messaging webhooks (each adapter validates its own signature)
+api.route('/messaging', messagingRoutes)
 
 // Public IVR audio serve (Twilio fetches during calls)
 api.get('/ivr-audio/:promptType/:language', async (c) => {
@@ -56,6 +61,7 @@ authenticated.route('/calls', callsRoutes)
 authenticated.route('/audit', auditRoutes)
 authenticated.route('/settings', settingsRoutes)
 authenticated.route('/telephony', webrtcRoutes)
+authenticated.route('/conversations', conversationsRoutes)
 
 api.route('/', authenticated)
 

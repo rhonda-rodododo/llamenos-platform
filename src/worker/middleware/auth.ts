@@ -13,5 +13,6 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
   c.set('pubkey', authResult.pubkey)
   c.set('volunteer', authResult.volunteer)
   c.set('isAdmin', authResult.volunteer.role === 'admin')
+  c.set('role', authResult.volunteer.role)
   await next()
 })

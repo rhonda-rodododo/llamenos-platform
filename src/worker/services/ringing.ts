@@ -75,6 +75,7 @@ export async function startParallelRinging(
     // Ring phone volunteers via telephony adapter (skip if no one needs phone ringing)
     if (toRingPhone.length > 0) {
       const adapter = await getTelephony(env, dos)
+      if (!adapter) return
       await adapter.ringVolunteers({
         callSid,
         callerNumber,

@@ -23,6 +23,7 @@ export async function maybeTranscribe(
 
   // Get recording audio directly by recording SID
   const adapter = await getTelephony(env, dos)
+  if (!adapter) return
   const audio = await adapter.getRecordingAudio(recordingSid)
   if (!audio) return
 
@@ -80,6 +81,7 @@ export async function transcribeVoicemail(
 
   // Get voicemail recording from telephony provider
   const adapter = await getTelephony(env, dos)
+  if (!adapter) return
   const audio = await adapter.getCallRecording(callSid)
   if (!audio) return
 

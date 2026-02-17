@@ -4,8 +4,10 @@ export interface Env {
   IDENTITY_DO: DurableObjectNamespace
   SETTINGS_DO: DurableObjectNamespace
   RECORDS_DO: DurableObjectNamespace
+  CONVERSATION_DO: DurableObjectNamespace
   AI: Ai
   ASSETS: Fetcher
+  R2_BUCKET: R2Bucket
   TWILIO_ACCOUNT_SID: string
   TWILIO_AUTH_TOKEN: string
   TWILIO_PHONE_NUMBER: string
@@ -14,11 +16,13 @@ export interface Env {
   ENVIRONMENT: string
 }
 
+export type UserRole = 'volunteer' | 'admin' | 'reporter'
+
 export interface Volunteer {
   pubkey: string
   name: string
   phone: string
-  role: 'volunteer' | 'admin'
+  role: UserRole
   active: boolean
   createdAt: string
   encryptedSecretKey: string // Admin-encrypted copy of the volunteer's nsec
@@ -94,7 +98,7 @@ export interface InviteCode {
   code: string
   name: string
   phone: string
-  role: 'volunteer' | 'admin'
+  role: UserRole
   createdBy: string
   createdAt: string
   expiresAt: string
@@ -131,6 +135,48 @@ export interface AuthPayload {
   token: string
 }
 
+// --- Conversation / Messaging Types ---
+
+import type { MessagingChannelType } from '../shared/types'
+
+export type ConversationStatus = 'active' | 'waiting' | 'closed'
+
+export interface Conversation {
+  id: string
+  channelType: MessagingChannelType | 'web'
+  contactIdentifierHash: string   // hashed phone/ID
+  contactLast4?: string           // last 4 digits (admin-only, like callerLast4)
+  assignedTo?: string             // volunteer pubkey
+  status: ConversationStatus
+  createdAt: string
+  updatedAt: string
+  lastMessageAt: string
+  messageCount: number
+  metadata?: {
+    linkedCallId?: string         // if conversation started from a call
+    reportId?: string             // if conversation is a report thread
+    type?: 'report'               // report conversations
+    reportTitle?: string          // encrypted
+    reportCategory?: string
+    customFieldValues?: string    // encrypted JSON of custom field values
+  }
+}
+
+export interface EncryptedMessage {
+  id: string
+  conversationId: string
+  direction: 'inbound' | 'outbound'
+  authorPubkey: string             // volunteer pubkey or 'system:inbound'
+  encryptedContent: string         // ECIES-encrypted message text
+  ephemeralPubkey: string          // for ECIES decryption
+  encryptedContentAdmin: string    // admin copy
+  ephemeralPubkeyAdmin: string
+  hasAttachments: boolean
+  attachmentIds?: string[]         // references to R2 encrypted blobs
+  createdAt: string
+  externalId?: string              // provider's message ID
+}
+
 // Hono typed context
 export type AppEnv = {
   Bindings: Env
@@ -138,5 +184,6 @@ export type AppEnv = {
     pubkey: string
     volunteer: Volunteer
     isAdmin: boolean
+    role: UserRole
   }
 }

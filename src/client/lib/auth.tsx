@@ -5,7 +5,7 @@ import { loginWithPasskey as webauthnLogin } from './webauthn'
 
 interface AuthState {
   keyPair: KeyPair | null
-  role: 'volunteer' | 'admin' | null
+  role: 'volunteer' | 'admin' | 'reporter' | null
   name: string | null
   isLoading: boolean
   error: string | null
