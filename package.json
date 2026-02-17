@@ -6,15 +6,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "bun run build && bunx wrangler deploy",
+    "deploy": "bun run deploy:demo && bun run deploy:site",
+    "deploy:demo": "bun run build && bunx wrangler deploy",
+    "deploy:site": "cd site && bun run deploy",
     "dev:worker": "bunx wrangler dev",
     "typecheck": "bunx tsc --noEmit",
     "bootstrap-admin": "bun run scripts/bootstrap-admin.ts",
     "test": "bunx playwright test",
     "test:ui": "bunx playwright test --ui",
     "site:dev": "cd site && bun run dev",
-    "site:build": "cd site && bun run build",
-    "site:deploy": "cd site && bun run build && bunx wrangler pages deploy dist --project-name llamenos-site"
+    "site:build": "cd site && bun run build"
   },
   "dependencies": {
     "@noble/ciphers": "^2.1.1",
