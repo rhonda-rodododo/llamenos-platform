@@ -1,5 +1,70 @@
 # Completed Backlog
 
+## 2026-02-17: Epics 42–47 — Multi-Channel Messaging, Reporter Role & In-App Guidance
+
+### Epic 42: Messaging Architecture Foundation
+- [x] `MessagingAdapter` interface with `sendMessage()`, `sendMediaMessage()`, `parseInboundWebhook()`, `validateWebhook()`
+- [x] Threaded conversations with `ConversationDO` Durable Object
+- [x] `GET/POST /conversations`, `GET/POST /conversations/:id/messages` API routes
+- [x] Real-time conversation updates via WebSocket (`conversation:new`, `message:new`)
+- [x] Conversation list + detail UI with message bubbles, timestamps, direction indicators
+- [x] Inbound webhook routing to correct channel adapter
+- [x] Conversations nav link (visible when messaging channels enabled)
+- [x] i18n: `conversations.*` keys in all 13 locales
+- [x] 6 E2E tests for conversation UI
+
+### Epic 43: Admin Setup Wizard
+- [x] `/setup` route with multi-step guided wizard (name, channels, providers)
+- [x] Channel selection cards (Voice, SMS, WhatsApp, Signal, Reports) with toggle
+- [x] Provider configuration per channel with credential forms
+- [x] `setupCompleted` flag in config context
+- [x] Auto-redirect to setup on first admin login when not completed
+- [x] i18n: `setupWizard.*` keys in all 13 locales
+- [x] 10 E2E tests for setup wizard flow
+
+### Epic 44: SMS Channel
+- [x] SMS adapters for Twilio, SignalWire, Vonage, Plivo (implements MessagingAdapter)
+- [x] Inbound SMS webhook parsing and signature validation per provider
+- [x] Auto-response with configurable welcome message
+- [x] SMS settings in admin panel (enable/disable, welcome message)
+- [x] Provider-specific message format handling
+
+### Epic 45: WhatsApp Business Channel
+- [x] WhatsApp Cloud API adapter (Meta Graph API v21.0)
+- [x] Template message support for initiating conversations
+- [x] 24-hour messaging window handling
+- [x] Webhook verification (hub.verify_token challenge)
+- [x] Media message support (images, documents, audio)
+- [x] WhatsApp settings in admin panel
+
+### Epic 46: Signal Channel
+- [x] Signal adapter via signal-cli-rest-api bridge
+- [x] Health monitoring with graceful degradation
+- [x] Voice message transcription via Workers AI Whisper
+- [x] Signal settings in admin panel (bridge URL, phone number)
+
+### Epic 47: Reporter Role & Encrypted File Uploads
+- [x] `reporter` role with restricted permissions (reports only)
+- [x] Reporter invite flow with role selector (volunteer/admin/reporter)
+- [x] Encrypted report submission (ECIES for body, plaintext title)
+- [x] Report categories and status tracking (open/claimed/resolved)
+- [x] Report claiming and threaded replies
+- [x] Reporter-specific navigation (reports + help only)
+- [x] `UserRole` type consolidated in shared/types.ts
+- [x] 46 E2E tests across reports, setup wizard, and conversations
+
+### In-App Guidance & Help
+- [x] `/help` route with FAQ sections (Getting Started, Calls & Shifts, Notes & Encryption, Administration)
+- [x] Role-specific guides (Admin Guide, Volunteer Guide, Reporter Guide)
+- [x] Quick reference cards (Keyboard Shortcuts, Security)
+- [x] Collapsible FAQ items with expand/collapse
+- [x] Quick Navigation links grid
+- [x] Getting Started checklist on admin dashboard (tracks setup progress)
+- [x] Help link in sidebar navigation for all user roles
+- [x] Help command in command palette
+- [x] 10 E2E tests for help features
+- [x] 214 total E2E tests passing (0 regressions)
+
 ## 2026-02-11: Epic 32 — Multi-Provider Telephony Configuration
 
 ### Epic 32: Provider Configuration System

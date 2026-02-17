@@ -38,13 +38,14 @@
 - [x] Epic 35: Asterisk ARI Adapter (self-hosted SIP, ARI bridge service)
 - [x] Epic 36: Telephony Documentation (provider comparison, setup guides, in-app help)
 
-## Multi-Channel Messaging & Reporter Role (Epics 42–47)
-- [ ] Epic 42: Messaging Architecture & Threaded Conversations (MessagingAdapter interface, ConversationDO, WebSocket events, conversation UI)
-- [ ] Epic 43: Admin Setup Wizard (guided first-run setup, channel selection, provider config, telephony optional)
-- [ ] Epic 44: SMS Channel (SMS adapters for all 5 providers, auto-response, provider message cleanup)
-- [ ] Epic 45: WhatsApp Business Channel (Cloud API messaging + Calling API voice, template messages, 24h window handling)
-- [ ] Epic 46: Signal Channel (signal-cli-rest-api bridge, voice message transcription, health monitoring, graceful degradation)
-- [ ] Epic 47: Reporter Role & Encrypted File Uploads (new role, R2 encrypted storage, chunked resumable upload, proxy re-encryption, report threads)
+## Multi-Channel Messaging & Reporter Role (Epics 42–47) — COMPLETE
+- [x] Epic 42: Messaging Architecture & Threaded Conversations
+- [x] Epic 43: Admin Setup Wizard
+- [x] Epic 44: SMS Channel
+- [x] Epic 45: WhatsApp Business Channel
+- [x] Epic 46: Signal Channel
+- [x] Epic 47: Reporter Role & Encrypted File Uploads
+- [x] In-App Guidance: Help page, FAQ, Getting Started checklist, command palette integration
 
 ## Low Priority (Post-Launch)
 - [ ] Add call recording playback in notes view
