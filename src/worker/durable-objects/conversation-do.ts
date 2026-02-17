@@ -42,6 +42,9 @@ export class ConversationDO extends DurableObject<Env> {
     // --- Inbound from webhooks ---
     this.router.post('/conversations/incoming', async (req) => this.handleIncoming(await req.json()))
 
+    // --- Contact lookup (server-side only, for outbound sends) ---
+    this.router.get('/conversations/:id/contact', async (_req, { id }) => this.getContactIdentifier(id))
+
     // --- Stats ---
     this.router.get('/conversations/stats', () => this.getStats())
 
@@ -220,6 +223,11 @@ export class ConversationDO extends DurableObject<Env> {
       }
       conversations.push(conv)
       await this.ctx.storage.put('conversations', conversations)
+
+      // Store the actual contact identifier for outbound sends (server-side only).
+      // This is NOT sent to clients — only used by the server to send replies.
+      // DO storage is encrypted at rest by Cloudflare.
+      await this.ctx.storage.put(`contact:${conv.id}`, incoming.senderIdentifier)
     }
 
     // Encrypt the message content using ECIES for the assigned volunteer (if any) and admin
@@ -267,6 +275,16 @@ export class ConversationDO extends DurableObject<Env> {
       isNew: conv.messageCount === 1,
       status: conv.status,
     })
+  }
+
+  // --- Contact Identifier Lookup (server-side only) ---
+
+  private async getContactIdentifier(conversationId: string): Promise<Response> {
+    const identifier = await this.ctx.storage.get<string>(`contact:${conversationId}`)
+    if (!identifier) {
+      return new Response(JSON.stringify({ error: 'No contact identifier stored' }), { status: 404 })
+    }
+    return Response.json({ identifier })
   }
 
   // --- Stats ---

@@ -7,6 +7,9 @@ import { SignalWireAdapter } from '../telephony/signalwire'
 import { VonageAdapter } from '../telephony/vonage'
 import { PlivoAdapter } from '../telephony/plivo'
 import { AsteriskAdapter } from '../telephony/asterisk'
+import { createSMSAdapter } from '../messaging/sms/factory'
+import { createWhatsAppAdapter } from '../messaging/whatsapp/factory'
+import { createSignalAdapter } from '../messaging/signal/factory'
 
 const IDENTITY_ID = 'global-identity'
 const SETTINGS_ID = 'global-settings'
@@ -77,19 +80,23 @@ export async function getMessagingAdapter(
     throw new Error(`${channel} channel is not enabled`)
   }
 
-  // Channel-specific adapters are loaded lazily to avoid bundling unused code
   switch (channel) {
     case 'sms': {
-      // SMS adapter will be implemented in Epic 44
-      throw new Error('SMS adapter not yet implemented')
+      if (!config.sms?.enabled) throw new Error('SMS is not enabled')
+      // SMS reuses telephony provider credentials
+      const telRes = await dos.settings.fetch(new Request('http://do/settings/telephony-provider'))
+      if (!telRes.ok) throw new Error('SMS requires a configured telephony provider')
+      const telConfig = await telRes.json() as TelephonyProviderConfig | null
+      if (!telConfig) throw new Error('SMS requires a configured telephony provider')
+      return createSMSAdapter(telConfig, config.sms)
     }
     case 'whatsapp': {
-      // WhatsApp adapter will be implemented in Epic 45
-      throw new Error('WhatsApp adapter not yet implemented')
+      if (!config.whatsapp) throw new Error('WhatsApp is not configured')
+      return createWhatsAppAdapter(config.whatsapp)
     }
     case 'signal': {
-      // Signal adapter will be implemented in Epic 46
-      throw new Error('Signal adapter not yet implemented')
+      if (!config.signal) throw new Error('Signal is not configured')
+      return createSignalAdapter(config.signal)
     }
     default:
       throw new Error(`Unknown channel: ${channel}`)

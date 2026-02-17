@@ -1,13 +1,42 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import type { MessagingChannelType } from '../../shared/types'
+import type { MessagingChannelType, MessagingConfig, WhatsAppConfig } from '../../shared/types'
 import type { MessagingAdapter, IncomingMessage } from './adapter'
 import { getDOs } from '../lib/do-access'
 import { getMessagingAdapter } from '../lib/do-access'
-import { encryptForPublicKey } from '../lib/crypto'
 import { audit } from '../services/audit'
 
 const messaging = new Hono<AppEnv>()
+
+/**
+ * WhatsApp webhook verification (GET).
+ * Meta's Cloud API sends a GET request with hub.mode, hub.verify_token, hub.challenge
+ * to verify webhook ownership during setup.
+ */
+messaging.get('/whatsapp/webhook', async (c) => {
+  const mode = c.req.query('hub.mode')
+  const token = c.req.query('hub.verify_token')
+  const challenge = c.req.query('hub.challenge')
+
+  if (mode !== 'subscribe' || !token || !challenge) {
+    return c.text('Bad request', 400)
+  }
+
+  // Read WhatsApp config to check verify token
+  const dos = getDOs(c.env)
+  try {
+    const res = await dos.settings.fetch(new Request('http://do/settings/messaging'))
+    if (res.ok) {
+      const config = await res.json() as MessagingConfig | null
+      const waConfig = config?.whatsapp as WhatsAppConfig | null
+      if (waConfig?.verifyToken && token === waConfig.verifyToken) {
+        return c.text(challenge)
+      }
+    }
+  } catch { /* fall through */ }
+
+  return c.text('Forbidden', 403)
+})
 
 /**
  * Messaging webhook handler.
