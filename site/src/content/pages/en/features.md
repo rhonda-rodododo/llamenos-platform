@@ -3,6 +3,12 @@ title: Features
 subtitle: Everything a crisis response platform needs, in one open-source package. Voice, SMS, WhatsApp, Signal, and encrypted reports — built on Cloudflare Workers with zero servers to manage.
 ---
 
+## Multi-Provider Telephony
+
+**5 voice providers** — Choose from Twilio, SignalWire, Vonage, Plivo, or self-hosted Asterisk. Configure your provider in the admin settings UI or during the setup wizard. Switch providers at any time without code changes.
+
+**WebRTC browser calling** — Volunteers can answer calls directly in the browser without a phone. Provider-specific WebRTC token generation for Twilio, SignalWire, Vonage, and Plivo. Configurable per-volunteer call preference (phone, browser, or both).
+
 ## Call Routing
 
 **Parallel ringing** — When a caller dials in, every on-shift, non-busy volunteer rings simultaneously. The first volunteer to pick up gets the call; other ringing stops immediately.
@@ -74,6 +80,22 @@ subtitle: Everything a crisis response platform needs, in one open-source packag
 **Call history** — Searchable, filterable call history with date ranges, phone number search, and volunteer assignment. GDPR-compliant data export.
 
 **In-app help** — FAQ sections, role-specific guides, quick reference cards for keyboard shortcuts and security. Accessible from the sidebar and command palette.
+
+## Volunteer Experience
+
+**Command palette** — Press Ctrl+K (or Cmd+K on Mac) for instant access to navigation, search, quick note creation, and theme switching. Admin-only commands are filtered by role.
+
+**Real-time notifications** — Incoming calls trigger a browser ringtone, push notification, and flashing tab title. Toggle each notification type independently in settings.
+
+**Volunteer presence** — Admins see real-time online, offline, and on-break counts. Volunteers can toggle a break switch in the sidebar to pause incoming calls without leaving their shift.
+
+**Keyboard shortcuts** — Press ? to see all available shortcuts. Navigate pages, open the command palette, and perform common actions without touching the mouse.
+
+**Note draft auto-save** — Notes are auto-saved as encrypted drafts in the browser. If the page reloads or the volunteer navigates away, their work is preserved. Drafts are cleaned from localStorage on logout.
+
+**Encrypted data export** — Export notes as a GDPR-compliant encrypted file (.enc) using the volunteer's own key. Only the original author can decrypt the export.
+
+**Dark/light themes** — Toggle between dark mode, light mode, or follow the system theme. Preference persisted per session.
 
 ## Multi-Language & Mobile
 

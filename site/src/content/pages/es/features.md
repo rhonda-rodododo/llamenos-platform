@@ -3,6 +3,12 @@ title: Funcionalidades
 subtitle: Todo lo que una plataforma de respuesta a crisis necesita, en un paquete de codigo abierto. Voz, SMS, WhatsApp, Signal y reportes cifrados — construido sobre Cloudflare Workers sin servidores que administrar.
 ---
 
+## Telefonia multiproveedor
+
+**5 proveedores de voz** — Elige entre Twilio, SignalWire, Vonage, Plivo o Asterisk autoalojado. Configura tu proveedor en la interfaz de administracion o durante el asistente de configuracion. Cambia de proveedor en cualquier momento sin cambios en el codigo.
+
+**Llamadas WebRTC en el navegador** — Los voluntarios pueden contestar llamadas directamente en el navegador sin un telefono. Generacion de tokens WebRTC especificos por proveedor para Twilio, SignalWire, Vonage y Plivo. Preferencia de llamada configurable por voluntario (telefono, navegador o ambos).
+
 ## Enrutamiento de llamadas
 
 **Timbre en paralelo** — Cuando un llamante marca, todos los voluntarios en turno y disponibles suenan simultaneamente. El primer voluntario que conteste toma la llamada; el timbre de los demas se detiene de inmediato.
@@ -74,6 +80,22 @@ subtitle: Todo lo que una plataforma de respuesta a crisis necesita, en un paque
 **Historial de llamadas** — Historial de llamadas con busqueda, filtros por rango de fechas, busqueda por numero de telefono y asignacion de voluntarios. Exportacion de datos compatible con GDPR.
 
 **Ayuda dentro de la aplicacion** — Secciones de preguntas frecuentes, guias por rol, tarjetas de referencia rapida para atajos de teclado y seguridad. Accesible desde la barra lateral y la paleta de comandos.
+
+## Experiencia del voluntario
+
+**Paleta de comandos** — Presiona Ctrl+K (o Cmd+K en Mac) para acceso instantaneo a navegacion, busqueda, creacion rapida de notas y cambio de tema. Los comandos exclusivos de administrador se filtran segun el rol.
+
+**Notificaciones en tiempo real** — Las llamadas entrantes activan un tono de timbre en el navegador, notificacion push y titulo de pestana parpadeante. Activa o desactiva cada tipo de notificacion de forma independiente en la configuracion.
+
+**Presencia de voluntarios** — Los administradores ven conteos en tiempo real de voluntarios en linea, desconectados y en descanso. Los voluntarios pueden activar un interruptor de descanso en la barra lateral para pausar las llamadas entrantes sin dejar su turno.
+
+**Atajos de teclado** — Presiona ? para ver todos los atajos disponibles. Navega entre paginas, abre la paleta de comandos y realiza acciones comunes sin tocar el raton.
+
+**Autoguardado de borradores de notas** — Las notas se guardan automaticamente como borradores cifrados en el navegador. Si la pagina se recarga o el voluntario navega a otro lugar, su trabajo se conserva. Los borradores se eliminan de localStorage al cerrar sesion.
+
+**Exportacion de datos cifrada** — Exporta notas como un archivo cifrado compatible con GDPR (.enc) usando la clave del voluntario. Solo el autor original puede descifrar la exportacion.
+
+**Temas claro/oscuro** — Alterna entre modo oscuro, modo claro o seguir el tema del sistema. La preferencia se mantiene por sesion.
 
 ## Multilenguaje y movil
 

@@ -37,20 +37,26 @@ src/
       conversations.tsx # Threaded messaging conversations
       reports.tsx      # Reporter submission + admin review
       help.tsx         # In-app FAQ and role-specific guides
+      link-device.tsx  # Device linking page (standalone, no auth required)
     components/        # App components + ui/ (shadcn primitives)
     lib/               # Client utilities
       api.ts           # REST API client
       auth.tsx         # Auth context (Nostr + WebAuthn)
-      crypto.ts        # E2EE encryption/decryption
+      key-manager.ts   # PIN-encrypted local key store (closure-based)
+      provisioning.ts  # Device linking (QR/code provisioning protocol)
+      crypto.ts        # E2EE encryption/decryption (notes, reports, export)
       webrtc.ts        # WebRTC call handling
       ws.ts            # WebSocket connection
+      backup.ts        # Encrypted backup/recovery key generation
     locales/           # 13 locale JSON files
   worker/              # Cloudflare Worker backend
     routes/            # Hono API route handlers
-    durable-objects/   # 4 singleton DOs
-      session-manager.ts   # Auth, settings, presence, WebSocket
+    durable-objects/   # 6 singleton DOs
+      identity-do.ts       # Auth, WebSocket, presence, device provisioning
+      settings-do.ts       # Settings, custom fields, IVR audio, messaging config
+      records-do.ts        # Audit log, call history, recordings
       shift-manager.ts     # Shifts, volunteers, invites
-      call-router.ts       # Calls, notes, audit, recordings
+      call-router.ts       # Calls, notes, active call state
       conversation-do.ts   # Threaded messaging conversations
     telephony/         # Voice provider adapters
       adapter.ts       # TelephonyAdapter interface
@@ -94,20 +100,35 @@ Configured in both `tsconfig.json` and `vite.config.ts`:
 
 ### Durable Objects
 
-Four singleton DOs accessed via `idFromName()`:
+Six singleton DOs accessed via `idFromName()`:
 
 | DO | ID | Purpose |
 |----|-----|---------|
-| SessionManagerDO | `global-session` | Auth, settings, WebSocket, presence |
+| IdentityDO | `global-identity` | Auth, WebSocket, presence, device provisioning |
+| SettingsDO | `global-settings` | Settings, custom fields, IVR audio, messaging config |
+| RecordsDO | `global-records` | Audit log, call history, recordings |
 | ShiftManagerDO | `global-shifts` | Shifts, volunteers, invites |
-| CallRouterDO | `global-calls` | Calls, notes, audit, recordings |
+| CallRouterDO | `global-calls` | Calls, notes, active call state |
 | ConversationDO | `global-conversations` | Threaded messaging conversations (SMS, WhatsApp, Signal) |
+
+> **Note:** The original `SessionManagerDO` was split into IdentityDO, SettingsDO, and RecordsDO (Epics 37-41) for separation of concerns.
 
 ### Authentication
 
 Dual auth modes:
 1. **Schnorr signatures** — `Authorization: Bearer {timestamp}:{hex-signature}` (BIP-340)
 2. **WebAuthn sessions** — `Authorization: Session {token}` (256-bit random, 8hr expiry)
+
+### Key Management
+
+Client-side key protection via `src/client/lib/key-manager.ts`:
+
+- **PIN-encrypted local store** — nsec encrypted with PBKDF2 (600K iterations) + XChaCha20-Poly1305, stored in localStorage
+- **In-memory closure** — decrypted nsec held in a closure variable only, never in sessionStorage or any browser API
+- **Auto-lock** — key zeroed on idle timeout or `document.hidden`; components show "Enter PIN" overlay when locked
+- **Two-tier access** — "authenticated but locked" (session token) vs "authenticated and unlocked" (PIN entered, full crypto)
+- **Device linking** — Signal-style QR provisioning via ephemeral ECDH key exchange through IdentityDO relay rooms (5-min TTL)
+- **Recovery keys** — 128-bit Base32 recovery keys with mandatory encrypted backup download during onboarding
 
 ### Telephony (Voice)
 
@@ -145,10 +166,11 @@ The `reporter` role has restricted navigation (reports + help only). Reporters a
 
 ### Encryption
 
-- **Notes**: XChaCha20-Poly1305, client-side encrypt/decrypt
+- **Notes**: Per-note forward secrecy — each note encrypted with unique random 32-byte key (XChaCha20-Poly1305), key wrapped via ECIES for each reader (author + admin envelopes). Compromising identity key does not reveal past notes.
 - **Transcriptions**: ECIES — ephemeral ECDH (secp256k1) + XChaCha20-Poly1305, dual-encrypted for volunteer + admin
 - **Reports**: ECIES encrypted body + encrypted file attachments, dual-encrypted for reporter + admin
-- **Key derivation**: HKDF-SHA256 with domain separation
+- **Data export**: Notes export encrypted with user's key (XChaCha20-Poly1305, .enc format)
+- **Key derivation**: HKDF-SHA256 with application salt (`llamenos:hkdf-salt:v1`)
 
 ## Testing
 

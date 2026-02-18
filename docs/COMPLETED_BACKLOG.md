@@ -82,6 +82,63 @@
 - `src/client/routes/onboarding.tsx`
 - `asterisk-bridge/src/index.ts`
 
+## 2026-02-17: Epics 48–52 — UI/UX Design Overhaul with Teal Brand Identity
+
+### Visual Identity
+- [x] Brand tokens: deep teal primary (oklch 195°), warm amber accent (oklch 70°), warm off-white/blue-charcoal backgrounds in light/dark modes
+- [x] New logo: shield + phone handset "L" mark with signal waves (SVG at all sizes)
+- [x] Typography: DM Sans for body/headings via Google Fonts
+- [x] Login page: radial gradient background, logo mark with fade-in animation, trust badge
+- [x] Onboarding: amber warning cards, logo mark throughout, gradient backgrounds
+- [x] Sidebar: logo mark, teal active nav border (3px), teal admin section headers
+- [x] Dashboard: tinted stat cards (green active calls, teal on-shift, amber on-break)
+- [x] All pages: consistent teal page title icons, warm card shadows
+
+### Marketing Site
+- [x] Teal accent palette applied throughout
+- [x] Inline SVG logo replacing text-only branding
+- [x] Enhanced hero glow effect
+- [x] Teal hover borders on feature cards
+- [x] Teal docs sidebar active states
+
+### Files Changed (32 files)
+- New: `src/client/components/logo-mark.tsx`
+- Modified: `index.html`, all SVG icons (`favicon.svg`, `apple-touch-icon.svg`, `pwa-*.svg`), `src/client/app.css`, all route pages, marketing site components and layouts
+- All 214 E2E tests passing, both app and site (182 pages) build cleanly
+
+## 2026-02-17: Epics 37–41 — Codebase Refactoring & Test Coverage
+
+### Epic 37: Split Admin Settings
+- [x] Split `admin/settings.tsx` (1,135 → 231 lines) into 8 focused section components under `components/admin-settings/`
+- [x] Components: call-settings, custom-fields, ivr-languages, passkey-policy, spam, telephony-provider, transcription, voice-prompts
+
+### Epic 38: Shared Voice Prompts
+- [x] Extracted ~800 lines of duplicated voice prompts from 4 telephony adapters into `shared/voice-prompts.ts`
+- [x] Single source of truth for all IVR prompt text across Twilio, Vonage, Plivo, and Asterisk
+
+### Epic 39: Split Notes Page
+- [x] Split `notes.tsx` (644 → 395 lines), extracting `NewNoteForm`, `NoteEditForm`, and shared `CustomFieldInputs` components
+
+### Epic 40: E2E Test Coverage Expansion
+- [x] 30 new E2E tests across 3 files: `audit-log.spec.ts`, `shift-management.spec.ts`, `ban-management.spec.ts`
+- [x] Total: 160 tests passing
+
+### Epic 41: Type Safety
+- [x] Fixed all `as any`/`unknown` casts in 6 files (volunteers route, volunteer-multi-select, audit page, volunteer profile, webauthn, webrtc)
+
+### SessionManagerDO Split (pre-requisite refactor)
+- [x] Split the 1,031-line `SessionManagerDO` "god object" (237-line `fetch()` with 40+ if-branches) into 3 focused DOs:
+  - **IdentityDO**: volunteers, invites, WebAuthn credentials, sessions
+  - **SettingsDO**: all config, IVR audio, rate limiting, fallback group
+  - **RecordsDO**: bans, notes, audit log
+- [x] Introduced `DORouter` — lightweight method+path router with `:param` extraction, replacing if-chain routing across all DOs
+- [x] All 131 E2E tests pass with zero behavior changes
+
+### Files Changed (34+ files)
+- New: `src/worker/durable-objects/identity-do.ts`, `settings-do.ts`, `records-do.ts`, `src/worker/lib/do-router.ts`, `src/shared/voice-prompts.ts`, `src/client/components/admin-settings/*.tsx`, `src/client/components/notes/*.tsx`, 3 new test files
+- Deleted: `src/worker/durable-objects/session-manager.ts`
+- Net: -1,553 / +2,299 lines (significant deduplication)
+
 ## 2026-02-17: Epics 42–47 — Multi-Channel Messaging, Reporter Role & In-App Guidance
 
 ### Epic 42: Messaging Architecture Foundation

@@ -28,12 +28,24 @@ Built for organizations that need to protect the identity of callers, reporters,
 - **Reporter role** — dedicated portal for submitting encrypted reports with file attachments
 - **Report workflow** — categories, status tracking (open/claimed/resolved), threaded replies
 
+### Volunteer Experience
+- **Command palette** — Ctrl/Cmd+K for quick navigation, search, and one-click note creation
+- **Real-time notifications** — ringtone, browser push notifications, and tab title flash on incoming calls
+- **Volunteer presence** — real-time online/offline/on-break status visible to admins
+- **Note draft auto-save** — encrypted drafts preserved in the browser across reloads
+- **Keyboard shortcuts** — press `?` for a full shortcut reference dialog
+- **Dark/light/system themes** — toggle in sidebar, persisted per session
+
 ### Administration
 - **Setup wizard** — guided multi-step setup on first admin login (name, channels, providers)
 - **In-app help** — FAQ, role-specific guides, getting started checklist
-- **Audit log** — every call, note, and admin action tracked
-- **12 languages** — English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, French, Haitian Creole, Korean, Russian, Hindi, Portuguese
-- **Mobile responsive PWA** — installable on any device
+- **Custom IVR voice prompts** — record greetings per language via MediaRecorder; falls back to TTS
+- **Configurable call settings** — queue timeout and voicemail duration (30–300s each)
+- **Audit log** — every call, note, message, and admin action tracked with hashed IP metadata
+- **Encrypted data export** — GDPR-compliant notes export encrypted with user's key (.enc format)
+- **Session management** — idle timeout warnings, auto-renewal, and forced re-auth on expiry
+- **13 languages** — English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, French, Haitian Creole, Korean, Russian, Hindi, Portuguese, German
+- **Mobile responsive PWA** — installable on any device with push notifications
 - **Accessibility** — skip nav, ARIA labels, RTL support, screen reader friendly
 - **GDPR compliant** — designed for EU-based organizations
 
@@ -202,9 +214,11 @@ src/
     lib/           # Auth, crypto, WebRTC, API client
   worker/          # Cloudflare Worker backend
     durable-objects/
-      session-manager.ts   # Auth, settings, WebSocket, presence
+      identity-do.ts       # Auth, WebSocket, presence, device provisioning
+      settings-do.ts       # Settings, custom fields, IVR audio, messaging config
+      records-do.ts        # Audit log, call history, recordings
       shift-manager.ts     # Shift scheduling, volunteer management
-      call-router.ts       # Call routing, notes, audit log
+      call-router.ts       # Call routing, notes, active calls
       conversation-do.ts   # Threaded messaging conversations
     telephony/     # Voice provider adapters (Twilio, SignalWire, Vonage, Plivo, Asterisk)
     messaging/     # Messaging channel adapters (SMS, WhatsApp, Signal)
@@ -218,6 +232,7 @@ site/              # Marketing site (Astro + Tailwind, Cloudflare Pages)
 
 ### Security model
 
+- **Durable Objects**: 6 singletons — IdentityDO, SettingsDO, RecordsDO, ShiftManagerDO, CallRouterDO, ConversationDO
 - **Authentication**: Nostr keypairs (BIP-340 Schnorr) + WebAuthn passkeys
 - **Local key protection**: PIN-encrypted key store (PBKDF2 600K iterations + XChaCha20-Poly1305); raw nsec never in sessionStorage — in-memory closure only, zeroed on lock
 - **Note encryption**: Per-note forward secrecy — each note encrypted with a unique random key, wrapped via ECIES for each authorized reader

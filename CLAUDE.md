@@ -49,9 +49,10 @@ src/
     locales/        # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
   worker/           # Cloudflare Worker backend
     api/            # REST API handlers
-    durable-objects/ # CallRouterDO, ShiftManagerDO, SessionManagerDO
-    telephony/      # TelephonyAdapter interface + TwilioAdapter
-    lib/            # Server utilities (auth, crypto, webauthn)
+    durable-objects/ # 6 DOs: IdentityDO, SettingsDO, RecordsDO, ShiftManagerDO, CallRouterDO, ConversationDO
+    telephony/      # TelephonyAdapter interface + 5 adapters (Twilio, SignalWire, Vonage, Plivo, Asterisk)
+    messaging/      # MessagingAdapter interface + SMS, WhatsApp, Signal adapters
+    lib/            # Server utilities (auth, crypto, webauthn, do-router)
   shared/           # Cross-boundary types and config (@shared alias)
     types.ts        # Shared types (CustomFieldDefinition, NotePayload, etc.)
     languages.ts    # Centralized language config (codes, labels, Twilio voice IDs)
@@ -64,11 +65,13 @@ src/
 
 ## Key Technical Patterns
 
-- **TelephonyAdapter**: Abstract interface for telephony providers. Twilio is the first implementation. All telephony logic goes through this adapter — never call Twilio APIs directly from business logic.
+- **TelephonyAdapter**: Abstract interface for 5 voice providers (Twilio, SignalWire, Vonage, Plivo, Asterisk). All telephony logic goes through this adapter — never call provider APIs directly from business logic.
+- **MessagingAdapter**: Abstract interface for text messaging channels (SMS, WhatsApp, Signal). Inbound webhooks route to ConversationDO.
 - **Parallel ringing**: All on-shift, non-busy volunteers ring simultaneously. First pickup terminates other calls.
 - **Shift routing**: Automated, recurring schedule with ring groups. Fallback group if no schedule is defined.
-- **Durable Objects**: Three singletons accessed via `idFromName()` — CallRouterDO, ShiftManagerDO, SessionManagerDO.
-- **E2EE notes**: ECIES encryption (ephemeral ECDH on secp256k1 + XChaCha20-Poly1305). Dual-encrypted: one copy for volunteer, one for admin.
+- **Durable Objects**: Six singletons accessed via `idFromName()` — IdentityDO, SettingsDO, RecordsDO, ShiftManagerDO, CallRouterDO, ConversationDO. Routed via `DORouter` (lightweight method+path router).
+- **E2EE notes**: Per-note forward secrecy — unique random key per note, wrapped via ECIES for each reader. Dual-encrypted: one copy for volunteer, one for admin.
+- **Key management**: PIN-encrypted local key store (`key-manager.ts`). nsec held in closure only, zeroed on lock. Device linking via ephemeral ECDH provisioning rooms.
 - **WebSocket auth**: Token sent via `Sec-WebSocket-Protocol` header, base64url encoded (no `=`/`/`).
 
 ## Gotchas
