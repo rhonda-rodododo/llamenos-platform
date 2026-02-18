@@ -2,7 +2,13 @@
   <rect width="512" height="512" rx="96" fill="#0d4f4f"/>
   <path d="M256 60L76 140v128c0 130 80 220 180 244 100-24 180-114 180-244V140L256 60z" fill="#1a7a7a"/>
   <path d="M256 82L92 154v118c0 118 73 200 164 222 91-22 164-104 164-222V154L256 82z" fill="#0d4f4f"/>
-  <path d="M176 168c0-13 11-24 24-24h16c13 0 24 11 24 24v56h64c13 0 24 11 24 24v80c0 13-11 24-24 24h-16c-13 0-24-11-24-24v-56h-64c-13 0-24-11-24-24v-80z" fill="#5de0d6"/>
-  <path d="M344 168a80 80 0 0 1 0 80" stroke="#5de0d6" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.7"/>
-  <path d="M376 144a120 120 0 0 1 0 128" stroke="#5de0d6" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.4"/>
+  <!-- Phone handset -->
+  <g transform="translate(208 248) rotate(-40)">
+    <rect x="-44.8" y="-104" width="89.6" height="44.8" rx="20.8" fill="#5de0d6"/>
+    <rect x="-17.6" y="-72" width="35.2" height="144" rx="16" fill="#5de0d6"/>
+    <rect x="-38.4" y="56" width="76.8" height="44.8" rx="20.8" fill="#5de0d6"/>
+  </g>
+  <!-- Signal waves -->
+  <path d="M312 168a64 64 0 0 1 0 80" stroke="#5de0d6" stroke-width="17.6" fill="none" stroke-linecap="round" opacity="0.7"/>
+  <path d="M352 144a104 104 0 0 1 0 120" stroke="#5de0d6" stroke-width="14.4" fill="none" stroke-linecap="round" opacity="0.4"/>
 </svg>
