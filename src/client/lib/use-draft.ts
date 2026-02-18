@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { encryptDraft, decryptDraft, getStoredSession, keyPairFromNsec } from './crypto'
+import { encryptDraft, decryptDraft } from './crypto'
+import * as keyManager from './key-manager'
 
 type FieldValues = Record<string, string | number | boolean>
 
@@ -13,11 +14,6 @@ interface DraftData {
 const STORAGE_PREFIX = 'llamenos-draft:'
 const DEBOUNCE_MS = 500
 
-function getSessionKeyPair() {
-  const nsec = getStoredSession()
-  return nsec ? keyPairFromNsec(nsec) : null
-}
-
 export function useDraft(key: string) {
   const [text, setText] = useState('')
   const [callId, setCallId] = useState('')
@@ -29,12 +25,12 @@ export function useDraft(key: string) {
 
   // Restore on mount
   useEffect(() => {
-    const keyPair = getSessionKeyPair()
-    if (!keyPair) return
+    if (!keyManager.isUnlocked()) return
     try {
       const raw = localStorage.getItem(storageKey)
       if (!raw) return
-      const decrypted = decryptDraft(raw, keyPair.secretKey)
+      const secretKey = keyManager.getSecretKey()
+      const decrypted = decryptDraft(raw, secretKey)
       if (!decrypted) return
       const data: DraftData = JSON.parse(decrypted)
       setText(data.text)
@@ -42,26 +38,30 @@ export function useDraft(key: string) {
       setFields(data.fields || {})
       setSavedAt(data.savedAt)
     } catch {
-      // Corrupted draft — ignore
+      // Corrupted draft or key locked — ignore
     }
   }, [storageKey])
 
   // Persist helper
   const persist = useCallback((t: string, cId: string, f: FieldValues) => {
-    const keyPair = getSessionKeyPair()
-    if (!keyPair) return
+    if (!keyManager.isUnlocked()) return
     const hasFields = Object.keys(f).length > 0
     if (!t && !cId && !hasFields) {
       localStorage.removeItem(storageKey)
       setSavedAt(null)
       return
     }
-    const now = Date.now()
-    const data: DraftData = { text: t, callId: cId, fields: f, savedAt: now }
-    const encrypted = encryptDraft(JSON.stringify(data), keyPair.secretKey)
-    localStorage.setItem(storageKey, encrypted)
-    setSavedAt(now)
-    setIsDirty(false)
+    try {
+      const secretKey = keyManager.getSecretKey()
+      const now = Date.now()
+      const data: DraftData = { text: t, callId: cId, fields: f, savedAt: now }
+      const encrypted = encryptDraft(JSON.stringify(data), secretKey)
+      localStorage.setItem(storageKey, encrypted)
+      setSavedAt(now)
+      setIsDirty(false)
+    } catch {
+      // Key locked during persist — ignore
+    }
   }, [storageKey])
 
   // Debounced save on text/callId/fields change

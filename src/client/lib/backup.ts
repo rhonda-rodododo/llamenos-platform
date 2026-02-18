@@ -65,10 +65,11 @@ export function generateRecoveryKey(): string {
 /**
  * Derive a KEK from a recovery key using PBKDF2.
  */
-async function deriveFromRecoveryKey(recoveryKey: string): Promise<Uint8Array> {
+async function deriveFromRecoveryKey(recoveryKey: string, perBackupSalt?: Uint8Array): Promise<Uint8Array> {
   const normalized = recoveryKey.replace(/-/g, '').toUpperCase()
   const keyBytes = utf8ToBytes(normalized)
-  const salt = utf8ToBytes('llamenos:recovery')
+  // Use per-backup random salt if provided, otherwise fall back to static salt for legacy backups
+  const salt = perBackupSalt ?? utf8ToBytes('llamenos:recovery')
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     keyBytes.buffer as ArrayBuffer,
@@ -160,9 +161,9 @@ export async function createBackup(
   }
 
   if (recoveryKey) {
-    const rKek = await deriveFromRecoveryKey(recoveryKey)
     const rSalt = new Uint8Array(16)
     crypto.getRandomValues(rSalt)
+    const rKek = await deriveFromRecoveryKey(recoveryKey, rSalt)
     const { nonce: rNonce, ciphertext: rCt } = encrypt(nsec, rKek)
     backup.recoveryKey = {
       salt: bytesToHex(rSalt),
@@ -189,7 +190,9 @@ export async function restoreFromBackupWithPin(backup: BackupFile, pin: string):
  */
 export async function restoreFromBackupWithRecoveryKey(backup: BackupFile, recoveryKey: string): Promise<string | null> {
   if (!backup.recoveryKey) return null
-  const rKek = await deriveFromRecoveryKey(recoveryKey)
+  // Use per-backup salt if present (new format), fall back to static salt for legacy backups
+  const perBackupSalt = backup.recoveryKey.salt ? hexToBytes(backup.recoveryKey.salt) : undefined
+  const rKek = await deriveFromRecoveryKey(recoveryKey, perBackupSalt)
   return decrypt(backup.recoveryKey.nonce, backup.recoveryKey.ciphertext, rKek)
 }
 

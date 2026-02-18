@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, uniquePhone, resetTestState, completeProfileSetup } from './helpers'
+import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, uniquePhone, resetTestState, completeProfileSetup, navigateAfterLogin } from './helpers'
 
 test.describe('Ban management', () => {
   test.beforeAll(async ({ request }) => {
@@ -200,8 +200,8 @@ test.describe('Ban management', () => {
     await loginAsVolunteer(page, nsec)
     await completeProfileSetup(page)
 
-    // Navigate directly to bans page
-    await page.goto('/bans')
+    // Navigate directly to bans page (SPA navigate to avoid full reload clearing keyManager)
+    await navigateAfterLogin(page, '/bans')
     await expect(page.getByText(/access denied/i)).toBeVisible({ timeout: 10000 })
   })
 })

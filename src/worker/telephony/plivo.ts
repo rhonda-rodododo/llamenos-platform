@@ -151,11 +151,11 @@ export class PlivoAdapter implements TelephonyAdapter {
       `)
     }
 
-    if (params.voiceCaptchaEnabled) {
-      const digits = String(Math.floor(1000 + Math.random() * 9000))
+    if (params.voiceCaptchaEnabled && params.captchaDigits) {
+      const digits = params.captchaDigits
       const captchaXml = sayOrPlay('captchaPrompt', lang, params.audioUrls)
       return this.plivoXml(`
-        <GetDigits numDigits="4" action="/api/telephony/captcha?expected=${digits}&amp;callSid=${params.callSid}&amp;lang=${lang}" method="POST" timeout="10" redirect="true">
+        <GetDigits numDigits="4" action="/api/telephony/captcha?callSid=${params.callSid}&amp;lang=${lang}" method="POST" timeout="10" redirect="true">
           ${greetingXml}
           ${captchaXml}
           ${speak(digits.split('').join(', ') + '.', lang)}

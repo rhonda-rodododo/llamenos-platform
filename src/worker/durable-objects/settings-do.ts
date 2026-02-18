@@ -77,6 +77,10 @@ export class SettingsDO extends DurableObject<Env> {
     // --- Rate Limiting ---
     this.router.post('/rate-limit/check', async (req) => this.checkRateLimit(await req.json()))
 
+    // --- CAPTCHA state (server-side storage of expected digits) ---
+    this.router.post('/captcha/store', async (req) => this.storeCaptcha(await req.json()))
+    this.router.post('/captcha/verify', async (req) => this.verifyCaptcha(await req.json()))
+
     // --- Test Reset ---
     this.router.post('/reset', async () => {
       await this.ctx.storage.deleteAll()
@@ -469,5 +473,41 @@ export class SettingsDO extends DurableObject<Env> {
     const meta = await this.ctx.storage.get<Array<{ promptType: string; language: string; size: number; uploadedAt: string }>>('ivrAudioMeta') || []
     await this.ctx.storage.put('ivrAudioMeta', meta.filter(m => !(m.promptType === promptType && m.language === language)))
     return Response.json({ ok: true })
+  }
+
+  // --- CAPTCHA Server-Side State ---
+
+  private async storeCaptcha(data: { callSid: string; expected: string }): Promise<Response> {
+    const key = `captcha:${data.callSid}`
+    // Store with creation time for expiry
+    await this.ctx.storage.put(key, { expected: data.expected, createdAt: Date.now() })
+    // Schedule cleanup alarm
+    try { await this.ctx.storage.setAlarm(Date.now() + 5 * 60 * 1000) } catch { /* alarm already set */ }
+    return Response.json({ ok: true })
+  }
+
+  private async verifyCaptcha(data: { callSid: string; digits: string }): Promise<Response> {
+    const key = `captcha:${data.callSid}`
+    const stored = await this.ctx.storage.get<{ expected: string; createdAt: number }>(key)
+    // Always delete after first verification attempt (one-time use)
+    await this.ctx.storage.delete(key)
+
+    if (!stored) {
+      return Response.json({ match: false, expected: '' })
+    }
+
+    // Expire after 5 minutes
+    if (Date.now() - stored.createdAt > 5 * 60 * 1000) {
+      return Response.json({ match: false, expected: stored.expected })
+    }
+
+    // Constant-time comparison
+    const expected = stored.expected
+    const digits = data.digits
+    let match = expected.length === digits.length ? 1 : 0
+    for (let i = 0; i < expected.length; i++) {
+      match &= expected.charCodeAt(i) === digits.charCodeAt(i) ? 1 : 0
+    }
+    return Response.json({ match: match === 1, expected })
   }
 }

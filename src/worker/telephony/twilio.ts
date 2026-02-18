@@ -50,15 +50,20 @@ function getTwilioVoice(lang: string): string {
 }
 
 
+/** Escape XML special characters for safe TwiML embedding */
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+}
+
 /** Generate TwiML: <Play> if custom audio exists, <Say> fallback */
 function sayOrPlay(promptKey: string, lang: string, audioUrls?: AudioUrlMap, text?: string): string {
   const audioUrl = audioUrls?.[`${promptKey}:${lang}`]
   if (audioUrl) {
-    return `<Play>${audioUrl}</Play>`
+    return `<Play>${escapeXml(audioUrl)}</Play>`
   }
   const voice = getTwilioVoice(lang)
   const content = text ?? getPrompt(promptKey, lang)
-  return `<Say language="${voice}">${content}</Say>`
+  return `<Say language="${voice}">${escapeXml(content)}</Say>`
 }
 
 /**
@@ -126,17 +131,17 @@ export class TwilioAdapter implements TelephonyAdapter {
       `)
     }
 
-    if (params.voiceCaptchaEnabled) {
-      const digits = String(Math.floor(1000 + Math.random() * 9000))
+    if (params.voiceCaptchaEnabled && params.captchaDigits) {
+      const digits = params.captchaDigits
       const captchaTwiml = sayOrPlay('captchaPrompt', lang, params.audioUrls)
       return this.twiml(`
         <Response>
-          <Gather numDigits="4" action="/api/telephony/captcha?expected=${digits}&amp;callSid=${params.callSid}&amp;lang=${lang}" method="POST" timeout="10">
+          <Gather numDigits="4" action="/api/telephony/captcha?callSid=${params.callSid}&amp;lang=${lang}" method="POST" timeout="10">
             ${greetingTwiml}
             ${captchaTwiml}
-            <Say language="${tLang}">${digits.split('').join(', ')}.</Say>
+            <Say language="${tLang}">${escapeXml(digits.split('').join(', '))}.</Say>
           </Gather>
-          <Say language="${tLang}">${getPrompt('captchaTimeout', lang)}</Say>
+          <Say language="${tLang}">${escapeXml(getPrompt('captchaTimeout', lang))}</Say>
           <Hangup/>
         </Response>
       `)

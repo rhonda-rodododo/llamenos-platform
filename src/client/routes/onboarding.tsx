@@ -5,7 +5,9 @@ import { useAuth } from '@/lib/auth'
 import { useConfig } from '@/lib/config'
 import { validateInvite, redeemInvite } from '@/lib/api'
 import { generateKeyPair } from '@/lib/crypto'
-import { isValidPin, storeEncryptedKey } from '@/lib/key-store'
+import { isValidPin } from '@/lib/key-store'
+import * as keyManager from '@/lib/key-manager'
+import { createBackup, generateRecoveryKey, downloadBackupFile } from '@/lib/backup'
 import { useToast } from '@/lib/toast'
 import { setLanguage } from '@/lib/i18n'
 import { LANGUAGES } from '@shared/languages'
@@ -116,8 +118,8 @@ function OnboardingPage() {
       setPubkey(kp.publicKey)
       setConfirmedPin(pin)
 
-      // Redeem invite on server
-      await redeemInvite(inviteCode, kp.publicKey)
+      // Redeem invite on server (with Schnorr signature proving key ownership)
+      await redeemInvite(inviteCode, kp.publicKey, kp.secretKey)
 
       // Set up backup verification (4 random chars from nsec)
       const nsecStr = kp.nsec
@@ -145,27 +147,24 @@ function OnboardingPage() {
     }
   }
 
-  function downloadBackup() {
-    const backup = JSON.stringify({
-      version: 1,
-      format: 'llamenos-key-backup',
-      pubkey,
-      nsec,
-      createdAt: new Date().toISOString(),
-    }, null, 2)
-    const blob = new Blob([backup], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `llamenos-backup-${pubkey.slice(0, 8)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+  // Recovery key — generated once per onboarding
+  const [recoveryKeyStr, setRecoveryKeyStr] = useState('')
+
+  async function downloadBackup() {
+    // Generate recovery key if not yet created
+    let rk = recoveryKeyStr
+    if (!rk) {
+      rk = generateRecoveryKey()
+      setRecoveryKeyStr(rk)
+    }
+    const backup = await createBackup(nsec, confirmedPin, pubkey, rk)
+    downloadBackupFile(backup)
   }
 
   async function handleComplete() {
     try {
-      // Store encrypted key with PIN and sign in
-      await storeEncryptedKey(nsec, confirmedPin, pubkey)
+      // Import key via key manager (encrypts with PIN and loads into memory)
+      await keyManager.importKey(nsec, confirmedPin)
       await signIn(nsec)
       navigate({ to: '/profile-setup' })
     } catch {

@@ -22,7 +22,7 @@ export async function generateRegOptions(
     attestationType: 'none',
     authenticatorSelection: {
       residentKey: 'preferred',
-      userVerification: 'preferred',
+      userVerification: 'required',
     },
     excludeCredentials: existingCreds.map(c => ({
       id: c.id,
@@ -51,7 +51,7 @@ export async function generateAuthOptions(
 ) {
   return generateAuthenticationOptions({
     rpID,
-    userVerification: 'preferred',
+    userVerification: 'required',
     allowCredentials: credentials.length > 0 ? credentials.map(c => ({
       id: c.id,
       transports: c.transports as AuthenticatorTransport[],

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN_NSEC, loginAsAdmin } from './helpers'
+import { TEST_PIN, enterPin, loginAsAdmin } from './helpers'
 
 test.describe('Auth guards', () => {
   test('unauthenticated user is redirected to login from /', async ({ page }) => {
@@ -22,13 +22,21 @@ test.describe('Auth guards', () => {
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test('session persists across page reload', async ({ page }) => {
+  test('session requires PIN re-entry after reload', async ({ page }) => {
     await loginAsAdmin(page)
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 
-    // Reload and check session persists
+    // Reload clears in-memory keyManager; encrypted key persists in localStorage
     await page.reload()
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+
+    // Should be redirected to login since keyManager is no longer unlocked
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
+
+    // Re-enter PIN to unlock the stored encrypted key
+    await enterPin(page, TEST_PIN)
+
+    // Should be back on the Dashboard
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 })
   })
 
   test('logout clears session', async ({ page }) => {
@@ -39,7 +47,7 @@ test.describe('Auth guards', () => {
     await page.getByRole('button', { name: /log out/i }).click()
     await expect(page).toHaveURL(/\/login/)
 
-    // Should not be able to access dashboard
+    // Should not be able to access dashboard without re-authenticating
     await page.goto('/')
     await expect(page).toHaveURL(/\/login/)
   })

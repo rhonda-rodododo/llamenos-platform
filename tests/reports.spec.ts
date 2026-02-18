@@ -2,6 +2,15 @@ import { test, expect, type Page } from '@playwright/test'
 import { loginAsAdmin, loginAsVolunteer, uniquePhone, resetTestState, logout } from './helpers'
 
 /**
+ * Navigate to the Reports page via sidebar link (SPA navigation).
+ * Avoids page.goto() which causes a full reload and clears the in-memory key manager.
+ */
+async function navigateToReports(page: Page): Promise<void> {
+  await page.getByRole('link', { name: 'Reports' }).click()
+  await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible({ timeout: 10000 })
+}
+
+/**
  * Helper: Complete the onboarding flow for an invited user.
  * Assumes the page is at /onboarding?code=... and the welcome screen is visible.
  * Returns the nsec from the backup step.
@@ -99,20 +108,19 @@ test.describe('Reports feature', () => {
   test.describe('Admin reports management', () => {
     test('reports page loads for admin', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
-      await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible({ timeout: 10000 })
+      await navigateToReports(page)
       await expect(page.getByRole('button', { name: /new/i })).toBeVisible()
     })
 
     test('empty reports list shows no reports message', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
       await expect(page.getByText('No reports')).toBeVisible({ timeout: 10000 })
     })
 
     test('admin can create a report', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
       await expect(page.getByRole('button', { name: /new/i })).toBeVisible({ timeout: 10000 })
 
       // Click "New" button to open the report form sheet
@@ -132,7 +140,7 @@ test.describe('Reports feature', () => {
 
     test('report shows in list with correct status', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Wait for reports to load
       await expect(page.getByText('Test Report').first()).toBeVisible({ timeout: 15000 })
@@ -148,7 +156,7 @@ test.describe('Reports feature', () => {
 
     test('selecting a report shows detail view', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Wait for report list to load
       await expect(page.getByText('Test Report').first()).toBeVisible({ timeout: 15000 })
@@ -165,7 +173,7 @@ test.describe('Reports feature', () => {
 
     test('admin can claim a report', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Wait and select the report
       await expect(page.getByText('Test Report').first()).toBeVisible({ timeout: 15000 })
@@ -187,7 +195,7 @@ test.describe('Reports feature', () => {
 
     test('admin can close a report', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Wait and select the report (should now be Active from previous test)
       await expect(page.getByText('Test Report').first()).toBeVisible({ timeout: 15000 })
@@ -207,7 +215,7 @@ test.describe('Reports feature', () => {
 
     test('status filter works', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Create two reports so we have something to filter
       for (const title of ['Filter Report A', 'Filter Report B']) {
@@ -262,7 +270,7 @@ test.describe('Reports feature', () => {
 
     test('report detail shows no messages for new report initially', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // The reports from the previous test should be present; create a fresh one
       await page.getByRole('button', { name: /new/i }).click()
@@ -287,7 +295,7 @@ test.describe('Reports feature', () => {
 
     test('admin can reply to a claimed report', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Create a fresh report to reply to
       await page.getByRole('button', { name: /new/i }).click()
@@ -323,8 +331,7 @@ test.describe('Reports feature', () => {
 
     test('new report form has encryption note', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
-      await expect(page.getByRole('button', { name: /new/i })).toBeVisible({ timeout: 10000 })
+      await navigateToReports(page)
 
       // Open the form
       await page.getByRole('button', { name: /new/i }).click()
@@ -340,8 +347,7 @@ test.describe('Reports feature', () => {
 
     test('report form validation prevents empty submission', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
-      await expect(page.getByRole('button', { name: /new/i })).toBeVisible({ timeout: 10000 })
+      await navigateToReports(page)
 
       // Open the form
       await page.getByRole('button', { name: /new/i }).click()
@@ -362,7 +368,7 @@ test.describe('Reports feature', () => {
 
     test('unselected state shows placeholder text', async ({ page }) => {
       await loginAsAdmin(page)
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Without selecting any report, the right panel should show placeholder
       await expect(page.getByText('Select a report to view details')).toBeVisible({ timeout: 10000 })
@@ -446,8 +452,7 @@ test.describe('Reports feature', () => {
         await page.waitForURL(u => !u.toString().includes('profile-setup'), { timeout: 15000 })
       }
 
-      await page.goto('/reports')
-      await expect(page.getByRole('button', { name: /new/i })).toBeVisible({ timeout: 10000 })
+      await navigateToReports(page)
 
       // Click "New" to open the report form
       await page.getByRole('button', { name: /new/i }).click()
@@ -475,7 +480,7 @@ test.describe('Reports feature', () => {
         await page.waitForURL(u => !u.toString().includes('profile-setup'), { timeout: 15000 })
       }
 
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Wait for the reporter's report to appear
       await expect(page.getByText('Reporter Test Report').first()).toBeVisible({ timeout: 15000 })
@@ -520,7 +525,7 @@ test.describe('Reports feature', () => {
         await page.waitForURL(u => !u.toString().includes('profile-setup'), { timeout: 15000 })
       }
 
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Select the report
       await expect(page.getByText('Reporter Test Report').first()).toBeVisible({ timeout: 15000 })
@@ -541,7 +546,7 @@ test.describe('Reports feature', () => {
         await page.waitForURL(u => !u.toString().includes('profile-setup'), { timeout: 15000 })
       }
 
-      await page.goto('/reports')
+      await navigateToReports(page)
 
       // Select the report
       await expect(page.getByText('Reporter Test Report').first()).toBeVisible({ timeout: 15000 })
@@ -566,8 +571,7 @@ test.describe('Reports feature', () => {
         await page.waitForURL(u => !u.toString().includes('profile-setup'), { timeout: 15000 })
       }
 
-      await page.goto('/reports')
-      await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible({ timeout: 10000 })
+      await navigateToReports(page)
 
       // The status and category filter dropdowns are admin-only
       // Reporter should not see "All statuses" select

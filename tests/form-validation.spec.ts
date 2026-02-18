@@ -73,14 +73,18 @@ test.describe('Form validation', () => {
 
   test('login rejects nsec without nsec prefix', async ({ page }) => {
     await page.getByRole('button', { name: /log out/i }).click()
-    await page.getByRole('textbox', { name: /secret key/i }).fill('npub1abc123')
+    // After logout, encrypted key is still in localStorage so PIN view shows.
+    // Click "Recovery options" to access the nsec input.
+    await page.getByRole('button', { name: /recovery options/i }).click()
+    await page.locator('#nsec').fill('npub1abc123')
     await page.getByRole('button', { name: /log in/i }).click()
     await expect(page.getByText(/invalid/i)).toBeVisible()
   })
 
   test('login rejects very short nsec', async ({ page }) => {
     await page.getByRole('button', { name: /log out/i }).click()
-    await page.getByRole('textbox', { name: /secret key/i }).fill('nsec1short')
+    await page.getByRole('button', { name: /recovery options/i }).click()
+    await page.locator('#nsec').fill('nsec1short')
     await page.getByRole('button', { name: /log in/i }).click()
     await expect(page.getByText(/invalid/i)).toBeVisible()
   })

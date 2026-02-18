@@ -56,6 +56,7 @@ async function main(): Promise<void> {
   // Start HTTP server for Worker commands
   const server = Bun.serve({
     port: config.bridgePort,
+    hostname: '127.0.0.1', // Bind to localhost only — must not be internet-facing
     async fetch(request: Request): Promise<Response> {
       const url = new URL(request.url)
       const path = url.pathname

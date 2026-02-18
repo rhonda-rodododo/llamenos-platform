@@ -1,4 +1,4 @@
-import { createAuthToken, keyPairFromNsec, getStoredSession, clearSession } from './crypto'
+import * as keyManager from './key-manager'
 
 const API_BASE = '/api'
 
@@ -12,12 +12,16 @@ function getAuthHeaders(): Record<string, string> {
   if (sessionToken) {
     return { 'Authorization': `Session ${sessionToken}` }
   }
-  const nsec = getStoredSession()
-  if (!nsec) return {}
-  const keyPair = keyPairFromNsec(nsec)
-  if (!keyPair) return {}
-  const token = createAuthToken(keyPair.secretKey, Date.now())
-  return { 'Authorization': `Bearer ${token}` }
+  // Use key manager for Schnorr auth if unlocked
+  if (keyManager.isUnlocked()) {
+    try {
+      const token = keyManager.createAuthToken(Date.now())
+      return { 'Authorization': `Bearer ${token}` }
+    } catch {
+      return {}
+    }
+  }
+  return {}
 }
 
 // Activity tracking callback — set by AuthProvider
@@ -66,10 +70,10 @@ export async function getConfig() {
 
 // --- Auth ---
 
-export async function login(pubkey: string, token: string) {
+export async function login(pubkey: string, timestamp: number, token: string) {
   return request<{ ok: true; role: UserRole }>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ pubkey, token }),
+    body: JSON.stringify({ pubkey, timestamp, token }),
   })
 }
 
@@ -338,11 +342,20 @@ export async function validateInvite(code: string) {
   return res.json() as Promise<{ valid: boolean; name?: string; role?: string; error?: string }>
 }
 
-export async function redeemInvite(code: string, pubkey: string) {
+export async function redeemInvite(code: string, pubkey: string, secretKey?: Uint8Array) {
+  // Include Schnorr signature to prove key possession
+  let authFields = {}
+  if (secretKey) {
+    const { createAuthToken } = await import('./crypto')
+    const timestamp = Date.now()
+    const tokenJson = createAuthToken(secretKey, timestamp)
+    const parsed = JSON.parse(tokenJson)
+    authFields = { timestamp: parsed.timestamp, token: parsed.token }
+  }
   const res = await fetch(`${API_BASE}/invites/redeem`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, pubkey }),
+    body: JSON.stringify({ code, pubkey, ...authFields }),
   })
   if (!res.ok) {
     const body = await res.text()
@@ -375,7 +388,6 @@ export async function uploadIvrAudio(promptType: string, language: string, audio
   })
   if (!res.ok) {
     if (res.status === 401) {
-      clearSession()
       onAuthExpired?.()
     }
     const body = await res.text()

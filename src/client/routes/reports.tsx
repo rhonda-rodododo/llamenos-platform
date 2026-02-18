@@ -12,7 +12,8 @@ import {
   type Report,
   type ConversationMessage,
 } from '@/lib/api'
-import { encryptForPublicKey, decryptTranscription, getStoredSession, keyPairFromNsec } from '@/lib/crypto'
+import { encryptForPublicKey, decryptTranscription } from '@/lib/crypto'
+import * as keyManager from '@/lib/key-manager'
 import { ReportForm } from '@/components/ReportForm'
 import { FilePreview } from '@/components/FilePreview'
 import { FileUpload } from '@/components/FileUpload'
@@ -548,10 +549,10 @@ function ReportStatusBadge({ status }: { status: string }) {
 
 function resolveSecretKey(keyPair: { secretKey: Uint8Array } | null): Uint8Array | null {
   if (keyPair) return keyPair.secretKey
-  const nsec = getStoredSession()
-  if (!nsec) return null
-  const kp = keyPairFromNsec(nsec)
-  return kp?.secretKey ?? null
+  if (keyManager.isUnlocked()) {
+    try { return keyManager.getSecretKey() } catch { return null }
+  }
+  return null
 }
 
 function formatTimestamp(iso: string): string {

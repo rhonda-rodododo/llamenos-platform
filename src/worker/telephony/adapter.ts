@@ -149,6 +149,8 @@ export interface IncomingCallParams {
   callerLanguage: string
   hotlineName: string
   audioUrls?: AudioUrlMap
+  /** Pre-generated CAPTCHA digits (generated server-side with CSPRNG) */
+  captchaDigits?: string
 }
 
 export interface CaptchaResponseParams {

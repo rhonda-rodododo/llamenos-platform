@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, resetTestState, uniquePhone } from './helpers'
+import { loginAsAdmin, resetTestState, uniquePhone, navigateAfterLogin } from './helpers'
 
 test.describe('Setup Wizard', () => {
   test.beforeAll(async ({ request }) => {
@@ -12,7 +12,7 @@ test.describe('Setup Wizard', () => {
 
   // --- Helper: navigate to /setup and wait for the wizard to render ---
   async function goToSetup(page: import('@playwright/test').Page) {
-    await page.goto('/setup')
+    await navigateAfterLogin(page, '/setup')
     await expect(page.getByText('Setup Wizard')).toBeVisible({ timeout: 10000 })
   }
 

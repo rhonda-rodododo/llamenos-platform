@@ -1,4 +1,4 @@
-import { getStoredSession, keyPairFromNsec, createAuthToken } from './crypto'
+import * as keyManager from './key-manager'
 
 type MessageHandler = (data: unknown) => void
 
@@ -28,15 +28,17 @@ export function connectWebSocket() {
   if (sessionToken) {
     // Use session token auth (prefixed for server to distinguish)
     authProtocol = `session-${sessionToken}`
+  } else if (keyManager.isUnlocked()) {
+    // Use Schnorr signature auth from key manager
+    try {
+      const token = keyManager.createAuthToken(Date.now())
+      // Use base64url encoding (no padding, URL-safe chars) — valid as HTTP token / subprotocol
+      authProtocol = btoa(token).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    } catch {
+      return
+    }
   } else {
-    // Fall back to Schnorr signature auth
-    const nsec = getStoredSession()
-    if (!nsec) return
-    const keyPair = keyPairFromNsec(nsec)
-    if (!keyPair) return
-    const token = createAuthToken(keyPair.secretKey, Date.now())
-    // Use base64url encoding (no padding, URL-safe chars) — valid as HTTP token / subprotocol
-    authProtocol = btoa(token).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    return
   }
 
   socket = new WebSocket(url, ['llamenos-auth', authProtocol])

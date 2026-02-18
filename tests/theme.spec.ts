@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin } from './helpers'
+import { loginAsAdmin, enterPin, TEST_PIN } from './helpers'
 
 test.describe('Theme', () => {
   test.beforeEach(async ({ page }) => {
@@ -27,6 +27,7 @@ test.describe('Theme', () => {
     await expect(page.locator('html')).toHaveClass(/dark/)
 
     await page.reload()
+    await enterPin(page, TEST_PIN)
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
     await expect(page.locator('html')).toHaveClass(/dark/)
   })

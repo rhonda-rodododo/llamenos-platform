@@ -12,6 +12,11 @@ import '@/app.css'
 
 const router = createRouter({ routeTree })
 
+// Expose router for E2E test navigation (avoids full page reloads)
+if (typeof window !== 'undefined') {
+  ;(window as any).__TEST_ROUTER = router
+}
+
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router

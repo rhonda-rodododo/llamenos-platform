@@ -1,5 +1,46 @@
 # Completed Backlog
 
+## 2026-02-17: Epic 53 — Deep Security Audit & Hardening (Round 5)
+
+### Critical Fixes
+- [x] Login endpoint now verifies Schnorr signature before returning user info (was unauthenticated role enumeration)
+- [x] CAPTCHA digits generated server-side with CSPRNG, stored in SettingsDO with one-time-use verification
+- [x] Removed `Math.random()` from all CAPTCHA paths — replaced with `crypto.getRandomValues()`
+
+### High Fixes
+- [x] Invite redemption requires Schnorr signature proof of private key ownership + rate limiting
+- [x] Upload chunk/status endpoints verify `uploadedBy === pubkey` ownership
+- [x] Sessions revoked (`revokeAllSessions`) on volunteer deactivation/deletion
+- [x] Onboarding backup encrypted with PBKDF2 + XChaCha20-Poly1305 (was plaintext nsec JSON)
+- [x] HKDF salt added: `llamenos:hkdf-salt:v1` for note encryption key derivation
+- [x] Recovery key PBKDF2 uses per-backup random salt (was static `'llamenos:recovery'`)
+- [x] TwiML XML injection prevented — `escapeXml()` for all `<Say>`/`<Play>` content
+
+### Medium Fixes
+- [x] WebAuthn login rate limited (10/min per IP) on options + verify
+- [x] CORS `Vary: Origin` header added to prevent cache poisoning
+- [x] Notes endpoints guarded with `volunteerOrAdminGuard` (reporters blocked)
+- [x] WebAuthn `userVerification` changed from `'preferred'` to `'required'`
+- [x] IP hash increased from 64-bit to 96-bit truncation
+- [x] Asterisk webhook: constant-time HMAC comparison + 5-minute timestamp replay protection
+- [x] Asterisk bridge bound to localhost only
+
+### Architecture Notes (documented, not fixed)
+- Schnorr token 5-min replay window — mitigated by HTTPS; full nonce system deferred
+- nsec in sessionStorage — mitigated by CSP; WebAuthn recommended as primary auth
+- Ban list bypassable via caller-ID spoofing — PSTN limitation
+- WebSocket rate limit resets on DO hibernation — acceptable for current usage
+
+### Files Changed (21 files)
+- `src/worker/routes/auth.ts`, `telephony.ts`, `invites.ts`, `uploads.ts`, `volunteers.ts`, `notes.ts`, `webauthn.ts`
+- `src/worker/lib/crypto.ts`, `webauthn.ts`
+- `src/worker/middleware/cors.ts`
+- `src/worker/durable-objects/settings-do.ts`, `identity-do.ts`
+- `src/worker/telephony/adapter.ts`, `twilio.ts`, `vonage.ts`, `plivo.ts`, `asterisk.ts`
+- `src/client/lib/crypto.ts`, `backup.ts`, `api.ts`
+- `src/client/routes/onboarding.tsx`
+- `asterisk-bridge/src/index.ts`
+
 ## 2026-02-17: Epics 42–47 — Multi-Channel Messaging, Reporter Role & In-App Guidance
 
 ### Epic 42: Messaging Architecture Foundation

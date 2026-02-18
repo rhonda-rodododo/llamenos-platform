@@ -67,6 +67,7 @@ export class IdentityDO extends DurableObject<Env> {
       if (!pubkey) return new Response('Missing pubkey', { status: 400 })
       return this.revokeAllSessions(pubkey)
     })
+    this.router.delete('/sessions/revoke-all/:pubkey', (_req, { pubkey }) => this.revokeAllSessions(pubkey))
 
     // --- Test Reset ---
     this.router.post('/reset', async () => {

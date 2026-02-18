@@ -67,5 +67,5 @@ export function hashPhone(phone: string): string {
  */
 export function hashIP(ip: string): string {
   const input = utf8ToBytes(`llamenos:ip:${ip}`)
-  return bytesToHex(sha256(input)).slice(0, 16) // Truncate to 16 hex chars (64-bit)
+  return bytesToHex(sha256(input)).slice(0, 24) // Truncate to 24 hex chars (96-bit) for collision resistance
 }

@@ -4,7 +4,7 @@
  */
 
 import { startRegistration, startAuthentication, type PublicKeyCredentialCreationOptionsJSON, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser'
-import { getStoredSession, keyPairFromNsec, createAuthToken } from './crypto'
+import * as keyManager from './key-manager'
 
 const API_BASE = '/api'
 
@@ -14,12 +14,16 @@ function getAuthHeaders(): Record<string, string> {
   if (sessionToken) {
     return { 'Authorization': `Session ${sessionToken}` }
   }
-  const nsec = getStoredSession()
-  if (!nsec) return {}
-  const keyPair = keyPairFromNsec(nsec)
-  if (!keyPair) return {}
-  const token = createAuthToken(keyPair.secretKey, Date.now())
-  return { 'Authorization': `Bearer ${token}` }
+  // Use key manager for Schnorr auth if unlocked
+  if (keyManager.isUnlocked()) {
+    try {
+      const token = keyManager.createAuthToken(Date.now())
+      return { 'Authorization': `Bearer ${token}` }
+    } catch {
+      return {}
+    }
+  }
+  return {}
 }
 
 /**

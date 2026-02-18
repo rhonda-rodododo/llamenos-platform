@@ -158,8 +158,8 @@ export class VonageAdapter implements TelephonyAdapter {
       return this.ncco([greetingAction, rateLimitAction])
     }
 
-    if (params.voiceCaptchaEnabled) {
-      const digits = String(Math.floor(1000 + Math.random() * 9000))
+    if (params.voiceCaptchaEnabled && params.captchaDigits) {
+      const digits = params.captchaDigits
       const captchaAction = sayOrStream('captchaPrompt', lang, params.audioUrls, undefined, true)
       const digitsTalk = talk(digits.split('').join(', ') + '.', lang, true)
 
@@ -171,7 +171,7 @@ export class VonageAdapter implements TelephonyAdapter {
           action: 'input',
           type: ['dtmf'],
           dtmf: { maxDigits: 4, timeOut: 10 },
-          eventUrl: [`/api/telephony/captcha?expected=${digits}&callSid=${params.callSid}&lang=${lang}`],
+          eventUrl: [`/api/telephony/captcha?callSid=${params.callSid}&lang=${lang}`],
           eventMethod: 'POST',
         },
       ])

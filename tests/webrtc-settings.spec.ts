@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, resetTestState } from './helpers'
+import { loginAsAdmin, resetTestState, enterPin, TEST_PIN, navigateAfterLogin } from './helpers'
 
 test.describe('WebRTC & Call Preference Settings', () => {
   test.beforeAll(async ({ request }) => {
@@ -47,7 +47,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('deep link to call-preference section auto-expands it', async ({ page }) => {
-    await page.goto('/settings?section=call-preference')
+    await navigateAfterLogin(page, '/settings?section=call-preference')
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // The section should be expanded — we should see the preference options
@@ -152,8 +152,11 @@ test.describe('WebRTC & Call Preference Settings', () => {
     await page.getByRole('button', { name: /save provider/i }).click()
     await expect(page.getByText(/telephony provider saved/i)).toBeVisible({ timeout: 5000 })
 
-    // Reload the page
+    // Reload the page — clears keyManager, PIN re-entry needed
     await page.reload()
+    await enterPin(page, TEST_PIN)
+    // PIN unlock redirects to dashboard — navigate back to Admin Settings
+    await page.getByRole('link', { name: 'Admin Settings' }).click()
     await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
 
     // Expand the section

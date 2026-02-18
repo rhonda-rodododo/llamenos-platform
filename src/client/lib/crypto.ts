@@ -65,8 +65,10 @@ export function isValidNsec(nsec: string): boolean {
 // Admin can also decrypt because they generated and stored the private key.
 
 function deriveEncryptionKey(secretKey: Uint8Array, context: string): Uint8Array {
-  // Derive a domain-separated key using HKDF-SHA256
-  return hkdf(sha256, secretKey, undefined, utf8ToBytes(`llamenos:${context}`), 32)
+  // Derive a domain-separated key using HKDF-SHA256 with a fixed application salt
+  // The salt provides independence between the IKM and the pseudorandom key per RFC 5869
+  const salt = utf8ToBytes('llamenos:hkdf-salt:v1')
+  return hkdf(sha256, secretKey, salt, utf8ToBytes(`llamenos:${context}`), 32)
 }
 
 export function encryptNote(payload: NotePayload, secretKey: Uint8Array): string {
@@ -246,21 +248,4 @@ export function createAuthToken(secretKey: Uint8Array, timestamp: number): strin
   const signature = schnorr.sign(messageHash, secretKey)
   const token = bytesToHex(signature)
   return JSON.stringify({ pubkey: publicKey, timestamp, token })
-}
-
-// --- Key Storage ---
-// Store encrypted in sessionStorage only (not localStorage for security)
-
-const STORAGE_KEY = 'llamenos-session'
-
-export function storeSession(nsec: string): void {
-  sessionStorage.setItem(STORAGE_KEY, nsec)
-}
-
-export function getStoredSession(): string | null {
-  return sessionStorage.getItem(STORAGE_KEY)
-}
-
-export function clearSession(): void {
-  sessionStorage.removeItem(STORAGE_KEY)
 }

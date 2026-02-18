@@ -1,10 +1,13 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
-import { type KeyPair, keyPairFromNsec, getStoredSession, storeSession, clearSession, createAuthToken } from './crypto'
+import { type KeyPair, keyPairFromNsec, createAuthToken } from './crypto'
+import * as keyManager from './key-manager'
+import { hasStoredKey } from './key-store'
 import { getMe, login, logout as apiLogout, updateMyAvailability, setOnAuthExpired, setOnApiActivity } from './api'
 import { loginWithPasskey as webauthnLogin } from './webauthn'
 
 interface AuthState {
-  keyPair: KeyPair | null
+  isKeyUnlocked: boolean
+  publicKey: string | null
   role: 'volunteer' | 'admin' | 'reporter' | null
   name: string | null
   isLoading: boolean
@@ -26,16 +29,21 @@ interface AuthContextValue extends AuthState {
   refreshProfile: () => Promise<void>
   toggleBreak: () => Promise<void>
   renewSession: () => Promise<void>
+  unlockWithPin: (pin: string) => Promise<boolean>
+  lockKey: () => void
   isAdmin: boolean
   isAuthenticated: boolean
   hasNsec: boolean
+  /** @deprecated Use keyManager.getSecretKey() directly instead */
+  keyPair: KeyPair | null
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
-    keyPair: null,
+    isKeyUnlocked: false,
+    publicKey: null,
     role: null,
     name: null,
     isLoading: true,
@@ -58,17 +66,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(s => s.sessionExpiring ? { ...s, sessionExpiring: false } : s)
   }, [])
 
+  // Listen for key manager lock/unlock events
+  useEffect(() => {
+    const unsubLock = keyManager.onLock(() => {
+      setState(s => ({ ...s, isKeyUnlocked: false }))
+    })
+    const unsubUnlock = keyManager.onUnlock(() => {
+      setState(s => ({
+        ...s,
+        isKeyUnlocked: true,
+        publicKey: keyManager.getPublicKeyHex(),
+      }))
+    })
+    return () => { unsubLock(); unsubUnlock() }
+  }, [])
+
   // Register auth expiry callback — called by api.ts when a 401 is received
   useEffect(() => {
     setOnAuthExpired(() => {
-      // Don't clear nsec from sessionStorage — allow reconnect
-      const hasNsec = !!getStoredSession()
       setState(s => ({
         ...s,
         sessionExpired: true,
         sessionExpiring: false,
-        // Keep keyPair if nsec is available for reconnect
-        ...(hasNsec ? {} : { keyPair: null, role: null, name: null }),
+        ...(s.isKeyUnlocked ? {} : { role: null, name: null }),
       }))
     })
     return () => setOnAuthExpired(null)
@@ -82,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Session expiry warning — check every 30s if idle > 4 min
   useEffect(() => {
-    if (!state.keyPair && !sessionStorage.getItem('llamenos-session-token')) return
+    if (!state.isKeyUnlocked && !sessionStorage.getItem('llamenos-session-token')) return
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastApiActivity.current
       const WARN_THRESHOLD = 4 * 60 * 1000 // 4 minutes
@@ -91,49 +111,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }, 30_000)
     return () => clearInterval(interval)
-  }, [state.keyPair, state.sessionExpired])
+  }, [state.isKeyUnlocked, state.sessionExpired])
 
   // Restore session on mount
   useEffect(() => {
-    // Try nsec first
-    const nsec = getStoredSession()
-    if (nsec) {
-      const keyPair = keyPairFromNsec(nsec)
-      if (keyPair) {
-        getMe()
-          .then((me) => {
-            lastApiActivity.current = Date.now()
-            setState({
-              keyPair,
-              role: me.role,
-              name: me.name,
-              isLoading: false,
-              error: null,
-              transcriptionEnabled: me.transcriptionEnabled,
-              spokenLanguages: me.spokenLanguages || ['en'],
-              uiLanguage: me.uiLanguage || 'en',
-              profileCompleted: me.profileCompleted ?? true,
-              onBreak: me.onBreak ?? false,
-              callPreference: me.callPreference ?? 'phone',
-              sessionExpiring: false,
-              sessionExpired: false,
-            })
-          })
-          .catch(() => {
-            clearSession()
-            setState(s => ({ ...s, keyPair: null, isLoading: false }))
-          })
-        return
-      }
-    }
-    // Try session token (WebAuthn session)
+    // Try session token (WebAuthn session) — always try this first
     const sessionToken = sessionStorage.getItem('llamenos-session-token')
     if (sessionToken) {
       getMe()
         .then((me) => {
           lastApiActivity.current = Date.now()
           setState({
-            keyPair: null,
+            isKeyUnlocked: keyManager.isUnlocked(),
+            publicKey: me.pubkey,
             role: me.role,
             name: me.name,
             isLoading: false,
@@ -143,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             uiLanguage: me.uiLanguage || 'en',
             profileCompleted: me.profileCompleted ?? true,
             onBreak: me.onBreak ?? false,
-              callPreference: me.callPreference ?? 'phone',
+            callPreference: me.callPreference ?? 'phone',
             sessionExpiring: false,
             sessionExpired: false,
           })
@@ -154,9 +144,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       return
     }
+    // If key manager is already unlocked (e.g., still in memory from tab switch),
+    // try to authenticate with Schnorr token
+    if (keyManager.isUnlocked()) {
+      getMe()
+        .then((me) => {
+          lastApiActivity.current = Date.now()
+          setState({
+            isKeyUnlocked: true,
+            publicKey: me.pubkey,
+            role: me.role,
+            name: me.name,
+            isLoading: false,
+            error: null,
+            transcriptionEnabled: me.transcriptionEnabled,
+            spokenLanguages: me.spokenLanguages || ['en'],
+            uiLanguage: me.uiLanguage || 'en',
+            profileCompleted: me.profileCompleted ?? true,
+            onBreak: me.onBreak ?? false,
+            callPreference: me.callPreference ?? 'phone',
+            sessionExpiring: false,
+            sessionExpired: false,
+          })
+        })
+        .catch(() => {
+          keyManager.lock()
+          setState(s => ({ ...s, isLoading: false }))
+        })
+      return
+    }
     setState(s => ({ ...s, isLoading: false }))
   }, [])
 
+  // Sign in with nsec (import flow — onboarding/recovery only)
   const signIn = useCallback(async (nsec: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }))
     const keyPair = keyPairFromNsec(nsec)
@@ -167,12 +187,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = createAuthToken(keyPair.secretKey, Date.now())
       const parsed = JSON.parse(token)
-      const result = await login(parsed.pubkey, parsed.token)
-      storeSession(nsec)
+      const result = await login(parsed.pubkey, parsed.timestamp, parsed.token)
       const me = await getMe()
       lastApiActivity.current = Date.now()
       setState({
-        keyPair,
+        isKeyUnlocked: keyManager.isUnlocked(),
+        publicKey: keyPair.publicKey,
         role: result.role,
         name: me.name,
         isLoading: false,
@@ -182,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         uiLanguage: me.uiLanguage || 'en',
         profileCompleted: me.profileCompleted ?? true,
         onBreak: me.onBreak ?? false,
-              callPreference: me.callPreference ?? 'phone',
+        callPreference: me.callPreference ?? 'phone',
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -195,16 +215,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signInWithPasskey = useCallback(async () => {
-    setState(s => ({ ...s, isLoading: true, error: null }))
+  // Unlock with PIN (primary day-to-day auth)
+  const unlockWithPin = useCallback(async (pin: string): Promise<boolean> => {
+    const pubkey = await keyManager.unlock(pin)
+    if (!pubkey) return false
+
     try {
-      const { token, pubkey } = await webauthnLogin()
-      // Store session token (not nsec — user doesn't have it)
-      sessionStorage.setItem('llamenos-session-token', token)
       const me = await getMe()
       lastApiActivity.current = Date.now()
       setState({
-        keyPair: null, // No nsec available
+        isKeyUnlocked: true,
+        publicKey: pubkey,
         role: me.role,
         name: me.name,
         isLoading: false,
@@ -214,7 +235,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         uiLanguage: me.uiLanguage || 'en',
         profileCompleted: me.profileCompleted ?? true,
         onBreak: me.onBreak ?? false,
-              callPreference: me.callPreference ?? 'phone',
+        callPreference: me.callPreference ?? 'phone',
+        sessionExpiring: false,
+        sessionExpired: false,
+      })
+      return true
+    } catch {
+      keyManager.lock()
+      return false
+    }
+  }, [])
+
+  const lockKey = useCallback(() => {
+    keyManager.lock()
+  }, [])
+
+  const signInWithPasskey = useCallback(async () => {
+    setState(s => ({ ...s, isLoading: true, error: null }))
+    try {
+      const { token, pubkey } = await webauthnLogin()
+      // Store session token (not nsec — user doesn't have it)
+      sessionStorage.setItem('llamenos-session-token', token)
+      const me = await getMe()
+      lastApiActivity.current = Date.now()
+      setState({
+        isKeyUnlocked: false, // No nsec available — crypto locked
+        publicKey: pubkey,
+        role: me.role,
+        name: me.name,
+        isLoading: false,
+        error: null,
+        transcriptionEnabled: me.transcriptionEnabled,
+        spokenLanguages: me.spokenLanguages || ['en'],
+        uiLanguage: me.uiLanguage || 'en',
+        profileCompleted: me.profileCompleted ?? true,
+        onBreak: me.onBreak ?? false,
+        callPreference: me.callPreference ?? 'phone',
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -235,12 +291,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...s,
         name: me.name,
         role: me.role,
+        publicKey: me.pubkey,
         transcriptionEnabled: me.transcriptionEnabled,
         spokenLanguages: me.spokenLanguages || ['en'],
         uiLanguage: me.uiLanguage || 'en',
         profileCompleted: me.profileCompleted ?? true,
         onBreak: me.onBreak ?? false,
-              callPreference: me.callPreference ?? 'phone',
+        callPreference: me.callPreference ?? 'phone',
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -253,19 +310,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const me = await getMe()
       lastApiActivity.current = Date.now()
-      const nsec = getStoredSession()
-      const kp = nsec ? keyPairFromNsec(nsec) : null
       setState(s => ({
         ...s,
-        keyPair: kp || s.keyPair,
         name: me.name,
         role: me.role,
+        publicKey: me.pubkey,
         transcriptionEnabled: me.transcriptionEnabled,
         spokenLanguages: me.spokenLanguages || ['en'],
         uiLanguage: me.uiLanguage || 'en',
         profileCompleted: me.profileCompleted ?? true,
         onBreak: me.onBreak ?? false,
-              callPreference: me.callPreference ?? 'phone',
+        callPreference: me.callPreference ?? 'phone',
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -289,13 +344,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     // Revoke server-side session token before clearing local state
     apiLogout()
-    clearSession()
+    keyManager.lock()
     sessionStorage.removeItem('llamenos-session-token')
     // Clean up encrypted drafts from localStorage
     const draftKeys = Object.keys(localStorage).filter(k => k.startsWith('llamenos-draft:'))
     draftKeys.forEach(k => localStorage.removeItem(k))
     setState({
-      keyPair: null,
+      isKeyUnlocked: false,
+      publicKey: null,
       role: null,
       name: null,
       isLoading: false,
@@ -313,6 +369,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasSessionToken = typeof window !== 'undefined' && !!sessionStorage.getItem('llamenos-session-token')
 
+  // Build a backward-compatible keyPair object from the key manager
+  // This is deprecated — components should use keyManager.getSecretKey() directly
+  let keyPair: KeyPair | null = null
+  if (state.isKeyUnlocked) {
+    try {
+      const sk = keyManager.getSecretKey()
+      const pk = keyManager.getPublicKeyHex()
+      if (pk) {
+        keyPair = {
+          secretKey: sk,
+          publicKey: pk,
+          nsec: '', // Not exposed — recovery only
+          npub: '', // Not exposed
+        }
+      }
+    } catch {
+      // Key became locked between render cycles
+    }
+  }
+
   const value: AuthContextValue = {
     ...state,
     signIn,
@@ -321,9 +397,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshProfile,
     toggleBreak,
     renewSession,
+    unlockWithPin,
+    lockKey,
     isAdmin: state.role === 'admin',
-    isAuthenticated: (state.keyPair !== null || hasSessionToken) && state.role !== null,
-    hasNsec: state.keyPair !== null,
+    isAuthenticated: (state.isKeyUnlocked || hasSessionToken) && state.role !== null,
+    hasNsec: state.isKeyUnlocked,
+    keyPair,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

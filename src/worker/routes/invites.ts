@@ -3,6 +3,7 @@ import type { AppEnv, UserRole } from '../types'
 import { getDOs } from '../lib/do-access'
 import { isValidE164, checkRateLimit } from '../lib/helpers'
 import { hashIP } from '../lib/crypto'
+import { verifyAuthToken } from '../lib/auth'
 import { auth as authMiddleware } from '../middleware/auth'
 import { adminGuard } from '../middleware/admin-guard'
 import { audit } from '../services/audit'
@@ -23,10 +24,25 @@ invites.get('/validate/:code', async (c) => {
 
 invites.post('/redeem', async (c) => {
   const dos = getDOs(c.env)
-  const body = await c.req.json() as { code: string; pubkey: string }
+  const body = await c.req.json() as { code: string; pubkey: string; timestamp: number; token: string }
+
+  // Require proof of private key possession via Schnorr signature
+  if (!body.pubkey || !body.timestamp || !body.token) {
+    return c.json({ error: 'Signature proof required' }, 400)
+  }
+  const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token })
+  if (!isValid) {
+    return c.json({ error: 'Invalid signature' }, 401)
+  }
+
+  // Rate limit redemption attempts
+  const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+  const limited = await checkRateLimit(dos.settings, `invite-redeem:${hashIP(clientIp)}`, 5)
+  if (limited) return c.json({ error: 'Too many requests' }, 429)
+
   return dos.identity.fetch(new Request('http://do/invites/redeem', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ code: body.code, pubkey: body.pubkey }),
   }))
 })
 

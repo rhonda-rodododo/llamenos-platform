@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { downloadFile, getFileEnvelopes, getFileMetadata } from '@/lib/api'
 import { decryptFile, decryptFileMetadata } from '@/lib/file-crypto'
-import { getStoredSession, keyPairFromNsec } from '@/lib/crypto'
+import * as keyManager from '@/lib/key-manager'
 import { FileIcon, ImageIcon, VideoIcon, Music, Download, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { EncryptedFileMetadata, RecipientEnvelope } from '@shared/types'
@@ -20,10 +20,10 @@ function formatFileSize(bytes: number): string {
 
 function resolveSecretKey(keyPair: { secretKey: Uint8Array } | null): Uint8Array | null {
   if (keyPair) return keyPair.secretKey
-  const nsec = getStoredSession()
-  if (!nsec) return null
-  const kp = keyPairFromNsec(nsec)
-  return kp?.secretKey ?? null
+  if (keyManager.isUnlocked()) {
+    try { return keyManager.getSecretKey() } catch { return null }
+  }
+  return null
 }
 
 export function FilePreview({ fileId }: FilePreviewProps) {

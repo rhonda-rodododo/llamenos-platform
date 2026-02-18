@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
-import { decryptTranscription, getStoredSession, keyPairFromNsec } from '@/lib/crypto'
+import { decryptTranscription } from '@/lib/crypto'
+import * as keyManager from '@/lib/key-manager'
 import type { ConversationMessage } from '@/lib/api'
 import { Lock, ArrowDown, ArrowUp, Loader2 } from 'lucide-react'
 
@@ -75,10 +76,10 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
 
   function resolveSecretKey(): Uint8Array | null {
     if (keyPair) return keyPair.secretKey
-    const nsec = getStoredSession()
-    if (!nsec) return null
-    const kp = keyPairFromNsec(nsec)
-    return kp?.secretKey ?? null
+    if (keyManager.isUnlocked()) {
+      try { return keyManager.getSecretKey() } catch { return null }
+    }
+    return null
   }
 
   function formatTimestamp(iso: string): string {

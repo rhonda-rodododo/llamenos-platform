@@ -8,7 +8,7 @@ import {
   getTranscriptionSettings,
   getWebRtcStatus,
 } from '@/lib/api'
-import { getStoredSession, keyPairFromNsec } from '@/lib/crypto'
+import * as keyManager from '@/lib/key-manager'
 import { nip19 } from 'nostr-tools'
 import { useToast } from '@/lib/toast'
 import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall } from 'lucide-react'
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/settings')({
 function SettingsPage() {
   const { t } = useTranslation()
   const { section } = useSearch({ from: '/settings' })
-  const { transcriptionEnabled, name: authName, spokenLanguages, callPreference, refreshProfile } = useAuth()
+  const { transcriptionEnabled, name: authName, spokenLanguages, callPreference, refreshProfile, publicKey } = useAuth()
   const { toast } = useToast()
   const [myTranscription, setMyTranscription] = useState(transcriptionEnabled)
   const [notifPrefs, setNotifPrefs] = useState(getNotificationPrefs)
@@ -73,9 +73,8 @@ function SettingsPage() {
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(spokenLanguages || ['en'])
 
   // Get npub for display
-  const nsec = getStoredSession()
-  const keyPair = nsec ? keyPairFromNsec(nsec) : null
-  const npub = keyPair ? nip19.npubEncode(keyPair.publicKey) : ''
+  const pk = keyManager.getPublicKeyHex() || publicKey
+  const npub = pk ? nip19.npubEncode(pk) : ''
 
   useEffect(() => {
     const promises: Promise<void>[] = [
@@ -234,25 +233,12 @@ function SettingsPage() {
         expanded={expanded.has('key-backup')}
         onToggle={(open) => toggleSection('key-backup', open)}
       >
-        <Button variant="outline" onClick={() => {
-          if (!nsec || !keyPair) return
-          const backup = JSON.stringify({
-            version: 1,
-            format: 'llamenos-key-backup',
-            pubkey: keyPair.publicKey,
-            nsec,
-            createdAt: new Date().toISOString(),
-          }, null, 2)
-          const blob = new Blob([backup], { type: 'application/json' })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `llamenos-backup-${keyPair.publicKey.slice(0, 8)}.json`
-          a.click()
-          URL.revokeObjectURL(url)
-        }}>
-          {t('onboarding.downloadBackup')}
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          {t('profileSettings.keyBackupNote', { defaultValue: 'Download a backup from the onboarding flow or use your recovery key to restore access on a new device.' })}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {npub ? `${t('profileSettings.publicKey', { defaultValue: 'Public key' })}: ${npub.slice(0, 16)}...` : ''}
+        </p>
       </SettingsSection>
 
       {/* Passkeys (WebAuthn) — all users */}

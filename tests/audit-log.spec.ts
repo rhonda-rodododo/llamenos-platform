@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, uniquePhone, resetTestState, completeProfileSetup } from './helpers'
+import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, uniquePhone, resetTestState, completeProfileSetup, navigateAfterLogin } from './helpers'
 
 test.describe('Audit log', () => {
   test.beforeAll(async ({ request }) => {
@@ -81,10 +81,8 @@ test.describe('Audit log', () => {
     await loginAsVolunteer(page, nsec)
     await completeProfileSetup(page)
 
-    // Try to navigate directly to audit page
-    await page.goto('/audit')
-    // Volunteer should not see audit entries — they get "Access denied" or redirect
-    // The audit page checks isAdmin and returns access denied text
+    // Try to navigate directly to audit page (SPA navigate to avoid full reload clearing keyManager)
+    await navigateAfterLogin(page, '/audit')
     await expect(page.getByText(/access denied/i)).toBeVisible({ timeout: 10000 })
   })
 

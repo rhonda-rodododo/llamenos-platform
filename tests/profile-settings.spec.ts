@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, completeProfileSetup, uniquePhone } from './helpers'
+import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, completeProfileSetup, uniquePhone, enterPin, TEST_PIN, navigateAfterLogin } from './helpers'
 
 test.describe('Profile self-service', () => {
   let volunteerNsec: string
@@ -31,6 +31,9 @@ test.describe('Profile self-service', () => {
 
     // Reload and verify name persisted via /auth/me
     await page.reload()
+    await enterPin(page, TEST_PIN)
+    // PIN unlock redirects to dashboard — navigate back to Settings
+    await page.getByRole('link', { name: 'Settings' }).last().click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
     await expect(page.locator('#profile-name')).toHaveValue(newName)
 
@@ -83,7 +86,7 @@ test.describe('Profile self-service', () => {
     await expect(page.locator('#profile-phone')).toBeVisible()
 
     // Public key should be shown
-    await expect(page.getByText(/npub1/)).toBeVisible()
+    await expect(page.getByText(/npub1/).first()).toBeVisible()
   })
 
   test('admin sees key backup in user settings and spam in admin settings', async ({ page }) => {
@@ -144,6 +147,9 @@ test.describe('Profile self-service', () => {
 
     // Verify name persists after reload
     await page.reload()
+    await enterPin(page, TEST_PIN)
+    // PIN unlock redirects to dashboard — navigate back to Settings
+    await page.getByRole('link', { name: 'Settings' }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
     await expect(page.locator('#profile-name')).toHaveValue(newName)
   })
@@ -170,7 +176,7 @@ test.describe('Profile self-service', () => {
 
   test('deep link expands and scrolls to section', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/settings?section=transcription')
+    await navigateAfterLogin(page, '/settings?section=transcription')
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Transcription section should be expanded — content should be visible

@@ -5,7 +5,7 @@
 - [x] Configure production wrangler secrets (TWILIO_*, ADMIN_PUBKEY) — deployed and running
 - [ ] Test full call flow end-to-end: incoming call -> CAPTCHA -> parallel ring -> answer -> notes -> hang up *(requires real phone + telephony account)*
 
-## Security Audit Findings (2026-02-12)
+## Security Audit Findings (2026-02-12, Round 4)
 
 ### Fixed (committed ddc95ec)
 - [x] **CRITICAL**: Vonage webhook validation was `return true` — now HMAC-SHA256
@@ -17,13 +17,39 @@
 - [x] **HIGH**: Weak KDF — upgraded SHA-256 concat to HKDF-SHA256 for note encryption
 - [x] **HIGH**: Security headers — COOP, no-referrer, expanded CSP and Permissions-Policy
 
-### Medium (fixed in 6d3deac)
+### Fixed (Round 4 medium, 6d3deac)
 - [x] Session token revocation: logout API + server-side session delete
 - [x] WebSocket call authorization: verify call state + volunteer ownership for answer/hangup/spam
 - [x] Invite code rate limit: reduced from 10 to 5 per minute
 - [x] Custom field label/option length validation: 200 char max
 - [x] Presence broadcast: volunteers get `{ hasAvailable }` only, admins get full counts
 - [ ] Encrypt/hash note metadata (callId, authorPubkey) to prevent correlation analysis — *trade-off: breaks server-side filtering/grouping; notes content is already E2EE*
+
+## Security Audit Findings (2026-02-17, Round 5 — Epic 53)
+
+### Fixed — CRITICAL
+- [x] Login endpoint did not verify Schnorr signature — anyone knowing pubkey could enumerate roles
+- [x] CAPTCHA expected digits stored in URL query params — attacker could see/modify; bypasses CAPTCHA
+- [x] `Math.random()` used for CAPTCHA generation — predictable, not CSPRNG
+
+### Fixed — HIGH
+- [x] Invite redemption accepted arbitrary pubkey — no proof of private key ownership
+- [x] Upload chunk/status endpoints had no ownership check
+- [x] Sessions not revoked on volunteer deactivation/deletion
+- [x] Plaintext nsec in onboarding backup — now encrypted with PBKDF2 + XChaCha20-Poly1305
+- [x] HKDF called without salt for note encryption — added fixed application salt
+- [x] Static PBKDF2 salt for recovery key derivation — now per-backup random salt
+- [x] TwiML XML injection via HOTLINE_NAME — added `escapeXml()` function
+
+### Fixed — MEDIUM
+- [x] No rate limiting on WebAuthn login flow — added IP-based 10/min
+- [x] CORS missing `Vary: Origin` header — cache poisoning risk
+- [x] Reporter role could create/edit call notes — added role guard
+- [x] WebAuthn userVerification "preferred" → "required"
+- [x] IP hash truncated to 64 bits — increased to 96 bits
+- [x] Asterisk webhook validation used `===` (non-constant-time) — now XOR comparison
+- [x] Asterisk webhook had no timestamp replay protection — added 5-min window
+- [x] Asterisk bridge bound to 0.0.0.0 — bound to 127.0.0.1
 
 ### Low / Future
 - [ ] Add auto-lock/panic-wipe mechanism for device seizure scenarios

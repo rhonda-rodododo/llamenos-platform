@@ -8,7 +8,7 @@ test.describe('Help & Getting Started', () => {
 
   test('help page loads with FAQ sections', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/help')
+    await page.getByRole('link', { name: 'Help' }).click()
 
     // Page heading should be visible
     await expect(page.getByRole('heading', { name: /help/i })).toBeVisible({ timeout: 10000 })
@@ -28,7 +28,7 @@ test.describe('Help & Getting Started', () => {
 
   test('help page FAQ items expand on click', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/help')
+    await page.getByRole('link', { name: 'Help' }).click()
     await expect(page.getByRole('heading', { name: /help/i })).toBeVisible({ timeout: 10000 })
 
     // Click a FAQ question
@@ -45,7 +45,7 @@ test.describe('Help & Getting Started', () => {
 
   test('help page shows admin guide for admin users', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/help')
+    await page.getByRole('link', { name: 'Help' }).click()
     await expect(page.getByRole('heading', { name: /help/i })).toBeVisible({ timeout: 10000 })
 
     // Admin guide should be visible
@@ -56,7 +56,7 @@ test.describe('Help & Getting Started', () => {
 
   test('help page shows keyboard shortcuts reference', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/help')
+    await page.getByRole('link', { name: 'Help' }).click()
     await expect(page.getByRole('heading', { name: /help/i })).toBeVisible({ timeout: 10000 })
 
     // Shortcut reference card should show shortcuts
@@ -67,7 +67,7 @@ test.describe('Help & Getting Started', () => {
 
   test('help page shows quick navigation links', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/help')
+    await page.getByRole('link', { name: 'Help' }).click()
     await expect(page.getByRole('heading', { name: /help/i })).toBeVisible({ timeout: 10000 })
 
     // Quick nav section should have links

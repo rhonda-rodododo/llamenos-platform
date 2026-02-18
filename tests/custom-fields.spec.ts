@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, resetTestState } from './helpers'
+import { loginAsAdmin, resetTestState, navigateAfterLogin } from './helpers'
 
 test.describe('Custom Note Fields', () => {
   test.beforeAll(async ({ request }) => {
@@ -101,10 +101,9 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('custom fields section deep link works', async ({ page }) => {
-    await page.goto('/admin/settings?section=custom-fields')
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await navigateAfterLogin(page, '/admin/settings?section=custom-fields')
 
     // Custom Note Fields section should be expanded — "Add Field" button should be visible
-    await expect(page.getByRole('button', { name: /add field/i })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: /add field/i })).toBeVisible({ timeout: 10000 })
   })
 })

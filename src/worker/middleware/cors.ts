@@ -12,6 +12,7 @@ export const cors = createMiddleware<AppEnv>(async (c, next) => {
         'Access-Control-Allow-Origin': allowedOrigin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Vary': 'Origin',
       },
     })
   }
@@ -19,4 +20,5 @@ export const cors = createMiddleware<AppEnv>(async (c, next) => {
   await next()
 
   c.header('Access-Control-Allow-Origin', allowedOrigin)
+  c.header('Vary', 'Origin')
 })

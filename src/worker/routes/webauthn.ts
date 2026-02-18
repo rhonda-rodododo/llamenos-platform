@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import type { AppEnv, WebAuthnCredential } from '../types'
 import { getDOs } from '../lib/do-access'
-import { uint8ArrayToBase64URL } from '../lib/helpers'
+import { uint8ArrayToBase64URL, checkRateLimit } from '../lib/helpers'
+import { hashIP } from '../lib/crypto'
 import { generateRegOptions, verifyRegResponse, generateAuthOptions, verifyAuthResponse } from '../lib/webauthn'
 import { auth as authMiddleware } from '../middleware/auth'
 import { audit } from '../services/audit'
@@ -12,6 +13,10 @@ const webauthn = new Hono<AppEnv>()
 
 webauthn.post('/login/options', async (c) => {
   const dos = getDOs(c.env)
+  // Rate limit WebAuthn login attempts to prevent challenge flooding
+  const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+  const limited = await checkRateLimit(dos.settings, `webauthn:${hashIP(clientIp)}`, 10)
+  if (limited) return c.json({ error: 'Too many requests. Try again later.' }, 429)
   const rpID = new URL(c.req.url).hostname
   const allCredsRes = await dos.identity.fetch(new Request('http://do/webauthn/all-credentials'))
   const { credentials } = await allCredsRes.json() as { credentials: Array<WebAuthnCredential & { ownerPubkey: string }> }
@@ -26,6 +31,10 @@ webauthn.post('/login/options', async (c) => {
 
 webauthn.post('/login/verify', async (c) => {
   const dos = getDOs(c.env)
+  // Rate limit verification attempts
+  const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+  const verifyLimited = await checkRateLimit(dos.settings, `webauthn-verify:${hashIP(clientIp)}`, 10)
+  if (verifyLimited) return c.json({ error: 'Too many requests. Try again later.' }, 429)
   const body = await c.req.json() as { assertion: any; challengeId: string }
   const origin = new URL(c.req.url).origin
   const rpID = new URL(c.req.url).hostname

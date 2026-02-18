@@ -1,9 +1,12 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
+import { volunteerOrAdminGuard } from '../middleware/role-guard'
 import { audit } from '../services/audit'
 
 const notes = new Hono<AppEnv>()
+// Only volunteers and admins can access call notes — reporters cannot
+notes.use('*', volunteerOrAdminGuard)
 
 notes.get('/', async (c) => {
   const dos = getDOs(c.env)

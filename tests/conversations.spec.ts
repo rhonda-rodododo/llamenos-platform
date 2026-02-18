@@ -1,17 +1,14 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, resetTestState } from './helpers'
+import { loginAsAdmin, navigateAfterLogin, resetTestState } from './helpers'
 
 test.describe('Conversations — no channels configured', () => {
   test.beforeAll(async ({ request }) => {
     await resetTestState(request)
   })
 
-  test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page)
-  })
-
   test('no messaging channels shows empty state on /conversations', async ({ page }) => {
-    await page.goto('/conversations')
+    await loginAsAdmin(page)
+    await navigateAfterLogin(page, '/conversations')
 
     // The "No messaging channels enabled" empty state should be visible
     await expect(page.getByText('No messaging channels enabled')).toBeVisible({ timeout: 10000 })
@@ -21,6 +18,7 @@ test.describe('Conversations — no channels configured', () => {
   })
 
   test('conversations nav link is hidden when no channels enabled', async ({ page }) => {
+    await loginAsAdmin(page)
     // On the dashboard, the Conversations nav link should not be visible
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
     await expect(page.getByRole('link', { name: /conversations/i })).not.toBeVisible()
@@ -37,7 +35,7 @@ test.describe('Conversations — with channels enabled', () => {
    * Navigates through the wizard selecting Reports + SMS, then completes setup.
    */
   async function enableChannelsViaSetupWizard(page: import('@playwright/test').Page) {
-    await page.goto('/setup')
+    await navigateAfterLogin(page, '/setup')
     await expect(page.getByText('Setup Wizard')).toBeVisible({ timeout: 10000 })
 
     // Step 1: Identity — fill required name
@@ -75,7 +73,7 @@ test.describe('Conversations — with channels enabled', () => {
 
   test('conversations page layout with channels enabled', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/reports')
+    await navigateAfterLogin(page, '/reports')
 
     // Reports page should show the two-column layout
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible({ timeout: 10000 })
@@ -86,18 +84,19 @@ test.describe('Conversations — with channels enabled', () => {
 
   test('empty reports list shows no reports state', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/reports')
+    await navigateAfterLogin(page, '/reports')
 
     // With channels enabled but no reports, should show empty state
     await expect(page.getByText('No reports')).toBeVisible({ timeout: 10000 })
   })
 
   test('no messaging empty state is NOT shown when channels are enabled', async ({ page }) => {
-    await loginAsAdmin(page)
-    // Navigate to conversations page - since we only enabled Reports (not sms/whatsapp/signal),
+    // Navigate to reports page - since we only enabled Reports (not sms/whatsapp/signal),
     // the conversations page (for messaging channels) will still show the empty state
     // but the Reports page should work fine
-    await page.goto('/reports')
+    await loginAsAdmin(page)
+    await page.getByRole('link', { name: 'Reports' }).click()
+    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible({ timeout: 10000 })
 
     // The "No messaging channels enabled" text should NOT appear on reports page
     await expect(page.getByText('No messaging channels enabled')).not.toBeVisible()
@@ -105,7 +104,6 @@ test.describe('Conversations — with channels enabled', () => {
 
   test('reports page is navigable from sidebar link', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 
     // Click the Reports link in the sidebar

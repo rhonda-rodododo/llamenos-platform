@@ -57,11 +57,23 @@ uploads.post('/init', async (c) => {
 
 // Upload a chunk
 uploads.put('/:id/chunks/:chunkIndex', async (c) => {
+  const pubkey = c.get('pubkey')
   const uploadId = c.req.param('id')
   const chunkIndex = parseInt(c.req.param('chunkIndex'), 10)
 
   if (isNaN(chunkIndex) || chunkIndex < 0) {
     return c.json({ error: 'Invalid chunk index' }, 400)
+  }
+
+  // Verify ownership before accepting chunk
+  const dos = getDOs(c.env)
+  const ownerRes = await dos.conversations.fetch(new Request(`http://do/files/${uploadId}`))
+  if (!ownerRes.ok) {
+    return c.json({ error: 'Upload not found' }, 404)
+  }
+  const fileRecord = await ownerRes.json() as FileRecord
+  if (fileRecord.uploadedBy !== pubkey && c.get('role') !== 'admin') {
+    return c.json({ error: 'Forbidden' }, 403)
   }
 
   // Store chunk directly in R2
@@ -74,7 +86,6 @@ uploads.put('/:id/chunks/:chunkIndex', async (c) => {
   await c.env.R2_BUCKET.put(r2Key, body)
 
   // Update completion count in ConversationDO
-  const dos = getDOs(c.env)
   const res = await dos.conversations.fetch(new Request(`http://do/files/${uploadId}/chunk-complete`, {
     method: 'POST',
     body: JSON.stringify({ chunkIndex }),
@@ -162,6 +173,7 @@ uploads.post('/:id/complete', async (c) => {
 
 // Get upload status (for resume)
 uploads.get('/:id/status', async (c) => {
+  const pubkey = c.get('pubkey')
   const uploadId = c.req.param('id')
   const dos = getDOs(c.env)
 
@@ -171,6 +183,10 @@ uploads.get('/:id/status', async (c) => {
   }
 
   const fileRecord = await res.json() as FileRecord
+  // Only allow the uploader or admin to check status
+  if (fileRecord.uploadedBy !== pubkey && c.get('role') !== 'admin') {
+    return c.json({ error: 'Upload not found' }, 404)
+  }
   return c.json({
     uploadId: fileRecord.id,
     status: fileRecord.status,

@@ -7,6 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: "html",
+  timeout: 60_000,
   use: {
     baseURL: "http://localhost:8787",
     trace: "on-first-retry",

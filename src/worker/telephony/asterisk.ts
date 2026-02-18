@@ -108,8 +108,8 @@ export class AsteriskAdapter implements TelephonyAdapter {
       ])
     }
 
-    if (voiceCaptchaEnabled) {
-      const digits = Math.floor(1000 + Math.random() * 9000).toString()
+    if (voiceCaptchaEnabled && params.captchaDigits) {
+      const digits = params.captchaDigits
       return this.json([
         this.speakOrPlay('captcha', lang, audioUrls, getPrompt('captcha', lang).replace('{digits}', digits.split('').join(' '))),
         {
@@ -117,7 +117,7 @@ export class AsteriskAdapter implements TelephonyAdapter {
           numDigits: 4,
           timeout: 10,
           callbackEvent: 'captcha_response',
-          metadata: { expectedDigits: digits, callSid },
+          metadata: { callSid },
         },
       ])
     }
@@ -269,6 +269,13 @@ export class AsteriskAdapter implements TelephonyAdapter {
 
     const body = await request.clone().text()
     const timestamp = request.headers.get('X-Bridge-Timestamp') || ''
+
+    // Reject webhooks with timestamps older than 5 minutes (replay protection)
+    const tsSeconds = parseInt(timestamp, 10)
+    if (isNaN(tsSeconds) || Math.abs(Date.now() / 1000 - tsSeconds) > 300) {
+      return false
+    }
+
     const payload = `${timestamp}.${body}`
 
     const key = await crypto.subtle.importKey(
@@ -281,7 +288,16 @@ export class AsteriskAdapter implements TelephonyAdapter {
     const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
     const expectedSig = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
 
-    return signature === expectedSig
+    // Constant-time comparison to prevent timing attacks
+    if (signature.length !== expectedSig.length) return false
+    const encoder = new TextEncoder()
+    const aBuf = encoder.encode(signature)
+    const bBuf = encoder.encode(expectedSig)
+    let result = 0
+    for (let i = 0; i < aBuf.length; i++) {
+      result |= aBuf[i] ^ bBuf[i]
+    }
+    return result === 0
   }
 
   // --- Webhook parsing (JSON payloads from ARI bridge) ---

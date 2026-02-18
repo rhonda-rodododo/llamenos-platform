@@ -93,6 +93,19 @@ telephony.post('/language-selected', async (c) => {
     rateLimited = rlData.limited
   }
 
+  // Generate CAPTCHA digits server-side with CSPRNG and store them
+  let captchaDigits: string | undefined
+  if (spamSettings.voiceCaptchaEnabled && !rateLimited) {
+    const buf = new Uint8Array(2)
+    crypto.getRandomValues(buf)
+    captchaDigits = String(1000 + (((buf[0] << 8) | buf[1]) % 9000))
+    // Store expected digits server-side (not in callback URL)
+    await dos.settings.fetch(new Request('http://do/captcha/store', {
+      method: 'POST',
+      body: JSON.stringify({ callSid, expected: captchaDigits }),
+    }))
+  }
+
   const audioUrls = await buildAudioUrlMap(dos.settings, new URL(c.req.url).origin)
   const response = await adapter.handleIncomingCall({
     callSid,
@@ -102,6 +115,7 @@ telephony.post('/language-selected', async (c) => {
     callerLanguage,
     hotlineName: c.env.HOTLINE_NAME || 'Llámenos',
     audioUrls,
+    captchaDigits,
   })
 
   if (!rateLimited && !spamSettings.voiceCaptchaEnabled) {
@@ -119,13 +133,19 @@ telephony.post('/captcha', async (c) => {
   const adapter = (await getTelephony(c.env, dos))!
   const { digits, callerNumber } = await adapter.parseCaptchaWebhook(c.req.raw)
   const url = new URL(c.req.url)
-  const expected = url.searchParams.get('expected') || ''
   const callSid = url.searchParams.get('callSid') || ''
   const callerLang = url.searchParams.get('lang') || DEFAULT_LANGUAGE
 
+  // Look up expected digits from server-side storage (not URL params)
+  const captchaRes = await dos.settings.fetch(new Request(`http://do/captcha/verify`, {
+    method: 'POST',
+    body: JSON.stringify({ callSid, digits }),
+  }))
+  const { match, expected } = await captchaRes.json() as { match: boolean; expected: string }
+
   const response = await adapter.handleCaptchaResponse({ callSid, digits, expectedDigits: expected, callerLanguage: callerLang })
 
-  if (digits === expected) {
+  if (match) {
     const origin = new URL(c.req.url).origin
     c.executionCtx.waitUntil(startParallelRinging(callSid, callerNumber, origin, c.env, dos))
   }

@@ -57,6 +57,10 @@ volunteers.patch('/:targetPubkey', async (c) => {
   if (res.ok) {
     const data = body as Record<string, unknown>
     if (data.role) await audit(dos.records, data.role === 'admin' ? 'adminPromoted' : 'adminDemoted', pubkey, { target: targetPubkey })
+    // Revoke all sessions when deactivating or changing role
+    if (data.active === false || data.role) {
+      await dos.identity.fetch(new Request(`http://do/sessions/revoke-all/${targetPubkey}`, { method: 'DELETE' }))
+    }
   }
   return res
 })
@@ -65,6 +69,8 @@ volunteers.delete('/:targetPubkey', async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const targetPubkey = c.req.param('targetPubkey')
+  // Revoke all sessions before deletion
+  await dos.identity.fetch(new Request(`http://do/sessions/revoke-all/${targetPubkey}`, { method: 'DELETE' }))
   const res = await dos.identity.fetch(new Request(`http://do/volunteers/${targetPubkey}`, { method: 'DELETE' }))
   if (res.ok) await audit(dos.records, 'volunteerRemoved', pubkey, { target: targetPubkey })
   return res

@@ -3,6 +3,7 @@ import type { AppEnv, WebAuthnCredential } from '../types'
 import { getDOs } from '../lib/do-access'
 import { hashIP } from '../lib/crypto'
 import { isValidE164, checkRateLimit } from '../lib/helpers'
+import { verifyAuthToken } from '../lib/auth'
 import { auth as authMiddleware } from '../middleware/auth'
 import { audit } from '../services/audit'
 
@@ -21,9 +22,16 @@ auth.post('/login', async (c) => {
     }
   }
 
-  const { pubkey } = await c.req.json() as { pubkey: string; token: string }
-  const res = await dos.identity.fetch(new Request(`http://do/volunteer/${pubkey}`))
-  if (!res.ok) return c.json({ error: 'Unknown user' }, 401)
+  const body = await c.req.json() as { pubkey: string; timestamp: number; token: string }
+  // Verify Schnorr signature before returning any user information
+  if (!body.pubkey || !body.timestamp || !body.token) {
+    return c.json({ error: 'Invalid credentials' }, 401)
+  }
+  const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token })
+  if (!isValid) return c.json({ error: 'Invalid credentials' }, 401)
+
+  const res = await dos.identity.fetch(new Request(`http://do/volunteer/${body.pubkey}`))
+  if (!res.ok) return c.json({ error: 'Invalid credentials' }, 401)
   const volunteer = await res.json() as { role: string }
   return c.json({ ok: true, role: volunteer.role })
 })
