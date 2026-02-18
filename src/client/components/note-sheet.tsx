@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useNoteSheet } from '@/lib/note-sheet-context'
 import { useDraft } from '@/lib/use-draft'
-import { encryptNote } from '@/lib/crypto'
+import { encryptNoteV2 } from '@/lib/crypto'
+import { useConfig } from '@/lib/config'
 import { createNote, updateNote, getCallHistory, getCustomFields, type CallRecord, type CustomFieldDefinition } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import type { NotePayload } from '@shared/types'
@@ -26,6 +27,7 @@ import { Lock, Save, Clock } from 'lucide-react'
 export function NoteSheet() {
   const { t } = useTranslation()
   const { keyPair, isAdmin } = useAuth()
+  const { adminPubkey } = useConfig()
   const { isOpen, mode, editNoteId, initialCallId, initialText, initialFields, close, onSaved } = useNoteSheet()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
@@ -111,11 +113,15 @@ export function NoteSheet() {
       if (fieldValues.length > 0) {
         payload.fields = Object.fromEntries(fieldValues)
       }
-      const encrypted = encryptNote(payload, keyPair.secretKey)
+      // V2 per-note ephemeral key encryption (forward secrecy)
+      const authorPub = keyPair.publicKey
+      const adminPub = adminPubkey || authorPub // fallback to self if admin pubkey not available
+      const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2(payload, authorPub, adminPub)
+
       if (mode === 'edit' && editNoteId) {
-        await updateNote(editNoteId, { encryptedContent: encrypted })
+        await updateNote(editNoteId, { encryptedContent, authorEnvelope, adminEnvelope })
       } else {
-        await createNote({ callId: draft.callId, encryptedContent: encrypted })
+        await createNote({ callId: draft.callId, encryptedContent, authorEnvelope, adminEnvelope })
       }
       draft.clearDraft()
       close()

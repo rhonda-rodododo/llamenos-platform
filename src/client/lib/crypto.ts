@@ -60,32 +60,154 @@ export function isValidNsec(nsec: string): boolean {
 }
 
 // --- Encryption ---
-// Uses XChaCha20-Poly1305 for symmetric encryption of notes.
-// The encryption key is derived from the volunteer's private key.
-// Admin can also decrypt because they generated and stored the private key.
 
 function deriveEncryptionKey(secretKey: Uint8Array, context: string): Uint8Array {
-  // Derive a domain-separated key using HKDF-SHA256 with a fixed application salt
-  // The salt provides independence between the IKM and the pseudorandom key per RFC 5869
   const salt = utf8ToBytes('llamenos:hkdf-salt:v1')
   return hkdf(sha256, secretKey, salt, utf8ToBytes(`llamenos:${context}`), 32)
 }
 
+// --- ECIES Key Wrapping (shared with file-crypto.ts pattern) ---
+
+export interface NoteEnvelope {
+  encryptedNoteKey: string  // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
+  ephemeralPubkey: string   // hex: compressed 33-byte pubkey
+}
+
+function wrapKeyForPubkey(
+  noteKey: Uint8Array,
+  recipientPubkeyHex: string,
+): NoteEnvelope {
+  const ephemeralSecret = randomBytes(32)
+  const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralSecret, true)
+
+  const recipientCompressed = hexToBytes('02' + recipientPubkeyHex)
+  const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
+  const sharedX = shared.slice(1, 33)
+
+  const context = utf8ToBytes('llamenos:note-key')
+  const keyInput = new Uint8Array(context.length + sharedX.length)
+  keyInput.set(context)
+  keyInput.set(sharedX, context.length)
+  const symmetricKey = sha256(keyInput)
+
+  const nonce = randomBytes(24)
+  const cipher = xchacha20poly1305(symmetricKey, nonce)
+  const ciphertext = cipher.encrypt(noteKey)
+
+  const packed = new Uint8Array(nonce.length + ciphertext.length)
+  packed.set(nonce)
+  packed.set(ciphertext, nonce.length)
+
+  return {
+    encryptedNoteKey: bytesToHex(packed),
+    ephemeralPubkey: bytesToHex(ephemeralPublicKey),
+  }
+}
+
+function unwrapNoteKey(
+  envelope: NoteEnvelope,
+  secretKey: Uint8Array,
+): Uint8Array {
+  const ephemeralPub = hexToBytes(envelope.ephemeralPubkey)
+  const shared = secp256k1.getSharedSecret(secretKey, ephemeralPub)
+  const sharedX = shared.slice(1, 33)
+
+  const context = utf8ToBytes('llamenos:note-key')
+  const keyInput = new Uint8Array(context.length + sharedX.length)
+  keyInput.set(context)
+  keyInput.set(sharedX, context.length)
+  const symmetricKey = sha256(keyInput)
+
+  const data = hexToBytes(envelope.encryptedNoteKey)
+  const nonce = data.slice(0, 24)
+  const ciphertext = data.slice(24)
+  const cipher = xchacha20poly1305(symmetricKey, nonce)
+  return cipher.decrypt(ciphertext)
+}
+
+// --- Per-Note Ephemeral Key Encryption (V2 — forward secrecy) ---
+
+export interface EncryptedNoteV2 {
+  encryptedContent: string     // hex: nonce(24) + ciphertext
+  authorEnvelope: NoteEnvelope // note key wrapped for the author
+  adminEnvelope: NoteEnvelope  // note key wrapped for the admin
+}
+
+/**
+ * Encrypt a note with a random per-note key, wrapped for both author and admin.
+ * Provides forward secrecy: compromising the identity key doesn't reveal past notes.
+ */
+export function encryptNoteV2(
+  payload: NotePayload,
+  authorPubkey: string,
+  adminPubkey: string,
+): EncryptedNoteV2 {
+  // Generate random per-note symmetric key
+  const noteKey = randomBytes(32)
+  const nonce = randomBytes(24)
+  const jsonString = JSON.stringify(payload)
+  const cipher = xchacha20poly1305(noteKey, nonce)
+  const ciphertext = cipher.encrypt(utf8ToBytes(jsonString))
+
+  const packed = new Uint8Array(nonce.length + ciphertext.length)
+  packed.set(nonce)
+  packed.set(ciphertext, nonce.length)
+
+  return {
+    encryptedContent: bytesToHex(packed),
+    authorEnvelope: wrapKeyForPubkey(noteKey, authorPubkey),
+    adminEnvelope: wrapKeyForPubkey(noteKey, adminPubkey),
+  }
+}
+
+/**
+ * Decrypt a V2 note using the appropriate envelope for the current user.
+ */
+export function decryptNoteV2(
+  encryptedContent: string,
+  envelope: NoteEnvelope,
+  secretKey: Uint8Array,
+): NotePayload | null {
+  try {
+    const noteKey = unwrapNoteKey(envelope, secretKey)
+    const data = hexToBytes(encryptedContent)
+    const nonce = data.slice(0, 24)
+    const ciphertext = data.slice(24)
+    const cipher = xchacha20poly1305(noteKey, nonce)
+    const plaintext = cipher.decrypt(ciphertext)
+    const decoded = new TextDecoder().decode(plaintext)
+    try {
+      const parsed = JSON.parse(decoded)
+      if (parsed && typeof parsed === 'object' && typeof parsed.text === 'string') {
+        return parsed as NotePayload
+      }
+    } catch {
+      // Not JSON
+    }
+    return { text: decoded }
+  } catch {
+    return null
+  }
+}
+
+// --- Legacy V1 Encryption (kept for backward compatibility) ---
+
+/** @deprecated Use encryptNoteV2 for new notes */
 export function encryptNote(payload: NotePayload, secretKey: Uint8Array): string {
   const key = deriveEncryptionKey(secretKey, 'notes')
-  const nonce = randomBytes(24) // XChaCha20 uses 24-byte nonces
+  const nonce = randomBytes(24)
   const jsonString = JSON.stringify(payload)
   const data = utf8ToBytes(jsonString)
   const cipher = xchacha20poly1305(key, nonce)
   const ciphertext = cipher.encrypt(data)
 
-  // Pack as: nonce (24) + ciphertext (variable)
   const packed = new Uint8Array(nonce.length + ciphertext.length)
   packed.set(nonce)
   packed.set(ciphertext, nonce.length)
   return bytesToHex(packed)
 }
 
+/** @deprecated Use decryptNoteV2 for V2 notes, falls back to this for legacy */
 export function decryptNote(packed: string, secretKey: Uint8Array): NotePayload | null {
   try {
     const key = deriveEncryptionKey(secretKey, 'notes')
@@ -95,7 +217,6 @@ export function decryptNote(packed: string, secretKey: Uint8Array): NotePayload 
     const cipher = xchacha20poly1305(key, nonce)
     const plaintext = cipher.decrypt(ciphertext)
     const decoded = new TextDecoder().decode(plaintext)
-    // Try parsing as NotePayload JSON
     try {
       const parsed = JSON.parse(decoded)
       if (parsed && typeof parsed === 'object' && typeof parsed.text === 'string') {
@@ -104,7 +225,6 @@ export function decryptNote(packed: string, secretKey: Uint8Array): NotePayload 
     } catch {
       // Not JSON — legacy plain text note
     }
-    // Legacy fallback: treat entire string as text
     return { text: decoded }
   } catch {
     return null

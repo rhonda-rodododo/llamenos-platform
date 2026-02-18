@@ -65,6 +65,7 @@ export async function getConfig() {
     hotlineNumber: string
     channels?: import('@shared/types').EnabledChannels
     setupCompleted?: boolean
+    adminPubkey?: string
   }>
 }
 
@@ -190,14 +191,23 @@ export async function listNotes(params?: { callId?: string; page?: number; limit
   return request<{ notes: EncryptedNote[]; total: number }>(`/notes?${qs}`)
 }
 
-export async function createNote(data: { callId: string; encryptedContent: string }) {
+export async function createNote(data: {
+  callId: string
+  encryptedContent: string
+  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+}) {
   return request<{ note: EncryptedNote }>('/notes', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export async function updateNote(id: string, data: { encryptedContent: string }) {
+export async function updateNote(id: string, data: {
+  encryptedContent: string
+  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+}) {
   return request<{ note: EncryptedNote }>(`/notes/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -512,6 +522,9 @@ export interface EncryptedNote {
   createdAt: string
   updatedAt: string
   ephemeralPubkey?: string
+  // V2 per-note ECIES envelopes (forward secrecy)
+  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
 }
 
 export interface ActiveCall {

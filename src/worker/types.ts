@@ -72,6 +72,9 @@ export interface EncryptedNote {
   createdAt: string
   updatedAt: string
   ephemeralPubkey?: string // hex-encoded, present for server-encrypted transcriptions (ECIES)
+  // V2 per-note ECIES envelopes (forward secrecy)
+  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
 }
 
 export interface AuditLogEntry {

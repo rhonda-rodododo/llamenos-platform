@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { listNotes, createNote, updateNote, getCallHistory, listVolunteers, getCustomFields, type EncryptedNote, type CallRecord, type CustomFieldDefinition, type Volunteer } from '@/lib/api'
-import { encryptNote, decryptNote, decryptTranscription, encryptExport } from '@/lib/crypto'
+import { encryptNoteV2, decryptNoteV2, decryptNote, decryptTranscription, encryptExport } from '@/lib/crypto'
+import { useConfig } from '@/lib/config'
 import { useToast } from '@/lib/toast'
 import type { NotePayload } from '@shared/types'
 import { StickyNote, Plus, Pencil, Lock, Mic, Save, X, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react'
@@ -34,6 +35,7 @@ interface DecryptedNote extends EncryptedNote {
 function NotesPage() {
   const { t } = useTranslation()
   const { keyPair, isAdmin } = useAuth()
+  const { adminPubkey } = useConfig()
   const { toast } = useToast()
   const navigate = useNavigate({ from: '/notes' })
   const { page, callId, search } = Route.useSearch()
@@ -88,7 +90,13 @@ function NotesPage() {
             } else if (isTranscription && !note.ephemeralPubkey) {
               payload = { text: note.encryptedContent }
             } else if (keyPair) {
-              payload = decryptNote(note.encryptedContent, keyPair.secretKey) || { text: '[Decryption failed]' }
+              // Try V2 (per-note ECIES envelope) first, fall back to V1 (legacy HKDF)
+              const envelope = isAdmin ? note.adminEnvelope : note.authorEnvelope
+              if (envelope) {
+                payload = decryptNoteV2(note.encryptedContent, envelope, keyPair.secretKey) || { text: '[Decryption failed]' }
+              } else {
+                payload = decryptNote(note.encryptedContent, keyPair.secretKey) || { text: '[Decryption failed]' }
+              }
             } else {
               payload = { text: '[No key]' }
             }
@@ -109,8 +117,10 @@ function NotesPage() {
     try {
       const payload: NotePayload = { text }
       if (Object.keys(fields).length > 0) payload.fields = fields
-      const encrypted = encryptNote(payload, keyPair.secretKey)
-      const res = await updateNote(noteId, { encryptedContent: encrypted })
+      const authorPub = keyPair.publicKey
+      const adminPub = adminPubkey || authorPub
+      const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2(payload, authorPub, adminPub)
+      const res = await updateNote(noteId, { encryptedContent, authorEnvelope, adminEnvelope })
       setNotes(prev => prev.map(n =>
         n.id === noteId ? { ...res.note, decrypted: text, payload, isTranscription: n.isTranscription } : n
       ))
@@ -128,8 +138,10 @@ function NotesPage() {
     try {
       const payload: NotePayload = { text }
       if (Object.keys(fields).length > 0) payload.fields = fields
-      const encrypted = encryptNote(payload, keyPair.secretKey)
-      const res = await createNote({ callId, encryptedContent: encrypted })
+      const authorPub = keyPair.publicKey
+      const adminPub = adminPubkey || authorPub
+      const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2(payload, authorPub, adminPub)
+      const res = await createNote({ callId, encryptedContent, authorEnvelope, adminEnvelope })
       setNotes(prev => [{ ...res.note, decrypted: text, payload, isTranscription: false }, ...prev])
       setTotal(prev => prev + 1)
       setShowNewNote(false)

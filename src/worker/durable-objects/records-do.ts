@@ -127,7 +127,11 @@ export class RecordsDO extends DurableObject<Env> {
     return Response.json({ notes: filtered, total })
   }
 
-  private async createNoteEntry(data: { callId: string; authorPubkey: string; encryptedContent: string; ephemeralPubkey?: string }): Promise<Response> {
+  private async createNoteEntry(data: {
+    callId: string; authorPubkey: string; encryptedContent: string; ephemeralPubkey?: string
+    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  }): Promise<Response> {
     const notes = await this.ctx.storage.get<EncryptedNote[]>('notes') || []
     const note: EncryptedNote = {
       id: crypto.randomUUID(),
@@ -137,18 +141,26 @@ export class RecordsDO extends DurableObject<Env> {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       ...(data.ephemeralPubkey ? { ephemeralPubkey: data.ephemeralPubkey } : {}),
+      ...(data.authorEnvelope ? { authorEnvelope: data.authorEnvelope } : {}),
+      ...(data.adminEnvelope ? { adminEnvelope: data.adminEnvelope } : {}),
     }
     notes.push(note)
     await this.ctx.storage.put('notes', notes)
     return Response.json({ note })
   }
 
-  private async updateNoteEntry(id: string, data: { encryptedContent: string; authorPubkey: string }): Promise<Response> {
+  private async updateNoteEntry(id: string, data: {
+    encryptedContent: string; authorPubkey: string
+    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  }): Promise<Response> {
     const notes = await this.ctx.storage.get<EncryptedNote[]>('notes') || []
     const note = notes.find(n => n.id === id)
     if (!note) return new Response('Not found', { status: 404 })
     if (note.authorPubkey !== data.authorPubkey) return new Response('Forbidden', { status: 403 })
     note.encryptedContent = data.encryptedContent
+    if (data.authorEnvelope) note.authorEnvelope = data.authorEnvelope
+    if (data.adminEnvelope) note.adminEnvelope = data.adminEnvelope
     note.updatedAt = new Date().toISOString()
     await this.ctx.storage.put('notes', notes)
     return Response.json({ note })

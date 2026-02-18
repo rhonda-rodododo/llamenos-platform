@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react'
 import { useCalls, useCallTimer, useShiftStatus } from '@/lib/hooks'
 import { createNote, addBan, getCallsTodayCount, getVolunteerPresence, listVolunteers, type ActiveCall, type VolunteerPresence, type Volunteer } from '@/lib/api'
 import { onMessage } from '@/lib/ws'
-import { encryptNote } from '@/lib/crypto'
+import { encryptNoteV2 } from '@/lib/crypto'
+import { useConfig } from '@/lib/config'
 import { useToast } from '@/lib/toast'
 import {
   PhoneIncoming,
@@ -178,6 +179,7 @@ function DashboardPage() {
             }
           }}
           secretKey={keyPair.secretKey}
+          authorPubkey={keyPair.publicKey}
         />
       )}
 
@@ -297,15 +299,17 @@ function DashboardPage() {
   )
 }
 
-function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, secretKey }: {
+function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, secretKey, authorPubkey }: {
   call: ActiveCall
   onHangup: () => void
   onReportSpam: () => void
   onBanNumber: () => void
   secretKey: Uint8Array
+  authorPubkey: string
 }) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { adminPubkey } = useConfig()
   const { formatted } = useCallTimer(call.startedAt)
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
@@ -315,8 +319,9 @@ function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, secretKey 
     if (!noteText.trim()) return
     setSaving(true)
     try {
-      const encrypted = encryptNote({ text: noteText }, secretKey)
-      await createNote({ callId: call.id, encryptedContent: encrypted })
+      const adminPub = adminPubkey || authorPubkey
+      const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2({ text: noteText }, authorPubkey, adminPub)
+      await createNote({ callId: call.id, encryptedContent, authorEnvelope, adminEnvelope })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {

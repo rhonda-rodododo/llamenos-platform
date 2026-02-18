@@ -26,7 +26,12 @@ notes.get('/', async (c) => {
 notes.post('/', async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
-  const body = await c.req.json() as { callId: string; encryptedContent: string }
+  const body = await c.req.json() as {
+    callId: string
+    encryptedContent: string
+    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  }
   const res = await dos.records.fetch(new Request('http://do/notes', {
     method: 'POST',
     body: JSON.stringify({ ...body, authorPubkey: pubkey }),
@@ -39,7 +44,11 @@ notes.patch('/:id', async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const id = c.req.param('id')
-  const body = await c.req.json() as { encryptedContent: string }
+  const body = await c.req.json() as {
+    encryptedContent: string
+    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  }
   const res = await dos.records.fetch(new Request(`http://do/notes/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ ...body, authorPubkey: pubkey }),

@@ -7,6 +7,7 @@ interface ConfigContextValue {
   hotlineNumber: string
   channels: EnabledChannels
   setupCompleted: boolean
+  adminPubkey: string
   isLoading: boolean
 }
 
@@ -23,6 +24,7 @@ const ConfigContext = createContext<ConfigContextValue>({
   hotlineNumber: '',
   channels: defaultChannels,
   setupCompleted: true,
+  adminPubkey: '',
   isLoading: true,
 })
 
@@ -31,6 +33,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [hotlineNumber, setHotlineNumber] = useState('')
   const [channels, setChannels] = useState<EnabledChannels>(defaultChannels)
   const [setupCompleted, setSetupCompleted] = useState(true)
+  const [adminPubkey, setAdminPubkey] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -40,6 +43,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setHotlineNumber(config.hotlineNumber || '')
         if (config.channels) setChannels(config.channels)
         if (config.setupCompleted !== undefined) setSetupCompleted(config.setupCompleted)
+        if (config.adminPubkey) setAdminPubkey(config.adminPubkey)
       })
       .finally(() => setIsLoading(false))
   }, [])
@@ -50,7 +54,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }, [hotlineName, isLoading])
 
   return (
-    <ConfigContext.Provider value={{ hotlineName, hotlineNumber, channels, setupCompleted, isLoading }}>
+    <ConfigContext.Provider value={{ hotlineName, hotlineNumber, channels, setupCompleted, adminPubkey, isLoading }}>
       {children}
     </ConfigContext.Provider>
   )
