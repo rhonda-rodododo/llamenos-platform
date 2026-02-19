@@ -1,0 +1,17 @@
+# Docker Compose override for E2E tests
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+#
+# Changes from production:
+#   - Exposes app port 3000 directly (bypasses Caddy)
+#   - Sets ENVIRONMENT=development (enables /api/test-reset endpoint)
+#   - Disables read_only to allow SQLite WAL files in tmpfs
+
+services:
+  app:
+    ports:
+      - "3000:3000"
+    read_only: false
+    environment:
+      - ENVIRONMENT=development

@@ -2,12 +2,14 @@
 #
 # On every push to main:
 #   1. Build & validate (typecheck, vite build, esbuild, site build)
-#   2. Auto-determine version bump from conventional commits
-#   3. Bump version, generate changelog, commit + tag
-#   4. Deploy app to Cloudflare Workers
-#   5. Deploy marketing site to Cloudflare Pages
-#   6. Create GitHub Release with changelog
+#   2. E2E tests against Cloudflare Workers (wrangler dev / miniflare)
+#   3. E2E tests against Docker Compose (Node.js self-hosted platform)
+#   4. Auto-determine version bump from conventional commits
+#   5. Bump version, generate changelog, commit + tag
+#   6. Deploy app to Cloudflare Workers + marketing site to Cloudflare Pages
+#   7. Create GitHub Release with changelog
 #
+# E2E tests MUST pass before any version bump, deployment, or release.
 # The created tag also triggers docker.yml for Docker image builds.
 
 name: CI
@@ -23,6 +25,8 @@ concurrency:
 
 env:
   BUN_VERSION: "1.2"
+  # Test admin keypair (derived from ADMIN_NSEC in tests/helpers.ts)
+  TEST_ADMIN_PUBKEY: "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
 
 jobs:
   # ─── Build & Validate ──────────────────────────────────────
@@ -31,21 +35,9 @@ jobs:
     # Skip commits made by this workflow (version bumps, changelog updates)
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
 
-    permissions:
-      contents: write
-
-    outputs:
-      new_version: ${{ steps.version.outputs.new_version }}
-      old_version: ${{ steps.version.outputs.old_version }}
-      bump_type: ${{ steps.version.outputs.bump_type }}
-      should_release: ${{ steps.version.outputs.should_release }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
@@ -85,7 +77,134 @@ jobs:
           path: site/dist/
           retention-days: 1
 
-      # ─── Determine version bump ─────────────────────────────
+  # ─── E2E Tests: Cloudflare Workers (wrangler dev) ──────────
+  e2e-cf:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create .dev.vars for tests
+        run: |
+          printf 'ADMIN_PUBKEY=%s\nENVIRONMENT=development\n' "${{ env.TEST_ADMIN_PUBKEY }}" > .dev.vars
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run E2E tests (Cloudflare Workers)
+        run: bunx playwright test
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: e2e-cf-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  # ─── E2E Tests: Docker Compose (Node.js platform) ─────────
+  e2e-docker:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Create .env for Docker Compose
+        run: |
+          printf '%s\n' \
+            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
+            "DOMAIN=localhost" \
+            "MINIO_ACCESS_KEY=testaccess" \
+            "MINIO_SECRET_KEY=testsecret123456" \
+            "HOTLINE_NAME=Llámenos" \
+            "BRIDGE_SECRET=ci-test-bridge-secret" \
+            > deploy/docker/.env
+
+      - name: Build and start Docker Compose
+        working-directory: deploy/docker
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+        timeout-minutes: 10
+
+      - name: Show container status
+        if: ${{ !cancelled() }}
+        working-directory: deploy/docker
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml ps
+          docker compose -f docker-compose.yml -f docker-compose.test.yml logs app --tail=50
+
+      - name: Verify app health
+        run: |
+          curl -sf http://localhost:3000/api/health
+          echo ""
+          echo "App is healthy!"
+
+      - name: Run E2E tests (Docker / Node.js)
+        run: bunx playwright test --config playwright.docker.config.ts
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: e2e-docker-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Tear down Docker Compose
+        if: always()
+        working-directory: deploy/docker
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
+
+  # ─── Version Bump & Changelog ──────────────────────────────
+  version:
+    needs: [build, e2e-cf, e2e-docker]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      old_version: ${{ steps.version.outputs.old_version }}
+      bump_type: ${{ steps.version.outputs.bump_type }}
+      should_release: ${{ steps.version.outputs.should_release }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Determine version bump from commits
         id: version
         run: |
@@ -133,7 +252,6 @@ jobs:
           echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "Version: $OLD_VERSION → $NEW_VERSION ($BUMP)"
 
-      # ─── Version bump + changelog ───────────────────────────
       - name: Install git-cliff
         if: steps.version.outputs.should_release == 'true'
         run: |
@@ -144,7 +262,6 @@ jobs:
         if: steps.version.outputs.should_release == 'true'
         run: |
           NEW_VERSION="${{ steps.version.outputs.new_version }}"
-          # Update package.json
           node -e "
             const pkg = require('./package.json');
             pkg.version = '$NEW_VERSION';
@@ -189,8 +306,8 @@ jobs:
 
   # ─── Deploy App to Cloudflare Workers ───────────────────────
   deploy-app:
-    needs: build
-    if: needs.build.outputs.should_release == 'true'
+    needs: version
+    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -222,8 +339,8 @@ jobs:
 
   # ─── Deploy Site to Cloudflare Pages ────────────────────────
   deploy-site:
-    needs: build
-    if: needs.build.outputs.should_release == 'true'
+    needs: version
+    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -252,8 +369,8 @@ jobs:
 
   # ─── Create GitHub Release ──────────────────────────────────
   release:
-    needs: [build, deploy-app, deploy-site]
-    if: needs.build.outputs.should_release == 'true'
+    needs: [version, deploy-app, deploy-site]
+    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -279,8 +396,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
-          tag_name: v${{ needs.build.outputs.new_version }}
-          name: v${{ needs.build.outputs.new_version }}
+          tag_name: v${{ needs.version.outputs.new_version }}
+          name: v${{ needs.version.outputs.new_version }}
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false

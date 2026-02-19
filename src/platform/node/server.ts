@@ -38,17 +38,13 @@ async function main() {
   app.route('/', workerApp as any)
 
   // Static file serving (replaces CF ASSETS binding)
-  // Must come after API routes so /api/* is handled first
-  const staticRoot = path.join(process.cwd(), 'dist', 'client')
-  app.use('*', serveStatic({
-    root: staticRoot,
-  }))
+  // The worker app's catch-all calls next() when ASSETS is null,
+  // allowing these middleware to serve static files on Node.js.
+  const staticDir = path.resolve(process.cwd(), 'dist', 'client')
+  app.use('*', serveStatic({ root: staticDir }))
 
-  // SPA fallback — serve index.html for unmatched routes
-  app.use('*', serveStatic({
-    root: staticRoot,
-    path: '/index.html',
-  }))
+  // SPA fallback — serve index.html for all unmatched routes
+  app.use('*', serveStatic({ root: staticDir, path: '/index.html' }))
 
   const port = parseInt(process.env.PORT || '3000')
   const server = serve({

@@ -36,11 +36,11 @@ test.describe('Help & Getting Started', () => {
     await faqQuestion.click()
 
     // The answer should be visible
-    await expect(page.getByText(/Use your secret key/)).toBeVisible()
+    await expect(page.getByText(/6-digit PIN/)).toBeVisible()
 
     // Click again to collapse
     await faqQuestion.click()
-    await expect(page.getByText(/Use your secret key/)).not.toBeVisible()
+    await expect(page.getByText(/6-digit PIN/)).not.toBeVisible()
   })
 
   test('help page shows admin guide for admin users', async ({ page }) => {

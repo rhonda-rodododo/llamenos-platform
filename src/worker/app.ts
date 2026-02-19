@@ -90,9 +90,11 @@ app.route('/api', api)
 
 // Static assets with security headers
 app.use('*', securityHeaders)
-app.all('*', async (c) => {
+app.all('*', async (c, next) => {
   if (!c.env.ASSETS) {
-    return new Response('Not Found', { status: 404 })
+    // Node.js mode — let the outer app's serveStatic handle static files
+    await next()
+    return
   }
   const assetResponse = await c.env.ASSETS.fetch(c.req.raw)
   return assetResponse
