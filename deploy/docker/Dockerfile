@@ -13,7 +13,7 @@ COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile --ignore-scripts
 COPY src/ src/
 COPY public/ public/
-COPY vite.config.ts tsconfig.json ./
+COPY index.html vite.config.ts tsconfig.json ./
 COPY tailwind.config.ts* ./
 RUN bun run build
 
