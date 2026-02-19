@@ -18,8 +18,11 @@ export function createBlobStorage(opts?: {
   region?: string
 }): BlobStorage {
   const endpoint = opts?.endpoint || process.env.MINIO_ENDPOINT || 'http://localhost:9000'
-  const accessKeyId = opts?.accessKeyId || process.env.MINIO_ACCESS_KEY || 'minioadmin'
-  const secretAccessKey = opts?.secretAccessKey || process.env.MINIO_SECRET_KEY || 'minioadmin'
+  const accessKeyId = opts?.accessKeyId || process.env.MINIO_ACCESS_KEY
+  const secretAccessKey = opts?.secretAccessKey || process.env.MINIO_SECRET_KEY
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('MinIO credentials required: set MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables')
+  }
   const bucket = opts?.bucket || process.env.MINIO_BUCKET || 'llamenos-files'
   const region = opts?.region || 'us-east-1'
 

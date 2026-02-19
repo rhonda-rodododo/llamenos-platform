@@ -1,0 +1,95 @@
+{{- if .Values.networkPolicy.enabled }}
+# Restrict app pod: only accept traffic from ingress controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "llamenos.fullname" . }}-app
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "llamenos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingressControllerLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.app.port }}
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow MinIO
+    {{- if .Values.minio.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "llamenos.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    {{- end }}
+    # Allow Whisper
+    {{- if .Values.whisper.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "llamenos.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: whisper
+      ports:
+        - protocol: TCP
+          port: 8080
+    {{- end }}
+    # Allow external (telephony providers, etc.)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# Restrict MinIO: only accept traffic from app pod
+{{- if .Values.minio.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "llamenos.fullname" . }}-minio
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "llamenos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "llamenos.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: app
+      ports:
+        - protocol: TCP
+          port: 9000
+{{- end }}
+{{- end }}

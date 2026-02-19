@@ -3,7 +3,9 @@ title: Getting Started
 description: Deploy your own Llamenos hotline in under an hour.
 ---
 
-Deploy your own Llamenos hotline in under an hour. You'll need a Cloudflare account, at least one communication channel (voice, SMS, WhatsApp, or Signal), and a machine with Bun installed.
+Deploy your own Llamenos hotline in under an hour. This guide covers the **Cloudflare Workers** deployment. If you prefer to self-host on your own infrastructure, see the [Self-Hosting Overview](/docs/self-hosting) for Docker Compose and Kubernetes options.
+
+You'll need a Cloudflare account, at least one communication channel (voice, SMS, WhatsApp, or Signal), and a machine with Bun installed.
 
 ## Prerequisites
 
@@ -131,6 +133,7 @@ This builds the frontend and deploys the Worker with Durable Objects to Cloudfla
 - [Admin Guide](/docs/admin-guide) — add volunteers, create shifts, configure channels and settings
 - [Volunteer Guide](/docs/volunteer-guide) — share with your volunteers
 - [Reporter Guide](/docs/reporter-guide) — set up the reporter role for encrypted report submissions
+- [Self-Hosting](/docs/self-hosting) — deploy on your own infrastructure instead of Cloudflare
 - [SMS Setup](/docs/setup-sms) — enable SMS messaging
 - [WhatsApp Setup](/docs/setup-whatsapp) — connect WhatsApp Business
 - [Signal Setup](/docs/setup-signal) — set up the Signal channel

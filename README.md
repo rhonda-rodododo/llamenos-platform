@@ -139,7 +139,11 @@ For local development, use [Cloudflare Tunnel](https://developers.cloudflare.com
 cloudflared tunnel --url http://localhost:8787
 ```
 
-## Deploy to Cloudflare
+## Deployment
+
+Llamenos supports two deployment targets. Both run the exact same application code.
+
+### Option A: Cloudflare Workers (managed)
 
 ```bash
 # Set required secrets
@@ -150,16 +154,48 @@ bunx wrangler secret put TWILIO_ACCOUNT_SID
 bunx wrangler secret put TWILIO_AUTH_TOKEN
 bunx wrangler secret put TWILIO_PHONE_NUMBER
 
-# Optional: WhatsApp Cloud API credentials
-bunx wrangler secret put WHATSAPP_ACCESS_TOKEN
-bunx wrangler secret put WHATSAPP_VERIFY_TOKEN
-bunx wrangler secret put WHATSAPP_PHONE_NUMBER_ID
-
 # Deploy
 bun run deploy
 ```
 
-After deploying, update your telephony and messaging provider webhook URLs to point to your Workers URL. Messaging channel credentials can also be configured entirely through the admin Settings UI.
+After deploying, update your telephony provider webhook URLs to point to your Workers URL. Messaging channel credentials can also be configured through the admin Settings UI.
+
+### Option B: Self-Hosted (Docker Compose)
+
+Run Llamenos on your own server with Docker Compose. Includes Caddy (automatic HTTPS), MinIO (file storage), and optional Whisper transcription.
+
+```bash
+cd deploy/docker
+cp .env.example .env
+# Edit .env with your ADMIN_PUBKEY, DOMAIN, and provider credentials
+
+docker compose up -d
+```
+
+Core services: app + Caddy + MinIO. Optional profiles for transcription, Asterisk, and Signal:
+
+```bash
+# Enable transcription
+docker compose --profile transcription up -d
+
+# Enable self-hosted Asterisk
+docker compose --profile asterisk up -d
+
+# Enable Signal messaging
+docker compose --profile signal up -d
+```
+
+### Option C: Kubernetes (Helm)
+
+```bash
+helm install llamenos deploy/helm/llamenos/ \
+  --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
+  --set secrets.minioAccessKey=your-access-key \
+  --set secrets.minioSecretKey=your-secret-key \
+  --set ingress.hosts[0].host=hotline.yourdomain.com
+```
+
+See the full [self-hosting documentation](https://llamenos-hotline.com/docs/self-hosting) for detailed guides.
 
 ## Telephony Providers
 
@@ -212,7 +248,7 @@ src/
     components/    # shadcn/ui components
     locales/       # Translation files (13 locales)
     lib/           # Auth, crypto, WebRTC, API client
-  worker/          # Cloudflare Worker backend
+  worker/          # Backend (Cloudflare Workers or Node.js)
     durable-objects/
       identity-do.ts       # Auth, WebSocket, presence, device provisioning
       settings-do.ts       # Settings, custom fields, IVR audio, messaging config
@@ -223,9 +259,15 @@ src/
     telephony/     # Voice provider adapters (Twilio, SignalWire, Vonage, Plivo, Asterisk)
     messaging/     # Messaging channel adapters (SMS, WhatsApp, Signal)
     routes/        # API route handlers
+  platform/        # Platform abstraction layer
+    cloudflare.ts  # Cloudflare Workers implementation
+    node/          # Node.js implementation (SQLite, MinIO, Whisper HTTP)
   shared/          # Code shared between client and worker
     types.ts       # Shared types (roles, conversations, reports, etc.)
     languages.ts   # Centralized language config
+deploy/
+  docker/          # Docker Compose deployment (Dockerfile, Caddyfile, .env.example)
+  helm/            # Kubernetes Helm chart
 asterisk-bridge/   # Standalone ARI bridge for self-hosted Asterisk
 site/              # Marketing site (Astro + Tailwind, Cloudflare Pages)
 ```
@@ -251,6 +293,36 @@ site/              # Marketing site (Astro + Tailwind, Cloudflare Pages)
 | Volunteer | Own notes, assigned conversations | Answer calls, write notes, respond to messages |
 | Reporter | Own reports only | Submit encrypted reports with file attachments |
 | Admin | All notes, reports, audit logs, conversations | Manage everything |
+
+## CI/CD
+
+Every push to `main` triggers the CI pipeline (`.github/workflows/ci.yml`):
+
+1. **Build & validate** — typecheck, Vite build, esbuild (Node.js), Astro site build
+2. **Auto-version** — determines `major`/`minor`/`patch` bump from conventional commit messages
+3. **Changelog** — generates via [git-cliff](https://git-cliff.org) from commit history
+4. **Deploy** — app Worker to Cloudflare Workers, marketing site to Cloudflare Pages (parallel)
+5. **Release** — creates GitHub Release with changelog notes
+6. **Docker** — the created tag triggers `docker.yml` to build + push images to GHCR
+
+### Required GitHub Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers + Pages deploy permissions |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID |
+
+`GITHUB_TOKEN` is provided automatically by GitHub Actions.
+
+### Versioning
+
+Uses [conventional commits](https://www.conventionalcommits.org/) to determine the version bump:
+
+- `feat:` → minor bump (0.x.0)
+- `fix:`, `docs:`, `chore:`, etc. → patch bump (0.0.x)
+- `feat!:` or `BREAKING CHANGE` → major bump (x.0.0)
+
+Manual versioning: `bun run version:bump <major|minor|patch> [description]`
 
 ## Development
 

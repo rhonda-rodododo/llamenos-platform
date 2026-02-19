@@ -27,19 +27,31 @@ RUN node esbuild.node.mjs
 
 # Stage 3: Production
 FROM node:22-slim
+
+# Install curl for healthcheck, then clean up
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r llamenos && useradd -r -g llamenos -d /app -s /sbin/nologin llamenos
+
 WORKDIR /app
 
 # Install better-sqlite3 native module
 COPY package.json ./
 RUN npm install --production --ignore-scripts && \
-    npm install better-sqlite3 --build-from-source
+    npm install better-sqlite3 --build-from-source && \
+    npm cache clean --force
 
 # Copy built artifacts
 COPY --from=frontend /app/dist/client/ dist/client/
 COPY --from=backend /app/dist/server/ dist/server/
 
-# Create data directory for SQLite databases
-RUN mkdir -p /app/data
+# Create data directory with correct ownership
+RUN mkdir -p /app/data && chown -R llamenos:llamenos /app
+
+# Switch to non-root user
+USER llamenos
 
 # Environment defaults
 ENV PLATFORM=node \

@@ -29,13 +29,14 @@ minio:
   enabled: true
   image:
     repository: minio/minio
-    tag: latest
+    tag: "RELEASE.2025-01-20T14-49-07Z"
   persistence:
     size: 50Gi
     storageClass: ""
+  # REQUIRED: Set unique credentials — never use defaults
   credentials:
-    accessKey: minioadmin
-    secretKey: minioadmin
+    accessKey: ""
+    secretKey: ""
   bucket: llamenos-files
   resources:
     requests:
@@ -50,7 +51,7 @@ whisper:
   enabled: false
   image:
     repository: fedirz/faster-whisper-server
-    tag: latest
+    tag: "0.4.1"
   model: "Systran/faster-whisper-base"
   device: "cpu"  # or "cuda" for GPU
   resources:
@@ -66,7 +67,7 @@ asterisk:
   enabled: false
   image:
     repository: andrius/asterisk
-    tag: latest
+    tag: "20.11"
 
 # Asterisk bridge
 asteriskBridge:
@@ -74,16 +75,23 @@ asteriskBridge:
   image:
     repository: ghcr.io/your-org/llamenos-asterisk-bridge
     tag: ""
-  bridgeSecret: changeme
+  # REQUIRED if using Asterisk: set a strong random secret
+  bridgeSecret: ""
 
 # Signal CLI messaging bridge
 signal:
   enabled: false
   image:
     repository: bbernhard/signal-cli-rest-api
-    tag: latest
+    tag: "0.92"
   persistence:
     size: 1Gi
+
+# Network policies (restrict pod-to-pod traffic)
+networkPolicy:
+  enabled: true
+  ingressControllerLabels:
+    app.kubernetes.io/name: ingress-nginx
 
 # Ingress
 ingress:
@@ -126,7 +134,7 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 1000
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
       - ALL

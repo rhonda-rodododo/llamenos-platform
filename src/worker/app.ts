@@ -31,10 +31,11 @@ const app = new Hono<AppEnv>()
 
 // --- API routes: CORS on all /api/* ---
 const api = new Hono<AppEnv>()
-api.use('*', cors)
 
-// Health check (no auth, no CORS — used by Docker/K8s probes)
-api.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
+// Health check — before CORS middleware (internal probes only, no external access needed)
+api.get('/health', (c) => c.json({ status: 'ok' }))
+
+api.use('*', cors)
 
 // Public routes (no auth)
 api.route('/config', configRoutes)
@@ -58,6 +59,10 @@ api.get('/ivr-audio/:promptType/:language', async (c) => {
   const dos = getDOs(c.env)
   const promptType = c.req.param('promptType')
   const language = c.req.param('language')
+  // Validate path params to prevent injection into the internal DO URL
+  if (!/^[a-z_-]+$/.test(promptType) || !/^[a-z]{2,5}(-[A-Z]{2})?$/.test(language)) {
+    return c.json({ error: 'Invalid parameters' }, 400)
+  }
   return dos.settings.fetch(new Request(`http://do/settings/ivr-audio/${promptType}/${language}`))
 })
 

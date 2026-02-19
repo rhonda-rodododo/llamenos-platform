@@ -6,6 +6,15 @@ guides:
   - title: Primeros Pasos
     description: Requisitos previos, instalacion, asistente de configuracion y tu primer despliegue.
     href: /docs/getting-started
+  - title: Autoalojamiento
+    description: Despliega en tu propia infraestructura con Docker Compose o Kubernetes.
+    href: /docs/self-hosting
+  - title: "Desplegar: Docker Compose"
+    description: Despliegue autoalojado en un solo servidor con HTTPS automatico.
+    href: /docs/deploy-docker
+  - title: "Desplegar: Kubernetes (Helm)"
+    description: Despliega en Kubernetes con el chart oficial de Helm.
+    href: /docs/deploy-kubernetes
   - title: Guia de Administrador
     description: Gestiona voluntarios, turnos, canales, conversaciones, reportes, bloqueos y configuracion.
     href: /docs/admin-guide
@@ -52,18 +61,19 @@ guides:
 
 ## Arquitectura general
 
-Llamenos es una aplicacion de pagina unica (SPA) respaldada por Cloudflare Workers y Durable Objects. No hay servidores tradicionales que gestionar. Soporta llamadas de voz, SMS, WhatsApp y Signal — todo enrutado a voluntarios en turno a traves de una interfaz unificada.
+Llamenos es una aplicacion de pagina unica (SPA) que puede ejecutarse en **Cloudflare Workers** o en tu propia infraestructura via **Docker Compose / Kubernetes**. Soporta llamadas de voz, SMS, WhatsApp y Signal — todo enrutado a voluntarios en turno a traves de una interfaz unificada.
 
-| Componente | Tecnologia |
-|---|---|
-| Frontend | Vite + React + TanStack Router |
-| Backend | Cloudflare Workers + 4 Durable Objects |
-| Voz | Twilio, SignalWire, Vonage, Plivo o Asterisk (via TelephonyAdapter) |
-| Mensajeria | SMS, WhatsApp Business, Signal (via MessagingAdapter) |
-| Autenticacion | Claves Nostr (BIP-340 Schnorr) + WebAuthn |
-| Cifrado | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Transcripcion | Cloudflare Workers AI (Whisper) |
-| i18n | i18next (12+ idiomas) |
+| Componente | Cloudflare | Autoalojado |
+|---|---|---|
+| Frontend | Vite + React + TanStack Router | Igual |
+| Backend | Cloudflare Workers + 6 Durable Objects | Node.js + SQLite |
+| Almacenamiento | R2 | MinIO (compatible con S3) |
+| Voz | Twilio, SignalWire, Vonage, Plivo o Asterisk | Igual |
+| Mensajeria | SMS, WhatsApp Business, Signal | Igual |
+| Autenticacion | Claves Nostr (BIP-340 Schnorr) + WebAuthn | Igual |
+| Cifrado | ECIES (secp256k1 + XChaCha20-Poly1305) | Igual |
+| Transcripcion | Workers AI (Whisper) | Contenedor faster-whisper |
+| i18n | i18next (13 idiomas) | Igual |
 
 ## Roles
 

@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-02-18
+
+### Features
+
+- **Multi-platform deployment**: Abstract all Cloudflare-specific APIs behind platform interfaces to enable self-hosted deployment via Docker Compose and Kubernetes
+- Platform abstraction layer (`src/platform/`) with DurableObject shim (SQLite/better-sqlite3), WebSocketPair polyfill, S3/MinIO blob storage, faster-whisper transcription client
+- Docker Compose infrastructure: app + Caddy reverse proxy + MinIO (core), with optional Whisper, Asterisk, and Signal profiles
+- Helm chart for Kubernetes deployment with configurable MinIO, Whisper, ingress, secrets, and persistent volumes
+- CI/CD GitHub Actions workflow for automatic Docker image builds and GHCR push on tag
+- Health check endpoint (`GET /api/health`) for Docker/K8s probes
+- Build-time aliasing: esbuild maps `cloudflare:workers` → Node.js shims without modifying DO source files
+
+### Security
+
+- **SQLite LIKE injection fix**: Escape `%` and `_` wildcards in DO storage `list()` prefix queries
+- **Path traversal prevention**: Sanitize className and instanceId in DO context creation
+- **Remove hardcoded credentials**: MinIO and BRIDGE_SECRET no longer have default values — require explicit configuration
+- **SSRF prevention**: Validate WHISPER_URL restricts to trusted internal hosts only
+- **Health endpoint hardening**: Remove timestamp from response, move before CORS middleware
+- **IVR audio param validation**: Restrict promptType/language to safe character patterns
+- **Docker non-root**: App container runs as dedicated `llamenos` user with read-only filesystem
+- **Container image pinning**: All Docker Compose and Helm images pinned to specific versions (no `latest`)
+- **Caddy security headers**: CSP, Permissions-Policy, HSTS (2yr), X-Permitted-Cross-Domain-Policies
+- **Helm secrets**: MinIO credentials stored in K8s Secret (not plaintext env vars)
+- **NetworkPolicy**: Helm chart includes pod-to-pod traffic restrictions
+- **K8s hardening**: readOnlyRootFilesystem, automountServiceAccountToken: false, tmpfs for /tmp
+- **CI/CD supply chain**: GitHub Actions pinned to commit SHAs, Trivy vulnerability scanning added
+- **Docker Compose required vars**: `ADMIN_PUBKEY`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` use `:?` syntax — Compose refuses to start if unset
+- **Asterisk isolation**: SIP ports removed from host binding (internal network only)
+
+### CI/CD
+
+- Continuous release pipeline (`ci.yml`) — on every push to main: typecheck, build, auto-version from conventional commits, changelog via git-cliff, deploy to CF Workers + Pages, GitHub Release
+- Docker image builds (`docker.yml`) triggered automatically by release tags
+- Parallel deploy: app Worker and marketing site deploy concurrently after build
+
+### Architecture
+
+- `src/platform/types.ts` — shared interfaces (StorageApi, DOContext, BlobStorage, TranscriptionService)
+- `src/platform/node/durable-object.ts` — SQLite-backed DO shim with WAL mode and setTimeout alarms
+- `src/platform/node/websocket-pair.ts` — EventEmitter-based WebSocketPair polyfill
+- `src/platform/node/blob-storage.ts` — S3-compatible storage via @aws-sdk/client-s3
+- `src/platform/node/transcription.ts` — HTTP client for faster-whisper OpenAI-compatible API
+- `src/platform/node/server.ts` — @hono/node-server entry point with static serving and WS upgrade
+- `src/worker/types.ts` — Env interface refactored with structural typing (DOStub, DONamespace)
+
+### Infrastructure
+
+- `deploy/docker/Dockerfile` — multi-stage build (frontend + backend + production)
+- `deploy/docker/docker-compose.yml` — 6 services with profile-based optional components
+- `deploy/docker/Caddyfile` — reverse proxy with automatic HTTPS and security headers
+- `deploy/helm/llamenos/` — full Helm chart with deployment, service, ingress, PVC, secrets templates
+- `.github/workflows/docker.yml` — GHCR image build for app + asterisk-bridge on tag push
+- `.dockerignore` — build exclusions for lean images
+
 ## [0.9.1] - 2026-02-18
 
 ### Documentation

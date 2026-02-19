@@ -6,6 +6,15 @@ guides:
   - title: Getting Started
     description: Prerequisites, installation, setup wizard, and your first deployment.
     href: /docs/getting-started
+  - title: Self-Hosting Overview
+    description: Deploy on your own infrastructure with Docker Compose or Kubernetes.
+    href: /docs/self-hosting
+  - title: "Deploy: Docker Compose"
+    description: Single-server self-hosted deployment with automatic HTTPS.
+    href: /docs/deploy-docker
+  - title: "Deploy: Kubernetes (Helm)"
+    description: Deploy to Kubernetes with the official Helm chart.
+    href: /docs/deploy-kubernetes
   - title: Admin Guide
     description: Manage volunteers, shifts, channels, ban lists, reports, and settings.
     href: /docs/admin-guide
@@ -52,18 +61,19 @@ guides:
 
 ## Architecture overview
 
-Llamenos is a single-page application (SPA) backed by Cloudflare Workers and Durable Objects. There are no traditional servers to manage. It supports voice calls, SMS, WhatsApp, and Signal — all routed to on-shift volunteers through a unified interface.
+Llamenos is a single-page application (SPA) that can run on **Cloudflare Workers** or on your own infrastructure via **Docker Compose / Kubernetes**. It supports voice calls, SMS, WhatsApp, and Signal — all routed to on-shift volunteers through a unified interface.
 
-| Component | Technology |
-|---|---|
-| Frontend | Vite + React + TanStack Router |
-| Backend | Cloudflare Workers + 4 Durable Objects |
-| Voice | Twilio, SignalWire, Vonage, Plivo, or Asterisk (via TelephonyAdapter) |
-| Messaging | SMS, WhatsApp Business, Signal (via MessagingAdapter) |
-| Auth | Nostr keypairs (BIP-340 Schnorr) + WebAuthn |
-| Encryption | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Transcription | Cloudflare Workers AI (Whisper) |
-| i18n | i18next (12+ languages) |
+| Component | Cloudflare | Self-Hosted |
+|---|---|---|
+| Frontend | Vite + React + TanStack Router | Same |
+| Backend | Cloudflare Workers + 6 Durable Objects | Node.js + SQLite |
+| Blob Storage | R2 | MinIO (S3-compatible) |
+| Voice | Twilio, SignalWire, Vonage, Plivo, or Asterisk | Same |
+| Messaging | SMS, WhatsApp Business, Signal | Same |
+| Auth | Nostr keypairs (BIP-340 Schnorr) + WebAuthn | Same |
+| Encryption | ECIES (secp256k1 + XChaCha20-Poly1305) | Same |
+| Transcription | Workers AI (Whisper) | faster-whisper container |
+| i18n | i18next (13 languages) | Same |
 
 ## Roles
 

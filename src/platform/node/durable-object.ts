@@ -57,7 +57,9 @@ class SqliteStorage implements StorageApi {
     const result = new Map<string, unknown>()
     let rows: Array<{ key: string; value: string }>
     if (options?.prefix) {
-      rows = this.db.prepare('SELECT key, value FROM kv WHERE key LIKE ?').all(`${options.prefix}%`) as Array<{ key: string; value: string }>
+      // Escape LIKE wildcards to prevent injection
+      const escaped = options.prefix.replace(/[%_\\]/g, '\\$&')
+      rows = this.db.prepare("SELECT key, value FROM kv WHERE key LIKE ? ESCAPE '\\'").all(`${escaped}%`) as Array<{ key: string; value: string }>
     } else {
       rows = this.db.prepare('SELECT key, value FROM kv').all() as Array<{ key: string; value: string }>
     }
@@ -203,10 +205,23 @@ export class DurableObject<Env = unknown> {
 }
 
 /**
+ * Sanitize a string for use in a filename — strip path separators and
+ * non-alphanumeric characters to prevent directory traversal.
+ */
+function sanitizeForPath(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, '')
+}
+
+/**
  * Create a DurableObject context for a given class name and instance ID.
  */
 export function createDOContext(className: string, instanceId: string): DOContext & { _storage: SqliteStorage; _wsManager: WebSocketManager } {
-  const dbPath = path.join(DATA_DIR, `${className}-${instanceId}.db`)
+  const safeClass = sanitizeForPath(className)
+  const safeId = sanitizeForPath(instanceId)
+  if (!safeClass || !safeId) {
+    throw new Error(`Invalid DO class/instance: ${className}/${instanceId}`)
+  }
+  const dbPath = path.join(DATA_DIR, `${safeClass}-${safeId}.db`)
   const storage = new SqliteStorage(dbPath)
   const wsManager = new WebSocketManager()
 

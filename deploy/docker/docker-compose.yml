@@ -18,6 +18,9 @@
 #   docker compose --profile asterisk up -d             # + Asterisk
 #   docker compose --profile signal up -d               # + Signal
 #   COMPOSE_PROFILES=transcription,signal docker compose up -d
+#
+# IMPORTANT: You MUST set MINIO_ACCESS_KEY, MINIO_SECRET_KEY, and
+# BRIDGE_SECRET (if using Asterisk) in your .env file before starting.
 
 name: llamenos
 
@@ -28,18 +31,21 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
     volumes:
       - app-data:/app/data
     environment:
       - PLATFORM=node
       - PORT=3000
       - DATA_DIR=/app/data
-      - ADMIN_PUBKEY=${ADMIN_PUBKEY}
+      - ADMIN_PUBKEY=${ADMIN_PUBKEY:?ADMIN_PUBKEY is required}
       - HOTLINE_NAME=${HOTLINE_NAME:-Hotline}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
       - MINIO_BUCKET=${MINIO_BUCKET:-llamenos-files}
       - WHISPER_URL=${WHISPER_URL:-http://whisper:8080/v1/audio/transcriptions}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
@@ -59,7 +65,7 @@ services:
       start_period: 20s
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.9-alpine
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
@@ -79,14 +85,14 @@ services:
         condition: service_healthy
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
     command: server /data --console-address ":9001"
     restart: unless-stopped
     volumes:
       - minio-data:/data
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
     networks:
       - internal
     healthcheck:
@@ -98,7 +104,7 @@ services:
 
   # ── Optional: Whisper Transcription ───────────────────────
   whisper:
-    image: fedirz/faster-whisper-server:latest
+    image: fedirz/faster-whisper-server:0.4.1
     profiles: ["transcription"]
     restart: unless-stopped
     environment:
@@ -115,12 +121,9 @@ services:
 
   # ── Optional: Asterisk PBX ───────────────────────────────
   asterisk:
-    image: andrius/asterisk:latest
+    image: andrius/asterisk:20.11
     profiles: ["asterisk"]
     restart: unless-stopped
-    ports:
-      - "5060:5060/udp"
-      - "5060:5060/tcp"
     volumes:
       - asterisk-config:/etc/asterisk
     networks:
@@ -141,7 +144,7 @@ services:
     environment:
       - ARI_URL=ws://asterisk:8088/ari/events
       - WORKER_WEBHOOK_URL=http://app:3000
-      - BRIDGE_SECRET=${BRIDGE_SECRET:-changeme}
+      - BRIDGE_SECRET=${BRIDGE_SECRET:?BRIDGE_SECRET is required — generate a random value}
     networks:
       - internal
     depends_on:
@@ -152,7 +155,7 @@ services:
 
   # ── Optional: Signal Messaging ───────────────────────────
   signal-cli:
-    image: bbernhard/signal-cli-rest-api:latest
+    image: bbernhard/signal-cli-rest-api:0.92
     profiles: ["signal"]
     restart: unless-stopped
     environment:

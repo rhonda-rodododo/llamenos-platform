@@ -23,6 +23,7 @@ spec:
         {{- include "llamenos.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: app
     spec:
+      automountServiceAccountToken: false
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -74,9 +75,15 @@ spec:
             - name: MINIO_ENDPOINT
               value: "http://{{ include "llamenos.fullname" . }}-minio:9000"
             - name: MINIO_ACCESS_KEY
-              value: {{ .Values.minio.credentials.accessKey | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llamenos.secretName" . }}
+                  key: minio-access-key
             - name: MINIO_SECRET_KEY
-              value: {{ .Values.minio.credentials.secretKey | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llamenos.secretName" . }}
+                  key: minio-secret-key
             - name: MINIO_BUCKET
               value: {{ .Values.minio.bucket | quote }}
             {{- end }}
@@ -118,7 +125,13 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
       volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
         - name: data
           {{- if .Values.app.persistence.enabled }}
           persistentVolumeClaim:

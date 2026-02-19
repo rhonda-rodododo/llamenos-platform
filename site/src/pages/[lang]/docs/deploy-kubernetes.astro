@@ -1,0 +1,18 @@
+---
+import DocsLayout from '../../../layouts/DocsLayout.astro';
+import { getEntry, render } from 'astro:content';
+import { type Lang, nonDefaultLocales } from '../../../i18n/config';
+
+export function getStaticPaths() {
+  return nonDefaultLocales.map(lang => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+const entry = (await getEntry('docs', `${lang}/deploy-kubernetes`)) ?? (await getEntry('docs', 'en/deploy-kubernetes'))!;
+const { Content } = await render(entry);
+---
+
+<DocsLayout title={entry.data.title} lang={lang}>
+  <h1>{entry.data.title}</h1>
+  <Content />
+</DocsLayout>
