@@ -1,7 +1,8 @@
+import type { DOStub } from '../types'
 import { hashIP } from '../lib/crypto'
 
 export async function audit(
-  records: DurableObjectStub,
+  records: DOStub,
   event: string,
   actorPubkey: string,
   details: Record<string, unknown> = {},

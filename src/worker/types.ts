@@ -1,13 +1,45 @@
+import type { BlobStorage, TranscriptionService } from '../platform/types'
+import type { MessagingChannelType } from '../shared/types'
+
+/**
+ * Environment bindings.
+ *
+ * On Cloudflare Workers: these are real CF bindings (DurableObjectNamespace, Ai, R2Bucket, Fetcher).
+ * On Node.js: these are shims from src/platform/node/ that implement the same method signatures.
+ *
+ * We use structural typing — the interfaces only require the methods we actually call.
+ */
+
+/** Minimal DurableObjectStub — only .fetch() is used */
+export interface DOStub {
+  fetch(request: Request): Promise<Response>
+}
+
+/** Minimal DurableObjectNamespace — only .idFromName() and .get() are used */
+export interface DONamespace {
+  idFromName(name: string): { toString(): string }
+  get(id: { toString(): string }): DOStub
+}
+
 export interface Env {
-  CALL_ROUTER: DurableObjectNamespace
-  SHIFT_MANAGER: DurableObjectNamespace
-  IDENTITY_DO: DurableObjectNamespace
-  SETTINGS_DO: DurableObjectNamespace
-  RECORDS_DO: DurableObjectNamespace
-  CONVERSATION_DO: DurableObjectNamespace
-  AI: Ai
-  ASSETS: Fetcher
-  R2_BUCKET: R2Bucket
+  // Durable Object namespaces (CF: DurableObjectNamespace, Node: shim)
+  CALL_ROUTER: DONamespace
+  SHIFT_MANAGER: DONamespace
+  IDENTITY_DO: DONamespace
+  SETTINGS_DO: DONamespace
+  RECORDS_DO: DONamespace
+  CONVERSATION_DO: DONamespace
+
+  // Transcription (CF: Ai binding, Node: Whisper HTTP client)
+  AI: TranscriptionService
+
+  // Static assets (CF: Fetcher, Node: null — served by Hono serveStatic)
+  ASSETS: { fetch(request: Request): Promise<Response> } | null
+
+  // Blob storage (CF: R2Bucket, Node: MinIO S3 client)
+  R2_BUCKET: BlobStorage
+
+  // Plain env vars / secrets (same on both platforms)
   TWILIO_ACCOUNT_SID: string
   TWILIO_AUTH_TOKEN: string
   TWILIO_PHONE_NUMBER: string
@@ -139,8 +171,6 @@ export interface AuthPayload {
 }
 
 // --- Conversation / Messaging Types ---
-
-import type { MessagingChannelType } from '../shared/types'
 
 export type ConversationStatus = 'active' | 'waiting' | 'closed'
 

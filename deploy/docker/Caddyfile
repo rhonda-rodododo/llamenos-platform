@@ -1,0 +1,30 @@
+{$DOMAIN:localhost} {
+	# API, telephony, messaging, and WebSocket routes → app
+	handle /api/* {
+		reverse_proxy app:3000
+	}
+
+	handle /telephony/* {
+		reverse_proxy app:3000
+	}
+
+	handle /messaging/* {
+		reverse_proxy app:3000
+	}
+
+	# Everything else → app (serves SPA static files)
+	handle {
+		reverse_proxy app:3000
+	}
+
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	encode gzip zstd
+}

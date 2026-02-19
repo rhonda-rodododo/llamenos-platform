@@ -43,7 +43,7 @@ export async function verifyAuthToken(auth: AuthPayload): Promise<boolean> {
 
 export async function authenticateRequest(
   request: Request,
-  identityDO: DurableObjectStub
+  identityDO: { fetch(req: Request): Promise<Response> }
 ): Promise<{ pubkey: string; volunteer: Volunteer } | null> {
   const authHeader = request.headers.get('Authorization')
 

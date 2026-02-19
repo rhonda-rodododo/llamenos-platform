@@ -73,6 +73,17 @@
 - [x] Epic 47: Reporter Role & Encrypted File Uploads
 - [x] In-App Guidance: Help page, FAQ, Getting Started checklist, command palette integration
 
+## Multi-Platform Deployment (Epic 55) — COMPLETE
+- [x] Platform abstraction layer (`src/platform/`) — interfaces for StorageApi, BlobStorage, TranscriptionService
+- [x] Node.js DurableObject shim with SQLite-backed storage (better-sqlite3, WAL mode)
+- [x] WebSocketPair polyfill for Node.js (EventEmitter-based connected shim sockets)
+- [x] Refactored Env interface with structural typing (DOStub, DONamespace, BlobStorage, TranscriptionService)
+- [x] esbuild Node.js build with `cloudflare:workers` → `src/platform/index.ts` alias
+- [x] Docker infrastructure (Dockerfile, docker-compose.yml, Caddyfile, .env.example)
+- [x] Helm chart for Kubernetes (app, MinIO, Whisper, optional Asterisk/Signal)
+- [x] CI/CD GitHub Actions workflow for Docker image builds (GHCR)
+- [x] Health check endpoint (`/api/health`)
+
 ## Low Priority (Post-Launch)
 - [ ] Add call recording playback in notes view
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)

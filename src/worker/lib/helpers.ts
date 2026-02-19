@@ -23,7 +23,7 @@ export function uint8ArrayToBase64URL(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-export async function buildAudioUrlMap(settings: DurableObjectStub, origin: string): Promise<Record<string, string>> {
+export async function buildAudioUrlMap(settings: { fetch(req: Request): Promise<Response> }, origin: string): Promise<Record<string, string>> {
   const audioRes = await settings.fetch(new Request('http://do/settings/ivr-audio'))
   const { recordings } = await audioRes.json() as { recordings: Array<{ promptType: string; language: string }> }
   const map: Record<string, string> = {}
@@ -37,7 +37,7 @@ export function telephonyResponse(response: { contentType: string; body: string 
   return new Response(response.body, { headers: { 'Content-Type': response.contentType } })
 }
 
-export async function checkRateLimit(settings: DurableObjectStub, key: string, maxPerMinute: number): Promise<boolean> {
+export async function checkRateLimit(settings: { fetch(req: Request): Promise<Response> }, key: string, maxPerMinute: number): Promise<boolean> {
   const rlRes = await settings.fetch(new Request('http://do/rate-limit/check', {
     method: 'POST',
     body: JSON.stringify({ key, maxPerMinute }),

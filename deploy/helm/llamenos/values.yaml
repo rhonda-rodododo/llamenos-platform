@@ -1,0 +1,136 @@
+# Llamenos Helm chart values
+
+app:
+  image:
+    repository: ghcr.io/your-org/llamenos
+    tag: ""  # Defaults to Chart.appVersion
+    pullPolicy: IfNotPresent
+  replicas: 1  # Must be 1 (SQLite is single-writer)
+  port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+  env:
+    HOTLINE_NAME: "Hotline"
+    ENVIRONMENT: "production"
+
+# MinIO for blob storage
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+  persistence:
+    size: 50Gi
+    storageClass: ""
+  credentials:
+    accessKey: minioadmin
+    secretKey: minioadmin
+  bucket: llamenos-files
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Whisper transcription
+whisper:
+  enabled: false
+  image:
+    repository: fedirz/faster-whisper-server
+    tag: latest
+  model: "Systran/faster-whisper-base"
+  device: "cpu"  # or "cuda" for GPU
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+# Asterisk PBX
+asterisk:
+  enabled: false
+  image:
+    repository: andrius/asterisk
+    tag: latest
+
+# Asterisk bridge
+asteriskBridge:
+  enabled: false
+  image:
+    repository: ghcr.io/your-org/llamenos-asterisk-bridge
+    tag: ""
+  bridgeSecret: changeme
+
+# Signal CLI messaging bridge
+signal:
+  enabled: false
+  image:
+    repository: bbernhard/signal-cli-rest-api
+    tag: latest
+  persistence:
+    size: 1Gi
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: hotline.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: llamenos-tls
+  #   hosts:
+  #     - hotline.example.org
+
+# Secrets (reference existing K8s secrets)
+secrets:
+  # Create a secret named "llamenos-secrets" with these keys:
+  #   admin-pubkey, twilio-account-sid, twilio-auth-token, twilio-phone-number
+  existingSecret: ""
+  # Or provide values directly (will be base64-encoded into a Secret)
+  adminPubkey: ""
+  twilioAccountSid: ""
+  twilioAuthToken: ""
+  twilioPhoneNumber: ""
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod-level settings
+podAnnotations: {}
+podSecurityContext:
+  fsGroup: 1000
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

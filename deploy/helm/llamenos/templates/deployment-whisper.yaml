@@ -1,0 +1,59 @@
+{{- if .Values.whisper.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "llamenos.fullname" . }}-whisper
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: whisper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "llamenos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: whisper
+  template:
+    metadata:
+      labels:
+        {{- include "llamenos.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: whisper
+    spec:
+      containers:
+        - name: whisper
+          image: "{{ .Values.whisper.image.repository }}:{{ .Values.whisper.image.tag }}"
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: WHISPER__MODEL
+              value: {{ .Values.whisper.model | quote }}
+            - name: WHISPER__DEVICE
+              value: {{ .Values.whisper.device | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          {{- with .Values.whisper.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "llamenos.fullname" . }}-whisper
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: whisper
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      name: http
+  selector:
+    {{- include "llamenos.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: whisper
+{{- end }}

@@ -1,0 +1,95 @@
+{{- if .Values.minio.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "llamenos.fullname" . }}-minio
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "llamenos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "llamenos.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      containers:
+        - name: minio
+          image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          env:
+            - name: MINIO_ROOT_USER
+              value: {{ .Values.minio.credentials.accessKey | quote }}
+            - name: MINIO_ROOT_PASSWORD
+              value: {{ .Values.minio.credentials.secretKey | quote }}
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          {{- with .Values.minio.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "llamenos.fullname" . }}-minio
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "llamenos.fullname" . }}-minio
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.minio.persistence.storageClass }}
+  storageClassName: {{ .Values.minio.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.minio.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "llamenos.fullname" . }}-minio
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: api
+      name: api
+    - port: 9001
+      targetPort: console
+      name: console
+  selector:
+    {{- include "llamenos.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+{{- end }}

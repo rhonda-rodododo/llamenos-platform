@@ -33,6 +33,9 @@ const app = new Hono<AppEnv>()
 const api = new Hono<AppEnv>()
 api.use('*', cors)
 
+// Health check (no auth, no CORS — used by Docker/K8s probes)
+api.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }))
+
 // Public routes (no auth)
 api.route('/config', configRoutes)
 api.route('/', devRoutes)

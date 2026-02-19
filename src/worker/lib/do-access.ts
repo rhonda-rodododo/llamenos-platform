@@ -1,4 +1,4 @@
-import type { Env } from '../types'
+import type { Env, DOStub } from '../types'
 import type { TelephonyAdapter } from '../telephony/adapter'
 import type { MessagingAdapter } from '../messaging/adapter'
 import type { TelephonyProviderConfig, MessagingChannelType, MessagingConfig } from '../../shared/types'
@@ -19,12 +19,12 @@ const CALL_ID = 'global-calls'
 const CONVERSATION_ID = 'global-conversations'
 
 export interface DurableObjects {
-  identity: DurableObjectStub
-  settings: DurableObjectStub
-  records: DurableObjectStub
-  shifts: DurableObjectStub
-  calls: DurableObjectStub
-  conversations: DurableObjectStub
+  identity: DOStub
+  settings: DOStub
+  records: DOStub
+  shifts: DOStub
+  calls: DOStub
+  conversations: DOStub
 }
 
 export function getDOs(env: Env): DurableObjects {

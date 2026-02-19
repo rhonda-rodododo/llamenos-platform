@@ -1,5 +1,56 @@
 # Completed Backlog
 
+## 2026-02-18: Epic 55 — Multi-Platform Deployment (Docker Compose + Helm)
+
+### Platform Abstraction Layer
+- [x] `src/platform/types.ts` — shared interfaces: StorageApi, DOContext, BlobStorage, TranscriptionService
+- [x] `src/platform/index.ts` — Node.js build entry (esbuild alias for `cloudflare:workers`)
+- [x] `src/platform/cloudflare.ts` — CF re-export (thin wrapper)
+- [x] `src/platform/node/durable-object.ts` — SQLite-backed DO shim (better-sqlite3, WAL mode, setTimeout alarms)
+- [x] `src/platform/node/websocket-pair.ts` — WebSocketPair polyfill (EventEmitter-based connected shim sockets)
+- [x] `src/platform/node/blob-storage.ts` — S3/MinIO client (@aws-sdk/client-s3)
+- [x] `src/platform/node/transcription.ts` — HTTP client for faster-whisper container
+- [x] `src/platform/node/env.ts` — Node.js env shim (Docker secrets + env vars, DO singletons)
+- [x] `src/platform/node/server.ts` — @hono/node-server entry point with static files + WS upgrade
+- [x] `src/platform/node/cf-types.d.ts` — Type declarations replacing @cloudflare/workers-types
+
+### Worker Refactoring (CF deployment unchanged)
+- [x] `src/worker/types.ts` — Platform-aware Env with DOStub, DONamespace, BlobStorage, TranscriptionService
+- [x] `src/worker/lib/do-access.ts` — Changed DurableObjectStub → DOStub
+- [x] `src/worker/services/audit.ts` — Changed DurableObjectStub → DOStub
+- [x] `src/worker/lib/helpers.ts` — Structural typing for stub parameter
+- [x] `src/worker/lib/auth.ts` — Structural typing for identityDO parameter
+- [x] `src/worker/app.ts` — Added `/api/health` endpoint
+
+### Build System
+- [x] `esbuild.node.mjs` — Node.js build config with `cloudflare:workers` alias + path aliases
+- [x] `package.json` — Added build:node, build:docker, start:node scripts + new dependencies
+
+### Docker Infrastructure
+- [x] `deploy/docker/Dockerfile` — Multi-stage build (frontend + backend + production)
+- [x] `deploy/docker/docker-compose.yml` — app, caddy, minio (core) + whisper, asterisk, signal (profiles)
+- [x] `deploy/docker/Caddyfile` — Reverse proxy with security headers
+- [x] `deploy/docker/.env.example` — All configuration variables documented
+- [x] `.dockerignore` — Build exclusions
+
+### Helm Chart (`deploy/helm/llamenos/`)
+- [x] `Chart.yaml` — apiVersion v2, appVersion 0.9.1
+- [x] `values.yaml` — Configurable app, MinIO, Whisper, Asterisk, Signal, ingress, secrets
+- [x] `templates/` — deployment-app, service-app, ingress, secret, pvc-app, deployment-minio, deployment-whisper, serviceaccount, NOTES.txt, _helpers.tpl
+
+### CI/CD
+- [x] `.github/workflows/docker.yml` — Build + push to GHCR on tag push (app + asterisk-bridge images)
+
+### New Dependencies
+- @hono/node-server, @hono/node-ws, better-sqlite3, @aws-sdk/client-s3, ws, esbuild
+- @types/better-sqlite3, @types/ws (devDeps)
+
+### Architecture Notes
+- DO source files unchanged — esbuild aliases `cloudflare:workers` to Node.js shim at build time
+- SQLite single-writer means Node.js deployment is single-replica (appropriate for crisis hotline scale)
+- WebSocket hibernation (CF-only feature) not needed — Node.js server stays running, connections stay open
+- Self-hosted deployments start fresh; no data migration from CF needed
+
 ## 2026-02-17: Epic 54 — Device-Centric Auth & Forward-Secret Encryption
 
 ### Phase 1: PIN-First Local Key Store

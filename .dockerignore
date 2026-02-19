@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.wrangler
+.dev.vars
+*.log
+tests
+site
+docs
+.playwright
+data
+deploy
+CHANGELOG.md

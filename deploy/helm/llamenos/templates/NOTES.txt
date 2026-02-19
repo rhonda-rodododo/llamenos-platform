@@ -1,0 +1,33 @@
+Llamenos has been deployed!
+
+1. Get the application URL:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}
+{{- end }}
+{{- else }}
+  kubectl port-forward svc/{{ include "llamenos.fullname" . }} {{ .Values.app.port }}:{{ .Values.app.port }}
+  Then open: http://localhost:{{ .Values.app.port }}
+{{- end }}
+
+2. Check deployment status:
+  kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+3. View logs:
+  kubectl logs -l app.kubernetes.io/instance={{ .Release.Name }} -c app
+
+{{- if not .Values.secrets.existingSecret }}
+{{- if not .Values.secrets.adminPubkey }}
+
+WARNING: No admin public key is configured!
+Run 'bun run bootstrap-admin' to generate one, then update your values:
+  helm upgrade {{ .Release.Name }} llamenos --set secrets.adminPubkey=YOUR_PUBKEY
+{{- end }}
+{{- end }}
+
+{{- if .Values.minio.enabled }}
+
+MinIO console (internal):
+  kubectl port-forward svc/{{ include "llamenos.fullname" . }}-minio 9001:9001
+  Then open: http://localhost:9001 ({{ .Values.minio.credentials.accessKey }}/{{ .Values.minio.credentials.secretKey }})
+{{- end }}

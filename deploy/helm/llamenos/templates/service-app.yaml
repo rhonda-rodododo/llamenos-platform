@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "llamenos.fullname" . }}
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.app.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "llamenos.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: app

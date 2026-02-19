@@ -28,7 +28,7 @@ export async function maybeTranscribe(
   if (!audio) return
 
   try {
-    // Transcribe using Cloudflare Workers AI (Whisper)
+    // Transcribe using platform transcription service (CF Workers AI or self-hosted Whisper)
     const result = await env.AI.run('@cf/openai/whisper', {
       audio: [...new Uint8Array(audio)],
     })

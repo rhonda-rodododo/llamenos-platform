@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "llamenos.fullname" . }}
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  replicas: {{ .Values.app.replicas }}
+  strategy:
+    type: Recreate  # Single-writer SQLite requires Recreate
+  selector:
+    matchLabels:
+      {{- include "llamenos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "llamenos.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "llamenos.serviceAccountName" . }}
+      containers:
+        - name: app
+          image: "{{ .Values.app.image.repository }}:{{ include "llamenos.appImageTag" . }}"
+          imagePullPolicy: {{ .Values.app.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.app.port }}
+              name: http
+              protocol: TCP
+          env:
+            - name: PLATFORM
+              value: "node"
+            - name: PORT
+              value: {{ .Values.app.port | quote }}
+            - name: DATA_DIR
+              value: "/app/data"
+            - name: HOTLINE_NAME
+              value: {{ .Values.app.env.HOTLINE_NAME | quote }}
+            - name: ENVIRONMENT
+              value: {{ .Values.app.env.ENVIRONMENT | quote }}
+            - name: ADMIN_PUBKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llamenos.secretName" . }}
+                  key: admin-pubkey
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llamenos.secretName" . }}
+                  key: twilio-account-sid
+                  optional: true
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llamenos.secretName" . }}
+                  key: twilio-auth-token
+                  optional: true
+            - name: TWILIO_PHONE_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llamenos.secretName" . }}
+                  key: twilio-phone-number
+                  optional: true
+            {{- if .Values.minio.enabled }}
+            - name: MINIO_ENDPOINT
+              value: "http://{{ include "llamenos.fullname" . }}-minio:9000"
+            - name: MINIO_ACCESS_KEY
+              value: {{ .Values.minio.credentials.accessKey | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ .Values.minio.credentials.secretKey | quote }}
+            - name: MINIO_BUCKET
+              value: {{ .Values.minio.bucket | quote }}
+            {{- end }}
+            {{- if .Values.whisper.enabled }}
+            - name: WHISPER_URL
+              value: "http://{{ include "llamenos.fullname" . }}-whisper:8080/v1/audio/transcriptions"
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.app.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          {{- if .Values.app.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "llamenos.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
