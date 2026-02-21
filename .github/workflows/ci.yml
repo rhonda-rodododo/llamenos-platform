@@ -194,8 +194,6 @@ jobs:
 
     permissions:
       contents: write
-      # Needed when git pull --rebase includes commits that modify .github/workflows/
-      workflows: write
 
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
