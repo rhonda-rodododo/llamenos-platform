@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-02-21
+
+### Bug Fixes
+
+- remove invalid workflows permission from version job
+- use correct CallSettings property names in status summary
+
+### Features
+
+- UI polish and admin UX improvements (epics 56-57)
+
+### Miscellaneous
+
+- v0.13.0
+
 ## [0.12.0] - 2026-02-19
 
 ### Bug Fixes
@@ -13,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - copy index.html into frontend build stage
 - fix strict mode violation in ban management test
 - rebase version commit onto latest before push
+- add workflows permission to version job
 
 ### Features
 
