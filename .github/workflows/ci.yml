@@ -289,7 +289,7 @@ jobs:
           git add package.json deploy/helm/llamenos/Chart.yaml
 
           # Create tag so git-cliff can generate notes for this version
-          git commit -m "chore(release): v${NEW_VERSION}"
+          git commit -m "chore(release): v${NEW_VERSION} [skip ci]"
           git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
 
           # Generate full CHANGELOG.md (includes the new tag)
