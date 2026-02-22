@@ -61,25 +61,27 @@ test.describe('Volunteer flow', () => {
     await loginAsVolunteer(page, volunteerNsec)
     await completeProfileSetup(page)
 
-    // Try accessing /volunteers directly
-    await page.goto('/volunteers')
-    await expect(page.getByText(/access denied/i)).toBeVisible()
+    // Use SPA navigation to avoid full page reload clearing the key manager
+    await page.evaluate(() => (window as any).__TEST_ROUTER?.navigate({ to: '/volunteers' }))
+    await expect(page.getByText(/access denied/i)).toBeVisible({ timeout: 10000 })
   })
 
   test('volunteer cannot access /shifts via URL', async ({ page }) => {
     await loginAsVolunteer(page, volunteerNsec)
     await completeProfileSetup(page)
 
-    await page.goto('/shifts')
-    await expect(page.getByText(/access denied/i)).toBeVisible()
+    // Use SPA navigation to avoid full page reload clearing the key manager
+    await page.evaluate(() => (window as any).__TEST_ROUTER?.navigate({ to: '/shifts' }))
+    await expect(page.getByText(/access denied/i)).toBeVisible({ timeout: 10000 })
   })
 
   test('volunteer cannot access /bans via URL', async ({ page }) => {
     await loginAsVolunteer(page, volunteerNsec)
     await completeProfileSetup(page)
 
-    await page.goto('/bans')
-    await expect(page.getByText(/access denied/i)).toBeVisible()
+    // Use SPA navigation to avoid full page reload clearing the key manager
+    await page.evaluate(() => (window as any).__TEST_ROUTER?.navigate({ to: '/bans' }))
+    await expect(page.getByText(/access denied/i)).toBeVisible({ timeout: 10000 })
   })
 
   test('volunteer can navigate to notes', async ({ page }) => {

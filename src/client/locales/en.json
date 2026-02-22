@@ -626,7 +626,19 @@
     "noChannelsSelected": "No channels selected",
     "configured": "Configured",
     "pending": "Pending",
-    "goToDashboard": "Go to Dashboard"
+    "goToDashboard": "Go to Dashboard",
+    "bootstrap": {
+      "title": "Create Admin Account",
+      "welcomeTitle": "Welcome to your hotline",
+      "welcomeDescription": "Let's create your admin account. Your cryptographic identity is generated in your browser — the server never sees your private key.",
+      "getStarted": "Get Started",
+      "generating": "Creating your admin account...",
+      "complete": "Admin account created!",
+      "completeSub": "Now let's configure your hotline.",
+      "continueSetup": "Continue to Setup",
+      "noAdminMessage": "No admin account configured yet. Complete the setup wizard to get started.",
+      "goToSetup": "Go to Setup"
+    }
   },
   "reports": {
     "title": "Reports",

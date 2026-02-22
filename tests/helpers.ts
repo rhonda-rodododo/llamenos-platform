@@ -118,6 +118,7 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
  */
 export async function loginAsAdmin(page: Page) {
   await page.goto('/login')
+  await page.evaluate(() => sessionStorage.clear())
   await preloadEncryptedKey(page, ADMIN_NSEC, TEST_PIN)
   await page.reload()
   await enterPin(page, TEST_PIN)
@@ -129,6 +130,7 @@ export async function loginAsAdmin(page: Page) {
  */
 export async function loginAsVolunteer(page: Page, nsec: string) {
   await page.goto('/login')
+  await page.evaluate(() => sessionStorage.clear())
   await preloadEncryptedKey(page, nsec, TEST_PIN)
   await page.reload()
   await enterPin(page, TEST_PIN)
@@ -142,6 +144,7 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
  */
 export async function loginWithNsec(page: Page, nsec: string) {
   await page.goto('/login')
+  await page.evaluate(() => sessionStorage.clear())
   await page.locator('#nsec').fill(nsec)
   await page.getByRole('button', { name: /log in/i }).click()
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: 15000 })

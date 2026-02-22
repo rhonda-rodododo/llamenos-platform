@@ -43,7 +43,7 @@ export const Route = createRootRoute({
 function RootLayout() {
   const { t } = useTranslation()
   const { isAuthenticated, isAdmin, signOut, name, role, isLoading, profileCompleted } = useAuth()
-  const { hotlineName } = useConfig()
+  const { hotlineName, needsBootstrap, isLoading: configLoading } = useConfig()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -56,20 +56,26 @@ function RootLayout() {
   }, [isAuthenticated])
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && location.pathname !== '/login' && location.pathname !== '/onboarding' && location.pathname !== '/link-device') {
-      navigate({ to: '/login' })
+    // Wait for both auth and config to finish loading before redirecting
+    if (!isLoading && !configLoading && !isAuthenticated && location.pathname !== '/login' && location.pathname !== '/onboarding' && location.pathname !== '/link-device' && location.pathname !== '/setup') {
+      // If no admin exists, redirect to setup wizard (which includes bootstrap)
+      if (needsBootstrap) {
+        navigate({ to: '/setup' })
+      } else {
+        navigate({ to: '/login' })
+      }
     }
-  }, [isLoading, isAuthenticated, location.pathname, navigate])
+  }, [isLoading, configLoading, isAuthenticated, location.pathname, navigate, needsBootstrap])
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && location.pathname === '/login') {
+    if (!isLoading && isAuthenticated && (location.pathname === '/login')) {
       navigate({ to: profileCompleted ? '/' : '/profile-setup' })
     }
   }, [isLoading, isAuthenticated, location.pathname, navigate, profileCompleted])
 
-  // Redirect to profile setup if not completed
+  // Redirect to profile setup if not completed (skip during setup wizard)
   useEffect(() => {
-    if (!isLoading && isAuthenticated && !profileCompleted && location.pathname !== '/profile-setup' && location.pathname !== '/login') {
+    if (!isLoading && isAuthenticated && !profileCompleted && location.pathname !== '/profile-setup' && location.pathname !== '/login' && location.pathname !== '/setup') {
       navigate({ to: '/profile-setup' })
     }
   }, [isLoading, isAuthenticated, profileCompleted, location.pathname, navigate])

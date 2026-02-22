@@ -79,6 +79,10 @@ export class IdentityDO extends DurableObject<Env> {
     this.router.post('/provision/rooms/:id/payload', async (req, { id }) =>
       this.setProvisionPayload(id, await req.json()))
 
+    // --- Admin Bootstrap ---
+    this.router.get('/has-admin', () => this.hasAdmin())
+    this.router.post('/bootstrap', async (req) => this.bootstrapAdmin(await req.json()))
+
     // --- Test Reset ---
     this.router.post('/reset', async () => {
       await this.ctx.storage.deleteAll()
@@ -155,6 +159,42 @@ export class IdentityDO extends DurableObject<Env> {
         await this.ctx.storage.delete(key)
       }
     }
+  }
+
+  // --- Admin Bootstrap Methods ---
+
+  private async hasAdmin(): Promise<Response> {
+    const volunteers = await this.ctx.storage.get<Record<string, Volunteer>>('volunteers') || {}
+    const hasAdmin = Object.values(volunteers).some(v => v.role === 'admin' && v.active)
+    return Response.json({ hasAdmin })
+  }
+
+  private async bootstrapAdmin(data: { pubkey: string }): Promise<Response> {
+    const volunteers = await this.ctx.storage.get<Record<string, Volunteer>>('volunteers') || {}
+    // One-shot: reject if any admin already exists
+    const adminExists = Object.values(volunteers).some(v => v.role === 'admin' && v.active)
+    if (adminExists) {
+      return new Response(JSON.stringify({ error: 'Admin already exists' }), { status: 403 })
+    }
+
+    const volunteer: Volunteer = {
+      pubkey: data.pubkey,
+      name: 'Admin',
+      phone: '',
+      role: 'admin',
+      active: true,
+      createdAt: new Date().toISOString(),
+      encryptedSecretKey: '',
+      transcriptionEnabled: true,
+      spokenLanguages: ['en', 'es'],
+      uiLanguage: 'en',
+      profileCompleted: false,
+      onBreak: false,
+      callPreference: 'phone',
+    }
+    volunteers[data.pubkey] = volunteer
+    await this.ctx.storage.put('volunteers', volunteers)
+    return Response.json({ ok: true })
   }
 
   // --- Volunteer Methods ---

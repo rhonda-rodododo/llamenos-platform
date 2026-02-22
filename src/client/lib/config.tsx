@@ -9,6 +9,7 @@ interface ConfigContextValue {
   setupCompleted: boolean
   adminPubkey: string
   demoMode: boolean
+  needsBootstrap: boolean
   isLoading: boolean
 }
 
@@ -27,6 +28,7 @@ const ConfigContext = createContext<ConfigContextValue>({
   setupCompleted: true,
   adminPubkey: '',
   demoMode: false,
+  needsBootstrap: false,
   isLoading: true,
 })
 
@@ -37,6 +39,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [setupCompleted, setSetupCompleted] = useState(true)
   const [adminPubkey, setAdminPubkey] = useState('')
   const [demoMode, setDemoMode] = useState(false)
+  const [needsBootstrap, setNeedsBootstrap] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -48,8 +51,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (config.setupCompleted !== undefined) setSetupCompleted(config.setupCompleted)
         if (config.adminPubkey) setAdminPubkey(config.adminPubkey)
         if (config.demoMode) setDemoMode(config.demoMode)
+        setNeedsBootstrap(!!config.needsBootstrap)
+        setIsLoading(false)
       })
-      .finally(() => setIsLoading(false))
+      .catch(() => setIsLoading(false))
   }, [])
 
   // Set document title
@@ -58,7 +63,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }, [hotlineName, isLoading])
 
   return (
-    <ConfigContext.Provider value={{ hotlineName, hotlineNumber, channels, setupCompleted, adminPubkey, demoMode, isLoading }}>
+    <ConfigContext.Provider value={{ hotlineName, hotlineNumber, channels, setupCompleted, adminPubkey, demoMode, needsBootstrap, isLoading }}>
       {children}
     </ConfigContext.Provider>
   )

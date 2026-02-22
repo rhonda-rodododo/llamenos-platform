@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, ArrowRight, SkipForward } from 'lucide-react'
 import { LogoMark } from '@/components/logo-mark'
+import { AdminBootstrap } from './AdminBootstrap'
 import { StepIdentity } from './StepIdentity'
 import { StepChannels } from './StepChannels'
 import { StepProviders } from './StepProviders'
@@ -54,10 +55,13 @@ const DEFAULT_SETUP_DATA: SetupData = {
   signalValidated: false,
 }
 
-export function SetupWizard() {
+export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boolean }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const [bootstrapComplete, setBootstrapComplete] = useState(
+    !needsBootstrap || sessionStorage.getItem('bootstrapComplete') === '1'
+  )
   const [step, setStep] = useState(0)
   const [data, setData] = useState<SetupData>(DEFAULT_SETUP_DATA)
   const [saving, setSaving] = useState(false)
@@ -102,6 +106,7 @@ export function SetupWizard() {
     setSaving(true)
     try {
       await completeSetup(demoMode)
+      sessionStorage.removeItem('bootstrapComplete')
       if (demoMode) {
         try {
           await seedDemoData()
@@ -126,6 +131,23 @@ export function SetupWizard() {
     t('setup.stepInvite'),
     t('setup.stepSummary'),
   ]
+
+  // Show bootstrap step if no admin exists
+  if (!bootstrapComplete) {
+    return (
+      <Card className="w-full max-w-2xl">
+        <div className="px-6 pt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <LogoMark size="sm" />
+            <h1 className="text-xl font-bold">{t('setup.bootstrap.title', { defaultValue: 'Create Admin Account' })}</h1>
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <AdminBootstrap onComplete={() => setBootstrapComplete(true)} />
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <Card className="w-full max-w-2xl">

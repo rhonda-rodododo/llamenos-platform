@@ -67,6 +67,7 @@ export async function getConfig() {
     setupCompleted?: boolean
     adminPubkey?: string
     demoMode?: boolean
+    needsBootstrap?: boolean
   }>
 }
 
@@ -77,6 +78,19 @@ export async function login(pubkey: string, timestamp: number, token: string) {
     method: 'POST',
     body: JSON.stringify({ pubkey, timestamp, token }),
   })
+}
+
+export async function bootstrapAdmin(pubkey: string, timestamp: number, token: string) {
+  const res = await fetch(`${API_BASE}/auth/bootstrap`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pubkey, timestamp, token }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new ApiError(res.status, body)
+  }
+  return res.json() as Promise<{ ok: true; role: 'admin' }>
 }
 
 export async function logout() {

@@ -34,6 +34,14 @@ config.get('/', async (c) => {
     }
   } catch { /* default to true */ }
 
+  // Check if bootstrap is needed (no admin exists)
+  let needsBootstrap = false
+  try {
+    const adminCheckRes = await dos.identity.fetch(new Request('http://do/has-admin'))
+    const { hasAdmin } = await adminCheckRes.json() as { hasAdmin: boolean }
+    needsBootstrap = !hasAdmin
+  } catch { /* default to false */ }
+
   return c.json({
     hotlineName: c.env.HOTLINE_NAME || 'Hotline',
     hotlineNumber,
@@ -41,6 +49,7 @@ config.get('/', async (c) => {
     setupCompleted,
     adminPubkey: c.env.ADMIN_PUBKEY,
     demoMode,
+    needsBootstrap,
   })
 })
 

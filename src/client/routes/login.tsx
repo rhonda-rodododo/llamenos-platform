@@ -10,7 +10,7 @@ import { readBackupFile, restoreFromBackupWithPin, restoreFromBackupWithRecovery
 import * as keyManager from '@/lib/key-manager'
 import { isWebAuthnAvailable } from '@/lib/webauthn'
 import { DemoAccountPicker } from '@/components/demo-account-picker'
-import { KeyRound, LogIn, Shield, Sun, Moon, Monitor, Fingerprint, Key, Smartphone, Upload } from 'lucide-react'
+import { KeyRound, LogIn, Shield, Sun, Moon, Monitor, Fingerprint, Key, Smartphone, Upload, ArrowRight } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { LogoMark } from '@/components/logo-mark'
 import { LanguageSelect } from '@/components/language-select'
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/login')({
 function LoginPage() {
   const { t } = useTranslation()
   const { signIn, signInWithPasskey, unlockWithPin, error, isLoading } = useAuth()
-  const { hotlineName, demoMode } = useConfig()
+  const { hotlineName, demoMode, needsBootstrap } = useConfig()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [validationError, setValidationError] = useState('')
@@ -262,6 +262,34 @@ function LoginPage() {
               {t('auth.securityNote')}
             </p>
           </CardFooter>
+        </Card>
+      </div>
+    )
+  }
+
+  // --- Bootstrap needed: redirect to setup ---
+  if (needsBootstrap) {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center bg-background overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-1/3 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
+        </div>
+        <Card className="relative z-10 w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-3">
+              <LogoMark size="xl" className="animate-in fade-in zoom-in duration-700" />
+            </div>
+            <CardTitle className="text-2xl">{hotlineName}</CardTitle>
+            <CardDescription>{t('setup.bootstrap.noAdminMessage', { defaultValue: 'No admin account configured yet. Complete the setup wizard to get started.' })}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/setup">
+              <Button className="w-full" size="lg">
+                <ArrowRight className="h-4 w-4" />
+                {t('setup.bootstrap.goToSetup', { defaultValue: 'Go to Setup' })}
+              </Button>
+            </Link>
+          </CardContent>
         </Card>
       </div>
     )
