@@ -6,6 +6,8 @@ import {
   updateSetupState,
   completeSetup,
   seedDemoData,
+  getConfig,
+  setActiveHub,
 } from '@/lib/api'
 import type { ChannelType } from '@shared/types'
 import type { TelephonyProviderConfig, WhatsAppConfig, SignalConfig } from '@shared/types'
@@ -109,6 +111,12 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
       sessionStorage.removeItem('bootstrapComplete')
       if (demoMode) {
         try {
+          // Re-fetch config to get the default hub ID (created during setup)
+          const config = await getConfig()
+          if (config.hubs?.length) {
+            const hubId = config.defaultHubId || config.hubs[0].id
+            setActiveHub(hubId)
+          }
           await seedDemoData()
         } catch {
           toast(t('setup.demoSeedFailed', { defaultValue: 'Sample data partially created' }), 'error')

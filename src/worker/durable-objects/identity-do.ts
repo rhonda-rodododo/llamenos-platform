@@ -1,6 +1,8 @@
 import { DurableObject } from 'cloudflare:workers'
-import type { Env, UserRole, Volunteer, InviteCode, WebAuthnCredential, WebAuthnSettings, ServerSession } from '../types'
+import type { Env, Volunteer, InviteCode, WebAuthnCredential, WebAuthnSettings, ServerSession } from '../types'
 import { DORouter } from '../lib/do-router'
+import { runMigrations } from '../../shared/migrations/runner'
+import { migrations } from '../../shared/migrations'
 
 /**
  * IdentityDO — manages people and auth:
@@ -11,6 +13,7 @@ import { DORouter } from '../lib/do-router'
  */
 export class IdentityDO extends DurableObject<Env> {
   private initialized = false
+  private migrated = false
   private router: DORouter
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -83,6 +86,10 @@ export class IdentityDO extends DurableObject<Env> {
     this.router.get('/has-admin', () => this.hasAdmin())
     this.router.post('/bootstrap', async (req) => this.bootstrapAdmin(await req.json()))
 
+    // --- Hub Role Management ---
+    this.router.post('/identity/hub-role', async (req) => this.setHubRole(await req.json()))
+    this.router.delete('/identity/hub-role', async (req) => this.removeHubRole(await req.json()))
+
     // --- Test Reset ---
     this.router.post('/reset', async () => {
       await this.ctx.storage.deleteAll()
@@ -103,7 +110,7 @@ export class IdentityDO extends DurableObject<Env> {
         pubkey: adminPubkey,
         name: 'Admin',
         phone: '',
-        role: 'admin',
+        roles: ['role-super-admin'],
         active: true,
         createdAt: new Date().toISOString(),
         encryptedSecretKey: '',
@@ -126,6 +133,10 @@ export class IdentityDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!this.migrated) {
+      await runMigrations(this.ctx.storage, migrations, 'identity')
+      this.migrated = true
+    }
     await this.ensureInit()
     return this.router.handle(request)
   }
@@ -165,14 +176,18 @@ export class IdentityDO extends DurableObject<Env> {
 
   private async hasAdmin(): Promise<Response> {
     const volunteers = await this.ctx.storage.get<Record<string, Volunteer>>('volunteers') || {}
-    const hasAdmin = Object.values(volunteers).some(v => v.role === 'admin' && v.active)
+    const hasAdmin = Object.values(volunteers).some(v =>
+      v.active && v.roles.includes('role-super-admin')
+    )
     return Response.json({ hasAdmin })
   }
 
   private async bootstrapAdmin(data: { pubkey: string }): Promise<Response> {
     const volunteers = await this.ctx.storage.get<Record<string, Volunteer>>('volunteers') || {}
-    // One-shot: reject if any admin already exists
-    const adminExists = Object.values(volunteers).some(v => v.role === 'admin' && v.active)
+    // One-shot: reject if any super-admin already exists
+    const adminExists = Object.values(volunteers).some(v =>
+      v.active && v.roles.includes('role-super-admin')
+    )
     if (adminExists) {
       return new Response(JSON.stringify({ error: 'Admin already exists' }), { status: 403 })
     }
@@ -181,7 +196,7 @@ export class IdentityDO extends DurableObject<Env> {
       pubkey: data.pubkey,
       name: 'Admin',
       phone: '',
-      role: 'admin',
+      roles: ['role-super-admin'],
       active: true,
       createdAt: new Date().toISOString(),
       encryptedSecretKey: '',
@@ -217,7 +232,8 @@ export class IdentityDO extends DurableObject<Env> {
     pubkey: string
     name: string
     phone: string
-    role: UserRole
+    roleIds?: string[]
+    roles?: string[]
     encryptedSecretKey: string
   }): Promise<Response> {
     const volunteers = await this.ctx.storage.get<Record<string, Volunteer>>('volunteers') || {}
@@ -225,7 +241,7 @@ export class IdentityDO extends DurableObject<Env> {
       pubkey: data.pubkey,
       name: data.name,
       phone: data.phone,
-      role: data.role,
+      roles: data.roleIds || data.roles || ['role-volunteer'],
       active: true,
       createdAt: new Date().toISOString(),
       encryptedSecretKey: data.encryptedSecretKey,
@@ -281,14 +297,14 @@ export class IdentityDO extends DurableObject<Env> {
     return Response.json({ invites: invites.filter(i => !i.usedAt) })
   }
 
-  private async createInvite(data: { name: string; phone: string; role: UserRole; createdBy: string }): Promise<Response> {
+  private async createInvite(data: { name: string; phone: string; roleIds: string[]; createdBy: string }): Promise<Response> {
     const invites = await this.ctx.storage.get<InviteCode[]>('invites') || []
     const code = crypto.randomUUID()
     const invite: InviteCode = {
       code,
       name: data.name,
       phone: data.phone,
-      role: data.role,
+      roleIds: data.roleIds || ['role-volunteer'],
       createdBy: data.createdBy,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -304,7 +320,7 @@ export class IdentityDO extends DurableObject<Env> {
     if (!invite) return Response.json({ valid: false, error: 'not_found' })
     if (invite.usedAt) return Response.json({ valid: false, error: 'already_used' })
     if (new Date(invite.expiresAt) < new Date()) return Response.json({ valid: false, error: 'expired' })
-    return Response.json({ valid: true, name: invite.name, role: invite.role })
+    return Response.json({ valid: true, name: invite.name, roleIds: invite.roleIds })
   }
 
   private async redeemInvite(data: { code: string; pubkey: string }): Promise<Response> {
@@ -323,7 +339,7 @@ export class IdentityDO extends DurableObject<Env> {
       pubkey: data.pubkey,
       name: invite.name,
       phone: invite.phone,
-      role: invite.role,
+      roles: invite.roleIds || ['role-volunteer'],
       active: true,
       createdAt: new Date().toISOString(),
       encryptedSecretKey: '',
@@ -536,6 +552,37 @@ export class IdentityDO extends DurableObject<Env> {
     room.status = 'ready'
     await this.ctx.storage.put(`provision:${id}`, room)
     return Response.json({ ok: true })
+  }
+
+  // --- Hub Role Methods ---
+
+  private async setHubRole(data: { pubkey: string; hubId: string; roleIds: string[] }): Promise<Response> {
+    const vols = await this.ctx.storage.get<Record<string, Volunteer>>('volunteers') || {}
+    const vol = vols[data.pubkey]
+    if (!vol) return Response.json({ error: 'Volunteer not found' }, { status: 404 })
+
+    const hubRoles = vol.hubRoles || []
+    const idx = hubRoles.findIndex(hr => hr.hubId === data.hubId)
+    if (idx >= 0) {
+      hubRoles[idx].roleIds = data.roleIds
+    } else {
+      hubRoles.push({ hubId: data.hubId, roleIds: data.roleIds })
+    }
+    vol.hubRoles = hubRoles
+    vols[data.pubkey] = vol
+    await this.ctx.storage.put('volunteers', vols)
+    return Response.json({ volunteer: vol })
+  }
+
+  private async removeHubRole(data: { pubkey: string; hubId: string }): Promise<Response> {
+    const vols = await this.ctx.storage.get<Record<string, Volunteer>>('volunteers') || {}
+    const vol = vols[data.pubkey]
+    if (!vol) return Response.json({ error: 'Volunteer not found' }, { status: 404 })
+
+    vol.hubRoles = (vol.hubRoles || []).filter(hr => hr.hubId !== data.hubId)
+    vols[data.pubkey] = vol
+    await this.ctx.storage.put('volunteers', vols)
+    return Response.json({ volunteer: vol })
   }
 }
 

@@ -1,9 +1,13 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, SpamSettings, CallSettings } from '../types'
-import type { CustomFieldDefinition, TelephonyProviderConfig, MessagingConfig, SetupState, EnabledChannels } from '../../shared/types'
+import type { CustomFieldDefinition, TelephonyProviderConfig, MessagingConfig, SetupState, EnabledChannels, Hub } from '../../shared/types'
 import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS, DEFAULT_MESSAGING_CONFIG, DEFAULT_SETUP_STATE } from '../../shared/types'
 import { IVR_LANGUAGES } from '../../shared/languages'
 import { DORouter } from '../lib/do-router'
+import { runMigrations } from '../../shared/migrations/runner'
+import { migrations } from '../../shared/migrations'
+import type { Role } from '../../shared/permissions'
+import { DEFAULT_ROLES } from '../../shared/permissions'
 
 /**
  * SettingsDO — manages system configuration:
@@ -19,6 +23,7 @@ import { DORouter } from '../lib/do-router'
  */
 export class SettingsDO extends DurableObject<Env> {
   private initialized = false
+  private migrated = false
   private router: DORouter
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -74,12 +79,30 @@ export class SettingsDO extends DurableObject<Env> {
     this.router.get('/fallback', () => this.getFallbackGroup())
     this.router.put('/fallback', async (req) => this.setFallbackGroup(await req.json()))
 
+    // --- Roles ---
+    this.router.get('/settings/roles', () => this.getRoles())
+    this.router.post('/settings/roles', async (req) => this.createRole(await req.json()))
+    this.router.patch('/settings/roles/:id', async (req, { id }) => this.updateRole(id, await req.json()))
+    this.router.delete('/settings/roles/:id', (_req, { id }) => this.deleteRole(id))
+
     // --- Rate Limiting ---
     this.router.post('/rate-limit/check', async (req) => this.checkRateLimit(await req.json()))
 
     // --- CAPTCHA state (server-side storage of expected digits) ---
     this.router.post('/captcha/store', async (req) => this.storeCaptcha(await req.json()))
     this.router.post('/captcha/verify', async (req) => this.verifyCaptcha(await req.json()))
+
+    // --- Hub Registry ---
+    this.router.get('/settings/hubs', () => this.getHubs())
+    this.router.post('/settings/hubs', async (req) => this.createHub(await req.json()))
+    this.router.get('/settings/hub/:id', (_req, { id }) => this.getHub(id))
+    this.router.patch('/settings/hub/:id', async (req, { id }) => this.updateHub(id, await req.json()))
+    this.router.delete('/settings/hub/:id', (_req, { id }) => this.archiveHub(id))
+    this.router.get('/settings/hub/:id/settings', (_req, { id }) => this.getHubSettings(id))
+    this.router.put('/settings/hub/:id/settings', async (req, { id }) => this.updateHubSettings(id, await req.json()))
+    this.router.get('/settings/hub/:hubId/telephony-provider', (_req, { hubId }) => this.getHubTelephonyProvider(hubId))
+    this.router.put('/settings/hub/:hubId/telephony-provider', async (req, { hubId }) => this.setHubTelephonyProvider(hubId, await req.json()))
+    this.router.get('/settings/hub-by-phone/:phone', (_req, { phone }) => this.getHubByPhone(phone))
 
     // --- Test Reset ---
     this.router.post('/reset', async () => {
@@ -117,9 +140,23 @@ export class SettingsDO extends DurableObject<Env> {
         voicemailMaxSeconds: 120,
       })
     }
+    // Seed default roles if not present
+    if (!(await this.ctx.storage.get<Role[]>('roles'))) {
+      const now = new Date().toISOString()
+      const roles: Role[] = DEFAULT_ROLES.map(r => ({
+        ...r,
+        createdAt: now,
+        updatedAt: now,
+      }))
+      await this.ctx.storage.put('roles', roles)
+    }
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!this.migrated) {
+      await runMigrations(this.ctx.storage, migrations, 'settings')
+      this.migrated = true
+    }
     await this.ensureInit()
     return this.router.handle(request)
   }
@@ -475,6 +512,78 @@ export class SettingsDO extends DurableObject<Env> {
     return Response.json({ ok: true })
   }
 
+  // --- Roles CRUD ---
+
+  private async getRoles(): Promise<Response> {
+    const roles = await this.ctx.storage.get<Role[]>('roles') || []
+    return Response.json({ roles })
+  }
+
+  private async createRole(data: unknown): Promise<Response> {
+    if (!data || typeof data !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 })
+    }
+    const { name, slug, permissions, description } = data as Partial<Role>
+    if (!name || !slug || !permissions || !description) {
+      return new Response(JSON.stringify({ error: 'name, slug, permissions, and description are required' }), { status: 400 })
+    }
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      return new Response(JSON.stringify({ error: 'slug must be lowercase alphanumeric with hyphens' }), { status: 400 })
+    }
+    const roles = await this.ctx.storage.get<Role[]>('roles') || []
+    if (roles.some(r => r.slug === slug)) {
+      return new Response(JSON.stringify({ error: `Role slug "${slug}" already exists` }), { status: 409 })
+    }
+    const now = new Date().toISOString()
+    const role: Role = {
+      id: `role-${crypto.randomUUID()}`,
+      name,
+      slug,
+      permissions: permissions as string[],
+      isDefault: false,
+      isSystem: false,
+      description,
+      createdAt: now,
+      updatedAt: now,
+    }
+    roles.push(role)
+    await this.ctx.storage.put('roles', roles)
+    return Response.json(role, { status: 201 })
+  }
+
+  private async updateRole(id: string, data: unknown): Promise<Response> {
+    const roles = await this.ctx.storage.get<Role[]>('roles') || []
+    const idx = roles.findIndex(r => r.id === id)
+    if (idx === -1) return new Response(JSON.stringify({ error: 'Role not found' }), { status: 404 })
+
+    const role = roles[idx]
+    if (role.isSystem) {
+      return new Response(JSON.stringify({ error: 'Cannot modify system roles' }), { status: 403 })
+    }
+
+    const updates = data as Partial<Role>
+    if (updates.name) role.name = updates.name
+    if (updates.description) role.description = updates.description
+    if (updates.permissions) role.permissions = updates.permissions as string[]
+    role.updatedAt = new Date().toISOString()
+
+    roles[idx] = role
+    await this.ctx.storage.put('roles', roles)
+    return Response.json(role)
+  }
+
+  private async deleteRole(id: string): Promise<Response> {
+    const roles = await this.ctx.storage.get<Role[]>('roles') || []
+    const role = roles.find(r => r.id === id)
+    if (!role) return new Response(JSON.stringify({ error: 'Role not found' }), { status: 404 })
+    if (role.isDefault) {
+      return new Response(JSON.stringify({ error: 'Cannot delete default roles' }), { status: 403 })
+    }
+
+    await this.ctx.storage.put('roles', roles.filter(r => r.id !== id))
+    return Response.json({ ok: true })
+  }
+
   // --- CAPTCHA Server-Side State ---
 
   private async storeCaptcha(data: { callSid: string; expected: string }): Promise<Response> {
@@ -509,5 +618,78 @@ export class SettingsDO extends DurableObject<Env> {
       match &= expected.charCodeAt(i) === digits.charCodeAt(i) ? 1 : 0
     }
     return Response.json({ match: match === 1, expected })
+  }
+
+  // --- Hub Registry Methods ---
+
+  private async getHubs(): Promise<Response> {
+    const hubs = await this.ctx.storage.get<Hub[]>('hubs') || []
+    return Response.json({ hubs })
+  }
+
+  private async createHub(hub: Hub): Promise<Response> {
+    const hubs = await this.ctx.storage.get<Hub[]>('hubs') || []
+    // Check slug uniqueness
+    if (hubs.some(h => h.slug === hub.slug)) {
+      return Response.json({ error: 'Hub slug already exists' }, { status: 409 })
+    }
+    hubs.push(hub)
+    await this.ctx.storage.put('hubs', hubs)
+    return Response.json({ hub })
+  }
+
+  private async getHub(id: string): Promise<Response> {
+    const hubs = await this.ctx.storage.get<Hub[]>('hubs') || []
+    const hub = hubs.find(h => h.id === id)
+    if (!hub) return Response.json({ error: 'Not found' }, { status: 404 })
+    return Response.json({ hub })
+  }
+
+  private async updateHub(id: string, data: Partial<Hub>): Promise<Response> {
+    const hubs = await this.ctx.storage.get<Hub[]>('hubs') || []
+    const idx = hubs.findIndex(h => h.id === id)
+    if (idx === -1) return Response.json({ error: 'Not found' }, { status: 404 })
+    hubs[idx] = { ...hubs[idx], ...data, updatedAt: new Date().toISOString() }
+    await this.ctx.storage.put('hubs', hubs)
+    return Response.json({ hub: hubs[idx] })
+  }
+
+  private async archiveHub(id: string): Promise<Response> {
+    const hubs = await this.ctx.storage.get<Hub[]>('hubs') || []
+    const idx = hubs.findIndex(h => h.id === id)
+    if (idx === -1) return Response.json({ error: 'Not found' }, { status: 404 })
+    hubs[idx].status = 'archived'
+    hubs[idx].updatedAt = new Date().toISOString()
+    await this.ctx.storage.put('hubs', hubs)
+    return Response.json({ ok: true })
+  }
+
+  private async getHubSettings(hubId: string): Promise<Response> {
+    const settings = await this.ctx.storage.get<Record<string, unknown>>(`hub:${hubId}:settings`) || {}
+    return Response.json(settings)
+  }
+
+  private async updateHubSettings(hubId: string, data: Record<string, unknown>): Promise<Response> {
+    const existing = await this.ctx.storage.get<Record<string, unknown>>(`hub:${hubId}:settings`) || {}
+    const merged = { ...existing, ...data }
+    await this.ctx.storage.put(`hub:${hubId}:settings`, merged)
+    return Response.json(merged)
+  }
+
+  private async getHubTelephonyProvider(hubId: string): Promise<Response> {
+    const config = await this.ctx.storage.get(`hub:${hubId}:telephony-provider`)
+    return Response.json(config || null)
+  }
+
+  private async setHubTelephonyProvider(hubId: string, config: unknown): Promise<Response> {
+    await this.ctx.storage.put(`hub:${hubId}:telephony-provider`, config)
+    return Response.json({ ok: true })
+  }
+
+  private async getHubByPhone(phone: string): Promise<Response> {
+    const hubs = await this.ctx.storage.get<Hub[]>('hubs') || []
+    const hub = hubs.find(h => h.phoneNumber === phone && h.status === 'active')
+    if (!hub) return Response.json({ error: 'No hub for this number' }, { status: 404 })
+    return Response.json({ hub })
   }
 }

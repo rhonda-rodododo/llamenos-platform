@@ -1,6 +1,6 @@
 import type { Env } from '../types'
 import type { DurableObjects } from '../lib/do-access'
-import { getTelephony } from '../lib/do-access'
+import { getTelephony, getHubTelephony } from '../lib/do-access'
 
 export async function startParallelRinging(
   callSid: string,
@@ -8,6 +8,7 @@ export async function startParallelRinging(
   origin: string,
   env: Env,
   dos: DurableObjects,
+  hubId?: string,
 ) {
   try {
     // Get on-shift volunteers
@@ -74,13 +75,16 @@ export async function startParallelRinging(
 
     // Ring phone volunteers via telephony adapter (skip if no one needs phone ringing)
     if (toRingPhone.length > 0) {
-      const adapter = await getTelephony(env, dos)
+      const adapter = hubId
+        ? await getHubTelephony(env, hubId)
+        : await getTelephony(env, dos)
       if (!adapter) return
       await adapter.ringVolunteers({
         callSid,
         callerNumber,
         volunteers: toRingPhone,
         callbackUrl: origin,
+        hubId,
       })
     }
   } catch (err) {

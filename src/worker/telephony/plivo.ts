@@ -68,6 +68,16 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 }
 
+/** Build XML-escaped hub query param suffix for Plivo XML callback URLs */
+function hubXmlParam(hubId?: string): string {
+  return hubId ? `&amp;hub=${escapeXml(encodeURIComponent(hubId))}` : ''
+}
+
+/** Build hub query param suffix for non-XML URLs */
+function hubQueryParam(hubId?: string): string {
+  return hubId ? `&hub=${encodeURIComponent(hubId)}` : ''
+}
+
 /**
  * PlivoAdapter — Plivo implementation of TelephonyAdapter.
  * Uses Plivo XML format (similar to TwiML but with different tag names).
@@ -113,12 +123,13 @@ export class PlivoAdapter implements TelephonyAdapter {
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
     const enabled = params.enabledLanguages
+    const hp = hubXmlParam(params.hubId)
     const activeLanguages = IVR_LANGUAGES.filter(code => enabled.includes(code))
 
     if (activeLanguages.length <= 1) {
       const lang = activeLanguages[0] || DEFAULT_LANGUAGE
       return this.plivoXml(`
-        <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${lang}</Redirect>
+        <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${lang}${hp}</Redirect>
       `)
     }
 
@@ -130,15 +141,16 @@ export class PlivoAdapter implements TelephonyAdapter {
     }).filter(Boolean).join('\n      ')
 
     return this.plivoXml(`
-      <GetDigits numDigits="1" action="/api/telephony/language-selected" method="POST" timeout="8" redirect="true">
+      <GetDigits numDigits="1" action="/api/telephony/language-selected${params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''}" method="POST" timeout="8" redirect="true">
         ${speakElements}
       </GetDigits>
-      <Redirect method="POST">/api/telephony/language-selected?auto=1</Redirect>
+      <Redirect method="POST">/api/telephony/language-selected?auto=1${hp}</Redirect>
     `)
   }
 
   async handleIncomingCall(params: IncomingCallParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
+    const hp = hubXmlParam(params.hubId)
     const greetingText = getPrompt('greeting', lang).replace('{name}', params.hotlineName)
     const greetingXml = sayOrPlay('greeting', lang, params.audioUrls, greetingText)
 
@@ -155,7 +167,7 @@ export class PlivoAdapter implements TelephonyAdapter {
       const digits = params.captchaDigits
       const captchaXml = sayOrPlay('captchaPrompt', lang, params.audioUrls)
       return this.plivoXml(`
-        <GetDigits numDigits="4" action="/api/telephony/captcha?callSid=${params.callSid}&amp;lang=${lang}" method="POST" timeout="10" redirect="true">
+        <GetDigits numDigits="4" action="/api/telephony/captcha?callSid=${params.callSid}&amp;lang=${lang}${hp}" method="POST" timeout="10" redirect="true">
           ${greetingXml}
           ${captchaXml}
           ${speak(digits.split('').join(', ') + '.', lang)}
@@ -169,17 +181,18 @@ export class PlivoAdapter implements TelephonyAdapter {
     return this.plivoXml(`
       ${greetingXml}
       ${holdXml}
-      <Conference waitSound="/api/telephony/wait-music?lang=${lang}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}" method="POST" startConferenceOnEnter="false" endConferenceOnExit="false" stayAlone="true">${params.callSid}</Conference>
+      <Conference waitSound="/api/telephony/wait-music?lang=${lang}${hp}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}${hp}" method="POST" startConferenceOnEnter="false" endConferenceOnExit="false" stayAlone="true">${params.callSid}</Conference>
     `)
   }
 
   async handleCaptchaResponse(params: CaptchaResponseParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
+    const hp = hubXmlParam(params.hubId)
 
     if (params.digits === params.expectedDigits) {
       return this.plivoXml(`
         ${speak(getPrompt('captchaSuccess', lang), lang)}
-        <Conference waitSound="/api/telephony/wait-music?lang=${lang}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}" method="POST" startConferenceOnEnter="false" endConferenceOnExit="false" stayAlone="true">${params.callSid}</Conference>
+        <Conference waitSound="/api/telephony/wait-music?lang=${lang}${hp}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}${hp}" method="POST" startConferenceOnEnter="false" endConferenceOnExit="false" stayAlone="true">${params.callSid}</Conference>
       `)
     }
 
@@ -190,8 +203,9 @@ export class PlivoAdapter implements TelephonyAdapter {
   }
 
   async handleCallAnswered(params: CallAnsweredParams): Promise<TelephonyResponse> {
+    const hp = hubXmlParam(params.hubId)
     return this.plivoXml(`
-      <Conference record="true" recordFileFormat="mp3" callbackUrl="${escapeXml(params.callbackUrl)}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.volunteerPubkey}" callbackMethod="POST" startConferenceOnEnter="true" endConferenceOnExit="true">${params.parentCallSid}</Conference>
+      <Conference record="true" recordFileFormat="mp3" callbackUrl="${escapeXml(params.callbackUrl)}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.volunteerPubkey}${hp}" callbackMethod="POST" startConferenceOnEnter="true" endConferenceOnExit="true">${params.parentCallSid}</Conference>
     `)
   }
 
@@ -210,10 +224,11 @@ export class PlivoAdapter implements TelephonyAdapter {
 
   async handleVoicemail(params: VoicemailParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
+    const hp = hubXmlParam(params.hubId)
     const voicemailXml = sayOrPlay('voicemailPrompt', lang, params.audioUrls)
     return this.plivoXml(`
       ${voicemailXml}
-      <Record maxLength="${params.maxRecordingSeconds ?? 120}" action="/api/telephony/voicemail-complete?callSid=${params.callSid}&amp;lang=${lang}" method="POST" callbackUrl="${escapeXml(params.callbackUrl)}/api/telephony/voicemail-recording?callSid=${params.callSid}" callbackMethod="POST" finishOnKey="#" />
+      <Record maxLength="${params.maxRecordingSeconds ?? 120}" action="/api/telephony/voicemail-complete?callSid=${params.callSid}&amp;lang=${lang}${hp}" method="POST" callbackUrl="${escapeXml(params.callbackUrl)}/api/telephony/voicemail-recording?callSid=${params.callSid}${hp}" callbackMethod="POST" finishOnKey="#" />
       <Hangup/>
     `)
   }
@@ -230,17 +245,18 @@ export class PlivoAdapter implements TelephonyAdapter {
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const callSids: string[] = []
+    const hubParam = params.hubId ? `&hub=${encodeURIComponent(params.hubId)}` : ''
 
     const calls = await Promise.allSettled(
       params.volunteers.map(async (vol) => {
         const body = {
           from: this.phoneNumber,
           to: vol.phone,
-          answer_url: `${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}`,
+          answer_url: `${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
           answer_method: 'POST',
-          hangup_url: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}`,
+          hangup_url: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
           hangup_method: 'POST',
-          ring_url: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}`,
+          ring_url: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
           ring_method: 'POST',
           ring_timeout: 30,
           machine_detection: 'hangup',
@@ -358,6 +374,7 @@ export class PlivoAdapter implements TelephonyAdapter {
     return {
       callSid: (form.get('CallUUID') as string) || '',
       callerNumber: (form.get('From') as string) || '',
+      calledNumber: (form.get('To') as string) || undefined,
     }
   }
 

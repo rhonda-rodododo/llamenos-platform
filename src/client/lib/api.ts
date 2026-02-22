@@ -55,6 +55,17 @@ export class ApiError extends Error {
   }
 }
 
+// --- Hub context for hub-scoped API calls ---
+
+let activeHubId: string | null = null
+export function setActiveHub(id: string | null) { activeHubId = id }
+export function getActiveHub(): string | null { return activeHubId }
+
+/** Prefix a path with the active hub scope. No-op when no hub is active. */
+function hp(path: string): string {
+  return activeHubId ? `/hubs/${activeHubId}${path}` : path
+}
+
 // --- Public config (no auth) ---
 
 export async function getConfig() {
@@ -68,13 +79,15 @@ export async function getConfig() {
     adminPubkey?: string
     demoMode?: boolean
     needsBootstrap?: boolean
+    hubs?: import('@shared/types').Hub[]
+    defaultHubId?: string
   }>
 }
 
 // --- Auth ---
 
 export async function login(pubkey: string, timestamp: number, token: string) {
-  return request<{ ok: true; role: UserRole }>('/auth/login', {
+  return request<{ ok: true; roles: string[] }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ pubkey, timestamp, token }),
   })
@@ -90,7 +103,7 @@ export async function bootstrapAdmin(pubkey: string, timestamp: number, token: s
     const body = await res.text()
     throw new ApiError(res.status, body)
   }
-  return res.json() as Promise<{ ok: true; role: 'admin' }>
+  return res.json() as Promise<{ ok: true; roles: string[] }>
 }
 
 export async function logout() {
@@ -98,7 +111,7 @@ export async function logout() {
 }
 
 export async function getMe() {
-  return request<{ pubkey: string; role: UserRole; name: string; transcriptionEnabled: boolean; spokenLanguages: string[]; uiLanguage: string; profileCompleted: boolean; onBreak: boolean; callPreference: 'phone' | 'browser' | 'both'; webauthnRequired: boolean; webauthnRegistered: boolean }>('/auth/me')
+  return request<{ pubkey: string; roles: string[]; permissions: string[]; primaryRole: { id: string; name: string; slug: string } | null; name: string; transcriptionEnabled: boolean; spokenLanguages: string[]; uiLanguage: string; profileCompleted: boolean; onBreak: boolean; callPreference: 'phone' | 'browser' | 'both'; webauthnRequired: boolean; webauthnRegistered: boolean }>('/auth/me')
 }
 
 // --- Volunteers (admin only) ---
@@ -107,14 +120,14 @@ export async function listVolunteers() {
   return request<{ volunteers: Volunteer[] }>('/volunteers')
 }
 
-export async function createVolunteer(data: { name: string; phone: string; role: UserRole; pubkey: string }) {
+export async function createVolunteer(data: { name: string; phone: string; roleIds: string[]; pubkey: string }) {
   return request<{ volunteer: Volunteer }>('/volunteers', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export async function updateVolunteer(pubkey: string, data: Partial<{ name: string; phone: string; role: UserRole; active: boolean }>) {
+export async function updateVolunteer(pubkey: string, data: Partial<{ name: string; phone: string; roles: string[]; active: boolean }>) {
   return request<{ volunteer: Volunteer }>(`/volunteers/${pubkey}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -134,39 +147,39 @@ export interface ShiftStatus {
 }
 
 export async function getMyShiftStatus() {
-  return request<ShiftStatus>('/shifts/my-status')
+  return request<ShiftStatus>(hp('/shifts/my-status'))
 }
 
 // --- Shifts (admin only) ---
 
 export async function listShifts() {
-  return request<{ shifts: Shift[] }>('/shifts')
+  return request<{ shifts: Shift[] }>(hp('/shifts'))
 }
 
 export async function createShift(data: Omit<Shift, 'id'>) {
-  return request<{ shift: Shift }>('/shifts', {
+  return request<{ shift: Shift }>(hp('/shifts'), {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export async function updateShift(id: string, data: Partial<Shift>) {
-  return request<{ shift: Shift }>(`/shifts/${id}`, {
+  return request<{ shift: Shift }>(hp(`/shifts/${id}`), {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
 
 export async function deleteShift(id: string) {
-  return request<{ ok: true }>(`/shifts/${id}`, { method: 'DELETE' })
+  return request<{ ok: true }>(hp(`/shifts/${id}`), { method: 'DELETE' })
 }
 
 export async function getFallbackGroup() {
-  return request<{ volunteers: string[] }>('/shifts/fallback')
+  return request<{ volunteers: string[] }>(hp('/shifts/fallback'))
 }
 
 export async function setFallbackGroup(volunteers: string[]) {
-  return request<{ ok: true }>('/shifts/fallback', {
+  return request<{ ok: true }>(hp('/shifts/fallback'), {
     method: 'PUT',
     body: JSON.stringify({ volunteers }),
   })
@@ -175,22 +188,22 @@ export async function setFallbackGroup(volunteers: string[]) {
 // --- Ban List ---
 
 export async function listBans() {
-  return request<{ bans: BanEntry[] }>('/bans')
+  return request<{ bans: BanEntry[] }>(hp('/bans'))
 }
 
 export async function addBan(data: { phone: string; reason: string }) {
-  return request<{ ban: BanEntry }>('/bans', {
+  return request<{ ban: BanEntry }>(hp('/bans'), {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export async function removeBan(phone: string) {
-  return request<{ ok: true }>(`/bans/${encodeURIComponent(phone)}`, { method: 'DELETE' })
+  return request<{ ok: true }>(hp(`/bans/${encodeURIComponent(phone)}`), { method: 'DELETE' })
 }
 
 export async function bulkAddBans(data: { phones: string[]; reason: string }) {
-  return request<{ count: number }>('/bans/bulk', {
+  return request<{ count: number }>(hp('/bans/bulk'), {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -203,7 +216,7 @@ export async function listNotes(params?: { callId?: string; page?: number; limit
   if (params?.callId) qs.set('callId', params.callId)
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
-  return request<{ notes: EncryptedNote[]; total: number }>(`/notes?${qs}`)
+  return request<{ notes: EncryptedNote[]; total: number }>(hp(`/notes?${qs}`))
 }
 
 export async function createNote(data: {
@@ -212,7 +225,7 @@ export async function createNote(data: {
   authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
   adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
 }) {
-  return request<{ note: EncryptedNote }>('/notes', {
+  return request<{ note: EncryptedNote }>(hp('/notes'), {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -223,7 +236,7 @@ export async function updateNote(id: string, data: {
   authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
   adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
 }) {
-  return request<{ note: EncryptedNote }>(`/notes/${id}`, {
+  return request<{ note: EncryptedNote }>(hp(`/notes/${id}`), {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
@@ -232,7 +245,7 @@ export async function updateNote(id: string, data: {
 // --- Calls ---
 
 export async function listActiveCalls() {
-  return request<{ calls: ActiveCall[] }>('/calls/active')
+  return request<{ calls: ActiveCall[] }>(hp('/calls/active'))
 }
 
 export async function getCallHistory(params?: { page?: number; limit?: number; search?: string; dateFrom?: string; dateTo?: string }) {
@@ -242,19 +255,19 @@ export async function getCallHistory(params?: { page?: number; limit?: number; s
   if (params?.search) qs.set('search', params.search)
   if (params?.dateFrom) qs.set('dateFrom', params.dateFrom)
   if (params?.dateTo) qs.set('dateTo', params.dateTo)
-  return request<{ calls: CallRecord[]; total: number }>(`/calls/history?${qs}`)
+  return request<{ calls: CallRecord[]; total: number }>(hp(`/calls/history?${qs}`))
 }
 
 // --- Calls Today ---
 
 export async function getCallsTodayCount() {
-  return request<{ count: number }>('/calls/today-count')
+  return request<{ count: number }>(hp('/calls/today-count'))
 }
 
 // --- Volunteer Presence (admin only) ---
 
 export async function getVolunteerPresence() {
-  return request<{ volunteers: VolunteerPresence[] }>('/calls/presence')
+  return request<{ volunteers: VolunteerPresence[] }>(hp('/calls/presence'))
 }
 
 // --- Audit Log (admin only) ---
@@ -276,7 +289,7 @@ export async function listAuditLog(params?: {
   if (params?.dateFrom) qs.set('dateFrom', params.dateFrom)
   if (params?.dateTo) qs.set('dateTo', params.dateTo)
   if (params?.search) qs.set('search', params.search)
-  return request<{ entries: AuditLogEntry[]; total: number }>(`/audit?${qs}`)
+  return request<{ entries: AuditLogEntry[]; total: number }>(hp(`/audit?${qs}`))
 }
 
 // --- Spam Mitigation ---
@@ -363,7 +376,7 @@ export async function listInvites() {
   return request<{ invites: InviteCode[] }>('/invites')
 }
 
-export async function createInvite(data: { name: string; phone: string; role: UserRole }) {
+export async function createInvite(data: { name: string; phone: string; roleIds: string[] }) {
   return request<{ invite: InviteCode }>('/invites', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -376,7 +389,7 @@ export async function revokeInvite(code: string) {
 
 export async function validateInvite(code: string) {
   const res = await fetch(`${API_BASE}/invites/validate/${code}`)
-  return res.json() as Promise<{ valid: boolean; name?: string; role?: string; error?: string }>
+  return res.json() as Promise<{ valid: boolean; name?: string; roleIds?: string[]; error?: string }>
 }
 
 export async function redeemInvite(code: string, pubkey: string, secretKey?: Uint8Array) {
@@ -508,15 +521,59 @@ export async function updateWebAuthnSettings(data: Partial<WebAuthnSettings>) {
   })
 }
 
+// --- Roles (PBAC) ---
+
+export interface RoleDefinition {
+  id: string
+  name: string
+  slug: string
+  permissions: string[]
+  isDefault: boolean
+  isSystem: boolean
+  description: string
+  createdAt: string
+  updatedAt: string
+}
+
+export async function listRoles() {
+  return request<{ roles: RoleDefinition[] }>('/settings/roles')
+}
+
+export async function createRole(data: { name: string; slug: string; permissions: string[]; description: string }) {
+  return request<{ role: RoleDefinition }>('/settings/roles', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateRole(id: string, data: Partial<{ name: string; permissions: string[]; description: string }>) {
+  return request<{ role: RoleDefinition }>(`/settings/roles/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteRole(id: string) {
+  return request<{ ok: true }>(`/settings/roles/${id}`, { method: 'DELETE' })
+}
+
+export async function getPermissionsCatalog() {
+  return request<{
+    permissions: Record<string, string>
+    byDomain: Record<string, { key: string; label: string }[]>
+  }>('/settings/permissions')
+}
+
 // --- Types ---
 
+/** @deprecated Use roles array + permissions */
 export type UserRole = 'volunteer' | 'admin' | 'reporter'
 
 export interface Volunteer {
   pubkey: string
   name: string
   phone: string
-  role: UserRole
+  roles: string[]
   active: boolean
   createdAt: string
   transcriptionEnabled: boolean
@@ -599,7 +656,7 @@ export interface InviteCode {
   code: string
   name: string
   phone: string
-  role: UserRole
+  roleIds: string[]
   createdBy: string
   createdAt: string
   expiresAt: string
@@ -659,18 +716,18 @@ export async function listConversations(params?: {
     total?: number
     assignedCount?: number
     waitingCount?: number
-  }>(`/conversations?${qs}`)
+  }>(hp(`/conversations?${qs}`))
 }
 
 export async function getConversation(id: string) {
-  return request<Conversation>(`/conversations/${id}`)
+  return request<Conversation>(hp(`/conversations/${id}`))
 }
 
 export async function getConversationMessages(id: string, params?: { page?: number; limit?: number }) {
   const qs = new URLSearchParams()
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
-  return request<{ messages: ConversationMessage[]; total: number }>(`/conversations/${id}/messages?${qs}`)
+  return request<{ messages: ConversationMessage[]; total: number }>(hp(`/conversations/${id}/messages?${qs}`))
 }
 
 export async function sendConversationMessage(id: string, data: {
@@ -680,25 +737,25 @@ export async function sendConversationMessage(id: string, data: {
   ephemeralPubkeyAdmin: string
   plaintextForSending?: string
 }) {
-  return request<ConversationMessage>(`/conversations/${id}/messages`, {
+  return request<ConversationMessage>(hp(`/conversations/${id}/messages`), {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export async function claimConversation(id: string) {
-  return request<Conversation>(`/conversations/${id}/claim`, { method: 'POST' })
+  return request<Conversation>(hp(`/conversations/${id}/claim`), { method: 'POST' })
 }
 
 export async function updateConversation(id: string, data: { status?: string; assignedTo?: string }) {
-  return request<Conversation>(`/conversations/${id}`, {
+  return request<Conversation>(hp(`/conversations/${id}`), {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
 
 export async function getConversationStats() {
-  return request<{ waiting: number; active: number; closed: number; today: number; total: number }>('/conversations/stats')
+  return request<{ waiting: number; active: number; closed: number; today: number; total: number }>(hp('/conversations/stats'))
 }
 
 // --- Messaging Config ---
@@ -773,7 +830,7 @@ export async function listReports(params?: { status?: string; category?: string;
   if (params?.category) qs.set('category', params.category)
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
-  return request<{ conversations: Report[]; total: number }>(`/reports?${qs}`)
+  return request<{ conversations: Report[]; total: number }>(hp(`/reports?${qs}`))
 }
 
 export async function createReport(data: {
@@ -784,21 +841,21 @@ export async function createReport(data: {
   encryptedContentAdmin: string
   ephemeralPubkeyAdmin: string
 }) {
-  return request<Report>('/reports', {
+  return request<Report>(hp('/reports'), {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export async function getReport(id: string) {
-  return request<Report>(`/reports/${id}`)
+  return request<Report>(hp(`/reports/${id}`))
 }
 
 export async function getReportMessages(id: string, params?: { page?: number; limit?: number }) {
   const qs = new URLSearchParams()
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
-  return request<{ messages: ConversationMessage[]; total: number }>(`/reports/${id}/messages?${qs}`)
+  return request<{ messages: ConversationMessage[]; total: number }>(hp(`/reports/${id}/messages?${qs}`))
 }
 
 export async function sendReportMessage(id: string, data: {
@@ -808,32 +865,32 @@ export async function sendReportMessage(id: string, data: {
   ephemeralPubkeyAdmin: string
   attachmentIds?: string[]
 }) {
-  return request<ConversationMessage>(`/reports/${id}/messages`, {
+  return request<ConversationMessage>(hp(`/reports/${id}/messages`), {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
 export async function assignReport(id: string, assignedTo: string) {
-  return request<Report>(`/reports/${id}/assign`, {
+  return request<Report>(hp(`/reports/${id}/assign`), {
     method: 'POST',
     body: JSON.stringify({ assignedTo }),
   })
 }
 
 export async function updateReport(id: string, data: { status?: string }) {
-  return request<Report>(`/reports/${id}`, {
+  return request<Report>(hp(`/reports/${id}`), {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
 
 export async function getReportCategories() {
-  return request<{ categories: string[] }>('/reports/categories')
+  return request<{ categories: string[] }>(hp('/reports/categories'))
 }
 
 export async function getReportFiles(id: string) {
-  return request<{ files: import('@shared/types').FileRecord[] }>(`/reports/${id}/files`)
+  return request<{ files: import('@shared/types').FileRecord[] }>(hp(`/reports/${id}/files`))
 }
 
 // --- File Uploads ---
@@ -906,13 +963,13 @@ export async function seedDemoData() {
   const { DEMO_ACCOUNTS } = await import('@shared/demo-accounts')
 
   // Create demo volunteers (admin is already created via ADMIN_PUBKEY)
-  const nonAdminAccounts = DEMO_ACCOUNTS.filter(a => a.role !== 'admin')
+  const nonAdminAccounts = DEMO_ACCOUNTS.filter(a => !a.roleIds.includes('role-super-admin'))
   for (const account of nonAdminAccounts) {
     try {
       await createVolunteer({
         name: account.name,
         phone: account.phone,
-        role: account.role,
+        roleIds: account.roleIds,
         pubkey: account.pubkey,
       })
     } catch { /* may already exist */ }
@@ -967,4 +1024,42 @@ export async function seedDemoData() {
       await addBan(ban)
     } catch { /* ignore */ }
   }
+}
+
+// --- Hub Management ---
+
+export type { Hub } from '@shared/types'
+import type { Hub } from '@shared/types'
+
+export async function listHubs() {
+  return request<{ hubs: Hub[] }>('/hubs')
+}
+
+export async function createHub(data: { name: string; slug?: string; description?: string; phoneNumber?: string }) {
+  return request<{ hub: Hub }>('/hubs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function getHub(hubId: string) {
+  return request<{ hub: Hub }>(`/hubs/${hubId}`)
+}
+
+export async function updateHub(hubId: string, data: Partial<Hub>) {
+  return request<{ hub: Hub }>(`/hubs/${hubId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function addHubMember(hubId: string, pubkey: string, roleIds: string[]) {
+  return request<{ ok: true }>(`/hubs/${hubId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ pubkey, roleIds }),
+  })
+}
+
+export async function removeHubMember(hubId: string, pubkey: string) {
+  return request<{ ok: true }>(`/hubs/${hubId}/members/${pubkey}`, { method: 'DELETE' })
 }

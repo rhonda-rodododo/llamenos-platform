@@ -75,21 +75,31 @@
 
 ## Multi-Platform Deployment (Epic 55) — COMPLETE
 - [x] Platform abstraction layer (`src/platform/`) — interfaces for StorageApi, BlobStorage, TranscriptionService
-- [x] Node.js DurableObject shim with SQLite-backed storage (better-sqlite3, WAL mode)
+- [x] Node.js DurableObject shim with PostgreSQL-backed storage (postgres.js, advisory locks)
 - [x] WebSocketPair polyfill for Node.js (EventEmitter-based connected shim sockets)
 - [x] Refactored Env interface with structural typing (DOStub, DONamespace, BlobStorage, TranscriptionService)
 - [x] esbuild Node.js build with `cloudflare:workers` → `src/platform/index.ts` alias
-- [x] Docker infrastructure (Dockerfile, docker-compose.yml, Caddyfile, .env.example)
-- [x] Helm chart for Kubernetes (app, MinIO, Whisper, optional Asterisk/Signal)
+- [x] Docker infrastructure (Dockerfile, docker-compose.yml with PostgreSQL, Caddyfile, .env.example)
+- [x] Helm chart for Kubernetes (app, PostgreSQL, MinIO, Whisper, optional Asterisk/Signal)
 - [x] CI/CD GitHub Actions workflow for Docker image builds (GHCR)
 - [x] Health check endpoint (`/api/health`)
+- [x] PostgreSQL replaces SQLite — enables multi-replica RollingUpdate in Kubernetes
 
-## Demo Mode (Epic 58)
-- [ ] Epic 58: Demo mode — env var toggle, pre-seeded data, one-click demo login, setup wizard skip, daily reset cron, demo banner
+## Demo Mode (Epic 58) — COMPLETE
+- [x] Epic 58: Demo mode — setup wizard opt-in, client-side seeding, one-click demo login, demo banner
 
-## UI Polish (Epics 56–57)
-- [ ] Epic 56: Page consistency & visual refinement (conversations heading, reports empty state, volunteer phone display, login file picker, dashboard stat cards)
-- [ ] Epic 57: Admin UX improvements (audit log filtering, admin settings status summaries)
+## Storage Migrations (Epic 59) — COMPLETE
+- [x] Epic 59: Unified data migration framework — migrations written against StorageApi, run on both CF DOs and PostgreSQL, version tracking per namespace, automatic execution at startup/first access
+
+## UI Polish (Epics 56–57) — COMPLETE
+- [x] Epic 56: Page consistency & visual refinement (conversations heading, reports empty state, volunteer phone display, login file picker, dashboard stat cards)
+- [x] Epic 57: Admin UX improvements (audit log filtering, admin settings status summaries)
+
+## Permission-Based Access Control & Multi-Hub (Epics 60–63)
+- [x] Epic 60: Permission-Based Access Control — dynamic roles, permission catalog, multi-role users, role manager UI
+- [x] Epic 61: Multi-Hub Architecture — hub isolation, per-hub DOs, hub-scoped roles, hub switcher UI, hub management admin page, telephony/messaging/WebSocket hub routing
+- [ ] Epic 62: Message Blasts — subscriber management, broadcast messaging, scheduled sends, opt-in/opt-out compliance
+- [ ] Epic 63: RCS Channel — Google RBM API adapter, rich cards, suggested replies, SMS fallback
 
 ## Low Priority (Post-Launch)
 - [ ] Add call recording playback in notes view

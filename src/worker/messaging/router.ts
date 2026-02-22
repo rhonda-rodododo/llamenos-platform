@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import type { MessagingChannelType, MessagingConfig, WhatsAppConfig } from '../../shared/types'
 import type { MessagingAdapter, IncomingMessage } from './adapter'
-import { getDOs } from '../lib/do-access'
+import { getDOs, getScopedDOs } from '../lib/do-access'
 import { getMessagingAdapter } from '../lib/do-access'
 import { audit } from '../services/audit'
 
@@ -41,9 +41,9 @@ messaging.get('/whatsapp/webhook', async (c) => {
 /**
  * Messaging webhook handler.
  * Each channel has its own webhook URL:
- *   /api/messaging/sms/webhook
- *   /api/messaging/whatsapp/webhook
- *   /api/messaging/signal/webhook
+ *   /api/messaging/sms/webhook?hub={hubId}
+ *   /api/messaging/whatsapp/webhook?hub={hubId}
+ *   /api/messaging/signal/webhook?hub={hubId}
  *
  * No auth middleware — each adapter validates its own webhook signature.
  */
@@ -54,7 +54,11 @@ messaging.post('/:channel/webhook', async (c) => {
     return c.json({ error: 'Unknown channel' }, 404)
   }
 
-  const dos = getDOs(c.env)
+  // Hub-scoped routing: read hubId from query param, fall back to global
+  const url = new URL(c.req.url)
+  const hubId = url.searchParams.get('hub') || undefined
+  const dos = getScopedDOs(c.env, hubId)
+
   let adapter: MessagingAdapter
   try {
     adapter = await getMessagingAdapter(channel, dos)
@@ -78,7 +82,7 @@ messaging.post('/:channel/webhook', async (c) => {
     return c.json({ error: 'Failed to parse message' }, 400)
   }
 
-  // Forward to ConversationDO for processing
+  // Forward to hub-scoped ConversationDO for processing
   const convRes = await dos.conversations.fetch(new Request('http://do/conversations/incoming', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

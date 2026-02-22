@@ -2,6 +2,8 @@ import { DurableObject } from 'cloudflare:workers'
 import type { Env, CallRecord } from '../types'
 import { hashPhone } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
+import { runMigrations } from '../../shared/migrations/runner'
+import { migrations } from '../../shared/migrations'
 
 /**
  * CallRouterDO — manages real-time call state and WebSocket connections.
@@ -15,6 +17,7 @@ import { DORouter } from '../lib/do-router'
  * - Call history
  */
 export class CallRouterDO extends DurableObject<Env> {
+  private migrated = false
   private router: DORouter
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -92,6 +95,10 @@ export class CallRouterDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!this.migrated) {
+      await runMigrations(this.ctx.storage, migrations, 'calls')
+      this.migrated = true
+    }
     // WebSocket upgrade bypasses router (not a standard REST route)
     const url = new URL(request.url)
     if (url.pathname === '/ws' && request.headers.get('Upgrade') === 'websocket') {

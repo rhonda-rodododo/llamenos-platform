@@ -63,6 +63,16 @@ function sayOrStream(promptKey: string, lang: string, audioUrls?: AudioUrlMap, t
   return talk(text, lang, bargeIn)
 }
 
+/** Build hub query param suffix for callback URLs */
+function hubQP(hubId?: string): string {
+  return hubId ? `&hub=${encodeURIComponent(hubId)}` : ''
+}
+
+/** Build hub query param as first param (?hub=...) for URLs with no existing params */
+function hubQPFirst(hubId?: string): string {
+  return hubId ? `?hub=${encodeURIComponent(hubId)}` : ''
+}
+
 /**
  * VonageAdapter — Vonage Voice API implementation of TelephonyAdapter.
  * Uses NCCO (Nexmo Call Control Object) JSON format instead of TwiML XML.
@@ -108,6 +118,7 @@ export class VonageAdapter implements TelephonyAdapter {
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
     const enabled = params.enabledLanguages
+    const hp = hubQP(params.hubId)
     const activeLanguages = IVR_LANGUAGES.filter(code => enabled.includes(code))
 
     if (activeLanguages.length <= 1) {
@@ -121,7 +132,7 @@ export class VonageAdapter implements TelephonyAdapter {
         {
           action: 'notify',
           payload: { lang, auto: true },
-          eventUrl: ['/api/telephony/language-selected?auto=1&forceLang=' + lang],
+          eventUrl: ['/api/telephony/language-selected?auto=1&forceLang=' + lang + hp],
           eventMethod: 'POST',
         },
       ])
@@ -141,7 +152,7 @@ export class VonageAdapter implements TelephonyAdapter {
         action: 'input',
         type: ['dtmf'],
         dtmf: { maxDigits: 1, timeOut: 8 },
-        eventUrl: ['/api/telephony/language-selected'],
+        eventUrl: ['/api/telephony/language-selected' + hubQPFirst(params.hubId)],
         eventMethod: 'POST',
       },
       ...talkActions,
@@ -150,6 +161,7 @@ export class VonageAdapter implements TelephonyAdapter {
 
   async handleIncomingCall(params: IncomingCallParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
+    const hp = hubQP(params.hubId)
     const greetingText = getPrompt('greeting', lang).replace('{name}', params.hotlineName)
     const greetingAction = sayOrStream('greeting', lang, params.audioUrls, greetingText)
 
@@ -171,7 +183,7 @@ export class VonageAdapter implements TelephonyAdapter {
           action: 'input',
           type: ['dtmf'],
           dtmf: { maxDigits: 4, timeOut: 10 },
-          eventUrl: [`/api/telephony/captcha?callSid=${params.callSid}&lang=${lang}`],
+          eventUrl: [`/api/telephony/captcha?callSid=${params.callSid}&lang=${lang}${hp}`],
           eventMethod: 'POST',
         },
       ])
@@ -186,13 +198,14 @@ export class VonageAdapter implements TelephonyAdapter {
         name: params.callSid,
         startOnEnter: false,
         endOnExit: false,
-        musicOnHoldUrl: ['/api/telephony/wait-music?lang=' + lang],
+        musicOnHoldUrl: ['/api/telephony/wait-music?lang=' + lang + hp],
       },
     ])
   }
 
   async handleCaptchaResponse(params: CaptchaResponseParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
+    const hp = hubQP(params.hubId)
 
     if (params.digits === params.expectedDigits) {
       return this.ncco([
@@ -202,7 +215,7 @@ export class VonageAdapter implements TelephonyAdapter {
           name: params.callSid,
           startOnEnter: false,
           endOnExit: false,
-          musicOnHoldUrl: ['/api/telephony/wait-music?lang=' + lang],
+          musicOnHoldUrl: ['/api/telephony/wait-music?lang=' + lang + hp],
         },
       ])
     }
@@ -211,6 +224,7 @@ export class VonageAdapter implements TelephonyAdapter {
   }
 
   async handleCallAnswered(params: CallAnsweredParams): Promise<TelephonyResponse> {
+    const hp = hubQP(params.hubId)
     return this.ncco([
       {
         action: 'conversation',
@@ -218,7 +232,7 @@ export class VonageAdapter implements TelephonyAdapter {
         startOnEnter: true,
         endOnExit: true,
         record: true,
-        eventUrl: [`${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&pubkey=${params.volunteerPubkey}`],
+        eventUrl: [`${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&pubkey=${params.volunteerPubkey}${hp}`],
         eventMethod: 'POST',
       },
     ])
@@ -242,6 +256,7 @@ export class VonageAdapter implements TelephonyAdapter {
 
   async handleVoicemail(params: VoicemailParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
+    const hp = hubQP(params.hubId)
     const voicemailAction = sayOrStream('voicemailPrompt', lang, params.audioUrls)
     return this.ncco([
       voicemailAction,
@@ -251,7 +266,7 @@ export class VonageAdapter implements TelephonyAdapter {
         endOnKey: '#',
         beepStart: true,
         timeOut: params.maxRecordingSeconds ?? 120,
-        eventUrl: [`${params.callbackUrl}/api/telephony/voicemail-recording?callSid=${params.callSid}`],
+        eventUrl: [`${params.callbackUrl}/api/telephony/voicemail-recording?callSid=${params.callSid}${hp}`],
         eventMethod: 'POST',
       },
       talk(getVoicemailThanks(lang), lang),
@@ -271,15 +286,16 @@ export class VonageAdapter implements TelephonyAdapter {
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const callSids: string[] = []
+    const hubParam = params.hubId ? `&hub=${encodeURIComponent(params.hubId)}` : ''
 
     const calls = await Promise.allSettled(
       params.volunteers.map(async (vol) => {
         const body = {
           to: [{ type: 'phone', number: vol.phone.replace('+', '') }],
           from: { type: 'phone', number: this.phoneNumber.replace('+', '') },
-          answer_url: [`${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}`],
+          answer_url: [`${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`],
           answer_method: 'POST',
-          event_url: [`${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}`],
+          event_url: [`${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`],
           event_method: 'POST',
           ringing_timer: 30,
           machine_detection: 'hangup',
@@ -406,6 +422,7 @@ export class VonageAdapter implements TelephonyAdapter {
     return {
       callSid: data.uuid || data.conversation_uuid || '',
       callerNumber: data.from || '',
+      calledNumber: data.to || undefined,
     }
   }
 

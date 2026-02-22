@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
-import { adminGuard } from '../middleware/admin-guard'
+import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const setup = new Hono<AppEnv>()
@@ -14,7 +14,7 @@ setup.get('/state', async (c) => {
 })
 
 // Update setup state (admin only)
-setup.patch('/state', adminGuard, async (c) => {
+setup.patch('/state', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -26,11 +26,41 @@ setup.patch('/state', adminGuard, async (c) => {
   return new Response(res.body, res)
 })
 
-// Complete setup (admin only)
-setup.post('/complete', adminGuard, async (c) => {
+// Complete setup (admin only) — also creates default hub if none exists
+setup.post('/complete', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json().catch(() => ({})) as { demoMode?: boolean }
+
+  // Create default hub if none exists
+  try {
+    const hubsRes = await dos.settings.fetch(new Request('http://do/settings/hubs'))
+    const hubsData = hubsRes.ok ? await hubsRes.json() as { hubs: unknown[] } : { hubs: [] }
+    if (hubsData.hubs.length === 0) {
+      const hotlineName = c.env.HOTLINE_NAME || 'Hotline'
+      const defaultHub = {
+        id: crypto.randomUUID(),
+        name: hotlineName,
+        slug: hotlineName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        status: 'active',
+        phoneNumber: c.env.TWILIO_PHONE_NUMBER || '',
+        createdBy: pubkey,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      await dos.settings.fetch(new Request('http://do/settings/hubs', {
+        method: 'POST',
+        body: JSON.stringify(defaultHub),
+      }))
+      // Assign admin to the default hub with all roles
+      await dos.identity.fetch(new Request('http://do/identity/hub-role', {
+        method: 'POST',
+        body: JSON.stringify({ pubkey, hubId: defaultHub.id, roleIds: ['role-super-admin'] }),
+      }))
+    }
+  } catch {
+    // Non-fatal — hub creation failing shouldn't block setup completion
+  }
 
   const res = await dos.settings.fetch(new Request('http://do/settings/setup', {
     method: 'PATCH',
@@ -42,7 +72,7 @@ setup.post('/complete', adminGuard, async (c) => {
 })
 
 // Test Signal bridge connection
-setup.post('/test/signal', adminGuard, async (c) => {
+setup.post('/test/signal', requirePermission('settings:manage-messaging'), async (c) => {
   const body = await c.req.json() as { bridgeUrl: string; bridgeApiKey: string }
 
   if (!body.bridgeUrl) {
@@ -86,7 +116,7 @@ setup.post('/test/signal', adminGuard, async (c) => {
 })
 
 // Test WhatsApp connection (direct Meta API)
-setup.post('/test/whatsapp', adminGuard, async (c) => {
+setup.post('/test/whatsapp', requirePermission('settings:manage-messaging'), async (c) => {
   const body = await c.req.json() as { phoneNumberId: string; accessToken: string }
 
   if (!body.phoneNumberId || !body.accessToken) {

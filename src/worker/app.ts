@@ -25,6 +25,8 @@ import filesRoutes from './routes/files'
 import reportsRoutes from './routes/reports'
 import setupRoutes from './routes/setup'
 import provisioningRoutes from './routes/provisioning'
+import hubRoutes from './routes/hubs'
+import { hubContext } from './middleware/hub'
 import { getDOs } from './lib/do-access'
 
 const app = new Hono<AppEnv>()
@@ -82,6 +84,20 @@ authenticated.route('/uploads', uploadsRoutes)
 authenticated.route('/files', filesRoutes)
 authenticated.route('/reports', reportsRoutes)
 authenticated.route('/setup', setupRoutes)
+authenticated.route('/hubs', hubRoutes)
+
+// Hub-scoped authenticated routes
+const hubScoped = new Hono<AppEnv>()
+hubScoped.use('*', hubContext)
+hubScoped.route('/shifts', shiftsRoutes)
+hubScoped.route('/bans', bansRoutes)
+hubScoped.route('/notes', notesRoutes)
+hubScoped.route('/calls', callsRoutes)
+hubScoped.route('/audit', auditRoutes)
+hubScoped.route('/conversations', conversationsRoutes)
+hubScoped.route('/reports', reportsRoutes)
+
+authenticated.route('/hubs/:hubId', hubScoped)
 
 api.route('/', authenticated)
 

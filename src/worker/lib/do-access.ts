@@ -38,6 +38,36 @@ export function getDOs(env: Env): DurableObjects {
   }
 }
 
+export interface HubDurableObjects {
+  records: DOStub
+  shifts: DOStub
+  calls: DOStub
+  conversations: DOStub
+}
+
+/**
+ * Get DOs scoped to a hub context. When hubId is provided, returns hub-scoped
+ * instances for records/shifts/calls/conversations while keeping global identity/settings.
+ * When hubId is undefined, returns the global singletons (backwards compatible).
+ */
+export function getScopedDOs(env: Env, hubId?: string): DurableObjects {
+  const global = getDOs(env)
+  if (hubId) {
+    const hub = getHubDOs(env, hubId)
+    return { ...global, ...hub }
+  }
+  return global
+}
+
+export function getHubDOs(env: Env, hubId: string): HubDurableObjects {
+  return {
+    records: env.RECORDS_DO.get(env.RECORDS_DO.idFromName(hubId)),
+    shifts: env.SHIFT_MANAGER.get(env.SHIFT_MANAGER.idFromName(hubId)),
+    calls: env.CALL_ROUTER.get(env.CALL_ROUTER.idFromName(hubId)),
+    conversations: env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(hubId)),
+  }
+}
+
 /**
  * Create a TelephonyAdapter from provider config.
  * Reads config from SettingsDO; falls back to env vars for Twilio.
@@ -62,6 +92,24 @@ export async function getTelephony(env: Env, dos: DurableObjects): Promise<Telep
   }
 
   return null
+}
+
+/**
+ * Get TelephonyAdapter for a specific hub.
+ * Falls back to global telephony config, then env vars.
+ */
+export async function getHubTelephony(env: Env, hubId: string): Promise<TelephonyAdapter | null> {
+  const dos = getDOs(env)
+  try {
+    const res = await dos.settings.fetch(new Request(`http://do/settings/hub/${hubId}/telephony-provider`))
+    if (res.ok) {
+      const config = await res.json() as TelephonyProviderConfig | null
+      if (config) return createAdapterFromConfig(config)
+    }
+  } catch {
+    // Fall through to global
+  }
+  return getTelephony(env, dos)
 }
 
 /**
