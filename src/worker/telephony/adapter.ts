@@ -3,6 +3,8 @@
 export interface WebhookCallInfo {
   callSid: string
   callerNumber: string
+  /** The called number (To / hotline number) — used for multi-hub routing */
+  calledNumber?: string
 }
 
 export interface WebhookDigits {
@@ -139,6 +141,8 @@ export interface LanguageMenuParams {
   callerNumber: string
   hotlineName: string
   enabledLanguages: string[]
+  /** Hub ID for multi-hub routing — appended to callback URLs as &hub= */
+  hubId?: string
 }
 
 export interface IncomingCallParams {
@@ -151,6 +155,8 @@ export interface IncomingCallParams {
   audioUrls?: AudioUrlMap
   /** Pre-generated CAPTCHA digits (generated server-side with CSPRNG) */
   captchaDigits?: string
+  /** Hub ID for multi-hub routing — appended to callback URLs as &hub= */
+  hubId?: string
 }
 
 export interface CaptchaResponseParams {
@@ -158,6 +164,8 @@ export interface CaptchaResponseParams {
   digits: string
   expectedDigits: string
   callerLanguage: string
+  /** Hub ID for multi-hub routing — appended to callback URLs as &hub= */
+  hubId?: string
 }
 
 export interface CallAnsweredParams {
@@ -167,6 +175,8 @@ export interface CallAnsweredParams {
   callbackUrl: string
   /** Volunteer pubkey for recording callback routing */
   volunteerPubkey: string
+  /** Hub ID for multi-hub routing — appended to callback URLs as &hub= */
+  hubId?: string
 }
 
 export interface VoicemailParams {
@@ -175,6 +185,8 @@ export interface VoicemailParams {
   callbackUrl: string
   audioUrls?: AudioUrlMap
   maxRecordingSeconds?: number
+  /** Hub ID for multi-hub routing — appended to callback URLs as &hub= */
+  hubId?: string
 }
 
 export interface RingVolunteersParams {
@@ -182,6 +194,8 @@ export interface RingVolunteersParams {
   callerNumber: string
   volunteers: Array<{ pubkey: string; phone: string }>
   callbackUrl: string
+  /** Hub ID for multi-hub routing — appended to callback URLs as ?hub= */
+  hubId?: string
 }
 
 export interface TelephonyResponse {

@@ -22,7 +22,7 @@ export function getDemoNsec(pubkey: string): string | undefined {
 }
 
 export function getDemoAccountsWithNsec() {
-  return DEMO_ACCOUNTS.filter(a => a.role !== 'volunteer' || a.name !== 'Fatima Al-Rashid').map(a => ({
+  return DEMO_ACCOUNTS.filter(a => !a.roleIds.includes('role-volunteer') || a.name !== 'Fatima Al-Rashid').map(a => ({
     ...a,
     nsec: DEMO_NSECS[a.pubkey]!,
   }))

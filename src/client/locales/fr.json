@@ -45,7 +45,7 @@
     "auditLog": "Journal d'audit",
     "callHistory": "Historique des appels",
     "settings": "Paramètres",
-    "adminSettings": "Paramètres admin"
+    "hubSettings": "Paramètres du hub"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -174,6 +174,10 @@
     "roleAdmin": "Administrateur",
     "inviteGenerated": "Invitation générée ! Partagez la clé secrète de manière sécurisée.",
     "secretKeyWarning": "Cette clé ne sera affichée qu'une seule fois. Partagez-la de manière sécurisée avec le bénévole.",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "Promouvoir administrateur",
     "removeAdmin": "Rétrograder administrateur",
     "active": "Actif",
@@ -307,14 +311,16 @@
     "updateProfile": "Mettre à jour le profil"
   },
   "phone": {
-    "hint": "Format : +1234567890",
+    "hint": "Sélectionnez le pays et entrez le numéro",
     "valid": "Numéro de téléphone valide",
-    "invalid": "Numéro de téléphone invalide"
+    "invalid": "Numéro de téléphone invalide",
+    "searchCountry": "Rechercher un pays...",
+    "noCountry": "Aucun pays trouvé."
   },
   "settings": {
     "title": "Paramètres du compte",
-    "adminTitle": "Paramètres admin",
-    "adminDescription": "Paramètres système affectant l'ensemble de la ligne d'urgence.",
+    "hubTitle": "Paramètres du hub",
+    "hubDescription": "Paramètres affectant l'ensemble du hub de la ligne d'urgence.",
     "general": "Général",
     "security": "Sécurité",
     "telephony": "Téléphonie",
@@ -472,6 +478,24 @@
     "activity": "Activité",
     "noActivity": "Aucune activité enregistrée"
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "Aller au contenu",
     "switchToLanguage": "Passer à {{language}}",
@@ -504,12 +528,11 @@
     "recoveryKeyWarning": "Notez-la et conservez-la en sécurité. Si vous perdez votre code PIN et cette clé, votre compte ne pourra pas être récupéré.",
     "downloadBackup": "Télécharger la Sauvegarde Chiffrée",
     "backupDownloaded": "Sauvegarde téléchargée",
-    "verifyTitle": "Vérifiez votre clé de récupération",
-    "verifyDescription": "Saisissez les caractères aux positions indiquées pour confirmer que vous avez sauvegardé votre clé de récupération",
-    "charAtPosition": "Caractère #{{position}}",
-    "verifyButton": "Vérifier",
-    "verifyFailed": "Vérification échouée — veuillez vérifier votre clé de récupération",
-    "verifySuccess": "Clé de récupération vérifiée !",
+    "storageTipsTitle": "Comment stocker votre clé de récupération",
+    "storageTip1": "Enregistrez-la dans un gestionnaire de mots de passe (1Password, Bitwarden, etc.)",
+    "storageTip2": "Stockez-la sur un appareil personnel auquel vous seul avez accès",
+    "storageTip3": "Écrivez-la et conservez-la dans un endroit physiquement sécurisé",
+    "backupAcknowledge": "J'ai enregistré ma clé de récupération dans un endroit sécurisé",
     "continue": "Continuer",
     "redeemFailed": "Échec de l'utilisation de l'invitation"
   },

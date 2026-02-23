@@ -5,7 +5,7 @@ app:
     repository: ghcr.io/your-org/llamenos
     tag: ""  # Defaults to Chart.appVersion
     pullPolicy: IfNotPresent
-  replicas: 1  # Must be 1 (SQLite is single-writer)
+  replicas: 2
   port: 3000
   resources:
     requests:
@@ -14,15 +14,17 @@ app:
     limits:
       cpu: "1"
       memory: 512Mi
-  persistence:
-    enabled: true
-    size: 10Gi
-    storageClass: ""
-    accessModes:
-      - ReadWriteOnce
   env:
     HOTLINE_NAME: "Hotline"
     ENVIRONMENT: "production"
+
+# PostgreSQL connection
+postgres:
+  host: ""       # Required: e.g. my-rds-instance.region.rds.amazonaws.com
+  port: 5432
+  database: llamenos
+  user: llamenos
+  poolSize: 10
 
 # MinIO for blob storage
 minio:
@@ -112,10 +114,11 @@ ingress:
 # Secrets (reference existing K8s secrets)
 secrets:
   # Create a secret named "llamenos-secrets" with these keys:
-  #   admin-pubkey, twilio-account-sid, twilio-auth-token, twilio-phone-number
+  #   admin-pubkey, postgres-password, twilio-account-sid, twilio-auth-token, twilio-phone-number
   existingSecret: ""
   # Or provide values directly (will be base64-encoded into a Secret)
   adminPubkey: ""
+  postgresPassword: ""  # Required
   twilioAccountSid: ""
   twilioAuthToken: ""
   twilioPhoneNumber: ""

@@ -3,11 +3,12 @@ title: "Deploy: Kubernetes (Helm)"
 description: Deploy Llamenos to Kubernetes using the official Helm chart.
 ---
 
-This guide covers deploying Llamenos to a Kubernetes cluster using the official Helm chart. The chart manages the application, MinIO object storage, and optional Whisper transcription as separate deployments.
+This guide covers deploying Llamenos to a Kubernetes cluster using the official Helm chart. The chart manages the application and optional MinIO/Whisper services as separate deployments. You provide a PostgreSQL database.
 
 ## Prerequisites
 
 - A Kubernetes cluster (v1.24+) — managed (EKS, GKE, AKS) or self-hosted
+- A PostgreSQL 14+ instance (managed RDS/Cloud SQL recommended, or self-hosted)
 - [Helm](https://helm.sh/) v3.10+
 - [kubectl](https://kubernetes.io/docs/tasks/tools/) configured for your cluster
 - An ingress controller (NGINX Ingress, Traefik, etc.)
@@ -30,8 +31,10 @@ Save the **nsec** securely. Copy the **hex public key** for the Helm values.
 ```bash
 helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
-  --set secrets.minioAccessKey=your-access-key \
-  --set secrets.minioSecretKey=your-secret-key \
+  --set secrets.postgresPassword=YOUR_PG_PASSWORD \
+  --set postgres.host=YOUR_PG_HOST \
+  --set minio.credentials.accessKey=your-access-key \
+  --set minio.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -44,19 +47,21 @@ Or create a `values-production.yaml` file for reproducible deploys:
 app:
   image:
     repository: ghcr.io/your-org/llamenos
-    tag: "0.10.0"
-  port: 3000
-  persistence:
-    size: 20Gi
-    storageClass: "gp3"   # AWS EBS, adjust for your provider
+    tag: "0.14.0"
+  replicas: 2
   env:
     HOTLINE_NAME: "Your Hotline"
-    PLATFORM: "node"
+
+postgres:
+  host: my-rds-instance.region.rds.amazonaws.com
+  port: 5432
+  database: llamenos
+  user: llamenos
+  poolSize: 10
 
 secrets:
   adminPubkey: "your_hex_public_key"
-  minioAccessKey: "your-access-key"
-  minioSecretKey: "your-secret-key-change-me"
+  postgresPassword: "your-strong-password"
   # twilioAccountSid: ""
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
@@ -66,6 +71,9 @@ minio:
   persistence:
     size: 50Gi
     storageClass: "gp3"
+  credentials:
+    accessKey: "your-access-key"
+    secretKey: "your-secret-key-change-me"
 
 whisper:
   enabled: true
@@ -110,7 +118,7 @@ kubectl get pods -l app.kubernetes.io/instance=llamenos
 # Check the app health
 kubectl port-forward svc/llamenos 3000:3000
 curl http://localhost:3000/api/health
-# → {"status":"ok","platform":"node","timestamp":"...","uptime":...}
+# → {"status":"ok"}
 ```
 
 ## 4. Configure DNS
@@ -132,21 +140,28 @@ Open `https://hotline.yourdomain.com` in your browser. Log in with the admin nse
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `app.image.repository` | Container image | `ghcr.io/your-org/llamenos` |
-| `app.image.tag` | Image tag | `latest` |
+| `app.image.tag` | Image tag | Chart appVersion |
 | `app.port` | Application port | `3000` |
-| `app.replicas` | Pod replicas (must be 1 — SQLite) | `1` |
-| `app.persistence.size` | SQLite data volume size | `10Gi` |
-| `app.persistence.storageClass` | Storage class | `""` (default) |
+| `app.replicas` | Pod replicas | `2` |
 | `app.resources` | CPU/memory requests and limits | `{}` |
 | `app.env` | Extra environment variables | `{}` |
+
+### PostgreSQL
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `postgres.host` | PostgreSQL hostname (required) | `""` |
+| `postgres.port` | PostgreSQL port | `5432` |
+| `postgres.database` | Database name | `llamenos` |
+| `postgres.user` | Database user | `llamenos` |
+| `postgres.poolSize` | Connection pool size | `10` |
 
 ### Secrets
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `secrets.adminPubkey` | Admin Nostr hex public key | `""` |
-| `secrets.minioAccessKey` | MinIO access key | `""` (required) |
-| `secrets.minioSecretKey` | MinIO secret key | `""` (required) |
+| `secrets.postgresPassword` | PostgreSQL password (required) | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |
 | `secrets.twilioPhoneNumber` | Twilio phone number (E.164) | `""` |
@@ -173,7 +188,7 @@ Open `https://hotline.yourdomain.com` in your browser. Log in with the admin nse
 |-----------|-------------|---------|
 | `whisper.enabled` | Deploy Whisper | `false` |
 | `whisper.image.repository` | Whisper image | `fedirz/faster-whisper-server` |
-| `whisper.image.tag` | Whisper tag | `latest` |
+| `whisper.image.tag` | Whisper tag | `0.4.1` |
 | `whisper.model` | Whisper model name | `Systran/faster-whisper-base` |
 | `whisper.device` | Device: `cpu` or `cuda` | `cpu` |
 | `whisper.resources` | CPU/memory requests and limits | `{}` |
@@ -211,9 +226,10 @@ Create the Secret with your preferred tool:
 ```bash
 # Manual
 kubectl create secret generic llamenos-secrets \
-  --from-literal=ADMIN_PUBKEY=your_key \
-  --from-literal=MINIO_ACCESS_KEY=your_key \
-  --from-literal=MINIO_SECRET_KEY=your_key
+  --from-literal=admin-pubkey=your_key \
+  --from-literal=postgres-password=your_password \
+  --from-literal=minio-access-key=your_key \
+  --from-literal=minio-secret-key=your_key
 
 # Or with External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
@@ -250,13 +266,17 @@ whisper:
 
 Ensure the [NVIDIA device plugin](https://github.com/NVIDIA/k8s-device-plugin) is installed in your cluster.
 
-## Scaling considerations
+## Scaling
 
-Llamenos uses SQLite for data storage, which requires a **single writer**. The Helm chart enforces `replicas: 1` with a `Recreate` deployment strategy. This is appropriate for crisis hotline workloads.
+The deployment uses `RollingUpdate` strategy for zero-downtime upgrades. Scale replicas based on your traffic:
 
-If you need horizontal scaling:
-- Use the [Cloudflare Workers deployment](/docs/getting-started) instead
-- Or put a read-replica in front of SQLite (advanced, not officially supported)
+```bash
+kubectl scale deployment llamenos --replicas=3
+```
+
+Or set `app.replicas` in your values file. PostgreSQL advisory locks ensure data consistency across replicas.
+
+For automatic global scaling without managing infrastructure, consider the [Cloudflare Workers deployment](/docs/getting-started).
 
 ## Monitoring
 
@@ -270,13 +290,13 @@ livenessProbe:
   httpGet:
     path: /api/health
     port: http
-  initialDelaySeconds: 10
+  initialDelaySeconds: 15
   periodSeconds: 15
 readinessProbe:
   httpGet:
     path: /api/health
     port: http
-  initialDelaySeconds: 5
+  initialDelaySeconds: 10
   periodSeconds: 10
 startupProbe:
   httpGet:
@@ -298,7 +318,7 @@ kubectl logs -l app.kubernetes.io/instance=llamenos -c app -f
 helm upgrade llamenos deploy/helm/llamenos/ -f values-production.yaml
 ```
 
-The `Recreate` strategy ensures the old pod terminates before the new one starts (SQLite single-writer requirement).
+The `RollingUpdate` strategy provides zero-downtime upgrades.
 
 ## Uninstalling
 
@@ -320,15 +340,14 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Common causes: missing secrets, incorrect ADMIN_PUBKEY, MinIO not ready.
+Common causes: missing secrets, incorrect ADMIN_PUBKEY, PostgreSQL not reachable, MinIO not ready.
 
-### PVC not binding
+### Database connection errors
 
-Check that your storage class exists and has available capacity:
+Verify PostgreSQL is reachable from the cluster:
 
 ```bash
-kubectl get sc
-kubectl get pvc -l app.kubernetes.io/instance=llamenos
+kubectl run pg-test --rm -it --image=postgres:17-alpine -- psql postgresql://llamenos:PASSWORD@PG_HOST:5432/llamenos -c "SELECT 1"
 ```
 
 ### Ingress not working

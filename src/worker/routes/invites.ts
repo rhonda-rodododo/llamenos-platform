@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
-import type { AppEnv, UserRole } from '../types'
+import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
 import { isValidE164, checkRateLimit } from '../lib/helpers'
 import { hashIP } from '../lib/crypto'
 import { verifyAuthToken } from '../lib/auth'
 import { auth as authMiddleware } from '../middleware/auth'
-import { adminGuard } from '../middleware/admin-guard'
+import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const invites = new Hono<AppEnv>()
@@ -46,19 +46,19 @@ invites.post('/redeem', async (c) => {
   }))
 })
 
-// --- Admin routes ---
-invites.use('/', authMiddleware, adminGuard)
-invites.use('/:code', authMiddleware, adminGuard)
+// --- Authenticated routes (require invites permissions) ---
+invites.use('/', authMiddleware, requirePermission('invites:read'))
+invites.use('/:code', authMiddleware, requirePermission('invites:read'))
 
 invites.get('/', async (c) => {
   const dos = getDOs(c.env)
   return dos.identity.fetch(new Request('http://do/invites'))
 })
 
-invites.post('/', async (c) => {
+invites.post('/', requirePermission('invites:create'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
-  const body = await c.req.json() as { name: string; phone: string; role: UserRole }
+  const body = await c.req.json() as { name: string; phone: string; roleIds: string[] }
   if (body.phone && !isValidE164(body.phone)) {
     return c.json({ error: 'Invalid phone number. Use E.164 format (e.g. +12125551234)' }, 400)
   }
@@ -70,7 +70,7 @@ invites.post('/', async (c) => {
   return res
 })
 
-invites.delete('/:code', async (c) => {
+invites.delete('/:code', requirePermission('invites:revoke'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const code = c.req.param('code')

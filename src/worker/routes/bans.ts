@@ -1,15 +1,15 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getDOs } from '../lib/do-access'
+import { getScopedDOs } from '../lib/do-access'
 import { isValidE164 } from '../lib/helpers'
-import { adminGuard } from '../middleware/admin-guard'
+import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const bans = new Hono<AppEnv>()
 
-// Any authenticated user can report/ban
-bans.post('/', async (c) => {
-  const dos = getDOs(c.env)
+// Any authenticated user with bans:report can report/ban
+bans.post('/', requirePermission('bans:report'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const body = await c.req.json() as { phone: string; reason: string }
   if (!isValidE164(body.phone)) {
@@ -23,14 +23,13 @@ bans.post('/', async (c) => {
   return res
 })
 
-// Admin-only routes
-bans.get('/', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+bans.get('/', requirePermission('bans:read'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   return dos.records.fetch(new Request('http://do/bans'))
 })
 
-bans.post('/bulk', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+bans.post('/bulk', requirePermission('bans:bulk-create'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const body = await c.req.json() as { phones: string[]; reason: string }
   const invalidPhones = body.phones.filter(p => !isValidE164(p))
@@ -45,8 +44,8 @@ bans.post('/bulk', adminGuard, async (c) => {
   return res
 })
 
-bans.delete('/:phone', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+bans.delete('/:phone', requirePermission('bans:delete'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const phone = decodeURIComponent(c.req.param('phone'))
   const res = await dos.records.fetch(new Request(`http://do/bans/${encodeURIComponent(phone)}`, { method: 'DELETE' }))

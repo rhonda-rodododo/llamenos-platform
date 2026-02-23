@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, Link as LinkIcon } from 'lucide-react'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
@@ -6,6 +6,36 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+
+/**
+ * Persists which settings sections are expanded across navigations via sessionStorage.
+ */
+export function usePersistedExpanded(storageKey: string, defaults: string[], deepLink?: string) {
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey)
+      if (saved) {
+        const set = new Set(JSON.parse(saved) as string[])
+        if (deepLink) set.add(deepLink)
+        return set
+      }
+    } catch { /* ignore */ }
+    const set = new Set(defaults)
+    if (deepLink) set.add(deepLink)
+    return set
+  })
+
+  const toggleSection = useCallback((id: string, open: boolean) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (open) next.add(id); else next.delete(id)
+      try { sessionStorage.setItem(storageKey, JSON.stringify([...next])) } catch { /* ignore */ }
+      return next
+    })
+  }, [storageKey])
+
+  return { expanded, toggleSection }
+}
 
 interface SettingsSectionProps {
   id: string

@@ -1,15 +1,17 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getDOs } from '../lib/do-access'
-import { adminGuard } from '../middleware/admin-guard'
+import { getScopedDOs } from '../lib/do-access'
+import { requirePermission } from '../middleware/permission-guard'
+import { checkPermission } from '../middleware/permission-guard'
 
 const calls = new Hono<AppEnv>()
 
 calls.get('/active', async (c) => {
-  const dos = getDOs(c.env)
-  const isAdmin = c.get('isAdmin')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
+  const permissions = c.get('permissions')
+  const canSeeFullInfo = checkPermission(permissions, 'calls:read-active-full')
   const res = await dos.calls.fetch(new Request('http://do/calls/active'))
-  if (!isAdmin) {
+  if (!canSeeFullInfo) {
     const data = await res.json() as { calls: Array<{ callerNumber: string; [key: string]: unknown }> }
     data.calls = data.calls.map(call => ({ ...call, callerNumber: '[redacted]' }))
     return c.json(data)
@@ -18,17 +20,17 @@ calls.get('/active', async (c) => {
 })
 
 calls.get('/today-count', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   return dos.calls.fetch(new Request('http://do/calls/today-count'))
 })
 
-calls.get('/presence', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+calls.get('/presence', requirePermission('calls:read-presence'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   return dos.calls.fetch(new Request('http://do/calls/presence'))
 })
 
-calls.get('/history', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+calls.get('/history', requirePermission('calls:read-history'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const params = new URLSearchParams()
   params.set('page', c.req.query('page') || '1')
   params.set('limit', c.req.query('limit') || '50')
@@ -38,9 +40,9 @@ calls.get('/history', adminGuard, async (c) => {
   return dos.calls.fetch(new Request(`http://do/calls/history?${params}`))
 })
 
-// Admin-only diagnostic endpoint — shows DO storage state
-calls.get('/debug', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+// Diagnostic endpoint
+calls.get('/debug', requirePermission('calls:debug'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const res = await dos.calls.fetch(new Request('http://do/calls/debug'))
   return res
 })

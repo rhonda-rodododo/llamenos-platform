@@ -13,7 +13,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   // --- Volunteer Settings: Call Preference ---
 
   test('call preference section is visible in volunteer settings', async ({ page }) => {
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Click to expand the Call Preference section
@@ -24,7 +24,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('phone only is selected by default', async ({ page }) => {
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByText('Call Preference').first().click()
 
     // Phone Only should be the active option (has the indicator dot)
@@ -33,7 +33,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('browser and both options are disabled when WebRTC not configured', async ({ page }) => {
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByText('Call Preference').first().click()
 
     // WebRTC not configured message should be visible
@@ -54,11 +54,11 @@ test.describe('WebRTC & Call Preference Settings', () => {
     await expect(page.getByText('Phone Only')).toBeVisible({ timeout: 5000 })
   })
 
-  // --- Admin Settings: WebRTC Configuration ---
+  // --- Hub Settings: WebRTC Configuration ---
 
   test('WebRTC config section appears in telephony provider settings', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand the Telephony Provider section
     await page.getByText('Telephony Provider').first().click()
@@ -68,7 +68,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('WebRTC toggle enables API key fields for Twilio', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
     await page.getByText('Telephony Provider').first().click()
 
     // Initially, WebRTC fields should not be visible (toggle is off)
@@ -86,7 +86,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('WebRTC fields not shown for Asterisk provider', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
     await page.getByText('Telephony Provider').first().click()
 
     // Switch to Asterisk
@@ -98,7 +98,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('WebRTC toggle shown for SignalWire provider', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
     await page.getByText('Telephony Provider').first().click()
 
     // Switch to SignalWire
@@ -110,7 +110,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('WebRTC toggle shown for Vonage without extra fields', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
     await page.getByText('Telephony Provider').first().click()
 
     // Switch to Vonage
@@ -131,7 +131,7 @@ test.describe('WebRTC & Call Preference Settings', () => {
   })
 
   test('WebRTC config persists with provider save', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
     await page.getByText('Telephony Provider').first().click()
 
     // Fill in basic Twilio credentials
@@ -155,9 +155,9 @@ test.describe('WebRTC & Call Preference Settings', () => {
     // Reload the page — clears keyManager, PIN re-entry needed
     await page.reload()
     await enterPin(page, TEST_PIN)
-    // PIN unlock redirects to dashboard — navigate back to Admin Settings
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    // PIN unlock redirects to dashboard — navigate back to Hub Settings
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand the section
     await page.getByText('Telephony Provider').first().click()

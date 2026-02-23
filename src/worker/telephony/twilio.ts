@@ -66,6 +66,16 @@ function sayOrPlay(promptKey: string, lang: string, audioUrls?: AudioUrlMap, tex
   return `<Say language="${voice}">${escapeXml(content)}</Say>`
 }
 
+/** Build XML-escaped hub query param suffix for TwiML callback URLs */
+function hubXmlParam(hubId?: string): string {
+  return hubId ? `&amp;hub=${escapeXml(encodeURIComponent(hubId))}` : ''
+}
+
+/** Build hub query param suffix for non-XML URLs */
+function hubQueryParam(hubId?: string): string {
+  return hubId ? `&hub=${encodeURIComponent(hubId)}` : ''
+}
+
 /**
  * TwilioAdapter — Twilio implementation of TelephonyAdapter.
  */
@@ -82,6 +92,7 @@ export class TwilioAdapter implements TelephonyAdapter {
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
     const enabled = params.enabledLanguages
+    const hp = hubXmlParam(params.hubId)
     // Filter IVR languages to only those enabled by admin
     const activeLanguages = IVR_LANGUAGES.filter(code => enabled.includes(code))
 
@@ -90,7 +101,7 @@ export class TwilioAdapter implements TelephonyAdapter {
       const lang = activeLanguages[0] || DEFAULT_LANGUAGE
       return this.twiml(`
         <Response>
-          <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${lang}</Redirect>
+          <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${lang}${hp}</Redirect>
         </Response>
       `)
     }
@@ -106,10 +117,10 @@ export class TwilioAdapter implements TelephonyAdapter {
 
     return this.twiml(`
       <Response>
-        <Gather numDigits="1" action="/api/telephony/language-selected" method="POST" timeout="8">
+        <Gather numDigits="1" action="/api/telephony/language-selected${params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''}" method="POST" timeout="8">
           ${sayElements}
         </Gather>
-        <Redirect method="POST">/api/telephony/language-selected?auto=1</Redirect>
+        <Redirect method="POST">/api/telephony/language-selected?auto=1${hp}</Redirect>
       </Response>
     `)
   }
@@ -117,6 +128,7 @@ export class TwilioAdapter implements TelephonyAdapter {
   async handleIncomingCall(params: IncomingCallParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
     const tLang = getTwilioVoice(lang)
+    const hp = hubXmlParam(params.hubId)
     const greetingText = getPrompt('greeting', lang).replace('{name}', params.hotlineName)
     const greetingTwiml = sayOrPlay('greeting', lang, params.audioUrls, greetingText)
 
@@ -136,7 +148,7 @@ export class TwilioAdapter implements TelephonyAdapter {
       const captchaTwiml = sayOrPlay('captchaPrompt', lang, params.audioUrls)
       return this.twiml(`
         <Response>
-          <Gather numDigits="4" action="/api/telephony/captcha?callSid=${params.callSid}&amp;lang=${lang}" method="POST" timeout="10">
+          <Gather numDigits="4" action="/api/telephony/captcha?callSid=${params.callSid}&amp;lang=${lang}${hp}" method="POST" timeout="10">
             ${greetingTwiml}
             ${captchaTwiml}
             <Say language="${tLang}">${escapeXml(digits.split('').join(', '))}.</Say>
@@ -152,7 +164,7 @@ export class TwilioAdapter implements TelephonyAdapter {
       <Response>
         ${greetingTwiml}
         ${holdTwiml}
-        <Enqueue waitUrl="/api/telephony/wait-music?lang=${lang}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}" method="POST">${params.callSid}</Enqueue>
+        <Enqueue waitUrl="/api/telephony/wait-music?lang=${lang}${hp}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}${hp}" method="POST">${params.callSid}</Enqueue>
       </Response>
     `)
   }
@@ -160,12 +172,13 @@ export class TwilioAdapter implements TelephonyAdapter {
   async handleCaptchaResponse(params: CaptchaResponseParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
     const tLang = getTwilioVoice(lang)
+    const hp = hubXmlParam(params.hubId)
 
     if (params.digits === params.expectedDigits) {
       return this.twiml(`
         <Response>
           <Say language="${tLang}">${getPrompt('captchaSuccess', lang)}</Say>
-          <Enqueue waitUrl="/api/telephony/wait-music?lang=${lang}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}" method="POST">${params.callSid}</Enqueue>
+          <Enqueue waitUrl="/api/telephony/wait-music?lang=${lang}${hp}" action="/api/telephony/queue-exit?callSid=${params.callSid}&amp;lang=${lang}${hp}" method="POST">${params.callSid}</Enqueue>
         </Response>
       `)
     }
@@ -178,9 +191,10 @@ export class TwilioAdapter implements TelephonyAdapter {
   }
 
   async handleCallAnswered(params: CallAnsweredParams): Promise<TelephonyResponse> {
+    const hp = hubXmlParam(params.hubId)
     return this.twiml(`
       <Response>
-        <Dial record="record-from-answer" recordingStatusCallback="${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.volunteerPubkey}" recordingStatusCallbackEvent="completed">
+        <Dial record="record-from-answer" recordingStatusCallback="${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.volunteerPubkey}${hp}" recordingStatusCallbackEvent="completed">
           <Queue>${params.parentCallSid}</Queue>
         </Dial>
       </Response>
@@ -204,11 +218,12 @@ export class TwilioAdapter implements TelephonyAdapter {
 
   async handleVoicemail(params: VoicemailParams): Promise<TelephonyResponse> {
     const lang = params.callerLanguage
+    const hp = hubXmlParam(params.hubId)
     const voicemailTwiml = sayOrPlay('voicemailPrompt', lang, params.audioUrls)
     return this.twiml(`
       <Response>
         ${voicemailTwiml}
-        <Record maxLength="${params.maxRecordingSeconds ?? 120}" action="/api/telephony/voicemail-complete?callSid=${params.callSid}&amp;lang=${lang}" recordingStatusCallback="${params.callbackUrl}/api/telephony/voicemail-recording?callSid=${params.callSid}" recordingStatusCallbackEvent="completed" />
+        <Record maxLength="${params.maxRecordingSeconds ?? 120}" action="/api/telephony/voicemail-complete?callSid=${params.callSid}&amp;lang=${lang}${hp}" recordingStatusCallback="${params.callbackUrl}/api/telephony/voicemail-recording?callSid=${params.callSid}${hp}" recordingStatusCallbackEvent="completed" />
         <Hangup/>
       </Response>
     `)
@@ -227,14 +242,15 @@ export class TwilioAdapter implements TelephonyAdapter {
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const callSids: string[] = []
+    const hubParam = params.hubId ? `&hub=${encodeURIComponent(params.hubId)}` : ''
 
     const calls = await Promise.allSettled(
       params.volunteers.map(async (vol) => {
         const body = new URLSearchParams({
           To: vol.phone,
           From: this.phoneNumber,
-          Url: `${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}`,
-          StatusCallback: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}`,
+          Url: `${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
+          StatusCallback: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
           Timeout: '30',
           MachineDetection: 'Enable',
         })
@@ -358,6 +374,7 @@ export class TwilioAdapter implements TelephonyAdapter {
     return {
       callSid: form.get('CallSid') as string,
       callerNumber: form.get('From') as string,
+      calledNumber: (form.get('To') as string) || undefined,
     }
   }
 

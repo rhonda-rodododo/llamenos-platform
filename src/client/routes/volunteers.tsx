@@ -10,8 +10,10 @@ import {
   listInvites,
   createInvite,
   revokeInvite,
+  listRoles,
   type Volunteer,
   type InviteCode,
+  type RoleDefinition,
 } from '@/lib/api'
 import { generateKeyPair } from '@/lib/crypto'
 import { useToast } from '@/lib/toast'
@@ -35,6 +37,7 @@ function VolunteersPage() {
   const { toast } = useToast()
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [invites, setInvites] = useState<InviteCode[]>([])
+  const [roles, setRoles] = useState<RoleDefinition[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [showInviteForm, setShowInviteForm] = useState(false)
   const [generatedNsec, setGeneratedNsec] = useState<string | null>(null)
@@ -47,9 +50,10 @@ function VolunteersPage() {
 
   async function loadData() {
     try {
-      const [volRes, invRes] = await Promise.all([listVolunteers(), listInvites()])
+      const [volRes, invRes, rolesRes] = await Promise.all([listVolunteers(), listInvites(), listRoles()])
       setVolunteers(volRes.volunteers)
       setInvites(invRes.invites)
+      setRoles(rolesRes.roles)
     } catch {
       toast(t('common.error'), 'error')
     } finally {
@@ -141,6 +145,7 @@ function VolunteersPage() {
       {/* Invite form */}
       {showInviteForm && (
         <InviteForm
+          roles={roles}
           onCreated={(invite) => {
             setInvites(prev => [...prev, invite])
             setInviteLink(`${window.location.origin}/onboarding?code=${invite.code}`)
@@ -153,6 +158,7 @@ function VolunteersPage() {
       {/* Add volunteer form */}
       {showAddForm && (
         <AddVolunteerForm
+          roles={roles}
           onCreated={(vol, nsec) => {
             setVolunteers(prev => [...prev, vol])
             setGeneratedNsec(nsec)
@@ -227,6 +233,7 @@ function VolunteersPage() {
                 <VolunteerRow
                   key={vol.pubkey}
                   volunteer={vol}
+                  roles={roles}
                   onUpdate={(updated) => {
                     setVolunteers(prev => prev.map(v => v.pubkey === updated.pubkey ? updated : v))
                   }}
@@ -243,7 +250,8 @@ function VolunteersPage() {
   )
 }
 
-function InviteForm({ onCreated, onCancel }: {
+function InviteForm({ roles, onCreated, onCancel }: {
+  roles: RoleDefinition[]
   onCreated: (invite: InviteCode) => void
   onCancel: () => void
 }) {
@@ -251,7 +259,7 @@ function InviteForm({ onCreated, onCancel }: {
   const { toast } = useToast()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [role, setRole] = useState<'volunteer' | 'admin' | 'reporter'>('volunteer')
+  const [roleId, setRoleId] = useState('role-volunteer')
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -262,7 +270,7 @@ function InviteForm({ onCreated, onCancel }: {
     }
     setSaving(true)
     try {
-      const res = await createInvite({ name, phone, role })
+      const res = await createInvite({ name, phone, roleIds: [roleId] })
       onCreated(res.invite)
       toast(t('volunteers.inviteCreated'), 'success')
     } catch {
@@ -304,14 +312,14 @@ function InviteForm({ onCreated, onCancel }: {
           </div>
           <div className="space-y-2">
             <Label htmlFor="invite-role">{t('volunteers.role')}</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as 'volunteer' | 'admin' | 'reporter')}>
+            <Select value={roleId} onValueChange={setRoleId}>
               <SelectTrigger id="invite-role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="volunteer">{t('volunteers.roleVolunteer')}</SelectItem>
-                <SelectItem value="admin">{t('volunteers.roleAdmin')}</SelectItem>
-                <SelectItem value="reporter">{t('volunteers.roleReporter', { defaultValue: 'Reporter' })}</SelectItem>
+                {roles.map(role => (
+                  <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -329,7 +337,8 @@ function InviteForm({ onCreated, onCancel }: {
   )
 }
 
-function AddVolunteerForm({ onCreated, onCancel }: {
+function AddVolunteerForm({ roles, onCreated, onCancel }: {
+  roles: RoleDefinition[]
   onCreated: (vol: Volunteer, nsec: string) => void
   onCancel: () => void
 }) {
@@ -337,7 +346,7 @@ function AddVolunteerForm({ onCreated, onCancel }: {
   const { toast } = useToast()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [role, setRole] = useState<'volunteer' | 'admin' | 'reporter'>('volunteer')
+  const [roleId, setRoleId] = useState('role-volunteer')
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -349,7 +358,7 @@ function AddVolunteerForm({ onCreated, onCancel }: {
     setSaving(true)
     try {
       const keyPair = generateKeyPair()
-      const res = await createVolunteer({ name, phone, role, pubkey: keyPair.publicKey })
+      const res = await createVolunteer({ name, phone, roleIds: [roleId], pubkey: keyPair.publicKey })
       onCreated(res.volunteer, keyPair.nsec)
       toast(t('volunteers.volunteerAdded'), 'success')
     } catch {
@@ -391,14 +400,14 @@ function AddVolunteerForm({ onCreated, onCancel }: {
           </div>
           <div className="space-y-2">
             <Label htmlFor="vol-role">{t('volunteers.role')}</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as 'volunteer' | 'admin' | 'reporter')}>
+            <Select value={roleId} onValueChange={setRoleId}>
               <SelectTrigger id="vol-role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="volunteer">{t('volunteers.roleVolunteer')}</SelectItem>
-                <SelectItem value="admin">{t('volunteers.roleAdmin')}</SelectItem>
-                <SelectItem value="reporter">{t('volunteers.roleReporter', { defaultValue: 'Reporter' })}</SelectItem>
+                {roles.map(role => (
+                  <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -416,8 +425,9 @@ function AddVolunteerForm({ onCreated, onCancel }: {
   )
 }
 
-function VolunteerRow({ volunteer, onUpdate, onDelete }: {
+function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
   volunteer: Volunteer
+  roles: RoleDefinition[]
   onUpdate: (vol: Volunteer) => void
   onDelete: () => void
 }) {
@@ -431,10 +441,14 @@ function VolunteerRow({ volunteer, onUpdate, onDelete }: {
     return phone.slice(0, 3) + '•'.repeat(phone.length - 5) + phone.slice(-2)
   }
 
-  async function toggleRole() {
-    const newRole = volunteer.role === 'admin' ? 'volunteer' : 'admin'
+  const primaryRoleId = volunteer.roles[0] || 'role-volunteer'
+  const primaryRole = roles.find(r => r.id === primaryRoleId)
+  const isAdminRole = primaryRoleId === 'role-super-admin' || primaryRoleId === 'role-hub-admin'
+
+  async function changeRole(newRoleId: string) {
+    if (newRoleId === primaryRoleId) return
     try {
-      const res = await updateVolunteer(volunteer.pubkey, { role: newRole })
+      const res = await updateVolunteer(volunteer.pubkey, { roles: [newRoleId] })
       onUpdate(res.volunteer)
     } catch {
       toast(t('common.error'), 'error')
@@ -478,13 +492,11 @@ function VolunteerRow({ volunteer, onUpdate, onDelete }: {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-        <Badge variant={volunteer.role === 'admin' ? 'default' : 'secondary'}>
-          {volunteer.role === 'admin' ? (
-            <><ShieldCheck className="h-3 w-3" /> {t('volunteers.roleAdmin')}</>
-          ) : volunteer.role === 'reporter' ? (
-            t('volunteers.roleReporter', { defaultValue: 'Reporter' })
-          ) : (
-            t('volunteers.roleVolunteer')
+        <Badge variant={isAdminRole ? 'default' : 'secondary'}>
+          {isAdminRole && <ShieldCheck className="h-3 w-3" />}
+          {primaryRole?.name || primaryRoleId}
+          {volunteer.roles.length > 1 && (
+            <span className="ml-1 text-xs opacity-70">+{volunteer.roles.length - 1}</span>
           )}
         </Badge>
         <button onClick={toggleActive} aria-pressed={volunteer.active}>
@@ -503,13 +515,17 @@ function VolunteerRow({ volunteer, onUpdate, onDelete }: {
           </Badge>
         )}
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="xs" onClick={toggleRole}>
-            {volunteer.role === 'admin' ? (
-              <><Shield className="h-3 w-3" /> {t('volunteers.removeAdmin')}</>
-            ) : (
-              <><ShieldCheck className="h-3 w-3" /> {t('volunteers.makeAdmin')}</>
-            )}
-          </Button>
+          <Select value={primaryRoleId} onValueChange={changeRole}>
+            <SelectTrigger className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none" aria-label={t('volunteers.changeRole')}>
+              <Shield className="h-3 w-3" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map(role => (
+                <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="ghost" size="icon-xs" onClick={() => setShowDeleteConfirm(true)} className="text-destructive hover:text-destructive" aria-label={t('a11y.deleteItem')}>
             <Trash2 className="h-3 w-3" />
           </Button>

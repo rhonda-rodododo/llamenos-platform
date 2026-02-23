@@ -10,15 +10,17 @@ import { Button } from '@/components/ui/button'
 const DEMO_PIN = '000000'
 
 const roleIcons: Record<string, typeof Shield> = {
-  admin: UserCog,
-  volunteer: Users,
-  reporter: FileText,
+  'role-super-admin': UserCog,
+  'role-hub-admin': UserCog,
+  'role-volunteer': Users,
+  'role-reporter': FileText,
 }
 
 const roleColors: Record<string, string> = {
-  admin: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-  volunteer: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  reporter: 'bg-green-500/10 text-green-600 dark:text-green-400',
+  'role-super-admin': 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+  'role-hub-admin': 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+  'role-volunteer': 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  'role-reporter': 'bg-green-500/10 text-green-600 dark:text-green-400',
 }
 
 export function DemoAccountPicker() {
@@ -60,8 +62,9 @@ export function DemoAccountPicker() {
 
         <div className="space-y-1.5">
           {accounts.map((account) => {
-            const Icon = roleIcons[account.role] || Shield
-            const colorClass = roleColors[account.role] || ''
+            const primaryRoleId = account.roleIds[0] || ''
+            const Icon = roleIcons[primaryRoleId] || Shield
+            const colorClass = roleColors[primaryRoleId] || ''
             const isLoading = loadingPubkey === account.pubkey
 
             return (

@@ -45,7 +45,7 @@
     "auditLog": "سجل المراجعة",
     "callHistory": "سجل المكالمات",
     "settings": "الإعدادات",
-    "adminSettings": "إعدادات المسؤول"
+    "hubSettings": "إعدادات المركز"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -174,6 +174,10 @@
     "roleAdmin": "مسؤول",
     "inviteGenerated": "تم إنشاء الدعوة! شارك المفتاح السري بأمان.",
     "secretKeyWarning": "سيتم عرض هذا المفتاح مرة واحدة فقط. شاركه بأمان مع المتطوع.",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "ترقية إلى مسؤول",
     "removeAdmin": "إزالة صلاحيات المسؤول",
     "active": "نشط",
@@ -307,14 +311,16 @@
     "updateProfile": "تحديث الملف الشخصي"
   },
   "phone": {
-    "hint": "الصيغة: +1234567890",
-    "valid": "رقم هاتف صالح",
-    "invalid": "رقم هاتف غير صالح"
+    "hint": "اختر البلد وأدخل الرقم",
+    "valid": "رقم هاتف صحيح",
+    "invalid": "رقم هاتف غير صحيح",
+    "searchCountry": "ابحث عن البلد...",
+    "noCountry": "لم يتم العثور على البلد."
   },
   "settings": {
     "title": "إعدادات الحساب",
-    "adminTitle": "إعدادات المسؤول",
-    "adminDescription": "إعدادات النظام التي تؤثر على خط المساعدة بالكامل.",
+    "hubTitle": "إعدادات المركز",
+    "hubDescription": "إعدادات تؤثر على مركز خط المساعدة بالكامل.",
     "general": "عام",
     "security": "الأمان",
     "telephony": "الاتصالات",
@@ -472,6 +478,24 @@
     "activity": "النشاط",
     "noActivity": "لا يوجد نشاط مسجل"
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "انتقل إلى المحتوى",
     "switchToLanguage": "التبديل إلى {{language}}",
@@ -504,12 +528,11 @@
     "recoveryKeyWarning": "اكتبه واحفظه بشكل آمن. إذا فقدت رمز PIN وهذا المفتاح، لن يمكن استرداد حسابك.",
     "downloadBackup": "تحميل نسخة احتياطية مشفرة",
     "backupDownloaded": "تم تحميل النسخة الاحتياطية",
-    "verifyTitle": "تحقق من مفتاح الاسترداد",
-    "verifyDescription": "أدخل الأحرف في هذه المواضع للتأكد من أنك حفظت مفتاح الاسترداد",
-    "charAtPosition": "الحرف #{{position}}",
-    "verifyButton": "تحقق",
-    "verifyFailed": "فشل التحقق — يرجى مراجعة مفتاح الاسترداد",
-    "verifySuccess": "تم التحقق من مفتاح الاسترداد!",
+    "storageTipsTitle": "كيفية تخزين مفتاح الاسترداد الخاص بك",
+    "storageTip1": "احفظه في مدير كلمات المرور (1Password، Bitwarden، إلخ.)",
+    "storageTip2": "قم بتخزينه على جهاز شخصي لا يمكن الوصول إليه إلا أنت",
+    "storageTip3": "اكتبه واحتفظ به في مكان آمن ماديًا",
+    "backupAcknowledge": "لقد حفظت مفتاح الاسترداد الخاص بي في مكان آمن",
     "continue": "متابعة",
     "redeemFailed": "فشل في استرداد الدعوة"
   },

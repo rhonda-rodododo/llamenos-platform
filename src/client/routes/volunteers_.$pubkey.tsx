@@ -135,8 +135,8 @@ function VolunteerProfilePage() {
                 <code className="text-xs text-muted-foreground">{volunteer.pubkey}</code>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge variant={volunteer.role === 'admin' ? 'default' : 'secondary'}>
-                  {volunteer.role === 'admin' ? (
+                <Badge variant={volunteer.roles.includes('role-super-admin') || volunteer.roles.includes('role-hub-admin') ? 'default' : 'secondary'}>
+                  {volunteer.roles.includes('role-super-admin') || volunteer.roles.includes('role-hub-admin') ? (
                     <><ShieldCheck className="h-3 w-3" /> {t('volunteers.roleAdmin')}</>
                   ) : (
                     <><Shield className="h-3 w-3" /> {t('volunteers.roleVolunteer')}</>

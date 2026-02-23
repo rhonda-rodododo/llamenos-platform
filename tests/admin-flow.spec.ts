@@ -17,8 +17,8 @@ test.describe('Admin flow', () => {
     await expect(page.getByRole('link', { name: 'Ban List' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Call History' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Audit Log' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Admin Settings' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Settings' }).last()).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Hub Settings' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Settings', exact: true })).toBeVisible()
   })
 
   test('volunteer CRUD', async ({ page }) => {
@@ -37,8 +37,8 @@ test.describe('Admin flow', () => {
     // Should show the generated nsec
     await expect(page.getByText(/nsec1/)).toBeVisible({ timeout: 15000 })
 
-    // Close the nsec card
-    await page.getByRole('button', { name: /close/i }).click()
+    // Close the nsec card — use data-slot to avoid matching toast dismiss icon
+    await page.locator('button[data-slot="button"]').filter({ hasText: 'Close' }).click()
 
     // Volunteer should appear (phone is masked by default)
     await expect(page.getByText(volName).first()).toBeVisible()
@@ -165,8 +165,8 @@ test.describe('Admin flow', () => {
   })
 
   test('admin settings page loads with all sections', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Section headers are always visible (in collapsible trigger)
     await expect(page.getByRole('heading', { name: 'Transcription' })).toBeVisible()
@@ -179,8 +179,8 @@ test.describe('Admin flow', () => {
   })
 
   test('admin settings toggles work', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand transcription section to see its switches
     await page.getByRole('heading', { name: 'Transcription' }).click()
@@ -224,6 +224,27 @@ test.describe('Admin flow', () => {
     await page.getByRole('combobox', { name: /cambiar a/i }).click()
     await page.getByRole('option', { name: /english/i }).click()
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+  })
+
+  test('admin settings shows status summaries when collapsed', async ({ page }) => {
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
+
+    // Wait for settings to load
+    await page.waitForTimeout(1000)
+
+    // Telephony section should show status summary (e.g., "Not configured" or provider name)
+    // The status text is in a span with text-xs text-muted-foreground, hidden on mobile (sm:block)
+    const telephonyCard = page.locator('#telephony-provider')
+    await expect(telephonyCard).toBeVisible()
+
+    // Transcription status should show "Enabled" or "Disabled"
+    const transcriptionCard = page.locator('#transcription')
+    await expect(transcriptionCard).toBeVisible()
+    const transcriptionStatus = transcriptionCard.locator('span.text-xs')
+    // At least one status text should be visible (on desktop viewports)
+    const statusCount = await page.locator('.text-xs.text-muted-foreground').filter({ hasText: /(Enabled|Disabled|Not configured|Not required|languages|fields|None|CAPTCHA|Default|Customized)/i }).count()
+    expect(statusCount).toBeGreaterThan(0)
   })
 
   test('logout works', async ({ page }) => {

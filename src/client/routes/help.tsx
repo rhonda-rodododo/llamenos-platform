@@ -15,7 +15,7 @@ export const Route = createFileRoute('/help')({
 
 function HelpPage() {
   const { t } = useTranslation()
-  const { isAdmin, role } = useAuth()
+  const { isAdmin, hasPermission } = useAuth()
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -55,10 +55,9 @@ function HelpPage() {
       </div>
 
       {/* Role-specific guides */}
-      {role === 'reporter' && <ReporterGuide />}
-      {role === 'volunteer' && <VolunteerGuide />}
+      {hasPermission('reports:create') && !isAdmin && !hasPermission('calls:answer') && <ReporterGuide />}
       {isAdmin && <AdminGuide />}
-      {(role === 'volunteer' || isAdmin) && <VolunteerGuide />}
+      {(hasPermission('calls:answer') || isAdmin) && <VolunteerGuide />}
 
       {/* FAQ sections */}
       <div className="space-y-4">
@@ -156,7 +155,7 @@ function HelpPage() {
                 <NavQuickLink to="/volunteers" icon={<Users className="h-3.5 w-3.5" />} label={t('nav.volunteers')} />
                 <NavQuickLink to="/shifts" icon={<Clock className="h-3.5 w-3.5" />} label={t('nav.shifts')} />
                 <NavQuickLink to="/bans" icon={<ShieldBan className="h-3.5 w-3.5" />} label={t('nav.banList')} />
-                <NavQuickLink to="/admin/settings" icon={<Settings className="h-3.5 w-3.5" />} label={t('nav.adminSettings')} />
+                <NavQuickLink to="/admin/settings" icon={<Settings className="h-3.5 w-3.5" />} label={t('nav.hubSettings', { defaultValue: 'Hub Settings' })} />
               </>
             )}
           </div>

@@ -2,15 +2,18 @@
  * Node.js environment shim — creates an Env object that matches
  * the Cloudflare Workers Env interface, using local implementations.
  *
- * - DO namespaces → local SQLite-backed singletons
+ * - DO namespaces → PostgreSQL-backed singletons
  * - AI binding → self-hosted Whisper HTTP client
  * - R2_BUCKET → MinIO S3 client
  * - ASSETS → null (handled by Hono serveStatic)
  * - Secrets → process.env or /run/secrets/ files
  */
-import { createDONamespace } from './durable-object'
+import { createDONamespace, storageInstances } from './durable-object'
 import { createBlobStorage } from './blob-storage'
 import { createTranscriptionService } from './transcription'
+import { initPostgresPool, getPool } from './storage/postgres-pool'
+import { startAlarmPoller } from './storage/alarm-poller'
+import { runStartupMigrations } from './storage/startup-migrations'
 import fs from 'node:fs'
 
 /**
@@ -34,6 +37,9 @@ function readSecret(name: string, envKey?: string): string {
  * with the platform module.
  */
 export async function createNodeEnv(): Promise<Record<string, unknown>> {
+  // Initialize PostgreSQL
+  await initPostgresPool()
+
   // Import DO classes dynamically
   const { IdentityDO } = await import('../../worker/durable-objects/identity-do')
   const { SettingsDO } = await import('../../worker/durable-objects/settings-do')
@@ -68,6 +74,12 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
   env.SHIFT_MANAGER = createDONamespace(ShiftManagerDO as any, 'shifts', env)
   env.CALL_ROUTER = createDONamespace(CallRouterDO as any, 'calls', env)
   env.CONVERSATION_DO = createDONamespace(ConversationDO as any, 'conversations', env)
+
+  // Run migrations for all existing namespaces before accepting traffic
+  await runStartupMigrations()
+
+  // Start alarm poller (storageInstances is populated as DOs are created above)
+  startAlarmPoller(storageInstances)
 
   return env
 }

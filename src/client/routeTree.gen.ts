@@ -27,6 +27,7 @@ import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VolunteersPubkeyRouteImport } from './routes/volunteers_.$pubkey'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminHubsRouteImport } from './routes/admin/hubs'
 
 const VolunteersRoute = VolunteersRouteImport.update({
   id: '/volunteers',
@@ -118,6 +119,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/admin/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminHubsRoute = AdminHubsRouteImport.update({
+  id: '/admin/hubs',
+  path: '/admin/hubs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
   '/volunteers': typeof VolunteersRoute
+  '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/volunteers/$pubkey': typeof VolunteersPubkeyRoute
 }
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
   '/volunteers': typeof VolunteersRoute
+  '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/volunteers/$pubkey': typeof VolunteersPubkeyRoute
 }
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
   '/volunteers': typeof VolunteersRoute
+  '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/volunteers_/$pubkey': typeof VolunteersPubkeyRoute
 }
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shifts'
     | '/volunteers'
+    | '/admin/hubs'
     | '/admin/settings'
     | '/volunteers/$pubkey'
   fileRoutesByTo: FileRoutesByTo
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shifts'
     | '/volunteers'
+    | '/admin/hubs'
     | '/admin/settings'
     | '/volunteers/$pubkey'
   id:
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shifts'
     | '/volunteers'
+    | '/admin/hubs'
     | '/admin/settings'
     | '/volunteers_/$pubkey'
   fileRoutesById: FileRoutesById
@@ -260,6 +272,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   ShiftsRoute: typeof ShiftsRoute
   VolunteersRoute: typeof VolunteersRoute
+  AdminHubsRoute: typeof AdminHubsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   VolunteersPubkeyRoute: typeof VolunteersPubkeyRoute
 }
@@ -392,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/hubs': {
+      id: '/admin/hubs'
+      path: '/admin/hubs'
+      fullPath: '/admin/hubs'
+      preLoaderRoute: typeof AdminHubsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -412,6 +432,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   ShiftsRoute: ShiftsRoute,
   VolunteersRoute: VolunteersRoute,
+  AdminHubsRoute: AdminHubsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   VolunteersPubkeyRoute: VolunteersPubkeyRoute,
 }

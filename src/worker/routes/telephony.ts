@@ -1,6 +1,9 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getDOs, getTelephony } from '../lib/do-access'
+import { getDOs, getScopedDOs, getTelephony, getHubTelephony } from '../lib/do-access'
+import type { DurableObjects } from '../lib/do-access'
+import type { TelephonyAdapter } from '../telephony/adapter'
+import type { Env } from '../types'
 import { buildAudioUrlMap, telephonyResponse } from '../lib/helpers'
 import { hashPhone } from '../lib/crypto'
 import { detectLanguageFromPhone, languageFromDigit, DEFAULT_LANGUAGE } from '../../shared/languages'
@@ -10,13 +13,31 @@ import { maybeTranscribe, transcribeVoicemail } from '../services/transcription'
 
 const telephony = new Hono<AppEnv>()
 
+/**
+ * Resolve hub-scoped DOs and telephony adapter from a hub query param.
+ * Falls back to global DOs when no hub is specified (backwards compatible).
+ */
+function getHubContext(env: Env, url: URL): { hubId: string | undefined; dos: DurableObjects } {
+  const hubId = url.searchParams.get('hub') || undefined
+  const dos = getScopedDOs(env, hubId)
+  return { hubId, dos }
+}
+
+async function getAdapter(env: Env, hubId: string | undefined, dos: DurableObjects): Promise<TelephonyAdapter | null> {
+  return hubId ? getHubTelephony(env, hubId) : getTelephony(env, dos)
+}
+
 // Validate telephony webhook signature on all routes
 telephony.use('*', async (c, next) => {
   const url = new URL(c.req.url)
   console.log(`[telephony] ${c.req.method} ${url.pathname}${url.search}`)
   const env = c.env
-  const dos = getDOs(env)
-  const adapter = await getTelephony(env, dos)
+
+  // For /incoming, we don't know the hub yet — use global adapter for validation
+  // For all other routes, hub is in query params
+  const hubId = url.searchParams.get('hub') || undefined
+  const dos = getScopedDOs(env, hubId)
+  const adapter = await getAdapter(env, hubId, dos)
 
   // If no telephony provider is configured, return a helpful error
   if (!adapter) {
@@ -37,12 +58,30 @@ telephony.use('*', async (c, next) => {
   await next()
 })
 
-// --- Step 1: Incoming call -> ban check -> language menu ---
+// --- Step 1: Incoming call -> hub lookup -> ban check -> language menu ---
 telephony.post('/incoming', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
-  const { callSid, callerNumber } = await adapter.parseIncomingWebhook(c.req.raw)
-  console.log(`[telephony] /incoming callSid=${callSid} caller=***${callerNumber.slice(-4)}`)
+  // Start with global DOs to parse the webhook and look up the hub
+  const globalDos = getDOs(c.env)
+  const globalAdapter = (await getTelephony(c.env, globalDos))!
+  const { callSid, callerNumber, calledNumber } = await globalAdapter.parseIncomingWebhook(c.req.raw)
+  console.log(`[telephony] /incoming callSid=${callSid} caller=***${callerNumber.slice(-4)} called=${calledNumber || 'unknown'}`)
+
+  // Look up which hub owns the called phone number
+  let hubId: string | undefined
+  if (calledNumber) {
+    const hubRes = await globalDos.settings.fetch(
+      new Request(`http://do/settings/hub-by-phone/${encodeURIComponent(calledNumber)}`)
+    )
+    if (hubRes.ok) {
+      const { hub } = await hubRes.json() as { hub: { id: string } }
+      hubId = hub.id
+      console.log(`[telephony] /incoming resolved hub=${hubId} for calledNumber=${calledNumber}`)
+    }
+  }
+
+  // Use hub-scoped DOs for all subsequent operations
+  const dos = hubId ? getScopedDOs(c.env, hubId) : globalDos
+  const adapter = hubId ? ((await getHubTelephony(c.env, hubId)) ?? globalAdapter) : globalAdapter
 
   const banCheck = await dos.records.fetch(new Request(`http://do/bans/check/${encodeURIComponent(callerNumber)}`))
   const { banned } = await banCheck.json() as { banned: boolean }
@@ -56,18 +95,19 @@ telephony.post('/incoming', async (c) => {
   const response = await adapter.handleLanguageMenu({
     callSid,
     callerNumber,
-    hotlineName: c.env.HOTLINE_NAME || 'Llámenos',
+    hotlineName: c.env.HOTLINE_NAME || 'Llamenos',
     enabledLanguages,
+    hubId,
   })
   return telephonyResponse(response)
 })
 
 // --- Step 2: Language selected -> spam check -> greeting + hold/captcha ---
 telephony.post('/language-selected', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
-  const { callSid, callerNumber, digits } = await adapter.parseLanguageWebhook(c.req.raw)
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
+  const { callSid, callerNumber, digits } = await adapter.parseLanguageWebhook(c.req.raw)
   const isAuto = url.searchParams.get('auto') === '1'
 
   let callerLanguage: string
@@ -113,15 +153,16 @@ telephony.post('/language-selected', async (c) => {
     voiceCaptchaEnabled: spamSettings.voiceCaptchaEnabled,
     rateLimited,
     callerLanguage,
-    hotlineName: c.env.HOTLINE_NAME || 'Llámenos',
+    hotlineName: c.env.HOTLINE_NAME || 'Llamenos',
     audioUrls,
     captchaDigits,
+    hubId,
   })
 
   if (!rateLimited && !spamSettings.voiceCaptchaEnabled) {
     const origin = new URL(c.req.url).origin
-    console.log(`[telephony] /language-selected starting parallel ringing callSid=${callSid} origin=${origin}`)
-    c.executionCtx.waitUntil(startParallelRinging(callSid, callerNumber, origin, c.env, dos))
+    console.log(`[telephony] /language-selected starting parallel ringing callSid=${callSid} origin=${origin} hub=${hubId || 'global'}`)
+    c.executionCtx.waitUntil(startParallelRinging(callSid, callerNumber, origin, c.env, dos, hubId))
   }
 
   return telephonyResponse(response)
@@ -129,10 +170,10 @@ telephony.post('/language-selected', async (c) => {
 
 // --- Step 3: CAPTCHA response ---
 telephony.post('/captcha', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
-  const { digits, callerNumber } = await adapter.parseCaptchaWebhook(c.req.raw)
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
+  const { digits, callerNumber } = await adapter.parseCaptchaWebhook(c.req.raw)
   const callSid = url.searchParams.get('callSid') || ''
   const callerLang = url.searchParams.get('lang') || DEFAULT_LANGUAGE
 
@@ -143,11 +184,11 @@ telephony.post('/captcha', async (c) => {
   }))
   const { match, expected } = await captchaRes.json() as { match: boolean; expected: string }
 
-  const response = await adapter.handleCaptchaResponse({ callSid, digits, expectedDigits: expected, callerLanguage: callerLang })
+  const response = await adapter.handleCaptchaResponse({ callSid, digits, expectedDigits: expected, callerLanguage: callerLang, hubId })
 
   if (match) {
     const origin = new URL(c.req.url).origin
-    c.executionCtx.waitUntil(startParallelRinging(callSid, callerNumber, origin, c.env, dos))
+    c.executionCtx.waitUntil(startParallelRinging(callSid, callerNumber, origin, c.env, dos, hubId))
   }
 
   return telephonyResponse(response)
@@ -155,9 +196,9 @@ telephony.post('/captcha', async (c) => {
 
 // --- Step 4: Volunteer answered -> bridge via queue ---
 telephony.post('/volunteer-answer', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
   const parentCallSid = url.searchParams.get('parentCallSid') || ''
   const pubkey = url.searchParams.get('pubkey') || ''
 
@@ -178,19 +219,19 @@ telephony.post('/volunteer-answer', async (c) => {
   })
 
   const origin = new URL(c.req.url).origin
-  const response = await adapter.handleCallAnswered({ parentCallSid, callbackUrl: origin, volunteerPubkey: pubkey })
+  const response = await adapter.handleCallAnswered({ parentCallSid, callbackUrl: origin, volunteerPubkey: pubkey, hubId })
   return telephonyResponse(response)
 })
 
 // --- Step 5: Call status callback ---
 telephony.post('/call-status', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
-  const { status: callStatus } = await adapter.parseCallStatusWebhook(c.req.raw)
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
+  const { status: callStatus } = await adapter.parseCallStatusWebhook(c.req.raw)
   const parentCallSid = url.searchParams.get('parentCallSid') || ''
 
-  console.log(`[call-status] status=${callStatus} parentCallSid=${parentCallSid}`)
+  console.log(`[call-status] status=${callStatus} parentCallSid=${parentCallSid} hub=${hubId || 'global'}`)
 
   if (callStatus === 'completed' || callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed') {
     const pubkey = url.searchParams.get('pubkey') || ''
@@ -221,9 +262,9 @@ telephony.post('/call-status', async (c) => {
 
 // --- Step 6: Wait music for queued callers ---
 telephony.all('/wait-music', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
   const lang = url.searchParams.get('lang') || DEFAULT_LANGUAGE
   const queueTime = c.req.method === 'POST'
     ? (await adapter.parseQueueWaitWebhook(c.req.raw)).queueTime
@@ -237,10 +278,10 @@ telephony.all('/wait-music', async (c) => {
 
 // --- Step 7: Queue exit -> voicemail if no one answered ---
 telephony.post('/queue-exit', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
-  const { result: queueResult } = await adapter.parseQueueExitWebhook(c.req.raw)
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
+  const { result: queueResult } = await adapter.parseQueueExitWebhook(c.req.raw)
   const callSid = url.searchParams.get('callSid') || ''
   const lang = url.searchParams.get('lang') || DEFAULT_LANGUAGE
 
@@ -262,6 +303,7 @@ telephony.post('/queue-exit', async (c) => {
       callbackUrl: origin,
       audioUrls,
       maxRecordingSeconds: callSettings.voicemailMaxSeconds,
+      hubId,
     })
     return telephonyResponse(response)
   }
@@ -271,19 +313,19 @@ telephony.post('/queue-exit', async (c) => {
 
 // --- Step 8: Voicemail recording complete ---
 telephony.post('/voicemail-complete', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
   const lang = url.searchParams.get('lang') || DEFAULT_LANGUAGE
   return telephonyResponse(adapter.handleVoicemailComplete(lang))
 })
 
 // --- Step 9: Call recording status callback (bridged call recording) ---
 telephony.post('/call-recording', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
-  const { status: recordingStatus, recordingSid } = await adapter.parseRecordingWebhook(c.req.raw)
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
+  const { status: recordingStatus, recordingSid } = await adapter.parseRecordingWebhook(c.req.raw)
   const parentCallSid = url.searchParams.get('parentCallSid') || ''
   const pubkey = url.searchParams.get('pubkey') || ''
 
@@ -316,10 +358,10 @@ telephony.post('/call-recording', async (c) => {
 
 // --- Step 10: Voicemail recording status callback ---
 telephony.post('/voicemail-recording', async (c) => {
-  const dos = getDOs(c.env)
-  const adapter = (await getTelephony(c.env, dos))!
-  const { status: recordingStatus } = await adapter.parseRecordingWebhook(c.req.raw)
   const url = new URL(c.req.url)
+  const { hubId, dos } = getHubContext(c.env, url)
+  const adapter = (await getAdapter(c.env, hubId, dos))!
+  const { status: recordingStatus } = await adapter.parseRecordingWebhook(c.req.raw)
   const callSid = url.searchParams.get('callSid') || ''
 
   if (recordingStatus === 'completed') {

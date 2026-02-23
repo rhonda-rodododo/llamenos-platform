@@ -11,14 +11,14 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('custom fields section visible in admin settings', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: /custom note fields/i })).toBeVisible()
   })
 
   test('admin can add a text custom field', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand Custom Note Fields section
     await page.getByRole('heading', { name: /custom note fields/i }).click()
@@ -43,8 +43,8 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('admin can add a select custom field with options', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand Custom Note Fields section
     await page.getByRole('heading', { name: /custom note fields/i }).click()
@@ -75,8 +75,8 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('admin can delete a custom field', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand Custom Note Fields section and wait for data to load
     await page.getByRole('heading', { name: /custom note fields/i }).click()

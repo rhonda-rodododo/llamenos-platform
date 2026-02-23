@@ -5,7 +5,9 @@ import { hashIP } from '../lib/crypto'
 import { isValidE164, checkRateLimit } from '../lib/helpers'
 import { verifyAuthToken } from '../lib/auth'
 import { auth as authMiddleware } from '../middleware/auth'
+import { checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
+import { getPrimaryRole } from '../../shared/permissions'
 
 const auth = new Hono<AppEnv>()
 
@@ -32,8 +34,49 @@ auth.post('/login', async (c) => {
 
   const res = await dos.identity.fetch(new Request(`http://do/volunteer/${body.pubkey}`))
   if (!res.ok) return c.json({ error: 'Invalid credentials' }, 401)
-  const volunteer = await res.json() as { role: string }
-  return c.json({ ok: true, role: volunteer.role })
+  const volunteer = await res.json() as { roles: string[] }
+  return c.json({ ok: true, roles: volunteer.roles })
+})
+
+// --- Bootstrap (no auth — one-shot admin registration) ---
+auth.post('/bootstrap', async (c) => {
+  const dos = getDOs(c.env)
+
+  // Rate limit by IP
+  if (c.env.ENVIRONMENT !== 'development') {
+    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const limited = await checkRateLimit(dos.settings, `bootstrap:${hashIP(clientIp)}`, 5)
+    if (limited) {
+      return c.json({ error: 'Too many attempts. Try again later.' }, 429)
+    }
+  }
+
+  const body = await c.req.json() as { pubkey: string; timestamp: number; token: string }
+  if (!body.pubkey || !body.timestamp || !body.token) {
+    return c.json({ error: 'Invalid request' }, 400)
+  }
+
+  // Verify Schnorr signature — proves caller owns the private key
+  const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token })
+  if (!isValid) return c.json({ error: 'Invalid signature' }, 401)
+
+  // Check if admin already exists
+  const checkRes = await dos.identity.fetch(new Request('http://do/has-admin'))
+  const { hasAdmin } = await checkRes.json() as { hasAdmin: boolean }
+  if (hasAdmin) {
+    return c.json({ error: 'Admin already exists' }, 403)
+  }
+
+  // Create the admin
+  const bootstrapRes = await dos.identity.fetch(new Request('http://do/bootstrap', {
+    method: 'POST',
+    body: JSON.stringify({ pubkey: body.pubkey }),
+  }))
+  if (!bootstrapRes.ok) {
+    return c.json({ error: 'Bootstrap failed' }, 500)
+  }
+
+  return c.json({ ok: true, roles: ['role-super-admin'] })
 })
 
 // --- Authenticated routes ---
@@ -44,16 +87,24 @@ auth.get('/me', async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const volunteer = c.get('volunteer')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
+  const allRoles = c.get('allRoles')
 
   const credsRes = await dos.identity.fetch(new Request(`http://do/webauthn/credentials?pubkey=${pubkey}`))
   const { credentials: webauthnCreds } = await credsRes.json() as { credentials: WebAuthnCredential[] }
   const settingsRes = await dos.identity.fetch(new Request('http://do/settings/webauthn'))
   const webauthnSettings = await settingsRes.json() as { requireForAdmins: boolean; requireForVolunteers: boolean }
+
+  const isAdmin = checkPermission(permissions, 'settings:manage')
   const webauthnRequired = isAdmin ? webauthnSettings.requireForAdmins : webauthnSettings.requireForVolunteers
+
+  const primaryRole = getPrimaryRole(volunteer.roles, allRoles)
+
   return c.json({
     pubkey: volunteer.pubkey,
-    role: volunteer.role,
+    roles: volunteer.roles,
+    permissions,
+    primaryRole: primaryRole ? { id: primaryRole.id, name: primaryRole.name, slug: primaryRole.slug } : null,
     name: volunteer.name,
     transcriptionEnabled: volunteer.transcriptionEnabled,
     spokenLanguages: volunteer.spokenLanguages || ['en'],
@@ -108,10 +159,10 @@ auth.patch('/me/availability', async (c) => {
 auth.patch('/me/transcription', async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
   const body = await c.req.json() as { enabled: boolean }
   // If volunteer is trying to disable, check if admin allows opt-out
-  if (!body.enabled && !isAdmin) {
+  if (!body.enabled && !checkPermission(permissions, 'settings:manage-transcription')) {
     const transRes = await dos.settings.fetch(new Request('http://do/settings/transcription'))
     const transSettings = await transRes.json() as { globalEnabled: boolean; allowVolunteerOptOut: boolean }
     if (!transSettings.allowVolunteerOptOut) {

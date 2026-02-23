@@ -3,7 +3,7 @@ title: "Deploy: Docker Compose"
 description: Deploy Llamenos on your own server with Docker Compose.
 ---
 
-This guide walks you through deploying Llamenos with Docker Compose on a single server. You'll have a fully functional hotline with automatic HTTPS, object storage, and optional transcription — all managed by Docker Compose.
+This guide walks you through deploying Llamenos with Docker Compose on a single server. You'll have a fully functional hotline with automatic HTTPS, PostgreSQL database, object storage, and optional transcription — all managed by Docker Compose.
 
 ## Prerequisites
 
@@ -44,6 +44,9 @@ Edit `.env` with your values:
 ADMIN_PUBKEY=your_hex_public_key_from_step_2
 DOMAIN=hotline.yourdomain.com
 
+# PostgreSQL password (generate a strong one)
+PG_PASSWORD=$(openssl rand -base64 24)
+
 # Hotline display name (shown in IVR prompts)
 HOTLINE_NAME=Your Hotline
 
@@ -57,7 +60,7 @@ MINIO_ACCESS_KEY=your-access-key
 MINIO_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Important**: Change the MinIO credentials from the defaults. These control access to uploaded files and recordings.
+> **Important**: Set strong, unique passwords for `PG_PASSWORD`, `MINIO_ACCESS_KEY`, and `MINIO_SECRET_KEY`.
 
 ## 4. Configure your domain
 
@@ -84,11 +87,12 @@ Caddy automatically obtains and renews Let's Encrypt TLS certificates for your d
 docker compose up -d
 ```
 
-This starts three core services:
+This starts four core services:
 
 | Service | Purpose | Port |
 |---------|---------|------|
 | **app** | Llamenos application | 3000 (internal) |
+| **postgres** | PostgreSQL database | 5432 (internal) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
 | **minio** | File/recording storage | 9000, 9001 (internal) |
 
@@ -103,7 +107,7 @@ Verify the health endpoint:
 
 ```bash
 curl https://hotline.yourdomain.com/api/health
-# → {"status":"ok","platform":"node","timestamp":"...","uptime":...}
+# → {"status":"ok"}
 ```
 
 ## 6. First login
@@ -167,18 +171,22 @@ docker compose pull
 docker compose up -d
 ```
 
-Your data is persisted in Docker volumes (`app-data`, `minio-data`, etc.) and survives container restarts and image updates.
+Your data is persisted in Docker volumes (`postgres-data`, `minio-data`, etc.) and survives container restarts and image updates.
 
 ## Backups
 
-### SQLite data
+### PostgreSQL
 
-The application database is stored in the `app-data` volume. Back it up while the app is running (SQLite WAL mode supports this):
+Use `pg_dump` for database backups:
 
 ```bash
-# Copy the data volume to a backup directory
-docker compose exec app cp -r /app/data /tmp/backup
-docker compose cp app:/tmp/backup ./backup-$(date +%Y%m%d)
+docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%d).sql
+```
+
+To restore:
+
+```bash
+docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
 ### MinIO storage
@@ -198,7 +206,7 @@ For production, set up a cron job:
 
 ```bash
 # /etc/cron.d/llamenos-backup
-0 3 * * * root cd /path/to/llamenos/deploy/docker && docker compose exec -T app cp -r /app/data /tmp/backup && docker compose cp app:/tmp/backup /backups/llamenos-$(date +\%Y\%m\%d) 2>&1 | logger -t llamenos-backup
+0 3 * * * root cd /path/to/llamenos/deploy/docker && docker compose exec -T postgres pg_dump -U llamenos llamenos | gzip > /backups/llamenos-$(date +\%Y\%m\%d).sql.gz 2>&1 | logger -t llamenos-backup
 ```
 
 ## Monitoring
@@ -237,8 +245,9 @@ docker compose logs app
 # Verify .env is loaded
 docker compose config
 
-# Ensure data directory is writable
-docker compose exec app ls -la /app/data
+# Check PostgreSQL is healthy
+docker compose ps postgres
+docker compose logs postgres
 ```
 
 ### Certificate issues
@@ -273,12 +282,16 @@ docker compose logs minio
                     ┌──────▼──────┐
                     │    App      │ :3000
                     │  (Node.js)  │
-                    └──┬────┬─────┘
-                       │    │
-              ┌────────▼┐  ┌▼────────┐
-              │  MinIO   │  │ Whisper  │ (optional)
-              │  :9000   │  │  :8080   │
-              └──────────┘  └──────────┘
+                    └──┬──┬──┬───┘
+                       │  │  │
+          ┌────────────▼┐ │ ┌▼────────┐
+          │  PostgreSQL  │ │ │ Whisper  │ (optional)
+          │    :5432     │ │ │  :8080   │
+          └──────────────┘ │ └──────────┘
+                    ┌──────▼──────┐
+                    │    MinIO    │
+                    │    :9000    │
+                    └─────────────┘
 ```
 
 ## Next steps

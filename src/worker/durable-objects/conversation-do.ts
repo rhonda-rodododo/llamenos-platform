@@ -4,6 +4,8 @@ import type { IncomingMessage } from '../messaging/adapter'
 import type { MessagingChannelType, FileRecord, RecipientEnvelope } from '../../shared/types'
 import { encryptForPublicKey, hashPhone } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
+import { runMigrations } from '../../shared/migrations/runner'
+import { migrations } from '../../shared/migrations'
 
 const PAGE_SIZE = 50
 
@@ -20,6 +22,7 @@ const PAGE_SIZE = 50
  */
 export class ConversationDO extends DurableObject<Env> {
   private initialized = false
+  private migrated = false
   private router: DORouter
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -74,6 +77,10 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!this.migrated) {
+      await runMigrations(this.ctx.storage, migrations, 'conversations')
+      this.migrated = true
+    }
     await this.ensureInit()
     return this.router.handle(request)
   }

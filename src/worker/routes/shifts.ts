@@ -1,40 +1,40 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getDOs } from '../lib/do-access'
-import { adminGuard } from '../middleware/admin-guard'
+import { getScopedDOs } from '../lib/do-access'
+import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const shifts = new Hono<AppEnv>()
 
 // All authenticated users can check their shift status
 shifts.get('/my-status', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   return dos.shifts.fetch(new Request(`http://do/my-status?pubkey=${pubkey}`))
 })
 
-// --- Admin-only routes ---
+// --- Permission-gated routes ---
 
-shifts.get('/fallback', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+shifts.get('/fallback', requirePermission('shifts:manage-fallback'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   return dos.settings.fetch(new Request('http://do/fallback'))
 })
 
-shifts.put('/fallback', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+shifts.put('/fallback', requirePermission('shifts:manage-fallback'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   return dos.settings.fetch(new Request('http://do/fallback', {
     method: 'PUT',
     body: JSON.stringify(await c.req.json()),
   }))
 })
 
-shifts.get('/', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+shifts.get('/', requirePermission('shifts:read'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   return dos.shifts.fetch(new Request('http://do/shifts'))
 })
 
-shifts.post('/', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+shifts.post('/', requirePermission('shifts:create'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const res = await dos.shifts.fetch(new Request('http://do/shifts', {
     method: 'POST',
@@ -44,8 +44,8 @@ shifts.post('/', adminGuard, async (c) => {
   return res
 })
 
-shifts.patch('/:id', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+shifts.patch('/:id', requirePermission('shifts:update'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const id = c.req.param('id')
   if (id === 'fallback') return c.json({ error: 'Not Found' }, 404)
@@ -57,8 +57,8 @@ shifts.patch('/:id', adminGuard, async (c) => {
   return res
 })
 
-shifts.delete('/:id', adminGuard, async (c) => {
-  const dos = getDOs(c.env)
+shifts.delete('/:id', requirePermission('shifts:delete'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const id = c.req.param('id')
   if (id === 'fallback') return c.json({ error: 'Not Found' }, 404)

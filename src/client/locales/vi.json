@@ -45,7 +45,7 @@
     "auditLog": "Nhật ký kiểm toán",
     "callHistory": "Lịch sử cuộc gọi",
     "settings": "Cài đặt",
-    "adminSettings": "Cài đặt quản trị"
+    "hubSettings": "Cài đặt hub"
   },
   "dashboard": {
     "title": "Bảng điều khiển",
@@ -174,6 +174,10 @@
     "roleAdmin": "Quản trị viên",
     "inviteGenerated": "Đã tạo lời mời! Chia sẻ khóa bí mật một cách an toàn.",
     "secretKeyWarning": "Khóa này chỉ hiển thị một lần. Chia sẻ an toàn với tình nguyện viên.",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "Thăng quản trị viên",
     "removeAdmin": "Hủy quản trị viên",
     "active": "Hoạt động",
@@ -307,14 +311,16 @@
     "updateProfile": "Cập nhật hồ sơ"
   },
   "phone": {
-    "hint": "Định dạng: +1234567890",
+    "hint": "Chọn quốc gia và nhập số",
     "valid": "Số điện thoại hợp lệ",
-    "invalid": "Số điện thoại không hợp lệ"
+    "invalid": "Số điện thoại không hợp lệ",
+    "searchCountry": "Tìm quốc gia...",
+    "noCountry": "Không tìm thấy quốc gia."
   },
   "settings": {
     "title": "Cài đặt tài khoản",
-    "adminTitle": "Cài đặt quản trị",
-    "adminDescription": "Cài đặt hệ thống ảnh hưởng đến toàn bộ đường dây nóng.",
+    "hubTitle": "Cài đặt hub",
+    "hubDescription": "Cài đặt ảnh hưởng đến toàn bộ hub đường dây nóng.",
     "general": "Chung",
     "security": "Bảo mật",
     "telephony": "Điện thoại",
@@ -472,6 +478,24 @@
     "activity": "Hoạt động",
     "noActivity": "Chưa có hoạt động nào"
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "Chuyển đến nội dung",
     "switchToLanguage": "Chuyển sang {{language}}",
@@ -504,12 +528,11 @@
     "recoveryKeyWarning": "Ghi lại và lưu trữ an toàn. Nếu bạn mất PIN và khóa này, tài khoản của bạn không thể được khôi phục.",
     "downloadBackup": "Tải Bản Sao Lưu Mã Hóa",
     "backupDownloaded": "Đã tải bản sao lưu",
-    "verifyTitle": "Xác minh khóa khôi phục của bạn",
-    "verifyDescription": "Nhập các ký tự ở các vị trí này để xác nhận bạn đã lưu khóa khôi phục",
-    "charAtPosition": "Ký tự #{{position}}",
-    "verifyButton": "Xác minh",
-    "verifyFailed": "Xác minh thất bại — vui lòng kiểm tra khóa khôi phục của bạn",
-    "verifySuccess": "Khóa khôi phục đã được xác minh!",
+    "storageTipsTitle": "Cách lưu trữ khóa khôi phục của bạn",
+    "storageTip1": "Lưu nó trong trình quản lý mật khẩu (1Password, Bitwarden, v.v.)",
+    "storageTip2": "Lưu trữ nó trên thiết bị cá nhân mà chỉ bạn có quyền truy cập",
+    "storageTip3": "Viết nó ra và giữ ở nơi an toàn vật lý",
+    "backupAcknowledge": "Tôi đã lưu khóa khôi phục của mình ở một vị trí an toàn",
     "continue": "Tiếp tục",
     "redeemFailed": "Không thể đổi lời mời"
   },

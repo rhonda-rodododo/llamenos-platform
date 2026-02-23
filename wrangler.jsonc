@@ -82,5 +82,37 @@
   "vars": {
     "ENVIRONMENT": "production",
     "HOTLINE_NAME": "Llámenos"
+  },
+
+  // Staging environment for pre-release testing
+  "env": {
+    "next": {
+      "routes": [
+        { "pattern": "demo-next.llamenos-hotline.com", "custom_domain": true }
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "CALL_ROUTER", "class_name": "CallRouterDO" },
+          { "name": "SHIFT_MANAGER", "class_name": "ShiftManagerDO" },
+          { "name": "IDENTITY_DO", "class_name": "IdentityDO" },
+          { "name": "SETTINGS_DO", "class_name": "SettingsDO" },
+          { "name": "RECORDS_DO", "class_name": "RecordsDO" },
+          { "name": "CONVERSATION_DO", "class_name": "ConversationDO" }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "R2_BUCKET",
+          "bucket_name": "llamenos-files-next"
+        }
+      ],
+      "ai": {
+        "binding": "AI"
+      },
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "HOTLINE_NAME": "Llámenos (Next)"
+      }
+    }
   }
 }

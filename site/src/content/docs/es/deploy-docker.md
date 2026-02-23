@@ -162,13 +162,18 @@ Tus datos se mantienen en volumenes Docker (`app-data`, `minio-data`, etc.) y so
 
 ## Respaldos
 
-### Datos SQLite
+### PostgreSQL
 
-La base de datos de la aplicacion se almacena en el volumen `app-data`. Respaldala mientras la app esta funcionando (el modo WAL de SQLite lo permite):
+Usa `pg_dump` para respaldos de la base de datos:
 
 ```bash
-docker compose exec app cp -r /app/data /tmp/backup
-docker compose cp app:/tmp/backup ./backup-$(date +%Y%m%d)
+docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%d).sql
+```
+
+Para restaurar:
+
+```bash
+docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
 ### Almacenamiento MinIO

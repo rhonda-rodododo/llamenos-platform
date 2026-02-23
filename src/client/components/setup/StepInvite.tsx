@@ -15,12 +15,16 @@ import {
 } from '@/components/ui/select'
 import { UserPlus, Copy, Loader2, Check } from 'lucide-react'
 
-export function StepInvite() {
+interface Props {
+  headingRef?: React.RefObject<HTMLHeadingElement | null>
+}
+
+export function StepInvite({ headingRef }: Props = {}) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [role, setRole] = useState<'volunteer' | 'admin'>('volunteer')
+  const [roleId, setRoleId] = useState<string>('role-volunteer')
   const [generating, setGenerating] = useState(false)
   const [invites, setInvites] = useState<InviteCode[]>([])
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
@@ -29,7 +33,7 @@ export function StepInvite() {
     if (!name.trim() || !phone.trim()) return
     setGenerating(true)
     try {
-      const { invite } = await createInvite({ name: name.trim(), phone: phone.trim(), role })
+      const { invite } = await createInvite({ name: name.trim(), phone: phone.trim(), roleIds: [roleId] })
       setInvites(prev => [invite, ...prev])
       setName('')
       setPhone('')
@@ -52,7 +56,7 @@ export function StepInvite() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{t('setup.inviteTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.inviteTitle')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('setup.inviteDescription')}</p>
       </div>
 
@@ -84,13 +88,13 @@ export function StepInvite() {
 
         <div className="space-y-1">
           <Label>{t('volunteers.role')}</Label>
-          <Select value={role} onValueChange={v => setRole(v as 'volunteer' | 'admin')}>
+          <Select value={roleId} onValueChange={setRoleId}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="volunteer">{t('volunteers.roleVolunteer')}</SelectItem>
-              <SelectItem value="admin">{t('volunteers.roleAdmin')}</SelectItem>
+              <SelectItem value="role-volunteer">{t('volunteers.roleVolunteer')}</SelectItem>
+              <SelectItem value="role-super-admin">{t('volunteers.roleAdmin')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -98,6 +102,7 @@ export function StepInvite() {
         <Button
           onClick={handleGenerate}
           disabled={generating || !name.trim() || !phone.trim()}
+          aria-busy={generating}
           className="w-full"
         >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
@@ -119,7 +124,7 @@ export function StepInvite() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{invite.name}</span>
                     <Badge variant="outline" className="text-[10px]">
-                      {invite.role === 'admin' ? t('volunteers.roleAdmin') : t('volunteers.roleVolunteer')}
+                      {invite.roleIds?.includes('role-super-admin') ? t('volunteers.roleAdmin') : t('volunteers.roleVolunteer')}
                     </Badge>
                   </div>
                   <p className="font-mono text-xs text-muted-foreground">{invite.code}</p>

@@ -194,7 +194,7 @@ test.describe('Ban management', () => {
     const name = `NoBanVol ${Date.now()}`
     await page.getByRole('link', { name: 'Volunteers' }).click()
     const nsec = await createVolunteerAndGetNsec(page, name, phone)
-    await page.getByRole('button', { name: /close/i }).click()
+    await page.locator('button[data-slot="button"]').filter({ hasText: 'Close' }).click()
 
     // Login as volunteer
     await page.getByRole('button', { name: /log out/i }).click()

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useConfig } from '@/lib/config'
@@ -35,7 +35,7 @@ function OnboardingPage() {
   const inviteCode = params.get('code') || ''
 
   const [step, setStep] = useState<Step>('loading')
-  const [inviteData, setInviteData] = useState<{ name: string; role: string } | null>(null)
+  const [inviteData, setInviteData] = useState<{ name: string; roleIds: string[] } | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [uiLang, setUiLang] = useState(i18n.language || 'en')
 
@@ -49,12 +49,31 @@ function OnboardingPage() {
   const [nsec, setNsec] = useState('')
   const [pubkey, setPubkey] = useState('')
 
-  // Recovery key & backup verification
+  // Recovery key & backup
   const [recoveryKeyStr, setRecoveryKeyStr] = useState('')
-  const [verifyChars, setVerifyChars] = useState<{ index: number; char: string }[]>([])
-  const [verifyInputs, setVerifyInputs] = useState<string[]>([])
-  const [backupVerified, setBackupVerified] = useState(false)
+  const [backupAcknowledged, setBackupAcknowledged] = useState(false)
   const [backupDownloaded, setBackupDownloaded] = useState(false)
+
+  const langGroupRef = useRef<HTMLDivElement>(null)
+
+  // Language radiogroup keyboard handler
+  const handleLangKeyDown = useCallback((e: React.KeyboardEvent, currentIndex: number) => {
+    let nextIndex: number | null = null
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      nextIndex = (currentIndex + 1) % LANGUAGES.length
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      nextIndex = (currentIndex - 1 + LANGUAGES.length) % LANGUAGES.length
+    }
+    if (nextIndex !== null) {
+      const lang = LANGUAGES[nextIndex]
+      setUiLang(lang.code)
+      setLanguage(lang.code)
+      const buttons = langGroupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      buttons?.[nextIndex]?.focus()
+    }
+  }, [])
 
   // Validate invite on initial mount only (ref survives re-renders but not re-mounts)
   const validatingRef = useRef(false)
@@ -70,7 +89,7 @@ function OnboardingPage() {
     }
     validateInvite(inviteCode).then(result => {
       if (result.valid) {
-        setInviteData({ name: result.name!, role: result.role! })
+        setInviteData({ name: result.name!, roleIds: result.roleIds || ['role-volunteer'] })
         setStep('welcome')
       } else {
         setStep('error')
@@ -125,29 +144,10 @@ function OnboardingPage() {
       const rk = generateRecoveryKey()
       setRecoveryKeyStr(rk)
 
-      // Set up verification (4 random chars from recovery key, skipping dashes)
-      const rkNoDash = rk.replace(/-/g, '')
-      const indices: number[] = []
-      while (indices.length < 4) {
-        const idx = Math.floor(Math.random() * rkNoDash.length)
-        if (!indices.includes(idx)) indices.push(idx)
-      }
-      indices.sort((a, b) => a - b)
-      setVerifyChars(indices.map(i => ({ index: i, char: rkNoDash[i] })))
-      setVerifyInputs(Array(4).fill(''))
       setStep('backup')
     } catch (err) {
       setStep('error')
       setErrorMsg(err instanceof Error ? err.message : t('onboarding.redeemFailed'))
-    }
-  }
-
-  function checkBackupVerification() {
-    const correct = verifyChars.every((vc, i) => verifyInputs[i].toLowerCase() === vc.char.toLowerCase())
-    if (correct) {
-      setBackupVerified(true)
-    } else {
-      toast(t('onboarding.verifyFailed'), 'error')
     }
   }
 
@@ -227,11 +227,20 @@ function OnboardingPage() {
                   <Globe className="h-4 w-4 text-muted-foreground" />
                   {t('profile.uiLanguage')}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {LANGUAGES.map(lang => (
+                <div
+                  ref={langGroupRef}
+                  role="radiogroup"
+                  aria-label={t('profile.uiLanguage')}
+                  className="flex flex-wrap gap-2"
+                >
+                  {LANGUAGES.map((lang, index) => (
                     <button
                       key={lang.code}
+                      role="radio"
+                      aria-checked={uiLang === lang.code}
+                      tabIndex={uiLang === lang.code ? 0 : -1}
                       onClick={() => { setUiLang(lang.code); setLanguage(lang.code) }}
+                      onKeyDown={e => handleLangKeyDown(e, index)}
                       className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
                         uiLang === lang.code
                           ? 'border-primary bg-primary/10 text-primary font-medium'
@@ -277,7 +286,7 @@ function OnboardingPage() {
                 autoFocus
               />
               {pinError && (
-                <p className="text-center text-sm text-destructive">{pinError}</p>
+                <p role="alert" className="text-center text-sm text-destructive">{pinError}</p>
               )}
               {pinStep === 'confirm' && (
                 <Button
@@ -335,59 +344,42 @@ function OnboardingPage() {
                 </div>
               </div>
 
-              {/* Download backup (mandatory) */}
+              {/* Storage tips */}
+              <div className="space-y-2 rounded-lg border bg-muted/50 p-3">
+                <p className="text-sm font-medium">{t('onboarding.storageTipsTitle')}</p>
+                <ul className="space-y-1 text-xs text-muted-foreground">
+                  <li>• {t('onboarding.storageTip1')}</li>
+                  <li>• {t('onboarding.storageTip2')}</li>
+                  <li>• {t('onboarding.storageTip3')}</li>
+                </ul>
+              </div>
+
+              {/* Download backup */}
               <Button variant="outline" onClick={downloadBackup} className="w-full">
                 <Download className="h-4 w-4" />
                 {t('onboarding.downloadBackup')}
               </Button>
 
-              {/* Verification — verify recovery key chars */}
-              {!backupVerified && (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">{t('onboarding.verifyTitle')}</p>
-                  <p className="text-xs text-muted-foreground">{t('onboarding.verifyDescription')}</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {verifyChars.map((vc, i) => (
-                      <div key={vc.index} className="space-y-1">
-                        <label className="text-xs text-muted-foreground">
-                          {t('onboarding.charAtPosition', { position: vc.index + 1 })}
-                        </label>
-                        <input
-                          type="text"
-                          maxLength={1}
-                          value={verifyInputs[i]}
-                          onChange={e => {
-                            const newInputs = [...verifyInputs]
-                            newInputs[i] = e.target.value
-                            setVerifyInputs(newInputs)
-                          }}
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-center font-mono text-sm uppercase focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    onClick={checkBackupVerification}
-                    disabled={verifyInputs.some(v => !v)}
-                    className="w-full"
-                  >
-                    {t('onboarding.verifyButton')}
-                  </Button>
-                </div>
-              )}
+              {/* Acknowledgment checkbox + continue */}
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={backupAcknowledged}
+                  onChange={e => setBackupAcknowledged(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+                <span className="text-sm">{t('onboarding.backupAcknowledge')}</span>
+              </label>
 
-              {backupVerified && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950/20 dark:text-green-300">
-                    <Check className="h-4 w-4" />
-                    {t('onboarding.verifySuccess')}
-                  </div>
-                  <Button onClick={handleComplete} className="w-full" size="lg" disabled={!backupDownloaded}>
-                    {t('onboarding.continue')}
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <Button
+                onClick={handleComplete}
+                className="w-full"
+                size="lg"
+                disabled={!backupDownloaded || !backupAcknowledged}
+              >
+                {t('onboarding.continue')}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </CardContent>
           </>
         )}

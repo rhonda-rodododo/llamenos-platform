@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { PhoneInput } from '@/components/phone-input'
 import { Radio, Save } from 'lucide-react'
 
 interface Props {
@@ -84,10 +85,9 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
         <div className="space-y-1">
           <Label>{t('telephonyProvider.phoneNumber')}</Label>
           <p className="text-xs text-muted-foreground">{t('telephonyProvider.phoneNumberHelp')}</p>
-          <Input
+          <PhoneInput
             value={draft.phoneNumber || ''}
-            onChange={e => updateDraft({ phoneNumber: e.target.value })}
-            placeholder="+12125551234"
+            onChange={(val) => updateDraft({ phoneNumber: val })}
           />
         </div>
 

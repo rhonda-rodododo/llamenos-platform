@@ -5,7 +5,7 @@
  * with the key alias: 'cloudflare:workers' → 'src/platform/index.ts'
  *
  * This transparently swaps the CF DurableObject base class
- * with our SQLite-backed shim, without changing any DO source files.
+ * with our PostgreSQL-backed shim, without changing any DO source files.
  */
 import * as esbuild from 'esbuild'
 import path from 'path'
@@ -45,9 +45,9 @@ await esbuild.build({
     },
   }],
 
-  // Don't bundle native modules
+  // Don't bundle these — they're installed as runtime deps
   external: [
-    'better-sqlite3',
+    'postgres',
     'ws',
   ],
 

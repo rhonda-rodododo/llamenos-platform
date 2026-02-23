@@ -42,4 +42,25 @@ test.describe('Theme', () => {
     await expect(page.getByRole('button', { name: /light theme/i })).toBeVisible()
     await expect(page.getByRole('button', { name: /system theme/i })).toBeVisible()
   })
+
+  test('dark theme persists across SPA navigation', async ({ page }) => {
+    // Switch to dark
+    await page.getByRole('button', { name: /dark theme/i }).click()
+    await expect(page.locator('html')).toHaveClass(/dark/)
+
+    // Navigate to Volunteers page
+    await page.getByRole('link', { name: 'Volunteers' }).click()
+    await expect(page.getByRole('heading', { name: 'Volunteers' })).toBeVisible()
+    await expect(page.locator('html')).toHaveClass(/dark/)
+
+    // Navigate to Audit Log
+    await page.getByRole('link', { name: 'Audit Log' }).click()
+    await expect(page.getByRole('heading', { name: /audit log/i })).toBeVisible()
+    await expect(page.locator('html')).toHaveClass(/dark/)
+
+    // Navigate back to Dashboard
+    await page.getByRole('link', { name: 'Dashboard' }).click()
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.locator('html')).toHaveClass(/dark/)
+  })
 })

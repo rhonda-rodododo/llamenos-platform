@@ -30,11 +30,46 @@ function resetIdleTimer() {
   }
 }
 
-// Lock on tab hide
+// Lock on tab hide — with configurable grace period so users can switch windows to copy/paste
+let visibilityTimer: ReturnType<typeof setTimeout> | null = null
+const LOCK_DELAY_KEY = 'llamenos-lock-delay'
+const DEFAULT_LOCK_DELAY_MS = 30_000 // 30 seconds
+
+function getLockDelay(): number {
+  try {
+    const stored = localStorage.getItem(LOCK_DELAY_KEY)
+    if (stored) {
+      const ms = parseInt(stored, 10)
+      if (ms >= 0 && ms <= 600_000) return ms // 0 = immediate, max 10 min
+    }
+  } catch { /* localStorage unavailable */ }
+  return DEFAULT_LOCK_DELAY_MS
+}
+
+/** Set the tab-switch lock delay in milliseconds (0 = lock immediately, max 600000 = 10 min) */
+export function setLockDelay(ms: number) {
+  const clamped = Math.max(0, Math.min(600_000, ms))
+  localStorage.setItem(LOCK_DELAY_KEY, String(clamped))
+}
+
+/** Get the current tab-switch lock delay in milliseconds */
+export function getLockDelayMs(): number {
+  return getLockDelay()
+}
+
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && secretKey) {
-      lock()
+      const delay = getLockDelay()
+      if (delay === 0) {
+        lock()
+      } else {
+        visibilityTimer = setTimeout(() => lock(), delay)
+      }
+    } else if (!document.hidden && visibilityTimer) {
+      // User came back within grace period — cancel the lock
+      clearTimeout(visibilityTimer)
+      visibilityTimer = null
     }
   })
 }

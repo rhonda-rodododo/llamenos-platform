@@ -1,22 +1,22 @@
 import { Hono } from 'hono'
-import type { AppEnv, UserRole } from '../types'
+import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
 import { isValidE164 } from '../lib/helpers'
-import { adminGuard } from '../middleware/admin-guard'
+import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const volunteers = new Hono<AppEnv>()
-volunteers.use('*', adminGuard)
+volunteers.use('*', requirePermission('volunteers:read'))
 
 volunteers.get('/', async (c) => {
   const dos = getDOs(c.env)
   return dos.identity.fetch(new Request('http://do/volunteers'))
 })
 
-volunteers.post('/', async (c) => {
+volunteers.post('/', requirePermission('volunteers:create'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
-  const body = await c.req.json() as { name: string; phone: string; role: UserRole; pubkey?: string }
+  const body = await c.req.json() as { name: string; phone: string; roleIds: string[]; pubkey?: string }
 
   if (body.phone && !isValidE164(body.phone)) {
     return c.json({ error: 'Invalid phone number. Use E.164 format (e.g. +12125551234)' }, 400)
@@ -33,19 +33,19 @@ volunteers.post('/', async (c) => {
       pubkey: newPubkey,
       name: body.name,
       phone: body.phone,
-      role: body.role,
+      roles: body.roleIds || ['role-volunteer'],
       encryptedSecretKey: '',
     }),
   }))
 
   if (res.ok) {
-    await audit(dos.records, 'volunteerAdded', pubkey, { target: newPubkey, role: body.role })
+    await audit(dos.records, 'volunteerAdded', pubkey, { target: newPubkey, roles: body.roleIds })
   }
 
   return res
 })
 
-volunteers.patch('/:targetPubkey', async (c) => {
+volunteers.patch('/:targetPubkey', requirePermission('volunteers:update'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const targetPubkey = c.req.param('targetPubkey')
@@ -56,16 +56,16 @@ volunteers.patch('/:targetPubkey', async (c) => {
   }))
   if (res.ok) {
     const data = body as Record<string, unknown>
-    if (data.role) await audit(dos.records, data.role === 'admin' ? 'adminPromoted' : 'adminDemoted', pubkey, { target: targetPubkey })
-    // Revoke all sessions when deactivating or changing role
-    if (data.active === false || data.role) {
+    if (data.roles) await audit(dos.records, 'rolesChanged', pubkey, { target: targetPubkey, roles: data.roles })
+    // Revoke all sessions when deactivating or changing roles
+    if (data.active === false || data.roles) {
       await dos.identity.fetch(new Request(`http://do/sessions/revoke-all/${targetPubkey}`, { method: 'DELETE' }))
     }
   }
   return res
 })
 
-volunteers.delete('/:targetPubkey', async (c) => {
+volunteers.delete('/:targetPubkey', requirePermission('volunteers:delete'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const targetPubkey = c.req.param('targetPubkey')

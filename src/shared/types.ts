@@ -245,3 +245,22 @@ export interface EnabledChannels {
   signal: boolean
   reports: boolean
 }
+
+// --- Hub Types ---
+
+export interface Hub {
+  id: string              // UUID
+  name: string            // Display name (e.g., "NYC Hotline")
+  slug: string            // URL-safe identifier
+  description?: string
+  status: 'active' | 'suspended' | 'archived'
+  phoneNumber?: string    // Primary hotline number (for routing)
+  createdBy: string       // Super admin pubkey
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HubRoleAssignment {
+  hubId: string
+  roleIds: string[]
+}

@@ -1,30 +1,31 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getDOs } from '../lib/do-access'
-import { volunteerOrAdminGuard } from '../middleware/role-guard'
+import { getScopedDOs } from '../lib/do-access'
+import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const notes = new Hono<AppEnv>()
-// Only volunteers and admins can access call notes — reporters cannot
-notes.use('*', volunteerOrAdminGuard)
+// Require at least notes:read-own to access any notes endpoint
+notes.use('*', requirePermission('notes:read-own'))
 
 notes.get('/', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
+  const canReadAll = checkPermission(permissions, 'notes:read-all')
   const callId = c.req.query('callId')
   const page = c.req.query('page') || '1'
   const limit = c.req.query('limit') || '50'
   const params = new URLSearchParams()
   if (callId) params.set('callId', callId)
-  if (!isAdmin) params.set('author', pubkey)
+  if (!canReadAll) params.set('author', pubkey)
   params.set('page', page)
   params.set('limit', limit)
   return dos.records.fetch(new Request(`http://do/notes?${params}`))
 })
 
-notes.post('/', async (c) => {
-  const dos = getDOs(c.env)
+notes.post('/', requirePermission('notes:create'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const body = await c.req.json() as {
     callId: string
@@ -40,8 +41,8 @@ notes.post('/', async (c) => {
   return res
 })
 
-notes.patch('/:id', async (c) => {
-  const dos = getDOs(c.env)
+notes.patch('/:id', requirePermission('notes:update-own'), async (c) => {
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
   const id = c.req.param('id')
   const body = await c.req.json() as {

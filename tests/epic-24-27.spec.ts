@@ -69,14 +69,14 @@ test.describe('Epic 26: Custom IVR Audio Recording', () => {
   })
 
   test('admin settings page shows voice prompts card', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: /voice prompts/i })).toBeVisible()
   })
 
   test('voice prompts card shows prompt types', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand Voice Prompts section
     await page.getByRole('heading', { name: /voice prompts/i }).click()
@@ -88,8 +88,8 @@ test.describe('Epic 26: Custom IVR Audio Recording', () => {
   })
 
   test('admin settings page shows IVR language menu card', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: /ivr language menu/i })).toBeVisible()
   })
 })
@@ -119,8 +119,8 @@ test.describe('Epic 27: Remaining Polish', () => {
   })
 
   test('settings toggle shows confirmation dialog', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand Spam Mitigation section
     await page.getByRole('heading', { name: 'Spam Mitigation' }).click()
@@ -140,8 +140,8 @@ test.describe('Epic 27: Remaining Polish', () => {
   })
 
   test('settings confirmation dialog applies change on confirm', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand Spam Mitigation section
     await page.getByRole('heading', { name: 'Spam Mitigation' }).click()
@@ -169,7 +169,7 @@ test.describe('Epic 27: Remaining Polish', () => {
 
   test('toast has dismiss button', async ({ page }) => {
     // Trigger a toast by saving profile
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: /update profile/i }).click()

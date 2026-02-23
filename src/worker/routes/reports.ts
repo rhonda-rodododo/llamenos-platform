@@ -1,15 +1,16 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getDOs } from '../lib/do-access'
+import { getScopedDOs } from '../lib/do-access'
+import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const reports = new Hono<AppEnv>()
 
-// List reports — reporters see only their own, admins see all
+// List reports — reporters see only their own, users with reports:read-all see everything
 reports.get('/', async (c) => {
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-  const dos = getDOs(c.env)
+  const permissions = c.get('permissions')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   const status = c.req.query('status') || ''
   const category = c.req.query('category') || ''
@@ -24,8 +25,11 @@ reports.get('/', async (c) => {
   if (status) qs.set('status', status)
   if (category) qs.set('category', category)
 
-  // Reporters can only see their own reports
-  if (role === 'reporter') {
+  const canReadAll = checkPermission(permissions, 'reports:read-all')
+  const canReadAssigned = checkPermission(permissions, 'reports:read-assigned')
+
+  // If user can only read their own reports (reporter)
+  if (!canReadAll && !canReadAssigned) {
     qs.set('authorPubkey', pubkey)
   }
 
@@ -38,15 +42,10 @@ reports.get('/', async (c) => {
   return c.json(data)
 })
 
-// Create a new report (reporter or admin)
-reports.post('/', async (c) => {
+// Create a new report (requires reports:create)
+reports.post('/', requirePermission('reports:create'), async (c) => {
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-  const dos = getDOs(c.env)
-
-  if (role !== 'reporter' && role !== 'admin') {
-    return c.json({ error: 'Only reporters and admins can create reports' }, 403)
-  }
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   const body = await c.req.json() as {
     title: string
@@ -125,8 +124,8 @@ reports.post('/', async (c) => {
 reports.get('/:id', async (c) => {
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-  const dos = getDOs(c.env)
+  const permissions = c.get('permissions')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   const res = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
   if (!res.ok) {
@@ -140,14 +139,19 @@ reports.get('/:id', async (c) => {
     return c.json({ error: 'Not a report' }, 404)
   }
 
-  // Reporters can only see their own reports
-  if (role === 'reporter' && report.contactIdentifierHash !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
-  }
+  const canReadAll = checkPermission(permissions, 'reports:read-all')
+  const canReadAssigned = checkPermission(permissions, 'reports:read-assigned')
 
-  // Volunteers can only see reports assigned to them
-  if (role === 'volunteer' && report.assignedTo !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
+  // Users with read-all can see everything
+  if (!canReadAll) {
+    // Users with read-assigned can see assigned reports
+    if (canReadAssigned && report.assignedTo === pubkey) {
+      // OK
+    } else if (report.contactIdentifierHash === pubkey) {
+      // Own report
+    } else {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
   }
 
   return c.json(report)
@@ -157,8 +161,8 @@ reports.get('/:id', async (c) => {
 reports.get('/:id/messages', async (c) => {
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-  const dos = getDOs(c.env)
+  const permissions = c.get('permissions')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   // Verify access
   const convRes = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
@@ -172,12 +176,17 @@ reports.get('/:id/messages', async (c) => {
     return c.json({ error: 'Not a report' }, 404)
   }
 
-  if (role === 'reporter' && report.contactIdentifierHash !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
-  }
+  const canReadAll = checkPermission(permissions, 'reports:read-all')
+  const canReadAssigned = checkPermission(permissions, 'reports:read-assigned')
 
-  if (role === 'volunteer' && report.assignedTo !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
+  if (!canReadAll) {
+    if (canReadAssigned && report.assignedTo === pubkey) {
+      // OK
+    } else if (report.contactIdentifierHash === pubkey) {
+      // Own report
+    } else {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
   }
 
   const limit = Math.min(parseInt(c.req.query('limit') || '100', 10), 200)
@@ -191,8 +200,8 @@ reports.get('/:id/messages', async (c) => {
 reports.post('/:id/messages', async (c) => {
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-  const dos = getDOs(c.env)
+  const permissions = c.get('permissions')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   // Verify access
   const convRes = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
@@ -206,12 +215,18 @@ reports.post('/:id/messages', async (c) => {
     return c.json({ error: 'Not a report' }, 404)
   }
 
-  // Reporters can reply to their own reports, admins/assigned volunteers can reply
-  if (role === 'reporter' && report.contactIdentifierHash !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
-  }
-  if (role === 'volunteer' && report.assignedTo !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
+  const canSendAny = checkPermission(permissions, 'reports:send-message')
+  const canSendOwn = checkPermission(permissions, 'reports:send-message-own')
+
+  // Check if user can send messages in this report
+  if (!canSendAny) {
+    if (canSendOwn && report.contactIdentifierHash === pubkey) {
+      // Reporter can reply to own report
+    } else if (report.assignedTo === pubkey) {
+      // Assigned volunteer can reply
+    } else {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
   }
 
   const body = await c.req.json() as {
@@ -222,7 +237,8 @@ reports.post('/:id/messages', async (c) => {
     attachmentIds?: string[]
   }
 
-  const direction = role === 'reporter' ? 'inbound' : 'outbound'
+  const isReporter = report.contactIdentifierHash === pubkey
+  const direction = isReporter ? 'inbound' : 'outbound'
 
   const msgRes = await dos.conversations.fetch(new Request(`http://do/conversations/${id}/messages`, {
     method: 'POST',
@@ -255,18 +271,13 @@ reports.post('/:id/messages', async (c) => {
   return c.json(msg)
 })
 
-// Assign a volunteer to a report (admin only)
-reports.post('/:id/assign', async (c) => {
+// Assign a volunteer to a report (requires reports:assign)
+reports.post('/:id/assign', requirePermission('reports:assign'), async (c) => {
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-
-  if (role !== 'admin') {
-    return c.json({ error: 'Only admins can assign reports' }, 403)
-  }
 
   const body = await c.req.json() as { assignedTo: string }
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   const res = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`, {
     method: 'PATCH',
@@ -293,16 +304,11 @@ reports.post('/:id/assign', async (c) => {
   return new Response(res.body, res)
 })
 
-// Update report status (admin or assigned volunteer)
-reports.patch('/:id', async (c) => {
+// Update report status (requires reports:update)
+reports.patch('/:id', requirePermission('reports:update'), async (c) => {
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-  const dos = getDOs(c.env)
-
-  if (role === 'reporter') {
-    return c.json({ error: 'Reporters cannot update report status' }, 403)
-  }
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   const body = await c.req.json() as { status?: string }
 
@@ -321,7 +327,7 @@ reports.patch('/:id', async (c) => {
 
 // Get report categories (from settings)
 reports.get('/categories', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const res = await dos.settings.fetch(new Request('http://do/settings/report-categories'))
   if (!res.ok) {
     return c.json({ categories: [] })
@@ -333,8 +339,8 @@ reports.get('/categories', async (c) => {
 reports.get('/:id/files', async (c) => {
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-  const dos = getDOs(c.env)
+  const permissions = c.get('permissions')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
 
   // Verify access
   const convRes = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
@@ -348,11 +354,17 @@ reports.get('/:id/files', async (c) => {
     return c.json({ error: 'Not a report' }, 404)
   }
 
-  if (role === 'reporter' && report.contactIdentifierHash !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
-  }
-  if (role === 'volunteer' && report.assignedTo !== pubkey) {
-    return c.json({ error: 'Forbidden' }, 403)
+  const canReadAll = checkPermission(permissions, 'reports:read-all')
+  const canReadAssigned = checkPermission(permissions, 'reports:read-assigned')
+
+  if (!canReadAll) {
+    if (canReadAssigned && report.assignedTo === pubkey) {
+      // OK
+    } else if (report.contactIdentifierHash === pubkey) {
+      // Own
+    } else {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
   }
 
   const filesRes = await dos.conversations.fetch(new Request(`http://do/files?conversationId=${id}`))

@@ -66,7 +66,7 @@ Llamenos is a single-page application (SPA) that can run on **Cloudflare Workers
 | Component | Cloudflare | Self-Hosted |
 |---|---|---|
 | Frontend | Vite + React + TanStack Router | Same |
-| Backend | Cloudflare Workers + 6 Durable Objects | Node.js + SQLite |
+| Backend | Cloudflare Workers + 6 Durable Objects | Node.js + PostgreSQL |
 | Blob Storage | R2 | MinIO (S3-compatible) |
 | Voice | Twilio, SignalWire, Vonage, Plivo, or Asterisk | Same |
 | Messaging | SMS, WhatsApp Business, Signal | Same |

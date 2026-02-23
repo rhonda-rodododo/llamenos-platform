@@ -3,12 +3,15 @@ import { type KeyPair, keyPairFromNsec, createAuthToken } from './crypto'
 import * as keyManager from './key-manager'
 import { hasStoredKey } from './key-store'
 import { getMe, login, logout as apiLogout, updateMyAvailability, setOnAuthExpired, setOnApiActivity } from './api'
+import { permissionGranted } from '@shared/permissions'
 import { loginWithPasskey as webauthnLogin } from './webauthn'
 
 interface AuthState {
   isKeyUnlocked: boolean
   publicKey: string | null
-  role: 'volunteer' | 'admin' | 'reporter' | null
+  roles: string[]
+  permissions: string[]
+  primaryRoleName: string | null
   name: string | null
   isLoading: boolean
   error: string | null
@@ -31,6 +34,7 @@ interface AuthContextValue extends AuthState {
   renewSession: () => Promise<void>
   unlockWithPin: (pin: string) => Promise<boolean>
   lockKey: () => void
+  hasPermission: (permission: string) => boolean
   isAdmin: boolean
   isAuthenticated: boolean
   hasNsec: boolean
@@ -44,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     isKeyUnlocked: false,
     publicKey: null,
-    role: null,
+    roles: [],
+    permissions: [],
+    primaryRoleName: null,
     name: null,
     isLoading: true,
     error: null,
@@ -88,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...s,
         sessionExpired: true,
         sessionExpiring: false,
-        ...(s.isKeyUnlocked ? {} : { role: null, name: null }),
+        ...(s.isKeyUnlocked ? {} : { roles: [], permissions: [], primaryRoleName: null, name: null }),
       }))
     })
     return () => setOnAuthExpired(null)
@@ -124,7 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setState({
             isKeyUnlocked: keyManager.isUnlocked(),
             publicKey: me.pubkey,
-            role: me.role,
+            roles: me.roles || [],
+            permissions: me.permissions || [],
+            primaryRoleName: me.primaryRole?.name || null,
             name: me.name,
             isLoading: false,
             error: null,
@@ -153,7 +161,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setState({
             isKeyUnlocked: true,
             publicKey: me.pubkey,
-            role: me.role,
+            roles: me.roles || [],
+            permissions: me.permissions || [],
+            primaryRoleName: me.primaryRole?.name || null,
             name: me.name,
             isLoading: false,
             error: null,
@@ -187,13 +197,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = createAuthToken(keyPair.secretKey, Date.now())
       const parsed = JSON.parse(token)
-      const result = await login(parsed.pubkey, parsed.timestamp, parsed.token)
+      await login(parsed.pubkey, parsed.timestamp, parsed.token)
       const me = await getMe()
       lastApiActivity.current = Date.now()
       setState({
         isKeyUnlocked: keyManager.isUnlocked(),
         publicKey: keyPair.publicKey,
-        role: result.role,
+        roles: me.roles || [],
+        permissions: me.permissions || [],
+        primaryRoleName: me.primaryRole?.name || null,
         name: me.name,
         isLoading: false,
         error: null,
@@ -226,7 +238,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState({
         isKeyUnlocked: true,
         publicKey: pubkey,
-        role: me.role,
+        roles: me.roles || [],
+        permissions: me.permissions || [],
+        primaryRoleName: me.primaryRole?.name || null,
         name: me.name,
         isLoading: false,
         error: null,
@@ -261,7 +275,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState({
         isKeyUnlocked: false, // No nsec available — crypto locked
         publicKey: pubkey,
-        role: me.role,
+        roles: me.roles || [],
+        permissions: me.permissions || [],
+        primaryRoleName: me.primaryRole?.name || null,
         name: me.name,
         isLoading: false,
         error: null,
@@ -290,7 +306,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState(s => ({
         ...s,
         name: me.name,
-        role: me.role,
+        roles: me.roles || [],
+        permissions: me.permissions || [],
+        primaryRoleName: me.primaryRole?.name || null,
         publicKey: me.pubkey,
         transcriptionEnabled: me.transcriptionEnabled,
         spokenLanguages: me.spokenLanguages || ['en'],
@@ -313,7 +331,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState(s => ({
         ...s,
         name: me.name,
-        role: me.role,
+        roles: me.roles || [],
+        permissions: me.permissions || [],
+        primaryRoleName: me.primaryRole?.name || null,
         publicKey: me.pubkey,
         transcriptionEnabled: me.transcriptionEnabled,
         spokenLanguages: me.spokenLanguages || ['en'],
@@ -352,7 +372,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({
       isKeyUnlocked: false,
       publicKey: null,
-      role: null,
+      roles: [],
+      permissions: [],
+      primaryRoleName: null,
       name: null,
       isLoading: false,
       error: null,
@@ -399,8 +421,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     renewSession,
     unlockWithPin,
     lockKey,
-    isAdmin: state.role === 'admin',
-    isAuthenticated: (state.isKeyUnlocked || hasSessionToken) && state.role !== null,
+    hasPermission: (permission: string) => permissionGranted(state.permissions, permission),
+    isAdmin: permissionGranted(state.permissions, 'settings:manage'),
+    isAuthenticated: (state.isKeyUnlocked || hasSessionToken) && state.roles.length > 0,
     hasNsec: state.isKeyUnlocked,
     keyPair,
   }

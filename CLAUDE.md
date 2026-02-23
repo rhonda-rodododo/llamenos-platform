@@ -12,7 +12,7 @@ Llámenos is a secure crisis response hotline webapp. Callers dial a phone numbe
 
 - **Runtime/Package Manager**: Bun
 - **Frontend**: Vite + TanStack Router (SPA, no SSR) + shadcn/ui (component installer)
-- **Backend**: Cloudflare Workers + Durable Objects
+- **Backend**: Cloudflare Workers + Durable Objects (cloud) / Node.js + PostgreSQL (self-hosted)
 - **Telephony**: Twilio via a `TelephonyAdapter` interface (designed for future provider swaps, e.g. SIP trunks)
 - **Auth**: Nostr keypairs (BIP-340 Schnorr signatures) + WebAuthn session tokens for multi-device support
 - **i18n**: Built-in from day one — all user-facing strings must be translatable

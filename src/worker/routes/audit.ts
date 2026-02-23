@@ -1,13 +1,13 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getDOs } from '../lib/do-access'
-import { adminGuard } from '../middleware/admin-guard'
+import { getScopedDOs } from '../lib/do-access'
+import { requirePermission } from '../middleware/permission-guard'
 
 const auditRoutes = new Hono<AppEnv>()
-auditRoutes.use('*', adminGuard)
+auditRoutes.use('*', requirePermission('audit:read'))
 
 auditRoutes.get('/', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const params = new URLSearchParams()
   params.set('page', c.req.query('page') || '1')
   params.set('limit', c.req.query('limit') || '50')

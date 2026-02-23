@@ -1,12 +1,15 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, Shift } from '../types'
 import { DORouter } from '../lib/do-router'
+import { runMigrations } from '../../shared/migrations/runner'
+import { migrations } from '../../shared/migrations'
 
 /**
  * ShiftManagerDO — manages shift schedules and routing.
  * Determines which volunteers should receive calls at any given time.
  */
 export class ShiftManagerDO extends DurableObject<Env> {
+  private migrated = false
   private router: DORouter
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -29,6 +32,10 @@ export class ShiftManagerDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!this.migrated) {
+      await runMigrations(this.ctx.storage, migrations, 'shifts')
+      this.migrated = true
+    }
     return this.router.handle(request)
   }
 

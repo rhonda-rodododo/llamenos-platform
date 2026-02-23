@@ -58,8 +58,12 @@ async function main() {
   injectWebSocket(server)
 
   // Graceful shutdown
-  const shutdown = () => {
+  const shutdown = async () => {
     console.log('[llamenos] Shutting down...')
+    const { stopAlarmPoller } = await import('./storage/alarm-poller')
+    const { closePool } = await import('./storage/postgres-pool')
+    stopAlarmPoller()
+    await closePool()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)

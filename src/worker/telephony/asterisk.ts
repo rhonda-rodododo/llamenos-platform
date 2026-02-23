@@ -211,12 +211,13 @@ export class AsteriskAdapter implements TelephonyAdapter {
   }
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
-    const { callSid, callerNumber, volunteers, callbackUrl } = params
+    const { callSid, callerNumber, volunteers, callbackUrl, hubId } = params
     const result = await this.bridgeRequest('POST', '/commands/ring', {
       parentCallSid: callSid,
       callerNumber,
       volunteers: volunteers.map(v => ({ pubkey: v.pubkey, phone: v.phone })),
       callbackUrl,
+      hubId,
     })
     return (result as { callSids?: string[] })?.callSids ?? []
   }
@@ -307,6 +308,7 @@ export class AsteriskAdapter implements TelephonyAdapter {
     return {
       callSid: data.channelId || data.callSid || '',
       callerNumber: data.callerNumber || data.from || '',
+      calledNumber: data.calledNumber || data.to || undefined,
     }
   }
 
@@ -462,7 +464,9 @@ interface AriWebhookPayload {
   channelId?: string
   callSid?: string
   callerNumber?: string
+  calledNumber?: string
   from?: string
+  to?: string
   digits?: string
   state?: string
   status?: string

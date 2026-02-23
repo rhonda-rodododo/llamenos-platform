@@ -124,7 +124,7 @@ export function CommandPalette() {
               <>
                 <CommandItem onSelect={() => runCommand(() => navigate({ to: '/admin/settings', search: { section: '' } }))}>
                   <Settings className="h-4 w-4" />
-                  {t('nav.adminSettings')}
+                  {t('nav.hubSettings', { defaultValue: 'Hub Settings' })}
                 </CommandItem>
                 <CommandItem onSelect={() => runCommand(() => navigate({ to: '/shifts' }))}>
                   <Clock className="h-4 w-4" />

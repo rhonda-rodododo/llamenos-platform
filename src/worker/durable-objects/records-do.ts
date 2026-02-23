@@ -1,6 +1,8 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, BanEntry, EncryptedNote, AuditLogEntry } from '../types'
 import { DORouter } from '../lib/do-router'
+import { runMigrations } from '../../shared/migrations/runner'
+import { migrations } from '../../shared/migrations'
 
 /**
  * RecordsDO — manages operational data:
@@ -9,6 +11,7 @@ import { DORouter } from '../lib/do-router'
  * - Audit log
  */
 export class RecordsDO extends DurableObject<Env> {
+  private migrated = false
   private router: DORouter
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -56,6 +59,10 @@ export class RecordsDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!this.migrated) {
+      await runMigrations(this.ctx.storage, migrations, 'records')
+      this.migrated = true
+    }
     return this.router.handle(request)
   }
 

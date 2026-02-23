@@ -13,7 +13,7 @@ test.describe('Conversations — no channels configured', () => {
     // The "No messaging channels enabled" empty state should be visible
     await expect(page.getByText('No messaging channels enabled')).toBeVisible({ timeout: 10000 })
     await expect(
-      page.getByText('Enable SMS, WhatsApp, Signal, or Reports in Admin Settings to start receiving messages.')
+      page.getByText('Enable SMS, WhatsApp, Signal, or Reports in Hub Settings to start receiving messages.')
     ).toBeVisible()
   })
 

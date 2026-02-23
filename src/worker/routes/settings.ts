@@ -1,18 +1,18 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
-import { adminGuard } from '../middleware/admin-guard'
+import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const settings = new Hono<AppEnv>()
 
-// --- Transcription settings: readable by all authenticated, writable by admin ---
+// --- Transcription settings: readable by all authenticated, writable by settings:manage ---
 settings.get('/transcription', async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/transcription'))
 })
 
-settings.patch('/transcription', adminGuard, async (c) => {
+settings.patch('/transcription', requirePermission('settings:manage-transcription'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -24,14 +24,15 @@ settings.patch('/transcription', adminGuard, async (c) => {
   return res
 })
 
-// --- Custom fields: readable by all authenticated (role-filtered), writable by admin ---
+// --- Custom fields: readable by all authenticated (filtered by permissions), writable by admin ---
 settings.get('/custom-fields', async (c) => {
   const dos = getDOs(c.env)
-  const isAdmin = c.get('isAdmin')
-  return dos.settings.fetch(new Request(`http://do/settings/custom-fields?role=${isAdmin ? 'admin' : 'volunteer'}`))
+  const permissions = c.get('permissions')
+  const canManageFields = checkPermission(permissions, 'settings:manage-fields')
+  return dos.settings.fetch(new Request(`http://do/settings/custom-fields?role=${canManageFields ? 'admin' : 'volunteer'}`))
 })
 
-settings.put('/custom-fields', adminGuard, async (c) => {
+settings.put('/custom-fields', requirePermission('settings:manage-fields'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -43,13 +44,13 @@ settings.put('/custom-fields', adminGuard, async (c) => {
   return res
 })
 
-// --- All remaining settings: admin only ---
-settings.get('/spam', adminGuard, async (c) => {
+// --- All remaining settings: require specific permissions ---
+settings.get('/spam', requirePermission('settings:manage-spam'), async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/spam'))
 })
 
-settings.patch('/spam', adminGuard, async (c) => {
+settings.patch('/spam', requirePermission('settings:manage-spam'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -61,12 +62,12 @@ settings.patch('/spam', adminGuard, async (c) => {
   return res
 })
 
-settings.get('/call', adminGuard, async (c) => {
+settings.get('/call', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/call'))
 })
 
-settings.patch('/call', adminGuard, async (c) => {
+settings.patch('/call', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -78,12 +79,12 @@ settings.patch('/call', adminGuard, async (c) => {
   return res
 })
 
-settings.get('/ivr-languages', adminGuard, async (c) => {
+settings.get('/ivr-languages', requirePermission('settings:manage-ivr'), async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/ivr-languages'))
 })
 
-settings.patch('/ivr-languages', adminGuard, async (c) => {
+settings.patch('/ivr-languages', requirePermission('settings:manage-ivr'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -95,12 +96,12 @@ settings.patch('/ivr-languages', adminGuard, async (c) => {
   return res
 })
 
-settings.get('/webauthn', adminGuard, async (c) => {
+settings.get('/webauthn', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   return dos.identity.fetch(new Request('http://do/settings/webauthn'))
 })
 
-settings.patch('/webauthn', adminGuard, async (c) => {
+settings.patch('/webauthn', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -112,13 +113,13 @@ settings.patch('/webauthn', adminGuard, async (c) => {
   return res
 })
 
-// --- Telephony Provider settings: admin only ---
-settings.get('/telephony-provider', adminGuard, async (c) => {
+// --- Telephony Provider settings ---
+settings.get('/telephony-provider', requirePermission('settings:manage-telephony'), async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/telephony-provider'))
 })
 
-settings.patch('/telephony-provider', adminGuard, async (c) => {
+settings.patch('/telephony-provider', requirePermission('settings:manage-telephony'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -130,7 +131,7 @@ settings.patch('/telephony-provider', adminGuard, async (c) => {
   return res
 })
 
-settings.post('/telephony-provider/test', adminGuard, async (c) => {
+settings.post('/telephony-provider/test', requirePermission('settings:manage-telephony'), async (c) => {
   const body = await c.req.json() as { type: string; accountSid?: string; authToken?: string; phoneNumber?: string; signalwireSpace?: string; apiKey?: string; apiSecret?: string; applicationId?: string; authId?: string; ariUrl?: string; ariUsername?: string; ariPassword?: string }
   try {
     let testUrl: string
@@ -142,7 +143,6 @@ settings.post('/telephony-provider/test', adminGuard, async (c) => {
         testHeaders['Authorization'] = 'Basic ' + btoa(`${body.accountSid}:${body.authToken}`)
         break
       case 'signalwire': {
-        // Validate space name is alphanumeric to prevent URL injection
         if (!body.signalwireSpace || !/^[a-zA-Z0-9_-]+$/.test(body.signalwireSpace)) {
           return Response.json({ ok: false, error: 'Invalid SignalWire space name' }, { status: 400 })
         }
@@ -158,7 +158,6 @@ settings.post('/telephony-provider/test', adminGuard, async (c) => {
         testHeaders['Authorization'] = 'Basic ' + btoa(`${body.authId}:${body.authToken}`)
         break
       case 'asterisk': {
-        // Validate ARI URL: must be HTTPS (or HTTP for local dev) and not an internal/loopback address
         if (!body.ariUrl) {
           return Response.json({ ok: false, error: 'ARI URL is required' }, { status: 400 })
         }
@@ -166,7 +165,6 @@ settings.post('/telephony-provider/test', adminGuard, async (c) => {
         try { ariParsed = new URL(body.ariUrl) } catch {
           return Response.json({ ok: false, error: 'Invalid ARI URL' }, { status: 400 })
         }
-        // Block internal IPs and loopback
         const hostname = ariParsed.hostname
         if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' ||
             hostname.startsWith('10.') || hostname.startsWith('172.') || hostname.startsWith('192.168.') ||
@@ -185,7 +183,7 @@ settings.post('/telephony-provider/test', adminGuard, async (c) => {
     }
 
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10000) // 10s timeout
+    const timeout = setTimeout(() => controller.abort(), 10000)
     try {
       const testRes = await fetch(testUrl, { headers: testHeaders, signal: controller.signal })
       clearTimeout(timeout)
@@ -202,13 +200,13 @@ settings.post('/telephony-provider/test', adminGuard, async (c) => {
   }
 })
 
-// --- Messaging config: admin only ---
-settings.get('/messaging', adminGuard, async (c) => {
+// --- Messaging config ---
+settings.get('/messaging', requirePermission('settings:manage-messaging'), async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/messaging'))
 })
 
-settings.patch('/messaging', adminGuard, async (c) => {
+settings.patch('/messaging', requirePermission('settings:manage-messaging'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -220,13 +218,13 @@ settings.patch('/messaging', adminGuard, async (c) => {
   return res
 })
 
-// --- Setup state: admin only ---
-settings.get('/setup', adminGuard, async (c) => {
+// --- Setup state ---
+settings.get('/setup', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/setup'))
 })
 
-settings.patch('/setup', adminGuard, async (c) => {
+settings.patch('/setup', requirePermission('settings:manage'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const body = await c.req.json()
@@ -238,12 +236,12 @@ settings.patch('/setup', adminGuard, async (c) => {
   return res
 })
 
-settings.get('/ivr-audio', adminGuard, async (c) => {
+settings.get('/ivr-audio', requirePermission('settings:manage-ivr'), async (c) => {
   const dos = getDOs(c.env)
   return dos.settings.fetch(new Request('http://do/settings/ivr-audio'))
 })
 
-settings.put('/ivr-audio/:promptType/:language', adminGuard, async (c) => {
+settings.put('/ivr-audio/:promptType/:language', requirePermission('settings:manage-ivr'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const promptType = c.req.param('promptType')
@@ -257,7 +255,7 @@ settings.put('/ivr-audio/:promptType/:language', adminGuard, async (c) => {
   return res
 })
 
-settings.delete('/ivr-audio/:promptType/:language', adminGuard, async (c) => {
+settings.delete('/ivr-audio/:promptType/:language', requirePermission('settings:manage-ivr'), async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
   const promptType = c.req.param('promptType')
@@ -267,6 +265,55 @@ settings.delete('/ivr-audio/:promptType/:language', adminGuard, async (c) => {
   }))
   if (res.ok) await audit(dos.records, 'ivrAudioDeleted', pubkey, { promptType, language })
   return res
+})
+
+// --- Roles (PBAC) ---
+settings.get('/roles', async (c) => {
+  const dos = getDOs(c.env)
+  return dos.settings.fetch(new Request('http://do/settings/roles'))
+})
+
+settings.post('/roles', requirePermission('system:manage-roles'), async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const body = await c.req.json()
+  const res = await dos.settings.fetch(new Request('http://do/settings/roles', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }))
+  if (res.ok) await audit(dos.records, 'roleCreated', pubkey, { name: (body as { name?: string }).name })
+  return res
+})
+
+settings.patch('/roles/:id', requirePermission('system:manage-roles'), async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const res = await dos.settings.fetch(new Request(`http://do/settings/roles/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }))
+  if (res.ok) await audit(dos.records, 'roleUpdated', pubkey, { roleId: id })
+  return res
+})
+
+settings.delete('/roles/:id', requirePermission('system:manage-roles'), async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const id = c.req.param('id')
+  const res = await dos.settings.fetch(new Request(`http://do/settings/roles/${id}`, { method: 'DELETE' }))
+  if (res.ok) await audit(dos.records, 'roleDeleted', pubkey, { roleId: id })
+  return res
+})
+
+// --- Permissions catalog ---
+settings.get('/permissions', requirePermission('system:manage-roles'), async (c) => {
+  const { PERMISSION_CATALOG, getPermissionsByDomain } = await import('../../shared/permissions')
+  return c.json({
+    permissions: PERMISSION_CATALOG,
+    byDomain: getPermissionsByDomain(),
+  })
 })
 
 export default settings

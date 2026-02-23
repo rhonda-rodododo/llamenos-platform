@@ -2,9 +2,11 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import type { FileRecord, UploadInit } from '../../shared/types'
 import { getDOs } from '../lib/do-access'
+import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const uploads = new Hono<AppEnv>()
+uploads.use('*', requirePermission('files:upload'))
 
 // Initialize an upload — returns uploadId and chunk upload URLs
 uploads.post('/init', async (c) => {
@@ -58,6 +60,7 @@ uploads.post('/init', async (c) => {
 // Upload a chunk
 uploads.put('/:id/chunks/:chunkIndex', async (c) => {
   const pubkey = c.get('pubkey')
+  const permissions = c.get('permissions')
   const uploadId = c.req.param('id')
   const chunkIndex = parseInt(c.req.param('chunkIndex'), 10)
 
@@ -72,7 +75,7 @@ uploads.put('/:id/chunks/:chunkIndex', async (c) => {
     return c.json({ error: 'Upload not found' }, 404)
   }
   const fileRecord = await ownerRes.json() as FileRecord
-  if (fileRecord.uploadedBy !== pubkey && c.get('role') !== 'admin') {
+  if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:download-all')) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -102,6 +105,7 @@ uploads.put('/:id/chunks/:chunkIndex', async (c) => {
 // Complete an upload — assembles chunks
 uploads.post('/:id/complete', async (c) => {
   const pubkey = c.get('pubkey')
+  const permissions = c.get('permissions')
   const uploadId = c.req.param('id')
   const dos = getDOs(c.env)
 
@@ -113,7 +117,7 @@ uploads.post('/:id/complete', async (c) => {
 
   const fileRecord = await statusRes.json() as FileRecord
 
-  if (fileRecord.uploadedBy !== pubkey && c.get('role') !== 'admin') {
+  if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:download-all')) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -174,6 +178,7 @@ uploads.post('/:id/complete', async (c) => {
 // Get upload status (for resume)
 uploads.get('/:id/status', async (c) => {
   const pubkey = c.get('pubkey')
+  const permissions = c.get('permissions')
   const uploadId = c.req.param('id')
   const dos = getDOs(c.env)
 
@@ -183,8 +188,8 @@ uploads.get('/:id/status', async (c) => {
   }
 
   const fileRecord = await res.json() as FileRecord
-  // Only allow the uploader or admin to check status
-  if (fileRecord.uploadedBy !== pubkey && c.get('role') !== 'admin') {
+  // Only allow the uploader or users with download-all to check status
+  if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:download-all')) {
     return c.json({ error: 'Upload not found' }, 404)
   }
   return c.json({

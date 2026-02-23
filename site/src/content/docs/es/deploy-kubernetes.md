@@ -116,8 +116,7 @@ Abre `https://linea.tudominio.com` en tu navegador. Inicia sesion con el nsec ad
 | `app.image.repository` | Imagen del contenedor | `ghcr.io/your-org/llamenos` |
 | `app.image.tag` | Etiqueta de imagen | `latest` |
 | `app.port` | Puerto de la aplicacion | `3000` |
-| `app.replicas` | Replicas (debe ser 1 — SQLite) | `1` |
-| `app.persistence.size` | Volumen de datos SQLite | `10Gi` |
+| `app.replicas` | Replicas de pods | `2` |
 
 ### Secretos
 
@@ -146,11 +145,17 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=MINIO_SECRET_KEY=tu_clave
 ```
 
-## Consideraciones de escalabilidad
+## Escalado
 
-Llamenos usa SQLite para almacenamiento de datos, lo que requiere un **unico escritor**. El chart de Helm impone `replicas: 1` con una estrategia de despliegue `Recreate`. Esto es apropiado para cargas de trabajo de lineas de crisis.
+El despliegue usa estrategia `RollingUpdate` para actualizaciones sin tiempo de inactividad. Escala las replicas segun tu trafico:
 
-Si necesitas escalado horizontal, usa el [despliegue en Cloudflare Workers](/docs/getting-started).
+```bash
+kubectl scale deployment llamenos --replicas=3
+```
+
+Los advisory locks de PostgreSQL garantizan la consistencia de datos entre replicas.
+
+Para escalado global automatico sin gestionar infraestructura, considera el [despliegue en Cloudflare Workers](/docs/getting-started).
 
 ## Actualizacion
 

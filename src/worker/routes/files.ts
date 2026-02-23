@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import type { FileRecord, RecipientEnvelope } from '../../shared/types'
 import { getDOs } from '../lib/do-access'
+import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const files = new Hono<AppEnv>()
@@ -10,6 +11,7 @@ const files = new Hono<AppEnv>()
 files.get('/:id/content', async (c) => {
   const fileId = c.req.param('id')
   const pubkey = c.get('pubkey')
+  const permissions = c.get('permissions')
   const dos = getDOs(c.env)
 
   // Get file record to verify access
@@ -24,7 +26,7 @@ files.get('/:id/content', async (c) => {
   }
 
   // Verify the requester has an envelope (is an authorized recipient)
-  const hasAccess = c.get('role') === 'admin' ||
+  const hasAccess = checkPermission(permissions, 'files:download-all') ||
     fileRecord.uploadedBy === pubkey ||
     fileRecord.recipientEnvelopes.some(e => e.pubkey === pubkey)
 
@@ -50,6 +52,7 @@ files.get('/:id/content', async (c) => {
 files.get('/:id/envelopes', async (c) => {
   const fileId = c.req.param('id')
   const pubkey = c.get('pubkey')
+  const permissions = c.get('permissions')
   const dos = getDOs(c.env)
 
   const recordRes = await dos.conversations.fetch(new Request(`http://do/files/${fileId}`))
@@ -59,7 +62,7 @@ files.get('/:id/envelopes', async (c) => {
 
   const fileRecord = await recordRes.json() as FileRecord
 
-  const hasAccess = c.get('role') === 'admin' ||
+  const hasAccess = checkPermission(permissions, 'files:download-all') ||
     fileRecord.uploadedBy === pubkey ||
     fileRecord.recipientEnvelopes.some(e => e.pubkey === pubkey)
 
@@ -67,8 +70,8 @@ files.get('/:id/envelopes', async (c) => {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
-  // Return only the envelope for the requesting user (or all for admin)
-  if (c.get('role') === 'admin') {
+  // Return only the envelope for the requesting user (or all for users with download-all)
+  if (checkPermission(permissions, 'files:download-all')) {
     return c.json({ envelopes: fileRecord.recipientEnvelopes })
   }
 
@@ -80,6 +83,7 @@ files.get('/:id/envelopes', async (c) => {
 files.get('/:id/metadata', async (c) => {
   const fileId = c.req.param('id')
   const pubkey = c.get('pubkey')
+  const permissions = c.get('permissions')
   const dos = getDOs(c.env)
 
   const recordRes = await dos.conversations.fetch(new Request(`http://do/files/${fileId}`))
@@ -89,7 +93,7 @@ files.get('/:id/metadata', async (c) => {
 
   const fileRecord = await recordRes.json() as FileRecord
 
-  const hasAccess = c.get('role') === 'admin' ||
+  const hasAccess = checkPermission(permissions, 'files:download-all') ||
     fileRecord.uploadedBy === pubkey ||
     fileRecord.recipientEnvelopes.some(e => e.pubkey === pubkey)
 
@@ -97,8 +101,8 @@ files.get('/:id/metadata', async (c) => {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
-  // Return only the metadata blob for the requesting user (or all for admin)
-  if (c.get('role') === 'admin') {
+  // Return only the metadata blob for the requesting user (or all for users with download-all)
+  if (checkPermission(permissions, 'files:download-all')) {
     return c.json({ metadata: fileRecord.encryptedMetadata })
   }
 
@@ -106,15 +110,10 @@ files.get('/:id/metadata', async (c) => {
   return c.json({ metadata: myMeta ? [myMeta] : [] })
 })
 
-// Share file with a new recipient (admin re-encrypts the file key for a volunteer)
-files.post('/:id/share', async (c) => {
+// Share file with a new recipient (requires files:share — admin re-encrypts the file key for a volunteer)
+files.post('/:id/share', requirePermission('files:share'), async (c) => {
   const fileId = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const role = c.get('role')
-
-  if (role !== 'admin') {
-    return c.json({ error: 'Only admins can share files' }, 403)
-  }
 
   const body = await c.req.json() as {
     envelope: RecipientEnvelope

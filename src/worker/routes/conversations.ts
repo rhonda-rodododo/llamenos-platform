@@ -1,20 +1,21 @@
 import { Hono } from 'hono'
 import type { AppEnv, EncryptedMessage } from '../types'
-import { getDOs, getMessagingAdapter } from '../lib/do-access'
-import { adminGuard } from '../middleware/admin-guard'
+import { getScopedDOs, getMessagingAdapter } from '../lib/do-access'
+import { checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 
 const conversations = new Hono<AppEnv>()
 
 /**
  * GET /conversations — list conversations
- * Volunteers see only their assigned + waiting conversations.
- * Admins see all.
+ * Users with conversations:read-all see everything.
+ * Others see only their assigned + waiting conversations.
  */
 conversations.get('/', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const pubkey = c.get('pubkey')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
+  const canReadAll = checkPermission(permissions, 'conversations:read-all')
   const status = c.req.query('status')
   const channel = c.req.query('channel')
   const page = c.req.query('page') || '1'
@@ -26,8 +27,8 @@ conversations.get('/', async (c) => {
   params.set('page', page)
   params.set('limit', limit)
 
-  // Volunteers only see their assigned conversations + waiting queue
-  if (!isAdmin) {
+  // Users without read-all only see their assigned conversations + waiting queue
+  if (!canReadAll) {
     // Fetch assigned conversations
     params.set('assignedTo', pubkey)
     const assignedRes = await dos.conversations.fetch(
@@ -59,7 +60,7 @@ conversations.get('/', async (c) => {
  * GET /conversations/stats — conversation metrics
  */
 conversations.get('/stats', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const res = await dos.conversations.fetch(new Request('http://do/conversations/stats'))
   return c.json(await res.json())
 })
@@ -68,17 +69,18 @@ conversations.get('/stats', async (c) => {
  * GET /conversations/:id — get single conversation
  */
 conversations.get('/:id', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
+  const canReadAll = checkPermission(permissions, 'conversations:read-all')
 
   const res = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
   if (!res.ok) return c.json({ error: 'Not found' }, 404)
 
   const conv = await res.json() as { assignedTo?: string; status: string }
   // Non-admins can only view their assigned or waiting conversations
-  if (!isAdmin && conv.assignedTo !== pubkey && conv.status !== 'waiting') {
+  if (!canReadAll && conv.assignedTo !== pubkey && conv.status !== 'waiting') {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -89,10 +91,11 @@ conversations.get('/:id', async (c) => {
  * GET /conversations/:id/messages — paginated messages
  */
 conversations.get('/:id/messages', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
+  const canReadAll = checkPermission(permissions, 'conversations:read-all')
   const page = c.req.query('page') || '1'
   const limit = c.req.query('limit') || '50'
 
@@ -100,7 +103,7 @@ conversations.get('/:id/messages', async (c) => {
   const convRes = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
   if (!convRes.ok) return c.json({ error: 'Not found' }, 404)
   const conv = await convRes.json() as { assignedTo?: string; status: string }
-  if (!isAdmin && conv.assignedTo !== pubkey && conv.status !== 'waiting') {
+  if (!canReadAll && conv.assignedTo !== pubkey && conv.status !== 'waiting') {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -116,10 +119,11 @@ conversations.get('/:id/messages', async (c) => {
  * If plaintext is provided, it's sent via the messaging adapter then discarded.
  */
 conversations.post('/:id/messages', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
+  const canSendAny = checkPermission(permissions, 'conversations:send-any')
 
   // Verify access
   const convRes = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
@@ -130,7 +134,7 @@ conversations.post('/:id/messages', async (c) => {
     contactIdentifierHash: string
     status: string
   }
-  if (!isAdmin && conv.assignedTo !== pubkey) {
+  if (!canSendAny && conv.assignedTo !== pubkey) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -212,17 +216,18 @@ conversations.post('/:id/messages', async (c) => {
  * PATCH /conversations/:id — update conversation (assign, close, reopen)
  */
 conversations.patch('/:id', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
-  const isAdmin = c.get('isAdmin')
+  const permissions = c.get('permissions')
+  const canUpdate = checkPermission(permissions, 'conversations:update')
   const body = await c.req.json() as { status?: string; assignedTo?: string }
 
-  // Only admin or assigned volunteer can update
+  // Only users with update permission or assigned volunteer can update
   const convRes = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`))
   if (!convRes.ok) return c.json({ error: 'Not found' }, 404)
   const conv = await convRes.json() as { assignedTo?: string }
-  if (!isAdmin && conv.assignedTo !== pubkey) {
+  if (!canUpdate && conv.assignedTo !== pubkey) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
@@ -257,7 +262,7 @@ conversations.patch('/:id', async (c) => {
  * POST /conversations/:id/claim — volunteer claims a waiting conversation
  */
 conversations.post('/:id/claim', async (c) => {
-  const dos = getDOs(c.env)
+  const dos = getScopedDOs(c.env, c.get('hubId'))
   const id = c.req.param('id')
   const pubkey = c.get('pubkey')
 

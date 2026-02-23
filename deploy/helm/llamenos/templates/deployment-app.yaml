@@ -8,7 +8,10 @@ metadata:
 spec:
   replicas: {{ .Values.app.replicas }}
   strategy:
-    type: Recreate  # Single-writer SQLite requires Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       {{- include "llamenos.selectorLabels" . | nindent 6 }}
@@ -42,8 +45,15 @@ spec:
               value: "node"
             - name: PORT
               value: {{ .Values.app.port | quote }}
-            - name: DATA_DIR
-              value: "/app/data"
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "llamenos.secretName" . }}
+                  key: postgres-password
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.postgres.user }}:$(PG_PASSWORD)@{{ .Values.postgres.host }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}"
+            - name: PG_POOL_SIZE
+              value: {{ .Values.postgres.poolSize | quote }}
             - name: HOTLINE_NAME
               value: {{ .Values.app.env.HOTLINE_NAME | quote }}
             - name: ENVIRONMENT
@@ -123,8 +133,6 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
-            - name: data
-              mountPath: /app/data
             - name: tmp
               mountPath: /tmp
       volumes:
@@ -132,13 +140,6 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 64Mi
-        - name: data
-          {{- if .Values.app.persistence.enabled }}
-          persistentVolumeClaim:
-            claimName: {{ include "llamenos.fullname" . }}-data
-          {{- else }}
-          emptyDir: {}
-          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

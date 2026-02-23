@@ -134,7 +134,7 @@ function ConversationsPage() {
             {t('conversations.noChannels', { defaultValue: 'No messaging channels enabled' })}
           </h2>
           <p className="text-muted-foreground max-w-md">
-            {t('conversations.noChannelsDescription', { defaultValue: 'Enable SMS, WhatsApp, Signal, or Reports in Admin Settings to start receiving messages.' })}
+            {t('conversations.noChannelsDescription', { defaultValue: 'Enable SMS, WhatsApp, Signal, or Reports in Hub Settings to start receiving messages.' })}
           </p>
         </div>
       </div>

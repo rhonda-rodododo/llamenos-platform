@@ -107,4 +107,102 @@ test.describe('Audit log', () => {
     await expect(page.getByText('Volunteer Added').first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('Volunteer Removed').first()).toBeVisible()
   })
+
+  test('filter bar is visible with all controls', async ({ page }) => {
+    await page.getByRole('link', { name: 'Audit Log' }).click()
+    await expect(page.getByRole('heading', { name: /audit log/i })).toBeVisible()
+
+    // Search input
+    await expect(page.getByPlaceholder(/search actor or event/i)).toBeVisible()
+    // Event type dropdown
+    await expect(page.getByText('All Events')).toBeVisible()
+    // Date inputs
+    await expect(page.locator('input[type="date"]').first()).toBeVisible()
+    await expect(page.locator('input[type="date"]').last()).toBeVisible()
+  })
+
+  test('event type filter narrows results', async ({ page }) => {
+    // Generate a volunteer event first
+    const phone = uniquePhone()
+    await createVolunteerAndGetNsec(page, `FilterVol ${Date.now()}`, phone)
+    await page.getByRole('button', { name: /close/i }).click()
+
+    await page.getByRole('link', { name: 'Audit Log' }).click()
+    await expect(page.getByText('Volunteer Added').first()).toBeVisible({ timeout: 10000 })
+
+    // Filter by volunteers category — click the select trigger
+    const eventTypeSelect = page.locator('button').filter({ hasText: 'All Events' })
+    await eventTypeSelect.click()
+    await page.getByRole('option', { name: /volunteers/i }).click()
+
+    // Volunteer events should still be visible
+    await expect(page.getByText('Volunteer Added').first()).toBeVisible({ timeout: 5000 })
+
+    // Switch to calls filter — click the select that now shows "Volunteers"
+    const currentSelect = page.locator('button[role="combobox"]').filter({ hasText: /volunteers/i })
+    await currentSelect.click()
+    await page.getByRole('option', { name: /calls/i }).click()
+
+    // Should show empty state (no call events in test) or no volunteer events
+    await page.waitForTimeout(2000)
+    await expect(page.getByText('Volunteer Added')).toHaveCount(0)
+  })
+
+  test('search filter works', async ({ page }) => {
+    // Generate audit entries
+    const phone = uniquePhone()
+    const name = `SearchVol ${Date.now()}`
+    await createVolunteerAndGetNsec(page, name, phone)
+    await page.getByRole('button', { name: /close/i }).click()
+
+    await page.getByRole('link', { name: 'Audit Log' }).click()
+    await expect(page.getByText('Volunteer Added').first()).toBeVisible({ timeout: 10000 })
+
+    // Type a search that matches nothing
+    await page.getByPlaceholder(/search actor or event/i).fill('xyznonexistent999')
+    // Wait for API to respond with filtered results
+    await page.waitForTimeout(2000)
+
+    // Either the empty state icon is shown or entries disappeared
+    const emptyState = page.locator('text=No audit entries')
+    const noEntries = await emptyState.isVisible().catch(() => false)
+    // Verify either empty state or that "Volunteer Added" is no longer showing
+    if (!noEntries) {
+      await expect(page.getByText('Volunteer Added')).toHaveCount(0)
+    }
+  })
+
+  test('clear button resets all filters', async ({ page }) => {
+    await page.getByRole('link', { name: 'Audit Log' }).click()
+    await expect(page.getByRole('heading', { name: /audit log/i })).toBeVisible()
+
+    // Apply a filter
+    await page.getByPlaceholder(/search actor or event/i).fill('something')
+
+    // Clear button should appear
+    await expect(page.getByRole('button', { name: /clear/i })).toBeVisible()
+
+    // Click clear
+    await page.getByRole('button', { name: /clear/i }).click()
+
+    // Search should be empty again
+    await expect(page.getByPlaceholder(/search actor or event/i)).toHaveValue('')
+
+    // Clear button should be gone
+    await expect(page.getByRole('button', { name: /clear/i })).toBeHidden()
+  })
+
+  test('event type badges use category colors', async ({ page }) => {
+    // Generate a volunteer event
+    const phone = uniquePhone()
+    await createVolunteerAndGetNsec(page, `BadgeVol ${Date.now()}`, phone)
+    await page.getByRole('button', { name: /close/i }).click()
+
+    await page.getByRole('link', { name: 'Audit Log' }).click()
+    await expect(page.getByText('Volunteer Added').first()).toBeVisible({ timeout: 10000 })
+
+    // Volunteer events should have purple badge
+    const badge = page.getByText('Volunteer Added').first()
+    await expect(badge).toHaveClass(/purple/)
+  })
 })

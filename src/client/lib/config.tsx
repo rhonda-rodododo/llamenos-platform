@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { getConfig } from './api'
-import type { EnabledChannels } from '@shared/types'
+import { getConfig, setActiveHub } from './api'
+import type { EnabledChannels, Hub } from '@shared/types'
 
 interface ConfigContextValue {
   hotlineName: string
@@ -9,7 +9,13 @@ interface ConfigContextValue {
   setupCompleted: boolean
   adminPubkey: string
   demoMode: boolean
+  needsBootstrap: boolean
   isLoading: boolean
+  hubs: Hub[]
+  defaultHubId: string | undefined
+  currentHubId: string | undefined
+  setCurrentHubId: (id: string) => void
+  isMultiHub: boolean
 }
 
 const defaultChannels: EnabledChannels = {
@@ -27,7 +33,13 @@ const ConfigContext = createContext<ConfigContextValue>({
   setupCompleted: true,
   adminPubkey: '',
   demoMode: false,
+  needsBootstrap: false,
   isLoading: true,
+  hubs: [],
+  defaultHubId: undefined,
+  currentHubId: undefined,
+  setCurrentHubId: () => {},
+  isMultiHub: false,
 })
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
@@ -37,7 +49,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [setupCompleted, setSetupCompleted] = useState(true)
   const [adminPubkey, setAdminPubkey] = useState('')
   const [demoMode, setDemoMode] = useState(false)
+  const [needsBootstrap, setNeedsBootstrap] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [hubs, setHubs] = useState<Hub[]>([])
+  const [defaultHubId, setDefaultHubId] = useState<string | undefined>()
+  const [currentHubId, setCurrentHubIdState] = useState<string | undefined>()
+
+  function setCurrentHubId(id: string) {
+    setCurrentHubIdState(id)
+    setActiveHub(id)
+  }
 
   useEffect(() => {
     getConfig()
@@ -48,8 +69,17 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (config.setupCompleted !== undefined) setSetupCompleted(config.setupCompleted)
         if (config.adminPubkey) setAdminPubkey(config.adminPubkey)
         if (config.demoMode) setDemoMode(config.demoMode)
+        setNeedsBootstrap(!!config.needsBootstrap)
+        if (config.hubs?.length) {
+          setHubs(config.hubs)
+          const hubId = config.defaultHubId || config.hubs[0].id
+          setDefaultHubId(hubId)
+          setCurrentHubIdState(hubId)
+          setActiveHub(hubId)
+        }
+        setIsLoading(false)
       })
-      .finally(() => setIsLoading(false))
+      .catch(() => setIsLoading(false))
   }, [])
 
   // Set document title
@@ -57,8 +87,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     if (!isLoading) document.title = hotlineName
   }, [hotlineName, isLoading])
 
+  const isMultiHub = hubs.length > 1
+
   return (
-    <ConfigContext.Provider value={{ hotlineName, hotlineNumber, channels, setupCompleted, adminPubkey, demoMode, isLoading }}>
+    <ConfigContext.Provider value={{
+      hotlineName, hotlineNumber, channels, setupCompleted, adminPubkey,
+      demoMode, needsBootstrap, isLoading, hubs, defaultHubId, currentHubId,
+      setCurrentHubId, isMultiHub,
+    }}>
       {children}
     </ConfigContext.Provider>
   )

@@ -10,9 +10,10 @@ import type { SetupData } from './SetupWizard'
 interface Props {
   data: SetupData
   onChange: (patch: Partial<SetupData>) => void
+  headingRef?: React.RefObject<HTMLHeadingElement | null>
 }
 
-export function StepSettings({ data, onChange }: Props) {
+export function StepSettings({ data, onChange, headingRef }: Props) {
   const { t } = useTranslation()
   const hasVoice = data.selectedChannels.includes('voice')
   const hasMessaging = data.selectedChannels.includes('sms') ||
@@ -35,7 +36,7 @@ export function StepSettings({ data, onChange }: Props) {
   if (!hasVoice && !hasMessaging && !hasReports) {
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">{t('setup.settingsTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.settingsTitle')}</h2>
         <p className="text-sm text-muted-foreground">{t('setup.noSettingsNeeded')}</p>
       </div>
     )
@@ -44,7 +45,7 @@ export function StepSettings({ data, onChange }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{t('setup.settingsTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.settingsTitle')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('setup.settingsDescription')}</p>
       </div>
 
@@ -169,7 +170,11 @@ export function StepSettings({ data, onChange }: Props) {
               {data.reportCategories.map(cat => (
                 <span key={cat} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs">
                   {cat}
-                  <button onClick={() => removeCategory(cat)} className="text-muted-foreground hover:text-foreground">
+                  <button
+                    onClick={() => removeCategory(cat)}
+                    aria-label={`${t('common.remove')}: ${cat}`}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </span>

@@ -45,24 +45,8 @@ async function completeOnboarding(page: Page): Promise<string> {
   // Download backup (mandatory before continue)
   await page.getByRole('button', { name: /download encrypted backup/i }).click()
 
-  // Verify recovery key (fill 4 character positions)
-  const charInputs = page.locator('input[type="text"][maxlength="1"]')
-  const charCount = await charInputs.count()
-  expect(charCount).toBe(4)
-
-  const rkNoDash = recoveryKey.replace(/-/g, '')
-  for (let i = 0; i < charCount; i++) {
-    const label = charInputs.nth(i).locator('xpath=..').locator('label')
-    const labelText = await label.textContent()
-    const match = labelText?.match(/#(\d+)/)
-    if (match && rkNoDash) {
-      const position = parseInt(match[1]) - 1
-      await charInputs.nth(i).fill(rkNoDash[position])
-    }
-  }
-
-  await page.getByRole('button', { name: /verify/i }).click()
-  await expect(page.getByText(/recovery key verified/i)).toBeVisible({ timeout: 5000 })
+  // Acknowledge backup saved (checkbox)
+  await page.getByText('I have saved my recovery key').click()
 
   // Continue to profile setup / dashboard
   await page.getByRole('button', { name: /continue/i }).click()
@@ -430,7 +414,7 @@ test.describe('Reports feature', () => {
       await expect(page.getByRole('link', { name: 'Dashboard' })).not.toBeVisible()
       await expect(page.getByRole('link', { name: 'Notes' })).not.toBeVisible()
       await expect(page.getByRole('link', { name: 'Volunteers' })).not.toBeVisible()
-      await expect(page.getByRole('link', { name: 'Admin Settings' })).not.toBeVisible()
+      await expect(page.getByRole('link', { name: 'Hub Settings' })).not.toBeVisible()
       await expect(page.getByRole('link', { name: 'Audit Log' })).not.toBeVisible()
     })
 

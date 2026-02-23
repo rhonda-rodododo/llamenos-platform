@@ -49,7 +49,8 @@
     "auditLog": "Audit Log",
     "callHistory": "Call History",
     "settings": "Settings",
-    "adminSettings": "Admin Settings",
+    "hubSettings": "Hub Settings",
+    "hubs": "Hubs",
     "reports": "Reports"
   },
   "dashboard": {
@@ -179,6 +180,10 @@
     "roleAdmin": "Admin",
     "inviteGenerated": "Invite generated! Share the secret key securely.",
     "secretKeyWarning": "This key will only be shown once. Share it securely with the volunteer.",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "Make Admin",
     "removeAdmin": "Remove Admin",
     "active": "Active",
@@ -320,14 +325,16 @@
     "updateProfile": "Update Profile"
   },
   "phone": {
-    "hint": "Format: +1234567890",
+    "hint": "Select country and enter number",
     "valid": "Valid phone number",
-    "invalid": "Invalid phone number"
+    "invalid": "Invalid phone number",
+    "searchCountry": "Search country...",
+    "noCountry": "No country found."
   },
   "settings": {
     "title": "Account Settings",
-    "adminTitle": "Admin Settings",
-    "adminDescription": "System-wide settings that affect the entire hotline.",
+    "hubTitle": "Hub Settings",
+    "hubDescription": "Settings that affect the entire hotline hub.",
     "general": "General",
     "security": "Security",
     "telephony": "Telephony",
@@ -389,12 +396,11 @@
     "recoveryKeyWarning": "Write this down and store it securely. If you lose your PIN and this key, your account cannot be recovered.",
     "downloadBackup": "Download Encrypted Backup",
     "backupDownloaded": "Backup downloaded",
-    "verifyTitle": "Verify your recovery key",
-    "verifyDescription": "Enter the characters at these positions to confirm you've saved your recovery key",
-    "charAtPosition": "Character #{{position}}",
-    "verifyButton": "Verify",
-    "verifyFailed": "Verification failed — please check your recovery key",
-    "verifySuccess": "Recovery key verified!",
+    "storageTipsTitle": "How to store your recovery key",
+    "storageTip1": "Save it in a password manager (1Password, Bitwarden, etc.)",
+    "storageTip2": "Store it on a personal device that only you access",
+    "storageTip3": "Write it down and keep it somewhere physically secure",
+    "backupAcknowledge": "I have saved my recovery key in a secure location",
     "continue": "Continue",
     "redeemFailed": "Failed to redeem invite"
   },
@@ -543,6 +549,7 @@
     "stepInvite": "Invite",
     "stepSummary": "Summary",
     "skip": "Skip",
+    "pinRequired": "Enter your PIN to continue setup.",
     "saveFailed": "Failed to save progress",
     "complete": "Setup complete! Welcome to your hotline.",
     "completeFailed": "Failed to complete setup",
@@ -626,7 +633,19 @@
     "noChannelsSelected": "No channels selected",
     "configured": "Configured",
     "pending": "Pending",
-    "goToDashboard": "Go to Dashboard"
+    "goToDashboard": "Go to Dashboard",
+    "bootstrap": {
+      "title": "Create Admin Account",
+      "welcomeTitle": "Welcome to your hotline",
+      "welcomeDescription": "Let's create your admin account. Your cryptographic identity is generated in your browser — the server never sees your private key.",
+      "getStarted": "Get Started",
+      "generating": "Creating your admin account...",
+      "complete": "Admin account created!",
+      "completeSub": "Now let's configure your hotline.",
+      "continueSetup": "Continue to Setup",
+      "noAdminMessage": "No admin account configured yet. Complete the setup wizard to get started.",
+      "goToSetup": "Go to Setup"
+    }
   },
   "reports": {
     "title": "Reports",
@@ -682,6 +701,24 @@
     "videoNotSupported": "Your browser does not support video playback.",
     "audioNotSupported": "Your browser does not support audio playback."
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "Skip to content",
     "switchToLanguage": "Switch to {{language}}",
@@ -718,5 +755,26 @@
     "link": "Link",
     "linkThisDevice": "Link this device",
     "invalidCode": "Invalid provisioning code. Please scan the QR code or copy the full code."
+  },
+  "hubs": {
+    "title": "Hub Management",
+    "createHub": "Create Hub",
+    "createHubDescription": "Create a new hub to organize your hotline operations.",
+    "editHub": "Edit Hub",
+    "editHubDescription": "Update the hub name, description, or phone number.",
+    "hubName": "Hub Name",
+    "hubNamePlaceholder": "e.g. NYC Crisis Line",
+    "hubDescription": "Description",
+    "hubDescriptionPlaceholder": "Brief description of this hub's purpose...",
+    "hubPhoneNumber": "Phone Number",
+    "hubPhoneNumberHelp": "The primary phone number for this hub (E.164 format).",
+    "hubCreated": "Hub created successfully",
+    "hubUpdated": "Hub updated successfully",
+    "noHubs": "No hubs yet. Create a hub to start organizing your hotline.",
+    "status": {
+      "active": "Active",
+      "suspended": "Suspended",
+      "archived": "Archived"
+    }
   }
 }

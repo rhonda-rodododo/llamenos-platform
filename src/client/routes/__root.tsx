@@ -13,6 +13,9 @@ import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts'
 import { LanguageSelect } from '@/components/language-select'
 import { LogoMark } from '@/components/logo-mark'
 import { DemoBanner } from '@/components/demo-banner'
+import { NotificationPromptBanner } from '@/components/notification-prompt-banner'
+import { PwaInstallBanner } from '@/components/pwa-install-banner'
+import { HubSwitcher } from '@/components/hub-switcher'
 import {
   LayoutDashboard,
   StickyNote,
@@ -25,7 +28,7 @@ import {
   Settings,
   LogOut,
   FileText,
-
+  Building2,
   PhoneCall,
   Sun,
   Moon,
@@ -42,8 +45,8 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const { t } = useTranslation()
-  const { isAuthenticated, isAdmin, signOut, name, role, isLoading, profileCompleted } = useAuth()
-  const { hotlineName } = useConfig()
+  const { isAuthenticated, isAdmin, signOut, name, isLoading, profileCompleted, hasPermission, primaryRoleName } = useAuth()
+  const { hotlineName, needsBootstrap, isLoading: configLoading } = useConfig()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -56,20 +59,30 @@ function RootLayout() {
   }, [isAuthenticated])
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && location.pathname !== '/login' && location.pathname !== '/onboarding' && location.pathname !== '/link-device') {
-      navigate({ to: '/login' })
+    // Wait for both auth and config to finish loading before redirecting
+    if (!isLoading && !configLoading && !isAuthenticated && location.pathname !== '/login' && location.pathname !== '/onboarding' && location.pathname !== '/link-device' && location.pathname !== '/setup') {
+      // If no admin exists, redirect to setup wizard (which includes bootstrap)
+      if (needsBootstrap) {
+        navigate({ to: '/setup' })
+      } else {
+        // Store the current path so we can return after PIN unlock
+        if (location.pathname !== '/') {
+          sessionStorage.setItem('returnTo', location.pathname)
+        }
+        navigate({ to: '/login' })
+      }
     }
-  }, [isLoading, isAuthenticated, location.pathname, navigate])
+  }, [isLoading, configLoading, isAuthenticated, location.pathname, navigate, needsBootstrap])
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && location.pathname === '/login') {
+    if (!isLoading && isAuthenticated && (location.pathname === '/login')) {
       navigate({ to: profileCompleted ? '/' : '/profile-setup' })
     }
   }, [isLoading, isAuthenticated, location.pathname, navigate, profileCompleted])
 
-  // Redirect to profile setup if not completed
+  // Redirect to profile setup if not completed (skip during setup wizard)
   useEffect(() => {
-    if (!isLoading && isAuthenticated && !profileCompleted && location.pathname !== '/profile-setup' && location.pathname !== '/login') {
+    if (!isLoading && isAuthenticated && !profileCompleted && location.pathname !== '/profile-setup' && location.pathname !== '/login' && location.pathname !== '/setup') {
       navigate({ to: '/profile-setup' })
     }
   }, [isLoading, isAuthenticated, profileCompleted, location.pathname, navigate])
@@ -115,7 +128,7 @@ const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frid
 
 function AuthenticatedLayout() {
   const { t } = useTranslation()
-  const { isAdmin, signOut, name, role, sessionExpiring, sessionExpired, renewSession } = useAuth()
+  const { isAdmin, signOut, name, sessionExpiring, sessionExpired, renewSession, hasPermission, primaryRoleName } = useAuth()
   const { hotlineName, hotlineNumber, channels, demoMode } = useConfig()
   const hasMessaging = useHasMessaging()
   const { theme, setTheme } = useTheme()
@@ -166,7 +179,7 @@ function AuthenticatedLayout() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-sidebar-foreground">{name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{role}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{primaryRoleName}</p>
                 </div>
               </div>
               {/* In-call indicator */}
@@ -202,8 +215,9 @@ function AuthenticatedLayout() {
           )}
         </div>
 
+        <HubSwitcher />
         <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3">
-          {role === 'reporter' ? (
+          {hasPermission('reports:create') && !hasPermission('calls:answer') ? (
             <>
               {/* Reporter-specific nav: reports and help */}
               <NavLink to="/reports" icon={<FileText className="h-4 w-4" />}>
@@ -227,6 +241,10 @@ function AuthenticatedLayout() {
                   {t('nav.reports', { defaultValue: 'Reports' })}
                 </NavLink>
               )}
+              {isAdmin && (
+                <NavLink to="/calls" icon={<PhoneIncoming className="h-4 w-4" />}>{t('nav.callHistory')}</NavLink>
+              )}
+              <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.settings')}</NavLink>
             </>
           )}
 
@@ -239,12 +257,13 @@ function AuthenticatedLayout() {
               <NavLink to="/shifts" icon={<Clock className="h-4 w-4" />}>{t('nav.shifts')}</NavLink>
               <NavLink to="/volunteers" icon={<Users className="h-4 w-4" />}>{t('nav.volunteers')}</NavLink>
               <NavLink to="/bans" icon={<ShieldBan className="h-4 w-4" />}>{t('nav.banList')}</NavLink>
-              <NavLink to="/calls" icon={<PhoneIncoming className="h-4 w-4" />}>{t('nav.callHistory')}</NavLink>
               <NavLink to="/audit" icon={<ScrollText className="h-4 w-4" />}>{t('nav.auditLog')}</NavLink>
-              <NavLink to="/admin/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.adminSettings')}</NavLink>
+              <NavLink to="/admin/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.hubSettings', { defaultValue: 'Hub Settings' })}</NavLink>
+              {hasPermission('system:manage-hubs') && (
+                <NavLink to="/admin/hubs" icon={<Building2 className="h-4 w-4" />}>{t('nav.hubs', { defaultValue: 'Hubs' })}</NavLink>
+              )}
             </>
           )}
-          <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.settings')}</NavLink>
           <NavLink to="/help" icon={<HelpCircle className="h-4 w-4" />}>{t('nav.help', { defaultValue: 'Help' })}</NavLink>
         </div>
 
@@ -291,6 +310,8 @@ function AuthenticatedLayout() {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {demoMode && <DemoBanner />}
+        <NotificationPromptBanner />
+        <PwaInstallBanner />
 
         {/* Mobile top bar */}
         <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background px-4 py-3 md:hidden">

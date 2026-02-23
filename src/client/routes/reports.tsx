@@ -32,7 +32,7 @@ export const Route = createFileRoute('/reports')({
 
 function ReportsPage() {
   const { t } = useTranslation()
-  const { keyPair, isAdmin, role } = useAuth()
+  const { keyPair, isAdmin, hasPermission } = useAuth()
   const { toast } = useToast()
 
   const [reports, setReports] = useState<Report[]>([])
@@ -267,7 +267,7 @@ function ReportsPage() {
                 onAssign={handleAssign}
                 onClose={handleClose}
                 isAdmin={isAdmin}
-                role={role}
+                hasPermission={hasPermission}
                 showFileUpload={showFileUpload}
                 onToggleFileUpload={() => setShowFileUpload(prev => !prev)}
                 onFileUploadComplete={handleFileUploadComplete}
@@ -341,7 +341,7 @@ function ReportCard({ report, isSelected, onSelect }: {
   )
 }
 
-function ReportDetail({ report, messages, messagesLoading, replyText, onReplyChange, onSend, sending, onAssign, onClose, isAdmin, role, showFileUpload, onToggleFileUpload, onFileUploadComplete, keyPair }: {
+function ReportDetail({ report, messages, messagesLoading, replyText, onReplyChange, onSend, sending, onAssign, onClose, isAdmin, hasPermission, showFileUpload, onToggleFileUpload, onFileUploadComplete, keyPair }: {
   report: Report
   messages: ConversationMessage[]
   messagesLoading: boolean
@@ -352,7 +352,7 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
   onAssign: (id: string) => void
   onClose: (id: string) => void
   isAdmin: boolean
-  role: string | null
+  hasPermission: (permission: string) => boolean
   showFileUpload: boolean
   onToggleFileUpload: () => void
   onFileUploadComplete: (fileIds: string[]) => void
@@ -396,7 +396,8 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
     setDecryptedContent(decrypted)
   }, [messages, keyPair, isAdmin])
 
-  const canReply = report.status === 'active' || role === 'reporter'
+  const isReporter = hasPermission('reports:create') && !hasPermission('calls:answer')
+  const canReply = report.status === 'active' || isReporter
 
   return (
     <>
@@ -420,7 +421,7 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-3">
-          {report.status === 'waiting' && (isAdmin || role === 'volunteer') && (
+          {report.status === 'waiting' && (isAdmin || hasPermission('calls:answer')) && (
             <Button size="sm" onClick={() => onAssign(report.id)}>
               <UserCheck className="h-3.5 w-3.5" />
               {t('reports.claim', { defaultValue: 'Claim' })}

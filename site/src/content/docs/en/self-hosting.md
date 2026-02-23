@@ -11,9 +11,7 @@ Llamenos can run on Cloudflare Workers **or** on your own infrastructure. Self-h
 |--------|----------|------------|---------|
 | [Cloudflare Workers](/docs/getting-started) | Easiest start, global edge | Low | Automatic |
 | [Docker Compose](/docs/deploy-docker) | Single-server self-hosting | Medium | Single node |
-| [Kubernetes (Helm)](/docs/deploy-kubernetes) | Multi-service orchestration | Higher | Manual (single-replica) |
-
-> **Note**: The Node.js self-hosted deployment uses SQLite for data storage, which means it runs as a **single replica**. This is appropriate for crisis hotline workloads (hundreds of concurrent users, not millions). If you need horizontal scaling, use the Cloudflare Workers deployment.
+| [Kubernetes (Helm)](/docs/deploy-kubernetes) | Multi-service orchestration | Higher | Horizontal (multi-replica) |
 
 ## Architecture differences
 
@@ -22,7 +20,7 @@ Both deployment targets run the **exact same application code**. The difference 
 | Component | Cloudflare | Self-Hosted |
 |-----------|------------|-------------|
 | **Backend runtime** | Cloudflare Workers | Node.js (via Hono) |
-| **Data storage** | Durable Objects (KV) | SQLite (better-sqlite3, WAL mode) |
+| **Data storage** | Durable Objects (KV) | PostgreSQL |
 | **Blob storage** | R2 | MinIO (S3-compatible) |
 | **Transcription** | Workers AI (Whisper) | faster-whisper container |
 | **Static files** | Workers Assets | Caddy / Hono serveStatic |
@@ -55,18 +53,18 @@ Both deployment targets run the **exact same application code**. The difference 
 
 **Choose Kubernetes (Helm) if:**
 - You already have a K8s cluster
-- You need declarative infrastructure management
+- You need horizontal scaling (multiple replicas)
 - You want to integrate with existing K8s tooling (cert-manager, external-secrets, etc.)
 
 ## Security considerations
 
 Self-hosting gives you more control but also more responsibility:
 
-- **Data at rest**: SQLite database files are stored unencrypted on disk. Use full-disk encryption (LUKS, dm-crypt) on your server. Note that call notes and transcriptions are already E2EE — the server never sees plaintext.
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server, or enable PostgreSQL TDE if available. Note that call notes and transcriptions are already E2EE — the server never sees plaintext.
 - **Network security**: Use a firewall to restrict access. Only ports 80/443 should be publicly accessible.
 - **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (excluded from images) or Docker/Kubernetes secrets.
 - **Updates**: Pull new images regularly. Watch the [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) for security fixes.
-- **Backups**: Back up the SQLite data directory and MinIO storage regularly. See the backup section in each deployment guide.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly. See the backup section in each deployment guide.
 
 ## Next steps
 

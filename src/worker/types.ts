@@ -46,15 +46,18 @@ export interface Env {
   ADMIN_PUBKEY: string
   HOTLINE_NAME: string
   ENVIRONMENT: string
+  E2E_TEST_SECRET?: string
 }
 
+/** @deprecated Use roles array + permission system instead */
 export type UserRole = 'volunteer' | 'admin' | 'reporter'
 
 export interface Volunteer {
   pubkey: string
   name: string
   phone: string
-  role: UserRole
+  roles: string[]            // Global role IDs (e.g., ['role-super-admin', 'role-volunteer'])
+  hubRoles?: { hubId: string; roleIds: string[] }[]  // Per-hub role assignments
   active: boolean
   createdAt: string
   encryptedSecretKey: string // Admin-encrypted copy of the volunteer's nsec
@@ -133,7 +136,7 @@ export interface InviteCode {
   code: string
   name: string
   phone: string
-  role: UserRole
+  roleIds: string[]          // Role IDs to assign on redemption
   createdBy: string
   createdAt: string
   expiresAt: string
@@ -216,7 +219,13 @@ export type AppEnv = {
   Variables: {
     pubkey: string
     volunteer: Volunteer
-    isAdmin: boolean
-    role: UserRole
+    /** Effective permissions resolved from all roles */
+    permissions: string[]
+    /** All role definitions (loaded once per request) */
+    allRoles: import('../shared/permissions').Role[]
+    /** Current hub ID (set by hub middleware for hub-scoped routes) */
+    hubId?: string
+    /** Hub-scoped permissions (resolved for the current hub) */
+    hubPermissions?: string[]
   }
 }

@@ -1,6 +1,11 @@
 #!/usr/bin/env bun
 /**
- * Bootstrap the first admin user.
+ * Bootstrap the first admin user (CLI method).
+ *
+ * NOTE: The recommended approach is in-browser bootstrap — simply visit
+ * your deployed app and the setup wizard will generate a keypair for you.
+ * This CLI script is useful for headless/CI setups where browser access
+ * is not available.
  *
  * Usage:
  *   bun run scripts/bootstrap-admin.ts
