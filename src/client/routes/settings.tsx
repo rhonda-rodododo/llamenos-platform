@@ -20,6 +20,7 @@ import {
   sendProvisionedKey,
 } from '@/lib/provisioning'
 import { getNotificationPrefs, setNotificationPrefs } from '@/lib/notifications'
+import { useNotificationPermission } from '@/lib/use-notification-permission'
 import { LANGUAGES } from '@shared/languages'
 import { SettingsSection } from '@/components/settings-section'
 import { Switch } from '@/components/ui/switch'
@@ -465,7 +466,62 @@ function SettingsPage() {
             }}
           />
         </div>
+        <NotificationPermissionStatus />
       </SettingsSection>
+    </div>
+  )
+}
+
+function NotificationPermissionStatus() {
+  const { t } = useTranslation()
+  const { permission, requestPermission } = useNotificationPermission()
+
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <Label>{t('notifications.permissionStatus')}</Label>
+          {permission === 'granted' && (
+            <p className="text-xs text-muted-foreground">{t('notifications.statusGranted')}</p>
+          )}
+          {permission === 'default' && (
+            <p className="text-xs text-muted-foreground">{t('notifications.statusDefault')}</p>
+          )}
+          {permission === 'denied' && (
+            <p className="text-xs text-muted-foreground">{t('notifications.statusDenied')}</p>
+          )}
+          {permission === 'unsupported' && (
+            <p className="text-xs text-muted-foreground">{t('notifications.statusUnsupported')}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {permission === 'granted' && (
+            <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
+              {t('notifications.granted')}
+            </Badge>
+          )}
+          {permission === 'default' && (
+            <>
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20">
+                {t('notifications.default')}
+              </Badge>
+              <Button size="sm" variant="outline" onClick={() => requestPermission()}>
+                {t('notifications.enablePermission')}
+              </Button>
+            </>
+          )}
+          {permission === 'denied' && (
+            <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20">
+              {t('notifications.denied')}
+            </Badge>
+          )}
+          {permission === 'unsupported' && (
+            <Badge variant="outline" className="text-muted-foreground">
+              {t('notifications.unsupported')}
+            </Badge>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

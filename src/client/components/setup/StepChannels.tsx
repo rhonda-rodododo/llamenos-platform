@@ -20,6 +20,7 @@ import type { SetupData } from './SetupWizard'
 interface Props {
   data: SetupData
   onChange: (patch: Partial<SetupData>) => void
+  headingRef?: React.RefObject<HTMLHeadingElement | null>
 }
 
 interface ChannelInfo {
@@ -51,7 +52,7 @@ const SECURITY_LABEL_KEYS: Record<TransportSecurity, string> = {
   'none': 'setup.securityNone',
 }
 
-export function StepChannels({ data, onChange }: Props) {
+export function StepChannels({ data, onChange, headingRef }: Props) {
   const { t } = useTranslation()
 
   function toggleChannel(channel: ChannelType) {
@@ -65,7 +66,7 @@ export function StepChannels({ data, onChange }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{t('setup.channelsTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.channelsTitle')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('setup.channelsDescription')}</p>
       </div>
 
@@ -116,7 +117,7 @@ export function StepChannels({ data, onChange }: Props) {
       </div>
 
       {data.selectedChannels.length === 0 && (
-        <p className="text-sm text-destructive">{t('setup.selectOneChannel')}</p>
+        <p role="alert" className="text-sm text-destructive">{t('setup.selectOneChannel')}</p>
       )}
     </div>
   )

@@ -38,6 +38,11 @@ test.describe('Invite-based onboarding', () => {
     await expect(page.getByText(/welcome/i)).toBeVisible({ timeout: 15000 })
     await expect(page.getByText(volName)).toBeVisible()
 
+    // A11y: language selector should be a radiogroup with roving tabindex
+    const langGroup = page.locator('[role="radiogroup"]')
+    await expect(langGroup).toBeVisible()
+    await expect(langGroup.locator('[role="radio"][aria-checked="true"]')).toBeVisible()
+
     // --- Step 4: Click Get Started ---
     await page.getByRole('button', { name: /get started/i }).click()
 
@@ -67,27 +72,8 @@ test.describe('Invite-based onboarding', () => {
     // Download backup (mandatory before continue)
     await page.getByRole('button', { name: /download encrypted backup/i }).click()
 
-    // --- Step 8: Verify recovery key (fill in the 4 characters) ---
-    const charInputs = page.locator('input[type="text"][maxlength="1"]')
-    const charCount = await charInputs.count()
-    expect(charCount).toBe(4)
-
-    // Recovery key without dashes for position lookup
-    const rkNoDash = recoveryKey!.replace(/-/g, '')
-
-    for (let i = 0; i < charCount; i++) {
-      const label = charInputs.nth(i).locator('xpath=..').locator('label')
-      const labelText = await label.textContent()
-      // Extract position number from "Character #N"
-      const match = labelText?.match(/#(\d+)/)
-      if (match && rkNoDash) {
-        const position = parseInt(match[1]) - 1 // 0-indexed
-        await charInputs.nth(i).fill(rkNoDash[position])
-      }
-    }
-
-    await page.getByRole('button', { name: /verify/i }).click()
-    await expect(page.getByText(/recovery key verified/i)).toBeVisible({ timeout: 5000 })
+    // --- Step 8: Acknowledge backup saved ---
+    await page.getByText('I have saved my recovery key').click()
 
     // --- Step 9: Continue to profile setup ---
     await page.getByRole('button', { name: /continue/i }).click()

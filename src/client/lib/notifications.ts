@@ -94,7 +94,7 @@ function stopTitleFlash() {
 
 // --- Browser Notifications ---
 
-async function requestPermission(): Promise<boolean> {
+export async function requestPermission(): Promise<boolean> {
   if (!('Notification' in window)) return false
   if (Notification.permission === 'granted') return true
   if (Notification.permission === 'denied') return false
@@ -106,7 +106,7 @@ function showBrowserNotification(title: string, body: string) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
   const notification = new Notification(title, {
     body,
-    icon: '/favicon.ico',
+    icon: '/favicon.svg',
     tag: 'incoming-call', // Replaces existing notification
   })
   notification.onclick = () => {

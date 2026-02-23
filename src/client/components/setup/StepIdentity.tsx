@@ -15,15 +15,16 @@ import type { SetupData } from './SetupWizard'
 interface Props {
   data: SetupData
   onChange: (patch: Partial<SetupData>) => void
+  headingRef?: React.RefObject<HTMLHeadingElement | null>
 }
 
-export function StepIdentity({ data, onChange }: Props) {
+export function StepIdentity({ data, onChange, headingRef }: Props) {
   const { t } = useTranslation()
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{t('setup.identityTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.identityTitle')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('setup.identityDescription')}</p>
       </div>
 
@@ -39,6 +40,7 @@ export function StepIdentity({ data, onChange }: Props) {
             value={data.hotlineName}
             onChange={e => onChange({ hotlineName: e.target.value })}
             placeholder={t('setup.hotlineNamePlaceholder')}
+            aria-required="true"
             autoFocus
           />
           <p className="text-xs text-muted-foreground">{t('setup.hotlineNameHelp')}</p>

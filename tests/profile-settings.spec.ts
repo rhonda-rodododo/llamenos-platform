@@ -13,7 +13,7 @@ test.describe('Profile self-service', () => {
 
   test('admin can edit profile name and it persists', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Profile card should be visible
@@ -33,7 +33,7 @@ test.describe('Profile self-service', () => {
     await page.reload()
     await enterPin(page, TEST_PIN)
     // PIN unlock redirects to dashboard — navigate back to Settings
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
     await expect(page.locator('#profile-name')).toHaveValue(newName)
 
@@ -45,7 +45,7 @@ test.describe('Profile self-service', () => {
 
   test('admin can save a valid phone number', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Enter a valid E.164 phone number
@@ -60,7 +60,7 @@ test.describe('Profile self-service', () => {
 
   test('profile rejects invalid phone', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Enter a too-short phone (PhoneInput strips non-digits)
@@ -93,19 +93,19 @@ test.describe('Profile self-service', () => {
     await loginAsAdmin(page)
 
     // Key Backup is in user settings
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: /key backup/i })).toBeVisible()
 
     // Spam Mitigation is in admin settings
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: /spam mitigation/i })).toBeVisible()
   })
 
   test('admin sees passkeys in user settings', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Passkeys (WebAuthn) card
@@ -119,8 +119,8 @@ test.describe('Profile self-service', () => {
     await page.getByRole('link', { name: 'Settings' }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
-    // Should NOT see Admin Settings nav link
-    await expect(page.getByRole('link', { name: 'Admin Settings' })).not.toBeVisible()
+    // Should NOT see Hub Settings nav link
+    await expect(page.getByRole('link', { name: 'Hub Settings' })).not.toBeVisible()
 
     // Should NOT see admin-only sections on user settings page
     await expect(page.getByRole('heading', { name: /passkey policy/i })).not.toBeVisible()
@@ -156,7 +156,7 @@ test.describe('Profile self-service', () => {
 
   test('spoken language selection works', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Find the spoken languages section
@@ -186,7 +186,7 @@ test.describe('Profile self-service', () => {
 
   test('sections collapse and expand on click', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Profile is expanded by default — its content should be visible
@@ -203,7 +203,7 @@ test.describe('Profile self-service', () => {
 
   test('multiple sections can be open simultaneously', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Profile is already expanded
@@ -219,7 +219,7 @@ test.describe('Profile self-service', () => {
 
   test('copy link button is present on each section', async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Settings' }).last().click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
 
     // Each section header should have a copy link button (profile, passkeys, transcription, notifications)

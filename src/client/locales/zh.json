@@ -45,7 +45,7 @@
     "auditLog": "审计日志",
     "callHistory": "通话记录",
     "settings": "设置",
-    "adminSettings": "管理员设置"
+    "hubSettings": "中心设置"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -174,6 +174,10 @@
     "roleAdmin": "管理员",
     "inviteGenerated": "邀请已生成！请安全地分享密钥。",
     "secretKeyWarning": "此密钥仅显示一次。请安全地与志愿者分享。",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "设为管理员",
     "removeAdmin": "取消管理员",
     "active": "活跃",
@@ -313,8 +317,8 @@
   },
   "settings": {
     "title": "账户设置",
-    "adminTitle": "管理员设置",
-    "adminDescription": "影响整个热线的系统设置。",
+    "hubTitle": "中心设置",
+    "hubDescription": "影响整个热线中心的设置。",
     "general": "常规",
     "security": "安全",
     "telephony": "电话",
@@ -472,6 +476,24 @@
     "activity": "活动记录",
     "noActivity": "无活动记录"
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "跳到内容",
     "switchToLanguage": "切换到{{language}}",
@@ -504,12 +526,11 @@
     "recoveryKeyWarning": "请记下并安全存储。如果您丢失了PIN和此密钥，您的账户将无法恢复。",
     "downloadBackup": "下载加密备份",
     "backupDownloaded": "备份已下载",
-    "verifyTitle": "验证您的恢复密钥",
-    "verifyDescription": "输入这些位置的字符以确认您已保存恢复密钥",
-    "charAtPosition": "第 {{position}} 个字符",
-    "verifyButton": "验证",
-    "verifyFailed": "验证失败 — 请检查您的恢复密钥",
-    "verifySuccess": "恢复密钥验证成功！",
+    "storageTipsTitle": "如何存储您的恢复密钥",
+    "storageTip1": "保存在密码管理器中（1Password、Bitwarden 等）",
+    "storageTip2": "存储在只有您可以访问的个人设备上",
+    "storageTip3": "写下来并保存在物理安全的地方",
+    "backupAcknowledge": "我已将恢复密钥保存在安全的位置",
     "continue": "继续",
     "redeemFailed": "兑换邀请失败"
   },

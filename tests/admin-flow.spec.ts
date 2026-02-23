@@ -17,8 +17,8 @@ test.describe('Admin flow', () => {
     await expect(page.getByRole('link', { name: 'Ban List' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Call History' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Audit Log' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Admin Settings' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Settings' }).last()).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Hub Settings' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Settings', exact: true })).toBeVisible()
   })
 
   test('volunteer CRUD', async ({ page }) => {
@@ -165,8 +165,8 @@ test.describe('Admin flow', () => {
   })
 
   test('admin settings page loads with all sections', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Section headers are always visible (in collapsible trigger)
     await expect(page.getByRole('heading', { name: 'Transcription' })).toBeVisible()
@@ -179,8 +179,8 @@ test.describe('Admin flow', () => {
   })
 
   test('admin settings toggles work', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand transcription section to see its switches
     await page.getByRole('heading', { name: 'Transcription' }).click()
@@ -227,8 +227,8 @@ test.describe('Admin flow', () => {
   })
 
   test('admin settings shows status summaries when collapsed', async ({ page }) => {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Wait for settings to load
     await page.waitForTimeout(1000)

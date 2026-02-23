@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
@@ -50,13 +50,59 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
   const [nsec, setNsec] = useState('')
   const [confirmedPin, setConfirmedPin] = useState('')
 
-  // Recovery key & backup verification
+  // Recovery key & backup
   const [recoveryKeyStr, setRecoveryKeyStr] = useState('')
-  const [verifyChars, setVerifyChars] = useState<{ index: number; char: string }[]>([])
-  const [verifyInputs, setVerifyInputs] = useState<string[]>([])
-  const [backupVerified, setBackupVerified] = useState(false)
+  const [backupAcknowledged, setBackupAcknowledged] = useState(false)
   const [backupDownloaded, setBackupDownloaded] = useState(false)
   const [pubkey, setPubkey] = useState('')
+
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null)
+  const langGroupRef = useRef<HTMLDivElement>(null)
+
+  // Focus step heading on step change
+  useEffect(() => {
+    const timer = setTimeout(() => stepHeadingRef.current?.focus(), 50)
+    return () => clearTimeout(timer)
+  }, [step, pinStep])
+
+  // Escape key navigation
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      if (step === 'pin' && pinStep === 'confirm') {
+        e.preventDefault()
+        setPinStep('create')
+        setPin1('')
+        setPin2('')
+        setPinError('')
+      } else if (step === 'pin' && pinStep === 'create') {
+        e.preventDefault()
+        setStep('welcome')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [step, pinStep])
+
+  // Language radiogroup keyboard handler
+  const handleLangKeyDown = useCallback((e: React.KeyboardEvent, currentIndex: number) => {
+    let nextIndex: number | null = null
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault()
+      nextIndex = (currentIndex + 1) % LANGUAGES.length
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      nextIndex = (currentIndex - 1 + LANGUAGES.length) % LANGUAGES.length
+    }
+    if (nextIndex !== null) {
+      const lang = LANGUAGES[nextIndex]
+      setUiLang(lang.code)
+      setLanguage(lang.code)
+      // Focus the new button
+      const buttons = langGroupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+      buttons?.[nextIndex]?.focus()
+    }
+  }, [])
 
   function handlePinComplete(enteredPin: string) {
     if (pinStep === 'create') {
@@ -98,16 +144,6 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
       const rk = generateRecoveryKey()
       setRecoveryKeyStr(rk)
 
-      // Set up verification (4 random chars from recovery key, skipping dashes)
-      const rkNoDash = rk.replace(/-/g, '')
-      const indices: number[] = []
-      while (indices.length < 4) {
-        const idx = Math.floor(Math.random() * rkNoDash.length)
-        if (!indices.includes(idx)) indices.push(idx)
-      }
-      indices.sort((a, b) => a - b)
-      setVerifyChars(indices.map(i => ({ index: i, char: rkNoDash[i] })))
-      setVerifyInputs(Array(4).fill(''))
       setStep('backup')
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.error'))
@@ -115,15 +151,6 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
       setPinStep('create')
       setPin1('')
       setPin2('')
-    }
-  }
-
-  function checkBackupVerification() {
-    const correct = verifyChars.every((vc, i) => verifyInputs[i].toLowerCase() === vc.char.toLowerCase())
-    if (correct) {
-      setBackupVerified(true)
-    } else {
-      toast(t('onboarding.verifyFailed'), 'error')
     }
   }
 
@@ -157,7 +184,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
             <div className="mx-auto">
               <LogoMark size="xl" />
             </div>
-            <h2 className="text-2xl font-bold">
+            <h2 ref={stepHeadingRef} tabIndex={-1} className="text-2xl font-bold outline-none">
               {t('setup.bootstrap.welcomeTitle', { defaultValue: 'Welcome to your hotline' })}
             </h2>
             <p className="text-muted-foreground">
@@ -171,11 +198,20 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
               <Globe className="h-4 w-4 text-muted-foreground" />
               {t('profile.uiLanguage')}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {LANGUAGES.map(lang => (
+            <div
+              ref={langGroupRef}
+              role="radiogroup"
+              aria-label={t('profile.uiLanguage')}
+              className="flex flex-wrap gap-2"
+            >
+              {LANGUAGES.map((lang, index) => (
                 <button
                   key={lang.code}
+                  role="radio"
+                  aria-checked={uiLang === lang.code}
+                  tabIndex={uiLang === lang.code ? 0 : -1}
                   onClick={() => { setUiLang(lang.code); setLanguage(lang.code) }}
+                  onKeyDown={e => handleLangKeyDown(e, index)}
                   className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
                     uiLang === lang.code
                       ? 'border-primary bg-primary/10 text-primary font-medium'
@@ -203,7 +239,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <KeyRound className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-xl font-bold">
+            <h2 ref={stepHeadingRef} tabIndex={-1} className="text-xl font-bold outline-none">
               {pinStep === 'create' ? t('pin.createTitle') : t('pin.confirmTitle')}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -212,7 +248,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
           </div>
 
           {error && (
-            <p className="text-sm text-destructive text-center">{error}</p>
+            <p role="alert" className="text-sm text-destructive text-center">{error}</p>
           )}
 
           <PinInput
@@ -224,7 +260,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
             autoFocus
           />
           {pinError && (
-            <p className="text-center text-sm text-destructive">{pinError}</p>
+            <p role="alert" className="text-center text-sm text-destructive">{pinError}</p>
           )}
           {pinStep === 'confirm' && (
             <Button
@@ -252,7 +288,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
       )}
 
       {step === 'generating' && (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
+        <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-12 gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">{t('setup.bootstrap.generating', { defaultValue: 'Creating your admin account...' })}</p>
         </div>
@@ -264,7 +300,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <ShieldCheck className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-xl font-bold">{t('onboarding.backupTitle')}</h2>
+            <h2 ref={stepHeadingRef} tabIndex={-1} className="text-xl font-bold outline-none">{t('onboarding.backupTitle')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{t('onboarding.backupDescription')}</p>
           </div>
 
@@ -290,59 +326,42 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
             </div>
           </div>
 
+          {/* Storage tips */}
+          <div className="space-y-2 rounded-lg border bg-muted/50 p-3">
+            <p className="text-sm font-medium">{t('onboarding.storageTipsTitle')}</p>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              <li>• {t('onboarding.storageTip1')}</li>
+              <li>• {t('onboarding.storageTip2')}</li>
+              <li>• {t('onboarding.storageTip3')}</li>
+            </ul>
+          </div>
+
           {/* Download backup */}
           <Button variant="outline" onClick={downloadBackup} className="w-full">
             <Download className="h-4 w-4" />
             {t('onboarding.downloadBackup')}
           </Button>
 
-          {/* Verification */}
-          {!backupVerified && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">{t('onboarding.verifyTitle')}</p>
-              <p className="text-xs text-muted-foreground">{t('onboarding.verifyDescription')}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {verifyChars.map((vc, i) => (
-                  <div key={vc.index} className="space-y-1">
-                    <label className="text-xs text-muted-foreground">
-                      {t('onboarding.charAtPosition', { position: vc.index + 1 })}
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={1}
-                      value={verifyInputs[i]}
-                      onChange={e => {
-                        const newInputs = [...verifyInputs]
-                        newInputs[i] = e.target.value
-                        setVerifyInputs(newInputs)
-                      }}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-center font-mono text-sm uppercase focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                    />
-                  </div>
-                ))}
-              </div>
-              <Button
-                onClick={checkBackupVerification}
-                disabled={verifyInputs.some(v => !v)}
-                className="w-full"
-              >
-                {t('onboarding.verifyButton')}
-              </Button>
-            </div>
-          )}
+          {/* Acknowledgment checkbox + continue */}
+          <label className="flex items-start gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={backupAcknowledged}
+              onChange={e => setBackupAcknowledged(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-input accent-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <span className="text-sm">{t('onboarding.backupAcknowledge')}</span>
+          </label>
 
-          {backupVerified && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950/20 dark:text-green-300">
-                <Check className="h-4 w-4" />
-                {t('onboarding.verifySuccess')}
-              </div>
-              <Button onClick={handleComplete} className="w-full" size="lg" disabled={!backupDownloaded}>
-                {t('setup.bootstrap.continueSetup', { defaultValue: 'Continue to Setup' })}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          <Button
+            onClick={handleComplete}
+            className="w-full"
+            size="lg"
+            disabled={!backupDownloaded || !backupAcknowledged}
+          >
+            {t('setup.bootstrap.continueSetup', { defaultValue: 'Continue to Setup' })}
+            <ArrowRight className="h-4 w-4" />
+          </Button>
         </div>
       )}
 

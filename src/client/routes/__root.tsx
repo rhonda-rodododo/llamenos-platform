@@ -13,6 +13,8 @@ import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts'
 import { LanguageSelect } from '@/components/language-select'
 import { LogoMark } from '@/components/logo-mark'
 import { DemoBanner } from '@/components/demo-banner'
+import { NotificationPromptBanner } from '@/components/notification-prompt-banner'
+import { PwaInstallBanner } from '@/components/pwa-install-banner'
 import { HubSwitcher } from '@/components/hub-switcher'
 import {
   LayoutDashboard,
@@ -235,6 +237,10 @@ function AuthenticatedLayout() {
                   {t('nav.reports', { defaultValue: 'Reports' })}
                 </NavLink>
               )}
+              {isAdmin && (
+                <NavLink to="/calls" icon={<PhoneIncoming className="h-4 w-4" />}>{t('nav.callHistory')}</NavLink>
+              )}
+              <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.settings')}</NavLink>
             </>
           )}
 
@@ -247,15 +253,13 @@ function AuthenticatedLayout() {
               <NavLink to="/shifts" icon={<Clock className="h-4 w-4" />}>{t('nav.shifts')}</NavLink>
               <NavLink to="/volunteers" icon={<Users className="h-4 w-4" />}>{t('nav.volunteers')}</NavLink>
               <NavLink to="/bans" icon={<ShieldBan className="h-4 w-4" />}>{t('nav.banList')}</NavLink>
-              <NavLink to="/calls" icon={<PhoneIncoming className="h-4 w-4" />}>{t('nav.callHistory')}</NavLink>
               <NavLink to="/audit" icon={<ScrollText className="h-4 w-4" />}>{t('nav.auditLog')}</NavLink>
-              <NavLink to="/admin/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.adminSettings')}</NavLink>
+              <NavLink to="/admin/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.hubSettings', { defaultValue: 'Hub Settings' })}</NavLink>
               {hasPermission('system:manage-hubs') && (
                 <NavLink to="/admin/hubs" icon={<Building2 className="h-4 w-4" />}>{t('nav.hubs', { defaultValue: 'Hubs' })}</NavLink>
               )}
             </>
           )}
-          <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.settings')}</NavLink>
           <NavLink to="/help" icon={<HelpCircle className="h-4 w-4" />}>{t('nav.help', { defaultValue: 'Help' })}</NavLink>
         </div>
 
@@ -302,6 +306,8 @@ function AuthenticatedLayout() {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {demoMode && <DemoBanner />}
+        <NotificationPromptBanner />
+        <PwaInstallBanner />
 
         {/* Mobile top bar */}
         <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background px-4 py-3 md:hidden">

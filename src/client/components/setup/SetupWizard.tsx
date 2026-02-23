@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
+import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
 import {
   updateSetupState,
@@ -9,12 +10,14 @@ import {
   getConfig,
   setActiveHub,
 } from '@/lib/api'
+import * as keyManager from '@/lib/key-manager'
 import type { ChannelType } from '@shared/types'
 import type { TelephonyProviderConfig, WhatsAppConfig, SignalConfig } from '@shared/types'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, ArrowRight, SkipForward } from 'lucide-react'
+import { ArrowLeft, ArrowRight, SkipForward, KeyRound } from 'lucide-react'
 import { LogoMark } from '@/components/logo-mark'
+import { PinInput } from '@/components/pin-input'
 import { AdminBootstrap } from './AdminBootstrap'
 import { StepIdentity } from './StepIdentity'
 import { StepChannels } from './StepChannels'
@@ -60,6 +63,7 @@ const DEFAULT_SETUP_DATA: SetupData = {
 export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boolean }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { unlockWithPin, isKeyUnlocked } = useAuth()
   const { toast } = useToast()
   const [bootstrapComplete, setBootstrapComplete] = useState(
     !needsBootstrap || sessionStorage.getItem('bootstrapComplete') === '1'
@@ -67,6 +71,49 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
   const [step, setStep] = useState(0)
   const [data, setData] = useState<SetupData>(DEFAULT_SETUP_DATA)
   const [saving, setSaving] = useState(false)
+  const [pinValue, setPinValue] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [pinLoading, setPinLoading] = useState(false)
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null)
+
+  // Focus step heading on step change
+  useEffect(() => {
+    // Short delay to let the new step render before focusing
+    const timer = setTimeout(() => stepHeadingRef.current?.focus(), 50)
+    return () => clearTimeout(timer)
+  }, [step])
+
+  // Escape key goes back one step
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && step > 0) {
+        e.preventDefault()
+        setStep(s => s - 1)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [step])
+
+  // After hard refresh, key is locked but stored — need PIN to re-authenticate
+  const needsPinUnlock = bootstrapComplete && !isKeyUnlocked && keyManager.hasStoredKey()
+
+  async function handlePinUnlock(pin: string) {
+    setPinLoading(true)
+    setPinError('')
+    try {
+      const ok = await unlockWithPin(pin)
+      if (!ok) {
+        setPinError(t('lock.wrongPin', { defaultValue: 'Wrong PIN' }))
+        setPinValue('')
+      }
+    } catch {
+      setPinError(t('lock.wrongPin', { defaultValue: 'Wrong PIN' }))
+      setPinValue('')
+    } finally {
+      setPinLoading(false)
+    }
+  }
 
   const updateData = useCallback((patch: Partial<SetupData>) => {
     setData(prev => ({ ...prev, ...patch }))
@@ -157,6 +204,43 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
     )
   }
 
+  // After hard refresh: key is stored but locked — prompt for PIN
+  if (needsPinUnlock) {
+    return (
+      <Card className="w-full max-w-2xl">
+        <div className="px-6 pt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <LogoMark size="sm" />
+            <h1 className="text-xl font-bold">{t('setup.title')}</h1>
+          </div>
+        </div>
+        <div className="px-6 py-6">
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <KeyRound className="h-6 w-6 text-primary" />
+              </div>
+              <h2 className="text-xl font-bold">{t('pin.unlockTitle', { defaultValue: 'Enter your PIN' })}</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {t('setup.pinRequired', { defaultValue: 'Enter your PIN to continue setup.' })}
+              </p>
+            </div>
+            <PinInput
+              length={6}
+              value={pinValue}
+              onChange={setPinValue}
+              onComplete={handlePinUnlock}
+              error={!!pinError}
+              autoFocus
+            />
+            {pinError && <p role="alert" className="text-center text-sm text-destructive">{pinError}</p>}
+            {pinLoading && <p role="status" className="text-center text-sm text-muted-foreground">{t('common.loading')}</p>}
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   return (
     <Card className="w-full max-w-2xl">
       {/* Header */}
@@ -171,7 +255,14 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
             <span>{stepLabels[step]}</span>
             <span>{t('setup.stepOf', { current: step + 1, total: TOTAL_STEPS })}</span>
           </div>
-          <div className="flex gap-1">
+          <div
+            className="flex gap-1"
+            role="progressbar"
+            aria-valuenow={step + 1}
+            aria-valuemin={1}
+            aria-valuemax={TOTAL_STEPS}
+            aria-label={t('setup.stepOf', { current: step + 1, total: TOTAL_STEPS })}
+          >
             {Array.from({ length: TOTAL_STEPS }, (_, i) => (
               <div
                 key={i}
@@ -181,17 +272,21 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
               />
             ))}
           </div>
+          {/* Screen reader step announcement */}
+          <div className="sr-only" aria-live="polite">
+            {t('setup.stepOf', { current: step + 1, total: TOTAL_STEPS })}: {stepLabels[step]}
+          </div>
         </div>
       </div>
 
       {/* Step content */}
       <div className="px-6 py-6">
-        {step === 0 && <StepIdentity data={data} onChange={updateData} />}
-        {step === 1 && <StepChannels data={data} onChange={updateData} />}
-        {step === 2 && <StepProviders data={data} onChange={updateData} />}
-        {step === 3 && <StepSettings data={data} onChange={updateData} />}
-        {step === 4 && <StepInvite />}
-        {step === 5 && <StepSummary data={data} onComplete={handleComplete} saving={saving} />}
+        {step === 0 && <StepIdentity data={data} onChange={updateData} headingRef={stepHeadingRef} />}
+        {step === 1 && <StepChannels data={data} onChange={updateData} headingRef={stepHeadingRef} />}
+        {step === 2 && <StepProviders data={data} onChange={updateData} headingRef={stepHeadingRef} />}
+        {step === 3 && <StepSettings data={data} onChange={updateData} headingRef={stepHeadingRef} />}
+        {step === 4 && <StepInvite headingRef={stepHeadingRef} />}
+        {step === 5 && <StepSummary data={data} onComplete={handleComplete} saving={saving} headingRef={stepHeadingRef} />}
       </div>
 
       {/* Navigation */}

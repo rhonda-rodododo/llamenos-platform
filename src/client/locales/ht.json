@@ -45,7 +45,7 @@
     "auditLog": "Jounal Odit",
     "callHistory": "Istorik Apèl",
     "settings": "Paramèt",
-    "adminSettings": "Paramèt Admin"
+    "hubSettings": "Paramèt Hub"
   },
   "dashboard": {
     "title": "Tablo",
@@ -174,6 +174,10 @@
     "roleAdmin": "Administratè",
     "inviteGenerated": "Envitasyon kreye! Pataje kle sekrè a an sekirite.",
     "secretKeyWarning": "Kle sa a ap parèt yon sèl fwa. Pataje li an sekirite avèk volontè a.",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "Fè Administratè",
     "removeAdmin": "Retire Administratè",
     "active": "Aktif",
@@ -313,8 +317,8 @@
   },
   "settings": {
     "title": "Paramèt Kont",
-    "adminTitle": "Paramèt Admin",
-    "adminDescription": "Paramèt sistèm ki afekte tout liy asistans lan.",
+    "hubTitle": "Paramèt Hub",
+    "hubDescription": "Paramèt ki afekte tout hub liy asistans lan.",
     "general": "Jeneral",
     "security": "Sekirite",
     "telephony": "Telefoni",
@@ -472,6 +476,24 @@
     "activity": "Aktivite",
     "noActivity": "Pa gen aktivite anrejistre"
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "Ale nan kontni",
     "switchToLanguage": "Chanje a {{language}}",
@@ -504,12 +526,11 @@
     "recoveryKeyWarning": "Ekri sa a epi estoke li an sekirite. Si ou pèdi PIN ou ak kle sa a, kont ou pa ka rekipere.",
     "downloadBackup": "Telechaje Sovgad Chifre",
     "backupDownloaded": "Sovgad telechaje",
-    "verifyTitle": "Verifye kle rekiperasyon ou",
-    "verifyDescription": "Antre karaktè nan pozisyon sa yo pou konfime ou anrejistre kle rekiperasyon ou",
-    "charAtPosition": "Karaktè #{{position}}",
-    "verifyButton": "Verifye",
-    "verifyFailed": "Verifikasyon echwe — tanpri verifye kle rekiperasyon ou",
-    "verifySuccess": "Kle rekiperasyon verifye!",
+    "storageTipsTitle": "Kijan pou estoke kle rekiperasyon w",
+    "storageTip1": "Anrejistre l nan yon jesyonè modpas (1Password, Bitwarden, elatriye)",
+    "storageTip2": "Estoke l sou yon aparèy pèsonèl ke ou sèlman gen aksè",
+    "storageTip3": "Ekri l epi kenbe l nan yon kote ki an sekirite fizikman",
+    "backupAcknowledge": "Mwen te anrejistre kle rekiperasyon mwen nan yon kote ki an sekirite",
     "continue": "Kontinye",
     "redeemFailed": "Echèk pou itilize envitasyon an"
   },

@@ -45,7 +45,7 @@
     "auditLog": "ऑडिट लॉग",
     "callHistory": "कॉल इतिहास",
     "settings": "सेटिंग्स",
-    "adminSettings": "व्यवस्थापक सेटिंग्स"
+    "hubSettings": "हब सेटिंग्स"
   },
   "dashboard": {
     "title": "डैशबोर्ड",
@@ -174,6 +174,10 @@
     "roleAdmin": "एडमिन",
     "inviteGenerated": "निमंत्रण बनाया गया! गुप्त कुंजी सुरक्षित रूप से साझा करें।",
     "secretKeyWarning": "यह कुंजी केवल एक बार दिखाई जाएगी। इसे स्वयंसेवक के साथ सुरक्षित रूप से साझा करें।",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "एडमिन बनाएं",
     "removeAdmin": "एडमिन हटाएं",
     "active": "सक्रिय",
@@ -313,8 +317,8 @@
   },
   "settings": {
     "title": "खाता सेटिंग्स",
-    "adminTitle": "व्यवस्थापक सेटिंग्स",
-    "adminDescription": "सिस्टम सेटिंग्स जो पूरी हेल्पलाइन को प्रभावित करती हैं।",
+    "hubTitle": "हब सेटिंग्स",
+    "hubDescription": "सेटिंग्स जो पूरे हेल्पलाइन हब को प्रभावित करती हैं।",
     "general": "सामान्य",
     "security": "सुरक्षा",
     "telephony": "टेलीफ़ोनी",
@@ -472,6 +476,24 @@
     "activity": "गतिविधि",
     "noActivity": "कोई गतिविधि दर्ज नहीं"
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "सामग्री पर जाएं",
     "switchToLanguage": "{{language}} में बदलें",
@@ -504,12 +526,11 @@
     "recoveryKeyWarning": "इसे लिख लें और सुरक्षित रूप से संग्रहित करें। यदि आप अपना PIN और यह कुंजी दोनों खो देते हैं, तो आपका खाता पुनर्प्राप्त नहीं किया जा सकता।",
     "downloadBackup": "एन्क्रिप्टेड बैकअप डाउनलोड करें",
     "backupDownloaded": "बैकअप डाउनलोड हो गया",
-    "verifyTitle": "अपनी रिकवरी कुंजी सत्यापित करें",
-    "verifyDescription": "यह पुष्टि करने के लिए कि आपने अपनी रिकवरी कुंजी सहेज ली है, इन स्थानों पर अक्षर दर्ज करें",
-    "charAtPosition": "अक्षर #{{position}}",
-    "verifyButton": "सत्यापित करें",
-    "verifyFailed": "सत्यापन विफल — कृपया अपनी रिकवरी कुंजी जांचें",
-    "verifySuccess": "रिकवरी कुंजी सत्यापित!",
+    "storageTipsTitle": "अपनी रिकवरी कुंजी को कैसे स्टोर करें",
+    "storageTip1": "इसे पासवर्ड मैनेजर में सहेजें (1Password, Bitwarden, आदि)",
+    "storageTip2": "इसे एक व्यक्तिगत डिवाइस पर स्टोर करें जिसे केवल आप एक्सेस कर सकते हैं",
+    "storageTip3": "इसे लिख लें और इसे भौतिक रूप से सुरक्षित स्थान पर रखें",
+    "backupAcknowledge": "मैंने अपनी रिकवरी कुंजी को एक सुरक्षित स्थान पर सहेज लिया है",
     "continue": "जारी रखें",
     "redeemFailed": "आमंत्रण उपयोग करने में विफल"
   },

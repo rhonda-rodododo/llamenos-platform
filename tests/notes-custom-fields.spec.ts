@@ -17,8 +17,8 @@ test.describe('Custom Fields in Notes', () => {
 
   /** Create a text custom field via admin settings UI */
   async function createCustomTextField(page: Page, label: string) {
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
     await page.getByRole('heading', { name: /custom note fields/i }).click()
     await expect(page.getByRole('button', { name: /add field/i })).toBeVisible({ timeout: 5000 })
     await page.getByRole('button', { name: /add field/i }).click()

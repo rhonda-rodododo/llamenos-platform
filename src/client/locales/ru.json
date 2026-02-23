@@ -45,7 +45,7 @@
     "auditLog": "Журнал аудита",
     "callHistory": "История звонков",
     "settings": "Настройки",
-    "adminSettings": "Настройки администратора"
+    "hubSettings": "Настройки хаба"
   },
   "dashboard": {
     "title": "Панель",
@@ -174,6 +174,10 @@
     "roleAdmin": "Администратор",
     "inviteGenerated": "Приглашение создано! Передайте секретный ключ безопасно.",
     "secretKeyWarning": "Этот ключ будет показан только один раз. Передайте его волонтёру безопасно.",
+    "roleHubAdmin": "Hub Admin",
+    "roleReviewer": "Reviewer",
+    "roleReporter": "Reporter",
+    "changeRole": "Change role",
     "makeAdmin": "Сделать администратором",
     "removeAdmin": "Снять права администратора",
     "active": "Активен",
@@ -313,8 +317,8 @@
   },
   "settings": {
     "title": "Настройки аккаунта",
-    "adminTitle": "Настройки администратора",
-    "adminDescription": "Системные настройки, влияющие на всю горячую линию.",
+    "hubTitle": "Настройки хаба",
+    "hubDescription": "Настройки, влияющие на весь хаб горячей линии.",
     "general": "Общие",
     "security": "Безопасность",
     "telephony": "Телефония",
@@ -472,6 +476,24 @@
     "activity": "Активность",
     "noActivity": "Нет записанной активности"
   },
+  "notifications": {
+    "promptText": "Enable notifications to get alerted when calls come in.",
+    "promptEnable": "Enable",
+    "permissionStatus": "Browser Permission",
+    "statusGranted": "Notifications are enabled.",
+    "statusDefault": "Browser notifications have not been enabled yet.",
+    "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
+    "statusUnsupported": "Your browser does not support notifications.",
+    "enablePermission": "Enable Notifications",
+    "granted": "Enabled",
+    "default": "Not enabled",
+    "denied": "Blocked",
+    "unsupported": "Not supported"
+  },
+  "pwa": {
+    "installText": "Install this app for quick access and a better experience.",
+    "installButton": "Install"
+  },
   "a11y": {
     "skipToContent": "Перейти к содержимому",
     "switchToLanguage": "Переключить на {{language}}",
@@ -504,12 +526,11 @@
     "recoveryKeyWarning": "Запишите это и храните надёжно. Если вы потеряете PIN и этот ключ, ваш аккаунт невозможно будет восстановить.",
     "downloadBackup": "Скачать зашифрованную резервную копию",
     "backupDownloaded": "Резервная копия скачана",
-    "verifyTitle": "Подтвердите ключ восстановления",
-    "verifyDescription": "Введите символы на указанных позициях, чтобы подтвердить, что вы сохранили ключ восстановления",
-    "charAtPosition": "Символ #{{position}}",
-    "verifyButton": "Подтвердить",
-    "verifyFailed": "Проверка не пройдена — пожалуйста, проверьте ваш ключ восстановления",
-    "verifySuccess": "Ключ восстановления подтверждён!",
+    "storageTipsTitle": "Как хранить ваш ключ восстановления",
+    "storageTip1": "Сохраните его в менеджере паролей (1Password, Bitwarden и т.д.)",
+    "storageTip2": "Храните его на личном устройстве, к которому есть доступ только у вас",
+    "storageTip3": "Запишите его и храните в физически безопасном месте",
+    "backupAcknowledge": "Я сохранил свой ключ восстановления в безопасном месте",
     "continue": "Продолжить",
     "redeemFailed": "Не удалось активировать приглашение"
   },

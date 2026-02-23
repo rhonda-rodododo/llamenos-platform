@@ -15,7 +15,11 @@ import {
 } from '@/components/ui/select'
 import { UserPlus, Copy, Loader2, Check } from 'lucide-react'
 
-export function StepInvite() {
+interface Props {
+  headingRef?: React.RefObject<HTMLHeadingElement | null>
+}
+
+export function StepInvite({ headingRef }: Props = {}) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [name, setName] = useState('')
@@ -52,7 +56,7 @@ export function StepInvite() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{t('setup.inviteTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.inviteTitle')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('setup.inviteDescription')}</p>
       </div>
 
@@ -98,6 +102,7 @@ export function StepInvite() {
         <Button
           onClick={handleGenerate}
           disabled={generating || !name.trim() || !phone.trim()}
+          aria-busy={generating}
           className="w-full"
         >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}

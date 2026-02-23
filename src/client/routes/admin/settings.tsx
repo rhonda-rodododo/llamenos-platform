@@ -178,9 +178,9 @@ function AdminSettingsPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Settings2 className="h-6 w-6 text-primary" />
-        <h1 className="text-xl font-bold sm:text-2xl">{t('settings.adminTitle')}</h1>
+        <h1 className="text-xl font-bold sm:text-2xl">{t('settings.hubTitle')}</h1>
       </div>
-      <p className="text-sm text-muted-foreground">{t('settings.adminDescription')}</p>
+      <p className="text-sm text-muted-foreground">{t('settings.hubDescription')}</p>
 
       {webauthnSettings && (
         <PasskeyPolicySection

@@ -7,9 +7,10 @@ import { SignalProviderForm } from './SignalProviderForm'
 interface Props {
   data: SetupData
   onChange: (patch: Partial<SetupData>) => void
+  headingRef?: React.RefObject<HTMLHeadingElement | null>
 }
 
-export function StepProviders({ data, onChange }: Props) {
+export function StepProviders({ data, onChange, headingRef }: Props) {
   const { t } = useTranslation()
   const hasVoiceOrSms = data.selectedChannels.includes('voice') || data.selectedChannels.includes('sms')
   const hasWhatsApp = data.selectedChannels.includes('whatsapp')
@@ -19,7 +20,7 @@ export function StepProviders({ data, onChange }: Props) {
   if (noProviders) {
     return (
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">{t('setup.providersTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.providersTitle')}</h2>
         <p className="text-sm text-muted-foreground">{t('setup.noProvidersNeeded')}</p>
       </div>
     )
@@ -28,7 +29,7 @@ export function StepProviders({ data, onChange }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{t('setup.providersTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.providersTitle')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('setup.providersDescription')}</p>
       </div>
 

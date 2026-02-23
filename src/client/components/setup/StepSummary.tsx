@@ -25,6 +25,7 @@ interface Props {
   data: SetupData
   onComplete: (options: { demoMode: boolean }) => void
   saving: boolean
+  headingRef?: React.RefObject<HTMLHeadingElement | null>
 }
 
 const CHANNEL_ICONS: Record<string, typeof Phone> = {
@@ -40,7 +41,7 @@ const STATUS_STYLES = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300',
 }
 
-export function StepSummary({ data, onComplete, saving }: Props) {
+export function StepSummary({ data, onComplete, saving, headingRef }: Props) {
   const { t } = useTranslation()
   const [demoMode, setDemoMode] = useState(false)
   const langConfig = LANGUAGE_MAP[data.language]
@@ -64,7 +65,7 @@ export function StepSummary({ data, onComplete, saving }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">{t('setup.summaryTitle')}</h2>
+        <h2 ref={headingRef} tabIndex={-1} className="text-lg font-semibold outline-none">{t('setup.summaryTitle')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('setup.summaryDescription')}</p>
       </div>
 

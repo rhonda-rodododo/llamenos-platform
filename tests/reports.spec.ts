@@ -430,7 +430,7 @@ test.describe('Reports feature', () => {
       await expect(page.getByRole('link', { name: 'Dashboard' })).not.toBeVisible()
       await expect(page.getByRole('link', { name: 'Notes' })).not.toBeVisible()
       await expect(page.getByRole('link', { name: 'Volunteers' })).not.toBeVisible()
-      await expect(page.getByRole('link', { name: 'Admin Settings' })).not.toBeVisible()
+      await expect(page.getByRole('link', { name: 'Hub Settings' })).not.toBeVisible()
       await expect(page.getByRole('link', { name: 'Audit Log' })).not.toBeVisible()
     })
 

@@ -40,6 +40,13 @@ test.describe('In-Browser Admin Bootstrap', () => {
     // Should show "Create Admin Account" bootstrap step
     await expect(page.getByText('Create Admin Account')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('Welcome to your hotline')).toBeVisible()
+
+    // A11y: language selector should be a radiogroup
+    const langGroup = page.locator('[role="radiogroup"]')
+    await expect(langGroup).toBeVisible()
+    // English should be checked by default
+    const engRadio = langGroup.locator('[role="radio"][aria-checked="true"]')
+    await expect(engRadio).toBeVisible()
   })
 
   // =====================================================================
@@ -109,26 +116,8 @@ test.describe('In-Browser Admin Bootstrap', () => {
     const download = await downloadPromise
     expect(download.suggestedFilename()).toContain('llamenos-backup-')
 
-    // Verify recovery key — fill in the 4 verification characters
-    const verifyLabels = page.locator('label:has-text("Character #")')
-    const verifyCount = await verifyLabels.count()
-    expect(verifyCount).toBe(4)
-
-    // Extract the recovery key without dashes and fill in verification
-    const rkNoDash = recoveryKey!.replace(/-/g, '')
-    for (let i = 0; i < verifyCount; i++) {
-      const label = await verifyLabels.nth(i).textContent()
-      const match = label?.match(/Character #(\d+)/)
-      if (match) {
-        const position = parseInt(match[1]) - 1 // 0-indexed
-        const char = rkNoDash[position]
-        await page.locator('label:has-text("Character #")').nth(i).locator('..').locator('input').fill(char)
-      }
-    }
-
-    // Click verify
-    await page.getByRole('button', { name: /verify/i }).click()
-    await expect(page.getByText('Recovery key verified!')).toBeVisible({ timeout: 5000 })
+    // Acknowledge backup saved
+    await page.getByText('I have saved my recovery key').click()
 
     // Click continue to setup
     await page.getByRole('button', { name: /continue to setup/i }).click()
@@ -136,7 +125,28 @@ test.describe('In-Browser Admin Bootstrap', () => {
     // Wait for bootstrap to complete and wizard to advance
     // Should advance to the normal setup wizard
     await expect(page.getByText('Setup Wizard')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText('Identity')).toBeVisible()
+    await expect(page.getByText('Identity', { exact: true })).toBeVisible()
+
+    // A11y: progress bar should have proper ARIA attributes
+    const progressbar = page.locator('[role="progressbar"]')
+    await expect(progressbar).toBeVisible()
+    await expect(progressbar).toHaveAttribute('aria-valuenow', '1')
+    await expect(progressbar).toHaveAttribute('aria-valuemax', '6')
+
+    // --- Hard refresh: should prompt for PIN re-entry ---
+    await page.reload()
+    // Key is stored in localStorage but locked after reload (in-memory closure cleared)
+    await expect(page.getByRole('heading', { name: 'Enter your PIN' })).toBeVisible({ timeout: 10000 })
+
+    // Enter the correct PIN
+    const unlockDigit1 = page.locator('input[aria-label="PIN digit 1"]')
+    await unlockDigit1.waitFor({ state: 'visible', timeout: 5000 })
+    await unlockDigit1.click()
+    await page.keyboard.type('123456', { delay: 50 })
+
+    // Should advance back to the wizard after PIN entry
+    await expect(page.getByText('Setup Wizard')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Identity', { exact: true })).toBeVisible()
   })
 
   // =====================================================================

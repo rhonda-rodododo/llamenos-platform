@@ -8,8 +8,8 @@ test.describe('Telephony Provider Settings', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page)
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
   })
 
   test('telephony provider section is visible and collapsed by default', async ({ page }) => {
@@ -125,9 +125,9 @@ test.describe('Telephony Provider Settings', () => {
     // Reload the page — clears keyManager, PIN re-entry needed
     await page.reload()
     await enterPin(page, TEST_PIN)
-    // PIN unlock redirects to dashboard — navigate back to Admin Settings
-    await page.getByRole('link', { name: 'Admin Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    // PIN unlock redirects to dashboard — navigate back to Hub Settings
+    await page.getByRole('link', { name: 'Hub Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // Expand the section
     await page.getByText('Telephony Provider').first().click()
@@ -185,7 +185,7 @@ test.describe('Telephony Provider Settings', () => {
 
   test('deep link to telephony-provider section auto-expands it', async ({ page }) => {
     await navigateAfterLogin(page, '/admin/settings?section=telephony-provider')
-    await expect(page.getByRole('heading', { name: 'Admin Settings', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
     // The section should be expanded — we should see the provider dropdown
     await expect(page.locator('select').first()).toBeVisible({ timeout: 5000 })
