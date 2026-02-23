@@ -18,8 +18,13 @@ test.describe('Custom Fields in Notes', () => {
   async function createCustomTextField(page: Page, label: string) {
     await page.getByRole('link', { name: 'Hub Settings' }).click()
     await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
-    await page.getByRole('heading', { name: /custom note fields/i }).click()
-    await expect(page.getByRole('button', { name: /add field/i })).toBeVisible({ timeout: 5000 })
+
+    // Expand section (idempotent — won't collapse if already open via sessionStorage)
+    const addFieldBtn = page.getByRole('button', { name: /add field/i })
+    if (!await addFieldBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await page.getByRole('heading', { name: /custom note fields/i }).click()
+    }
+    await expect(addFieldBtn).toBeVisible({ timeout: 10000 })
 
     // If a field with this label already exists (e.g. from a flaky retry), skip creation
     const existing = page.locator('.rounded-lg.border').filter({ hasText: label })
@@ -27,7 +32,7 @@ test.describe('Custom Fields in Notes', () => {
       return
     }
 
-    await page.getByRole('button', { name: /add field/i }).click()
+    await addFieldBtn.click()
     await page.getByPlaceholder('e.g. Severity Rating').fill(label)
     await page.getByRole('button', { name: /save/i }).last().click()
     await expect(page.getByText(/success/i)).toBeVisible({ timeout: 10000 })

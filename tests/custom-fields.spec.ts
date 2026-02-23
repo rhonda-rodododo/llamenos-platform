@@ -1,5 +1,18 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { loginAsAdmin } from './helpers'
+
+/** Expand the Custom Note Fields section (idempotent — won't collapse if already open) */
+async function expandCustomFields(page: Page) {
+  await page.getByRole('link', { name: 'Hub Settings' }).click()
+  await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
+
+  // Check if section is already expanded (sessionStorage persists across serial tests)
+  const addFieldBtn = page.getByRole('button', { name: /add field/i })
+  if (!await addFieldBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await page.getByRole('heading', { name: /custom note fields/i }).click()
+  }
+  await expect(addFieldBtn).toBeVisible({ timeout: 10000 })
+}
 
 test.describe('Custom Note Fields', () => {
   // Tests depend on each other's state (empty state → add → delete)
@@ -16,14 +29,7 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('admin can add a text custom field', async ({ page }) => {
-    await page.getByRole('link', { name: 'Hub Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
-
-    // Expand Custom Note Fields section
-    await page.getByRole('heading', { name: /custom note fields/i }).click()
-
-    // Wait for section to load (either empty state or existing fields)
-    await expect(page.getByRole('button', { name: /add field/i })).toBeVisible({ timeout: 5000 })
+    await expandCustomFields(page)
 
     // Click Add Field
     await page.getByRole('button', { name: /add field/i }).click()
@@ -42,11 +48,7 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('admin can add a select custom field with options', async ({ page }) => {
-    await page.getByRole('link', { name: 'Hub Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
-
-    // Expand Custom Note Fields section
-    await page.getByRole('heading', { name: /custom note fields/i }).click()
+    await expandCustomFields(page)
 
     // Click Add Field
     await page.getByRole('button', { name: /add field/i }).click()
@@ -74,16 +76,10 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('admin can delete a custom field', async ({ page }) => {
-    await page.getByRole('link', { name: 'Hub Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
-
-    // Expand Custom Note Fields section and wait for data to load
-    await page.getByRole('heading', { name: /custom note fields/i }).click()
-    const addFieldBtn = page.getByRole('button', { name: /add field/i })
-    await expect(addFieldBtn).toBeVisible({ timeout: 5000 })
+    await expandCustomFields(page)
 
     // First create a field to delete
-    await addFieldBtn.click()
+    await page.getByRole('button', { name: /add field/i }).click()
     await expect(page.getByPlaceholder('e.g. Severity Rating')).toBeVisible({ timeout: 10000 })
     await page.getByPlaceholder('e.g. Severity Rating').fill('ToDelete')
     await page.getByRole('button', { name: /save/i }).last().click()
@@ -100,14 +96,9 @@ test.describe('Custom Note Fields', () => {
   })
 
   test('custom fields section deep link works', async ({ page }) => {
-    // Navigate to Hub Settings and verify the deep link section parameter works
-    await page.getByRole('link', { name: 'Hub Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
-
-    // Expand Custom Note Fields section via heading click (simulates deep link behavior)
-    await page.getByRole('heading', { name: /custom note fields/i }).click()
+    await expandCustomFields(page)
 
     // Custom Note Fields section should be expanded — "Add Field" button should be visible
-    await expect(page.getByRole('button', { name: /add field/i })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('button', { name: /add field/i })).toBeVisible()
   })
 })
