@@ -16,6 +16,7 @@ export const PERMISSION_CATALOG = {
   'calls:read-active-full': 'See active calls with full caller info',
   'calls:read-history': 'View call history',
   'calls:read-presence': 'View volunteer presence',
+  'calls:read-recording': 'Listen to call recordings',
   'calls:debug': 'Debug call state',
 
   // Notes

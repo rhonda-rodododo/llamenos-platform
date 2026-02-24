@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { NewNoteForm } from '@/components/notes/new-note-form'
 import { NoteEditForm } from '@/components/notes/note-edit-form'
+import { RecordingPlayer } from '@/components/recording-player'
 
 type NotesSearch = { page: number; callId: string; search: string }
 
@@ -326,6 +327,11 @@ function NotesPage() {
                     )
                   })()}
                 </CardTitle>
+                {callInfoMap.get(cId)?.hasRecording && (
+                  <div className="mt-2">
+                    <RecordingPlayer callId={cId} />
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="p-0 divide-y divide-border">
                 {callNotes.map(note => (

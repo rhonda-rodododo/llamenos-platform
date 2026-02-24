@@ -39,6 +39,7 @@ export class CallRouterDO extends DurableObject<Env> {
       console.log(`[call-history] active=${activeCalls.length} history=${historyAll.length}`)
       return this.getCallHistory(page, limit, { search, dateFrom, dateTo })
     })
+    this.router.get('/calls/:callId', async (_req, { callId }) => this.getCallById(callId))
     this.router.post('/calls/incoming', async (req) => this.handleIncomingCall(await req.json()))
     this.router.post('/calls/:callId/answer', async (req, { callId }) => this.handleCallAnswered(callId, await req.json()))
     this.router.post('/calls/:callId/end', (_req, { callId }) => this.handleCallEnded(callId))
@@ -284,6 +285,20 @@ export class CallRouterDO extends DurableObject<Env> {
     )
   }
 
+  // --- Single Call Lookup ---
+
+  private async getCallById(callId: string): Promise<Response> {
+    // Search active calls first, then history
+    const activeCalls = await this.ctx.storage.get<CallRecord[]>('activeCalls') || []
+    let call = activeCalls.find(c => c.id === callId)
+    if (!call) {
+      const history = await this.ctx.storage.get<CallRecord[]>('callHistory') || []
+      call = history.find(c => c.id === callId)
+    }
+    if (!call) return new Response('Call not found', { status: 404 })
+    return Response.json({ call })
+  }
+
   // --- Call Handling ---
 
   private async handleIncomingCall(data: {
@@ -444,6 +459,8 @@ export class CallRouterDO extends DurableObject<Env> {
     // Apply allowed metadata fields
     if (data.hasTranscription !== undefined) call.hasTranscription = Boolean(data.hasTranscription)
     if (data.hasVoicemail !== undefined) call.hasVoicemail = Boolean(data.hasVoicemail)
+    if (data.recordingSid !== undefined) call.recordingSid = String(data.recordingSid)
+    if (data.hasRecording !== undefined) call.hasRecording = Boolean(data.hasRecording)
 
     if (source === 'active') {
       await this.ctx.storage.put('activeCalls', activeCalls)

@@ -58,10 +58,10 @@ export async function maybeTranscribe(
         }),
       }))
 
-      // Mark call record as having a transcription
+      // Mark call record as having a transcription and persist the recording SID
       await dos.calls.fetch(new Request(`http://do/calls/${parentCallSid}/metadata`, {
         method: 'PATCH',
-        body: JSON.stringify({ hasTranscription: true }),
+        body: JSON.stringify({ hasTranscription: true, recordingSid, hasRecording: true }),
       }))
     }
   } catch (err) {

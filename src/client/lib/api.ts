@@ -267,6 +267,23 @@ export async function getCallsTodayCount() {
   return request<{ count: number }>(hp('/calls/today-count'))
 }
 
+// --- Call Recording ---
+
+export async function getCallRecording(callId: string): Promise<ArrayBuffer> {
+  const pathOnly = hp(`/calls/${callId}/recording`).split('?')[0]
+  const method = 'GET'
+  const headers = {
+    ...getAuthHeaders(method, pathOnly),
+  }
+  const res = await fetch(`${API_BASE}${hp(`/calls/${callId}/recording`)}`, { headers })
+  if (!res.ok) {
+    if (res.status === 401) onAuthExpired?.()
+    throw new ApiError(res.status, await res.text())
+  }
+  onApiActivity?.()
+  return res.arrayBuffer()
+}
+
 // --- Volunteer Presence (admin only) ---
 
 export async function getVolunteerPresence() {
@@ -632,6 +649,7 @@ export interface CallRecord {
   duration: number
   hasTranscription: boolean
   hasVoicemail: boolean
+  hasRecording?: boolean
   status: 'completed' | 'unanswered'
 }
 

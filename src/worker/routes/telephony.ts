@@ -347,6 +347,12 @@ telephony.post('/call-recording', async (c) => {
     }
 
     if (recordingSid) {
+      // Persist recording SID on the call record so the recording playback endpoint can find it
+      await dos.calls.fetch(new Request(`http://do/calls/${parentCallSid}/metadata`, {
+        method: 'PATCH',
+        body: JSON.stringify({ recordingSid, hasRecording: true }),
+      }))
+
       c.executionCtx.waitUntil(
         maybeTranscribe(parentCallSid, recordingSid, pubkey, c.env, dos)
       )

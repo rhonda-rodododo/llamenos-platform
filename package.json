@@ -12,6 +12,7 @@
     "deploy:next": "bun run build && bunx wrangler deploy --env next",
     "deploy:site": "cd site && bun run deploy",
     "dev:worker": "bunx wrangler dev",
+    "dev:tunnel": "bash scripts/dev-tunnel.sh",
     "build:node": "node esbuild.node.mjs",
     "build:docker": "bun run build && bun run build:node",
     "start:node": "PLATFORM=node node dist/server/index.js",

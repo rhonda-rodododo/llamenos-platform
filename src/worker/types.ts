@@ -99,6 +99,8 @@ export interface CallRecord {
   status: 'ringing' | 'in-progress' | 'completed' | 'unanswered'
   hasTranscription: boolean
   hasVoicemail: boolean
+  recordingSid?: string
+  hasRecording?: boolean
 }
 
 export interface EncryptedNote {

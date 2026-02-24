@@ -4,12 +4,13 @@ import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { getCallHistory, listVolunteers, type CallRecord, type Volunteer } from '@/lib/api'
 import { useToast } from '@/lib/toast'
-import { PhoneIncoming, ChevronLeft, ChevronRight, Clock, Mic, Search, X, StickyNote, Voicemail, PhoneMissed } from 'lucide-react'
+import { PhoneIncoming, ChevronLeft, ChevronRight, Clock, Mic, Search, X, StickyNote, Voicemail, PhoneMissed, Disc } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { RecordingPlayer } from '@/components/recording-player'
 
 type CallsSearch = {
   page: number
@@ -222,7 +223,16 @@ function CallHistoryPage() {
                         </Badge>
                       </Link>
                     )}
+                    {call.hasRecording && (
+                      <Badge variant="secondary" className="gap-1" data-testid="recording-badge">
+                        <Disc className="h-3 w-3" />
+                        {t('recording.title')}
+                      </Badge>
+                    )}
                   </div>
+                  {call.hasRecording && (
+                    <RecordingPlayer callId={call.id} />
+                  )}
                   <span className="flex-1 text-right text-xs text-muted-foreground">
                     {new Date(call.startedAt).toLocaleString()}
                   </span>
