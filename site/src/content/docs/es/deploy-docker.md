@@ -207,21 +207,12 @@ curl -I http://linea.tudominio.com
 
 ## Arquitectura del servicio
 
-```
-                    ┌─────────────┐
-   Internet ───────►│    Caddy     │ :80/:443
-                    │  (TLS, proxy)│
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │    App      │ :3000
-                    │  (Node.js)  │
-                    └──┬────┬─────┘
-                       │    │
-              ┌────────▼┐  ┌▼────────┐
-              │  MinIO   │  │ Whisper  │ (opcional)
-              │  :9000   │  │  :8080   │
-              └──────────┘  └──────────┘
+```mermaid
+flowchart TD
+    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, proxy inverso)"]
+    Caddy -->|":3000"| App["App<br/>(Node.js)"]
+    App --> MinIO[("MinIO<br/>:9000")]
+    App -.->|"opcional"| Whisper["Whisper<br/>:8080"]
 ```
 
 ## Siguientes pasos

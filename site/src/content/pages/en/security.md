@@ -5,6 +5,16 @@ subtitle: An honest assessment of what Llamenos encrypts end-to-end, what the se
 
 ## What is encrypted end-to-end
 
+```mermaid
+flowchart LR
+    A["📝 Plaintext Note"] --> B["🔑 Generate Random Key"]
+    B --> C["🔐 XChaCha20-Poly1305"]
+    C --> D["📦 ECIES Wrap<br/>(Volunteer Key)"]
+    C --> E["📦 ECIES Wrap<br/>(Admin Key)"]
+    D --> F[("💾 Encrypted Storage")]
+    E --> F
+```
+
 <details>
 <summary><strong>Call notes (with forward secrecy)</strong></summary>
 
@@ -83,6 +93,21 @@ Timestamps, call durations, routing decisions, queue positions, and which volunt
 
 ## Local key protection
 
+```mermaid
+sequenceDiagram
+    participant V as 👤 Volunteer
+    participant B as 🖥️ Browser
+    participant S as ☁️ Server
+
+    V->>B: Enter PIN
+    B->>B: PBKDF2 derive KEK (600K iterations)
+    B->>B: Decrypt nsec with XChaCha20
+    B->>B: Hold key in memory closure
+    B->>S: Schnorr signature challenge
+    S-->>B: Session token (8hr TTL)
+    Note over B: Key zeroed on lock/logout
+```
+
 <details>
 <summary><strong>PIN-encrypted key store</strong></summary>
 
@@ -92,6 +117,24 @@ Your secret key (nsec) is encrypted in the browser's localStorage using PBKDF2-S
 
 <details>
 <summary><strong>Device linking protocol</strong></summary>
+
+```mermaid
+sequenceDiagram
+    participant D1 as 📱 Device 1
+    participant S as ☁️ Server Relay
+    participant D2 as 💻 Device 2 (new)
+
+    D1->>S: Create provisioning room
+    S-->>D1: Room ID + QR code
+    D2->>D2: Scan QR code
+    D2->>S: Join with ephemeral pubkey
+    S-->>D1: Device 2 pubkey
+    D1->>D1: ECDH shared secret
+    D1->>S: Encrypted nsec
+    S-->>D2: Encrypted nsec
+    D2->>D2: Decrypt + set new PIN
+    Note over S: Room expires in 5 min
+```
 
 Adding a new device uses an ephemeral ECDH key exchange. The new device generates a temporary secp256k1 keypair and displays a QR code. The primary device scans it, computes a shared secret via ECDH, encrypts the nsec with XChaCha20-Poly1305, and sends it through a single-use relay room. The new device decrypts, prompts for a new PIN, and stores the key locally. The relay room expires after 5 minutes and is deleted after one use.
 

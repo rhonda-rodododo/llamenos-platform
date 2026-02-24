@@ -4,6 +4,61 @@ A secure, self-hosted crisis response platform. Supports voice calls, SMS, Whats
 
 Built for organizations that need to protect the identity of callers, reporters, and volunteers against well-funded adversaries.
 
+## Screenshots
+
+<p align="center">
+  <img src="site/public/screenshots/dashboard-desktop.png" alt="Dashboard" width="600" />
+</p>
+
+<p align="center">
+  <em>Admin dashboard with real-time volunteer presence and active calls</em>
+</p>
+
+<details>
+<summary><strong>More screenshots</strong></summary>
+
+### Conversations
+<p align="center">
+  <img src="site/public/screenshots/conversations-desktop.png" alt="Conversations" width="600" />
+</p>
+<p align="center"><em>Unified messaging view for SMS, WhatsApp, and Signal</em></p>
+
+### Volunteers
+<p align="center">
+  <img src="site/public/screenshots/volunteers-desktop.png" alt="Volunteers" width="600" />
+</p>
+<p align="center"><em>Manage volunteer accounts and permissions</em></p>
+
+### Shifts
+<p align="center">
+  <img src="site/public/screenshots/shifts-desktop.png" alt="Shifts" width="600" />
+</p>
+<p align="center"><em>Create recurring shift schedules</em></p>
+
+### Mobile
+<p align="center">
+  <img src="site/public/screenshots/dashboard-mobile.png" alt="Mobile Dashboard" width="200" />
+  <img src="site/public/screenshots/conversations-mobile.png" alt="Mobile Conversations" width="200" />
+  <img src="site/public/screenshots/notes-mobile.png" alt="Mobile Notes" width="200" />
+</p>
+<p align="center"><em>Fully responsive mobile interface</em></p>
+
+</details>
+
+## How it works
+
+```mermaid
+flowchart TD
+    A["📞 Incoming Call"] --> B{"Shift Active?"}
+    B -->|Yes| C["🔔 Ring All On-Shift Volunteers"]
+    B -->|No| D["🔔 Ring Fallback Group"]
+    C --> E{"First Pickup"}
+    D --> E
+    E -->|Answered| F["✅ Connect Call"]
+    E -->|No Answer| G["📬 Voicemail"]
+    F --> H["📝 Save Encrypted Note"]
+```
+
 ## Features
 
 ### Voice Calling

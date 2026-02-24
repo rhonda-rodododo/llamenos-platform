@@ -1,0 +1,153 @@
+---
+/**
+ * Screenshot gallery component for the marketing site.
+ * Shows application screenshots with device frames and tabbed navigation.
+ */
+
+interface Screenshot {
+  name: string
+  desktop: string
+  mobile?: string
+  label: string
+  description: string
+}
+
+const screenshots: Screenshot[] = [
+  {
+    name: 'dashboard',
+    desktop: '/screenshots/dashboard-desktop.png',
+    mobile: '/screenshots/dashboard-mobile.png',
+    label: 'Dashboard',
+    description: 'Real-time overview of active calls, volunteer presence, and shift status.',
+  },
+  {
+    name: 'conversations',
+    desktop: '/screenshots/conversations-desktop.png',
+    mobile: '/screenshots/conversations-mobile.png',
+    label: 'Conversations',
+    description: 'Unified messaging view for SMS, WhatsApp, and Signal conversations.',
+  },
+  {
+    name: 'notes',
+    desktop: '/screenshots/notes-desktop.png',
+    mobile: '/screenshots/notes-mobile.png',
+    label: 'Notes',
+    description: 'End-to-end encrypted call notes with custom fields and search.',
+  },
+  {
+    name: 'volunteers',
+    desktop: '/screenshots/volunteers-desktop.png',
+    label: 'Volunteers',
+    description: 'Manage volunteer accounts, roles, and permissions.',
+  },
+  {
+    name: 'shifts',
+    desktop: '/screenshots/shifts-desktop.png',
+    label: 'Shifts',
+    description: 'Create recurring shift schedules with automatic call routing.',
+  },
+  {
+    name: 'settings',
+    desktop: '/screenshots/settings-desktop.png',
+    label: 'Settings',
+    description: 'Configure telephony providers, messaging channels, and hub settings.',
+  },
+]
+---
+
+<div class="screenshot-gallery">
+  <!-- Tab navigation -->
+  <div class="flex flex-wrap gap-2 mb-6 border-b border-border pb-4">
+    {screenshots.map((s, i) => (
+      <button
+        class:list={[
+          'tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+          i === 0 ? 'bg-accent text-white' : 'bg-bg-soft text-fg-muted hover:bg-bg-card hover:text-fg',
+        ]}
+        data-tab={s.name}
+      >
+        {s.label}
+      </button>
+    ))}
+  </div>
+
+  <!-- Screenshot panels -->
+  {screenshots.map((s, i) => (
+    <div
+      class:list={['tab-panel', i === 0 ? 'block' : 'hidden']}
+      data-panel={s.name}
+    >
+      <p class="text-fg-muted mb-6 text-center max-w-2xl mx-auto">{s.description}</p>
+
+      <div class="flex flex-col lg:flex-row gap-8 items-center justify-center">
+        <!-- Desktop frame -->
+        <div class="relative">
+          <div class="bg-gray-800 rounded-t-lg px-4 py-2 flex items-center gap-2">
+            <div class="flex gap-1.5">
+              <div class="w-3 h-3 rounded-full bg-red-500"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <div class="flex-1 text-center">
+              <span class="text-gray-400 text-xs">hotline.example.com</span>
+            </div>
+          </div>
+          <div class="border-4 border-gray-800 border-t-0 rounded-b-lg overflow-hidden shadow-2xl">
+            <img
+              src={s.desktop}
+              alt={`${s.label} - Desktop view`}
+              class="w-full max-w-[640px]"
+              loading="lazy"
+            />
+          </div>
+        </div>
+
+        <!-- Mobile frame (if available) -->
+        {s.mobile && (
+          <div class="relative">
+            <div class="bg-gray-900 rounded-[2rem] p-2 shadow-2xl">
+              <div class="bg-black rounded-[1.5rem] overflow-hidden relative">
+                <!-- Notch -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-b-xl z-10"></div>
+                <img
+                  src={s.mobile}
+                  alt={`${s.label} - Mobile view`}
+                  class="w-[187px]"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  ))}
+</div>
+
+<script>
+  // Tab switching logic
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tabName = btn.getAttribute('data-tab')
+
+      // Update button states
+      document.querySelectorAll('.tab-btn').forEach((b) => {
+        b.classList.remove('bg-accent', 'text-white')
+        b.classList.add('bg-bg-soft', 'text-fg-muted')
+      })
+      btn.classList.remove('bg-bg-soft', 'text-fg-muted')
+      btn.classList.add('bg-accent', 'text-white')
+
+      // Show/hide panels
+      document.querySelectorAll('.tab-panel').forEach((panel) => {
+        if (panel.getAttribute('data-panel') === tabName) {
+          panel.classList.remove('hidden')
+          panel.classList.add('block')
+        } else {
+          panel.classList.add('hidden')
+          panel.classList.remove('block')
+        }
+      })
+    })
+  })
+</script>

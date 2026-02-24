@@ -14,9 +14,11 @@ Llamenos supports Signal messaging via a self-hosted [signal-cli-rest-api](https
 
 ## Architecture
 
-```
-Signal User ──► Signal Servers ──► signal-cli bridge ──► Llamenos Worker
-                                    (self-hosted)         (Cloudflare)
+```mermaid
+flowchart LR
+    User["Signal User"] --> Servers["Signal Servers"]
+    Servers --> Bridge["signal-cli bridge<br/>(self-hosted)"]
+    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
 ```
 
 The signal-cli bridge runs on your infrastructure and forwards messages to your Worker via HTTP webhooks. This means you control the entire message path from Signal to your application.
