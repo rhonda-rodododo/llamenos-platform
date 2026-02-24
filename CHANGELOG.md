@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-02-24
+
+### Bug Fixes
+
+- fix panic wipe overlay rendering and playwright port config
+- match bun versions
+
+### Documentation
+
+- update backlog to reflect all completed epics
+
+### Features
+
+- add panic wipe, SRI hashes, and PIN challenge
+- add RCS Business Messaging channel (Epic 63)
+- add message blasts with subscriber management (Epic 62)
+- add call recording playback and dev tunnel script
+- add Ansible playbooks, OpenTofu modules, and ops docs (Epic 66)
+
+### Miscellaneous
+
+- update logo SVG and clean up footer
+- v0.16.0 [skip ci]
+
 ## [0.15.0] - 2026-02-24
 
 ### Bug Fixes
