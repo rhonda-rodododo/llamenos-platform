@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUN_VERSION: "1.2"
+  BUN_VERSION: "1.3.5"
   # Test admin keypair (derived from ADMIN_NSEC in tests/helpers.ts)
   TEST_ADMIN_PUBKEY: "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
 
