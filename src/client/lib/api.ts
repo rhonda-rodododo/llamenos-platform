@@ -30,9 +30,11 @@ export function setOnApiActivity(cb: (() => void) | null) { onApiActivity = cb }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = ((options.method as string) || 'GET').toUpperCase()
+  // Strip query params from path for auth token signing (server uses url.pathname)
+  const pathOnly = path.split('?')[0]
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(method, path),
+    ...getAuthHeaders(method, pathOnly),
     ...options.headers,
   }
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
