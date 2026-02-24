@@ -6,7 +6,7 @@ export default defineConfig({
   output: 'static',
   integrations: [
     mermaid({
-      theme: 'neutral',
+      theme: 'dark',
     }),
   ],
   vite: {
