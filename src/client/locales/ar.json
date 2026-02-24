@@ -496,6 +496,23 @@
     "installText": "Install this app for quick access and a better experience.",
     "installButton": "Install"
   },
+  "panicWipe": {
+    "wiping": "Emergency wipe in progress..."
+  },
+  "pinChallenge": {
+    "title": "Verify Your Identity",
+    "description": "Enter your PIN to continue with this action.",
+    "wrongPin": "Wrong PIN. {{remaining}} attempt(s) remaining.",
+    "maxAttempts": "Maximum attempts exceeded. Key has been wiped."
+  },
+  "recording": {
+    "title": "Call Recording",
+    "play": "Play Recording",
+    "pause": "Pause",
+    "loading": "Loading recording...",
+    "error": "Failed to load recording",
+    "noRecording": "No recording available"
+  },
   "a11y": {
     "skipToContent": "انتقل إلى المحتوى",
     "switchToLanguage": "التبديل إلى {{language}}",

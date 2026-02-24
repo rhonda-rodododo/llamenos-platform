@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sriWorkboxPlugin } from './src/client/lib/sri-workbox-plugin'
 import path from 'path'
 
 export default defineConfig({
@@ -49,6 +50,7 @@ export default defineConfig({
         // No API runtime caching — sensitive call data must never be cached on device
       },
     }),
+    sriWorkboxPlugin(),
   ],
   root: '.',
   publicDir: 'public',

@@ -19,6 +19,8 @@ import { generateKeyPair } from '@/lib/crypto'
 import { useToast } from '@/lib/toast'
 import { UserPlus, Shield, ShieldCheck, Trash2, Key, Copy, Coffee, Eye, EyeOff, Mail, X } from 'lucide-react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { PinChallengeDialog } from '@/components/pin-challenge-dialog'
+import { usePinChallenge } from '@/lib/use-pin-challenge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -440,6 +442,7 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
   const { toast } = useToast()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showPhone, setShowPhone] = useState(false)
+  const pinChallenge = usePinChallenge()
 
   const primaryRoleId = volunteer.roles[0] || 'role-volunteer'
   const primaryRole = roles.find(r => r.id === primaryRoleId)
@@ -484,7 +487,18 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
           {volunteer.phone && (
             <p className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {showPhone ? volunteer.phone : maskedPhone(volunteer.phone)}
-              <button onClick={() => setShowPhone(!showPhone)} className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={async () => {
+                  if (showPhone) {
+                    setShowPhone(false)
+                  } else {
+                    const ok = await pinChallenge.requirePin()
+                    if (ok) setShowPhone(true)
+                  }
+                }}
+                className="text-muted-foreground hover:text-foreground"
+                data-testid="toggle-phone-visibility"
+              >
                 {showPhone ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
               </button>
             </p>
@@ -539,6 +553,13 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
         description={`${volunteer.name} (${maskedPhone(volunteer.phone)})`}
         confirmLabel={t('common.delete')}
         onConfirm={handleDelete}
+      />
+      <PinChallengeDialog
+        open={pinChallenge.isOpen}
+        attempts={pinChallenge.attempts}
+        error={pinChallenge.error}
+        onComplete={pinChallenge.handleComplete}
+        onCancel={pinChallenge.handleCancel}
       />
     </div>
   )

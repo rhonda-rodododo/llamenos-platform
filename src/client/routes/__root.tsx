@@ -15,6 +15,7 @@ import { LogoMark } from '@/components/logo-mark'
 import { DemoBanner } from '@/components/demo-banner'
 import { NotificationPromptBanner } from '@/components/notification-prompt-banner'
 import { PwaInstallBanner } from '@/components/pwa-install-banner'
+import { PanicWipeIndicator } from '@/components/panic-wipe-indicator'
 import { HubSwitcher } from '@/components/hub-switcher'
 import {
   LayoutDashboard,
@@ -332,6 +333,7 @@ function AuthenticatedLayout() {
       <CommandPalette />
       <KeyboardShortcutsDialog />
       <NoteSheet />
+      <PanicWipeIndicator />
 
       {/* Session expiring warning */}
       {sessionExpiring && !sessionExpired && (
