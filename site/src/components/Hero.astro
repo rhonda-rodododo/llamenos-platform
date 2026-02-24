@@ -15,39 +15,54 @@ interface Props {
 const { badge, title, titleAccent, description, cta, ctaSecondary, ctaHref, ctaSecondaryHref } = Astro.props;
 ---
 
-<section class="relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-28">
-  <div class="absolute inset-0 -z-10">
-    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full bg-accent/10 blur-3xl"></div>
-    <div class="absolute top-1/3 left-1/3 w-[400px] h-[400px] rounded-full bg-accent-bright/5 blur-3xl"></div>
+<section class="hero-section relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-28">
+  <!-- Animated gradient mesh background -->
+  <div class="absolute inset-0 -z-10 overflow-hidden">
+    <!-- Primary animated orb -->
+    <div class="hero-orb-1 absolute top-1/4 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-gradient-to-br from-accent/20 via-accent-bright/10 to-transparent blur-3xl"></div>
+    <!-- Secondary floating orb -->
+    <div class="hero-orb-2 absolute top-1/3 left-1/4 w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-accent-bright/15 to-transparent blur-3xl"></div>
+    <!-- Tertiary accent orb -->
+    <div class="hero-orb-3 absolute bottom-0 right-1/4 w-[400px] h-[400px] rounded-full bg-gradient-to-tl from-green/10 to-transparent blur-3xl"></div>
+    <!-- Grid pattern overlay -->
+    <div class="absolute inset-0 bg-[linear-gradient(rgba(81,175,174,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(81,175,174,0.03)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)]"></div>
   </div>
 
   <div class="mx-auto max-w-6xl px-6">
     <div class="max-w-3xl">
-      <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-3.5 py-1.5 text-xs text-accent-bright font-medium">
-        <span class="h-1.5 w-1.5 rounded-full bg-green animate-pulse"></span>
+      <!-- Animated badge -->
+      <div class="hero-badge mb-6 inline-flex items-center gap-2 rounded-full border border-accent/30 bg-gradient-to-r from-accent/10 to-accent/5 px-4 py-2 text-xs text-accent-bright font-medium shadow-lg shadow-accent/5 backdrop-blur-sm">
+        <span class="relative flex h-2 w-2">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-75"></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-green"></span>
+        </span>
         {badge}
       </div>
 
-      <h1 class="text-4xl font-bold tracking-tight text-fg sm:text-5xl lg:text-6xl">
+      <!-- Title with gradient accent -->
+      <h1 class="hero-title text-4xl font-bold tracking-tight text-fg sm:text-5xl lg:text-6xl">
         {title}<br />
-        <span class="text-accent-bright">{titleAccent}</span>
+        <span class="bg-gradient-to-r from-accent-bright via-accent to-accent-bright bg-clip-text text-transparent bg-[size:200%] animate-gradient">{titleAccent}</span>
       </h1>
 
-      <p class="mt-6 text-lg text-fg-muted max-w-2xl leading-relaxed">
+      <p class="hero-description mt-6 text-lg text-fg-muted max-w-2xl leading-relaxed">
         {description}
       </p>
 
-      <div class="mt-10 flex flex-col sm:flex-row gap-4">
+      <div class="hero-cta mt-10 flex flex-col sm:flex-row gap-4">
         <a
           href={ctaHref}
-          class="inline-flex items-center justify-center rounded-lg bg-accent px-6 py-3 text-sm font-medium text-white transition-all hover:bg-accent-bright hover:shadow-lg hover:shadow-accent/20"
+          class="group relative inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-accent to-accent-bright px-7 py-3.5 text-sm font-semibold text-white transition-all duration-300 hover:shadow-xl hover:shadow-accent/30 hover:-translate-y-0.5"
         >
-          {cta}
-          <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+          <span class="absolute inset-0 rounded-xl bg-gradient-to-r from-accent-bright to-accent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
+          <span class="relative flex items-center">
+            {cta}
+            <svg class="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+          </span>
         </a>
         <a
           href={ctaSecondaryHref}
-          class="inline-flex items-center justify-center rounded-lg border border-border bg-bg-soft px-6 py-3 text-sm font-medium text-fg transition-colors hover:bg-bg-card hover:border-border-bright"
+          class="group inline-flex items-center justify-center rounded-xl border border-border bg-bg-soft/50 backdrop-blur-sm px-7 py-3.5 text-sm font-medium text-fg transition-all duration-300 hover:bg-bg-card hover:border-accent/40 hover:shadow-lg hover:shadow-accent/5"
         >
           {ctaSecondary}
         </a>
@@ -55,3 +70,68 @@ const { badge, title, titleAccent, description, cta, ctaSecondary, ctaHref, ctaS
     </div>
   </div>
 </section>
+
+<style>
+  /* Floating animation for orbs */
+  .hero-orb-1 {
+    animation: float-1 20s ease-in-out infinite;
+  }
+  .hero-orb-2 {
+    animation: float-2 25s ease-in-out infinite;
+  }
+  .hero-orb-3 {
+    animation: float-3 18s ease-in-out infinite;
+  }
+
+  @keyframes float-1 {
+    0%, 100% { transform: translate(-50%, 0) scale(1); }
+    50% { transform: translate(-50%, -30px) scale(1.05); }
+  }
+  @keyframes float-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(20px, -20px) scale(1.02); }
+    66% { transform: translate(-10px, 10px) scale(0.98); }
+  }
+  @keyframes float-3 {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(-20px, -15px); }
+  }
+
+  /* Gradient text animation */
+  @keyframes gradient {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+  }
+  .animate-gradient {
+    animation: gradient 8s ease infinite;
+  }
+
+  /* Entrance animations */
+  .hero-badge {
+    animation: fade-up 0.6s ease-out both;
+    animation-delay: 0.1s;
+  }
+  .hero-title {
+    animation: fade-up 0.6s ease-out both;
+    animation-delay: 0.2s;
+  }
+  .hero-description {
+    animation: fade-up 0.6s ease-out both;
+    animation-delay: 0.3s;
+  }
+  .hero-cta {
+    animation: fade-up 0.6s ease-out both;
+    animation-delay: 0.4s;
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>

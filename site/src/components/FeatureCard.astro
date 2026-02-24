@@ -8,10 +8,31 @@ interface Props {
 const { title, description, icon } = Astro.props;
 ---
 
-<div class="group rounded-xl border border-border bg-bg-card p-6 transition-all hover:border-accent/40 hover:shadow-lg hover:shadow-accent/5">
-  <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent-bright text-lg">
-    {icon}
+<div class="feature-card group relative rounded-2xl border border-border bg-gradient-to-b from-bg-card to-bg-card/50 p-6 transition-all duration-300 hover:border-accent/50 hover:-translate-y-1">
+  <!-- Glow effect on hover -->
+  <div class="absolute inset-0 rounded-2xl bg-gradient-to-b from-accent/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+  <!-- Subtle inner glow -->
+  <div class="absolute inset-px rounded-[15px] bg-gradient-to-b from-white/[0.03] to-transparent pointer-events-none"></div>
+
+  <div class="relative">
+    <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent/20 to-accent/5 text-xl ring-1 ring-accent/20 transition-all duration-300 group-hover:ring-accent/40 group-hover:shadow-lg group-hover:shadow-accent/10">
+      {icon}
+    </div>
+    <h3 class="text-base font-semibold text-fg mb-2 transition-colors duration-300 group-hover:text-accent-bright">{title}</h3>
+    <p class="text-sm text-fg-muted leading-relaxed">{description}</p>
   </div>
-  <h3 class="text-base font-semibold text-fg mb-2">{title}</h3>
-  <p class="text-sm text-fg-muted leading-relaxed">{description}</p>
 </div>
+
+<style>
+  .feature-card {
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.1),
+      0 2px 4px rgba(0,0,0,0.05);
+  }
+  .feature-card:hover {
+    box-shadow:
+      0 0 0 1px rgba(81,175,174,0.2),
+      0 8px 24px rgba(0,0,0,0.15),
+      0 0 32px rgba(81,175,174,0.08);
+  }
+</style>

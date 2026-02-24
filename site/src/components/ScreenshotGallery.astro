@@ -57,12 +57,14 @@ const screenshots: Screenshot[] = [
 
 <div class="screenshot-gallery">
   <!-- Tab navigation -->
-  <div class="flex flex-wrap gap-2 mb-6 border-b border-border pb-4">
+  <div class="flex flex-wrap justify-center gap-2 mb-8">
     {screenshots.map((s, i) => (
       <button
         class:list={[
-          'tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-          i === 0 ? 'bg-accent text-white' : 'bg-bg-soft text-fg-muted hover:bg-bg-card hover:text-fg',
+          'tab-btn relative px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300',
+          i === 0
+            ? 'bg-gradient-to-r from-accent to-accent-bright text-white shadow-lg shadow-accent/25'
+            : 'bg-bg-soft/50 text-fg-muted hover:bg-bg-card hover:text-fg border border-transparent hover:border-border',
         ]}
         data-tab={s.name}
       >
@@ -74,48 +76,68 @@ const screenshots: Screenshot[] = [
   <!-- Screenshot panels -->
   {screenshots.map((s, i) => (
     <div
-      class:list={['tab-panel', i === 0 ? 'block' : 'hidden']}
+      class:list={['tab-panel transition-all duration-500', i === 0 ? 'block' : 'hidden']}
       data-panel={s.name}
     >
-      <p class="text-fg-muted mb-6 text-center max-w-2xl mx-auto">{s.description}</p>
+      <p class="text-fg-muted mb-8 text-center max-w-2xl mx-auto">{s.description}</p>
 
       <div class="flex flex-col lg:flex-row gap-8 items-center justify-center">
         <!-- Desktop frame -->
-        <div class="relative">
-          <div class="bg-gray-800 rounded-t-lg px-4 py-2 flex items-center gap-2">
-            <div class="flex gap-1.5">
-              <div class="w-3 h-3 rounded-full bg-red-500"></div>
-              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+        <div class="desktop-frame relative group">
+          <!-- Glow effect -->
+          <div class="absolute -inset-4 bg-gradient-to-r from-accent/20 via-accent-bright/10 to-accent/20 rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div class="relative">
+            <!-- Browser chrome -->
+            <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-t-xl px-4 py-3 flex items-center gap-3">
+              <div class="flex gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-500 transition-colors"></div>
+                <div class="w-3 h-3 rounded-full bg-yellow-500/80 hover:bg-yellow-500 transition-colors"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500/80 hover:bg-green-500 transition-colors"></div>
+              </div>
+              <div class="flex-1 flex justify-center">
+                <div class="flex items-center gap-2 bg-gray-700/50 rounded-lg px-4 py-1.5">
+                  <svg class="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                  <span class="text-gray-400 text-xs font-mono">hotline.example.com</span>
+                </div>
+              </div>
             </div>
-            <div class="flex-1 text-center">
-              <span class="text-gray-400 text-xs">hotline.example.com</span>
+            <!-- Screenshot -->
+            <div class="border-4 border-gray-900 border-t-0 rounded-b-xl overflow-hidden shadow-2xl">
+              <img
+                src={s.desktop}
+                alt={`${s.label} - Desktop view`}
+                class="w-full max-w-[640px] transition-transform duration-500 group-hover:scale-[1.02]"
+                loading="lazy"
+              />
             </div>
-          </div>
-          <div class="border-4 border-gray-800 border-t-0 rounded-b-lg overflow-hidden shadow-2xl">
-            <img
-              src={s.desktop}
-              alt={`${s.label} - Desktop view`}
-              class="w-full max-w-[640px]"
-              loading="lazy"
-            />
+            <!-- Reflection -->
+            <div class="absolute -bottom-8 left-4 right-4 h-8 bg-gradient-to-b from-white/[0.02] to-transparent blur-sm"></div>
           </div>
         </div>
 
         <!-- Mobile frame (if available) -->
         {s.mobile && (
-          <div class="relative">
-            <div class="bg-gray-900 rounded-[2rem] p-2 shadow-2xl">
-              <div class="bg-black rounded-[1.5rem] overflow-hidden relative">
-                <!-- Notch -->
-                <div class="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-b-xl z-10"></div>
-                <img
-                  src={s.mobile}
-                  alt={`${s.label} - Mobile view`}
-                  class="w-[187px]"
-                  loading="lazy"
-                />
+          <div class="mobile-frame relative group">
+            <!-- Glow effect -->
+            <div class="absolute -inset-4 bg-gradient-to-r from-accent/20 to-accent-bright/20 rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div class="relative">
+              <!-- Phone shell -->
+              <div class="bg-gradient-to-b from-gray-800 to-gray-900 rounded-[2.5rem] p-2 shadow-2xl ring-1 ring-white/5">
+                <div class="bg-black rounded-[2rem] overflow-hidden relative">
+                  <!-- Dynamic Island -->
+                  <div class="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-6 bg-black rounded-full z-10 flex items-center justify-center">
+                    <div class="w-2 h-2 rounded-full bg-gray-800"></div>
+                  </div>
+                  <img
+                    src={s.mobile}
+                    alt={`${s.label} - Mobile view`}
+                    class="w-[187px] transition-transform duration-500 group-hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                </div>
               </div>
+              <!-- Reflection -->
+              <div class="absolute -bottom-6 left-2 right-2 h-6 bg-gradient-to-b from-white/[0.02] to-transparent blur-sm"></div>
             </div>
           </div>
         )}
@@ -123,6 +145,49 @@ const screenshots: Screenshot[] = [
     </div>
   ))}
 </div>
+
+<style>
+  .desktop-frame, .mobile-frame {
+    animation: float 6s ease-in-out infinite;
+  }
+  .mobile-frame {
+    animation-delay: -3s;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  /* Tab active state animation */
+  .tab-btn[data-active="true"] {
+    background: linear-gradient(135deg, var(--color-accent), var(--color-accent-bright));
+    color: white;
+    box-shadow: 0 4px 15px rgba(81, 175, 174, 0.25);
+  }
+
+  /* Panel transitions */
+  .tab-panel {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  .tab-panel.block {
+    opacity: 1;
+    transform: translateY(0);
+    animation: panel-in 0.4s ease-out;
+  }
+
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>
 
 <script>
   // Tab switching logic
@@ -132,13 +197,15 @@ const screenshots: Screenshot[] = [
 
       // Update button states
       document.querySelectorAll('.tab-btn').forEach((b) => {
-        b.classList.remove('bg-accent', 'text-white')
-        b.classList.add('bg-bg-soft', 'text-fg-muted')
+        b.classList.remove('bg-gradient-to-r', 'from-accent', 'to-accent-bright', 'text-white', 'shadow-lg', 'shadow-accent/25')
+        b.classList.add('bg-bg-soft/50', 'text-fg-muted', 'border-transparent')
+        b.removeAttribute('data-active')
       })
-      btn.classList.remove('bg-bg-soft', 'text-fg-muted')
-      btn.classList.add('bg-accent', 'text-white')
+      btn.classList.remove('bg-bg-soft/50', 'text-fg-muted', 'border-transparent')
+      btn.classList.add('bg-gradient-to-r', 'from-accent', 'to-accent-bright', 'text-white', 'shadow-lg', 'shadow-accent/25')
+      btn.setAttribute('data-active', 'true')
 
-      // Show/hide panels
+      // Show/hide panels with animation
       document.querySelectorAll('.tab-panel').forEach((panel) => {
         if (panel.getAttribute('data-panel') === tabName) {
           panel.classList.remove('hidden')
