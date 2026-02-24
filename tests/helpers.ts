@@ -65,35 +65,46 @@ export async function enterPin(page: Page, pin: string) {
 
 /**
  * Navigate to a URL after the user has already logged in.
- * Full page loads clear the in-memory keyManager, so this logs in first,
- * waits for the authenticated layout to fully render (sidebar visible),
- * then uses TanStack Router's navigate() for SPA navigation to the target.
+ * If already authenticated (sidebar visible), does SPA navigation directly.
+ * Otherwise, re-authenticates via PIN entry first.
  */
 export async function navigateAfterLogin(page: Page, url: string): Promise<void> {
-  // Always start from /login to get a clean auth flow
-  await page.goto('/login')
-  await page.waitForLoadState('domcontentloaded')
+  // Check if we're already authenticated (sidebar Dashboard link visible)
+  const dashboardLink = page.getByRole('link', { name: 'Dashboard' })
+  const isAuthenticated = await dashboardLink.isVisible({ timeout: 1000 }).catch(() => false)
 
-  const pinInput = page.locator('input[aria-label="PIN digit 1"]')
-  const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
+  if (!isAuthenticated) {
+    // Need to re-authenticate — full page load clears in-memory keyManager
+    await page.goto('/login')
+    await page.waitForLoadState('domcontentloaded')
 
-  if (pinVisible) {
-    await enterPin(page, TEST_PIN)
+    const pinInput = page.locator('input[aria-label="PIN digit 1"]')
+    const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
+
+    if (pinVisible) {
+      await enterPin(page, TEST_PIN)
+    }
+
+    // Wait for the authenticated layout
+    await dashboardLink.waitFor({ state: 'visible', timeout: 30000 })
   }
 
-  // Wait for the authenticated layout — sidebar nav link confirms auth is fully settled
-  await page.getByRole('link', { name: 'Dashboard' }).waitFor({ state: 'visible', timeout: 30000 })
-
-  // Now use router.navigate for SPA navigation (no page reload)
+  // SPA navigation via TanStack Router (no page reload, keeps auth state)
   const parsed = new URL(url, 'http://localhost')
-  const path = parsed.pathname + parsed.search
-  await page.evaluate((p) => {
+  const searchParams = Object.fromEntries(parsed.searchParams.entries())
+  await page.evaluate(({ pathname, search }) => {
     const router = (window as any).__TEST_ROUTER
-    if (router) router.navigate({ to: p })
-  }, path)
+    if (!router) return
+    if (Object.keys(search).length > 0) {
+      router.navigate({ to: pathname, search })
+    } else {
+      router.navigate({ to: pathname })
+    }
+  }, { pathname: parsed.pathname, search: searchParams })
   await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: 10000 })
-  // Wait for the route component to render
-  await page.waitForTimeout(500)
+
+  // Allow route component to mount and initial API calls to complete
+  await page.waitForTimeout(1500)
 }
 
 /**

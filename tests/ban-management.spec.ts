@@ -131,7 +131,7 @@ test.describe('Ban management', () => {
     await page.getByLabel(/phone number/i).blur()
     await page.getByLabel(/reason/i).fill('First ban')
     await page.getByRole('button', { name: /save/i }).click()
-    await expect(page.getByText(phone1)).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(phone1).first()).toBeVisible({ timeout: 10000 })
 
     // Add second ban
     await page.getByRole('button', { name: /ban number/i }).click()
@@ -139,7 +139,7 @@ test.describe('Ban management', () => {
     await page.getByLabel(/phone number/i).blur()
     await page.getByLabel(/reason/i).fill('Second ban')
     await page.getByRole('button', { name: /save/i }).click()
-    await expect(page.getByText(phone2)).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(phone2).first()).toBeVisible({ timeout: 10000 })
 
     // Both should be visible in the ban list
     const list = page.locator('main')

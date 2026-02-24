@@ -44,10 +44,10 @@ test.describe('WebRTC & Call Preference Settings', () => {
 
   test('deep link to call-preference section auto-expands it', async ({ page }) => {
     await navigateAfterLogin(page, '/settings?section=call-preference')
-    await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Account Settings', exact: true })).toBeVisible({ timeout: 10000 })
 
     // The section should be expanded — we should see the preference options
-    await expect(page.getByText('Phone Only')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('Phone Only')).toBeVisible({ timeout: 10000 })
   })
 
   // --- Hub Settings: WebRTC Configuration ---

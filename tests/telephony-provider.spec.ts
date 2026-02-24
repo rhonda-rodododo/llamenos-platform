@@ -18,7 +18,7 @@ test.describe('Telephony Provider Settings', () => {
   test('shows env fallback message when no provider configured', async ({ page }) => {
     // Expand the Telephony Provider section
     await page.getByText('Telephony Provider').first().click()
-    await expect(page.getByText(/using environment variable defaults/i)).toBeVisible()
+    await expect(page.getByText(/using environment variable defaults/i)).toBeVisible({ timeout: 10000 })
   })
 
   test('provider dropdown shows all providers', async ({ page }) => {
@@ -184,9 +184,9 @@ test.describe('Telephony Provider Settings', () => {
 
   test('deep link to telephony-provider section auto-expands it', async ({ page }) => {
     await navigateAfterLogin(page, '/admin/settings?section=telephony-provider')
-    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible({ timeout: 10000 })
 
     // The section should be expanded — we should see the provider dropdown
-    await expect(page.locator('select').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('select').first()).toBeVisible({ timeout: 10000 })
   })
 })

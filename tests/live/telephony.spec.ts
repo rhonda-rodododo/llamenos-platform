@@ -12,7 +12,13 @@ import {
 
 test.describe.configure({ mode: 'serial' })
 
+// Skip the entire suite when live Twilio credentials are not available (e.g. CI)
+const hasLiveCreds = !!process.env.TWILIO_ACCOUNT_SID
+
 test.describe('Live Telephony', () => {
+  // eslint-disable-next-line playwright/no-skipped-test
+  test.skip(!hasLiveCreds, 'Live telephony tests require TWILIO_ACCOUNT_SID')
+
   test.beforeAll(async ({ request }) => {
     await resetStaging(request)
   })
