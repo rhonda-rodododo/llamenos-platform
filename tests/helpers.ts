@@ -21,10 +21,10 @@ export const Timeouts = {
   ELEMENT: 10000,
   /** Time to wait for auth-related operations */
   AUTH: 30000,
-  /** Short delay for UI settling (prefer waitForResponse where possible) */
+  /** Short delay for UI settling after login/navigation */
   UI_SETTLE: 500,
-  /** Medium delay for async operations (prefer waitForResponse where possible) */
-  ASYNC_SETTLE: 1000,
+  /** Medium delay for route component mount and initial API calls */
+  ASYNC_SETTLE: 1500,
 } as const
 
 // Re-export TestIds for convenience
@@ -129,8 +129,8 @@ export async function navigateAfterLogin(page: Page, url: string): Promise<void>
   }, { pathname: parsed.pathname, search: searchParams })
   await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: Timeouts.NAVIGATION })
 
-  // Wait for network to settle instead of arbitrary timeout
-  await page.waitForLoadState('networkidle', { timeout: Timeouts.ASYNC_SETTLE }).catch(() => {})
+  // Allow route component to mount and initial API calls to complete
+  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 }
 
 /**
@@ -172,8 +172,8 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await page.reload()
   await enterPin(page, TEST_PIN)
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.API })
-  // Wait for network to settle instead of arbitrary timeout
-  await page.waitForLoadState('networkidle', { timeout: Timeouts.UI_SETTLE }).catch(() => {})
+  // Short delay for initial API calls to complete
+  await page.waitForTimeout(Timeouts.UI_SETTLE)
 }
 
 /**
