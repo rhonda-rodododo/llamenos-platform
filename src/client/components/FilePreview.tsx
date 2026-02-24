@@ -18,8 +18,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function resolveSecretKey(keyPair: { secretKey: Uint8Array } | null): Uint8Array | null {
-  if (keyPair) return keyPair.secretKey
+function resolveSecretKey(): Uint8Array | null {
   if (keyManager.isUnlocked()) {
     try { return keyManager.getSecretKey() } catch { return null }
   }
@@ -28,7 +27,7 @@ function resolveSecretKey(keyPair: { secretKey: Uint8Array } | null): Uint8Array
 
 export function FilePreview({ fileId }: FilePreviewProps) {
   const { t } = useTranslation()
-  const { keyPair } = useAuth()
+  const { hasNsec, publicKey } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
@@ -39,7 +38,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
     let objectUrl: string | null = null
 
     async function loadAndDecrypt() {
-      const secretKey = resolveSecretKey(keyPair)
+      const secretKey = resolveSecretKey()
       if (!secretKey) {
         if (mounted) setError(t('reports.noKeyAvailable', { defaultValue: 'Encryption key not available' }))
         if (mounted) setLoading(false)
@@ -56,7 +55,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
         if (!mounted) return
 
         // Find our envelope
-        const myPubkey = keyPair?.publicKey
+        const myPubkey = publicKey
         let envelope: RecipientEnvelope | undefined
         if (myPubkey) {
           envelope = envelopes.find(e => e.pubkey === myPubkey)
@@ -101,7 +100,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
       mounted = false
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [fileId, keyPair, t])
+  }, [fileId, hasNsec, publicKey, t])
 
   if (loading) {
     return (

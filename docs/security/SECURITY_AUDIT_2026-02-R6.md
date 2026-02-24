@@ -118,13 +118,13 @@ The `ARI_PASSWORD` defaulted to `changeme` with no required override in compose.
 
 ### MEDIUM
 
-#### M-1: SSRF Blocklist Incomplete for Connection Test Endpoints
+#### ~~M-1: SSRF Blocklist Incomplete for Connection Test Endpoints~~ — FIXED
 
 **Files**: `src/worker/routes/settings.ts:168-174`, `src/worker/routes/setup.ts:89-93`
 
-The SSRF check uses string prefix matching (`hostname.startsWith('172.')`) which over-blocks public IPs in 172.0-15.x and 172.32-255.x. More critically, IPv6 link-local (`fe80::`), Cloudflare CGNAT (`100.64.0.0/10`), and IPv4-mapped IPv6 addresses are not blocked.
+The SSRF check used string prefix matching (`hostname.startsWith('172.')`) which over-blocked public IPs in 172.0-15.x and 172.32-255.x. IPv6 link-local, CGNAT, and IPv4-mapped IPv6 addresses were not blocked.
 
-**Recommendation**: Use proper CIDR subnet parsing. Block `100.64.0.0/10`, `169.254.0.0/16`, `fe80::/10`, `::1`, `fc00::/7`, and IPv4-mapped IPv6 (`::ffff:127.0.0.1`).
+**Fix**: Expanded SSRF blocklist with proper CIDR matching covering `100.64.0.0/10`, `169.254.0.0/16`, `fe80::/10`, `::1`, `fc00::/7`, and IPv4-mapped IPv6 addresses. Fixed 172.x over-blocking to only block `172.16.0.0/12`.
 
 #### M-2: `/calls/active` and `/calls/today-count` Have No Permission Guard
 
@@ -215,37 +215,37 @@ No egress rule for external PostgreSQL (port 5432). In a default-deny Kubernetes
 
 ### LOW
 
-#### L-1: Admin Pubkey Exposed in Public `/api/config` Endpoint
+#### ~~L-1: Admin Pubkey Exposed in Public `/api/config` Endpoint~~ — FIXED
 
 **File**: `src/worker/routes/config.ts:64`
 
-The admin's Nostr public key is returned without authentication. While public keys are inherently public, this enables correlation with the admin's identity on other Nostr-connected platforms.
+The admin's Nostr public key was returned without authentication, enabling correlation with the admin's identity on other Nostr-connected platforms.
 
-**Recommendation**: Document operational requirement that the admin keypair must be used exclusively for Llamenos. Consider returning `adminPubkey` only to authenticated users.
+**Fix**: Removed `adminPubkey` from the public `/api/config` endpoint. It is now returned only in the authenticated `/api/auth/me` response. Client auth context updated to source `adminPubkey` from the auth state instead of the config context.
 
-#### L-2: Volunteer Phone Numbers in Invite List and Delete Dialogs
+#### ~~L-2: Volunteer Phone Numbers in Invite List and Delete Dialogs~~ — FIXED
 
 **Files**: `src/client/routes/volunteers.tsx:184-186,538-540`
 
-Pending invites and delete confirmation dialogs show full phone numbers without masking.
+Pending invites and delete confirmation dialogs showed full phone numbers without masking.
 
-**Recommendation**: Apply the same `maskedPhone()` pattern used elsewhere. Consider re-PIN step-up for unmasking.
+**Fix**: Applied `maskedPhone()` to both the invite list and volunteer delete confirmation dialog. The function was extracted to module scope for reuse.
 
-#### L-3: `keyPair.secretKey` Propagated Through React State
+#### ~~L-3: `keyPair.secretKey` Propagated Through React State~~ — FIXED
 
 **File**: `src/client/lib/auth.tsx:396-412`
 
-The deprecated `keyPair` object distributes the raw `Uint8Array` secret key across multiple React component trees. React DevTools or error boundaries could expose it.
+The `keyPair` object distributed the raw `Uint8Array` secret key across multiple React component trees. React DevTools or error boundaries could expose it.
 
-**Recommendation**: Refactor to call `keyManager.getSecretKey()` at the point of crypto operations rather than holding it in React state.
+**Fix**: Removed `keyPair` from `AuthContextValue` entirely. All 9 consumer components refactored to use `hasNsec` for null checks, `publicKey` for the public key, and `keyManager.getSecretKey()` called at the point of crypto operations. Secret key material no longer exists in React state.
 
-#### L-4: Schnorr Tokens Not Bound to Request Path
+#### ~~L-4: Schnorr Tokens Not Bound to Request Path~~ — FIXED
 
 **File**: `src/worker/lib/auth.ts:35`
 
-The signed message is `llamenos:auth:${pubkey}:${timestamp}` without request method/path. A captured token is reusable across any endpoint within its 5-minute window.
+The signed message was `llamenos:auth:${pubkey}:${timestamp}` without request method/path. A captured token was reusable across any endpoint within its 5-minute window.
 
-**Recommendation**: Include the request method and path in the signed message for tighter binding.
+**Fix**: Signed message now includes method and path: `llamenos:auth:${pubkey}:${timestamp}:${method}:${path}`. All client call sites updated to pass method+path. Server-side verification extracts method+path from the request and includes them in signature verification. Backward-compatible: server accepts tokens without method/path during transition.
 
 #### L-5: Rate Limiter Off-by-One
 
@@ -255,21 +255,21 @@ Uses `recent.length > maxPerMinute` (greater-than) rather than `>=`, allowing on
 
 **Recommendation**: Change to `>=`.
 
-#### L-6: Shift Time Format Not Validated
+#### ~~L-6: Shift Time Format Not Validated~~ — FIXED
 
 **File**: `src/worker/durable-objects/shift-manager.ts:90`
 
-Shift `startTime`/`endTime` are compared as strings without format validation. Malformed values produce unexpected string comparison results.
+Shift `startTime`/`endTime` were compared as strings without format validation. Malformed values produced unexpected string comparison results.
 
-**Recommendation**: Validate `HH:MM` format on input.
+**Fix**: Added `isValidTimeFormat()` function with regex `/^([01]\d|2[0-3]):[0-5]\d$/` validation. Applied to both `createShift()` and `updateShift()` handlers, returning 400 for invalid formats.
 
-#### L-7: `style-src 'unsafe-inline'` in CSP
+#### ~~L-7: `style-src 'unsafe-inline'` in CSP~~ — DOCUMENTED
 
 **File**: `src/worker/middleware/security-headers.ts:14`
 
 Required by Tailwind CSS but weakens XSS defense-in-depth.
 
-**Recommendation**: Investigate nonce-based CSP for styles, or accept as a documented trade-off.
+**Fix**: Added explanatory comment documenting the trade-off. Nonce-based CSP is not feasible with Tailwind's runtime style injection. Accepted as a documented architectural constraint.
 
 #### L-8: Playwright Trace Artifacts May Contain Auth Tokens
 

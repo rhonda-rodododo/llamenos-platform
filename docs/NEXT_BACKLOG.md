@@ -77,7 +77,7 @@ Deployment guide: [`docs/security/DEPLOYMENT_HARDENING.md`](security/DEPLOYMENT_
 - [x] **H-6**: Asterisk `ARI_PASSWORD` has no required override in compose — added `:?` required syntax
 
 ### Medium — Epic 65
-- [ ] **M-1**: SSRF blocklist incomplete (IPv6, CGNAT, mapped addresses)
+- [x] **M-1**: SSRF blocklist incomplete (IPv6, CGNAT, mapped addresses) — expanded blocklist with proper CIDR matching
 - [x] **M-2**: `/calls/active` and `/calls/today-count` missing permission guards — added
 - [x] **M-3**: `isAdmin` query param on internal DO API — replaced with dedicated `/admin/volunteers/:pubkey` DO route
 - [x] **M-4**: Missing security headers in Worker — added CORP and X-Permitted-Cross-Domain-Policies
@@ -89,13 +89,13 @@ Deployment guide: [`docs/security/DEPLOYMENT_HARDENING.md`](security/DEPLOYMENT_
 - [x] **M-10**: Helm NetworkPolicy missing PostgreSQL egress rule — added conditional TCP egress for postgres.port
 
 ### Low — Epic 67
-- [ ] **L-1**: `adminPubkey` in public config — restrict to authenticated users
-- [ ] **L-2**: Phone numbers unmasked in invite list and delete dialogs
-- [ ] **L-3**: `keyPair.secretKey` propagated through React state — refactor to closure
-- [ ] **L-4**: Schnorr tokens not bound to request path
+- [x] **L-1**: `adminPubkey` in public config — moved to authenticated `/api/auth/me` response
+- [x] **L-2**: Phone numbers unmasked in invite list and delete dialogs — applied `maskedPhone()` pattern
+- [x] **L-3**: `keyPair.secretKey` propagated through React state — removed from auth context, all consumers use `keyManager.getSecretKey()` at point of use
+- [x] **L-4**: Schnorr tokens not bound to request path — tokens now include method+path in signed message
 - [x] **L-5**: Rate limiter off-by-one (`>` vs `>=`) — fixed
-- [ ] **L-6**: Shift time format not validated
-- [ ] **L-7**: Document CSP `style-src 'unsafe-inline'` trade-off
+- [x] **L-6**: Shift time format not validated — added HH:MM regex validation
+- [x] **L-7**: Document CSP `style-src 'unsafe-inline'` trade-off — added explanatory comment
 - [x] **L-8**: Reduce Playwright trace artifact retention to 1 day — done
 - [ ] **L-9**: Add panic-wipe mechanism for device seizure
 - [ ] **L-10**: SRI hashes for service worker cached assets

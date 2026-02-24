@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
-import { type KeyPair, keyPairFromNsec, createAuthToken } from './crypto'
+import { keyPairFromNsec, createAuthToken } from './crypto'
 import * as keyManager from './key-manager'
 import { hasStoredKey } from './key-store'
 import { getMe, login, logout as apiLogout, updateMyAvailability, setOnAuthExpired, setOnApiActivity } from './api'
@@ -40,7 +40,6 @@ interface AuthContextValue extends AuthState {
   isAuthenticated: boolean
   hasNsec: boolean
   adminPubkey: string
-  keyPair: KeyPair | null
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -401,20 +400,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasSessionToken = typeof window !== 'undefined' && !!sessionStorage.getItem('llamenos-session-token')
 
-  // Build keyPair from key manager when unlocked
-  let keyPair: KeyPair | null = null
-  if (state.isKeyUnlocked) {
-    try {
-      const sk = keyManager.getSecretKey()
-      const pk = keyManager.getPublicKeyHex()
-      if (pk) {
-        keyPair = { secretKey: sk, publicKey: pk, nsec: '', npub: '' }
-      }
-    } catch {
-      // Key became locked between render cycles
-    }
-  }
-
   const value: AuthContextValue = {
     ...state,
     signIn,
@@ -429,7 +414,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: permissionGranted(state.permissions, 'settings:manage'),
     isAuthenticated: (state.isKeyUnlocked || hasSessionToken) && state.roles.length > 0,
     hasNsec: state.isKeyUnlocked,
-    keyPair,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

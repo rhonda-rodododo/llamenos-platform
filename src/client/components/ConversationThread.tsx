@@ -14,7 +14,7 @@ interface ConversationThreadProps {
 
 export function ConversationThread({ conversationId, messages, isLoading }: ConversationThreadProps) {
   const { t } = useTranslation()
-  const { keyPair, isAdmin } = useAuth()
+  const { hasNsec, isAdmin } = useAuth()
   const [decryptedContent, setDecryptedContent] = useState<Map<string, string>>(new Map())
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showScrollDown, setShowScrollDown] = useState(false)
@@ -52,7 +52,7 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
     }
 
     setDecryptedContent(newDecrypted)
-  }, [messages, keyPair, isAdmin])
+  }, [messages, hasNsec, isAdmin])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -75,7 +75,6 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
   }
 
   function resolveSecretKey(): Uint8Array | null {
-    if (keyPair) return keyPair.secretKey
     if (keyManager.isUnlocked()) {
       try { return keyManager.getSecretKey() } catch { return null }
     }
