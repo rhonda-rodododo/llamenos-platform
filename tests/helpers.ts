@@ -191,5 +191,8 @@ export function uniquePhone(): string {
 }
 
 export async function resetTestState(request: APIRequestContext) {
-  await request.post('/api/test-reset')
+  const res = await request.post('/api/test-reset')
+  if (!res.ok()) {
+    throw new Error(`test-reset failed with status ${res.status()}: ${await res.text()}`)
+  }
 }
