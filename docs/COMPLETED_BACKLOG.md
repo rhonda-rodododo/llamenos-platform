@@ -1,5 +1,40 @@
 # Completed Backlog
 
+## 2026-02-24: Complete All Remaining Epics
+
+### Phase 1: Security Completion
+- [x] **L-9 Panic Wipe** — Triple-Escape detector, full storage wipe, red flash overlay (`panic-wipe.ts`, `panic-wipe-indicator.tsx`)
+- [x] **L-10 SRI Hashes** — Vite closeBundle plugin computing SHA-384 for all precached assets, patching fetch in sw.js (`sri-workbox-plugin.ts`)
+- [x] **PIN Challenge Re-auth** — PIN dialog before sensitive actions (phone unmask), max 3 attempts, auto-wipe on failure (`use-pin-challenge.ts`, `pin-challenge-dialog.tsx`)
+
+### Phase 2: Epic 63 — RCS Channel
+- [x] Google RBM REST adapter with JWT service account auth (`rcs/rbm-client.ts`, `rcs/adapter.ts`)
+- [x] RBM API types for webhooks, rich cards, suggestions (`rcs/types.ts`)
+- [x] Admin UI section: agent ID, service account key, webhook URL, fallback toggle, connection test (`rcs-channel-section.tsx`)
+- [x] Shared types extension: `'rcs'` in MessagingChannelType, RCSConfig, channel maps
+- [x] Router + factory integration for webhook handling
+
+### Phase 3: Epic 62 — Message Blasts
+- [x] Subscriber management in ConversationDO (CRUD, import, keyword opt-in/out, HMAC preference tokens)
+- [x] Blast CRUD and delivery via DO alarms (rate-limited batch sending)
+- [x] TCPA-compliant STOP keyword always recognized
+- [x] Blast API routes proxying to ConversationDO
+- [x] Public subscriber preferences endpoint (token-validated, no auth)
+- [x] Client UI: BlastComposer, SubscriberManager, BlastSettingsPanel, blasts route, preferences route
+- [x] Keyword interception in messaging webhook router
+
+### Phase 4: Post-Launch Features
+- [x] **Call Recording Playback** — On-demand fetch from telephony provider via `TelephonyAdapter.getRecordingAudio()`, permission-gated (admin or answering volunteer), lazy-loading `<RecordingPlayer>` component in calls and notes views
+- [x] **CF Tunnel** — `scripts/dev-tunnel.sh` wrapping cloudflared for local dev webhook testing
+
+### Phase 5: Epic 66 — Deployment Hardening
+- [x] Ansible: 8 roles (common, ssh-hardening, firewall, kernel-hardening, fail2ban, docker, llamenos, backup)
+- [x] Ansible: 4 playbooks (harden, deploy, update, backup) with Jinja2 templates
+- [x] Ansible: justfile with generate-secrets, encrypt-vars, and all deployment commands
+- [x] OpenTofu: Hetzner module with cloud-init hardening + generic module for Ansible inventory
+- [x] `docs/QUICKSTART.md` — step-by-step deployment guide
+- [x] `docs/RUNBOOK.md` — operational runbook (secret rotation, incident response, backup recovery)
+
 ## 2026-02-18: Epic 55 — Multi-Platform Deployment (Docker Compose + Helm)
 
 ### Platform Abstraction Layer

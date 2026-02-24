@@ -1,7 +1,7 @@
 # Next Backlog
 
 ## High Priority (Pre-Launch)
-- [ ] Set up Cloudflare Tunnel for local dev with telephony webhooks
+- [x] Set up Cloudflare Tunnel for local dev with telephony webhooks (`scripts/dev-tunnel.sh`)
 - [x] Configure production wrangler secrets (TWILIO_*, ADMIN_PUBKEY) — deployed and running
 - [ ] Test full call flow end-to-end: incoming call -> CAPTCHA -> parallel ring -> answer -> notes -> hang up *(requires real phone + telephony account)*
 
@@ -52,10 +52,10 @@
 - [x] Asterisk bridge bound to 0.0.0.0 — bound to 127.0.0.1
 
 ### Low / Future
-- [ ] Add auto-lock/panic-wipe mechanism for device seizure scenarios
-- [ ] SRI hashes for PWA service worker cached assets
-- [ ] Consider re-auth step-up for sensitive actions (e.g., unmasking volunteer phone numbers)
-- [ ] Auth token nonce-based replay protection (currently mitigated by HTTPS + Schnorr signatures + 5min window)
+- [x] Add auto-lock/panic-wipe mechanism for device seizure scenarios (triple-Escape trigger)
+- [x] SRI hashes for PWA service worker cached assets (`sri-workbox-plugin.ts`)
+- [x] Consider re-auth step-up for sensitive actions — PIN challenge dialog for phone unmask
+- [ ] Auth token nonce-based replay protection *(accepted trade-off: mitigated by HTTPS + Schnorr + 5-min window + method/path binding)*
 
 ## Security Audit Findings (2026-02-23, Round 6)
 
@@ -97,15 +97,15 @@ Deployment guide: [`docs/security/DEPLOYMENT_HARDENING.md`](security/DEPLOYMENT_
 - [x] **L-6**: Shift time format not validated — added HH:MM regex validation
 - [x] **L-7**: Document CSP `style-src 'unsafe-inline'` trade-off — added explanatory comment
 - [x] **L-8**: Reduce Playwright trace artifact retention to 1 day — done
-- [ ] **L-9**: Add panic-wipe mechanism for device seizure
-- [ ] **L-10**: SRI hashes for service worker cached assets
+- [x] **L-9**: Add panic-wipe mechanism for device seizure (triple-Escape trigger + full wipe)
+- [x] **L-10**: SRI hashes for service worker cached assets (Vite closeBundle plugin)
 
 ## Deployment Hardening Tooling — Epic 66
-- [ ] Ansible playbook for VPS hardening (SSH, firewall, kernel, Docker, fail2ban)
-- [ ] Ansible playbook for application deployment (docker-compose, secrets, health check)
-- [ ] Ansible playbook for updates and rollbacks
-- [ ] Ansible playbook for encrypted backups
-- [ ] OpenTofu module for Hetzner VPS provisioning (optional)
+- [x] Ansible playbook for VPS hardening (SSH, firewall, kernel, Docker, fail2ban)
+- [x] Ansible playbook for application deployment (docker-compose, secrets, health check)
+- [x] Ansible playbook for updates and rollbacks
+- [x] Ansible playbook for encrypted backups
+- [x] OpenTofu module for Hetzner VPS provisioning (optional)
 - [x] Quick start guide for first-time operators (`docs/QUICKSTART.md`)
 - [x] Operator runbook (secret rotation, incident response, backup recovery) (`docs/RUNBOOK.md`)
 - [x] Updated DEPLOYMENT_HARDENING.md with Ansible tooling cross-references
@@ -151,9 +151,9 @@ Deployment guide: [`docs/security/DEPLOYMENT_HARDENING.md`](security/DEPLOYMENT_
 ## Permission-Based Access Control & Multi-Hub (Epics 60–63)
 - [x] Epic 60: Permission-Based Access Control — dynamic roles, permission catalog, multi-role users, role manager UI
 - [x] Epic 61: Multi-Hub Architecture — hub isolation, per-hub DOs, hub-scoped roles, hub switcher UI, hub management admin page, telephony/messaging/WebSocket hub routing
-- [ ] Epic 62: Message Blasts — subscriber management, broadcast messaging, scheduled sends, opt-in/opt-out compliance
-- [ ] Epic 63: RCS Channel — Google RBM API adapter, rich cards, suggested replies, SMS fallback
+- [x] Epic 62: Message Blasts — subscriber management, broadcast messaging, scheduled sends, opt-in/opt-out compliance
+- [x] Epic 63: RCS Channel — Google RBM API adapter, rich cards, suggested replies, SMS fallback
 
 ## Low Priority (Post-Launch)
-- [ ] Add call recording playback in notes view
+- [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
