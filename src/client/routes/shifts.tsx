@@ -68,7 +68,7 @@ function ShiftsPage() {
           <Clock className="h-6 w-6 text-primary" />
           <h1 className="text-xl font-bold sm:text-2xl">{t('shifts.title')}</h1>
         </div>
-        <Button onClick={() => { setShowForm(true); setEditingShift(null) }}>
+        <Button data-testid="shift-create-btn" onClick={() => { setShowForm(true); setEditingShift(null) }}>
           <CalendarPlus className="h-4 w-4" />
           {t('shifts.createShift')}
         </Button>
@@ -127,7 +127,7 @@ function ShiftsPage() {
           </Card>
         ) : (
           shifts.map(shift => (
-            <Card key={shift.id}>
+            <Card key={shift.id} data-testid={`shift-card-${shift.id}`}>
               <CardContent>
                 <div className="flex items-start justify-between">
                   <div>
@@ -143,16 +143,17 @@ function ShiftsPage() {
                         </Badge>
                       ))}
                     </div>
-                    <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <p data-testid="shift-volunteer-count" className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" />
                       {shift.volunteerPubkeys.length} {t('shifts.volunteers').toLowerCase()}
                     </p>
                   </div>
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="icon-xs" onClick={() => setEditingShift(shift)} aria-label={t('a11y.editItem')}>
+                    <Button data-testid="shift-edit-btn" variant="ghost" size="icon-xs" onClick={() => setEditingShift(shift)} aria-label={t('a11y.editItem')}>
                       <Pencil className="h-3 w-3" />
                     </Button>
                     <Button
+                      data-testid="shift-delete-btn"
                       variant="ghost"
                       size="icon-xs"
                       className="text-destructive hover:text-destructive"
@@ -177,7 +178,7 @@ function ShiftsPage() {
       </div>
 
       {/* Fallback group */}
-      <Card>
+      <Card data-testid="fallback-group-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <LifeBuoy className="h-4 w-4 text-muted-foreground" />
@@ -230,11 +231,12 @@ function ShiftForm({ shift, volunteers, onSave, onCancel }: {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form data-testid="shift-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="shift-name">{t('shifts.shiftName')}</Label>
             <Input
               id="shift-name"
+              data-testid="shift-name-input"
               value={name}
               onChange={e => setName(e.target.value)}
               required
@@ -245,6 +247,7 @@ function ShiftForm({ shift, volunteers, onSave, onCancel }: {
               <Label htmlFor="start-time">{t('shifts.startTime')}</Label>
               <Input
                 id="start-time"
+                data-testid="shift-start-time"
                 type="time"
                 value={startTime}
                 onChange={e => setStartTime(e.target.value)}
@@ -254,6 +257,7 @@ function ShiftForm({ shift, volunteers, onSave, onCancel }: {
               <Label htmlFor="end-time">{t('shifts.endTime')}</Label>
               <Input
                 id="end-time"
+                data-testid="shift-end-time"
                 type="time"
                 value={endTime}
                 onChange={e => setEndTime(e.target.value)}
@@ -287,10 +291,10 @@ function ShiftForm({ shift, volunteers, onSave, onCancel }: {
             />
           </div>
           <div className="flex gap-2">
-            <Button type="submit" disabled={saving}>
+            <Button data-testid="form-save-btn" type="submit" disabled={saving}>
               {saving ? t('common.loading') : t('common.save')}
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button data-testid="form-cancel-btn" type="button" variant="outline" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
           </div>

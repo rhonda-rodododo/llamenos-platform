@@ -44,11 +44,11 @@ function BansPage() {
           <h1 className="text-xl font-bold sm:text-2xl">{t('banList.title')}</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowBulk(!showBulk)}>
+          <Button data-testid="ban-import-btn" variant="outline" onClick={() => setShowBulk(!showBulk)}>
             <Upload className="h-4 w-4" />
             {t('banList.bulkImport')}
           </Button>
-          <Button onClick={() => setShowAdd(!showAdd)}>
+          <Button data-testid="ban-add-btn" onClick={() => setShowAdd(!showAdd)}>
             <Plus className="h-4 w-4" />
             {t('banList.addNumber')}
           </Button>
@@ -94,7 +94,7 @@ function BansPage() {
               {t('banList.noEntries')}
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <div data-testid="ban-list" className="divide-y divide-border">
               {bans.map(ban => (
                 <BanRow
                   key={ban.phone}
@@ -147,7 +147,7 @@ function AddBanForm({ onAdded, onCancel }: {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form data-testid="ban-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="ban-phone">{t('banList.phoneNumber')}</Label>
@@ -169,10 +169,10 @@ function AddBanForm({ onAdded, onCancel }: {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button type="submit" disabled={saving}>
+            <Button data-testid="form-save-btn" type="submit" disabled={saving}>
               {saving ? t('common.loading') : t('common.save')}
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button data-testid="form-cancel-btn" type="button" variant="outline" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
           </div>
@@ -191,13 +191,14 @@ function BanRow({ ban, onRemoved }: {
   const [showConfirm, setShowConfirm] = useState(false)
 
   return (
-    <div className="flex flex-wrap items-center gap-4 px-4 py-3 sm:px-6">
+    <div data-testid={`ban-row-${ban.phone.replace(/\+/g, '')}`} className="flex flex-wrap items-center gap-4 px-4 py-3 sm:px-6">
       <code className="text-xs font-mono">{ban.phone}</code>
       <span className="flex-1 text-sm text-muted-foreground">{ban.reason}</span>
       <span className="text-xs text-muted-foreground">
         {new Date(ban.bannedAt).toLocaleDateString()}
       </span>
       <Button
+        data-testid="ban-remove-btn"
         variant="ghost"
         size="icon-xs"
         className="text-destructive hover:text-destructive"
@@ -266,10 +267,11 @@ function BulkImportForm({ onImported, onCancel }: {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form data-testid="ban-bulk-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>{t('banList.bulkImportDescription')}</Label>
             <textarea
+              data-testid="ban-bulk-phones"
               value={text}
               onChange={e => setText(e.target.value)}
               rows={6}
@@ -287,10 +289,10 @@ function BulkImportForm({ onImported, onCancel }: {
             />
           </div>
           <div className="flex gap-2">
-            <Button type="submit" disabled={saving}>
+            <Button data-testid="form-submit-btn" type="submit" disabled={saving}>
               {saving ? t('common.loading') : t('common.submit')}
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button data-testid="form-cancel-btn" type="button" variant="outline" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
           </div>

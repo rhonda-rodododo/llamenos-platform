@@ -3,9 +3,35 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { getPublicKey, nip19 } from 'nostr-tools'
+import { TestIds } from './test-ids'
 
 export const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
 export const TEST_PIN = '123456'
+
+/**
+ * Default timeout values for common operations.
+ * Centralized here for easy tuning during test optimization.
+ */
+export const Timeouts = {
+  /** Time to wait for page navigation */
+  NAVIGATION: 10000,
+  /** Time to wait for API responses */
+  API: 15000,
+  /** Time to wait for elements to appear */
+  ELEMENT: 10000,
+  /** Time to wait for auth-related operations */
+  AUTH: 30000,
+  /** Short delay for UI settling (prefer waitForResponse where possible) */
+  UI_SETTLE: 500,
+  /** Medium delay for async operations (prefer waitForResponse where possible) */
+  ASYNC_SETTLE: 1000,
+} as const
+
+// Re-export TestIds for convenience
+export { TestIds } from './test-ids'
+
+// Re-export page object utilities
+export * from './pages/index'
 
 /**
  * Pre-compute an encrypted key blob in Node.js (Playwright runtime) and inject
@@ -101,10 +127,10 @@ export async function navigateAfterLogin(page: Page, url: string): Promise<void>
       router.navigate({ to: pathname })
     }
   }, { pathname: parsed.pathname, search: searchParams })
-  await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: 10000 })
+  await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: Timeouts.NAVIGATION })
 
-  // Allow route component to mount and initial API calls to complete
-  await page.waitForTimeout(1500)
+  // Wait for network to settle instead of arbitrary timeout
+  await page.waitForLoadState('networkidle', { timeout: Timeouts.ASYNC_SETTLE }).catch(() => {})
 }
 
 /**
@@ -145,8 +171,9 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await preloadEncryptedKey(page, nsec, TEST_PIN)
   await page.reload()
   await enterPin(page, TEST_PIN)
-  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: 15000 })
-  await page.waitForTimeout(500)
+  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.API })
+  // Wait for network to settle instead of arbitrary timeout
+  await page.waitForLoadState('networkidle', { timeout: Timeouts.UI_SETTLE }).catch(() => {})
 }
 
 /**
@@ -170,14 +197,15 @@ export async function createVolunteerAndGetNsec(page: Page, name: string, phone:
   await page.getByRole('link', { name: 'Volunteers' }).click()
   await expect(page.getByRole('heading', { name: 'Volunteers' })).toBeVisible()
 
-  await page.getByRole('button', { name: /add volunteer/i }).click()
+  await page.getByTestId(TestIds.VOLUNTEER_ADD_BTN).click()
   await page.getByLabel('Name').fill(name)
   await page.getByLabel('Phone Number').fill(phone)
   await page.getByLabel('Phone Number').blur()
-  await page.getByRole('button', { name: /save/i }).click()
+  await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 
-  await expect(page.locator('code').first()).toBeVisible({ timeout: 15000 })
-  const nsec = await page.locator('code').first().textContent()
+  const nsecCode = page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)
+  await expect(nsecCode).toBeVisible({ timeout: Timeouts.API })
+  const nsec = await nsecCode.textContent()
   if (!nsec) throw new Error('Failed to get nsec')
   return nsec
 }

@@ -216,7 +216,7 @@ function NotesPage() {
               {t('notes.export')}
             </Button>
           )}
-          <Button onClick={() => setShowNewNote(!showNewNote)}>
+          <Button data-testid="note-new-btn" onClick={() => setShowNewNote(!showNewNote)}>
             <Plus className="h-4 w-4" />
             {t('notes.newNote')}
           </Button>
@@ -382,6 +382,7 @@ function NotesPage() {
                       </div>
                       {editingId !== note.id && (
                         <Button
+                          data-testid="note-edit-btn"
                           variant="ghost" size="icon-xs"
                           onClick={() => setEditingId(note.id)}
                           aria-label={t('a11y.editItem')}

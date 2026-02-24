@@ -121,6 +121,7 @@ function CallHistoryPage() {
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
+                  data-testid="call-search"
                   value={searchInput}
                   onChange={e => setSearchInput(e.target.value)}
                   placeholder={t('callHistory.searchPlaceholder')}
@@ -147,11 +148,11 @@ function CallHistoryPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" size="sm" aria-label={t('a11y.searchButton')}>
+              <Button data-testid="call-search-btn" type="submit" size="sm" aria-label={t('a11y.searchButton')}>
                 <Search className="h-4 w-4" />
               </Button>
               {hasFilters && (
-                <Button type="button" variant="ghost" size="sm" onClick={clearFilters} aria-label={t('a11y.clearFilters')}>
+                <Button data-testid="call-clear-filters" type="button" variant="ghost" size="sm" onClick={clearFilters} aria-label={t('a11y.clearFilters')}>
                   <X className="h-4 w-4" />
                 </Button>
               )}

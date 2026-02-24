@@ -84,7 +84,7 @@ function VolunteersPage() {
             <Mail className="h-4 w-4" />
             {t('volunteers.inviteVolunteer')}
           </Button>
-          <Button onClick={() => { setShowAddForm(true); setGeneratedNsec(null) }}>
+          <Button data-testid="volunteer-add-btn" onClick={() => { setShowAddForm(true); setGeneratedNsec(null) }}>
             <UserPlus className="h-4 w-4" />
             {t('volunteers.addVolunteer')}
           </Button>
@@ -103,7 +103,7 @@ function VolunteersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <code className="flex-1 break-all rounded-md bg-background px-3 py-2 text-xs">{generatedNsec}</code>
+              <code data-testid="volunteer-nsec-code" className="flex-1 break-all rounded-md bg-background px-3 py-2 text-xs">{generatedNsec}</code>
               <Button
                 variant="outline"
                 size="icon"
@@ -235,7 +235,7 @@ function VolunteersPage() {
           ) : volunteers.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">{t('common.noData')}</div>
           ) : (
-            <div className="divide-y divide-border">
+            <div data-testid="volunteer-list" className="divide-y divide-border">
               {volunteers.map(vol => (
                 <VolunteerRow
                   key={vol.pubkey}
@@ -419,10 +419,10 @@ function AddVolunteerForm({ roles, onCreated, onCancel }: {
             </Select>
           </div>
           <div className="flex gap-2">
-            <Button type="submit" disabled={saving}>
+            <Button data-testid="form-save-btn" type="submit" disabled={saving}>
               {saving ? t('common.loading') : t('common.save')}
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button data-testid="form-cancel-btn" type="button" variant="outline" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
           </div>
@@ -477,7 +477,7 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
   }
 
   return (
-    <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
+    <div data-testid={`volunteer-row-${volunteer.pubkey.slice(0, 8)}`} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
           {volunteer.name.charAt(0).toUpperCase()}
@@ -540,7 +540,7 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="ghost" size="icon-xs" onClick={() => setShowDeleteConfirm(true)} className="text-destructive hover:text-destructive" aria-label={t('a11y.deleteItem')}>
+          <Button data-testid="volunteer-delete-btn" variant="ghost" size="icon-xs" onClick={() => setShowDeleteConfirm(true)} className="text-destructive hover:text-destructive" aria-label={t('a11y.deleteItem')}>
             <Trash2 className="h-3 w-3" />
           </Button>
         </div>

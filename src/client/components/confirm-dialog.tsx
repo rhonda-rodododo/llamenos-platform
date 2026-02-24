@@ -47,16 +47,17 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent data-testid="confirm-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button data-testid="confirm-dialog-cancel" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             {cancelLabel || t('common.cancel')}
           </Button>
           <Button
+            data-testid="confirm-dialog-ok"
             variant={variant}
             onClick={handleConfirm}
             disabled={loading}

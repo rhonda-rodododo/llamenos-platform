@@ -37,7 +37,7 @@ export function NewNoteForm({ recentCalls, customFieldDefs, saving, onSave, onCa
   }
 
   return (
-    <Card>
+    <Card data-testid="note-form">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <StickyNote className="h-4 w-4 text-muted-foreground" />
@@ -64,6 +64,7 @@ export function NewNoteForm({ recentCalls, customFieldDefs, saving, onSave, onCa
           ) : (
             <Input
               id="call-id"
+              data-testid="note-call-id"
               value={callId}
               onChange={e => setCallId(e.target.value)}
               placeholder={t('notes.callIdPlaceholder')}
@@ -86,6 +87,7 @@ export function NewNoteForm({ recentCalls, customFieldDefs, saving, onSave, onCa
         <div className="space-y-2">
           <Label>{t('notes.newNote')}</Label>
           <textarea
+            data-testid="note-content"
             value={text}
             onChange={e => setText(e.target.value)}
             placeholder={t('notes.notePlaceholder')}
@@ -100,11 +102,11 @@ export function NewNoteForm({ recentCalls, customFieldDefs, saving, onSave, onCa
           idPrefix="new-field"
         />
         <div className="flex gap-2">
-          <Button onClick={handleSave} disabled={saving || !text.trim() || !callId.trim() || callId === '__manual'}>
+          <Button data-testid="form-save-btn" onClick={handleSave} disabled={saving || !text.trim() || !callId.trim() || callId === '__manual'}>
             <Save className="h-4 w-4" />
             {saving ? t('common.loading') : t('common.save')}
           </Button>
-          <Button variant="outline" onClick={onCancel}>
+          <Button data-testid="form-cancel-btn" variant="outline" onClick={onCancel}>
             {t('common.cancel')}
           </Button>
         </div>
