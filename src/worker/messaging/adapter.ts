@@ -1,4 +1,5 @@
 import type { MessagingChannelType } from '../../shared/types'
+import type { MessageDeliveryStatus } from '../types'
 
 /**
  * MessagingAdapter — abstract interface for messaging channel providers.
@@ -22,6 +23,9 @@ export interface MessagingAdapter {
 
   // Check if the channel is properly configured and reachable
   getChannelStatus(): Promise<ChannelStatus>
+
+  // Parse status webhook callback (delivery receipts, read receipts)
+  parseStatusWebhook?(request: Request): Promise<MessageStatusUpdate | null>
 }
 
 export interface IncomingMessage {
@@ -57,4 +61,15 @@ export interface ChannelStatus {
   connected: boolean
   details?: Record<string, unknown>
   error?: string
+}
+
+/**
+ * Normalized status update from messaging provider.
+ * Used to update message delivery status in ConversationDO.
+ */
+export interface MessageStatusUpdate {
+  externalId: string           // provider's message ID
+  status: MessageDeliveryStatus
+  timestamp: string
+  failureReason?: string       // error message if status is 'failed'
 }

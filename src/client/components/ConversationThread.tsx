@@ -4,7 +4,8 @@ import { useAuth } from '@/lib/auth'
 import { decryptTranscription } from '@/lib/crypto'
 import * as keyManager from '@/lib/key-manager'
 import type { ConversationMessage } from '@/lib/api'
-import { Lock, ArrowDown, ArrowUp, Loader2 } from 'lucide-react'
+import { Lock, ArrowDown, ArrowUp, Loader2, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react'
+import type { MessageDeliveryStatus } from '@/lib/api'
 
 interface ConversationThreadProps {
   conversationId: string
@@ -100,6 +101,23 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
     })
   }
 
+  function StatusIcon({ status }: { status?: MessageDeliveryStatus }) {
+    switch (status) {
+      case 'pending':
+        return <Clock className="h-3 w-3" />
+      case 'sent':
+        return <Check className="h-3 w-3" />
+      case 'delivered':
+        return <CheckCheck className="h-3 w-3" />
+      case 'read':
+        return <CheckCheck className="h-3 w-3 text-blue-400" />
+      case 'failed':
+        return <AlertCircle className="h-3 w-3 text-red-400" />
+      default:
+        return <Check className="h-3 w-3" />
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -157,7 +175,14 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
                   {isInbound ? (
                     <ArrowDown className="h-3 w-3" />
                   ) : (
-                    <ArrowUp className="h-3 w-3" />
+                    <>
+                      <StatusIcon status={msg.status} />
+                      {msg.status === 'failed' && msg.failureReason && (
+                        <span className="text-red-400 truncate max-w-[100px]" title={msg.failureReason}>
+                          {t('conversations.failed', 'Failed')}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

@@ -69,6 +69,9 @@ export interface Volunteer {
   profileCompleted: boolean  // Whether first-login setup is done
   onBreak: boolean           // Temporarily unavailable (still on shift)
   callPreference: 'phone' | 'browser' | 'both'  // How to receive calls (default: 'phone')
+  // Messaging channel capabilities (Epic 68)
+  supportedMessagingChannels?: MessagingChannelType[]  // SMS, WhatsApp, Signal, RCS (empty = all)
+  messagingEnabled?: boolean  // Whether volunteer can handle messaging conversations
 }
 
 export interface Shift {
@@ -202,6 +205,8 @@ export interface Conversation {
   }
 }
 
+export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
+
 export interface EncryptedMessage {
   id: string
   conversationId: string
@@ -215,6 +220,12 @@ export interface EncryptedMessage {
   attachmentIds?: string[]         // references to R2 encrypted blobs
   createdAt: string
   externalId?: string              // provider's message ID
+  // Delivery status tracking (Epic 71)
+  status?: MessageDeliveryStatus   // delivery status (default: 'pending' for outbound)
+  deliveredAt?: string             // ISO timestamp when delivered
+  readAt?: string                  // ISO timestamp when read (if supported)
+  failureReason?: string           // error message for failed messages
+  retryCount?: number              // number of retry attempts
 }
 
 // --- Blast Queue ---

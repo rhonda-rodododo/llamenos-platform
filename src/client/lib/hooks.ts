@@ -190,12 +190,20 @@ export function useConversations() {
       )
     })
 
+    // Message status update
+    const unsubStatus = onMessage('message:status', () => {
+      // Status updates trigger a refetch of messages for the active conversation
+      // This is handled by the ConversationsPage which polls messages periodically
+      // We don't need to update conversation metadata for status changes
+    })
+
     return () => {
       unsubSync()
       unsubNew()
       unsubAssigned()
       unsubClosed()
       unsubMessage()
+      unsubStatus()
     }
   }, [])
 

@@ -261,6 +261,7 @@ export class IdentityDO extends DurableObject<Env> {
   private static readonly VOLUNTEER_SAFE_FIELDS = new Set([
     'name', 'phone', 'spokenLanguages', 'uiLanguage', 'profileCompleted',
     'transcriptionEnabled', 'onBreak', 'callPreference',
+    // Note: supportedMessagingChannels and messagingEnabled are admin-only fields
   ])
 
   private async updateVolunteer(pubkey: string, data: Partial<Volunteer>, isAdmin = false): Promise<Response> {

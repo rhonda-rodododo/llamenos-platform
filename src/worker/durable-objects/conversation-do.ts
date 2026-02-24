@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, Conversation, EncryptedMessage, ConversationStatus } from '../types'
-import type { IncomingMessage } from '../messaging/adapter'
+import type { IncomingMessage, MessageStatusUpdate } from '../messaging/adapter'
 import type { MessagingChannelType, FileRecord, RecipientEnvelope, Subscriber, Blast, BlastSettings, BlastContent } from '../../shared/types'
 import { DEFAULT_BLAST_SETTINGS } from '../../shared/types'
 import { encryptForPublicKey, hashPhone } from '../lib/crypto'
@@ -50,6 +50,9 @@ export class ConversationDO extends DurableObject<Env> {
     // --- Inbound from webhooks ---
     this.router.post('/conversations/incoming', async (req) => this.handleIncoming(await req.json()))
 
+    // --- Message status updates ---
+    this.router.post('/messages/status', async (req) => this.updateMessageStatus(await req.json()))
+
     // --- Contact lookup (server-side only, for outbound sends) ---
     this.router.get('/conversations/:id/contact', async (_req, { id }) => this.getContactIdentifier(id))
 
@@ -86,6 +89,16 @@ export class ConversationDO extends DurableObject<Env> {
     // --- Blast Settings ---
     this.router.get('/blast-settings', () => this.getBlastSettings())
     this.router.patch('/blast-settings', async (req) => this.updateBlastSettings(await req.json()))
+
+    // --- Volunteer Load Tracking (for auto-assignment) ---
+    this.router.get('/load/:pubkey', (_req, { pubkey }) => this.getVolunteerLoad(pubkey))
+    this.router.get('/load', () => this.getAllVolunteerLoads())
+    this.router.post('/load/increment', async (req) => this.incrementLoad(await req.json()))
+    this.router.post('/load/decrement', async (req) => this.decrementLoad(await req.json()))
+
+    // --- Auto-assignment helper ---
+    this.router.post('/conversations/:id/auto-assign', async (req, { id }) =>
+      this.autoAssignConversation(id, await req.json()))
 
     // --- Test Reset ---
     this.router.post('/reset', async () => {
@@ -158,6 +171,9 @@ export class ConversationDO extends DurableObject<Env> {
     const conv = conversations.find(c => c.id === id)
     if (!conv) return new Response('Conversation not found', { status: 404 })
 
+    const prevStatus = conv.status
+    const prevAssignedTo = conv.assignedTo
+
     // Allowed updates
     if (data.status) conv.status = data.status
     if (data.assignedTo !== undefined) conv.assignedTo = data.assignedTo
@@ -165,6 +181,17 @@ export class ConversationDO extends DurableObject<Env> {
     conv.updatedAt = new Date().toISOString()
 
     await this.ctx.storage.put('conversations', conversations)
+
+    // Update volunteer load counters
+    // Decrement from previous volunteer if closing or reassigning
+    if (prevAssignedTo && (conv.status === 'closed' || conv.assignedTo !== prevAssignedTo)) {
+      await this.decrementLoad({ pubkey: prevAssignedTo, conversationId: id })
+    }
+    // Increment for new volunteer if assigning
+    if (conv.assignedTo && conv.assignedTo !== prevAssignedTo && conv.status !== 'closed') {
+      await this.incrementLoad({ pubkey: conv.assignedTo, conversationId: id })
+    }
+
     return Response.json(conv)
   }
 
@@ -182,7 +209,9 @@ export class ConversationDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('conversations', conversations)
 
-    // Broadcast assignment via CallRouterDO (WebSocket hub)
+    // Increment volunteer load counter
+    await this.incrementLoad({ pubkey: data.pubkey, conversationId: id })
+
     return Response.json(conv)
   }
 
@@ -212,6 +241,8 @@ export class ConversationDO extends DurableObject<Env> {
       id: data.id || crypto.randomUUID(),
       conversationId,
       createdAt: new Date().toISOString(),
+      // Set initial status for outbound messages
+      status: data.direction === 'outbound' ? 'pending' : undefined,
     }
 
     const messages = await this.ctx.storage.get<EncryptedMessage[]>(`messages:${conversationId}`) || []
@@ -224,7 +255,75 @@ export class ConversationDO extends DurableObject<Env> {
     conv.messageCount = messages.length
     await this.ctx.storage.put('conversations', conversations)
 
+    // Store external ID mapping for status tracking
+    if (message.externalId) {
+      await this.ctx.storage.put(`external-id:${message.externalId}`, {
+        conversationId,
+        messageId: message.id,
+      })
+    }
+
     return Response.json(message)
+  }
+
+  /**
+   * Update message delivery status based on provider webhook callback.
+   * Uses external ID to look up the message.
+   */
+  private async updateMessageStatus(update: MessageStatusUpdate): Promise<Response> {
+    // Look up message by external ID
+    const mapping = await this.ctx.storage.get<{ conversationId: string; messageId: string }>(
+      `external-id:${update.externalId}`
+    )
+    if (!mapping) {
+      // Message not found — might be for a different hub or old message
+      return Response.json({ found: false })
+    }
+
+    const { conversationId, messageId } = mapping
+
+    // Get messages for the conversation
+    const messages = await this.ctx.storage.get<EncryptedMessage[]>(`messages:${conversationId}`) || []
+    const message = messages.find(m => m.id === messageId)
+    if (!message) {
+      return Response.json({ found: false })
+    }
+
+    // Only update if the new status is "more advanced" than current
+    // pending -> sent -> delivered -> read / failed
+    const statusOrder: Record<string, number> = {
+      'pending': 0,
+      'sent': 1,
+      'delivered': 2,
+      'read': 3,
+      'failed': 3, // failed is also terminal
+    }
+
+    const currentOrder = statusOrder[message.status || 'pending']
+    const newOrder = statusOrder[update.status]
+
+    if (newOrder <= currentOrder && update.status !== 'failed') {
+      // Don't downgrade status (except failed can override anything)
+      return Response.json({ conversationId, messageId, statusUnchanged: true })
+    }
+
+    // Update the message status
+    message.status = update.status
+    if (update.status === 'delivered') {
+      message.deliveredAt = update.timestamp
+    } else if (update.status === 'read') {
+      message.readAt = update.timestamp
+      // Set deliveredAt if not already set
+      if (!message.deliveredAt) {
+        message.deliveredAt = update.timestamp
+      }
+    } else if (update.status === 'failed') {
+      message.failureReason = update.failureReason
+    }
+
+    await this.ctx.storage.put(`messages:${conversationId}`, messages)
+
+    return Response.json({ conversationId, messageId, status: update.status })
   }
 
   // --- Inbound Message Processing ---
@@ -855,6 +954,115 @@ export class ConversationDO extends DurableObject<Env> {
     return Response.json(updated)
   }
 
+  // --- Volunteer Load Tracking ---
+
+  /**
+   * Get the number of active conversations assigned to a volunteer.
+   * Storage key: `volunteer-load:{pubkey}` = number
+   */
+  private async getVolunteerLoad(pubkey: string): Promise<Response> {
+    const load = await this.ctx.storage.get<number>(`volunteer-load:${pubkey}`) || 0
+    const conversationIds = await this.ctx.storage.get<string[]>(`volunteer-conversations:${pubkey}`) || []
+    return Response.json({ pubkey, load, conversationIds })
+  }
+
+  /**
+   * Get all volunteer load counts.
+   */
+  private async getAllVolunteerLoads(): Promise<Response> {
+    const loadMap = await this.ctx.storage.list<number>({ prefix: 'volunteer-load:' })
+    const loads: Record<string, number> = {}
+    for (const [key, value] of loadMap) {
+      const pubkey = key.replace('volunteer-load:', '')
+      loads[pubkey] = value
+    }
+    return Response.json({ loads })
+  }
+
+  /**
+   * Increment volunteer load counter and track conversation ID.
+   */
+  private async incrementLoad(data: { pubkey: string; conversationId: string }): Promise<Response> {
+    const loadKey = `volunteer-load:${data.pubkey}`
+    const convKey = `volunteer-conversations:${data.pubkey}`
+
+    const currentLoad = await this.ctx.storage.get<number>(loadKey) || 0
+    const conversationIds = await this.ctx.storage.get<string[]>(convKey) || []
+
+    // Avoid double-counting
+    if (!conversationIds.includes(data.conversationId)) {
+      conversationIds.push(data.conversationId)
+      await this.ctx.storage.put(loadKey, currentLoad + 1)
+      await this.ctx.storage.put(convKey, conversationIds)
+    }
+
+    return Response.json({ load: currentLoad + 1 })
+  }
+
+  /**
+   * Decrement volunteer load counter and remove conversation ID.
+   */
+  private async decrementLoad(data: { pubkey: string; conversationId: string }): Promise<Response> {
+    const loadKey = `volunteer-load:${data.pubkey}`
+    const convKey = `volunteer-conversations:${data.pubkey}`
+
+    const currentLoad = await this.ctx.storage.get<number>(loadKey) || 0
+    const conversationIds = await this.ctx.storage.get<string[]>(convKey) || []
+
+    const idx = conversationIds.indexOf(data.conversationId)
+    if (idx >= 0) {
+      conversationIds.splice(idx, 1)
+      await this.ctx.storage.put(loadKey, Math.max(0, currentLoad - 1))
+      await this.ctx.storage.put(convKey, conversationIds)
+    }
+
+    return Response.json({ load: Math.max(0, currentLoad - 1) })
+  }
+
+  /**
+   * Auto-assign a conversation to a volunteer (server-side assignment, for new conversations).
+   * Used by the messaging router after auto-assignment logic selects a volunteer.
+   */
+  private async autoAssignConversation(
+    id: string,
+    data: { pubkey: string; adminPubkey: string }
+  ): Promise<Response> {
+    const conversations = await this.ctx.storage.get<Conversation[]>('conversations') || []
+    const conv = conversations.find(c => c.id === id)
+    if (!conv) return new Response('Conversation not found', { status: 404 })
+    if (conv.status !== 'waiting') {
+      return new Response(JSON.stringify({ error: 'Conversation is not in waiting state' }), { status: 400 })
+    }
+
+    conv.assignedTo = data.pubkey
+    conv.status = 'active'
+    conv.updatedAt = new Date().toISOString()
+
+    await this.ctx.storage.put('conversations', conversations)
+
+    // Increment volunteer load
+    await this.incrementLoad({ pubkey: data.pubkey, conversationId: id })
+
+    // Re-encrypt existing messages for the newly assigned volunteer
+    // For inbound messages that were encrypted with admin key, we need to re-encrypt
+    const messages = await this.ctx.storage.get<EncryptedMessage[]>(`messages:${id}`) || []
+    let changed = false
+    for (const msg of messages) {
+      if (msg.direction === 'inbound' && msg.authorPubkey === 'system:inbound') {
+        // Re-encrypt using admin's decryption of the content (this would require admin nsec)
+        // For now, we'll leave messages encrypted for admin only until volunteer sends
+        // The volunteer will see "[Encrypted for admin]" for pre-assignment messages
+        // This is a security trade-off: volunteer only sees messages from assignment forward
+        changed = false
+      }
+    }
+    if (changed) {
+      await this.ctx.storage.put(`messages:${id}`, messages)
+    }
+
+    return Response.json(conv)
+  }
+
   // --- Blast Delivery (alarm-driven) ---
 
   private async processActiveBlasts(): Promise<void> {
@@ -918,10 +1126,15 @@ export class ConversationDO extends DurableObject<Env> {
     const timeout = 60 * 60 * 1000 // 60 minutes default
 
     let changed = false
+    const closedAssignees: Array<{ pubkey: string; conversationId: string }> = []
     for (const conv of conversations) {
       if (conv.status === 'active' || conv.status === 'waiting') {
         const lastActivity = new Date(conv.lastMessageAt).getTime()
         if (now - lastActivity > timeout) {
+          // Track assigned volunteer for load counter update
+          if (conv.assignedTo) {
+            closedAssignees.push({ pubkey: conv.assignedTo, conversationId: conv.id })
+          }
           conv.status = 'closed'
           conv.updatedAt = new Date().toISOString()
           changed = true
@@ -931,6 +1144,10 @@ export class ConversationDO extends DurableObject<Env> {
 
     if (changed) {
       await this.ctx.storage.put('conversations', conversations)
+      // Decrement load counters for auto-closed conversations
+      for (const { pubkey, conversationId } of closedAssignees) {
+        await this.decrementLoad({ pubkey, conversationId })
+      }
     }
 
     // Schedule next alarm in 5 minutes

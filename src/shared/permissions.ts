@@ -40,6 +40,12 @@ export const PERMISSION_CATALOG = {
   'conversations:read-assigned': 'Read assigned + waiting conversations',
   'conversations:read-all': 'Read all conversations',
   'conversations:claim': 'Claim a waiting conversation',
+  'conversations:claim-sms': 'Claim SMS conversations',
+  'conversations:claim-whatsapp': 'Claim WhatsApp conversations',
+  'conversations:claim-signal': 'Claim Signal conversations',
+  'conversations:claim-rcs': 'Claim RCS conversations',
+  'conversations:claim-web': 'Claim web conversations',
+  'conversations:claim-any': 'Claim any channel (bypass restrictions)',
   'conversations:send': 'Send messages in assigned conversations',
   'conversations:send-any': 'Send messages in any conversation',
   'conversations:update': 'Reassign/close/reopen conversations',
@@ -179,6 +185,8 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'calls:answer', 'calls:read-active',
       'notes:create', 'notes:read-own', 'notes:update-own',
       'conversations:claim', 'conversations:send', 'conversations:read-assigned',
+      'conversations:claim-sms', 'conversations:claim-whatsapp',
+      'conversations:claim-signal', 'conversations:claim-rcs', 'conversations:claim-web',
       'shifts:read-own', 'bans:report',
       'reports:read-assigned', 'reports:send-message',
       'files:upload', 'files:download-own',
@@ -328,4 +336,49 @@ export function getUserHubIds(
   const globalPerms = resolvePermissions(globalRoles, allRoleDefs)
   if (permissionGranted(globalPerms, '*')) return null // all hubs
   return hubRoles.map(hr => hr.hubId)
+}
+
+// --- Channel Permission Helpers ---
+
+/** Map of channel types to their claim permission */
+export const CHANNEL_CLAIM_PERMISSIONS: Record<string, string> = {
+  sms: 'conversations:claim-sms',
+  whatsapp: 'conversations:claim-whatsapp',
+  signal: 'conversations:claim-signal',
+  rcs: 'conversations:claim-rcs',
+  web: 'conversations:claim-web',
+}
+
+/**
+ * Check if a user can claim conversations on a specific channel.
+ * Returns true if user has:
+ * - Global wildcard (*)
+ * - conversations:* wildcard
+ * - conversations:claim-any (bypass channel restrictions)
+ * - The specific channel claim permission (e.g., conversations:claim-sms)
+ */
+export function canClaimChannel(permissions: string[], channelType: string): boolean {
+  // Global or domain wildcard
+  if (permissionGranted(permissions, 'conversations:claim-any')) return true
+
+  // Check specific channel permission
+  const channelPerm = CHANNEL_CLAIM_PERMISSIONS[channelType]
+  if (channelPerm && permissionGranted(permissions, channelPerm)) return true
+
+  return false
+}
+
+/**
+ * Get the list of channels a user can claim based on their permissions.
+ */
+export function getClaimableChannels(permissions: string[]): string[] {
+  // If has claim-any, return all channels
+  if (permissionGranted(permissions, 'conversations:claim-any')) {
+    return Object.keys(CHANNEL_CLAIM_PERMISSIONS)
+  }
+
+  // Filter to channels they have specific permissions for
+  return Object.entries(CHANNEL_CLAIM_PERMISSIONS)
+    .filter(([, perm]) => permissionGranted(permissions, perm))
+    .map(([channel]) => channel)
 }

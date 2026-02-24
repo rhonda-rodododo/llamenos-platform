@@ -5,7 +5,9 @@ import type {
   SendMediaParams,
   SendResult,
   ChannelStatus,
+  MessageStatusUpdate,
 } from '../adapter'
+import type { MessageDeliveryStatus } from '../../types'
 import type { MessagingChannelType } from '../../../shared/types'
 import { hashPhone } from '../../lib/crypto'
 
@@ -190,6 +192,52 @@ export class TwilioSMSAdapter implements MessagingAdapter {
         },
       }
     )
+  }
+
+  /**
+   * Parse Twilio status callback webhook.
+   * Twilio sends status updates as form-encoded POST to a configured StatusCallback URL.
+   * Status values: queued, failed, sent, delivered, undelivered
+   */
+  async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate | null> {
+    try {
+      const form = await request.clone().formData()
+
+      const messageSid = (form.get('MessageSid') as string) || ''
+      const messageStatus = (form.get('MessageStatus') as string) || ''
+      const errorCode = form.get('ErrorCode') as string | null
+      const errorMessage = form.get('ErrorMessage') as string | null
+
+      if (!messageSid || !messageStatus) {
+        return null
+      }
+
+      // Map Twilio status to our normalized status
+      const statusMap: Record<string, MessageDeliveryStatus> = {
+        'queued': 'pending',
+        'sending': 'pending',
+        'sent': 'sent',
+        'delivered': 'delivered',
+        'undelivered': 'failed',
+        'failed': 'failed',
+      }
+
+      const status = statusMap[messageStatus.toLowerCase()]
+      if (!status) {
+        return null
+      }
+
+      return {
+        externalId: messageSid,
+        status,
+        timestamp: new Date().toISOString(),
+        failureReason: status === 'failed' && (errorMessage || errorCode)
+          ? `${errorCode || 'ERR'}: ${errorMessage || 'Message delivery failed'}`
+          : undefined,
+      }
+    } catch {
+      return null
+    }
   }
 
   // --- Helpers ---

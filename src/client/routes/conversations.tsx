@@ -17,9 +17,10 @@ import { ConversationList } from '@/components/ConversationList'
 import { ConversationThread } from '@/components/ConversationThread'
 import { MessageComposer } from '@/components/MessageComposer'
 import { ChannelBadge } from '@/components/ChannelBadge'
-import { MessageSquare, X, UserCheck, Lock } from 'lucide-react'
+import { MessageSquare, X, UserCheck, Lock, UserCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ReassignDialog } from '@/components/ReassignDialog'
 
 export const Route = createFileRoute('/conversations')({
   component: ConversationsPage,
@@ -35,6 +36,7 @@ function ConversationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ConversationMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
+  const [reassignOpen, setReassignOpen] = useState(false)
 
   const selectedConv = conversations.find(c => c.id === selectedId)
 
@@ -197,6 +199,12 @@ function ConversationsPage() {
                     {t('conversations.claim', { defaultValue: 'Claim' })}
                   </Button>
                 )}
+                {isAdmin && (selectedConv.status === 'active' || selectedConv.status === 'waiting') && (
+                  <Button size="sm" variant="outline" onClick={() => setReassignOpen(true)}>
+                    <UserCog className="h-3.5 w-3.5 mr-1" />
+                    {t('conversations.reassign', { defaultValue: 'Reassign' })}
+                  </Button>
+                )}
                 {selectedConv.status === 'active' && (
                   <Button size="sm" variant="outline" onClick={() => handleClose(selectedConv.id)}>
                     <X className="h-3.5 w-3.5 mr-1" />
@@ -234,6 +242,15 @@ function ConversationsPage() {
         )}
       </div>
     </div>
+
+      {/* Reassign Dialog */}
+      {selectedConv && (
+        <ReassignDialog
+          conversation={selectedConv}
+          open={reassignOpen}
+          onOpenChange={setReassignOpen}
+        />
+      )}
     </div>
   )
 }

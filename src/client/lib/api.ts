@@ -130,7 +130,14 @@ export async function createVolunteer(data: { name: string; phone: string; roleI
   })
 }
 
-export async function updateVolunteer(pubkey: string, data: Partial<{ name: string; phone: string; roles: string[]; active: boolean }>) {
+export async function updateVolunteer(pubkey: string, data: Partial<{
+  name: string
+  phone: string
+  roles: string[]
+  active: boolean
+  supportedMessagingChannels: string[]
+  messagingEnabled: boolean
+}>) {
   return request<{ volunteer: Volunteer }>(`/volunteers/${pubkey}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -599,6 +606,9 @@ export interface Volunteer {
   transcriptionEnabled: boolean
   onBreak: boolean
   callPreference: 'phone' | 'browser' | 'both'
+  // Messaging capabilities (Epic 68)
+  supportedMessagingChannels?: string[]  // SMS, WhatsApp, Signal, RCS (empty = all)
+  messagingEnabled?: boolean  // Whether volunteer can handle messaging conversations
 }
 
 export interface Shift {
@@ -706,6 +716,8 @@ export interface Conversation {
   }
 }
 
+export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
+
 export interface ConversationMessage {
   id: string
   conversationId: string
@@ -717,6 +729,12 @@ export interface ConversationMessage {
   ephemeralPubkeyAdmin: string
   hasAttachments: boolean
   attachmentIds?: string[]
+  // Delivery status tracking (Epic 71)
+  status?: MessageDeliveryStatus
+  deliveredAt?: string
+  readAt?: string
+  failureReason?: string
+  retryCount?: number
   createdAt: string
   externalId?: string
 }
@@ -777,6 +795,10 @@ export async function updateConversation(id: string, data: { status?: string; as
 
 export async function getConversationStats() {
   return request<{ waiting: number; active: number; closed: number; today: number; total: number }>(hp('/conversations/stats'))
+}
+
+export async function getVolunteerLoads() {
+  return request<{ loads: Record<string, number> }>(hp('/conversations/load'))
 }
 
 // --- Messaging Config ---

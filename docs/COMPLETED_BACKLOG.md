@@ -1,5 +1,72 @@
 # Completed Backlog
 
+## 2026-02-24: Two-Way Messaging with Volunteer Assignment
+
+### Epics 68-73: Volunteer Messaging Assignment & Two-Way Conversation UI
+
+#### Epic 68: Messaging Channel Permissions
+
+- [x] Added `supportedMessagingChannels` and `messagingEnabled` fields to Volunteer type
+- [x] Added channel-specific claim permissions (`conversations:claim-sms`, `conversations:claim-whatsapp`, etc.)
+- [x] Updated default volunteer role with all channel claim permissions
+- [x] Added `canClaimChannel()` and `getClaimableChannels()` helper functions
+- [x] Updated conversations route to validate channel permissions on claim
+- [x] Updated conversation listing to filter by volunteer's supported channels
+- [x] Added MessagingChannelsCard UI component on volunteer profile page
+
+#### Epic 69: Messaging Auto-Assignment
+
+- [x] Added volunteer load tracking to ConversationDO (`getVolunteerLoad()`, `getAllVolunteerLoads()`)
+- [x] Implemented `incrementLoad()` / `decrementLoad()` for conversation assignment tracking
+- [x] Added `autoAssignConversation()` endpoint in ConversationDO
+- [x] Updated `claimConversation()` to increment load counter
+- [x] Updated `updateConversation()` to handle load changes on reassign/close
+- [x] Updated alarm handler to decrement load on auto-close
+- [x] Implemented `tryAutoAssign()` function in messaging router
+- [x] Auto-assignment algorithm: filters by shift, channel capability, messaging enabled, not on-break, load capacity
+
+#### Epic 70: Conversation Reassignment UI
+
+- [x] Added `ReassignDialog` component with volunteer picker
+- [x] Shows volunteer name, current load, channel capability, on-break status
+- [x] Sorted volunteers by capability (capable first) then load (ascending)
+- [x] Added "Reassign" button to conversation header (admin only)
+- [x] Added "Return to queue" button to unassign and return to waiting status
+- [x] Added `getVolunteerLoads()` API function
+- [x] Added `/conversations/load` API route (admin only)
+
+#### Epic 71: Message Delivery Status Tracking
+
+- [x] Added `MessageDeliveryStatus` type (`pending`, `sent`, `delivered`, `read`, `failed`)
+- [x] Added status fields to EncryptedMessage type (`status`, `deliveredAt`, `readAt`, `failureReason`, `retryCount`)
+- [x] Added `MessageStatusUpdate` interface for webhook status callbacks
+- [x] Added `parseStatusWebhook()` method to MessagingAdapter interface
+- [x] Implemented status parsing in TwilioSmsAdapter (Twilio status callbacks)
+- [x] Implemented status parsing in WhatsAppAdapter (Meta + Twilio modes)
+- [x] Added `/messages/status` endpoint to ConversationDO
+- [x] External ID mapping storage for status lookup
+- [x] Status progression logic (only advance status, except failed can override)
+- [x] Updated messaging router to check for status webhooks before parsing as message
+- [x] WebSocket broadcast of `message:status` events
+
+#### Epic 72: Volunteer Load Balancing
+
+- [x] Implemented as part of Epic 69 (load tracking + auto-assignment)
+- [x] `maxConcurrentPerVolunteer` setting enforced during auto-assignment
+
+#### Epic 73: Enhanced Two-Way Conversation UI
+
+- [x] Added delivery status icons to outbound messages in ConversationThread
+- [x] Status indicators: Clock (pending), Check (sent), CheckCheck (delivered), CheckCheck+blue (read), AlertCircle (failed)
+- [x] Failed message reason displayed as tooltip
+- [x] WebSocket listener for `message:status` events
+
+### Files Changed (20+ files)
+
+- New: `src/client/components/ReassignDialog.tsx`, `docs/epics/epic-68-*` through `epic-73-*`
+- Modified: `src/worker/types.ts`, `src/shared/permissions.ts`, `src/worker/routes/conversations.ts`, `src/worker/durable-objects/conversation-do.ts`, `src/worker/messaging/router.ts`, `src/worker/messaging/adapter.ts`, `src/worker/messaging/sms/twilio.ts`, `src/worker/messaging/whatsapp/adapter.ts`, `src/client/lib/api.ts`, `src/client/lib/hooks.ts`, `src/client/routes/conversations.tsx`, `src/client/routes/volunteers_.$pubkey.tsx`, `src/client/components/ConversationThread.tsx`
+- Added shadcn components: checkbox, scroll-area
+
 ## 2026-02-24: Complete All Remaining Epics
 
 ### Phase 1: Security Completion

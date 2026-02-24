@@ -5,7 +5,9 @@ import type {
   SendMediaParams,
   SendResult,
   ChannelStatus,
+  MessageStatusUpdate,
 } from '../adapter'
+import type { MessageDeliveryStatus } from '../../types'
 import type { WhatsAppConfig } from '../../../shared/types'
 import type {
   MetaWebhookPayload,
@@ -327,6 +329,105 @@ export class WhatsAppAdapter implements MessagingAdapter {
     }
 
     return { body, mediaUrls, mediaTypes }
+  }
+
+  /**
+   * Parse status webhook updates from WhatsApp.
+   * Both Meta and Twilio send delivery status updates.
+   */
+  async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate | null> {
+    if (this.integrationMode === 'direct') {
+      return this.parseMetaStatusWebhook(request)
+    }
+    return this.parseTwilioStatusWebhook(request)
+  }
+
+  /**
+   * Parse Meta Cloud API status webhooks.
+   * Meta sends statuses in the same webhook format as messages.
+   */
+  private async parseMetaStatusWebhook(request: Request): Promise<MessageStatusUpdate | null> {
+    try {
+      const payload = await request.clone().json() as MetaWebhookPayload
+
+      const entry = payload.entry?.[0]
+      if (!entry) return null
+
+      const change = entry.changes?.[0]
+      if (!change) return null
+
+      const statuses = change.value?.statuses
+      if (!statuses || statuses.length === 0) return null
+
+      const status = statuses[0]
+      if (!status.id || !status.status) return null
+
+      // Map Meta status to our normalized status
+      const statusMap: Record<string, MessageDeliveryStatus> = {
+        'sent': 'sent',
+        'delivered': 'delivered',
+        'read': 'read',
+        'failed': 'failed',
+      }
+
+      const normalizedStatus = statusMap[status.status]
+      if (!normalizedStatus) return null
+
+      return {
+        externalId: status.id,
+        status: normalizedStatus,
+        timestamp: status.timestamp
+          ? new Date(parseInt(status.timestamp, 10) * 1000).toISOString()
+          : new Date().toISOString(),
+        failureReason: normalizedStatus === 'failed' && status.errors?.length
+          ? status.errors[0].message || status.errors[0].title
+          : undefined,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Parse Twilio WhatsApp status callbacks.
+   * Same format as regular Twilio SMS status callbacks.
+   */
+  private async parseTwilioStatusWebhook(request: Request): Promise<MessageStatusUpdate | null> {
+    try {
+      const form = await request.clone().formData()
+
+      const messageSid = (form.get('MessageSid') as string) || ''
+      const messageStatus = (form.get('MessageStatus') as string) || ''
+      const errorCode = form.get('ErrorCode') as string | null
+      const errorMessage = form.get('ErrorMessage') as string | null
+
+      if (!messageSid || !messageStatus) return null
+
+      // Map Twilio status to our normalized status
+      const statusMap: Record<string, MessageDeliveryStatus> = {
+        'queued': 'pending',
+        'sending': 'pending',
+        'sent': 'sent',
+        'delivered': 'delivered',
+        'read': 'read',
+        'undelivered': 'failed',
+        'failed': 'failed',
+      }
+
+      const status = statusMap[messageStatus.toLowerCase()]
+      if (!status) return null
+
+      return {
+        externalId: messageSid,
+        status,
+        timestamp: new Date().toISOString(),
+        failureReason: status === 'failed' && (errorMessage || errorCode)
+          ? `${errorCode || 'ERR'}: ${errorMessage || 'Message delivery failed'}`
+          : undefined,
+      }
+    } catch {
+      return null
+    }
   }
 
   // --- Private: Twilio WhatsApp parsing ---

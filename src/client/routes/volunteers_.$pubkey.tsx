@@ -6,10 +6,12 @@ import {
   listVolunteers,
   listAuditLog,
   listShifts,
+  updateVolunteer,
   type Volunteer,
   type AuditLogEntry,
   type Shift,
 } from '@/lib/api'
+import { useToast } from '@/lib/toast'
 import {
   ArrowLeft,
   ScrollText,
@@ -20,15 +22,20 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  Globe,
   Phone,
   Eye,
   EyeOff,
+  MessageSquare,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { LANGUAGES } from '@shared/languages'
+
+const MESSAGING_CHANNELS = ['sms', 'whatsapp', 'signal', 'rcs', 'web'] as const
 
 export const Route = createFileRoute('/volunteers_/$pubkey')({
   component: VolunteerProfilePage,
@@ -40,6 +47,7 @@ function VolunteerProfilePage() {
   const { t } = useTranslation()
   const { isAdmin } = useAuth()
   const { pubkey } = Route.useParams()
+  const { toast } = useToast()
   const [volunteer, setVolunteer] = useState<Volunteer | null>(null)
   const [shifts, setShifts] = useState<Shift[]>([])
   const [auditEntries, setAuditEntries] = useState<AuditLogEntry[]>([])
@@ -48,6 +56,7 @@ function VolunteerProfilePage() {
   const [loading, setLoading] = useState(true)
   const [auditLoading, setAuditLoading] = useState(true)
   const [showPhone, setShowPhone] = useState(false)
+  const [savingChannels, setSavingChannels] = useState(false)
   const auditLimit = 20
 
   // Load volunteer + shifts
@@ -211,6 +220,27 @@ function VolunteerProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Messaging Channels Configuration */}
+      <MessagingChannelsCard
+        volunteer={volunteer}
+        saving={savingChannels}
+        onSave={async (channels, enabled) => {
+          setSavingChannels(true)
+          try {
+            const res = await updateVolunteer(pubkey, {
+              supportedMessagingChannels: channels,
+              messagingEnabled: enabled,
+            })
+            setVolunteer(res.volunteer)
+            toast(t('volunteerProfile.channelsSaved'), 'success')
+          } catch {
+            toast(t('common.error'), 'error')
+          } finally {
+            setSavingChannels(false)
+          }
+        }}
+      />
+
       {/* Activity / Audit Log */}
       <Card>
         <CardHeader>
@@ -282,5 +312,111 @@ function VolunteerProfilePage() {
         )}
       </Card>
     </div>
+  )
+}
+
+function MessagingChannelsCard({
+  volunteer,
+  saving,
+  onSave,
+}: {
+  volunteer: Volunteer
+  saving: boolean
+  onSave: (channels: string[], enabled: boolean) => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const [enabled, setEnabled] = useState(volunteer.messagingEnabled !== false)
+  const [channels, setChannels] = useState<string[]>(
+    volunteer.supportedMessagingChannels || []
+  )
+  const [dirty, setDirty] = useState(false)
+
+  const channelLabels: Record<string, string> = {
+    sms: t('volunteerProfile.channelSms'),
+    whatsapp: t('volunteerProfile.channelWhatsapp'),
+    signal: t('volunteerProfile.channelSignal'),
+    rcs: t('volunteerProfile.channelRcs'),
+    web: t('volunteerProfile.channelWeb'),
+  }
+
+  function toggleChannel(ch: string) {
+    setChannels(prev => {
+      const next = prev.includes(ch)
+        ? prev.filter(c => c !== ch)
+        : [...prev, ch]
+      setDirty(true)
+      return next
+    })
+  }
+
+  function handleEnabledChange(checked: boolean) {
+    setEnabled(checked)
+    setDirty(true)
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          {t('volunteerProfile.messagingChannels')}
+        </CardTitle>
+        <CardDescription>
+          {t('volunteerProfile.messagingChannelsDescription')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Messaging Enabled Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="messaging-enabled">{t('volunteerProfile.messagingEnabled')}</Label>
+            <p className="text-xs text-muted-foreground">
+              {t('volunteerProfile.messagingEnabledDescription')}
+            </p>
+          </div>
+          <Switch
+            id="messaging-enabled"
+            checked={enabled}
+            onCheckedChange={handleEnabledChange}
+          />
+        </div>
+
+        {/* Channel Selection */}
+        {enabled && (
+          <div className="space-y-3">
+            <Label>{t('volunteerProfile.selectChannels')}</Label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {MESSAGING_CHANNELS.map(ch => (
+                <label
+                  key={ch}
+                  className="flex cursor-pointer items-center gap-2 rounded-md border border-border p-3 hover:bg-muted/50"
+                >
+                  <Checkbox
+                    checked={channels.length === 0 || channels.includes(ch)}
+                    onCheckedChange={() => toggleChannel(ch)}
+                  />
+                  <span className="text-sm">{channelLabels[ch]}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {channels.length === 0
+                ? t('volunteerProfile.allChannels')
+                : `${channels.length} ${channels.length === 1 ? 'channel' : 'channels'} selected`}
+            </p>
+          </div>
+        )}
+
+        {/* Save Button */}
+        {dirty && (
+          <Button
+            onClick={() => onSave(channels, enabled)}
+            disabled={saving}
+          >
+            {saving ? t('common.loading') : t('common.save')}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   )
 }

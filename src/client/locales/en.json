@@ -538,7 +538,20 @@
     "assignedShifts": "Assigned Shifts",
     "noShifts": "Not assigned to any shifts",
     "activity": "Activity",
-    "noActivity": "No activity recorded"
+    "noActivity": "No activity recorded",
+    "messagingChannels": "Messaging Channels",
+    "messagingChannelsDescription": "Channels this volunteer can handle",
+    "messagingEnabled": "Messaging Enabled",
+    "messagingEnabledDescription": "Allow this volunteer to handle messaging conversations",
+    "allChannels": "All Channels",
+    "noChannels": "No messaging",
+    "channelSms": "SMS",
+    "channelWhatsapp": "WhatsApp",
+    "channelSignal": "Signal",
+    "channelRcs": "RCS",
+    "channelWeb": "Web",
+    "channelsSaved": "Channel settings saved",
+    "selectChannels": "Select channels"
   },
   "setup": {
     "title": "Setup Wizard",
