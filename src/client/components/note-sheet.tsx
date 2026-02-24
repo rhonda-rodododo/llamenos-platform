@@ -26,7 +26,7 @@ import { Lock, Save, Clock } from 'lucide-react'
 
 export function NoteSheet() {
   const { t } = useTranslation()
-  const { keyPair, isAdmin, adminPubkey } = useAuth()
+  const { hasNsec, publicKey, isAdmin, adminPubkey } = useAuth()
   const { isOpen, mode, editNoteId, initialCallId, initialText, initialFields, close, onSaved } = useNoteSheet()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
@@ -101,7 +101,7 @@ export function NoteSheet() {
   }
 
   async function handleSave() {
-    if (!keyPair || !draft.text.trim()) return
+    if (!hasNsec || !publicKey || !draft.text.trim()) return
     if (mode === 'new' && !draft.callId.trim()) return
     if (!validateFields()) return
     setSaving(true)
@@ -113,7 +113,7 @@ export function NoteSheet() {
         payload.fields = Object.fromEntries(fieldValues)
       }
       // V2 per-note ephemeral key encryption (forward secrecy)
-      const authorPub = keyPair.publicKey
+      const authorPub = publicKey
       const adminPub = adminPubkey || authorPub // fallback to self if admin pubkey not available
       const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2(payload, authorPub, adminPub)
 

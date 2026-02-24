@@ -396,7 +396,7 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
     }
 
     setDecryptedContent(decrypted)
-  }, [messages, keyPair, isAdmin])
+  }, [messages, hasNsec, isAdmin])
 
   const isReporter = hasPermission('reports:create') && !hasPermission('calls:answer')
   const canReply = report.status === 'active' || isReporter
@@ -492,11 +492,11 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
       </div>
 
       {/* File upload area */}
-      {showFileUpload && keyPair && (
+      {showFileUpload && hasNsec && publicKey && (
         <div className="border-t border-border px-4 py-3">
           <FileUpload
             conversationId={report.id}
-            recipientPubkeys={[keyPair.publicKey]}
+            recipientPubkeys={[publicKey]}
             onUploadComplete={onFileUploadComplete}
           />
         </div>
@@ -569,13 +569,6 @@ function ReportStatusBadge({ status }: { status: string }) {
   )
 }
 
-function resolveSecretKey(keyPair: { secretKey: Uint8Array } | null): Uint8Array | null {
-  if (keyPair) return keyPair.secretKey
-  if (keyManager.isUnlocked()) {
-    try { return keyManager.getSecretKey() } catch { return null }
-  }
-  return null
-}
 
 function formatTimestamp(iso: string): string {
   const date = new Date(iso)

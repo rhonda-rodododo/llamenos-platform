@@ -35,7 +35,7 @@ export const Route = createFileRoute('/')({
 
 function DashboardPage() {
   const { t } = useTranslation()
-  const { isAuthenticated, isAdmin, keyPair, onBreak, toggleBreak } = useAuth()
+  const { isAuthenticated, isAdmin, hasNsec, publicKey, onBreak, toggleBreak } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
   const { calls, currentCall, answerCall, hangupCall, reportSpam, ringingCalls, activeCalls } = useCalls()
@@ -168,7 +168,7 @@ function DashboardPage() {
       )}
 
       {/* Current active call */}
-      {currentCall && keyPair && (
+      {currentCall && hasNsec && publicKey && (
         <ActiveCallPanel
           call={currentCall}
           onHangup={() => hangupCall(currentCall.id)}
@@ -182,8 +182,7 @@ function DashboardPage() {
               toast(t('common.error'), 'error')
             }
           }}
-          secretKey={keyPair.secretKey}
-          authorPubkey={keyPair.publicKey}
+          authorPubkey={publicKey}
         />
       )}
 
@@ -303,12 +302,11 @@ function DashboardPage() {
   )
 }
 
-function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, secretKey, authorPubkey }: {
+function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, authorPubkey }: {
   call: ActiveCall
   onHangup: () => void
   onReportSpam: () => void
   onBanNumber: () => void
-  secretKey: Uint8Array
   authorPubkey: string
 }) {
   const { t } = useTranslation()

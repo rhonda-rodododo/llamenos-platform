@@ -20,7 +20,7 @@ interface ReportFormProps {
 
 export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
   const { t } = useTranslation()
-  const { keyPair, adminPubkey } = useAuth()
+  const { hasNsec, publicKey, adminPubkey } = useAuth()
   const { toast } = useToast()
 
   const [title, setTitle] = useState('')
@@ -48,7 +48,7 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
       return
     }
 
-    if (!keyPair) {
+    if (!hasNsec || !publicKey) {
       toast(t('reports.noKeyPair', { defaultValue: 'Encryption key not available' }), 'error')
       return
     }
@@ -56,10 +56,10 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
     setSubmitting(true)
 
     try {
-      const recipientPubkey = adminPubkey || keyPair.publicKey
+      const recipientPubkey = adminPubkey || publicKey
 
       // Encrypt body for the reporter
-      const bodyEncrypted = encryptForPublicKey(body.trim(), keyPair.publicKey)
+      const bodyEncrypted = encryptForPublicKey(body.trim(), publicKey)
       // Encrypt body for the admin
       const bodyEncryptedAdmin = encryptForPublicKey(body.trim(), recipientPubkey)
 
@@ -81,7 +81,7 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
     } finally {
       setSubmitting(false)
     }
-  }, [title, body, category, keyPair, adminPubkey, toast, t, resetForm, onOpenChange, onCreated])
+  }, [title, body, category, hasNsec, publicKey, adminPubkey, toast, t, resetForm, onOpenChange, onCreated])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
