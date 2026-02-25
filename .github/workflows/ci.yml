@@ -112,6 +112,10 @@ jobs:
       - name: Install site dependencies
         run: cd site && bun install --frozen-lockfile
 
+      - name: Set build-time constants (Epic 79)
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> $GITHUB_ENV
+
       - name: Typecheck
         run: bun run typecheck
 
@@ -120,6 +124,23 @@ jobs:
 
       - name: Build Node.js server
         run: bun run build:node
+
+      - name: Capture Worker bundle (Epic 79)
+        run: bunx wrangler deploy --dry-run --outdir dist/worker-bundle/
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Compute build checksums (Epic 79)
+        run: |
+          cd dist
+          find client server -type f -exec sha256sum {} \; | sort > ../CHECKSUMS.txt
+          cd ..
+          if [ -d dist/worker-bundle ]; then
+            sha256sum dist/worker-bundle/* >> CHECKSUMS.txt
+          fi
+          sha256sum bun.lockb >> CHECKSUMS.txt
+          echo "$(wc -l < CHECKSUMS.txt) files checksummed"
 
       - name: Build marketing site
         run: bun run site:build
@@ -131,6 +152,13 @@ jobs:
           name: app-build
           path: dist/
           retention-days: 1
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: checksums
+          path: CHECKSUMS.txt
+          retention-days: 7
 
       - name: Upload site build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -462,6 +490,19 @@ jobs:
           name: app-build
           path: dist/
 
+      - name: Inject build-time constants into Worker config (Epic 79)
+        run: |
+          VERSION="${{ needs.version.outputs.new_version }}"
+          BUILD_TIME=$(date -d "@$(git log -1 --format=%ct)" -Iseconds 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%S+00:00)
+          node -e "
+            const fs = require('fs');
+            let cfg = fs.readFileSync('wrangler.jsonc', 'utf-8');
+            cfg = cfg.replace(/\"__BUILD_VERSION__\":\s*\"[^\"]*\"/, '\"__BUILD_VERSION__\": \"' + \"'${VERSION}'\" + '\"');
+            cfg = cfg.replace(/\"__BUILD_COMMIT__\":\s*\"[^\"]*\"/, '\"__BUILD_COMMIT__\": \"' + \"'${GITHUB_SHA}'\" + '\"');
+            cfg = cfg.replace(/\"__BUILD_TIME__\":\s*\"[^\"]*\"/, '\"__BUILD_TIME__\": \"' + \"'${BUILD_TIME}'\" + '\"');
+            fs.writeFileSync('wrangler.jsonc', cfg);
+          "
+
       - name: Deploy Worker
         run: bunx wrangler deploy
         env:
@@ -510,12 +551,33 @@ jobs:
 
     permissions:
       contents: write
+      id-token: write  # Required for SLSA attestation
+      attestations: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+
+      - name: Download checksums
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: checksums
+
+      - name: Download app build (for attestation)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: app-build
+          path: dist/
+
+      - name: Generate SLSA build provenance (Epic 79)
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v2.1.0
+        with:
+          subject-path: |
+            CHECKSUMS.txt
+            dist/client/**/*.js
+            dist/client/**/*.css
 
       - name: Install git-cliff
         run: |
@@ -538,3 +600,5 @@ jobs:
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
+          files: |
+            CHECKSUMS.txt

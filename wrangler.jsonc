@@ -84,6 +84,14 @@
   //   { "binding": "NOSFLARE", "service": "llamenos-relay" }
   // ],
 
+  // Build-time constants for reproducible builds (Epic 79)
+  // CI overrides these via --define flags; dev builds use defaults
+  "define": {
+    "__BUILD_TIME__": "'dev'",
+    "__BUILD_COMMIT__": "'dev'",
+    "__BUILD_VERSION__": "'0.0.0-dev'"
+  },
+
   // Environment variables (secrets go in .dev.vars for local dev)
   // SERVER_NOSTR_SECRET goes in .dev.vars (wrangler secret put SERVER_NOSTR_SECRET)
   "vars": {

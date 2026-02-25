@@ -1,0 +1,50 @@
+# Dockerfile.build — Canonical build environment for reproducible builds (Epic 79)
+#
+# This container produces deterministic output given the same source code.
+# All verification builds MUST use this container (not bare metal) to ensure
+# consistent Tailwind CSS ordering and build tool behavior.
+#
+# Usage:
+#   docker build -f Dockerfile.build -t llamenos-build .
+#   docker create --name extract llamenos-build
+#   docker cp extract:/build/dist ./dist
+#   docker rm extract
+#
+# CI sets SOURCE_DATE_EPOCH from git commit time for deterministic timestamps.
+# Local builds default to epoch 0 (1970-01-01) for full reproducibility.
+
+FROM oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b627e2a521
+
+# Consistent locale (prevents locale-dependent output differences)
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+# Remove variable environment
+ENV HOME=/build
+ENV USER=build
+
+# Default SOURCE_DATE_EPOCH for local builds (CI overrides via --build-arg)
+ARG SOURCE_DATE_EPOCH=0
+ARG GITHUB_SHA=local
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+ENV GITHUB_SHA=${GITHUB_SHA}
+
+WORKDIR /build
+
+# Install dependencies first (layer caching)
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile --ignore-scripts
+
+# Copy source
+COPY src/ src/
+COPY public/ public/
+COPY index.html vite.config.ts tsconfig.json esbuild.node.mjs ./
+COPY tailwind.config.ts* ./
+
+# Build frontend (Vite) — reads SOURCE_DATE_EPOCH and GITHUB_SHA
+RUN bun run build
+
+# Build Node.js server (esbuild) — reads SOURCE_DATE_EPOCH and GITHUB_SHA
+RUN node esbuild.node.mjs
+
+# Output: /build/dist/client/ and /build/dist/server/

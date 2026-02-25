@@ -80,4 +80,16 @@ config.get('/', async (c) => {
   })
 })
 
+// Build verification endpoint (Epic 79: Reproducible Builds)
+// Informational only — trust anchor is CHECKSUMS.txt in GitHub Releases
+config.get('/verify', (c) => {
+  return c.json({
+    version: __BUILD_VERSION__,
+    commit: __BUILD_COMMIT__,
+    buildTime: __BUILD_TIME__,
+    verificationUrl: 'https://github.com/rhonda-rodododo/llamenos/releases',
+    trustAnchor: 'GitHub Release checksums + SLSA provenance',
+  })
+})
+
 export default config
