@@ -4,6 +4,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { hmac } from '@noble/hashes/hmac.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { LABEL_TRANSCRIPTION, HMAC_PHONE_PREFIX, HMAC_IP_PREFIX } from '@shared/crypto-labels'
 
 /**
  * ECIES encryption for server-produced transcriptions.
@@ -30,10 +31,10 @@ export function encryptForPublicKey(
   const sharedX = shared.slice(1, 33) // extract x-coordinate (32 bytes)
 
   // Derive symmetric key with domain separation
-  const context = utf8ToBytes('llamenos:transcription')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_TRANSCRIPTION)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   // Encrypt with XChaCha20-Poly1305
@@ -60,7 +61,7 @@ export function encryptForPublicKey(
  */
 export function hashPhone(phone: string, secret: string): string {
   const key = hexToBytes(secret)
-  const input = utf8ToBytes(`llamenos:phone:${phone}`)
+  const input = utf8ToBytes(`${HMAC_PHONE_PREFIX}${phone}`)
   return bytesToHex(hmac(sha256, key, input))
 }
 
@@ -70,6 +71,6 @@ export function hashPhone(phone: string, secret: string): string {
  */
 export function hashIP(ip: string, secret: string): string {
   const key = hexToBytes(secret)
-  const input = utf8ToBytes(`llamenos:ip:${ip}`)
+  const input = utf8ToBytes(`${HMAC_IP_PREFIX}${ip}`)
   return bytesToHex(hmac(sha256, key, input)).slice(0, 24)
 }

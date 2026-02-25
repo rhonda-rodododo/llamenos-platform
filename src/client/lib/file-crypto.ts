@@ -4,6 +4,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import type { EncryptedFileMetadata, RecipientEnvelope } from '@shared/types'
+import { LABEL_FILE_KEY, LABEL_FILE_METADATA } from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
@@ -30,10 +31,10 @@ function wrapKeyForPubkey(
   const sharedX = shared.slice(1, 33)
 
   // Derive symmetric key
-  const context = utf8ToBytes('llamenos:file-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_FILE_KEY)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   // Encrypt the file key
@@ -66,10 +67,10 @@ export function unwrapFileKey(
   const sharedX = shared.slice(1, 33)
 
   // Derive symmetric key
-  const context = utf8ToBytes('llamenos:file-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_FILE_KEY)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   // Decrypt
@@ -94,10 +95,10 @@ function encryptMetadataForPubkey(
   const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
   const sharedX = shared.slice(1, 33)
 
-  const context = utf8ToBytes('llamenos:file-metadata')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_FILE_METADATA)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   const nonce = randomBytes(24)
@@ -129,10 +130,10 @@ export function decryptFileMetadata(
     const shared = secp256k1.getSharedSecret(secretKey, ephemeralPub)
     const sharedX = shared.slice(1, 33)
 
-    const context = utf8ToBytes('llamenos:file-metadata')
-    const keyInput = new Uint8Array(context.length + sharedX.length)
-    keyInput.set(context)
-    keyInput.set(sharedX, context.length)
+    const label = utf8ToBytes(LABEL_FILE_METADATA)
+    const keyInput = new Uint8Array(label.length + sharedX.length)
+    keyInput.set(label)
+    keyInput.set(sharedX, label.length)
     const symmetricKey = sha256(keyInput)
 
     const data = hexToBytes(encryptedContentHex)

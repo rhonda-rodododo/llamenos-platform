@@ -6,6 +6,15 @@ import { hkdf } from '@noble/hashes/hkdf.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import type { NotePayload } from '@shared/types'
+import {
+  LABEL_NOTE_KEY,
+  LABEL_TRANSCRIPTION,
+  HKDF_SALT,
+  HKDF_CONTEXT_NOTES,
+  HKDF_CONTEXT_DRAFTS,
+  HKDF_CONTEXT_EXPORT,
+  AUTH_PREFIX,
+} from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
@@ -61,9 +70,9 @@ export function isValidNsec(nsec: string): boolean {
 
 // --- Encryption ---
 
-function deriveEncryptionKey(secretKey: Uint8Array, context: string): Uint8Array {
-  const salt = utf8ToBytes('llamenos:hkdf-salt:v1')
-  return hkdf(sha256, secretKey, salt, utf8ToBytes(`llamenos:${context}`), 32)
+function deriveEncryptionKey(secretKey: Uint8Array, label: string): Uint8Array {
+  const salt = utf8ToBytes(HKDF_SALT)
+  return hkdf(sha256, secretKey, salt, utf8ToBytes(label), 32)
 }
 
 // --- ECIES Key Wrapping (shared with file-crypto.ts pattern) ---
@@ -84,10 +93,10 @@ function wrapKeyForPubkey(
   const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
   const sharedX = shared.slice(1, 33)
 
-  const context = utf8ToBytes('llamenos:note-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_NOTE_KEY)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   const nonce = randomBytes(24)
@@ -112,10 +121,10 @@ function unwrapNoteKey(
   const shared = secp256k1.getSharedSecret(secretKey, ephemeralPub)
   const sharedX = shared.slice(1, 33)
 
-  const context = utf8ToBytes('llamenos:note-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_NOTE_KEY)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   const data = hexToBytes(envelope.encryptedNoteKey)
@@ -196,7 +205,7 @@ export function decryptNoteV2(
 /** Decrypt a legacy V1 note — kept for backward compatibility only. */
 export function decryptNote(packed: string, secretKey: Uint8Array): NotePayload | null {
   try {
-    const key = deriveEncryptionKey(secretKey, 'notes')
+    const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_NOTES)
     const data = hexToBytes(packed)
     const nonce = data.slice(0, 24)
     const ciphertext = data.slice(24)
@@ -235,10 +244,10 @@ export function decryptTranscription(
     const sharedX = shared.slice(1, 33)
 
     // Derive symmetric key with same domain separation as server
-    const context = utf8ToBytes('llamenos:transcription')
-    const keyInput = new Uint8Array(context.length + sharedX.length)
-    keyInput.set(context)
-    keyInput.set(sharedX, context.length)
+    const label = utf8ToBytes(LABEL_TRANSCRIPTION)
+    const keyInput = new Uint8Array(label.length + sharedX.length)
+    keyInput.set(label)
+    keyInput.set(sharedX, label.length)
     const symmetricKey = sha256(keyInput)
 
     // Unpack: nonce (24) + ciphertext
@@ -274,10 +283,10 @@ export function encryptForPublicKey(
   const sharedX = shared.slice(1, 33)
 
   // Derive symmetric key with domain separation (same as server)
-  const context = utf8ToBytes('llamenos:transcription')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_TRANSCRIPTION)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   // Encrypt with XChaCha20-Poly1305
@@ -300,7 +309,7 @@ export function encryptForPublicKey(
 // Same as notes but with "drafts" domain separation for local draft auto-save
 
 export function encryptDraft(plaintext: string, secretKey: Uint8Array): string {
-  const key = deriveEncryptionKey(secretKey, 'drafts')
+  const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_DRAFTS)
   const nonce = randomBytes(24)
   const data = utf8ToBytes(plaintext)
   const cipher = xchacha20poly1305(key, nonce)
@@ -314,7 +323,7 @@ export function encryptDraft(plaintext: string, secretKey: Uint8Array): string {
 
 export function decryptDraft(packed: string, secretKey: Uint8Array): string | null {
   try {
-    const key = deriveEncryptionKey(secretKey, 'drafts')
+    const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_DRAFTS)
     const data = hexToBytes(packed)
     const nonce = data.slice(0, 24)
     const ciphertext = data.slice(24)
@@ -330,7 +339,7 @@ export function decryptDraft(packed: string, secretKey: Uint8Array): string | nu
 // Encrypts a JSON export blob so it can only be read with the user's key
 
 export function encryptExport(jsonString: string, secretKey: Uint8Array): Uint8Array {
-  const key = deriveEncryptionKey(secretKey, 'export')
+  const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_EXPORT)
   const nonce = randomBytes(24)
   const data = utf8ToBytes(jsonString)
   const cipher = xchacha20poly1305(key, nonce)
@@ -349,7 +358,7 @@ export function encryptExport(jsonString: string, secretKey: Uint8Array): Uint8A
 export function createAuthToken(secretKey: Uint8Array, timestamp: number, method: string, path: string): string {
   const publicKey = getPublicKey(secretKey)
   // Bind token to specific request method+path to prevent cross-endpoint replay
-  const message = `llamenos:auth:${publicKey}:${timestamp}:${method}:${path}`
+  const message = `${AUTH_PREFIX}${publicKey}:${timestamp}:${method}:${path}`
   const messageHash = sha256(utf8ToBytes(message))
   // Sign with Schnorr (BIP-340) — proves possession of the secret key
   const signature = schnorr.sign(messageHash, secretKey)

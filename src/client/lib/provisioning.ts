@@ -20,6 +20,7 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { LABEL_DEVICE_PROVISION } from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
@@ -28,10 +29,10 @@ function randomBytes(n: number): Uint8Array {
 }
 
 function deriveSharedKey(sharedX: Uint8Array): Uint8Array {
-  const context = utf8ToBytes('llamenos:device-provision')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_DEVICE_PROVISION)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   return sha256(keyInput)
 }
 

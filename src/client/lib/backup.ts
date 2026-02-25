@@ -16,6 +16,7 @@
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { RECOVERY_SALT } from '@shared/crypto-labels'
 
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 
@@ -69,7 +70,7 @@ async function deriveFromRecoveryKey(recoveryKey: string, perBackupSalt?: Uint8A
   const normalized = recoveryKey.replace(/-/g, '').toUpperCase()
   const keyBytes = utf8ToBytes(normalized)
   // Use per-backup random salt if provided, otherwise fall back to static salt for legacy backups
-  const salt = perBackupSalt ?? utf8ToBytes('llamenos:recovery')
+  const salt = perBackupSalt ?? utf8ToBytes(RECOVERY_SALT)
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     keyBytes.buffer as ArrayBuffer,

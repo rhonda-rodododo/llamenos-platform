@@ -11,6 +11,7 @@ import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { HMAC_PREFERENCE_TOKEN, HMAC_SUBSCRIBER } from '@shared/crypto-labels'
 
 const PAGE_SIZE = 50
 
@@ -527,7 +528,7 @@ export class ConversationDO extends DurableObject<Env> {
   // --- Subscriber Management ---
 
   private generatePreferenceToken(identifierHash: string): string {
-    const key = utf8ToBytes('llamenos:preference-token')
+    const key = utf8ToBytes(HMAC_PREFERENCE_TOKEN)
     const input = utf8ToBytes(identifierHash)
     return bytesToHex(hmac(sha256, key, input))
   }
@@ -691,7 +692,7 @@ export class ConversationDO extends DurableObject<Env> {
     for (const entry of data.subscribers) {
       // Generate identifier hash using HMAC (consistent with messaging router pattern)
       const identifierHash = bytesToHex(
-        hmac(sha256, utf8ToBytes('llamenos:subscriber'), utf8ToBytes(entry.identifier))
+        hmac(sha256, utf8ToBytes(HMAC_SUBSCRIBER), utf8ToBytes(entry.identifier))
       )
 
       const existing = await this.ctx.storage.get<Subscriber>(`subscribers:${identifierHash}`)
