@@ -411,8 +411,8 @@ export class CallRouterDO extends DurableObject<Env> {
       const shiftDO = this.env.SHIFT_MANAGER.get(this.env.SHIFT_MANAGER.idFromName('global-shifts'))
       const shiftRes = await shiftDO.fetch(new Request('http://do/current-volunteers'))
       if (shiftRes.ok) {
-        const data = await shiftRes.json() as { pubkeys: string[] }
-        onShiftPubkeys = data.pubkeys
+        const data = await shiftRes.json() as { volunteers?: string[] }
+        onShiftPubkeys = Array.isArray(data.volunteers) ? data.volunteers : []
       }
     } catch {
       // Shift DO not available — fall back to empty
@@ -480,8 +480,8 @@ export class CallRouterDO extends DurableObject<Env> {
       const shiftDO = this.env.SHIFT_MANAGER.get(this.env.SHIFT_MANAGER.idFromName('global-shifts'))
       const shiftRes = await shiftDO.fetch(new Request('http://do/current-volunteers'))
       if (shiftRes.ok) {
-        const data = await shiftRes.json() as { pubkeys: string[] }
-        onShiftCount = data.pubkeys.length
+        const data = await shiftRes.json() as { volunteers?: string[] }
+        onShiftCount = Array.isArray(data.volunteers) ? data.volunteers.length : 0
       }
     } catch {}
 
