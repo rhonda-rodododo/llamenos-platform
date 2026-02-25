@@ -368,8 +368,8 @@ export class ConversationDO extends DurableObject<Env> {
     // Encrypt the message content using ECIES for the assigned volunteer (if any) and admin
     // For inbound messages, the server encrypts the plaintext that arrived via the channel
     // The plaintext is discarded after encryption
-    const adminPubkey = this.env.ADMIN_PUBKEY
-    const adminEncrypted = encryptForPublicKey(incoming.body || '', adminPubkey)
+    const adminDecryptionPubkey = this.env.ADMIN_DECRYPTION_PUBKEY || this.env.ADMIN_PUBKEY
+    const adminEncrypted = encryptForPublicKey(incoming.body || '', adminDecryptionPubkey)
 
     let volunteerEncrypted = { encryptedContent: '', ephemeralPubkey: '' }
     if (conv.assignedTo) {

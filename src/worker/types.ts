@@ -44,6 +44,7 @@ export interface Env {
   TWILIO_AUTH_TOKEN: string
   TWILIO_PHONE_NUMBER: string
   ADMIN_PUBKEY: string
+  ADMIN_DECRYPTION_PUBKEY?: string // Separate pubkey for note/hub key encryption (falls back to ADMIN_PUBKEY)
   HOTLINE_NAME: string
   ENVIRONMENT: string
   HMAC_SECRET: string
@@ -115,8 +116,8 @@ export interface EncryptedNote {
   updatedAt: string
   ephemeralPubkey?: string // hex-encoded, present for server-encrypted transcriptions (ECIES)
   // V2 per-note ECIES envelopes (forward secrecy)
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }
 
 export interface AuditLogEntry {

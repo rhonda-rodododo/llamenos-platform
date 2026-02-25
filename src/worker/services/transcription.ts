@@ -47,7 +47,7 @@ export async function maybeTranscribe(
       }))
 
       // Also encrypt for admin so they can read transcriptions independently
-      const adminEncrypted = encryptForPublicKey(result.text, env.ADMIN_PUBKEY)
+      const adminEncrypted = encryptForPublicKey(result.text, env.ADMIN_DECRYPTION_PUBKEY || env.ADMIN_PUBKEY)
       await dos.records.fetch(new Request('http://do/notes', {
         method: 'POST',
         body: JSON.stringify({
@@ -92,7 +92,7 @@ export async function transcribeVoicemail(
 
     if (result.text) {
       // Voicemails are encrypted only for admin (no volunteer answered)
-      const adminEncrypted = encryptForPublicKey(result.text, env.ADMIN_PUBKEY)
+      const adminEncrypted = encryptForPublicKey(result.text, env.ADMIN_DECRYPTION_PUBKEY || env.ADMIN_PUBKEY)
       await dos.records.fetch(new Request('http://do/notes', {
         method: 'POST',
         body: JSON.stringify({

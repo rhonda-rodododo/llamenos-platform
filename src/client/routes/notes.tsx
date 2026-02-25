@@ -35,7 +35,7 @@ interface DecryptedNote extends EncryptedNote {
 
 function NotesPage() {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, isAdmin, adminPubkey } = useAuth()
+  const { hasNsec, publicKey, isAdmin, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate({ from: '/notes' })
   const { page, callId, search } = Route.useSearch()
@@ -93,7 +93,10 @@ function NotesPage() {
             } else if (hasNsec) {
               // Try V2 (per-note ECIES envelope) first, fall back to V1 (legacy HKDF)
               const sk = keyManager.getSecretKey()
-              const envelope = isAdmin ? note.adminEnvelope : note.authorEnvelope
+              const myPubkey = publicKey!
+              const envelope = isAdmin
+                ? note.adminEnvelopes?.find(e => e.pubkey === myPubkey) ?? note.adminEnvelopes?.[0]
+                : note.authorEnvelope
               if (envelope) {
                 payload = decryptNoteV2(note.encryptedContent, envelope, sk) || { text: '[Decryption failed]' }
               } else {
@@ -120,9 +123,9 @@ function NotesPage() {
       const payload: NotePayload = { text }
       if (Object.keys(fields).length > 0) payload.fields = fields
       const authorPub = publicKey
-      const adminPub = adminPubkey || authorPub
-      const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2(payload, authorPub, adminPub)
-      const res = await updateNote(noteId, { encryptedContent, authorEnvelope, adminEnvelope })
+      const adminPub = adminDecryptionPubkey || authorPub
+      const { encryptedContent, authorEnvelope, adminEnvelopes } = encryptNoteV2(payload, authorPub, [adminPub])
+      const res = await updateNote(noteId, { encryptedContent, authorEnvelope, adminEnvelopes })
       setNotes(prev => prev.map(n =>
         n.id === noteId ? { ...res.note, decrypted: text, payload, isTranscription: n.isTranscription } : n
       ))
@@ -141,9 +144,9 @@ function NotesPage() {
       const payload: NotePayload = { text }
       if (Object.keys(fields).length > 0) payload.fields = fields
       const authorPub = publicKey
-      const adminPub = adminPubkey || authorPub
-      const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2(payload, authorPub, adminPub)
-      const res = await createNote({ callId, encryptedContent, authorEnvelope, adminEnvelope })
+      const adminPub = adminDecryptionPubkey || authorPub
+      const { encryptedContent, authorEnvelope, adminEnvelopes } = encryptNoteV2(payload, authorPub, [adminPub])
+      const res = await createNote({ callId, encryptedContent, authorEnvelope, adminEnvelopes })
       setNotes(prev => [{ ...res.note, decrypted: text, payload, isTranscription: false }, ...prev])
       setTotal(prev => prev + 1)
       setShowNewNote(false)

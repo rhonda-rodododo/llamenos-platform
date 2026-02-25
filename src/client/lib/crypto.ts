@@ -75,17 +75,30 @@ function deriveEncryptionKey(secretKey: Uint8Array, label: string): Uint8Array {
   return hkdf(sha256, secretKey, salt, utf8ToBytes(label), 32)
 }
 
-// --- ECIES Key Wrapping (shared with file-crypto.ts pattern) ---
+// --- Generic ECIES Key Wrapping ---
+// Shared primitive: ECDH + SHA-256(label || sharedX) + XChaCha20-Poly1305
+// Used by notes (LABEL_NOTE_KEY), files (LABEL_FILE_KEY), hub keys (LABEL_HUB_KEY_WRAP)
 
-export interface NoteEnvelope {
-  encryptedNoteKey: string  // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
-  ephemeralPubkey: string   // hex: compressed 33-byte pubkey
+/** A symmetric key wrapped via ECIES for a single recipient. */
+export interface KeyEnvelope {
+  wrappedKey: string       // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
+  ephemeralPubkey: string  // hex: compressed 33-byte pubkey
 }
 
-function wrapKeyForPubkey(
-  noteKey: Uint8Array,
+/** A KeyEnvelope tagged with the recipient's pubkey (for multi-recipient scenarios). */
+export interface RecipientKeyEnvelope extends KeyEnvelope {
+  pubkey: string  // recipient's x-only pubkey (hex)
+}
+
+/**
+ * Wrap a 32-byte symmetric key for a recipient using ECIES.
+ * Domain separation via `label` prevents cross-context key reuse.
+ */
+export function eciesWrapKey(
+  key: Uint8Array,
   recipientPubkeyHex: string,
-): NoteEnvelope {
+  label: string,
+): KeyEnvelope {
   const ephemeralSecret = randomBytes(32)
   const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralSecret, true)
 
@@ -93,41 +106,46 @@ function wrapKeyForPubkey(
   const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
   const sharedX = shared.slice(1, 33)
 
-  const label = utf8ToBytes(LABEL_NOTE_KEY)
-  const keyInput = new Uint8Array(label.length + sharedX.length)
-  keyInput.set(label)
-  keyInput.set(sharedX, label.length)
+  const labelBytes = utf8ToBytes(label)
+  const keyInput = new Uint8Array(labelBytes.length + sharedX.length)
+  keyInput.set(labelBytes)
+  keyInput.set(sharedX, labelBytes.length)
   const symmetricKey = sha256(keyInput)
 
   const nonce = randomBytes(24)
   const cipher = xchacha20poly1305(symmetricKey, nonce)
-  const ciphertext = cipher.encrypt(noteKey)
+  const ciphertext = cipher.encrypt(key)
 
   const packed = new Uint8Array(nonce.length + ciphertext.length)
   packed.set(nonce)
   packed.set(ciphertext, nonce.length)
 
   return {
-    encryptedNoteKey: bytesToHex(packed),
+    wrappedKey: bytesToHex(packed),
     ephemeralPubkey: bytesToHex(ephemeralPublicKey),
   }
 }
 
-function unwrapNoteKey(
-  envelope: NoteEnvelope,
+/**
+ * Unwrap a 32-byte symmetric key from an ECIES envelope.
+ * Must use the same `label` that was used during wrapping.
+ */
+export function eciesUnwrapKey(
+  envelope: KeyEnvelope,
   secretKey: Uint8Array,
+  label: string,
 ): Uint8Array {
   const ephemeralPub = hexToBytes(envelope.ephemeralPubkey)
   const shared = secp256k1.getSharedSecret(secretKey, ephemeralPub)
   const sharedX = shared.slice(1, 33)
 
-  const label = utf8ToBytes(LABEL_NOTE_KEY)
-  const keyInput = new Uint8Array(label.length + sharedX.length)
-  keyInput.set(label)
-  keyInput.set(sharedX, label.length)
+  const labelBytes = utf8ToBytes(label)
+  const keyInput = new Uint8Array(labelBytes.length + sharedX.length)
+  keyInput.set(labelBytes)
+  keyInput.set(sharedX, labelBytes.length)
   const symmetricKey = sha256(keyInput)
 
-  const data = hexToBytes(envelope.encryptedNoteKey)
+  const data = hexToBytes(envelope.wrappedKey)
   const nonce = data.slice(0, 24)
   const ciphertext = data.slice(24)
   const cipher = xchacha20poly1305(symmetricKey, nonce)
@@ -137,19 +155,21 @@ function unwrapNoteKey(
 // --- Per-Note Ephemeral Key Encryption (V2 — forward secrecy) ---
 
 export interface EncryptedNoteV2 {
-  encryptedContent: string     // hex: nonce(24) + ciphertext
-  authorEnvelope: NoteEnvelope // note key wrapped for the author
-  adminEnvelope: NoteEnvelope  // note key wrapped for the admin
+  encryptedContent: string              // hex: nonce(24) + ciphertext
+  authorEnvelope: KeyEnvelope           // note key wrapped for the author
+  adminEnvelopes: RecipientKeyEnvelope[] // note key wrapped for each admin (multi-admin)
 }
 
 /**
- * Encrypt a note with a random per-note key, wrapped for both author and admin.
+ * Encrypt a note with a random per-note key, wrapped for the author and all admins.
  * Provides forward secrecy: compromising the identity key doesn't reveal past notes.
+ *
+ * @param adminPubkeys - Array of admin decryption pubkeys (supports multi-admin)
  */
 export function encryptNoteV2(
   payload: NotePayload,
   authorPubkey: string,
-  adminPubkey: string,
+  adminPubkeys: string[],
 ): EncryptedNoteV2 {
   // Generate random per-note symmetric key
   const noteKey = randomBytes(32)
@@ -164,8 +184,11 @@ export function encryptNoteV2(
 
   return {
     encryptedContent: bytesToHex(packed),
-    authorEnvelope: wrapKeyForPubkey(noteKey, authorPubkey),
-    adminEnvelope: wrapKeyForPubkey(noteKey, adminPubkey),
+    authorEnvelope: eciesWrapKey(noteKey, authorPubkey, LABEL_NOTE_KEY),
+    adminEnvelopes: adminPubkeys.map(pk => ({
+      pubkey: pk,
+      ...eciesWrapKey(noteKey, pk, LABEL_NOTE_KEY),
+    })),
   }
 }
 
@@ -174,11 +197,11 @@ export function encryptNoteV2(
  */
 export function decryptNoteV2(
   encryptedContent: string,
-  envelope: NoteEnvelope,
+  envelope: KeyEnvelope,
   secretKey: Uint8Array,
 ): NotePayload | null {
   try {
-    const noteKey = unwrapNoteKey(envelope, secretKey)
+    const noteKey = eciesUnwrapKey(envelope, secretKey, LABEL_NOTE_KEY)
     const data = hexToBytes(encryptedContent)
     const nonce = data.slice(0, 24)
     const ciphertext = data.slice(24)

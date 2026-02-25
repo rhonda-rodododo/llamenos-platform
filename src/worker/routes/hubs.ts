@@ -131,4 +131,51 @@ routes.delete('/:hubId/members/:pubkey', requirePermission('volunteers:manage-ro
   return c.json({ ok: true })
 })
 
+// --- Hub Key Management ---
+
+// Get my hub key envelope (any hub member)
+routes.get('/:hubId/key', async (c) => {
+  const hubId = c.req.param('hubId')
+  const pubkey = c.get('pubkey')
+  const dos = getDOs(c.env)
+
+  const res = await dos.settings.fetch(new Request(`http://do/settings/hub/${hubId}/key`))
+  if (!res.ok) return c.json({ error: 'Hub not found' }, 404)
+
+  const { envelopes } = await res.json() as {
+    envelopes: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+  }
+
+  // Return only the envelope for this user
+  const myEnvelope = envelopes.find(e => e.pubkey === pubkey)
+  if (!myEnvelope) return c.json({ error: 'No key envelope for this user' }, 404)
+
+  return c.json({ envelope: myEnvelope })
+})
+
+// Set hub key envelopes (admin only — distributes wrapped hub key to all members)
+routes.put('/:hubId/key', requirePermission('system:manage-hubs'), async (c) => {
+  const hubId = c.req.param('hubId')
+  const dos = getDOs(c.env)
+  const body = await c.req.json() as {
+    envelopes: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+  }
+
+  if (!Array.isArray(body.envelopes) || body.envelopes.length === 0) {
+    return c.json({ error: 'At least one envelope required' }, 400)
+  }
+
+  const res = await dos.settings.fetch(new Request(`http://do/settings/hub/${hubId}/key`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }))
+
+  if (!res.ok) {
+    const err = await res.text()
+    return c.json({ error: err }, res.status as 404 | 500)
+  }
+
+  return c.json({ ok: true })
+})
+
 export default routes

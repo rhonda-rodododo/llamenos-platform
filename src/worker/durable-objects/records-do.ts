@@ -140,8 +140,8 @@ export class RecordsDO extends DurableObject<Env> {
 
   private async createNoteEntry(data: {
     callId: string; authorPubkey: string; encryptedContent: string; ephemeralPubkey?: string
-    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
   }): Promise<Response> {
     const notes = await this.ctx.storage.get<EncryptedNote[]>('notes') || []
     const note: EncryptedNote = {
@@ -153,7 +153,7 @@ export class RecordsDO extends DurableObject<Env> {
       updatedAt: new Date().toISOString(),
       ...(data.ephemeralPubkey ? { ephemeralPubkey: data.ephemeralPubkey } : {}),
       ...(data.authorEnvelope ? { authorEnvelope: data.authorEnvelope } : {}),
-      ...(data.adminEnvelope ? { adminEnvelope: data.adminEnvelope } : {}),
+      ...(data.adminEnvelopes ? { adminEnvelopes: data.adminEnvelopes } : {}),
     }
     notes.push(note)
     await this.ctx.storage.put('notes', notes)
@@ -162,8 +162,8 @@ export class RecordsDO extends DurableObject<Env> {
 
   private async updateNoteEntry(id: string, data: {
     encryptedContent: string; authorPubkey: string
-    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
   }): Promise<Response> {
     const notes = await this.ctx.storage.get<EncryptedNote[]>('notes') || []
     const note = notes.find(n => n.id === id)
@@ -171,7 +171,7 @@ export class RecordsDO extends DurableObject<Env> {
     if (note.authorPubkey !== data.authorPubkey) return new Response('Forbidden', { status: 403 })
     note.encryptedContent = data.encryptedContent
     if (data.authorEnvelope) note.authorEnvelope = data.authorEnvelope
-    if (data.adminEnvelope) note.adminEnvelope = data.adminEnvelope
+    if (data.adminEnvelopes) note.adminEnvelopes = data.adminEnvelopes
     note.updatedAt = new Date().toISOString()
     await this.ctx.storage.put('notes', notes)
     return Response.json({ note })

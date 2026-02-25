@@ -311,7 +311,7 @@ function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, authorPubk
 }) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const { adminPubkey } = useAuth()
+  const { adminDecryptionPubkey } = useAuth()
   const { formatted } = useCallTimer(call.startedAt)
   const [noteText, setNoteText] = useState('')
   const [saving, setSaving] = useState(false)
@@ -321,9 +321,9 @@ function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, authorPubk
     if (!noteText.trim()) return
     setSaving(true)
     try {
-      const adminPub = adminPubkey || authorPubkey
-      const { encryptedContent, authorEnvelope, adminEnvelope } = encryptNoteV2({ text: noteText }, authorPubkey, adminPub)
-      await createNote({ callId: call.id, encryptedContent, authorEnvelope, adminEnvelope })
+      const adminPub = adminDecryptionPubkey || authorPubkey
+      const { encryptedContent, authorEnvelope, adminEnvelopes } = encryptNoteV2({ text: noteText }, authorPubkey, [adminPub])
+      await createNote({ callId: call.id, encryptedContent, authorEnvelope, adminEnvelopes })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {

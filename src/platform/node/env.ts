@@ -50,6 +50,7 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
 
   // Read secrets
   const adminPubkey = readSecret('admin-pubkey', 'ADMIN_PUBKEY')
+  const adminDecryptionPubkey = process.env.ADMIN_DECRYPTION_PUBKEY || ''
   const hmacSecret = readSecret('hmac-secret', 'HMAC_SECRET')
   const twilioAccountSid = readSecret('twilio-account-sid', 'TWILIO_ACCOUNT_SID')
   const twilioAuthToken = readSecret('twilio-auth-token', 'TWILIO_AUTH_TOKEN')
@@ -58,6 +59,7 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
   // Create the env object (without DO namespaces initially)
   const env: Record<string, unknown> = {
     ADMIN_PUBKEY: adminPubkey,
+    ADMIN_DECRYPTION_PUBKEY: adminDecryptionPubkey || undefined,
     HMAC_SECRET: hmacSecret,
     HOTLINE_NAME: process.env.HOTLINE_NAME || 'Hotline',
     ENVIRONMENT: process.env.ENVIRONMENT || 'production',

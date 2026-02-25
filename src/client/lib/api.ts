@@ -114,7 +114,7 @@ export async function logout() {
 }
 
 export async function getMe() {
-  return request<{ pubkey: string; roles: string[]; permissions: string[]; primaryRole: { id: string; name: string; slug: string } | null; name: string; transcriptionEnabled: boolean; spokenLanguages: string[]; uiLanguage: string; profileCompleted: boolean; onBreak: boolean; callPreference: 'phone' | 'browser' | 'both'; webauthnRequired: boolean; webauthnRegistered: boolean; adminPubkey: string }>('/auth/me')
+  return request<{ pubkey: string; roles: string[]; permissions: string[]; primaryRole: { id: string; name: string; slug: string } | null; name: string; transcriptionEnabled: boolean; spokenLanguages: string[]; uiLanguage: string; profileCompleted: boolean; onBreak: boolean; callPreference: 'phone' | 'browser' | 'both'; webauthnRequired: boolean; webauthnRegistered: boolean; adminPubkey: string; adminDecryptionPubkey: string }>('/auth/me')
 }
 
 // --- Volunteers (admin only) ---
@@ -232,8 +232,8 @@ export async function listNotes(params?: { callId?: string; page?: number; limit
 export async function createNote(data: {
   callId: string
   encryptedContent: string
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }) {
   return request<{ note: EncryptedNote }>(hp('/notes'), {
     method: 'POST',
@@ -243,8 +243,8 @@ export async function createNote(data: {
 
 export async function updateNote(id: string, data: {
   encryptedContent: string
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }) {
   return request<{ note: EncryptedNote }>(hp(`/notes/${id}`), {
     method: 'PATCH',
@@ -637,8 +637,8 @@ export interface EncryptedNote {
   updatedAt: string
   ephemeralPubkey?: string
   // V2 per-note ECIES envelopes (forward secrecy)
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }
 
 export interface ActiveCall {
