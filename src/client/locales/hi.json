@@ -594,7 +594,16 @@
     "codePlaceholder": "QR डेटा या कोड पेस्ट करें...",
     "link": "जोड़ें",
     "linkThisDevice": "इस डिवाइस को जोड़ें",
-    "invalidCode": "अमान्य प्रावधान कोड। कृपया QR कोड स्कैन करें या पूरा कोड कॉपी करें।"
+    "invalidCode": "अमान्य प्रावधान कोड। कृपया QR कोड स्कैन करें या पूरा कोड कॉपी करें।",
+    "verifySAS": "Verify Security Code",
+    "verifySASDesc": "Compare this code with the code shown on your primary device.",
+    "verifySASPrimary": "Verify this code matches the code on the new device:",
+    "securityCode": "Security code",
+    "compareCodes": "Both devices must show the same code. If the codes don't match, do NOT proceed — an attacker may be present.",
+    "codesMatch": "Codes match",
+    "codesDontMatch": "Codes don't match",
+    "sasMismatch": "Security codes did not match. The linking session has been aborted for your safety. Please try again.",
+    "decryptFailed": "Failed to decrypt key from primary device. Please try again."
   },
   "blasts": {
     "title": "Message Blasts",

@@ -18,6 +18,7 @@ import {
   getProvisioningRoom,
   encryptNsecForDevice,
   sendProvisionedKey,
+  computeSASForPrimaryDevice,
 } from '@/lib/provisioning'
 import { getNotificationPrefs, setNotificationPrefs } from '@/lib/notifications'
 import { useNotificationPermission } from '@/lib/use-notification-permission'
@@ -518,8 +519,9 @@ function LinkDeviceSection() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [linkCode, setLinkCode] = useState('')
-  const [status, setStatus] = useState<'idle' | 'linking' | 'success' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'linking' | 'verify-sas' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')
+  const [sasCode, setSasCode] = useState('')
 
   async function handleLinkDevice() {
     if (!linkCode.trim()) return
@@ -559,6 +561,10 @@ function LinkDeviceSection() {
       const secretKey = keyManager.getSecretKey()
       const publicKey = keyManager.getPublicKeyHex()!
 
+      // Compute SAS for display BEFORE sending nsec
+      const sas = computeSASForPrimaryDevice(secretKey, room.ephemeralPubkey)
+      setSasCode(sas)
+
       // ECDH encrypt nsec for the new device
       const encrypted = encryptNsecForDevice(nsecStr, room.ephemeralPubkey, secretKey)
 
@@ -569,8 +575,8 @@ function LinkDeviceSection() {
         'Authorization': `Bearer ${authToken}`,
       })
 
-      setStatus('success')
-      setStatusMessage(t('deviceLink.linkSuccess'))
+      setStatus('verify-sas')
+      setStatusMessage(t('deviceLink.verifySASPrimary'))
     } catch {
       setStatus('error')
       setStatusMessage(t('deviceLink.linkFailed'))
@@ -608,6 +614,17 @@ function LinkDeviceSection() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           {t('common.loading')}
+        </div>
+      ) : status === 'verify-sas' ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">{statusMessage}</p>
+          <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4 text-center" data-testid="primary-sas-code">
+            <p className="text-xs text-muted-foreground mb-1">{t('deviceLink.securityCode')}</p>
+            <p className="text-3xl font-mono font-bold tracking-[0.3em]">{sasCode}</p>
+          </div>
+          <Button variant="outline" className="w-full" onClick={() => { setStatus('idle'); setLinkCode(''); setSasCode('') }}>
+            {t('common.done')}
+          </Button>
         </div>
       ) : (
         <div className="flex items-center gap-2 text-sm text-green-600">

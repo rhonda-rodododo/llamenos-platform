@@ -594,7 +594,16 @@
     "codePlaceholder": "QR 데이터 또는 코드를 붙여넣기...",
     "link": "연결",
     "linkThisDevice": "이 기기 연결",
-    "invalidCode": "유효하지 않은 프로비저닝 코드입니다. QR 코드를 스캔하거나 전체 코드를 복사해 주세요."
+    "invalidCode": "유효하지 않은 프로비저닝 코드입니다. QR 코드를 스캔하거나 전체 코드를 복사해 주세요.",
+    "verifySAS": "Verify Security Code",
+    "verifySASDesc": "Compare this code with the code shown on your primary device.",
+    "verifySASPrimary": "Verify this code matches the code on the new device:",
+    "securityCode": "Security code",
+    "compareCodes": "Both devices must show the same code. If the codes don't match, do NOT proceed — an attacker may be present.",
+    "codesMatch": "Codes match",
+    "codesDontMatch": "Codes don't match",
+    "sasMismatch": "Security codes did not match. The linking session has been aborted for your safety. Please try again.",
+    "decryptFailed": "Failed to decrypt key from primary device. Please try again."
   },
   "blasts": {
     "title": "Message Blasts",

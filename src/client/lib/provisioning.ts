@@ -18,9 +18,10 @@
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { sha256 } from '@noble/hashes/sha2.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { LABEL_DEVICE_PROVISION } from '@shared/crypto-labels'
+import { LABEL_DEVICE_PROVISION, SAS_SALT, SAS_INFO } from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
@@ -34,6 +35,57 @@ function deriveSharedKey(sharedX: Uint8Array): Uint8Array {
   keyInput.set(label)
   keyInput.set(sharedX, label.length)
   return sha256(keyInput)
+}
+
+// --- SAS Verification ---
+
+/**
+ * Derive a 6-digit Short Authentication String from the ECDH shared secret.
+ * Both devices compute this independently — if codes match, no MITM is present.
+ * Returns formatted "XXX XXX" string for display.
+ */
+export function computeProvisioningSAS(sharedX: Uint8Array): string {
+  const sasBytes = hkdf(sha256, sharedX, utf8ToBytes(SAS_SALT), utf8ToBytes(SAS_INFO), 4)
+  const num = ((sasBytes[0] << 24) | (sasBytes[1] << 16) | (sasBytes[2] << 8) | sasBytes[3]) >>> 0
+  const code = (num % 1_000_000).toString().padStart(6, '0')
+  return `${code.slice(0, 3)} ${code.slice(3)}`
+}
+
+/**
+ * Compute the ECDH shared secret x-coordinate from an ephemeral/primary keypair.
+ * Shared between both sides of provisioning for SAS computation.
+ */
+function computeSharedX(ourSecretKey: Uint8Array, theirPubkeyHex: string): Uint8Array {
+  // theirPubkeyHex may be x-only (32 bytes/64 hex) or compressed (33 bytes/66 hex)
+  const theirPub = theirPubkeyHex.length === 64
+    ? hexToBytes('02' + theirPubkeyHex)
+    : hexToBytes(theirPubkeyHex)
+  const shared = secp256k1.getSharedSecret(ourSecretKey, theirPub)
+  return shared.slice(1, 33)
+}
+
+/**
+ * Compute SAS code for the new device side.
+ * Called after receiving the primary device's pubkey from the provisioning room.
+ */
+export function computeSASForNewDevice(
+  ephemeralSecret: Uint8Array,
+  primaryPubkeyHex: string,
+): string {
+  const sharedX = computeSharedX(ephemeralSecret, primaryPubkeyHex)
+  return computeProvisioningSAS(sharedX)
+}
+
+/**
+ * Compute SAS code for the primary device side.
+ * Called after fetching the new device's ephemeral pubkey from the provisioning room.
+ */
+export function computeSASForPrimaryDevice(
+  primarySecretKey: Uint8Array,
+  ephemeralPubkeyHex: string,
+): string {
+  const sharedX = computeSharedX(primarySecretKey, ephemeralPubkeyHex)
+  return computeProvisioningSAS(sharedX)
 }
 
 // --- New Device Side ---

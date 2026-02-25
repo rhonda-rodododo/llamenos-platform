@@ -797,7 +797,16 @@
     "codePlaceholder": "Paste QR data or code...",
     "link": "Link",
     "linkThisDevice": "Link this device",
-    "invalidCode": "Invalid provisioning code. Please scan the QR code or copy the full code."
+    "invalidCode": "Invalid provisioning code. Please scan the QR code or copy the full code.",
+    "verifySAS": "Verify Security Code",
+    "verifySASDesc": "Compare this code with the code shown on your primary device.",
+    "verifySASPrimary": "Verify this code matches the code on the new device:",
+    "securityCode": "Security code",
+    "compareCodes": "Both devices must show the same code. If the codes don't match, do NOT proceed — an attacker may be present.",
+    "codesMatch": "Codes match",
+    "codesDontMatch": "Codes don't match",
+    "sasMismatch": "Security codes did not match. The linking session has been aborted for your safety. Please try again.",
+    "decryptFailed": "Failed to decrypt key from primary device. Please try again."
   },
   "hubs": {
     "title": "Hub Management",
