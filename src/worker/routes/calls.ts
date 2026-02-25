@@ -39,6 +39,65 @@ calls.get('/history', requirePermission('calls:read-history'), async (c) => {
   return dos.calls.fetch(new Request(`http://do/calls/history?${params}`))
 })
 
+// --- Call Actions (REST endpoints for WS→Nostr migration) ---
+
+// Answer a ringing call (volunteer)
+calls.post('/:callId/answer', requirePermission('calls:answer'), async (c) => {
+  const callId = c.req.param('callId')
+  const pubkey = c.get('pubkey')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
+
+  const res = await dos.calls.fetch(new Request(`http://do/calls/${callId}/answer`, {
+    method: 'POST',
+    body: JSON.stringify({ pubkey }),
+  }))
+
+  if (res.status === 409) return c.json({ error: 'Call already answered' }, 409)
+  if (!res.ok) return c.json({ error: 'Failed to answer call' }, 500)
+  return res
+})
+
+// Hang up an active call (volunteer who answered it)
+calls.post('/:callId/hangup', requirePermission('calls:answer'), async (c) => {
+  const callId = c.req.param('callId')
+  const pubkey = c.get('pubkey')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
+
+  // Verify the volunteer answered this call
+  const callRes = await dos.calls.fetch(new Request(`http://do/calls/${callId}`))
+  if (!callRes.ok) return c.json({ error: 'Call not found' }, 404)
+  const { call } = await callRes.json() as { call: CallRecord }
+  if (call.answeredBy !== pubkey) return c.json({ error: 'Not your call' }, 403)
+
+  const res = await dos.calls.fetch(new Request(`http://do/calls/${callId}/end`, {
+    method: 'POST',
+  }))
+
+  if (!res.ok) return c.json({ error: 'Failed to hang up call' }, 500)
+  return res
+})
+
+// Report a call as spam (volunteer who answered it)
+calls.post('/:callId/spam', requirePermission('calls:answer'), async (c) => {
+  const callId = c.req.param('callId')
+  const pubkey = c.get('pubkey')
+  const dos = getScopedDOs(c.env, c.get('hubId'))
+
+  // Verify the volunteer answered this call
+  const callRes = await dos.calls.fetch(new Request(`http://do/calls/${callId}`))
+  if (!callRes.ok) return c.json({ error: 'Call not found' }, 404)
+  const { call } = await callRes.json() as { call: CallRecord }
+  if (call.answeredBy !== pubkey) return c.json({ error: 'Not your call' }, 403)
+
+  const res = await dos.calls.fetch(new Request(`http://do/calls/${callId}/spam`, {
+    method: 'POST',
+    body: JSON.stringify({ pubkey }),
+  }))
+
+  if (!res.ok) return c.json({ error: 'Failed to report spam' }, 500)
+  return res
+})
+
 // Recording playback — admin or answering volunteer
 calls.get('/:callId/recording', async (c) => {
   const callId = c.req.param('callId')

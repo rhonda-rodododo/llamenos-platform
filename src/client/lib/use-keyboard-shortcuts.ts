@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useAuth } from './auth'
 import { useNoteSheet } from './note-sheet-context'
 import { getRingingCallIds, getCurrentCallId } from './call-state'
-import { sendMessage } from './ws'
+import { answerCall, hangupCall } from './api'
 import { stopRinging } from './notifications'
 
 function isInputFocused(): boolean {
@@ -60,7 +60,7 @@ export function useKeyboardShortcuts() {
         const ringing = getRingingCallIds()
         if (ringing.length > 0) {
           e.preventDefault()
-          sendMessage('call:answer', { callId: ringing[0] })
+          answerCall(ringing[0]).catch(() => {})
           stopRinging()
         }
         return
@@ -71,7 +71,7 @@ export function useKeyboardShortcuts() {
         const currentId = getCurrentCallId()
         if (currentId) {
           e.preventDefault()
-          sendMessage('call:hangup', { callId: currentId })
+          hangupCall(currentId).catch(() => {})
         }
         return
       }

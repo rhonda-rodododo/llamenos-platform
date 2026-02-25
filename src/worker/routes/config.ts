@@ -62,6 +62,10 @@ config.get('/', async (c) => {
     ? deriveServerKeypair(c.env.SERVER_NOSTR_SECRET).pubkey
     : undefined
 
+  // Client-facing relay URL (explicit env var, or default /nostr path if relay is configured)
+  const nostrRelayUrl = c.env.NOSTR_RELAY_PUBLIC_URL
+    || (serverNostrPubkey ? '/nostr' : undefined)
+
   return c.json({
     hotlineName: c.env.HOTLINE_NAME || 'Hotline',
     hotlineNumber,
@@ -72,6 +76,7 @@ config.get('/', async (c) => {
     hubs,
     defaultHubId,
     serverNostrPubkey,
+    nostrRelayUrl,
   })
 })
 

@@ -11,7 +11,7 @@
 {% endif %}
 
 {{ domain }} {
-	# API, telephony, messaging, and WebSocket routes
+	# API, telephony, and messaging routes
 	handle /api/* {
 		reverse_proxy app:3000
 	}
@@ -23,6 +23,13 @@
 	handle /messaging/* {
 		reverse_proxy app:3000
 	}
+
+{% if 'nostr' in compose_profiles %}
+	# Nostr relay WebSocket proxy (strfry)
+	handle /nostr {
+		reverse_proxy strfry:7777
+	}
+{% endif %}
 
 	# Everything else (SPA static files)
 	handle {
@@ -47,7 +54,7 @@
 		X-Permitted-Cross-Domain-Policies "none"
 
 		# Content Security Policy
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss://{{ domain }}; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss://{{ domain }}/nostr; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
 		# Permissions Policy (restrict browser features)
 		Permissions-Policy "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"

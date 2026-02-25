@@ -4,6 +4,8 @@ import { hashPhone } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '../../shared/migrations/runner'
 import { migrations } from '../../shared/migrations'
+import { getNostrPublisher } from '../lib/do-access'
+import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '../../shared/nostr-events'
 
 /**
  * CallRouterDO — manages real-time call state and WebSocket connections.
@@ -334,6 +336,14 @@ export class CallRouterDO extends DurableObject<Env> {
       callerNumber: '[redacted]',
     })
 
+    // Publish to Nostr relay (redacted — no PII in relay events)
+    this.publishNostrEvent(KIND_CALL_RING, {
+      type: 'call:ring',
+      callId: call.id,
+      callerLast4: call.callerLast4,
+      startedAt: call.startedAt,
+    })
+
     return Response.json({ call })
   }
 
@@ -354,6 +364,14 @@ export class CallRouterDO extends DurableObject<Env> {
       callerNumber: '[redacted]',
     })
     this.broadcastPresenceUpdate()
+
+    // Publish call update to Nostr relay
+    this.publishNostrEvent(KIND_CALL_UPDATE, {
+      type: 'call:update',
+      callId: call.id,
+      status: call.status,
+      answeredBy: call.answeredBy,
+    })
 
     return Response.json({ call })
   }
@@ -387,6 +405,13 @@ export class CallRouterDO extends DurableObject<Env> {
       callerNumber: '[redacted]',
     })
     this.broadcastPresenceUpdate()
+
+    // Publish call ended to Nostr relay
+    this.publishNostrEvent(KIND_CALL_UPDATE, {
+      type: 'call:update',
+      callId: call.id,
+      status: 'completed',
+    })
 
     return Response.json({ call })
   }
@@ -434,6 +459,13 @@ export class CallRouterDO extends DurableObject<Env> {
       callId: call.id,
       startedAt: call.startedAt,
       callerNumber: '[redacted]',
+    })
+
+    // Publish voicemail event to Nostr relay
+    this.publishNostrEvent(KIND_CALL_VOICEMAIL, {
+      type: 'voicemail:new',
+      callId: call.id,
+      startedAt: call.startedAt,
     })
 
     return Response.json({ call })
@@ -592,6 +624,35 @@ export class CallRouterDO extends DurableObject<Env> {
     return Response.json({ count: historyToday + activeToday })
   }
 
+  // --- Nostr Event Publishing ---
+
+  /**
+   * Publish a Nostr event for the hub this DO instance represents.
+   * Content is JSON-stringified and published as-is — hub key encryption
+   * will be added in Epic 76.2 integration.
+   */
+  private publishNostrEvent(kind: number, content: Record<string, unknown>): void {
+    try {
+      const publisher = getNostrPublisher(this.env)
+      // The hub ID is derived from this DO's name (the hub scope)
+      // For now, we tag with 'd' = 'global' for the default hub
+      const hubTag = 'global'
+      publisher.publish({
+        kind,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['d', hubTag],
+          ['t', 'llamenos:event'],
+        ],
+        content: JSON.stringify(content),
+      }).catch(err => {
+        console.error('[nostr] Failed to publish event:', err)
+      })
+    } catch {
+      // Nostr not configured — silently skip
+    }
+  }
+
   // --- Broadcasting ---
 
   private async broadcast(pubkeys: string[], message: Record<string, unknown>) {
@@ -653,5 +714,11 @@ export class CallRouterDO extends DurableObject<Env> {
       const isAdmin = tags[1] === 'admin'
       ws.send(isAdmin ? adminData : volunteerData)
     }
+
+    // Publish presence summary to Nostr relay (volunteers see summary only)
+    this.publishNostrEvent(KIND_PRESENCE_UPDATE, {
+      type: 'presence:summary',
+      hasAvailable: available > 0,
+    })
   }
 }

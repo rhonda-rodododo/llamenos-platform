@@ -4,7 +4,6 @@ import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
 import { useCalls, useCallTimer, useShiftStatus } from '@/lib/hooks'
 import { createNote, addBan, getCallsTodayCount, getVolunteerPresence, listVolunteers, type ActiveCall, type VolunteerPresence, type Volunteer } from '@/lib/api'
-import { onMessage } from '@/lib/ws'
 import { encryptNoteV2 } from '@/lib/crypto'
 
 import { useToast } from '@/lib/toast'
@@ -56,21 +55,19 @@ function DashboardPage() {
     getCallsTodayCount().then(r => setCallsToday(r.count)).catch(() => {})
   }, [isAuthenticated, activeCalls.length])
 
-  // Fetch volunteer presence (admin only)
+  // Fetch volunteer presence (admin only) with periodic refresh
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return
-    getVolunteerPresence().then(r => setPresence(r.volunteers)).catch(() => {})
-    listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => {})
+    let mounted = true
+    const fetchPresence = () => {
+      getVolunteerPresence().then(r => { if (mounted) setPresence(r.volunteers) }).catch(() => {})
+    }
+    fetchPresence()
+    listVolunteers().then(r => { if (mounted) setVolunteers(r.volunteers) }).catch(() => {})
+    // Poll presence every 15s (replaces WS-based real-time presence)
+    const interval = setInterval(fetchPresence, 15_000)
+    return () => { mounted = false; clearInterval(interval) }
   }, [isAuthenticated, isAdmin])
-
-  // Listen for real-time presence updates — refresh from API on change
-  useEffect(() => {
-    if (!isAdmin) return
-    const unsub = onMessage('presence:update', () => {
-      getVolunteerPresence().then(r => setPresence(r.volunteers)).catch(() => {})
-    })
-    return unsub
-  }, [isAdmin])
 
   if (!isAuthenticated) return null
 

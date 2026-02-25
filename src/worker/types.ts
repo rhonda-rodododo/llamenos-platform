@@ -58,6 +58,9 @@ export interface Env {
   SERVER_NOSTR_SECRET?: string
   // Relay URL for Node.js persistent WebSocket (Docker/self-hosted)
   NOSTR_RELAY_URL?: string
+  // Public-facing relay URL for client browser connections (e.g., wss://relay.example.com)
+  // Falls back to /nostr (reverse-proxied via Caddy) if not set but relay is configured
+  NOSTR_RELAY_PUBLIC_URL?: string
 }
 
 /** @deprecated Use roles array + permission system instead */

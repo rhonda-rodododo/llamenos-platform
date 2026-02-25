@@ -15,6 +15,10 @@ interface ConfigContextValue {
   currentHubId: string | undefined
   setCurrentHubId: (id: string) => void
   isMultiHub: boolean
+  /** Server's Nostr pubkey for verifying authoritative events */
+  serverNostrPubkey: string | undefined
+  /** Client-facing Nostr relay URL */
+  nostrRelayUrl: string | undefined
 }
 
 const defaultChannels: EnabledChannels = {
@@ -39,6 +43,8 @@ const ConfigContext = createContext<ConfigContextValue>({
   currentHubId: undefined,
   setCurrentHubId: () => {},
   isMultiHub: false,
+  serverNostrPubkey: undefined,
+  nostrRelayUrl: undefined,
 })
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
@@ -52,6 +58,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [hubs, setHubs] = useState<Hub[]>([])
   const [defaultHubId, setDefaultHubId] = useState<string | undefined>()
   const [currentHubId, setCurrentHubIdState] = useState<string | undefined>()
+  const [serverNostrPubkey, setServerNostrPubkey] = useState<string | undefined>()
+  const [nostrRelayUrl, setNostrRelayUrl] = useState<string | undefined>()
 
   function setCurrentHubId(id: string) {
     setCurrentHubIdState(id)
@@ -74,6 +82,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           setCurrentHubIdState(hubId)
           setActiveHub(hubId)
         }
+        if (config.serverNostrPubkey) setServerNostrPubkey(config.serverNostrPubkey)
+        if (config.nostrRelayUrl) setNostrRelayUrl(config.nostrRelayUrl)
         setIsLoading(false)
       })
       .catch(() => setIsLoading(false))
@@ -90,7 +100,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     <ConfigContext.Provider value={{
       hotlineName, hotlineNumber, channels, setupCompleted,
       demoMode, needsBootstrap, isLoading, hubs, defaultHubId, currentHubId,
-      setCurrentHubId, isMultiHub,
+      setCurrentHubId, isMultiHub, serverNostrPubkey, nostrRelayUrl,
     }}>
       {children}
     </ConfigContext.Provider>

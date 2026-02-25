@@ -7,7 +7,6 @@ import configRoutes from './routes/config'
 import devRoutes from './routes/dev'
 import authRoutes from './routes/auth'
 import webauthnRoutes from './routes/webauthn'
-import websocketRoutes from './routes/websocket'
 import volunteersRoutes from './routes/volunteers'
 import invitesRoutes from './routes/invites'
 import shiftsRoutes from './routes/shifts'
@@ -46,7 +45,6 @@ api.route('/', devRoutes)
 api.route('/auth', authRoutes)
 api.route('/webauthn', webauthnRoutes)
 api.route('/invites', invitesRoutes)
-api.route('/', websocketRoutes)
 
 // Device provisioning (mixed auth — room creation is public, payload submission is authenticated)
 api.route('/provision', provisioningRoutes)

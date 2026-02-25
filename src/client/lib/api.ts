@@ -84,6 +84,8 @@ export async function getConfig() {
     needsBootstrap?: boolean
     hubs?: import('@shared/types').Hub[]
     defaultHubId?: string
+    serverNostrPubkey?: string
+    nostrRelayUrl?: string
   }>
 }
 
@@ -266,6 +268,20 @@ export async function getCallHistory(params?: { page?: number; limit?: number; s
   if (params?.dateFrom) qs.set('dateFrom', params.dateFrom)
   if (params?.dateTo) qs.set('dateTo', params.dateTo)
   return request<{ calls: CallRecord[]; total: number }>(hp(`/calls/history?${qs}`))
+}
+
+// --- Call Actions (REST) ---
+
+export async function answerCall(callId: string) {
+  return request<{ call: ActiveCall }>(hp(`/calls/${callId}/answer`), { method: 'POST' })
+}
+
+export async function hangupCall(callId: string) {
+  return request<{ call: ActiveCall }>(hp(`/calls/${callId}/hangup`), { method: 'POST' })
+}
+
+export async function reportCallSpam(callId: string) {
+  return request<{ callId: string; callerNumber: string | null; reportedBy: string }>(hp(`/calls/${callId}/spam`), { method: 'POST' })
 }
 
 // --- Calls Today ---
