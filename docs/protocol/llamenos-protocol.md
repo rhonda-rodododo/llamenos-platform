@@ -1,8 +1,15 @@
 # Llámenos Cryptographic Protocol Specification
 
-**Version:** 1.0
-**Date:** 2026-02-17
+**Version:** 1.1
+**Date:** 2026-02-25
 **Status:** Normative
+
+**Related Documents**:
+
+- [Security Overview](../security/README.md) — Entry point for security auditors
+- [Data Classification](../security/DATA_CLASSIFICATION.md) — Complete data inventory
+- [Threat Model](../security/THREAT_MODEL.md) — Adversaries and trust boundaries
+- [Security Audit R6](../security/SECURITY_AUDIT_2026-02-R6.md) — Latest audit findings
 
 ## 1. Overview
 

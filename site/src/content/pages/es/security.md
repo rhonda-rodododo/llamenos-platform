@@ -1,146 +1,116 @@
 ---
-title: Modelo de seguridad y privacidad
-subtitle: Una evaluacion honesta de lo que Llamenos cifra de extremo a extremo, lo que el servidor puede ver y lo que estamos trabajando para mejorar. Cubre llamadas de voz, canales de mensajeria, notas, reportes y transcripciones.
+title: Seguridad y Privacidad
+subtitle: Que esta protegido, que es visible, y que puede obtenerse bajo citacion judicial — organizado por las funciones que uses.
 ---
 
-## Que esta cifrado de extremo a extremo
+## Si tu proveedor de hosting recibe una citacion
 
-<details>
-<summary><strong>Notas de llamadas (con secreto hacia adelante)</strong></summary>
+| Pueden proporcionar | NO pueden proporcionar |
+|---------------------|------------------------|
+| Metadatos de llamadas/mensajes (horarios, duraciones) | Contenido de notas, transcripciones, cuerpos de reportes |
+| Blobs de base de datos cifrados | Claves de descifrado (almacenadas en tus dispositivos) |
+| Que voluntarios estaban activos cuando | Claves de cifrado por nota (efimeras) |
+| Contenido de mensajes SMS/WhatsApp | Tu secreto HMAC para revertir hashes de telefonos |
 
-Cada nota se cifra con una clave aleatoria unica de 32 bytes usando XChaCha20-Poly1305. Esa clave por nota se envuelve via ECIES (ECDH efimero sobre secp256k1) para cada lector autorizado — un sobre para el voluntario, otro para el administrador. Ambos pueden descifrar de forma independiente usando sus claves privadas. Dado que cada nota usa una clave aleatoria nueva, comprometer la clave de identidad no revela retroactivamente las notas pasadas.
+**El servidor almacena datos que no puede leer.** Los metadatos (cuando, cuanto tiempo, quien) son visibles. El contenido (que se dijo, que se escribio) no lo es.
 
-</details>
+---
 
-<details>
-<summary><strong>Transcripciones de llamadas</strong></summary>
+## Por funcion
 
-Despues de la transcripcion, el texto resultante se cifra usando el mismo esquema ECIES antes de almacenarse. Lo que se guarda es solo texto cifrado. Tanto el voluntario como el administrador reciben copias cifradas de forma independiente.
+Tu exposicion de privacidad depende de que canales habilites:
 
-</details>
+### Llamadas de voz
 
-<details>
-<summary><strong>Valores de campos personalizados</strong></summary>
+| Si usas... | Terceros pueden acceder | Servidor puede acceder | Contenido E2EE |
+|------------|------------------------|------------------------|----------------|
+| Twilio/SignalWire/Vonage/Plivo | Audio de llamadas (en vivo), registros | Metadatos de llamadas | Notas, transcripciones |
+| Asterisk autoalojado | Nada (tu lo controlas) | Metadatos de llamadas | Notas, transcripciones |
+| Navegador a navegador (WebRTC) | Nada | Metadatos de llamadas | Notas, transcripciones |
 
-Los campos personalizados definidos por el administrador (texto, numero, seleccion, casilla de verificacion, area de texto) se cifran junto con el contenido de la nota usando el mismo cifrado ECIES. Las definiciones de los campos (nombres, tipos, opciones) se almacenan en texto plano para la interfaz del formulario, pero todos los valores ingresados por el usuario se cifran antes de salir del navegador.
+**Citacion al proveedor de telefonia**: Tienen registros detallados de llamadas (horarios, numeros, duraciones). NO tienen notas de llamadas ni transcripciones. La grabacion esta deshabilitada por defecto.
 
-</details>
+**Ventana de transcripcion**: Durante los ~30 segundos de transcripcion, el audio es procesado por Cloudflare Workers AI. Despues de la transcripcion, solo se almacena texto cifrado.
 
-<details>
-<summary><strong>Borradores de notas</strong></summary>
+### Mensajeria de texto
 
-Las notas en progreso se guardan automaticamente como borradores cifrados en el localStorage del navegador. Se cifran con la clave publica del voluntario antes de almacenarse. Los borradores se eliminan del localStorage al cerrar sesion.
+| Canal | Acceso del proveedor | Almacenamiento en servidor | Notas |
+|-------|---------------------|---------------------------|-------|
+| SMS | Tu proveedor de telefonia lee todos los mensajes | Texto plano | Limitacion inherente de SMS |
+| WhatsApp | Meta lee todos los mensajes | Texto plano | Requisito de WhatsApp Business API |
+| Signal | La red Signal es E2EE, pero el bridge signal-cli descifra | Texto plano | Mejor que SMS, no es conocimiento cero |
 
-</details>
+**Citacion al proveedor de mensajeria**: El proveedor de SMS tiene el contenido completo de mensajes. Meta tiene el contenido de WhatsApp. Los mensajes de Signal son E2EE hasta el bridge, pero el bridge (ejecutandose en tu servidor) tiene texto plano.
 
-<details>
-<summary><strong>Reportes cifrados</strong></summary>
+**Mejora futura**: Estamos explorando almacenamiento E2EE de mensajes donde el servidor solo almacena texto cifrado. Ver [que esta planeado](#que-esta-planeado).
 
-Los reportes enviados por el rol de reportero se cifran usando el mismo esquema ECIES. El cuerpo del reporte se cifra en el navegador antes de subirlo — el servidor almacena solo texto cifrado. Los titulos de los reportes se almacenan en texto plano para permitir la clasificacion y el seguimiento de estado. Los archivos adjuntos se cifran por separado antes de subirlos. Tanto el reportero como el administrador reciben copias cifradas de forma independiente.
+### Notas, transcripciones y reportes
 
-</details>
+Todo el contenido escrito por voluntarios esta cifrado de extremo a extremo:
 
-## Lo que el servidor nunca ve
+- Cada nota usa una clave aleatoria unica (secreto hacia adelante)
+- Las claves se envuelven separadamente para el voluntario y el administrador
+- El servidor almacena solo texto cifrado
+- El descifrado ocurre en el navegador
 
-- Contenido de las notas (texto libre y valores de campos personalizados)
-- Texto de transcripciones despues del cifrado
-- Contenido del cuerpo de reportes y archivos adjuntos
-- Claves secretas de voluntarios y reporteros (nsec) — nunca se almacenan en texto plano; cifradas con PIN en reposo, solo en memoria cuando estan desbloqueadas
-- Claves de cifrado por nota — cada nota usa una clave aleatoria nueva; la clave de identidad sola no puede descifrar notas almacenadas
-- Contenido de borradores de notas (almacenados localmente en el navegador)
+**Incautacion de dispositivo**: Sin tu PIN, los atacantes obtienen un blob cifrado. Un PIN de 6 digitos con 600K iteraciones de PBKDF2 toma horas de fuerza bruta en hardware GPU.
 
-## Canales de mensajeria
+---
 
-<details>
-<summary><strong>Contenido de mensajes SMS, WhatsApp y Signal</strong></summary>
+## Privacidad del numero de telefono del voluntario
 
-Los mensajes de texto enviados via SMS, WhatsApp o Signal son procesados por el proveedor de mensajeria respectivo (tu proveedor de telefonia para SMS, Meta para WhatsApp, o el bridge signal-cli para Signal). El contenido de los mensajes pasa a traves de estos intermediarios. Llamenos almacena los mensajes de conversacion en el servidor para la vista de conversaciones con hilos. A diferencia de las notas y reportes, el contenido de mensajeria no esta cifrado de extremo a extremo entre el navegador y el servidor — llega a traves de webhooks del proveedor y se almacena tal como se recibe.
+Cuando los voluntarios reciben llamadas en sus telefonos personales, sus numeros quedan expuestos a tu proveedor de telefonia.
 
-</details>
+| Escenario | Numero de telefono visible para |
+|-----------|--------------------------------|
+| Llamada PSTN al telefono del voluntario | Proveedor de telefonia, operador movil |
+| Navegador a navegador (WebRTC) | Nadie (el audio permanece en el navegador) |
+| Asterisk autoalojado + telefono SIP | Solo tu servidor Asterisk |
 
-## Limitaciones honestas
+**Para proteger numeros de telefono de voluntarios**: Usa llamadas basadas en navegador (WebRTC) o proporciona telefonos SIP conectados a Asterisk autoalojado.
 
-<details>
-<summary><strong>Las llamadas de voz pasan por la PSTN y tu proveedor de telefonia</strong></summary>
+**Mejora futura**: Aplicaciones nativas de escritorio y movil para recibir llamadas sin exponer numeros de telefono personales.
 
-Cuando se usa un proveedor en la nube (Twilio, SignalWire, Vonage o Plivo), Llamenos enruta las llamadas a traves de la red telefonica publica conmutada (PSTN) via la infraestructura de ese proveedor. Esto significa que el proveedor procesa el audio de las llamadas en tiempo real y puede tecnicamente acceder a el durante el transito. Esta es una limitacion inherente de la telefonia en la nube basada en PSTN. Para maxima privacidad, Llamenos tambien soporta Asterisk autoalojado con troncales SIP, lo que elimina al proveedor tercero por completo.
+---
 
-</details>
+## Que esta planeado
 
-<details>
-<summary><strong>La transcripcion requiere acceso al audio en el servidor</strong></summary>
+Estamos trabajando en mejoras para reducir los requisitos de confianza:
 
-Las grabaciones de llamadas se transcriben en el servidor usando Cloudflare Workers AI (Whisper). Durante la transcripcion, el servidor tiene acceso transitorio al audio. Despues de completar la transcripcion, el texto se cifra inmediatamente y la referencia al audio se descarta. La ventana de acceso al texto plano se minimiza pero existe.
+| Funcion | Estado | Beneficio de privacidad |
+|---------|--------|------------------------|
+| Almacenamiento E2EE de mensajes | Planeado | SMS/WhatsApp/Signal almacenados como texto cifrado |
+| Transcripcion del lado del cliente | Planeado | El audio nunca sale del navegador |
+| Aplicaciones nativas para recibir llamadas | Planeado | No se exponen numeros de telefono personales |
+| Builds reproducibles | Planeado | Verificar que el codigo desplegado coincide con el fuente |
+| Bridge Signal autoalojado | Disponible | Ejecutar signal-cli en tu propia infraestructura |
 
-</details>
+---
 
-<details>
-<summary><strong>Los metadatos de llamadas son visibles para el servidor</strong></summary>
+## Tabla resumen
 
-Marcas de tiempo, duraciones de llamadas, decisiones de enrutamiento, posiciones en la cola y que voluntario respondio — todo esto son metadatos operacionales que el servidor necesita para funcionar. Los numeros de telefono se almacenan para la verificacion de listas de bloqueo, pero no se incluyen en las transmisiones WebSocket a los voluntarios. La identidad del llamante se redacta de las actualizaciones en tiempo real.
+| Tipo de dato | Cifrado | Visible al servidor | Obtenible bajo citacion |
+|--------------|---------|--------------------|-----------------------|
+| Notas de llamadas | Si (E2EE) | No | Solo texto cifrado |
+| Transcripciones | Si (E2EE) | No | Solo texto cifrado |
+| Reportes | Si (E2EE) | No | Solo texto cifrado |
+| Archivos adjuntos | Si (E2EE) | No | Solo texto cifrado |
+| Metadatos de llamadas | No | Si | Si |
+| Identidades de voluntarios | Cifrado en reposo | Solo admin | Si (con esfuerzo) |
+| Hashes de telefonos de llamantes | HMAC hasheado | Solo hash | Hash (no reversible sin tu secreto) |
+| Contenido SMS | No | Si | Si |
+| Contenido WhatsApp | No | Si | Si (tambien de Meta) |
+| Contenido Signal | No | Si | Si (de tu servidor) |
 
-</details>
+---
 
-## Proteccion local de claves
+## Para auditores de seguridad
 
-<details>
-<summary><strong>Almacen de claves cifrado con PIN</strong></summary>
+Documentacion tecnica:
 
-Tu clave secreta (nsec) se cifra en el localStorage del navegador usando PBKDF2-SHA256 (600,000 iteraciones) para derivar una clave de cifrado, luego XChaCha20-Poly1305 para cifrar el nsec. La clave sin cifrar nunca se almacena en sessionStorage, cookies ni ninguna ubicacion accesible del navegador. Cuando ingresas tu PIN, la clave se descifra en una variable de clausura de JavaScript — solo existe en memoria y se limpia al bloquear o cerrar sesion.
+- [Especificacion del Protocolo](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/protocol/llamenos-protocol.md)
+- [Modelo de Amenazas](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/THREAT_MODEL.md)
+- [Clasificacion de Datos](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Auditorias de Seguridad](https://github.com/rhonda-rodododo/llamenos/tree/main/docs/security)
 
-</details>
-
-<details>
-<summary><strong>Protocolo de vinculacion de dispositivos</strong></summary>
-
-Agregar un nuevo dispositivo usa un intercambio de claves ECDH efimero. El nuevo dispositivo genera un par de claves secp256k1 temporal y muestra un codigo QR. El dispositivo principal lo escanea, calcula un secreto compartido via ECDH, cifra el nsec con XChaCha20-Poly1305 y lo envia a traves de una sala de retransmision de un solo uso. El nuevo dispositivo descifra, solicita un nuevo PIN y almacena la clave localmente. La sala de retransmision expira despues de 5 minutos y se elimina despues de un uso.
-
-</details>
-
-<details>
-<summary><strong>Claves de recuperacion</strong></summary>
-
-Durante la incorporacion, se genera una clave de recuperacion de 128 bits y se muestra en formato Base32. Esta clave cifra una copia de respaldo del nsec (PBKDF2 + XChaCha20-Poly1305). El nsec sin cifrar nunca se muestra a los usuarios — solo reciben la clave de recuperacion. Es obligatorio descargar un archivo de respaldo cifrado antes de continuar.
-
-</details>
-
-## Modelo de amenazas
-
-Llamenos esta disenado para proteger a los voluntarios y llamantes de lineas de crisis contra:
-
-1. **Filtracion de base de datos** — Un atacante que obtenga la base de datos solo obtiene texto cifrado de notas y transcripciones. Sin las claves privadas del voluntario o administrador, el contenido es ilegible.
-2. **Servidor comprometido** — Un servidor comprometido puede ver metadatos de llamadas y tiene acceso transitorio al audio durante la transcripcion, pero no puede leer notas ni transcripciones almacenadas.
-3. **Vigilancia de red** — Todas las conexiones usan TLS. Las conexiones WebSocket estan autenticadas. El servidor aplica HSTS y encabezados CSP estrictos.
-4. **Suplantacion de voluntario** — La autenticacion usa firmas BIP-340 Schnorr. Sin la clave privada del voluntario, el inicio de sesion es imposible. Los passkeys de WebAuthn agregan un segundo factor respaldado por hardware.
-5. **Amenaza interna (voluntario)** — Los voluntarios solo pueden descifrar sus propias notas. No pueden ver las notas de otros voluntarios, informacion personal ni datos exclusivos del administrador.
-6. **XSS / extension del navegador** — La clave secreta nunca esta en sessionStorage ni en el ambito global. Solo existe en una variable de clausura, que se limpia al bloquear. Un ataque XSS durante una sesion desbloqueada podria firmar solicitudes, pero no puede extraer la clave para uso fuera de linea.
-7. **Confiscacion de dispositivo** — Un dispositivo confiscado solo contiene el blob de clave cifrado con PIN. Sin el PIN (y la derivacion PBKDF2 de 600,000 iteraciones), la clave es irrecuperable. El secreto hacia adelante por nota significa que incluso recuperar la clave de identidad no revela notas pasadas.
-
-Ningun sistema es perfectamente seguro. El objetivo es minimizar la superficie de confianza y ser transparentes sobre lo que queda.
-
-## En lo que estamos trabajando
-
-<details>
-<summary><strong>Llamadas en el navegador con WebRTC</strong></summary>
-
-Migrar las llamadas de voz de PSTN/proveedores en la nube a WebRTC permite audio directo de navegador a navegador, eliminando al proveedor de telefonia de la ruta de voz por completo. Llamenos ya soporta llamadas WebRTC para voluntarios — combinado con una instalacion de Asterisk autoalojado, toda la ruta de voz puede evitar la infraestructura de terceros.
-
-</details>
-
-<details>
-<summary><strong>Transcripcion en el cliente</strong></summary>
-
-Ejecutar Whisper (o un modelo similar) directamente en el navegador via WebAssembly o WebGPU eliminaria por completo el acceso al audio en el servidor. La transcripcion se generaria localmente y se cifraria antes de subirla.
-
-</details>
-
-<details>
-<summary><strong>Builds reproducibles</strong></summary>
-
-Compilaciones deterministas que permitan a cualquier persona verificar que el codigo desplegado coincide con el repositorio de codigo abierto, asegurando que no se hayan introducido modificaciones del lado del servidor.
-
-</details>
-
-## Verificalo tu mismo
-
-Llamenos es completamente de codigo abierto. Cada operacion de cifrado, cada endpoint de API, cada verificacion del lado del cliente — todo esta en el repositorio. Lee el codigo, audita la criptografia, reporta problemas. [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)
+Llamenos es codigo abierto: [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)

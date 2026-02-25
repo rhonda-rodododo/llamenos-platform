@@ -4,11 +4,17 @@
 
 This document defines the threat model for Llamenos, a secure crisis response hotline webapp. It identifies adversaries, attack surfaces, trust boundaries, and the security properties the system must maintain. All architectural decisions and security controls are evaluated against this model.
 
+**Related Documents**:
+- [Security Overview](README.md) — Entry point for security auditors
+- [Data Classification](DATA_CLASSIFICATION.md) — Complete data inventory with encryption status
+- [Protocol Specification](../protocol/llamenos-protocol.md) — Cryptographic algorithms and wire formats
+- [Deployment Hardening](DEPLOYMENT_HARDENING.md) — Infrastructure security guidance
+
 ## Protected Assets
 
 | Asset | Classification | Storage Location | Protection |
 |-------|---------------|-----------------|------------|
-| Caller phone numbers | PII / Safety-Critical | Hashed in DO/PostgreSQL | SHA-256 with domain prefix; full number transient in telephony flow only |
+| Caller phone numbers | PII / Safety-Critical | Hashed in DO/PostgreSQL | HMAC-SHA256 with operator secret; last 4 digits stored plaintext for display |
 | Call note content | Confidential | Encrypted in DO/PostgreSQL | E2EE V2: per-note XChaCha20-Poly1305, ECIES key wrapping |
 | Volunteer identity (name, phone) | PII / Safety-Critical | Encrypted at rest in DO/PostgreSQL | Visible only to admins; never exposed to other volunteers or callers |
 | Volunteer private keys (nsec) | Secret | PIN-encrypted in browser localStorage | PBKDF2-SHA256 600K iterations + XChaCha20-Poly1305 |
@@ -143,7 +149,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 |---------|------|------------|
 | Volunteer → Admin escalation | Role modification | Safe-fields allowlist on self-update; `roles` requires `volunteers:update` permission |
 | Volunteer → Other volunteer's notes | Note content theft | E2EE — server has no plaintext; `notes:read-own` permission scoping |
-| Volunteer → Caller identification | PII exposure | **CURRENT GAP**: `callerNumber` broadcast to all volunteers |
+| Volunteer → Caller identification | PII exposure | Caller numbers hashed; only `callerLast4` sent to answering volunteer; redacted for others |
 | Admin → Excessive data access | Insider threat | Audit logging of all admin actions; admin notes are separately encrypted |
 | WebSocket message injection | Fake call events | WS rate limiting + prototype pollution guard + action authorization checks |
 
@@ -159,7 +165,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | Key-at-rest confidentiality | PBKDF2-SHA256 (600K iter) + XChaCha20-Poly1305 | ~20 bits PIN + 256-bit key |
 | Auth token unforgeability | BIP-340 Schnorr signatures | 128-bit security level |
 | Session token unpredictability | `crypto.getRandomValues(32)` | 256-bit |
-| Phone hash preimage resistance | SHA-256 with domain prefix | ~33 bits (phone space) |
+| Phone hash preimage resistance | HMAC-SHA256 with operator secret | Infeasible without HMAC secret |
 
 ### What We Do NOT Guarantee
 
@@ -170,6 +176,84 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | SMS/WhatsApp E2EE | Provider requires plaintext | Yes — documented per-channel |
 | PIN brute-force resistance (offline) | 4-6 digit PIN, ~10K-1M possibilities | Marginal — recommend 6-digit minimum |
 | Server-side key deletion verification | Cannot prove Cloudflare/operator deleted data | Yes — fundamental cloud trust limitation |
+
+## Legal Compulsion and Subpoena Scenarios
+
+This section documents what data can be obtained through legal process against various parties. Crisis hotlines operating in hostile legal environments should understand these limitations.
+
+### Subpoena of Hosting Provider (Cloudflare, VPS)
+
+**Obtainable:**
+- Encrypted database contents (ciphertext for E2EE data)
+- Plaintext metadata: call timestamps, durations, volunteer assignments, call IDs
+- Caller phone hashes (irreversible without operator's HMAC secret)
+- Audit logs with truncated IP hashes
+- Traffic metadata (request times, sizes, source IPs)
+- Account information for the operator
+
+**Not Obtainable:**
+- Note content, transcription text, report bodies (E2EE — provider has ciphertext only)
+- Volunteer private keys (stored client-side, never uploaded)
+- Per-note encryption keys (ephemeral, never persisted)
+- Operator's HMAC secret (not stored with hosting provider)
+
+### Subpoena of Telephony Provider (Twilio, SignalWire, etc.)
+
+**Obtainable:**
+- Call detail records (timestamps, phone numbers, durations)
+- Call recordings (if recording is enabled — **Llamenos does NOT enable recording by default**)
+- SMS message content (passes through provider in plaintext)
+- WhatsApp message content (passes through Meta)
+- Account and billing information
+
+**Not Obtainable:**
+- Call notes (never sent to telephony provider)
+- Volunteer identities beyond phone numbers used for call routing
+- Any E2EE content
+
+### Device Seizure (Volunteer)
+
+**Without PIN:**
+- Encrypted key blob in localStorage requires PIN brute-force
+- 600,000 PBKDF2 iterations + 4-6 digit PIN = estimated hours on GPU hardware
+- Session tokens may still be valid if device was recently used (8-hour TTL)
+
+**With PIN (or successful brute-force):**
+- Access to that volunteer's decrypted notes
+- Cannot decrypt other volunteers' notes (separate keypairs)
+- Per-note forward secrecy: compromising identity key does not reveal notes without also obtaining the per-note ECIES envelopes
+
+**Mitigations:**
+- Enable device full-disk encryption
+- Use 6-digit PIN (not 4-digit)
+- Enable auto-lock on shorter timeout
+- Admin can remotely revoke sessions
+
+### Device Seizure (Admin)
+
+**Impact if admin nsec is obtained:**
+- Can decrypt all notes (admin envelope exists on every note)
+- Can impersonate admin role
+- Cannot impersonate individual volunteers
+
+**Mitigations:**
+- Store admin nsec in hardware security module (HSM) or air-gapped device
+- Use YubiKey or similar for admin authentication
+- Never store admin nsec on internet-connected devices
+- Implement admin key rotation procedures
+
+### Insider Threat (Malicious Operator)
+
+A malicious operator with server access can:
+- Read all plaintext metadata
+- Modify server code to capture data before encryption (requires deployment access)
+- Access HMAC secret to reverse phone hashes
+- Cannot decrypt E2EE content without volunteer/admin private keys
+
+**Mitigations:**
+- Reproducible builds (planned) allow verification of deployed code
+- Multi-party deployment approval
+- Audit logging of all server access
 
 ## Deployment-Specific Threats
 
@@ -196,4 +280,5 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
+| 2026-02-25 | 1.1 | Documentation overhaul | Added legal compulsion section; fixed phone hashing to HMAC-SHA256; fixed caller number broadcast status; added cross-references |
 | 2026-02-23 | 1.0 | Security Audit R6 | Initial threat model document |
