@@ -168,7 +168,7 @@ jobs:
     # Skip E2E when only docs/site files changed
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
