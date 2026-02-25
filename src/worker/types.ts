@@ -39,6 +39,9 @@ export interface Env {
   // Blob storage (CF: R2Bucket, Node: MinIO S3 client)
   R2_BUCKET: BlobStorage
 
+  // Nostr relay service binding (CF: Fetcher to Nosflare, Node: null)
+  NOSFLARE?: { fetch(request: Request): Promise<Response> }
+
   // Plain env vars / secrets (same on both platforms)
   TWILIO_ACCOUNT_SID: string
   TWILIO_AUTH_TOKEN: string
@@ -50,6 +53,11 @@ export interface Env {
   HMAC_SECRET: string
   E2E_TEST_SECRET?: string
   DEV_RESET_SECRET?: string
+
+  // Server Nostr identity (Epic 76.1) — hex secret for HKDF keypair derivation
+  SERVER_NOSTR_SECRET?: string
+  // Relay URL for Node.js persistent WebSocket (Docker/self-hosted)
+  NOSTR_RELAY_URL?: string
 }
 
 /** @deprecated Use roles array + permission system instead */

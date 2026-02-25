@@ -92,3 +92,11 @@ export const RECOVERY_SALT = 'llamenos:recovery'
 
 /** Generic backup encryption (Epic 76.0 — new format) */
 export const LABEL_BACKUP = 'llamenos:backup'
+
+// --- Server Nostr Identity (Epic 76.1) ---
+
+/** HKDF derivation for server Nostr keypair from SERVER_NOSTR_SECRET */
+export const LABEL_SERVER_NOSTR_KEY = 'llamenos:server-nostr-key'
+
+/** HKDF info parameter for server Nostr key (versioned for rotation) */
+export const LABEL_SERVER_NOSTR_KEY_INFO = 'llamenos:server-nostr-key:v1'

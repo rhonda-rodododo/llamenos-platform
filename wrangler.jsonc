@@ -78,7 +78,14 @@
     "binding": "AI"
   },
 
+  // Service bindings — Nostr relay (Nosflare fork)
+  // Uncomment when llamenos-relay Worker is deployed:
+  // "services": [
+  //   { "binding": "NOSFLARE", "service": "llamenos-relay" }
+  // ],
+
   // Environment variables (secrets go in .dev.vars for local dev)
+  // SERVER_NOSTR_SECRET goes in .dev.vars (wrangler secret put SERVER_NOSTR_SECRET)
   "vars": {
     "ENVIRONMENT": "production",
     "HOTLINE_NAME": "Llámenos"
@@ -109,6 +116,10 @@
       "ai": {
         "binding": "AI"
       },
+      // Uncomment when llamenos-relay Worker is deployed:
+      // "services": [
+      //   { "binding": "NOSFLARE", "service": "llamenos-relay-next" }
+      // ],
       "vars": {
         "ENVIRONMENT": "staging",
         "HOTLINE_NAME": "Llámenos (Next)"

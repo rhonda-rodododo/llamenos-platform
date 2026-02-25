@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
+import { deriveServerKeypair } from '../lib/nostr-publisher'
 import type { EnabledChannels, Hub, SetupState } from '../../shared/types'
 
 const config = new Hono<AppEnv>()
@@ -56,6 +57,11 @@ config.get('/', async (c) => {
     }
   } catch { /* default to empty */ }
 
+  // Derive server Nostr pubkey for client event verification (Epic 76.1)
+  const serverNostrPubkey = c.env.SERVER_NOSTR_SECRET
+    ? deriveServerKeypair(c.env.SERVER_NOSTR_SECRET).pubkey
+    : undefined
+
   return c.json({
     hotlineName: c.env.HOTLINE_NAME || 'Hotline',
     hotlineNumber,
@@ -65,6 +71,7 @@ config.get('/', async (c) => {
     needsBootstrap,
     hubs,
     defaultHubId,
+    serverNostrPubkey,
   })
 })
 

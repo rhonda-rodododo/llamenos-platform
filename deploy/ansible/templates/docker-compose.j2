@@ -32,6 +32,10 @@ services:
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
       - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+{% if 'nostr' in compose_profiles %}
+      - SERVER_NOSTR_SECRET=${SERVER_NOSTR_SECRET}
+      - NOSTR_RELAY_URL=${NOSTR_RELAY_URL}
+{% endif %}
     networks:
       - web
       - internal
@@ -184,6 +188,26 @@ services:
       - no-new-privileges:true
 {% endif %}
 
+{% if 'nostr' in compose_profiles %}
+  # ── Optional: Nostr Relay (strfry) ─────────────────────────
+
+  strfry:
+    image: {{ strfry_image | default('dockurr/strfry:latest') }}
+    restart: unless-stopped
+    volumes:
+      - nostr-data:/app/strfry-db
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7777"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+{% endif %}
+
 {% if 'signal' in compose_profiles %}
   # ── Optional: Signal Messaging ──────────────────────────────
 
@@ -212,6 +236,9 @@ volumes:
   caddy-data:
   caddy-config:
   minio-data:
+{% if 'nostr' in compose_profiles %}
+  nostr-data:
+{% endif %}
 {% if 'asterisk' in compose_profiles %}
   asterisk-config:
 {% endif %}
