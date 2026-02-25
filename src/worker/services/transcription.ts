@@ -1,7 +1,7 @@
 import type { Env } from '../types'
 import type { DurableObjects } from '../lib/do-access'
 import { getTelephony } from '../lib/do-access'
-import { encryptForPublicKey } from '../lib/crypto'
+import { encryptMessageForStorage } from '../lib/crypto'
 
 export async function maybeTranscribe(
   parentCallSid: string,
@@ -34,27 +34,19 @@ export async function maybeTranscribe(
     })
 
     if (result.text) {
-      // ECIES: encrypt transcription for the volunteer's public key
-      const { encryptedContent, ephemeralPubkey } = encryptForPublicKey(result.text, volunteerPubkey)
+      // Envelope encryption: single ciphertext, wrapped key for volunteer + admin
+      const adminPubkey = env.ADMIN_DECRYPTION_PUBKEY || env.ADMIN_PUBKEY
+      const readerPubkeys = [volunteerPubkey]
+      if (adminPubkey !== volunteerPubkey) readerPubkeys.push(adminPubkey)
+
+      const { encryptedContent, readerEnvelopes } = encryptMessageForStorage(result.text, readerPubkeys)
       await dos.records.fetch(new Request('http://do/notes', {
         method: 'POST',
         body: JSON.stringify({
           callId: parentCallSid,
           authorPubkey: 'system:transcription',
           encryptedContent,
-          ephemeralPubkey,
-        }),
-      }))
-
-      // Also encrypt for admin so they can read transcriptions independently
-      const adminEncrypted = encryptForPublicKey(result.text, env.ADMIN_DECRYPTION_PUBKEY || env.ADMIN_PUBKEY)
-      await dos.records.fetch(new Request('http://do/notes', {
-        method: 'POST',
-        body: JSON.stringify({
-          callId: parentCallSid,
-          authorPubkey: 'system:transcription:admin',
-          encryptedContent: adminEncrypted.encryptedContent,
-          ephemeralPubkey: adminEncrypted.ephemeralPubkey,
+          readerEnvelopes,
         }),
       }))
 
@@ -91,15 +83,16 @@ export async function transcribeVoicemail(
     })
 
     if (result.text) {
-      // Voicemails are encrypted only for admin (no volunteer answered)
-      const adminEncrypted = encryptForPublicKey(result.text, env.ADMIN_DECRYPTION_PUBKEY || env.ADMIN_PUBKEY)
+      // Voicemails: envelope encryption for admin only
+      const adminPubkey = env.ADMIN_DECRYPTION_PUBKEY || env.ADMIN_PUBKEY
+      const { encryptedContent, readerEnvelopes } = encryptMessageForStorage(result.text, [adminPubkey])
       await dos.records.fetch(new Request('http://do/notes', {
         method: 'POST',
         body: JSON.stringify({
           callId: callSid,
           authorPubkey: 'system:voicemail',
-          encryptedContent: adminEncrypted.encryptedContent,
-          ephemeralPubkey: adminEncrypted.ephemeralPubkey,
+          encryptedContent,
+          readerEnvelopes,
         }),
       }))
 
