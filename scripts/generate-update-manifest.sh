@@ -12,13 +12,11 @@
 set -euo pipefail
 
 # Extract version from tag
-if [[ "${GITHUB_REF_NAME:-}" =~ ^release/desktop-v(.+)$ ]]; then
-  VERSION="${BASH_REMATCH[1]}"
-elif [[ "${GITHUB_REF_NAME:-}" =~ ^v(.+)$ ]]; then
+if [[ "${GITHUB_REF_NAME:-}" =~ ^v(.+)$ ]]; then
   VERSION="${BASH_REMATCH[1]}"
 else
   echo "Error: Cannot determine version from GITHUB_REF_NAME=${GITHUB_REF_NAME:-unset}" >&2
-  echo "Expected format: release/desktop-v1.2.0 or v1.2.0" >&2
+  echo "Expected format: v1.2.0" >&2
   exit 1
 fi
 

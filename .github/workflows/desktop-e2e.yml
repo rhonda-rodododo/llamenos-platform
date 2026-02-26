@@ -79,12 +79,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Clone llamenos-core sibling (needed for path dep)
-      - name: Checkout llamenos-core
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: rhonda-rodododo/llamenos-core
-          path: ../llamenos-core
+      # Replace local path dep with git dep so Cargo fetches from GitHub
+      - name: Use llamenos-core from GitHub
+        shell: bash
+        run: sed -i 's|llamenos-core = { path = "../../llamenos-core" }|llamenos-core = { git = "https://github.com/rhonda-rodododo/llamenos-core.git" }|' src-tauri/Cargo.toml
 
       # Build the Tauri debug binary (tests will use this)
       - name: Build Tauri debug binary
