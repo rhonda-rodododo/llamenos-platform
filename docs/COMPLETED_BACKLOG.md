@@ -2,6 +2,28 @@
 
 ## 2026-02-26: Multi-Platform Native Clients (`desktop` branch)
 
+### Epic 90: UniFFI Bindings for llamenos-core
+
+**llamenos-core repo (shared Rust crypto crate):**
+- UniFFI 0.28 proc-macro annotations on all public types and functions, gated behind `uniffi-bindgen` feature
+- 8 structs annotated with `uniffi::Record`: KeyPair, KeyEnvelope, RecipientKeyEnvelope, EncryptedNote, EncryptedMessage, EncryptedKeyData, AuthToken
+- CryptoError annotated with `uniffi::Error` + `flat_error` (serializes via Display for non-FFI-compatible `#[from]` variants)
+- 15 functions exported directly via `#[uniffi::export]`, 7 via hex-string FFI wrappers in `src/ffi.rs`
+- FFI wrappers convert `[u8; 32]`/`&[u8]` to hex strings and `&[T]` slices to `Vec<T>` at the FFI boundary
+- `uniffi-bindgen` binary + `scripts/generate-bindings.sh` for binding generation
+- `release-bindgen` profile (inherits release, strip=false to preserve UniFFI metadata)
+- Generated Swift bindings (55KB) and Kotlin bindings in `bindings/`
+- 22 tests pass with feature (17 original + 5 FFI-specific), 17 without
+
+**llamenos-mobile repo (React Native Expo Module):**
+- Expo Module at `modules/llamenos-core/` with `expo-module.config.json` for iOS/Android autolinking
+- Swift implementation (`LlamenosCoreModule.swift`, 193 lines) — bridges all 22 UniFFI functions with dict↔struct helpers
+- Kotlin implementation (`LlamenosCoreModule.kt`, 211 lines) — bridges all 22 functions with `System.loadLibrary("llamenos_core")`
+- Android `build.gradle` with JNA dependency for UniFFI runtime
+- TypeScript interface (`LlamenosCoreModule.ts`) with full type definitions for all native functions
+- Platform-aware `crypto-provider.ts` — tries native Rust (UniFFI) first, falls back to JS (@noble/*) when unavailable
+- Cross-compilation build script (`scripts/build-native-libs.sh`) for iOS (device + Apple Silicon sim) and Android (4 ABIs)
+
 ### Epic 88: Desktop & Mobile E2E Tests
 
 **Desktop (llamenos repo, `desktop` branch):**
