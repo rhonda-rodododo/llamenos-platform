@@ -2,6 +2,39 @@
 
 ## 2026-02-26: Multi-Platform Native Clients (`desktop` branch)
 
+### Epic 91: Native VoIP Calling — Linphone SDK Expo Module
+
+**llamenos-mobile repo (Expo Module + React hook):**
+- `modules/llamenos-sip/` Expo Module wrapping Linphone SDK for iOS and Android
+- TypeScript interface (`LlamenosSipModule.ts`) with types: SipConfig, CallState, RegistrationState, CallInfo, AudioDevice, MediaEncryptionMode, SipEventMap
+- Graceful fallback via `requireOptionalNativeModule` — returns null in Expo Go
+- iOS Swift implementation (LlamenosSipModule.swift, ~480 lines):
+  - Linphone Core init with Opus/PCMU/PCMA codecs, SRTP encryption
+  - CallKit integration (CXProvider + CXCallController) with UUID mapping
+  - PushKit VoIP push (PKPushRegistry) — wakes app for incoming calls
+  - Core.iterate() at 20ms via Timer
+  - Audio device management (earpiece/speaker routing)
+- Android Kotlin implementation (LlamenosSipModule.kt, ~450 lines):
+  - Linphone Core with CoreListenerStub
+  - ConnectionService (self-managed PhoneAccount via TelecomManager)
+  - FCM token for VoIP push
+  - Fallback notification when ConnectionService unavailable
+  - LinphoneConnectionService.kt for native call UI
+- `src/lib/voip.ts` — React hook (`useVoip()`) with state and call controls
+  - Module-level functions: initializeVoip(), connectVoip(), disconnectVoip(), destroyVoip()
+  - Native event subscription (module IS the EventEmitter in Expo SDK 52+)
+  - AppState foreground re-sync
+- `src/lib/voip-config.ts` — SIP config from server + VoIP push token registration
+- Updated `app/call/[id].tsx` with VoIP controls (mute, speaker, hold, encryption badge)
+- Updated `app/_layout.tsx` with VoIP initialization on auth
+
+**llamenos repo (server-side SIP + VoIP push):**
+- `src/worker/telephony/sip-tokens.ts` — SIP token generation for all 5 providers (Twilio, SignalWire, Vonage→Asterisk, Plivo, Asterisk)
+- `GET /api/telephony/sip-token` and `GET /api/telephony/sip-status` endpoints
+- `POST/DELETE /api/devices/voip-token` — VoIP push token management
+- `src/worker/lib/voip-push.ts` — APNs VoIP push (PushKit) + FCM high-priority data messages
+- Extended ringing service with VoIP push dispatch (best-effort, non-blocking)
+
 ### Epic 90: UniFFI Bindings for llamenos-core
 
 **llamenos-core repo (shared Rust crypto crate):**

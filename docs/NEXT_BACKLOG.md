@@ -205,7 +205,7 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 89: Mobile UI Polish & Accessibility](epics/epic-89-mobile-ui-polish.md)** — Dark mode, haptic feedback, VoiceOver/TalkBack a11y, loading skeletons, error boundaries, offline handling, 13 locale verification
 
 ### Native VoIP Calling
-- [ ] **[Epic 91: Native VoIP Calling](epics/epic-91-native-voip-calling.md)** — Linphone SDK Turbo Native Module, provider-agnostic SIP, CallKit (iOS) + ConnectionService (Android), VoIP push, SRTP/ZRTP encryption, all 5 telephony providers
+- [x] **[Epic 91: Native VoIP Calling](epics/epic-91-native-voip-calling.md)** — Linphone SDK Expo Module, provider-agnostic SIP, CallKit (iOS) + ConnectionService (Android), VoIP push, SRTP/ZRTP encryption, all 5 telephony providers
 
 ### Cross-Platform Testing & Native Crypto
 - [x] **[Epic 88: Desktop & Mobile E2E Tests](epics/epic-88-platform-e2e-tests.md)** — WebdriverIO + tauri-driver for desktop, Detox for mobile, CI integration
