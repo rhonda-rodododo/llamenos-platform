@@ -419,11 +419,7 @@ The Nostr relay handles all real-time event delivery (call notifications, presen
 
 #### Docker Compose
 
-Enable the Nostr relay profile:
-
-```bash
-docker compose --profile nostr up -d
-```
+The Nostr relay (strfry) is a core service that starts automatically with `docker compose up -d`.
 
 Required environment variables:
 ```bash

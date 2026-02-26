@@ -24,12 +24,10 @@
 		reverse_proxy app:3000
 	}
 
-{% if 'nostr' in compose_profiles %}
 	# Nostr relay WebSocket proxy (strfry)
 	handle /nostr {
 		reverse_proxy strfry:7777
 	}
-{% endif %}
 
 	# Everything else (SPA static files)
 	handle {

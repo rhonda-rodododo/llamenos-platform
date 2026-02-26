@@ -411,7 +411,7 @@ docker compose exec app curl -sf http://localhost:3000/api/health
 
 ### 4.5 Nostr Relay (strfry) Backup
 
-If the Nostr relay is enabled, back up the LMDB data directory:
+Back up the strfry LMDB data directory:
 
 ```bash
 # Back up the strfry-db Docker volume
@@ -660,7 +660,7 @@ This limits each container to 30 MB of logs (3 files x 10 MB). Adjust if you nee
 
 ### 6.5 Nostr Relay Monitoring
 
-If the Nostr relay is enabled (`--profile nostr`):
+Monitor the Nostr relay (core service):
 
 ```bash
 # Check relay health
@@ -739,7 +739,7 @@ docker compose logs caddy --tail 20
 
 ```bash
 # Check if the relay container is running
-docker compose --profile nostr ps
+docker compose ps strfry
 
 # Check the relay health
 docker compose exec strfry curl -sf http://localhost:7777
@@ -756,7 +756,7 @@ curl -sI https://hotline.yourorg.org/nostr
 
 | Symptom | Cause | Solution |
 |---------|-------|----------|
-| Relay container not running | Profile not enabled | `docker compose --profile nostr up -d` |
+| Relay container not running | Container stopped or failed | `docker compose up -d strfry` |
 | 502 on `/nostr` | Caddy can't reach strfry | Check `docker compose logs caddy` for upstream errors |
 | Auth failures in browser console | `SERVER_NOSTR_SECRET` missing or changed | Verify `.env` has `SERVER_NOSTR_SECRET`; restart app if changed |
 | Events not delivered | NIP-42 auth failing | Check relay logs; verify client pubkey is allowed |

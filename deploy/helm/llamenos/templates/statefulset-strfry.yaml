@@ -1,0 +1,71 @@
+# Nostr relay (strfry) — core service for all real-time events
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "llamenos.fullname" . }}-strfry
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: strfry
+spec:
+  replicas: 1
+  serviceName: {{ include "llamenos.fullname" . }}-strfry
+  selector:
+    matchLabels:
+      {{- include "llamenos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: strfry
+  template:
+    metadata:
+      labels:
+        {{- include "llamenos.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: strfry
+    spec:
+      containers:
+        - name: strfry
+          image: "{{ .Values.nostr.image.repository }}:{{ .Values.nostr.image.tag }}"
+          ports:
+            - containerPort: 7777
+              name: relay
+          livenessProbe:
+            httpGet:
+              path: /
+              port: relay
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: relay
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /app/strfry-db
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.nostr.persistence.storageClass }}
+        storageClassName: {{ .Values.nostr.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.nostr.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "llamenos.fullname" . }}-strfry
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+    app.kubernetes.io/component: strfry
+spec:
+  type: ClusterIP
+  ports:
+    - port: 7777
+      targetPort: relay
+      name: relay
+  selector:
+    {{- include "llamenos.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: strfry

@@ -64,25 +64,14 @@ For Cloudflare Workers deployments, Nosflare runs as a Durable Object with a ser
 
 ### Docker Compose
 
-Enable the Nostr relay profile:
-
-```bash
-cd /opt/llamenos/deploy/docker
-
-# Generate the server Nostr secret
-SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
-echo "SERVER_NOSTR_SECRET=$SERVER_NOSTR_SECRET" >> .env
-
-# Start with the nostr profile
-docker compose --profile nostr up -d
-```
+The Nostr relay (strfry) is a core service that starts automatically with `docker compose up -d`. The `SERVER_NOSTR_SECRET` env var is required in `.env` (see [Quickstart](QUICKSTART.md)).
 
 The relay runs on port 7777 internally. Caddy proxies `/nostr` to the relay via WebSocket.
 
 **Environment variables**:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SERVER_NOSTR_SECRET` | Yes (if relay enabled) | — | 64-char hex; server derives its Nostr keypair from this |
+| `SERVER_NOSTR_SECRET` | Yes | — | 64-char hex; server derives its Nostr keypair from this |
 | `NOSTR_RELAY_URL` | No | `ws://strfry:7777` | Internal relay URL (Docker network) |
 
 ### Kubernetes (StatefulSet)
@@ -257,9 +246,9 @@ docker compose start strfry
    docker compose ps strfry
    ```
 
-2. Check if the nostr profile is enabled:
+2. Check the strfry container status:
    ```bash
-   docker compose --profile nostr ps
+   docker compose ps strfry
    ```
 
 3. Check Caddy is proxying `/nostr`:

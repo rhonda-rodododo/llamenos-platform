@@ -83,6 +83,14 @@ twilio_account_sid: ""
 twilio_auth_token: ""
 twilio_phone_number: ""
 
+# ─── Nostr Relay (Core) ─────────────────────────────────────────
+# Server secret for signing relay events (used for all real-time updates).
+# Generate with: openssl rand -hex 32
+server_nostr_secret: ""
+
+# Relay URL (default: ws://strfry:7777 for the bundled strfry)
+# nostr_relay_url: "ws://strfry:7777"
+
 # ─── Optional Profiles ──────────────────────────────────────────
 # Enable optional Docker Compose profiles
 # Options: transcription, asterisk, signal

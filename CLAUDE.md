@@ -88,7 +88,7 @@ src/
 - Nostr pubkeys are x-only (32 bytes) — prepend `"02"` for ECDH compressed format
 - `secp256k1.getSharedSecret()` returns 33 bytes; extract x-coord with `.slice(1, 33)`
 - Workbox `navigateFallbackDenylist` excludes `/api/` and `/telephony/` routes from SPA caching
-- Docker `--profile nostr` required for Nostr relay (strfry); `SERVER_NOSTR_SECRET` env var required when relay is enabled
+- Nostr relay (strfry) is a core service, not optional — always runs with Docker Compose and Helm
 - `SERVER_NOSTR_SECRET` must be exactly 64 hex chars; server derives its Nostr keypair via HKDF
 - Hub key is random bytes, NOT derived from any identity key — see `hub-key-manager.ts`
 

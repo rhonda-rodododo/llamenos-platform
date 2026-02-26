@@ -44,6 +44,15 @@ spec:
         - protocol: TCP
           port: 9000
     {{- end }}
+    # Allow Nostr relay (strfry)
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "llamenos.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: strfry
+      ports:
+        - protocol: TCP
+          port: 7777
     # Allow Whisper
     {{- if .Values.whisper.enabled }}
     - to:
@@ -101,4 +110,36 @@ spec:
         - protocol: TCP
           port: 9000
 {{- end }}
+---
+# Restrict strfry: only accept traffic from app pod and ingress (for /nostr WebSocket)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "llamenos.fullname" . }}-strfry
+  labels:
+    {{- include "llamenos.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "llamenos.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: strfry
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "llamenos.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: app
+      ports:
+        - protocol: TCP
+          port: 7777
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingressControllerLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 7777
 {{- end }}

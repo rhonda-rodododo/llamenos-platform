@@ -12,8 +12,7 @@
 		reverse_proxy app:3000
 	}
 
-	# Nostr relay WebSocket proxy → strfry (if running)
-	# Enable by adding strfry to your compose profile
+	# Nostr relay WebSocket proxy → strfry
 	handle /nostr {
 		reverse_proxy strfry:7777
 	}

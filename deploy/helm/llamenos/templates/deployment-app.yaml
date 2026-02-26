@@ -101,7 +101,6 @@ spec:
             - name: WHISPER_URL
               value: "http://{{ include "llamenos.fullname" . }}-whisper:8080/v1/audio/transcriptions"
             {{- end }}
-            {{- if .Values.nostr.enabled }}
             - name: SERVER_NOSTR_SECRET
               valueFrom:
                 secretKeyRef:
@@ -109,7 +108,6 @@ spec:
                   key: server-nostr-secret
             - name: NOSTR_RELAY_URL
               value: {{ .Values.nostr.relayUrl | default "ws://strfry:7777" | quote }}
-            {{- end }}
           livenessProbe:
             httpGet:
               path: /api/health

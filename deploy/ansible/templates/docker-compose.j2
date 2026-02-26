@@ -32,10 +32,8 @@ services:
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
       - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
-{% if 'nostr' in compose_profiles %}
       - SERVER_NOSTR_SECRET=${SERVER_NOSTR_SECRET}
       - NOSTR_RELAY_URL=${NOSTR_RELAY_URL}
-{% endif %}
     networks:
       - web
       - internal
@@ -43,6 +41,8 @@ services:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      strfry:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
@@ -188,8 +188,7 @@ services:
       - no-new-privileges:true
 {% endif %}
 
-{% if 'nostr' in compose_profiles %}
-  # ── Optional: Nostr Relay (strfry) ─────────────────────────
+  # ── Core: Nostr Relay (strfry) ──────────────────────────────
 
   strfry:
     image: {{ strfry_image | default('dockurr/strfry:latest') }}
@@ -206,7 +205,6 @@ services:
       start_period: 10s
     security_opt:
       - no-new-privileges:true
-{% endif %}
 
 {% if 'signal' in compose_profiles %}
   # ── Optional: Signal Messaging ──────────────────────────────
@@ -236,9 +234,7 @@ volumes:
   caddy-data:
   caddy-config:
   minio-data:
-{% if 'nostr' in compose_profiles %}
   nostr-data:
-{% endif %}
 {% if 'asterisk' in compose_profiles %}
   asterisk-config:
 {% endif %}

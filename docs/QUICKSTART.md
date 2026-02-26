@@ -325,6 +325,10 @@ MINIO_ACCESS_KEY=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)
 MINIO_SECRET_KEY=$(openssl rand -base64 24)
 echo "MINIO_ACCESS_KEY: $MINIO_ACCESS_KEY"
 echo "MINIO_SECRET_KEY: $MINIO_SECRET_KEY"
+
+# Generate server Nostr secret (for relay event signing)
+SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
+echo "SERVER_NOSTR_SECRET: $SERVER_NOSTR_SECRET"
 ```
 
 **SECURITY WARNING**: Record these secrets in a password manager immediately. They cannot be recovered if lost. You will need the database password for backup recovery operations.
@@ -347,6 +351,7 @@ PG_PASSWORD=<generated above>
 HMAC_SECRET=<generated above>
 MINIO_ACCESS_KEY=<generated above>
 MINIO_SECRET_KEY=<generated above>
+SERVER_NOSTR_SECRET=<generated above>
 
 # Application
 HOTLINE_NAME=Hotline
@@ -541,9 +546,9 @@ Run through this checklist to verify your deployment:
   ```
 - [ ] fail2ban is active: `sudo fail2ban-client status sshd`
 
-### Nostr Relay (if enabled)
+### Nostr Relay
 
-- [ ] Relay container is running: `docker compose --profile nostr ps`
+- [ ] Relay container is running: `docker compose ps strfry`
 - [ ] `/nostr` WebSocket endpoint responds: `curl -sI https://hotline.yourorg.org/nostr` returns 426 Upgrade Required
 - [ ] `SERVER_NOSTR_SECRET` is set in `.env`
 - [ ] Real-time events work: open two browser tabs, verify presence updates appear
@@ -625,33 +630,6 @@ Storage migrations run automatically on application startup. No manual migration
 ---
 
 ## Optional: Enable Additional Services
-
-### Nostr Relay (Real-Time Events)
-
-Enables real-time event delivery (call notifications, presence updates, typing indicators) via an encrypted Nostr relay. **Recommended for production deployments.**
-
-```bash
-cd /opt/llamenos/deploy/docker
-
-# Generate the server Nostr secret (64-char hex)
-SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
-echo "SERVER_NOSTR_SECRET=$SERVER_NOSTR_SECRET" >> .env
-
-# Start with the nostr profile
-docker compose --profile nostr up -d
-```
-
-The relay runs strfry on port 7777 internally. Caddy automatically proxies `/nostr` to the relay.
-
-**Verify the relay is running:**
-```bash
-docker compose --profile nostr ps
-# strfry should show "running"
-```
-
-Without the Nostr relay, the app falls back to REST polling for state updates. Real-time features (instant call notifications, live presence) require the relay.
-
-For detailed relay operations, hardening, and monitoring, see [`docs/RELAY_OPERATIONS.md`](RELAY_OPERATIONS.md).
 
 ### Whisper Transcription (Legacy — Server-Side)
 
