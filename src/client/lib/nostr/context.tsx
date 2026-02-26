@@ -3,6 +3,9 @@
  *
  * Manages the RelayManager lifecycle: connects when authenticated,
  * disconnects on sign-out, and exposes relay state to the component tree.
+ *
+ * The relay authenticates via Rust CryptoState (nsec never in webview).
+ * No getSecretKey callback is needed — NIP-42 auth uses platform.signNostrEvent().
  */
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -27,8 +30,6 @@ interface NostrProviderProps {
   serverPubkey: string | undefined
   /** Whether the user is authenticated */
   isAuthenticated: boolean
-  /** Returns the user's Nostr secret key (32 bytes) or null if locked */
-  getSecretKey: () => Uint8Array | null
   /** Returns the hub symmetric key or null if unavailable */
   getHubKey: () => Uint8Array | null
 }
@@ -38,15 +39,12 @@ export function NostrProvider({
   relayUrl,
   serverPubkey,
   isAuthenticated,
-  getSecretKey,
   getHubKey,
 }: NostrProviderProps) {
   const [state, setState] = useState<RelayState>('disconnected')
   const relayRef = useRef<RelayManager | null>(null)
 
-  // Stable refs for callbacks to avoid recreating RelayManager on every render
-  const getSecretKeyRef = useRef(getSecretKey)
-  getSecretKeyRef.current = getSecretKey
+  // Stable ref for hub key callback to avoid recreating RelayManager on every render
   const getHubKeyRef = useRef(getHubKey)
   getHubKeyRef.current = getHubKey
 
@@ -74,7 +72,6 @@ export function NostrProvider({
     const manager = new RelayManager({
       relayUrl: wsUrl,
       serverPubkey,
-      getSecretKey: () => getSecretKeyRef.current(),
       getHubKey: () => getHubKeyRef.current(),
       onStateChange: setState,
     })

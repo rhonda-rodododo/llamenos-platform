@@ -1,4 +1,5 @@
 import * as keyManager from './key-manager'
+import { createAuthToken } from './platform'
 
 const API_BASE = '/api'
 
@@ -6,16 +7,16 @@ const API_BASE = '/api'
 let onAuthExpired: (() => void) | null = null
 export function setOnAuthExpired(cb: (() => void) | null) { onAuthExpired = cb }
 
-function getAuthHeaders(method: string, apiPath: string): Record<string, string> {
+async function getAuthHeaders(method: string, apiPath: string): Promise<Record<string, string>> {
   // Prefer session token if available (WebAuthn-based sessions)
   const sessionToken = sessionStorage.getItem('llamenos-session-token')
   if (sessionToken) {
     return { 'Authorization': `Session ${sessionToken}` }
   }
-  // Use key manager for Schnorr auth if unlocked
+  // Use CryptoState for Schnorr auth if unlocked
   if (keyManager.isUnlocked()) {
     try {
-      const token = keyManager.createAuthToken(Date.now(), method, `${API_BASE}${apiPath}`)
+      const token = await createAuthToken(Date.now(), method, `${API_BASE}${apiPath}`)
       return { 'Authorization': `Bearer ${token}` }
     } catch {
       return {}
@@ -34,7 +35,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const pathOnly = path.split('?')[0]
   const headers = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(method, pathOnly),
+    ...await getAuthHeaders(method, pathOnly),
     ...options.headers,
   }
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
@@ -297,7 +298,7 @@ export async function getCallRecording(callId: string): Promise<ArrayBuffer> {
   const pathOnly = hp(`/calls/${callId}/recording`).split('?')[0]
   const method = 'GET'
   const headers = {
-    ...getAuthHeaders(method, pathOnly),
+    ...await getAuthHeaders(method, pathOnly),
   }
   const res = await fetch(`${API_BASE}${hp(`/calls/${callId}/recording`)}`, { headers })
   if (!res.ok) {
@@ -440,9 +441,9 @@ export async function redeemInvite(code: string, pubkey: string, secretKeyHex?: 
   // Include Schnorr signature to prove key possession
   let authFields = {}
   if (secretKeyHex) {
-    const { createAuthToken } = await import('./platform')
+    const { createAuthTokenStateless } = await import('./platform')
     const timestamp = Date.now()
-    const tokenJson = await createAuthToken(secretKeyHex, timestamp, 'POST', '/api/invites/redeem')
+    const tokenJson = await createAuthTokenStateless(secretKeyHex, timestamp, 'POST', '/api/invites/redeem')
     const parsed = JSON.parse(tokenJson)
     authFields = { timestamp: parsed.timestamp, token: parsed.token }
   }
@@ -475,7 +476,7 @@ export async function uploadIvrAudio(promptType: string, language: string, audio
   const res = await fetch(`${API_BASE}/settings/ivr-audio/${promptType}/${language}`, {
     method: 'PUT',
     headers: {
-      ...getAuthHeaders('PUT', `/settings/ivr-audio/${promptType}/${language}`),
+      ...await getAuthHeaders('PUT', `/settings/ivr-audio/${promptType}/${language}`),
       'Content-Type': audioBlob.type || 'audio/webm',
     },
     body: audioBlob,
@@ -980,7 +981,7 @@ export async function initUpload(data: import('@shared/types').UploadInit) {
 
 export async function uploadChunk(uploadId: string, chunkIndex: number, data: ArrayBuffer) {
   const headers = {
-    ...getAuthHeaders('PUT', `/uploads/${uploadId}/chunks/${chunkIndex}`),
+    ...await getAuthHeaders('PUT', `/uploads/${uploadId}/chunks/${chunkIndex}`),
     'Content-Type': 'application/octet-stream',
   }
   const res = await fetch(`${API_BASE}/uploads/${uploadId}/chunks/${chunkIndex}`, {
@@ -1005,7 +1006,7 @@ export async function getUploadStatus(uploadId: string) {
 }
 
 export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
-  const headers = getAuthHeaders('GET', `/files/${fileId}/content`)
+  const headers = await getAuthHeaders('GET', `/files/${fileId}/content`)
   const res = await fetch(`${API_BASE}/files/${fileId}/content`, { headers })
   if (!res.ok) {
     if (res.status === 401) onAuthExpired?.()

@@ -18,13 +18,6 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function resolveSecretKey(): Uint8Array | null {
-  if (keyManager.isUnlocked()) {
-    try { return keyManager.getSecretKey() } catch { return null }
-  }
-  return null
-}
-
 export function FilePreview({ fileId }: FilePreviewProps) {
   const { t } = useTranslation()
   const { hasNsec, publicKey } = useAuth()
@@ -38,8 +31,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
     let objectUrl: string | null = null
 
     async function loadAndDecrypt() {
-      const secretKey = resolveSecretKey()
-      if (!secretKey) {
+      if (!hasNsec || !keyManager.isUnlocked()) {
         if (mounted) setError(t('reports.noKeyAvailable', { defaultValue: 'Encryption key not available' }))
         if (mounted) setLoading(false)
         return
@@ -73,14 +65,14 @@ export function FilePreview({ fileId }: FilePreviewProps) {
         let decryptedMeta: EncryptedFileMetadata | null = null
         const myMetadata = metadataList.find(m => m.pubkey === myPubkey) || metadataList[0]
         if (myMetadata) {
-          decryptedMeta = decryptFileMetadata(myMetadata.encryptedContent, myMetadata.ephemeralPubkey, secretKey)
+          decryptedMeta = await decryptFileMetadata(myMetadata.encryptedContent, myMetadata.ephemeralPubkey)
           if (decryptedMeta && mounted) {
             setMetadata(decryptedMeta)
           }
         }
 
         // Decrypt file content
-        const { blob } = await decryptFile(encryptedData, envelope, secretKey)
+        const { blob } = await decryptFile(encryptedData, envelope)
         if (!mounted) return
 
         const resolvedMime = decryptedMeta?.mimeType || 'application/octet-stream'

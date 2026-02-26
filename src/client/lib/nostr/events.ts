@@ -2,8 +2,9 @@
  * Nostr event creation, validation, and deduplication.
  */
 
-import { finalizeEvent, verifyEvent } from 'nostr-tools/pure'
-import type { EventTemplate, VerifiedEvent, Event as NostrEvent } from 'nostr-tools/core'
+import { verifyEvent } from 'nostr-tools/pure'
+import type { Event as NostrEvent } from 'nostr-tools/core'
+import { signNostrEvent, type SignedNostrEvent } from '../platform'
 import type { LlamenosEvent } from './types'
 
 /** Max age for event deduplication (5 minutes) */
@@ -58,25 +59,24 @@ export class EventDeduplicator {
 }
 
 /**
- * Create a signed Nostr event for a hub.
+ * Create a signed Nostr event for a hub via Rust CryptoState.
  * Content is the raw encrypted string (caller handles encryption).
+ * The nsec never enters the webview — signing happens in Rust.
  */
-export function createHubEvent(
+export async function createHubEvent(
   hubId: string,
   kind: number,
   encryptedContent: string,
-  secretKey: Uint8Array,
-): VerifiedEvent {
-  const template: EventTemplate = {
+): Promise<SignedNostrEvent> {
+  return signNostrEvent(
     kind,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
+    Math.floor(Date.now() / 1000),
+    [
       ['d', hubId],
       ['t', 'llamenos:event'],
     ],
-    content: encryptedContent,
-  }
-  return finalizeEvent(template, secretKey)
+    encryptedContent,
+  )
 }
 
 /**

@@ -5,19 +5,20 @@
 
 import { startRegistration, startAuthentication, type PublicKeyCredentialCreationOptionsJSON, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser'
 import * as keyManager from './key-manager'
+import { createAuthToken } from './platform'
 
 const API_BASE = '/api'
 
-function getAuthHeaders(method: string, path: string): Record<string, string> {
+async function getAuthHeaders(method: string, path: string): Promise<Record<string, string>> {
   // Prefer session token if available
   const sessionToken = sessionStorage.getItem('llamenos-session-token')
   if (sessionToken) {
     return { 'Authorization': `Session ${sessionToken}` }
   }
-  // Use key manager for Schnorr auth if unlocked
+  // Use CryptoState for Schnorr auth if unlocked
   if (keyManager.isUnlocked()) {
     try {
-      const token = keyManager.createAuthToken(Date.now(), method, `${API_BASE}${path}`)
+      const token = await createAuthToken(Date.now(), method, `${API_BASE}${path}`)
       return { 'Authorization': `Bearer ${token}` }
     } catch {
       return {}
@@ -41,7 +42,7 @@ export function isWebAuthnAvailable(): boolean {
  */
 export async function registerCredential(label: string): Promise<void> {
   // 1. Get registration options from server
-  const optionsHeaders = getAuthHeaders('POST', '/webauthn/register/options')
+  const optionsHeaders = await getAuthHeaders('POST', '/webauthn/register/options')
   const optionsRes = await fetch(`${API_BASE}/webauthn/register/options`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...optionsHeaders },
@@ -54,7 +55,7 @@ export async function registerCredential(label: string): Promise<void> {
   const attestation = await startRegistration({ optionsJSON })
 
   // 3. Verify with server
-  const verifyHeaders = getAuthHeaders('POST', '/webauthn/register/verify')
+  const verifyHeaders = await getAuthHeaders('POST', '/webauthn/register/verify')
   const verifyRes = await fetch(`${API_BASE}/webauthn/register/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...verifyHeaders },
@@ -101,7 +102,7 @@ export interface WebAuthnCredentialInfo {
  * List registered credentials for the current user.
  */
 export async function listCredentials(): Promise<WebAuthnCredentialInfo[]> {
-  const headers = getAuthHeaders('GET', '/webauthn/credentials')
+  const headers = await getAuthHeaders('GET', '/webauthn/credentials')
   const res = await fetch(`${API_BASE}/webauthn/credentials`, { headers })
   if (!res.ok) throw new Error('Failed to list credentials')
   const data = await res.json() as { credentials: WebAuthnCredentialInfo[] }
@@ -112,7 +113,7 @@ export async function listCredentials(): Promise<WebAuthnCredentialInfo[]> {
  * Delete a registered credential.
  */
 export async function deleteCredential(id: string): Promise<void> {
-  const headers = getAuthHeaders('DELETE', `/webauthn/credentials/${encodeURIComponent(id)}`)
+  const headers = await getAuthHeaders('DELETE', `/webauthn/credentials/${encodeURIComponent(id)}`)
   const res = await fetch(`${API_BASE}/webauthn/credentials/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers,

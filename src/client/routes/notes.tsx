@@ -5,7 +5,6 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { listNotes, createNote, updateNote, getCallHistory, listVolunteers, getCustomFields, type EncryptedNote, type CallRecord, type CustomFieldDefinition, type Volunteer } from '@/lib/api'
 import { encryptNote, decryptNote, decryptLegacyNote, decryptTranscription, decryptCallRecord, encryptExport } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
-import { bytesToHex } from '@noble/hashes/utils.js'
 import { useToast } from '@/lib/toast'
 import type { NotePayload } from '@shared/types'
 import { StickyNote, Plus, Pencil, Lock, Mic, Save, X, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react'
@@ -64,14 +63,13 @@ function NotesPage() {
   useEffect(() => {
     if (!hasNsec || !publicKey || recentCalls.length === 0) return
     if (!keyManager.isUnlocked()) return
-    const skHex = bytesToHex(keyManager.getSecretKey())
 
     ;(async () => {
       let changed = false
       const decrypted = await Promise.all(recentCalls.map(async call => {
         if (call.answeredBy !== undefined) return call
         if (!call.encryptedContent || !call.adminEnvelopes?.length) return call
-        const meta = await decryptCallRecord(call.encryptedContent, call.adminEnvelopes, skHex, publicKey)
+        const meta = await decryptCallRecord(call.encryptedContent, call.adminEnvelopes)
         if (meta) {
           changed = true
           return { ...call, answeredBy: meta.answeredBy, callerNumber: meta.callerNumber }
@@ -103,27 +101,27 @@ function NotesPage() {
         if (note.authorPubkey === 'system:transcription') return !isAdmin
         return true
       })
-      const skHex = hasNsec && keyManager.isUnlocked() ? bytesToHex(keyManager.getSecretKey()) : null
+      const canDecrypt = hasNsec && keyManager.isUnlocked()
       const decryptedNotes: DecryptedNote[] = await Promise.all(
         filtered.map(async note => {
           const isTranscription = note.authorPubkey.startsWith('system:transcription')
           let payload: NotePayload
-          if (isTranscription && note.ephemeralPubkey && skHex) {
-            const text = await decryptTranscription(note.encryptedContent, note.ephemeralPubkey, skHex) || '[Decryption failed]'
+          if (isTranscription && note.ephemeralPubkey && canDecrypt) {
+            const text = await decryptTranscription(note.encryptedContent, note.ephemeralPubkey) || '[Decryption failed]'
             payload = { text }
           } else if (isTranscription && !note.ephemeralPubkey) {
             payload = { text: note.encryptedContent }
-          } else if (skHex) {
+          } else if (canDecrypt) {
             // Try V2 (per-note ECIES envelope) first, fall back to V1 (legacy HKDF)
             const myPubkey = publicKey!
             const envelope = isAdmin
               ? note.adminEnvelopes?.find(e => e.pubkey === myPubkey) ?? note.adminEnvelopes?.[0]
               : note.authorEnvelope
             if (envelope) {
-              const decryptedJson = await decryptNote(note.encryptedContent, envelope, skHex)
+              const decryptedJson = await decryptNote(note.encryptedContent, envelope)
               payload = decryptedJson ? JSON.parse(decryptedJson) : { text: '[Decryption failed]' }
             } else {
-              payload = await decryptLegacyNote(note.encryptedContent, skHex) || { text: '[Decryption failed]' }
+              payload = await decryptLegacyNote(note.encryptedContent) || { text: '[Decryption failed]' }
             }
           } else {
             payload = { text: '[No key]' }
@@ -208,14 +206,14 @@ function NotesPage() {
 
   async function handleExport() {
     if (!hasNsec || !keyManager.isUnlocked()) return
-    const skHex = bytesToHex(keyManager.getSecretKey())
     const rows = filteredNotes.map(n => ({
       id: n.id, callId: n.callId, content: n.decrypted, fields: n.payload.fields,
       isTranscription: n.isTranscription, createdAt: n.createdAt, updatedAt: n.updatedAt,
     }))
     const jsonString = JSON.stringify(rows, null, 2)
-    const encrypted = await encryptExport(jsonString, skHex)
-    const blob = new Blob([encrypted.buffer as ArrayBuffer], { type: 'application/octet-stream' })
+    const base64 = await encryptExport(jsonString)
+    const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    const blob = new Blob([binary.buffer as ArrayBuffer], { type: 'application/octet-stream' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

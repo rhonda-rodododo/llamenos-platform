@@ -1,11 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useConfig } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
-import { isValidNsec } from '@/lib/platform'
-import { hasStoredKey } from '@/lib/key-store'
+import { isValidNsec, hasStoredKey } from '@/lib/platform'
 import { readBackupFile, restoreFromBackupWithPin, restoreFromBackupWithRecoveryKey } from '@/lib/backup'
 import * as keyManager from '@/lib/key-manager'
 import { isWebAuthnAvailable } from '@/lib/webauthn'
@@ -34,7 +33,12 @@ function LoginPage() {
   const [showRecovery, setShowRecovery] = useState(false)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
   const webauthnAvailable = isWebAuthnAvailable()
-  const storedKeyExists = hasStoredKey()
+  const [storedKeyExists, setStoredKeyExists] = useState(false)
+
+  // Check for stored key on mount (async for Tauri Store)
+  useEffect(() => {
+    hasStoredKey().then(setStoredKeyExists).catch(() => {})
+  }, [])
 
   // Recovery state
   const [recoveryMode, setRecoveryMode] = useState<'none' | 'nsec' | 'backup'>('none')
@@ -65,8 +69,8 @@ function LoginPage() {
     return false
   }
 
-  function handlePinWipe() {
-    keyManager.wipeKey()
+  async function handlePinWipe() {
+    await keyManager.wipeKey()
     setValidationError(t('lock.keyWiped', { defaultValue: 'Key wiped after too many failed attempts. Please restore from backup.' }))
     setShowRecovery(true)
   }
@@ -75,7 +79,7 @@ function LoginPage() {
   async function handleNsecSubmit(e: React.FormEvent) {
     e.preventDefault()
     setValidationError('')
-    if (!nsec.trim() || !isValidNsec(nsec.trim())) {
+    if (!nsec.trim() || !(await isValidNsec(nsec.trim()))) {
       setValidationError(t('auth.invalidKey'))
       return
     }

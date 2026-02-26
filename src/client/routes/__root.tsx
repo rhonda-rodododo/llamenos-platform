@@ -6,7 +6,6 @@ import { useTheme } from '@/lib/theme'
 import { useEffect, useState, useCallback, type ReactNode } from 'react'
 import { NostrProvider } from '@/lib/nostr/context'
 import { useCalls, useShiftStatus } from '@/lib/hooks'
-import * as keyManager from '@/lib/key-manager'
 import { CommandPalette, triggerCommandPalette } from '@/components/command-palette'
 import { KeyboardShortcutsDialog } from '@/components/keyboard-shortcuts-dialog'
 import { NoteSheet } from '@/components/note-sheet'
@@ -144,18 +143,11 @@ const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frid
 /**
  * Wraps AuthenticatedLayout with NostrProvider for relay connectivity.
  * Separated so the NostrProvider has access to both auth and config contexts.
+ *
+ * NIP-42 auth uses Rust CryptoState — no getSecretKey callback needed.
  */
 function NostrWrappedLayout() {
   const { serverNostrPubkey, nostrRelayUrl } = useConfig()
-
-  // Callbacks for NostrProvider — get secret key and hub key from key manager
-  const getSecretKey = useCallback((): Uint8Array | null => {
-    try {
-      return keyManager.isUnlocked() ? keyManager.getSecretKey() : null
-    } catch {
-      return null
-    }
-  }, [])
 
   // Hub key not yet available at this layer — will be provided by hub-key-manager
   // when Epic 76.2 hub key distribution is wired in. For now, return null
@@ -169,7 +161,6 @@ function NostrWrappedLayout() {
       relayUrl={nostrRelayUrl}
       serverPubkey={serverNostrPubkey}
       isAuthenticated={true}
-      getSecretKey={getSecretKey}
       getHubKey={getHubKey}
     >
       <AuthenticatedLayout />

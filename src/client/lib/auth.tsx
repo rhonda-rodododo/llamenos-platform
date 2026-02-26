@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
-import { keyPairFromNsec, createAuthToken } from './crypto'
+import { keyPairFromNsec, createAuthTokenStateless, hasStoredKey } from './platform'
 import * as keyManager from './key-manager'
-import { hasStoredKey } from './key-store'
 import { getMe, login, logout as apiLogout, updateMyAvailability, setOnAuthExpired, setOnApiActivity } from './api'
 import { permissionGranted } from '@shared/permissions'
 import { loginWithPasskey as webauthnLogin } from './webauthn'
@@ -197,14 +196,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign in with nsec (import flow — onboarding/recovery only)
   const signIn = useCallback(async (nsec: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }))
-    const keyPair = keyPairFromNsec(nsec)
+    const keyPair = await keyPairFromNsec(nsec)
     if (!keyPair) {
       setState(s => ({ ...s, isLoading: false, error: 'Invalid secret key' }))
       return
     }
     try {
-      const token = createAuthToken(keyPair.secretKey, Date.now(), 'POST', '/api/auth/login')
-      const parsed = JSON.parse(token)
+      // Use stateless auth token (nsec not yet in CryptoState)
+      const tokenJson = await createAuthTokenStateless(
+        keyPair.secretKeyHex, Date.now(), 'POST', '/api/auth/login',
+      )
+      const parsed = JSON.parse(tokenJson)
       await login(parsed.pubkey, parsed.timestamp, parsed.token)
       const me = await getMe()
       lastApiActivity.current = Date.now()

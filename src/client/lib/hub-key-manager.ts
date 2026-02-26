@@ -4,19 +4,26 @@
  * Hub-wide symmetric encryption key management. Each hub has a random 32-byte
  * key that is ECIES-wrapped individually for each member who needs it.
  *
+ * ECIES wrap/unwrap operations delegate to Rust via platform.ts.
+ * Symmetric hub encrypt/decrypt stays in JS (hub key is shared symmetric, not identity-secret).
+ *
  * Key lifecycle:
  *   1. Admin generates hub key via generateHubKey()
- *   2. Key is wrapped for each member via wrapHubKeyForMember()
+ *   2. Key is wrapped for each member via wrapHubKeyForMember() (Rust ECIES)
  *   3. Members fetch their wrapped key from GET /api/hub/key
- *   4. Members unwrap with their secret key via unwrapHubKey()
- *   5. Hub key encrypts/decrypts hub-scoped data via encryptForHub()/decryptFromHub()
+ *   4. Members unwrap with CryptoState via unwrapHubKey() (Rust ECIES)
+ *   5. Hub key encrypts/decrypts hub-scoped data via encryptForHub()/decryptFromHub() (JS)
  *   6. On rotation, admin generates new key + re-wraps for all members
  */
 
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { eciesWrapKey, eciesUnwrapKey, type KeyEnvelope, type RecipientKeyEnvelope } from './crypto'
+import {
+  unwrapHubKey as platformUnwrapHubKey,
+  eciesWrapKey,
+} from './platform'
+import type { KeyEnvelope, RecipientKeyEnvelope } from './platform'
 import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
@@ -34,16 +41,19 @@ export function generateHubKey(): Uint8Array {
 }
 
 /**
- * Wrap a hub key for a specific member using ECIES.
+ * Wrap a hub key for a specific member using ECIES via Rust.
  * Uses LABEL_HUB_KEY_WRAP domain separation to prevent cross-context attacks.
+ * No nsec involved — uses ephemeral keys for wrapping.
  */
-export function wrapHubKeyForMember(
+export async function wrapHubKeyForMember(
   hubKey: Uint8Array,
   memberPubkeyHex: string,
-): RecipientKeyEnvelope {
+): Promise<RecipientKeyEnvelope> {
+  const hubKeyHex = bytesToHex(hubKey)
+  const envelope = await eciesWrapKey(hubKeyHex, memberPubkeyHex, LABEL_HUB_KEY_WRAP)
   return {
     pubkey: memberPubkeyHex,
-    ...eciesWrapKey(hubKey, memberPubkeyHex, LABEL_HUB_KEY_WRAP),
+    ...envelope,
   }
 }
 
@@ -51,26 +61,28 @@ export function wrapHubKeyForMember(
  * Wrap a hub key for multiple members at once.
  * Returns an array of RecipientKeyEnvelopes.
  */
-export function wrapHubKeyForMembers(
+export async function wrapHubKeyForMembers(
   hubKey: Uint8Array,
   memberPubkeys: string[],
-): RecipientKeyEnvelope[] {
-  return memberPubkeys.map(pk => wrapHubKeyForMember(hubKey, pk))
+): Promise<RecipientKeyEnvelope[]> {
+  return Promise.all(memberPubkeys.map(pk => wrapHubKeyForMember(hubKey, pk)))
 }
 
 /**
- * Unwrap a hub key from an ECIES envelope using the member's secret key.
+ * Unwrap a hub key from an ECIES envelope using CryptoState (nsec stays in Rust).
+ * Returns the hub key as bytes.
  */
-export function unwrapHubKey(
+export async function unwrapHubKey(
   envelope: KeyEnvelope,
-  secretKey: Uint8Array,
-): Uint8Array {
-  return eciesUnwrapKey(envelope, secretKey, LABEL_HUB_KEY_WRAP)
+): Promise<Uint8Array> {
+  const hex = await platformUnwrapHubKey(envelope)
+  return hexToBytes(hex)
 }
 
 /**
  * Encrypt arbitrary data with the hub key using XChaCha20-Poly1305.
  * Returns hex: nonce(24) + ciphertext.
+ * Hub key is shared symmetric — stays in JS.
  */
 export function encryptForHub(
   plaintext: string,
@@ -89,6 +101,7 @@ export function encryptForHub(
 /**
  * Decrypt hub-encrypted data using the hub key.
  * Returns null on decryption failure (wrong key, corrupted data, etc.).
+ * Hub key is shared symmetric — stays in JS.
  */
 export function decryptFromHub(
   packed: string,
@@ -115,10 +128,10 @@ export function decryptFromHub(
  * 2. Storing the new envelopes server-side
  * 3. Distributing via GET /api/hub/key
  */
-export function rotateHubKey(
+export async function rotateHubKey(
   memberPubkeys: string[],
-): { hubKey: Uint8Array; envelopes: RecipientKeyEnvelope[] } {
+): Promise<{ hubKey: Uint8Array; envelopes: RecipientKeyEnvelope[] }> {
   const hubKey = generateHubKey()
-  const envelopes = wrapHubKeyForMembers(hubKey, memberPubkeys)
+  const envelopes = await wrapHubKeyForMembers(hubKey, memberPubkeys)
   return { hubKey, envelopes }
 }

@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { isTauri } from '@/lib/platform'
+// Tauri-only app — always in Tauri context
 
 interface UpdateInfo {
   version: string
@@ -32,7 +32,7 @@ export function UpdateChecker() {
   const updateRef = useRef<Awaited<ReturnType<typeof import('@tauri-apps/plugin-updater').check>> | null>(null)
 
   const checkForUpdate = useCallback(async () => {
-    if (!isTauri()) return
+    // Always in Tauri context
 
     try {
       const { check } = await import('@tauri-apps/plugin-updater')
@@ -55,7 +55,7 @@ export function UpdateChecker() {
   }, [])
 
   useEffect(() => {
-    if (!isTauri()) return
+    // Always in Tauri context
 
     // Check on mount (short delay to not block startup)
     const timeout = setTimeout(checkForUpdate, 5000)

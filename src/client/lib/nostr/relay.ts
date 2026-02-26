@@ -3,14 +3,15 @@
  *
  * Handles:
  * - WebSocket connection to the Nostr relay
- * - NIP-42 authentication
+ * - NIP-42 authentication (via Rust CryptoState — nsec never in webview)
  * - Subscription management
  * - Reconnection with exponential backoff + jitter
  * - Event deduplication and validation
  */
 
-import { finalizeEvent, verifyEvent } from 'nostr-tools/pure'
+import { verifyEvent } from 'nostr-tools/pure'
 import type { Event as NostrEvent } from 'nostr-tools/core'
+import { signNostrEvent } from '../platform'
 import { EventDeduplicator, validateLlamenosEvent, parseLlamenosContent } from './events'
 import { decryptFromHub } from '../hub-key-manager'
 import type { LlamenosEvent, RelayState, NostrEventHandler } from './types'
@@ -18,7 +19,6 @@ import type { LlamenosEvent, RelayState, NostrEventHandler } from './types'
 export interface RelayManagerOptions {
   relayUrl: string
   serverPubkey: string
-  getSecretKey: () => Uint8Array | null
   getHubKey: () => Uint8Array | null
   onStateChange?: (state: RelayState) => void
 }
@@ -39,7 +39,6 @@ export class RelayManager {
   private state: RelayState = 'disconnected'
   private serverPubkey: string
   private relayUrl: string
-  private getSecretKey: () => Uint8Array | null
   private getHubKey: () => Uint8Array | null
   private onStateChange?: (state: RelayState) => void
   private subscriptions = new Map<string, Subscription>()
@@ -53,7 +52,6 @@ export class RelayManager {
   constructor(options: RelayManagerOptions) {
     this.relayUrl = options.relayUrl
     this.serverPubkey = options.serverPubkey
-    this.getSecretKey = options.getSecretKey
     this.getHubKey = options.getHubKey
     this.onStateChange = options.onStateChange
   }
@@ -237,29 +235,29 @@ export class RelayManager {
     }, 2000)
   }
 
-  private handleAuth(challenge: string): void {
+  private async handleAuth(challenge: string): Promise<void> {
     this.setState('authenticating')
-    const sk = this.getSecretKey()
-    if (!sk) {
-      console.error('[nostr] Cannot authenticate: key manager locked')
-      return
-    }
 
-    const authEvent = finalizeEvent({
-      kind: 22242,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [
-        ['relay', this.relayUrl],
-        ['challenge', challenge],
-      ],
-      content: '',
-    }, sk)
+    try {
+      // Sign NIP-42 auth event via Rust CryptoState (nsec never enters webview)
+      const authEvent = await signNostrEvent(
+        22242,
+        Math.floor(Date.now() / 1000),
+        [
+          ['relay', this.relayUrl],
+          ['challenge', challenge],
+        ],
+        '',
+      )
 
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(['AUTH', authEvent]))
-      this.authenticated = true
-      this.setState('connected')
-      this.flushPendingSubscriptions()
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify(['AUTH', authEvent]))
+        this.authenticated = true
+        this.setState('connected')
+        this.flushPendingSubscriptions()
+      }
+    } catch {
+      console.error('[nostr] Cannot authenticate: key manager locked or IPC error')
     }
   }
 

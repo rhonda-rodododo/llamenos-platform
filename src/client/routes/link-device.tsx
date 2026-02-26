@@ -11,7 +11,7 @@ import {
   type ProvisioningSession,
 } from '@/lib/provisioning'
 import * as keyManager from '@/lib/key-manager'
-import { hasStoredKey } from '@/lib/key-store'
+import { hasStoredKey } from '@/lib/platform'
 import { LogoMark } from '@/components/logo-mark'
 import { LanguageSelect } from '@/components/language-select'
 import { PinInput } from '@/components/pin-input'
@@ -44,9 +44,9 @@ function LinkDevicePage() {
 
   // If user already has a stored key, redirect to login
   useEffect(() => {
-    if (hasStoredKey()) {
-      navigate({ to: '/login' })
-    }
+    hasStoredKey().then(exists => {
+      if (exists) navigate({ to: '/login' })
+    }).catch(() => {})
   }, [navigate])
 
   async function startLinking() {

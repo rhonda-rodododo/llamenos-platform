@@ -2,8 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
-import { generateKeyPair, createAuthToken } from '@/lib/platform'
-import { isValidPin } from '@/lib/key-store'
+import { generateKeyPair, createAuthTokenStateless } from '@/lib/platform'
+import { isValidPin } from '@/lib/key-manager'
 import * as keyManager from '@/lib/key-manager'
 import { bootstrapAdmin } from '@/lib/api'
 import { createBackup, generateRecoveryKey, downloadBackupFile } from '@/lib/backup'
@@ -134,7 +134,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
       setConfirmedPin(pin)
 
       // Create Schnorr signature to prove key ownership
-      const tokenJson = await createAuthToken(kp.secretKeyHex, Date.now(), 'POST', '/api/auth/bootstrap')
+      const tokenJson = await createAuthTokenStateless(kp.secretKeyHex, Date.now(), 'POST', '/api/auth/bootstrap')
       const parsed = JSON.parse(tokenJson)
 
       // Call bootstrap endpoint

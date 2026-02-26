@@ -1,30 +1,26 @@
 /**
- * Singleton Key Manager — holds the decrypted secret key in a closure variable.
+ * Singleton Key Manager — manages crypto lock/unlock state.
  *
- * Platform behavior:
- *
- * **Browser**: The secretKey is a Uint8Array in this module's closure scope.
- *   NEVER stored in sessionStorage, window, or any globally accessible object.
- *
- * **Desktop (Tauri)**: The nsec is loaded into Rust CryptoState via stateful
- *   IPC commands. The platform.ts functions prefer CryptoState for all crypto
- *   operations (nsec never sent back over IPC). However, the secretKey is
- *   also cached in the closure for backward compatibility with call sites
- *   that use getSecretKey() directly. Epic 81 will migrate all callers to
- *   platform.ts and remove the nsec from the webview entirely.
+ * **Tauri-only**: The nsec lives exclusively in Rust CryptoState.
+ * This module tracks unlock state and cached public key for the UI.
+ * It never holds or touches the secret key.
  *
  * States:
- *   Locked:   secretKey === null — only session-token auth available
- *   Unlocked: secretKey is a Uint8Array in memory — full crypto available
+ *   Locked:   unlocked === false — only session-token auth available
+ *   Unlocked: unlocked === true — CryptoState has nsec, full crypto available
  */
 
-import { getPublicKey, nip19 } from 'nostr-tools'
-import { decryptStoredKey, storeEncryptedKey, hasStoredKey, clearStoredKey } from './key-store'
-import { createAuthToken as _createAuthToken } from './crypto'
-import { isTauri, lockCrypto } from './platform'
+import {
+  decryptWithPin,
+  lockCrypto,
+  encryptWithPin,
+  clearStoredKey as platformClearStoredKey,
+  keyPairFromNsec,
+  hasStoredKey as platformHasStoredKey,
+} from './platform'
 
 // --- Private state (closure-scoped, never exported) ---
-let secretKey: Uint8Array | null = null
+let unlocked = false
 let publicKey: string | null = null
 
 // --- Auto-lock ---
@@ -35,7 +31,7 @@ const IDLE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 
 function resetIdleTimer() {
   if (idleTimer) clearTimeout(idleTimer)
-  if (secretKey) {
+  if (unlocked) {
     idleTimer = setTimeout(() => lock(), IDLE_TIMEOUT_MS)
   }
 }
@@ -69,7 +65,7 @@ export function getLockDelayMs(): number {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && secretKey) {
+    if (document.hidden && unlocked) {
       const delay = getLockDelay()
       if (delay === 0) {
         lock()
@@ -90,138 +86,70 @@ if (typeof document !== 'undefined') {
  * Unlock the key store by decrypting the nsec with the user's PIN.
  * Returns the hex pubkey on success, null on wrong PIN.
  *
- * On desktop, this also loads the nsec into Rust CryptoState via
- * platform.decryptWithPin → unlock_with_pin IPC. The stateful IPC
- * commands in platform.ts then use CryptoState directly, so the nsec
- * never travels from Rust → webview → Rust again.
+ * The nsec is loaded into Rust CryptoState and NEVER enters the webview.
  */
 export async function unlock(pin: string): Promise<string | null> {
-  if (isTauri()) {
-    // Desktop: unlock_with_pin loads nsec into Rust CryptoState and returns pubkey.
-    // We also decrypt locally to populate the closure for backward compatibility.
-    const { decryptWithPin: platformDecrypt } = await import('./platform')
-    const pubkey = await platformDecrypt(pin)
-    if (!pubkey) return null
+  const pubkey = await decryptWithPin(pin)
+  if (!pubkey) return null
 
-    // The platform returns pubkey on desktop (nsec stays in Rust).
-    // But we still need secretKey in the closure for getSecretKey() callers
-    // until Epic 81 migrates them. Decrypt locally for the closure.
-    const nsec = await decryptStoredKey(pin)
-    if (nsec) {
-      try {
-        const decoded = nip19.decode(nsec)
-        if (decoded.type === 'nsec') {
-          secretKey = decoded.data
-        }
-      } catch { /* fallthrough — CryptoState still works */ }
-    }
-
-    publicKey = pubkey
-    resetIdleTimer()
-    unlockCallbacks.forEach(cb => cb())
-    return publicKey
-  }
-
-  // Browser: existing flow
-  const nsec = await decryptStoredKey(pin)
-  if (!nsec) return null
-
-  try {
-    const decoded = nip19.decode(nsec)
-    if (decoded.type !== 'nsec') return null
-    secretKey = decoded.data
-    publicKey = getPublicKey(secretKey)
-    resetIdleTimer()
-    unlockCallbacks.forEach(cb => cb())
-    return publicKey
-  } catch {
-    return null
-  }
+  publicKey = pubkey
+  unlocked = true
+  resetIdleTimer()
+  unlockCallbacks.forEach(cb => cb())
+  return publicKey
 }
 
 /**
- * Lock the key manager — zeros out the secret key bytes.
- * Desktop: also locks the Rust CryptoState.
+ * Lock the key manager — zeros nsec in Rust CryptoState.
  */
 export function lock() {
-  if (secretKey) {
-    secretKey.fill(0)
-  }
-  secretKey = null
+  unlocked = false
   // Don't clear publicKey — it's not secret and useful for display
   if (idleTimer) {
     clearTimeout(idleTimer)
     idleTimer = null
   }
   // Lock Rust CryptoState (fire-and-forget)
-  if (isTauri()) {
-    lockCrypto().catch(() => {})
-  }
+  lockCrypto().catch(() => {})
   lockCallbacks.forEach(cb => cb())
 }
 
 /**
- * Import a key (onboarding / recovery): encrypt and store, then load into memory.
+ * Import a key (onboarding / recovery): encrypt and store, then load into CryptoState.
  */
 export async function importKey(nsec: string, pin: string): Promise<string> {
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  const sk = decoded.data
-  const pk = getPublicKey(sk)
+  const kp = await keyPairFromNsec(nsec)
+  if (!kp) throw new Error('Invalid nsec')
 
-  if (isTauri()) {
-    // platform.encryptWithPin calls import_key_to_state — encrypts + loads into CryptoState
-    const { encryptWithPin } = await import('./platform')
-    await encryptWithPin(nsec, pin, pk)
-  } else {
-    await storeEncryptedKey(nsec, pin, pk)
-  }
+  // encryptWithPin calls import_key_to_state — encrypts + loads into CryptoState
+  await encryptWithPin(nsec, pin, kp.publicKey)
 
-  secretKey = sk
-  publicKey = pk
+  publicKey = kp.publicKey
+  unlocked = true
   resetIdleTimer()
   unlockCallbacks.forEach(cb => cb())
-  return pk
-}
-
-/**
- * Get the secret key. Throws if locked.
- */
-export function getSecretKey(): Uint8Array {
-  if (!secretKey) throw new KeyLockedError()
-  resetIdleTimer()
-  return secretKey
+  return kp.publicKey
 }
 
 /**
  * Check if the key manager is currently unlocked.
  */
 export function isUnlocked(): boolean {
-  return secretKey !== null
+  return unlocked
 }
 
 /**
- * Get the public key (hex). Available when unlocked OR if we can derive it
- * from the stored key ID.
+ * Get the public key (hex). Available when unlocked OR if we have it cached.
  */
 export function getPublicKeyHex(): string | null {
   return publicKey
 }
 
 /**
- * Check if there's an encrypted key in local storage.
+ * Check if there's an encrypted key in Tauri Store.
+ * Async — re-exports from platform.ts.
  */
-export { hasStoredKey } from './key-store'
-
-/**
- * Create a Schnorr auth token using the in-memory secret key.
- * Throws KeyLockedError if locked.
- */
-export function createAuthToken(timestamp: number, method: string, path: string): string {
-  if (!secretKey) throw new KeyLockedError()
-  resetIdleTimer()
-  return _createAuthToken(secretKey, timestamp, method, path)
-}
+export { hasStoredKey } from './platform'
 
 /**
  * Register a callback for lock events.
@@ -240,12 +168,12 @@ export function onUnlock(cb: () => void): () => void {
 }
 
 /**
- * Wipe the encrypted key from localStorage and lock.
+ * Wipe the encrypted key from storage and lock.
  * Used when max PIN attempts exceeded.
  */
-export function wipeKey() {
+export async function wipeKey() {
   lock()
-  clearStoredKey()
+  await platformClearStoredKey()
 }
 
 /**
@@ -258,11 +186,7 @@ export class KeyLockedError extends Error {
   }
 }
 
-/**
- * Get the nsec as bech32 string (for testing/backup only).
- * Returns null if locked.
- */
-export function getNsec(): string | null {
-  if (!secretKey) return null
-  return nip19.nsecEncode(secretKey)
+/** Validate a PIN format (4-8 digits). */
+export function isValidPin(pin: string): boolean {
+  return /^\d{4,8}$/.test(pin)
 }

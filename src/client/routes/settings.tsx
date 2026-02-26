@@ -558,29 +558,36 @@ function LinkDeviceSection() {
         return
       }
 
-      // Get nsec from key-manager
-      const nsecStr = keyManager.getNsec()
+      // Get nsec from Rust CryptoState (device provisioning is the one case
+      // where the nsec intentionally enters the webview — see Epic 93 §5.4)
+      const { getNsecFromState, createAuthToken } = await import('@/lib/platform')
+      const nsecStr = await getNsecFromState()
       if (!nsecStr) {
         setStatus('error')
         setStatusMessage(t('pin.keyLocked'))
         return
       }
 
-      const secretKey = keyManager.getSecretKey()
       const publicKey = keyManager.getPublicKeyHex()!
 
+      // Decode nsec temporarily for SAS computation and ECDH
+      const { nip19 } = await import('nostr-tools')
+      const decoded = nip19.decode(nsecStr)
+      if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
+      const secretKeyBytes = decoded.data
+
       // Compute SAS for display BEFORE sending nsec
-      const sas = computeSASForPrimaryDevice(secretKey, room.ephemeralPubkey)
+      const sas = computeSASForPrimaryDevice(secretKeyBytes, room.ephemeralPubkey)
       setSasCode(sas)
 
       // ECDH encrypt nsec for the new device
-      const encrypted = encryptNsecForDevice(nsecStr, room.ephemeralPubkey, secretKey)
+      const encrypted = encryptNsecForDevice(nsecStr, room.ephemeralPubkey, secretKeyBytes)
 
-      // Send encrypted payload (authenticated)
+      // Send encrypted payload (authenticated via CryptoState)
       const provisionPath = `/api/provision/rooms/${roomId}/payload`
-      const authToken = keyManager.createAuthToken(Date.now(), 'POST', provisionPath)
+      const authTokenJson = await createAuthToken(Date.now(), 'POST', provisionPath)
       await sendProvisionedKey(roomId, token, encrypted, publicKey, {
-        'Authorization': `Bearer ${authToken}`,
+        'Authorization': `Bearer ${authTokenJson}`,
       })
 
       setStatus('verify-sas')

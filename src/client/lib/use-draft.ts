@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { encryptDraft, decryptDraft } from './platform'
 import * as keyManager from './key-manager'
-import { bytesToHex } from '@noble/hashes/utils.js'
 
 type FieldValues = Record<string, string | number | boolean>
 
@@ -29,11 +28,10 @@ export function useDraft(key: string) {
     if (!keyManager.isUnlocked()) return
     const raw = localStorage.getItem(storageKey)
     if (!raw) return
-    const skHex = bytesToHex(keyManager.getSecretKey())
 
     ;(async () => {
       try {
-        const decrypted = await decryptDraft(raw, skHex)
+        const decrypted = await decryptDraft(raw)
         if (!decrypted) return
         const data: DraftData = JSON.parse(decrypted)
         setText(data.text)
@@ -56,10 +54,9 @@ export function useDraft(key: string) {
       return
     }
     try {
-      const skHex = bytesToHex(keyManager.getSecretKey())
       const now = Date.now()
       const data: DraftData = { text: t, callId: cId, fields: f, savedAt: now }
-      const encrypted = await encryptDraft(JSON.stringify(data), skHex)
+      const encrypted = await encryptDraft(JSON.stringify(data))
       localStorage.setItem(storageKey, encrypted)
       setSavedAt(now)
       setIsDirty(false)

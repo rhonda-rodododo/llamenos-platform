@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { decryptMessage } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
-import { bytesToHex } from '@noble/hashes/utils.js'
 import type { ConversationMessage } from '@/lib/api'
 import { Lock, ArrowDown, ArrowUp, Loader2, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react'
 import type { MessageDeliveryStatus } from '@/lib/api'
@@ -24,10 +23,7 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
   // Decrypt messages when they change
   useEffect(() => {
     if (messages.length === 0 || !publicKey) return
-
-    const secretKey = resolveSecretKey()
-    if (!secretKey) return
-    const skHex = bytesToHex(secretKey)
+    if (!hasNsec || !keyManager.isUnlocked()) return
 
     ;(async () => {
       const newDecrypted = new Map<string, string>()
@@ -36,8 +32,6 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
           const plaintext = await decryptMessage(
             msg.encryptedContent,
             msg.readerEnvelopes,
-            skHex,
-            publicKey,
           )
           if (plaintext !== null) {
             newDecrypted.set(msg.id, plaintext)
@@ -66,13 +60,6 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
     }
-  }
-
-  function resolveSecretKey(): Uint8Array | null {
-    if (keyManager.isUnlocked()) {
-      try { return keyManager.getSecretKey() } catch { return null }
-    }
-    return null
   }
 
   function formatTimestamp(iso: string): string {

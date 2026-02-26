@@ -6,7 +6,6 @@ import { getCallHistory, listVolunteers, type CallRecord, type Volunteer } from 
 import { useToast } from '@/lib/toast'
 import { decryptCallRecord } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
-import { bytesToHex } from '@noble/hashes/utils.js'
 import { PhoneIncoming, ChevronLeft, ChevronRight, Clock, Mic, Search, X, StickyNote, Voicemail, PhoneMissed, Disc } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
@@ -70,14 +69,13 @@ function CallHistoryPage() {
   useEffect(() => {
     if (!hasNsec || !publicKey || calls.length === 0) return
     if (!keyManager.isUnlocked()) return
-    const skHex = bytesToHex(keyManager.getSecretKey())
 
     ;(async () => {
       let changed = false
       const decrypted = await Promise.all(calls.map(async call => {
         if (call.answeredBy !== undefined) return call // already decrypted
         if (!call.encryptedContent || !call.adminEnvelopes?.length) return call
-        const meta = await decryptCallRecord(call.encryptedContent, call.adminEnvelopes, skHex, publicKey)
+        const meta = await decryptCallRecord(call.encryptedContent, call.adminEnvelopes)
         if (meta) {
           changed = true
           return { ...call, answeredBy: meta.answeredBy, callerNumber: meta.callerNumber }

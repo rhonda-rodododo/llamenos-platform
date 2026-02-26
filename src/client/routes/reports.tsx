@@ -14,7 +14,6 @@ import {
 } from '@/lib/api'
 import { encryptMessage, decryptMessage } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
-import { bytesToHex } from '@noble/hashes/utils.js'
 import { ReportForm } from '@/components/ReportForm'
 import { FilePreview } from '@/components/FilePreview'
 import { FileUpload } from '@/components/FileUpload'
@@ -372,7 +371,6 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
   useEffect(() => {
     if (messages.length === 0 || !publicKey) return
     if (!hasNsec || !keyManager.isUnlocked()) return
-    const skHex = bytesToHex(keyManager.getSecretKey())
 
     ;(async () => {
       const decrypted = new Map<string, string>()
@@ -381,8 +379,6 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
           const plaintext = await decryptMessage(
             msg.encryptedContent,
             msg.readerEnvelopes,
-            skHex,
-            publicKey,
           )
           if (plaintext !== null) {
             decrypted.set(msg.id, plaintext)
