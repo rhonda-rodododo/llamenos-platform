@@ -2,7 +2,7 @@
 # generate-update-manifest.sh — Build the latest.json manifest for Tauri auto-updater.
 #
 # Run in CI after all platform builds complete. Expects:
-#   - GITHUB_REF_NAME (e.g., "release/desktop-v1.2.0" or "v1.2.0")
+#   - GITHUB_REF_NAME (e.g., "v1.2.0") or version passed via workflow_dispatch
 #   - Platform-specific .sig files in artifacts/ directory
 #
 # Usage: ./scripts/generate-update-manifest.sh

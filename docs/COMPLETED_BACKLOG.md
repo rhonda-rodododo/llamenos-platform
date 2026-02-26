@@ -1,5 +1,47 @@
 # Completed Backlog
 
+## 2026-02-26: Release Pipeline & Distribution (`desktop` branch)
+
+### Epic 99: Human Setup Guide (HUMAN_INSTRUCTIONS.md)
+
+Comprehensive operator guide at `docs/HUMAN_INSTRUCTIONS.md` (~730 lines):
+- **Tauri updater signing**: Keypair generation, GitHub secrets setup
+- **Apple Developer Account**: Certificate export, notarization, App-Specific Password
+- **Windows code signing**: Azure Trusted Signing setup (recommended over EV hardware tokens)
+- **Flathub submission**: Fork, manifest, PR workflow
+- **Future mobile**: F-Droid and Google Play Store placeholders
+- **GitHub secrets checklist**: Complete table of all 13 secrets across all workflows
+- **Version sync checklist**: Pre-release verification steps
+
+### Epic 98: Download Experience
+
+Marketing site download page with OS auto-detection:
+- **`site/src/pages/download.astro`** + **`[lang]/download.astro`**: Platform detection via `navigator.userAgent`, 6 download cards (Windows, macOS, Linux AppImage/deb/Flatpak, Mobile coming soon), client-side `latest.json` fetch for download URLs
+- **`site/src/i18n/translations/download.ts`**: Full i18n for en, es, zh (other langs fall back to English)
+- **Header.astro**: Added Download to nav items
+- **HomeContent.astro**: Hero CTA → `/download`, secondary → `/docs/getting-started`
+- **common.ts**: Added `download` nav key across all 13 languages
+- **home.ts**: Hero CTA text "Get started" → "Download" (13 langs), "Mobile-first PWA" → "Desktop app" (13 langs)
+- Site builds 286 pages successfully
+
+### Epic 97: Desktop Release Pipeline
+
+Activated and extended `tauri-release.yml` for automated desktop distribution:
+- **Trigger**: Changed from `release/desktop-v*` to `v*` tags (same as docker.yml)
+- **Version sync step**: Extracts version from tag, updates `tauri.conf.json` + `package.json` before build
+- **Flatpak job**: `flatpak/flatpak-github-actions/flatpak-builder@v6` with `org.gnome.Platform` v47
+- **Flatpak manifest**: `flatpak/org.llamenos.Hotline.yml` + `.desktop` + `.metainfo.xml`
+- **Updater feature flag**: `src-tauri/Cargo.toml` makes `tauri-plugin-updater` optional; Flatpak builds with `--no-default-features --features custom-protocol`
+- **Conditional compilation**: `src-tauri/src/lib.rs` uses `#[cfg(feature = "updater")]` for updater plugin
+- **Release dedup**: Checks if GitHub Release exists (from ci.yml), uploads artifacts to it or creates new
+
+### Epic 96: llamenos-core CI/CD Pipeline
+
+Added CI/CD to the `llamenos-core` repo:
+- **`.github/workflows/ci.yml`**: Runs on every push to main + PRs — `cargo test --all-features`, `cargo clippy -- -D warnings`, WASM build validation, UniFFI build validation
+- **`.github/workflows/release.yml`**: On `v*` tags — builds native libraries for 4 targets (linux-x64, macos-x64, macos-arm64, windows-x64), WASM package via wasm-pack, UniFFI Swift+Kotlin bindings, creates GitHub Release with all artifacts
+- **`scripts/bump-version.sh`**: Reads Cargo.toml version, bumps major/minor/patch, updates Cargo.toml+Cargo.lock, creates annotated git tag
+
 ## 2026-02-26: Multi-Platform Native Clients (`desktop` branch)
 
 ### Epic 95: Deployment Architecture for Desktop-Only

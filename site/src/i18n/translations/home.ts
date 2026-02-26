@@ -30,8 +30,8 @@ export const home: Record<string, {
       title: 'Secure crisis hotline',
       titleAccent: 'for the people who need it',
       description: 'Llámenos is open-source hotline software that protects callers and volunteers. Encrypted notes, real-time call routing, and a zero-knowledge architecture \u2014 so sensitive conversations stay private.',
-      cta: 'Get started',
-      ctaSecondary: 'Read the security model',
+      cta: 'Download',
+      ctaSecondary: 'Get started',
     },
     features: {
       heading: 'Built for crisis response',
@@ -42,7 +42,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: '12+ languages built in', description: 'Full UI translations for English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, French, Haitian Creole, Korean, Russian, Hindi, and Portuguese.' },
         { icon: '\u{1F399}', title: 'AI transcription', description: 'Whisper-powered call transcription with end-to-end encryption. Admin and volunteer can toggle independently.' },
         { icon: '\u{1F6E1}', title: 'Spam mitigation', description: 'Voice CAPTCHA, rate limiting, and real-time ban lists. Admins toggle protections without restarting.' },
-        { icon: '\u{1F4F1}', title: 'Mobile-first PWA', description: 'Works on any device. Installable as an app. Push notifications for incoming calls.' },
+        { icon: '\u{1F5A5}', title: 'Desktop app', description: 'Native desktop app for Windows, macOS, and Linux. Secure key storage, auto-updates, and system tray integration. Mobile app coming soon.' },
       ],
     },
     security: {
@@ -63,8 +63,8 @@ export const home: Record<string, {
       title: 'Línea de crisis segura',
       titleAccent: 'para quienes la necesitan',
       description: 'Llámenos es un software de línea de ayuda de código abierto que protege a quienes llaman y a los voluntarios. Notas cifradas, enrutamiento de llamadas en tiempo real y una arquitectura de conocimiento cero \u2014 para que las conversaciones sensibles permanezcan privadas.',
-      cta: 'Comenzar',
-      ctaSecondary: 'Leer el modelo de seguridad',
+      cta: 'Descargar',
+      ctaSecondary: 'Comenzar',
     },
     features: {
       heading: 'Diseñado para respuesta a crisis',
@@ -75,7 +75,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: 'Más de 12 idiomas integrados', description: 'Traducciones completas de la interfaz para inglés, español, chino, tagalo, vietnamita, árabe, francés, criollo haitiano, coreano, ruso, hindi y portugués.' },
         { icon: '\u{1F399}', title: 'Transcripción con IA', description: 'Transcripción de llamadas con Whisper y cifrado de extremo a extremo. El administrador y el voluntario pueden activarla independientemente.' },
         { icon: '\u{1F6E1}', title: 'Mitigación de spam', description: 'CAPTCHA de voz, limitación de tasa y listas de bloqueo en tiempo real. Los administradores activan las protecciones sin reiniciar.' },
-        { icon: '\u{1F4F1}', title: 'PWA móvil primero', description: 'Funciona en cualquier dispositivo. Instalable como aplicación. Notificaciones push para llamadas entrantes.' },
+        { icon: '\u{1F5A5}', title: 'Aplicacion de escritorio', description: 'Aplicacion nativa para Windows, macOS y Linux. Almacenamiento seguro de claves, actualizaciones automaticas e integracion con la bandeja del sistema. Aplicacion movil proximamente.' },
       ],
     },
     security: {
@@ -96,8 +96,8 @@ export const home: Record<string, {
       title: '安全的危机热线',
       titleAccent: '为需要帮助的人而建',
       description: 'Llámenos 是保护来电者和志愿者的开源热线软件。加密笔记、实时呼叫路由和零知识架构——确保敏感对话保持私密。',
-      cta: '开始使用',
-      ctaSecondary: '阅读安全模型',
+      cta: '下载',
+      ctaSecondary: '开始使用',
     },
     features: {
       heading: '专为危机响应打造',
@@ -108,7 +108,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: '内置12+种语言', description: '完整的界面翻译，支持英语、西班牙语、中文、他加禄语、越南语、阿拉伯语、法语、海地克里奥尔语、韩语、俄语、印地语和葡萄牙语。' },
         { icon: '\u{1F399}', title: 'AI 转录', description: '基于 Whisper 的通话转录，端到端加密。管理员和志愿者可独立切换。' },
         { icon: '\u{1F6E1}', title: '垃圾来电防护', description: '语音 CAPTCHA、速率限制和实时封禁列表。管理员无需重启即可切换保护。' },
-        { icon: '\u{1F4F1}', title: '移动优先 PWA', description: '适用于任何设备。可安装为应用。来电推送通知。' },
+        { icon: '\u{1F5A5}', title: '桌面应用', description: '适用于 Windows、macOS 和 Linux 的原生桌面应用。安全密钥存储、自动更新和系统托盘集成。移动应用即将推出。' },
       ],
     },
     security: {
@@ -129,8 +129,8 @@ export const home: Record<string, {
       title: 'Secure na crisis hotline',
       titleAccent: 'para sa mga nangangailangan',
       description: 'Ang Llámenos ay open-source na hotline software na nagpoprotekta sa mga tumatawag at mga volunteer. Encrypted na mga tala, real-time na call routing, at zero-knowledge architecture \u2014 para manatiling pribado ang mga sensitibong usapan.',
-      cta: 'Magsimula',
-      ctaSecondary: 'Basahin ang modelo ng seguridad',
+      cta: 'I-download',
+      ctaSecondary: 'Magsimula',
     },
     features: {
       heading: 'Ginawa para sa crisis response',
@@ -141,7 +141,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: '12+ na wika ang built-in', description: 'Kumpletong pagsasalin ng UI para sa Ingles, Espanyol, Tsino, Tagalog, Vietnamese, Arabe, Pranses, Haitian Creole, Korean, Ruso, Hindi, at Portuges.' },
         { icon: '\u{1F399}', title: 'AI na transkripsyon', description: 'Transkripsyon ng tawag gamit ang Whisper na may end-to-end encryption. Maaaring i-toggle ng admin at volunteer nang hiwalay.' },
         { icon: '\u{1F6E1}', title: 'Proteksyon laban sa spam', description: 'Voice CAPTCHA, rate limiting, at real-time na ban list. Maaaring i-toggle ng mga admin ang proteksyon nang hindi nire-restart.' },
-        { icon: '\u{1F4F1}', title: 'Mobile-first PWA', description: 'Gumagana sa anumang device. Maaaring i-install bilang app. Push notification para sa papasok na tawag.' },
+        { icon: '\u{1F5A5}', title: 'Desktop app', description: 'Native desktop app para sa Windows, macOS, at Linux. Secure key storage, auto-updates, at system tray integration. Mobile app ay paparating na.' },
       ],
     },
     security: {
@@ -162,8 +162,8 @@ export const home: Record<string, {
       title: 'Đường dây nóng khủng hoảng an toàn',
       titleAccent: 'cho những người cần nó',
       description: 'Llámenos là phần mềm đường dây nóng mã nguồn mở bảo vệ người gọi và tình nguyện viên. Ghi chú được mã hóa, định tuyến cuộc gọi thời gian thực và kiến trúc không tiết lộ \u2014 để các cuộc trò chuyện nhạy cảm luôn riêng tư.',
-      cta: 'Bắt đầu',
-      ctaSecondary: 'Đọc mô hình bảo mật',
+      cta: 'Tải xuống',
+      ctaSecondary: 'Bắt đầu',
     },
     features: {
       heading: 'Xây dựng cho ứng phó khủng hoảng',
@@ -174,7 +174,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: 'Hơn 12 ngôn ngữ tích hợp', description: 'Bản dịch giao diện đầy đủ cho tiếng Anh, Tây Ban Nha, Trung Quốc, Tagalog, Việt Nam, Ả Rập, Pháp, Creole Haiti, Hàn Quốc, Nga, Hindi và Bồ Đào Nha.' },
         { icon: '\u{1F399}', title: 'Phiên âm AI', description: 'Phiên âm cuộc gọi bằng Whisper với mã hóa đầu cuối. Quản trị viên và tình nguyện viên có thể bật/tắt độc lập.' },
         { icon: '\u{1F6E1}', title: 'Chống spam', description: 'CAPTCHA giọng nói, giới hạn tốc độ và danh sách cấm thời gian thực. Quản trị viên bật/tắt bảo vệ mà không cần khởi động lại.' },
-        { icon: '\u{1F4F1}', title: 'PWA ưu tiên di động', description: 'Hoạt động trên mọi thiết bị. Có thể cài đặt như ứng dụng. Thông báo đẩy cho cuộc gọi đến.' },
+        { icon: '\u{1F5A5}', title: 'Ứng dụng máy tính', description: 'Ứng dụng máy tính gốc cho Windows, macOS và Linux. Lưu trữ khóa an toàn, tự động cập nhật và tích hợp khay hệ thống. Ứng dụng di động sắp ra mắt.' },
       ],
     },
     security: {
@@ -195,8 +195,8 @@ export const home: Record<string, {
       title: 'خط ساخن آمن للأزمات',
       titleAccent: 'للأشخاص الذين يحتاجونه',
       description: 'Llámenos هو برنامج خط ساخن مفتوح المصدر يحمي المتصلين والمتطوعين. ملاحظات مشفرة، وتوجيه مكالمات في الوقت الفعلي، وبنية معرفة صفرية \u2014 لتبقى المحادثات الحساسة خاصة.',
-      cta: 'ابدأ الآن',
-      ctaSecondary: 'اقرأ نموذج الأمان',
+      cta: 'تحميل',
+      ctaSecondary: 'ابدأ الآن',
     },
     features: {
       heading: 'مصمم للاستجابة للأزمات',
@@ -207,7 +207,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: 'أكثر من 12 لغة مدمجة', description: 'ترجمات كاملة للواجهة بالإنجليزية والإسبانية والصينية والتاغالوغية والفيتنامية والعربية والفرنسية والكريولية الهايتية والكورية والروسية والهندية والبرتغالية.' },
         { icon: '\u{1F399}', title: 'نسخ بالذكاء الاصطناعي', description: 'نسخ المكالمات بتقنية Whisper مع تشفير من طرف إلى طرف. يمكن للمسؤول والمتطوع التبديل بشكل مستقل.' },
         { icon: '\u{1F6E1}', title: 'مكافحة البريد المزعج', description: 'CAPTCHA صوتي، وتحديد المعدل، وقوائم حظر فورية. يمكن للمسؤولين تبديل الحماية دون إعادة التشغيل.' },
-        { icon: '\u{1F4F1}', title: 'PWA للجوال أولاً', description: 'يعمل على أي جهاز. قابل للتثبيت كتطبيق. إشعارات فورية للمكالمات الواردة.' },
+        { icon: '\u{1F5A5}', title: 'تطبيق سطح المكتب', description: 'تطبيق أصلي لسطح المكتب لأنظمة Windows وmacOS وLinux. تخزين آمن للمفاتيح، تحديثات تلقائية، وتكامل مع علبة النظام. تطبيق الجوال قريبًا.' },
       ],
     },
     security: {
@@ -228,8 +228,8 @@ export const home: Record<string, {
       title: "Ligne d'urgence sécurisée",
       titleAccent: 'pour ceux qui en ont besoin',
       description: "Llámenos est un logiciel de ligne d'assistance open source qui protège les appelants et les bénévoles. Notes chiffrées, routage d'appels en temps réel et architecture zéro connaissance \u2014 pour que les conversations sensibles restent privées.",
-      cta: 'Commencer',
-      ctaSecondary: 'Lire le modèle de sécurité',
+      cta: 'Télécharger',
+      ctaSecondary: 'Commencer',
     },
     features: {
       heading: "Conçu pour la réponse aux crises",
@@ -240,7 +240,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: 'Plus de 12 langues intégrées', description: "Traductions complètes de l'interface : anglais, espagnol, chinois, tagalog, vietnamien, arabe, français, créole haïtien, coréen, russe, hindi et portugais." },
         { icon: '\u{1F399}', title: 'Transcription IA', description: "Transcription d'appels par Whisper avec chiffrement de bout en bout. L'administrateur et le bénévole peuvent activer/désactiver indépendamment." },
         { icon: '\u{1F6E1}', title: 'Protection anti-spam', description: "CAPTCHA vocal, limitation de débit et listes de blocage en temps réel. Les administrateurs activent les protections sans redémarrage." },
-        { icon: '\u{1F4F1}', title: 'PWA mobile first', description: "Fonctionne sur tout appareil. Installable comme application. Notifications push pour les appels entrants." },
+        { icon: '\u{1F5A5}', title: 'Application de bureau', description: "Application native pour Windows, macOS et Linux. Stockage sécurisé des clés, mises à jour automatiques et intégration à la barre des tâches. Application mobile bientôt disponible." },
       ],
     },
     security: {
@@ -261,8 +261,8 @@ export const home: Record<string, {
       title: 'Liy kriz ki an sekirite',
       titleAccent: 'pou moun ki bezwen li',
       description: 'Llámenos se yon lojisyèl liy asistans open source ki pwoteje moun ki rele ak volontè yo. Nòt chifre, direksyon apèl an tan reyèl, ak achitekti zewo konesans \u2014 pou konvèsasyon sansib yo rete prive.',
-      cta: 'Kòmanse',
-      ctaSecondary: 'Li modèl sekirite a',
+      cta: 'Telechaje',
+      ctaSecondary: 'Kòmanse',
     },
     features: {
       heading: 'Fèt pou repons a kriz',
@@ -273,7 +273,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: '12+ lang entegre', description: 'Tradiksyon konplè pou Angle, Panyòl, Chinwa, Tagalog, Vyetnamyen, Arab, Fransè, Kreyòl Ayisyen, Koreyen, Ris, Hindi, ak Pòtigè.' },
         { icon: '\u{1F399}', title: 'Transkripsyon IA', description: 'Transkripsyon apèl ak Whisper ki gen chifraj bout-an-bout. Admin ak volontè ka aktive/dezaktive endepandaman.' },
         { icon: '\u{1F6E1}', title: 'Pwoteksyon kont spam', description: 'CAPTCHA vwa, limit vitès, ak lis entèdiksyon an tan reyèl. Admin yo ka aktive pwoteksyon san redemaraj.' },
-        { icon: '\u{1F4F1}', title: 'PWA mobil dabò', description: 'Mache sou nenpòt aparèy. Ka enstale tankou aplikasyon. Notifikasyon push pou apèl ki rantre.' },
+        { icon: '\u{1F5A5}', title: 'Aplikasyon biwo', description: 'Aplikasyon biwo natif pou Windows, macOS, ak Linux. Depo kle ki an sekirite, aktyalizasyon otomatik, ak entegrasyon baro sistèm. Aplikasyon mobil ap vini byento.' },
       ],
     },
     security: {
@@ -294,8 +294,8 @@ export const home: Record<string, {
       title: '안전한 위기 핫라인',
       titleAccent: '도움이 필요한 사람들을 위해',
       description: 'Llámenos는 발신자와 자원봉사자를 보호하는 오픈 소스 핫라인 소프트웨어입니다. 암호화된 메모, 실시간 통화 라우팅, 제로 지식 아키텍처 \u2014 민감한 대화를 비공개로 유지합니다.',
-      cta: '시작하기',
-      ctaSecondary: '보안 모델 읽기',
+      cta: '다운로드',
+      ctaSecondary: '시작하기',
     },
     features: {
       heading: '위기 대응을 위해 구축',
@@ -306,7 +306,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: '12개 이상 언어 내장', description: '영어, 스페인어, 중국어, 타갈로그어, 베트남어, 아랍어, 프랑스어, 아이티 크리올어, 한국어, 러시아어, 힌디어, 포르투갈어 전체 UI 번역.' },
         { icon: '\u{1F399}', title: 'AI 녹취', description: 'Whisper 기반 통화 녹취, 종단간 암호화 포함. 관리자와 자원봉사자가 독립적으로 전환 가능.' },
         { icon: '\u{1F6E1}', title: '스팸 방지', description: '음성 CAPTCHA, 속도 제한, 실시간 차단 목록. 관리자가 재시작 없이 보호를 전환합니다.' },
-        { icon: '\u{1F4F1}', title: '모바일 우선 PWA', description: '모든 기기에서 작동. 앱으로 설치 가능. 수신 전화 푸시 알림.' },
+        { icon: '\u{1F5A5}', title: '데스크톱 앱', description: 'Windows, macOS, Linux용 네이티브 데스크톱 앱. 안전한 키 저장소, 자동 업데이트, 시스템 트레이 통합. 모바일 앱 곧 출시.' },
       ],
     },
     security: {
@@ -327,8 +327,8 @@ export const home: Record<string, {
       title: 'Безопасная кризисная горячая линия',
       titleAccent: 'для тех, кому это нужно',
       description: 'Llámenos — это программное обеспечение горячей линии с открытым исходным кодом, защищающее звонящих и волонтёров. Зашифрованные заметки, маршрутизация вызовов в реальном времени и архитектура нулевого знания \u2014 чтобы конфиденциальные разговоры оставались приватными.',
-      cta: 'Начать',
-      ctaSecondary: 'Прочитать модель безопасности',
+      cta: 'Скачать',
+      ctaSecondary: 'Начать',
     },
     features: {
       heading: 'Создано для реагирования на кризисы',
@@ -339,7 +339,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: 'Более 12 встроенных языков', description: 'Полные переводы интерфейса: английский, испанский, китайский, тагальский, вьетнамский, арабский, французский, гаитянский креольский, корейский, русский, хинди и португальский.' },
         { icon: '\u{1F399}', title: 'ИИ-транскрипция', description: 'Транскрипция звонков на базе Whisper со сквозным шифрованием. Администратор и волонтёр могут переключать независимо.' },
         { icon: '\u{1F6E1}', title: 'Защита от спама', description: 'Голосовая CAPTCHA, ограничение частоты и списки блокировки в реальном времени. Администраторы переключают защиту без перезапуска.' },
-        { icon: '\u{1F4F1}', title: 'PWA с приоритетом мобильных', description: 'Работает на любом устройстве. Устанавливается как приложение. Push-уведомления о входящих звонках.' },
+        { icon: '\u{1F5A5}', title: 'Настольное приложение', description: 'Нативное приложение для Windows, macOS и Linux. Безопасное хранилище ключей, автообновления и интеграция с системным треем. Мобильное приложение скоро.' },
       ],
     },
     security: {
@@ -360,8 +360,8 @@ export const home: Record<string, {
       title: 'सुरक्षित संकट हॉटलाइन',
       titleAccent: 'उन लोगों के लिए जिन्हें इसकी ज़रूरत है',
       description: 'Llámenos एक ओपन-सोर्स हॉटलाइन सॉफ़्टवेयर है जो कॉल करने वालों और स्वयंसेवकों की रक्षा करता है। एन्क्रिप्टेड नोट्स, रियल-टाइम कॉल रूटिंग, और ज़ीरो-नॉलेज आर्किटेक्चर \u2014 ताकि संवेदनशील बातचीत निजी बनी रहे।',
-      cta: 'शुरू करें',
-      ctaSecondary: 'सुरक्षा मॉडल पढ़ें',
+      cta: 'डाउनलोड',
+      ctaSecondary: 'शुरू करें',
     },
     features: {
       heading: 'संकट प्रतिक्रिया के लिए निर्मित',
@@ -372,7 +372,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: '12+ भाषाएँ बिल्ट-इन', description: 'अंग्रेज़ी, स्पेनिश, चीनी, तागालोग, वियतनामी, अरबी, फ़्रेंच, हैतियन क्रियोल, कोरियाई, रूसी, हिंदी और पुर्तगाली के लिए पूर्ण UI अनुवाद।' },
         { icon: '\u{1F399}', title: 'AI ट्रांसक्रिप्शन', description: 'Whisper-संचालित कॉल ट्रांसक्रिप्शन, एंड-टू-एंड एन्क्रिप्शन के साथ। एडमिन और स्वयंसेवक स्वतंत्र रूप से टॉगल कर सकते हैं।' },
         { icon: '\u{1F6E1}', title: 'स्पैम सुरक्षा', description: 'वॉइस CAPTCHA, रेट लिमिटिंग, और रियल-टाइम बैन लिस्ट। एडमिन बिना रीस्टार्ट किए सुरक्षा टॉगल करते हैं।' },
-        { icon: '\u{1F4F1}', title: 'मोबाइल-फ़र्स्ट PWA', description: 'किसी भी डिवाइस पर काम करता है। ऐप के रूप में इंस्टॉल करने योग्य। आने वाली कॉल के लिए पुश नोटिफ़िकेशन।' },
+        { icon: '\u{1F5A5}', title: 'डेस्कटॉप ऐप', description: 'Windows, macOS और Linux के लिए नेटिव डेस्कटॉप ऐप। सुरक्षित कुंजी भंडारण, स्वचालित अपडेट और सिस्टम ट्रे एकीकरण। मोबाइल ऐप जल्द आ रहा है।' },
       ],
     },
     security: {
@@ -393,8 +393,8 @@ export const home: Record<string, {
       title: 'Linha de crise segura',
       titleAccent: 'para quem precisa',
       description: 'O Llámenos é um software de linha de ajuda de código aberto que protege quem liga e voluntários. Notas criptografadas, roteamento de chamadas em tempo real e arquitetura de conhecimento zero \u2014 para que conversas sensíveis permaneçam privadas.',
-      cta: 'Começar',
-      ctaSecondary: 'Ler o modelo de segurança',
+      cta: 'Baixar',
+      ctaSecondary: 'Começar',
     },
     features: {
       heading: 'Construído para resposta a crises',
@@ -405,7 +405,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: 'Mais de 12 idiomas integrados', description: 'Traduções completas da interface para inglês, espanhol, chinês, tagalo, vietnamita, árabe, francês, crioulo haitiano, coreano, russo, hindi e português.' },
         { icon: '\u{1F399}', title: 'Transcrição com IA', description: 'Transcrição de chamadas com Whisper e criptografia de ponta a ponta. Administrador e voluntário podem alternar independentemente.' },
         { icon: '\u{1F6E1}', title: 'Proteção contra spam', description: 'CAPTCHA de voz, limitação de taxa e listas de bloqueio em tempo real. Administradores alternam proteções sem reiniciar.' },
-        { icon: '\u{1F4F1}', title: 'PWA mobile first', description: 'Funciona em qualquer dispositivo. Instalável como aplicativo. Notificações push para chamadas recebidas.' },
+        { icon: '\u{1F5A5}', title: 'Aplicativo de desktop', description: 'Aplicativo nativo para Windows, macOS e Linux. Armazenamento seguro de chaves, atualizações automáticas e integração com a bandeja do sistema. Aplicativo móvel em breve.' },
       ],
     },
     security: {
@@ -426,8 +426,8 @@ export const home: Record<string, {
       title: 'Sichere Krisenhotline',
       titleAccent: 'für die Menschen, die sie brauchen',
       description: 'Llámenos ist eine Open-Source-Hotline-Software, die Anrufer und Freiwillige schützt. Verschlüsselte Notizen, Echtzeit-Anrufweiterleitung und eine Zero-Knowledge-Architektur \u2014 damit sensible Gespräche privat bleiben.',
-      cta: 'Erste Schritte',
-      ctaSecondary: 'Sicherheitsmodell lesen',
+      cta: 'Herunterladen',
+      ctaSecondary: 'Erste Schritte',
     },
     features: {
       heading: 'Für Krisenreaktion entwickelt',
@@ -438,7 +438,7 @@ export const home: Record<string, {
         { icon: '\u{1F30D}', title: 'Über 12 integrierte Sprachen', description: 'Vollständige UI-Übersetzungen für Englisch, Spanisch, Chinesisch, Tagalog, Vietnamesisch, Arabisch, Französisch, Haitianisches Kreol, Koreanisch, Russisch, Hindi und Portugiesisch.' },
         { icon: '\u{1F399}', title: 'KI-Transkription', description: 'Whisper-basierte Anruftranskription mit Ende-zu-Ende-Verschlüsselung. Administrator und Freiwillige können unabhängig umschalten.' },
         { icon: '\u{1F6E1}', title: 'Spam-Schutz', description: 'Sprach-CAPTCHA, Ratenbegrenzung und Echtzeit-Sperrlisten. Administratoren schalten Schutzmaßnahmen ohne Neustart um.' },
-        { icon: '\u{1F4F1}', title: 'Mobile-first PWA', description: 'Funktioniert auf jedem Gerät. Als App installierbar. Push-Benachrichtigungen für eingehende Anrufe.' },
+        { icon: '\u{1F5A5}', title: 'Desktop-App', description: 'Native Desktop-App für Windows, macOS und Linux. Sichere Schlüsselspeicherung, automatische Updates und Systemtray-Integration. Mobile App kommt bald.' },
       ],
     },
     security: {

@@ -1,5 +1,5 @@
 export const common: Record<string, {
-  nav: { features: string; security: string; docs: string; github: string };
+  nav: { features: string; security: string; download: string; docs: string; github: string };
   footer: {
     projectHeading: string;
     docsHeading: string;
@@ -40,7 +40,7 @@ export const common: Record<string, {
   languageSwitcher: string;
 }> = {
   en: {
-    nav: { features: 'Features', security: 'Security', docs: 'Docs', github: 'GitHub' },
+    nav: { features: 'Features', security: 'Security', download: 'Download', docs: 'Docs', github: 'GitHub' },
     footer: {
       projectHeading: 'Project',
       docsHeading: 'Documentation',
@@ -81,7 +81,7 @@ export const common: Record<string, {
     languageSwitcher: 'Language',
   },
   es: {
-    nav: { features: 'Funciones', security: 'Seguridad', docs: 'Documentación', github: 'GitHub' },
+    nav: { features: 'Funciones', security: 'Seguridad', download: 'Descargar', docs: 'Documentación', github: 'GitHub' },
     footer: {
       projectHeading: 'Proyecto',
       docsHeading: 'Documentación',
@@ -122,7 +122,7 @@ export const common: Record<string, {
     languageSwitcher: 'Idioma',
   },
   zh: {
-    nav: { features: '功能', security: '安全', docs: '文档', github: 'GitHub' },
+    nav: { features: '功能', security: '安全', download: '下载', docs: '文档', github: 'GitHub' },
     footer: {
       projectHeading: '项目',
       docsHeading: '文档',
@@ -163,7 +163,7 @@ export const common: Record<string, {
     languageSwitcher: '语言',
   },
   tl: {
-    nav: { features: 'Mga Tampok', security: 'Seguridad', docs: 'Dokumentasyon', github: 'GitHub' },
+    nav: { features: 'Mga Tampok', security: 'Seguridad', download: 'I-download', docs: 'Dokumentasyon', github: 'GitHub' },
     footer: {
       projectHeading: 'Proyekto',
       docsHeading: 'Dokumentasyon',
@@ -204,7 +204,7 @@ export const common: Record<string, {
     languageSwitcher: 'Wika',
   },
   vi: {
-    nav: { features: 'Tính năng', security: 'Bảo mật', docs: 'Tài liệu', github: 'GitHub' },
+    nav: { features: 'Tính năng', security: 'Bảo mật', download: 'Tải xuống', docs: 'Tài liệu', github: 'GitHub' },
     footer: {
       projectHeading: 'Dự án',
       docsHeading: 'Tài liệu',
@@ -245,7 +245,7 @@ export const common: Record<string, {
     languageSwitcher: 'Ngôn ngữ',
   },
   ar: {
-    nav: { features: 'الميزات', security: 'الأمان', docs: 'التوثيق', github: 'GitHub' },
+    nav: { features: 'الميزات', security: 'الأمان', download: 'تحميل', docs: 'التوثيق', github: 'GitHub' },
     footer: {
       projectHeading: 'المشروع',
       docsHeading: 'التوثيق',
@@ -286,7 +286,7 @@ export const common: Record<string, {
     languageSwitcher: 'اللغة',
   },
   fr: {
-    nav: { features: 'Fonctionnalités', security: 'Sécurité', docs: 'Documentation', github: 'GitHub' },
+    nav: { features: 'Fonctionnalités', security: 'Sécurité', download: 'Télécharger', docs: 'Documentation', github: 'GitHub' },
     footer: {
       projectHeading: 'Projet',
       docsHeading: 'Documentation',
@@ -327,7 +327,7 @@ export const common: Record<string, {
     languageSwitcher: 'Langue',
   },
   ht: {
-    nav: { features: 'Karakteristik', security: 'Sekirite', docs: 'Dokimantasyon', github: 'GitHub' },
+    nav: { features: 'Karakteristik', security: 'Sekirite', download: 'Telechaje', docs: 'Dokimantasyon', github: 'GitHub' },
     footer: {
       projectHeading: 'Pwojè',
       docsHeading: 'Dokimantasyon',
@@ -368,7 +368,7 @@ export const common: Record<string, {
     languageSwitcher: 'Lang',
   },
   ko: {
-    nav: { features: '기능', security: '보안', docs: '문서', github: 'GitHub' },
+    nav: { features: '기능', security: '보안', download: '다운로드', docs: '문서', github: 'GitHub' },
     footer: {
       projectHeading: '프로젝트',
       docsHeading: '문서',
@@ -409,7 +409,7 @@ export const common: Record<string, {
     languageSwitcher: '언어',
   },
   ru: {
-    nav: { features: 'Возможности', security: 'Безопасность', docs: 'Документация', github: 'GitHub' },
+    nav: { features: 'Возможности', security: 'Безопасность', download: 'Скачать', docs: 'Документация', github: 'GitHub' },
     footer: {
       projectHeading: 'Проект',
       docsHeading: 'Документация',
@@ -450,7 +450,7 @@ export const common: Record<string, {
     languageSwitcher: 'Язык',
   },
   hi: {
-    nav: { features: 'सुविधाएँ', security: 'सुरक्षा', docs: 'दस्तावेज़', github: 'GitHub' },
+    nav: { features: 'सुविधाएँ', security: 'सुरक्षा', download: 'डाउनलोड', docs: 'दस्तावेज़', github: 'GitHub' },
     footer: {
       projectHeading: 'परियोजना',
       docsHeading: 'दस्तावेज़',
@@ -491,7 +491,7 @@ export const common: Record<string, {
     languageSwitcher: 'भाषा',
   },
   pt: {
-    nav: { features: 'Recursos', security: 'Segurança', docs: 'Documentação', github: 'GitHub' },
+    nav: { features: 'Recursos', security: 'Segurança', download: 'Baixar', docs: 'Documentação', github: 'GitHub' },
     footer: {
       projectHeading: 'Projeto',
       docsHeading: 'Documentação',
@@ -532,7 +532,7 @@ export const common: Record<string, {
     languageSwitcher: 'Idioma',
   },
   de: {
-    nav: { features: 'Funktionen', security: 'Sicherheit', docs: 'Dokumentation', github: 'GitHub' },
+    nav: { features: 'Funktionen', security: 'Sicherheit', download: 'Herunterladen', docs: 'Dokumentation', github: 'GitHub' },
     footer: {
       projectHeading: 'Projekt',
       docsHeading: 'Dokumentation',

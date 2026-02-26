@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Hotline
+Comment=Secure crisis response hotline
+GenericName=Crisis Hotline
+Exec=llamenos-desktop
+Icon=org.llamenos.Hotline
+Terminal=false
+Type=Application
+Categories=Network;Communication;Security;
+Keywords=crisis;hotline;encrypted;volunteer;
+StartupWMClass=org.llamenos.hotline
+StartupNotify=true

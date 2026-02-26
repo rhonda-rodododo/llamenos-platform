@@ -6,7 +6,7 @@ use crate::crypto::CryptoState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_stronghold::Builder::new(|password| {
                 // PBKDF2-SHA256 with 600K iterations — matches web app's key derivation.
@@ -36,8 +36,13 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_log::Builder::new().build())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_process::init());
+
+    // Updater disabled for Flatpak builds (Flatpak has its own update mechanism)
+    #[cfg(feature = "updater")]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+    builder
         // Register CryptoState as managed state
         .manage(CryptoState::new())
         .setup(|app| {

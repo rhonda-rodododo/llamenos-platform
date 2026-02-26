@@ -1,16 +1,16 @@
 # CI workflow for desktop (Tauri) release builds.
-# Builds signed desktop apps for macOS, Windows, and Linux.
+# Builds signed desktop apps for macOS, Windows, and Linux (AppImage, deb, Flatpak).
 # Generates latest.json manifest for auto-updater.
 #
-# Trigger: push to tags matching release/desktop-v* or manual dispatch.
-# Epic 87: Desktop Auto-Updater & Distribution.
+# Trigger: push to tags matching v* or manual dispatch.
+# Epics 87, 97: Desktop Auto-Updater & Release Pipeline.
 
 name: Desktop Release
 
 on:
   push:
     tags:
-      - 'release/desktop-v*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -91,6 +91,33 @@ jobs:
           repository: rhonda-rodododo/llamenos-core
           path: ../llamenos-core
 
+      # Sync version from tag into tauri.conf.json and package.json
+      - name: Sync version from tag
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "Building version: ${VERSION}"
+
+          # Update tauri.conf.json
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf-8'));
+            conf.version = '${VERSION}';
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          "
+
+          # Update package.json (for Vite build metadata)
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+            pkg.version = '${VERSION}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
       # macOS code signing
       - name: Setup macOS signing
         if: matrix.platform == 'macos-latest'
@@ -142,10 +169,44 @@ jobs:
             src-tauri/target/**/release/bundle/**/*.deb
           retention-days: 5
 
+  # ─── Flatpak Build ────────────────────────────────────────────
+  build-flatpak:
+    runs-on: ubuntu-latest
+    name: Build (Flatpak)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Checkout llamenos-core
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: rhonda-rodododo/llamenos-core
+          path: ../llamenos-core
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: llamenos-hotline.flatpak
+          manifest-path: flatpak/org.llamenos.Hotline.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Upload Flatpak bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tauri-Flatpak
+          path: llamenos-hotline.flatpak
+          retention-days: 5
+
+  # ─── Publish Release ──────────────────────────────────────────
   release:
-    needs: build
+    needs: [build, build-flatpak]
     runs-on: ubuntu-latest
     name: Publish Release
+
+    # Run even if Flatpak fails (it's a new build target, may have issues)
+    if: always() && needs.build.result == 'success'
+
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -163,7 +224,7 @@ jobs:
       - name: Flatten artifact structure
         run: |
           mkdir -p flat-artifacts
-          find artifacts -type f \( -name '*.tar.gz' -o -name '*.tar.gz.sig' -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' -o -name '*.AppImage' -o -name '*.AppImage.sig' -o -name '*.dmg' -o -name '*.deb' \) -exec cp {} flat-artifacts/ \;
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.tar.gz.sig' -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' -o -name '*.AppImage' -o -name '*.AppImage.sig' -o -name '*.dmg' -o -name '*.deb' -o -name '*.flatpak' \) -exec cp {} flat-artifacts/ \;
           ls -la flat-artifacts/
 
       # Generate update manifest
@@ -179,20 +240,30 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            VERSION="${GITHUB_REF_NAME#release/desktop-v}"
+            VERSION="${GITHUB_REF_NAME#v}"
             echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           fi
 
-      # Create GitHub Release
-      - name: Create Release
+      # Create GitHub Release (or add to existing release from ci.yml)
+      - name: Upload desktop artifacts to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          TAG="v${VERSION}"
 
-          # Upload all artifacts + manifest to release
-          gh release create "v${VERSION}" \
-            --title "Desktop v${VERSION}" \
-            --generate-notes \
-            flat-artifacts/* \
-            latest.json
+          # Check if release already exists (created by ci.yml)
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
+            echo "Release ${TAG} exists — uploading desktop artifacts..."
+            gh release upload "${TAG}" \
+              flat-artifacts/* \
+              latest.json \
+              --clobber
+          else
+            echo "Creating new release ${TAG}..."
+            gh release create "${TAG}" \
+              --title "v${VERSION}" \
+              --generate-notes \
+              flat-artifacts/* \
+              latest.json
+          fi

@@ -211,6 +211,12 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 88: Desktop & Mobile E2E Tests](epics/epic-88-platform-e2e-tests.md)** — WebdriverIO + tauri-driver for desktop, Detox for mobile, CI integration
 - [x] **[Epic 90: UniFFI Bindings for llamenos-core](epics/epic-90-uniffi-bindings.md)** — `#[uniffi::export]` annotations, Swift/Kotlin bindings, React Native native module, mobile crypto migration from JS to Rust
 
+## Release Pipeline & Distribution (Epics 96–99) — COMPLETE
+- [x] **[Epic 96: llamenos-core CI/CD Pipeline](epics/epic-96-core-ci.md)** — cargo test + clippy on every push/PR, tagged releases with native libs + WASM + UniFFI bindings
+- [x] **[Epic 97: Desktop Release Pipeline](epics/epic-97-desktop-release.md)** — tauri-release.yml on v* tags, Flatpak build, updater feature flag, version sync from tag
+- [x] **[Epic 98: Download Experience](epics/epic-98-download-experience.md)** — /download page with OS detection, platform cards, i18n (13 langs), hero CTA update
+- [x] **[Epic 99: Human Setup Guide](epics/epic-99-human-setup.md)** — HUMAN_INSTRUCTIONS.md with signing keys, certificates, secrets checklist
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)

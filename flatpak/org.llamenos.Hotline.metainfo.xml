@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.llamenos.Hotline</id>
+  <name>Hotline</name>
+  <summary>Secure crisis response hotline</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+
+  <description>
+    <p>
+      Llámenos is open-source hotline software that protects callers and volunteers.
+      Encrypted notes, real-time call routing, and a zero-knowledge architecture —
+      so sensitive conversations stay private.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>End-to-end encrypted call notes with per-note forward secrecy</li>
+      <li>Parallel call ringing for all on-shift volunteers</li>
+      <li>12+ languages built in</li>
+      <li>AI transcription with Whisper (client-side, encrypted)</li>
+      <li>Spam mitigation: voice CAPTCHA, rate limiting, ban lists</li>
+      <li>Multi-channel messaging: SMS, WhatsApp, Signal</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">org.llamenos.Hotline.desktop</launchable>
+
+  <url type="homepage">https://llamenos.org</url>
+  <url type="bugtracker">https://github.com/rhonda-rodododo/llamenos/issues</url>
+  <url type="vcs-browser">https://github.com/rhonda-rodododo/llamenos</url>
+
+  <developer id="org.llamenos">
+    <name>Llámenos Contributors</name>
+  </developer>
+
+  <branding>
+    <color type="primary" scheme_preference="dark">#0a1628</color>
+    <color type="primary" scheme_preference="light">#51afae</color>
+  </branding>
+
+  <content_rating type="oars-1.1" />
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Dashboard showing active calls and shift status</caption>
+      <image>https://llamenos.org/screenshots/dashboard-desktop.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Encrypted call notes with custom fields</caption>
+      <image>https://llamenos.org/screenshots/notes-desktop.png</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="0.18.0" date="2026-02-26">
+      <description>
+        <p>Initial Flatpak release — desktop-only architecture with native Rust crypto.</p>
+      </description>
+    </release>
+  </releases>
+
+  <requires>
+    <display_length compare="ge">800</display_length>
+  </requires>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+</component>

@@ -1,0 +1,92 @@
+# Flatpak manifest for Llámenos Hotline desktop app.
+#
+# Build with: flatpak-builder --install --user build-dir org.llamenos.Hotline.yml
+# Or via CI: flatpak/flatpak-github-actions/flatpak-builder
+#
+# The updater feature is disabled — Flatpak has its own update mechanism.
+#
+# Epic 97: Desktop Release Pipeline.
+
+id: org.llamenos.Hotline
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node20
+
+command: llamenos-desktop
+
+finish-args:
+  # Wayland + X11 display
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # Network access (API + relay connections)
+  - --share=network
+  # Desktop notifications
+  - --talk-name=org.freedesktop.Notifications
+  # System tray (AppIndicator)
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Audio (for call transcription via WebRTC)
+  - --socket=pulseaudio
+  # File access for data export
+  - --filesystem=xdg-download:create
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+  env:
+    CARGO_HOME: /run/build/llamenos-desktop/cargo
+    npm_config_nodedir: /usr/lib/sdk/node20
+
+modules:
+  # llamenos-core sibling crate (needed as path dependency)
+  - name: llamenos-core
+    buildsystem: simple
+    build-commands:
+      - cp -r . /run/build/llamenos-core
+    sources:
+      - type: git
+        url: https://github.com/rhonda-rodododo/llamenos-core.git
+        branch: main
+
+  # Main desktop application
+  - name: llamenos-desktop
+    buildsystem: simple
+    build-commands:
+      # Symlink llamenos-core as sibling (Cargo.toml expects ../../llamenos-core)
+      - ln -sf /run/build/llamenos-core ../llamenos-core
+
+      # Install Node.js dependencies (offline from generated sources)
+      - npm ci --offline
+
+      # Build Vite frontend
+      - npx vite build
+
+      # Build Tauri backend without updater (Flatpak manages updates)
+      - cd src-tauri && cargo build --release --no-default-features --features custom-protocol
+
+      # Install binary
+      - install -Dm755 src-tauri/target/release/llamenos-desktop /app/bin/llamenos-desktop
+
+      # Install frontend assets
+      - mkdir -p /app/share/llamenos/frontend
+      - cp -r dist/client/* /app/share/llamenos/frontend/
+
+      # Install icons
+      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.llamenos.Hotline.png
+      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/org.llamenos.Hotline.png
+
+      # Install desktop entry and metainfo
+      - install -Dm644 flatpak/org.llamenos.Hotline.desktop /app/share/applications/org.llamenos.Hotline.desktop
+      - install -Dm644 flatpak/org.llamenos.Hotline.metainfo.xml /app/share/metainfo/org.llamenos.Hotline.metainfo.xml
+
+    sources:
+      - type: dir
+        path: ..
+      # Offline Rust dependencies (generate with flatpak-cargo-generator.py)
+      # - type: file
+      #   path: cargo-sources.json
+      # Offline Node dependencies (generate with flatpak-node-generator)
+      # - type: file
+      #   path: node-sources.json

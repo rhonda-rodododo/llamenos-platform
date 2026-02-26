@@ -1,0 +1,210 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { type Lang, nonDefaultLocales } from '../../i18n/config';
+import { getTranslation } from '../../i18n/utils';
+import { download } from '../../i18n/translations/download';
+
+export function getStaticPaths() {
+  return nonDefaultLocales.map(lang => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getTranslation(download, lang);
+
+const REPO = 'rhonda-rodododo/llamenos';
+const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+const LATEST_JSON = `${RELEASES_URL}/download/latest.json`;
+---
+
+<BaseLayout title={t.title} description={t.subtitle} lang={lang}>
+  <section class="pt-32 pb-20 md:pt-40">
+    <div class="mx-auto max-w-6xl px-6">
+      <!-- Header -->
+      <div class="max-w-2xl mb-16">
+        <h1 class="text-3xl font-bold tracking-tight text-fg sm:text-4xl lg:text-5xl">{t.title}</h1>
+        <p class="mt-4 text-lg text-fg-muted leading-relaxed">{t.subtitle}</p>
+      </div>
+
+      <!-- Recommended platform (detected via JS) -->
+      <div id="recommended-section" class="hidden mb-12">
+        <h2 class="text-sm font-medium text-accent-bright uppercase tracking-wider mb-4">{t.recommended}</h2>
+        <div id="recommended-card" class="rounded-2xl border border-accent/30 bg-accent/5 p-6 flex items-center justify-between gap-6">
+          <div>
+            <h3 id="recommended-name" class="text-xl font-semibold text-fg"></h3>
+            <p id="recommended-desc" class="text-fg-muted text-sm mt-1"></p>
+          </div>
+          <a id="recommended-link" href="#" class="shrink-0 inline-flex items-center justify-center rounded-lg bg-accent px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-bright">
+            Download
+          </a>
+        </div>
+      </div>
+
+      <!-- All platforms grid -->
+      <h2 class="text-sm font-medium text-fg-muted uppercase tracking-wider mb-6">{t.allPlatforms}</h2>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-16">
+        <!-- Windows -->
+        <div class="rounded-xl border border-border bg-bg-card p-5 flex flex-col" data-platform="windows">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="h-8 w-8 text-fg-muted" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+            <div>
+              <h3 class="font-semibold text-fg">{t.platforms.windows.name}</h3>
+              <p class="text-xs text-fg-muted">{t.platforms.windows.description}</p>
+            </div>
+          </div>
+          <a id="dl-windows" href={RELEASES_URL} class="mt-auto inline-flex items-center justify-center rounded-lg border border-border bg-bg-soft px-4 py-2 text-sm font-medium text-fg transition-colors hover:bg-bg-card">
+            Download .exe
+          </a>
+        </div>
+
+        <!-- macOS -->
+        <div class="rounded-xl border border-border bg-bg-card p-5 flex flex-col" data-platform="macos">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="h-8 w-8 text-fg-muted" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            <div>
+              <h3 class="font-semibold text-fg">{t.platforms.macos.name}</h3>
+              <p class="text-xs text-fg-muted">{t.platforms.macos.description}</p>
+            </div>
+          </div>
+          <a id="dl-macos" href={RELEASES_URL} class="mt-auto inline-flex items-center justify-center rounded-lg border border-border bg-bg-soft px-4 py-2 text-sm font-medium text-fg transition-colors hover:bg-bg-card">
+            Download .dmg
+          </a>
+        </div>
+
+        <!-- Linux AppImage -->
+        <div class="rounded-xl border border-border bg-bg-card p-5 flex flex-col" data-platform="linux-appimage">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="h-8 w-8 text-fg-muted" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.368 1.884 1.368.39 0 .739-.134 1.107-.465 1.196-.676 1.167-1.677.745-2.553-.224-.47-.396-.845-.406-1.081-.018-.291.05-.527.136-.822.04-.099.094-.196.149-.295l.048-.09c.326-.652.478-1.202.39-1.75a1.6 1.6 0 00-.093-.286c.146-.234.308-.47.479-.744.574-.87 1.07-2.105 1.182-3.67.042-.533.006-1.071-.094-1.581 0-.006-.001-.012-.001-.018-.005-.032-.012-.065-.02-.099a3.97 3.97 0 00-.12-.505c-.29-.984-.78-1.84-1.35-2.526-.57-.685-1.22-1.2-1.82-1.487-.6-.29-1.18-.395-1.58-.395h-.046c-.576.016-.755.093-1.04.272-.33-.036-.66-.048-.99-.036z"/></svg>
+            <div>
+              <h3 class="font-semibold text-fg">{t.platforms.linuxAppImage.name}</h3>
+              <p class="text-xs text-fg-muted">{t.platforms.linuxAppImage.description}</p>
+            </div>
+          </div>
+          <a id="dl-linux-appimage" href={RELEASES_URL} class="mt-auto inline-flex items-center justify-center rounded-lg border border-border bg-bg-soft px-4 py-2 text-sm font-medium text-fg transition-colors hover:bg-bg-card">
+            Download .AppImage
+          </a>
+        </div>
+
+        <!-- Linux .deb -->
+        <div class="rounded-xl border border-border bg-bg-card p-5 flex flex-col" data-platform="linux-deb">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="h-8 w-8 text-fg-muted" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.368 1.884 1.368.39 0 .739-.134 1.107-.465 1.196-.676 1.167-1.677.745-2.553-.224-.47-.396-.845-.406-1.081-.018-.291.05-.527.136-.822.04-.099.094-.196.149-.295l.048-.09c.326-.652.478-1.202.39-1.75a1.6 1.6 0 00-.093-.286c.146-.234.308-.47.479-.744.574-.87 1.07-2.105 1.182-3.67.042-.533.006-1.071-.094-1.581 0-.006-.001-.012-.001-.018-.005-.032-.012-.065-.02-.099a3.97 3.97 0 00-.12-.505c-.29-.984-.78-1.84-1.35-2.526-.57-.685-1.22-1.2-1.82-1.487-.6-.29-1.18-.395-1.58-.395h-.046c-.576.016-.755.093-1.04.272-.33-.036-.66-.048-.99-.036z"/></svg>
+            <div>
+              <h3 class="font-semibold text-fg">{t.platforms.linuxDeb.name}</h3>
+              <p class="text-xs text-fg-muted">{t.platforms.linuxDeb.description}</p>
+            </div>
+          </div>
+          <a id="dl-linux-deb" href={RELEASES_URL} class="mt-auto inline-flex items-center justify-center rounded-lg border border-border bg-bg-soft px-4 py-2 text-sm font-medium text-fg transition-colors hover:bg-bg-card">
+            Download .deb
+          </a>
+        </div>
+
+        <!-- Linux Flatpak -->
+        <div class="rounded-xl border border-border bg-bg-card p-5 flex flex-col" data-platform="linux-flatpak">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="h-8 w-8 text-fg-muted" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <div>
+              <h3 class="font-semibold text-fg">{t.platforms.linuxFlatpak.name}</h3>
+              <p class="text-xs text-fg-muted">{t.platforms.linuxFlatpak.description}</p>
+            </div>
+          </div>
+          <a id="dl-linux-flatpak" href={RELEASES_URL} class="mt-auto inline-flex items-center justify-center rounded-lg border border-border bg-bg-soft px-4 py-2 text-sm font-medium text-fg transition-colors hover:bg-bg-card">
+            Download .flatpak
+          </a>
+        </div>
+
+        <!-- Mobile (coming soon) -->
+        <div class="rounded-xl border border-border/50 bg-bg-card/50 p-5 flex flex-col opacity-60">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="h-8 w-8 text-fg-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            <div>
+              <h3 class="font-semibold text-fg">{t.platforms.mobile.name}</h3>
+              <p class="text-xs text-fg-muted">{t.platforms.mobile.description}</p>
+            </div>
+          </div>
+          <span class="mt-auto inline-flex items-center justify-center rounded-lg border border-border/50 bg-bg-soft/50 px-4 py-2 text-sm font-medium text-fg-muted cursor-default">
+            Coming soon
+          </span>
+        </div>
+      </div>
+
+      <!-- System requirements -->
+      <div class="rounded-xl border border-border bg-bg-card p-6 max-w-2xl">
+        <h3 class="font-semibold text-fg mb-3">{t.systemReqs}</h3>
+        <ul class="space-y-2 text-sm text-fg-muted">
+          {t.reqItems.map(item => (
+            <li class="flex items-start gap-2">
+              <svg class="h-4 w-4 text-accent mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <!-- Links -->
+      <div class="flex flex-wrap gap-6 mt-8 text-sm">
+        <a href={RELEASES_URL} class="text-accent-bright hover:text-accent transition-colors" target="_blank" rel="noopener noreferrer">
+          {t.releaseNotes} &rarr;
+        </a>
+        <a href={`${RELEASES_URL}/download/CHECKSUMS.txt`} class="text-accent-bright hover:text-accent transition-colors" target="_blank" rel="noopener noreferrer">
+          {t.checksum} &rarr;
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<script define:vars={{ LATEST_JSON }}>
+  const ua = navigator.userAgent.toLowerCase();
+  let detectedOS = 'linux';
+  if (ua.includes('win')) detectedOS = 'windows';
+  else if (ua.includes('mac')) detectedOS = 'macos';
+
+  const section = document.getElementById('recommended-section');
+  const nameEl = document.getElementById('recommended-name');
+  const descEl = document.getElementById('recommended-desc');
+  const linkEl = document.getElementById('recommended-link');
+
+  const cards = document.querySelectorAll('[data-platform]');
+  cards.forEach(card => {
+    if (card.dataset.platform === detectedOS ||
+        (detectedOS === 'linux' && card.dataset.platform === 'linux-appimage')) {
+      card.classList.add('ring-1', 'ring-accent/30');
+    }
+  });
+
+  fetch(LATEST_JSON)
+    .then(r => r.ok ? r.json() : Promise.reject('No releases'))
+    .then(data => {
+      const version = data.version;
+      const platformMap = {
+        'windows': { jsonKey: 'windows-x86_64', btn: 'dl-windows' },
+        'macos': { jsonKey: 'darwin-universal', btn: 'dl-macos', fallbackKey: 'darwin-x86_64' },
+        'linux-appimage': { jsonKey: 'linux-x86_64', btn: 'dl-linux-appimage' },
+      };
+
+      for (const [, info] of Object.entries(platformMap)) {
+        const platformData = data.platforms[info.jsonKey] || (info.fallbackKey && data.platforms[info.fallbackKey]);
+        if (platformData?.url) {
+          const btn = document.getElementById(info.btn);
+          if (btn) btn.href = platformData.url;
+        }
+      }
+
+      if (section && nameEl && descEl && linkEl) {
+        const recMap = {
+          windows: { name: 'Windows', desc: `v${version}`, key: 'windows-x86_64' },
+          macos: { name: 'macOS', desc: `v${version}`, key: 'darwin-universal', fallback: 'darwin-x86_64' },
+          linux: { name: 'Linux AppImage', desc: `v${version}`, key: 'linux-x86_64' },
+        };
+        const rec = recMap[detectedOS];
+        if (rec) {
+          const platformData = data.platforms[rec.key] || (rec.fallback && data.platforms[rec.fallback]);
+          nameEl.textContent = rec.name;
+          descEl.textContent = rec.desc;
+          if (platformData?.url) linkEl.href = platformData.url;
+          section.classList.remove('hidden');
+        }
+      }
+    })
+    .catch(() => {});
+</script>
