@@ -16,6 +16,7 @@ import { LogoMark } from '@/components/logo-mark'
 import { DemoBanner } from '@/components/demo-banner'
 import { NotificationPromptBanner } from '@/components/notification-prompt-banner'
 import { PwaInstallBanner } from '@/components/pwa-install-banner'
+import { UpdateChecker } from '@/components/UpdateChecker'
 import { PanicWipeIndicator } from '@/components/panic-wipe-indicator'
 import { HubSwitcher } from '@/components/hub-switcher'
 import {
@@ -365,6 +366,7 @@ function AuthenticatedLayout() {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {demoMode && <DemoBanner />}
+        <UpdateChecker />
         <NotificationPromptBanner />
         <PwaInstallBanner />
 

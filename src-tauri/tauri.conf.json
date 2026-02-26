@@ -54,7 +54,15 @@
     ],
     "category": "Utility",
     "shortDescription": "Secure crisis response hotline",
-    "longDescription": "Secure, privacy-preserving crisis response hotline with end-to-end encryption"
+    "longDescription": "Secure, privacy-preserving crisis response hotline with end-to-end encryption",
+    "createUpdaterArtifacts": true
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/rhonda-rodododo/llamenos/releases/latest/download/latest.json"
+      ]
+    }
+  }
 }
