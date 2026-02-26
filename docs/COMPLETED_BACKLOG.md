@@ -1,5 +1,74 @@
 # Completed Backlog
 
+## 2026-02-25: Documentation Overhaul (`next` branch)
+
+### ZK Architecture Documentation
+- [x] Security docs: THREAT_MODEL (Nostr relay trust, audit log tamper detection, admin key separation, hub key compromise, reproducible builds, client-side transcription), DEPLOYMENT_HARDENING (Caddy ingress, strfry operations, build verification), KEY_REVOCATION_RUNBOOK (verification checklists, CLI rotation), DATA_CLASSIFICATION (E2EE messaging, hash-chained audit, encrypted shifts), security/README (E2EE at rest for messages, additional security features table)
+- [x] Architecture docs: E2EE_ARCHITECTURE (implemented status, past-tense history, resolved questions), llamenos-protocol (NIP-42 auth, envelope encryption, all 25 crypto labels, hub event encryption, audit integrity)
+- [x] New docs: RELAY_OPERATIONS.md (strfry/Nosflare deployment, hardening, monitoring, backup, troubleshooting), REPRODUCIBLE_BUILDS.md (trust model, verification, scope, CI, SLSA)
+- [x] Deployment docs: QUICKSTART (relay setup, test checklist), RUNBOOK (relay troubleshooting, server Nostr secret rotation, relay monitoring/backup, scaling), Helm values.yaml (Caddy ingress, serverNostrSecret)
+- [x] Project docs: CLAUDE.md (ZK patterns, gotchas, directory structure)
+
+## 2026-02-25: Zero-Knowledge Architecture (`next` branch)
+
+### Epic 76.0: Security Foundations
+- [x] Created `@shared/crypto-labels.ts` — authoritative domain separation constants for all crypto operations
+- [x] Refactored all hardcoded label strings in client and server crypto modules
+- [x] Fixed device provisioning SAS verification
+- [x] Generic backup file format
+
+### Epic 76.1: Worker-Relay Communication
+- [x] `NostrPublisher` interface with CF (DO service binding) and Node.js (persistent WebSocket) implementations
+- [x] Server keypair derivation from `SERVER_NOSTR_SECRET` env var
+- [x] Nosflare service binding in wrangler.jsonc
+- [x] strfry in docker-compose.yml for Node.js path
+
+### Epic 76.2: Key Architecture Redesign
+- [x] Hub key = `crypto.getRandomValues(32)`, ECIES-wrapped per member
+- [x] `hub-key-manager.ts` client library for hub key distribution
+- [x] Multi-admin envelope support: `adminPubkeys[]` → `adminEnvelopes[]`
+- [x] Updated RecordsDO, ConversationDO storage for envelope arrays
+- [x] Identity + decryption key separation in bootstrap-admin
+
+### Epic 76: Nostr Relay Real-Time Sync
+- [x] Complete WebSocket removal — deleted `ws.ts`, `websocket.ts`, `websocket-pair.ts`
+- [x] Nostr-only real-time broadcasts via ephemeral kind 20001 events
+- [x] Client-side Nostr relay subscription hooks
+- [x] Server-authoritative call state (REST + DO serialization, relay for notification)
+
+### Epic 74: E2EE Messaging Storage
+- [x] Envelope encryption: per-message random symmetric key, ECIES-wrapped per reader
+- [x] Server encrypts inbound messages on webhook receipt (plaintext discarded immediately)
+- [x] Client-side decryption in ConversationThread component
+- [x] Conversation reassignment re-wrapping support
+
+### Epic 77: Metadata Encryption
+- [x] Per-record DO storage keys (`callrecord:${id}`, `audit:${id}`)
+- [x] Encrypted call record metadata with admin envelopes
+- [x] Hash-chained audit log (SHA-256 `previousEntryHash` + `entryHash`)
+- [x] Client-side decryption in calls.tsx and notes.tsx
+- [x] Fixed `audit:_lastHash` collision with audit entry list queries
+
+### Epic 78: Client-Side Transcription
+- [x] Migrated transcription service from dual-ECIES to envelope encryption pattern
+- [x] Removed dead `encryptForPublicKey` from both client and server crypto modules
+- [x] `@huggingface/transformers` v3.8.1 — ONNX Runtime single-threaded WASM (no SharedArrayBuffer)
+- [x] AudioWorklet ring buffer (`audio-capture-worklet.js`) — 60s buffer, 30s chunks, 5s overlap
+- [x] Web Worker transcription (`transcription-worker.ts`) — Whisper ONNX in isolated worker thread
+- [x] `TranscriptionManager` orchestrator + `useTranscription` React hook
+- [x] Settings UI: enable/disable toggle, model selection (tiny/base, en/multilingual)
+- [x] Auto-save encrypted transcript note on call hangup
+- [x] "Transcribes your speech only" limitation documented in UI
+- [x] E2E tests for settings persistence and configuration
+
+### Epic 79: Reproducible Builds
+- [x] Build-time defines (`__BUILD_TIME__`, `__BUILD_COMMIT__`, `__BUILD_VERSION__`) in Vite, esbuild, Wrangler
+- [x] `src/globals.d.ts` type declarations for build-time constants
+- [x] `Dockerfile.build` — canonical build environment with pinned Bun image
+- [x] `scripts/verify-build.sh` — Docker-based verification against GitHub Release checksums
+- [x] `/api/config/verify` informational endpoint
+- [x] CI: `SOURCE_DATE_EPOCH`, Worker bundle capture, `CHECKSUMS.txt` in releases, SLSA attestation
+
 ## 2026-02-24: Two-Way Messaging with Volunteer Assignment
 
 ### Epics 68-73: Volunteer Messaging Assignment & Two-Way Conversation UI

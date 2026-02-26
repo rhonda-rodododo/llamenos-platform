@@ -4,51 +4,13 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import type { EncryptedFileMetadata, RecipientEnvelope } from '@shared/types'
+import { LABEL_FILE_KEY, LABEL_FILE_METADATA } from '@shared/crypto-labels'
+import { eciesWrapKey, eciesUnwrapKey } from './crypto'
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
   crypto.getRandomValues(buf)
   return buf
-}
-
-/**
- * ECIES key wrapping — wraps a symmetric file key for a given recipient public key.
- * Uses the same pattern as encryptForPublicKey but only for a 32-byte key.
- */
-function wrapKeyForPubkey(
-  fileKey: Uint8Array,
-  recipientPubkeyHex: string,
-): { encryptedFileKey: string; ephemeralPubkey: string } {
-  const ephemeralSecret = randomBytes(32)
-  const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralSecret, true)
-
-  // Nostr pubkeys are x-only (32 bytes). Prepend 02 for compressed format.
-  const recipientCompressed = hexToBytes('02' + recipientPubkeyHex)
-
-  // ECDH shared secret
-  const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
-  const sharedX = shared.slice(1, 33)
-
-  // Derive symmetric key
-  const context = utf8ToBytes('llamenos:file-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
-  const symmetricKey = sha256(keyInput)
-
-  // Encrypt the file key
-  const nonce = randomBytes(24)
-  const cipher = xchacha20poly1305(symmetricKey, nonce)
-  const ciphertext = cipher.encrypt(fileKey)
-
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-
-  return {
-    encryptedFileKey: bytesToHex(packed),
-    ephemeralPubkey: bytesToHex(ephemeralPublicKey),
-  }
 }
 
 /**
@@ -59,29 +21,16 @@ export function unwrapFileKey(
   ephemeralPubkeyHex: string,
   secretKey: Uint8Array,
 ): Uint8Array {
-  const ephemeralPub = hexToBytes(ephemeralPubkeyHex)
-
-  // ECDH shared secret
-  const shared = secp256k1.getSharedSecret(secretKey, ephemeralPub)
-  const sharedX = shared.slice(1, 33)
-
-  // Derive symmetric key
-  const context = utf8ToBytes('llamenos:file-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
-  const symmetricKey = sha256(keyInput)
-
-  // Decrypt
-  const data = hexToBytes(encryptedFileKeyHex)
-  const nonce = data.slice(0, 24)
-  const ciphertext = data.slice(24)
-  const cipher = xchacha20poly1305(symmetricKey, nonce)
-  return cipher.decrypt(ciphertext)
+  return eciesUnwrapKey(
+    { wrappedKey: encryptedFileKeyHex, ephemeralPubkey: ephemeralPubkeyHex },
+    secretKey,
+    LABEL_FILE_KEY,
+  )
 }
 
 /**
- * Encrypt a file's metadata for a recipient (using same ECIES as messages).
+ * Encrypt a file's metadata for a recipient (ECIES with LABEL_FILE_METADATA domain separation).
+ * Unlike key wrapping, this encrypts arbitrary-length data, so it uses raw ECDH+XChaCha20.
  */
 function encryptMetadataForPubkey(
   metadata: EncryptedFileMetadata,
@@ -94,10 +43,10 @@ function encryptMetadataForPubkey(
   const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
   const sharedX = shared.slice(1, 33)
 
-  const context = utf8ToBytes('llamenos:file-metadata')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const label = utf8ToBytes(LABEL_FILE_METADATA)
+  const keyInput = new Uint8Array(label.length + sharedX.length)
+  keyInput.set(label)
+  keyInput.set(sharedX, label.length)
   const symmetricKey = sha256(keyInput)
 
   const nonce = randomBytes(24)
@@ -129,10 +78,10 @@ export function decryptFileMetadata(
     const shared = secp256k1.getSharedSecret(secretKey, ephemeralPub)
     const sharedX = shared.slice(1, 33)
 
-    const context = utf8ToBytes('llamenos:file-metadata')
-    const keyInput = new Uint8Array(context.length + sharedX.length)
-    keyInput.set(context)
-    keyInput.set(sharedX, context.length)
+    const label = utf8ToBytes(LABEL_FILE_METADATA)
+    const keyInput = new Uint8Array(label.length + sharedX.length)
+    keyInput.set(label)
+    keyInput.set(sharedX, label.length)
     const symmetricKey = sha256(keyInput)
 
     const data = hexToBytes(encryptedContentHex)
@@ -189,11 +138,11 @@ export async function encryptFile(
   packed.set(fileNonce)
   packed.set(encryptedContent, fileNonce.length)
 
-  // Wrap the file key for each recipient
-  const recipientEnvelopes: RecipientEnvelope[] = recipientPubkeys.map(pubkey => ({
-    pubkey,
-    ...wrapKeyForPubkey(fileKey, pubkey),
-  }))
+  // Wrap the file key for each recipient using shared ECIES
+  const recipientEnvelopes: RecipientEnvelope[] = recipientPubkeys.map(pubkey => {
+    const { wrappedKey, ephemeralPubkey } = eciesWrapKey(fileKey, pubkey, LABEL_FILE_KEY)
+    return { pubkey, encryptedFileKey: wrappedKey, ephemeralPubkey }
+  })
 
   // Encrypt metadata for each recipient
   const encryptedMetadataList = recipientPubkeys.map(pubkey =>
@@ -249,7 +198,7 @@ export function rewrapFileKey(
   const fileKey = unwrapFileKey(encryptedFileKeyHex, ephemeralPubkeyHex, adminSecretKey)
 
   // Re-encrypt for new recipient
-  const { encryptedFileKey, ephemeralPubkey } = wrapKeyForPubkey(fileKey, newRecipientPubkeyHex)
+  const { wrappedKey: encryptedFileKey, ephemeralPubkey } = eciesWrapKey(fileKey, newRecipientPubkeyHex, LABEL_FILE_KEY)
 
   return {
     pubkey: newRecipientPubkeyHex,

@@ -117,6 +117,7 @@ auth.get('/me', async (c) => {
     webauthnRequired,
     webauthnRegistered: webauthnCreds.length > 0,
     adminPubkey: c.env.ADMIN_PUBKEY,
+    adminDecryptionPubkey: c.env.ADMIN_DECRYPTION_PUBKEY || c.env.ADMIN_PUBKEY,
   })
 })
 

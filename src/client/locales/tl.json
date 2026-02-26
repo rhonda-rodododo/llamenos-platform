@@ -594,7 +594,16 @@
     "codePlaceholder": "I-paste ang QR data o code...",
     "link": "I-link",
     "linkThisDevice": "I-link ang device na ito",
-    "invalidCode": "Hindi valid ang provisioning code. Paki-scan ang QR code o kopyahin ang buong code."
+    "invalidCode": "Hindi valid ang provisioning code. Paki-scan ang QR code o kopyahin ang buong code.",
+    "verifySAS": "Verify Security Code",
+    "verifySASDesc": "Compare this code with the code shown on your primary device.",
+    "verifySASPrimary": "Verify this code matches the code on the new device:",
+    "securityCode": "Security code",
+    "compareCodes": "Both devices must show the same code. If the codes don't match, do NOT proceed — an attacker may be present.",
+    "codesMatch": "Codes match",
+    "codesDontMatch": "Codes don't match",
+    "sasMismatch": "Security codes did not match. The linking session has been aborted for your safety. Please try again.",
+    "decryptFailed": "Failed to decrypt key from primary device. Please try again."
   },
   "blasts": {
     "title": "Message Blasts",

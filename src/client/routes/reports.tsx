@@ -12,7 +12,7 @@ import {
   type Report,
   type ConversationMessage,
 } from '@/lib/api'
-import { encryptForPublicKey, decryptTranscription } from '@/lib/crypto'
+import { encryptMessage, decryptMessage } from '@/lib/crypto'
 import * as keyManager from '@/lib/key-manager'
 import { ReportForm } from '@/components/ReportForm'
 import { FilePreview } from '@/components/FilePreview'
@@ -32,7 +32,7 @@ export const Route = createFileRoute('/reports')({
 
 function ReportsPage() {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, isAdmin, hasPermission } = useAuth()
+  const { hasNsec, publicKey, isAdmin, hasPermission, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   const [reports, setReports] = useState<Report[]>([])
@@ -122,15 +122,17 @@ function ReportsPage() {
     if (!selectedId || !replyText.trim() || !hasNsec || !publicKey) return
     setSending(true)
     try {
-      const recipientPubkey = selectedReport?.assignedTo || publicKey
-      const myEncrypted = encryptForPublicKey(replyText.trim(), publicKey)
-      const adminEncrypted = encryptForPublicKey(replyText.trim(), recipientPubkey)
+      // Build reader list: current user + admin decryption pubkey
+      const readerPubkeys = [publicKey]
+      if (adminDecryptionPubkey && adminDecryptionPubkey !== publicKey) {
+        readerPubkeys.push(adminDecryptionPubkey)
+      }
+
+      const encrypted = encryptMessage(replyText.trim(), readerPubkeys)
 
       const msg = await sendReportMessage(selectedId, {
-        encryptedContent: myEncrypted.encryptedContent,
-        ephemeralPubkey: myEncrypted.ephemeralPubkey,
-        encryptedContentAdmin: adminEncrypted.encryptedContent,
-        ephemeralPubkeyAdmin: adminEncrypted.ephemeralPubkey,
+        encryptedContent: encrypted.encryptedContent,
+        readerEnvelopes: encrypted.readerEnvelopes,
       })
       setMessages(prev => [msg, ...prev])
       setReplyText('')
@@ -139,21 +141,23 @@ function ReportsPage() {
     } finally {
       setSending(false)
     }
-  }, [selectedId, replyText, hasNsec, publicKey, selectedReport, toast, t])
+  }, [selectedId, replyText, hasNsec, publicKey, adminDecryptionPubkey, toast, t])
 
   const handleFileUploadComplete = useCallback(async (fileIds: string[]) => {
     if (!selectedId || !hasNsec || !publicKey) return
     try {
-      const recipientPubkey = selectedReport?.assignedTo || publicKey
+      // Build reader list: current user + admin decryption pubkey
+      const readerPubkeys = [publicKey]
+      if (adminDecryptionPubkey && adminDecryptionPubkey !== publicKey) {
+        readerPubkeys.push(adminDecryptionPubkey)
+      }
+
       const placeholder = t('reports.filesAttached', { defaultValue: '[Files attached]', count: fileIds.length })
-      const myEncrypted = encryptForPublicKey(placeholder, publicKey)
-      const adminEncrypted = encryptForPublicKey(placeholder, recipientPubkey)
+      const encrypted = encryptMessage(placeholder, readerPubkeys)
 
       const msg = await sendReportMessage(selectedId, {
-        encryptedContent: myEncrypted.encryptedContent,
-        ephemeralPubkey: myEncrypted.ephemeralPubkey,
-        encryptedContentAdmin: adminEncrypted.encryptedContent,
-        ephemeralPubkeyAdmin: adminEncrypted.ephemeralPubkey,
+        encryptedContent: encrypted.encryptedContent,
+        readerEnvelopes: encrypted.readerEnvelopes,
         attachmentIds: fileIds,
       })
       setMessages(prev => [msg, ...prev])
@@ -161,7 +165,7 @@ function ReportsPage() {
     } catch {
       toast(t('reports.sendError', { defaultValue: 'Failed to send message' }), 'error')
     }
-  }, [selectedId, hasNsec, publicKey, selectedReport, toast, t])
+  }, [selectedId, hasNsec, publicKey, adminDecryptionPubkey, toast, t])
 
   const handleReportCreated = useCallback((reportId: string) => {
     // Refresh reports list and select the new one
@@ -363,9 +367,9 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
     if (node) node.scrollTop = node.scrollHeight
   }, [])
 
-  // Decrypt messages
+  // Decrypt messages using envelope pattern
   useEffect(() => {
-    if (messages.length === 0) return
+    if (messages.length === 0 || !publicKey) return
 
     let secretKey: Uint8Array | null = null
     if (hasNsec) {
@@ -376,27 +380,21 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
     const decrypted = new Map<string, string>()
 
     for (const msg of messages) {
-      const encrypted = isAdmin ? msg.encryptedContentAdmin : msg.encryptedContent
-      const ephemeral = isAdmin ? msg.ephemeralPubkeyAdmin : msg.ephemeralPubkey
-
-      if (encrypted && ephemeral) {
-        const plaintext = decryptTranscription(encrypted, ephemeral, secretKey)
+      if (msg.encryptedContent && msg.readerEnvelopes?.length) {
+        const plaintext = decryptMessage(
+          msg.encryptedContent,
+          msg.readerEnvelopes,
+          secretKey,
+          publicKey,
+        )
         if (plaintext !== null) {
           decrypted.set(msg.id, plaintext)
-        } else {
-          // Try fallback copy
-          const fallbackEnc = isAdmin ? msg.encryptedContent : msg.encryptedContentAdmin
-          const fallbackEph = isAdmin ? msg.ephemeralPubkey : msg.ephemeralPubkeyAdmin
-          if (fallbackEnc && fallbackEph) {
-            const fallback = decryptTranscription(fallbackEnc, fallbackEph, secretKey)
-            if (fallback !== null) decrypted.set(msg.id, fallback)
-          }
         }
       }
     }
 
     setDecryptedContent(decrypted)
-  }, [messages, hasNsec, isAdmin])
+  }, [messages, hasNsec, publicKey])
 
   const isReporter = hasPermission('reports:create') && !hasPermission('calls:answer')
   const canReply = report.status === 'active' || isReporter

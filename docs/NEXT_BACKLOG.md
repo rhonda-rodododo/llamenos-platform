@@ -12,8 +12,8 @@
 - [x] **CRITICAL**: Caller phone hash leaked in spam report WS response
 - [x] **HIGH**: Mass assignment — volunteer self-update now restricted to safe fields allowlist
 - [x] **HIGH**: SSRF in provider test — ARI URL validation, internal IP blocking, fetch timeout
-- [x] **HIGH**: WebSocket flooding — rate limit 30 msgs/10s with auto-disconnect
-- [x] **HIGH**: WebSocket prototype pollution — reject `__proto__`/`constructor`/`prototype`
+- [x] **HIGH**: ~~WebSocket flooding~~ — WebSocket removed; Nostr relay rate limiting replaces
+- [x] **HIGH**: ~~WebSocket prototype pollution~~ — WebSocket removed; no longer applicable
 - [x] **HIGH**: Weak KDF — upgraded SHA-256 concat to HKDF-SHA256 for note encryption
 - [x] **HIGH**: Security headers — COOP, no-referrer, expanded CSP and Permissions-Policy
 
@@ -153,6 +153,33 @@ Deployment guide: [`docs/security/DEPLOYMENT_HARDENING.md`](security/DEPLOYMENT_
 - [x] Epic 61: Multi-Hub Architecture — hub isolation, per-hub DOs, hub-scoped roles, hub switcher UI, hub management admin page, telephony/messaging/WebSocket hub routing
 - [x] Epic 62: Message Blasts — subscriber management, broadcast messaging, scheduled sends, opt-in/opt-out compliance
 - [x] Epic 63: RCS Channel — Google RBM API adapter, rich cards, suggested replies, SMS fallback
+
+## Zero-Knowledge Architecture (Epics 74–79)
+
+Full E2EE transformation to Signal-level privacy. Clean rewrite — no migration, no feature flags (pre-production).
+
+Architecture overview: [`docs/architecture/E2EE_ARCHITECTURE.md`](architecture/E2EE_ARCHITECTURE.md)
+
+**Dependency graph:** 76.0 → 76.1 / 76.2 → 76 → 74 / 75 / 77 → 78 / 79
+
+### Pre-Implementation Foundations — COMPLETE
+- [x] **[Epic 76.0: Security Foundations](epics/epic-76.0-security-foundations.md)** — Domain separation label audit, provisioning SAS verification fix, crypto-labels.ts
+- [x] **[Epic 76.1: Worker-Relay Communication](epics/epic-76.1-worker-relay-communication.md)** — NostrPublisher interface, CF/Node implementations, server keypair, relay infrastructure
+- [x] **[Epic 76.2: Key Architecture Redesign](epics/epic-76.2-key-architecture-redesign.md)** — Hub key = random 32 bytes ECIES-wrapped per member, multi-admin envelopes, hub key manager
+
+### Foundation Layer — COMPLETE
+- [x] **[Epic 76: Nostr Relay Real-Time Sync](epics/epic-76-nostr-relay-sync.md)** — Complete WS removal, Nostr-only real-time broadcasts, ephemeral kind 20001 events
+
+### Data Encryption Layer — COMPLETE
+- [x] **[Epic 74: E2EE Messaging Storage](epics/epic-74-e2ee-messaging-storage.md)** — Envelope encryption: per-message random key, ECIES envelopes for volunteer + admin
+- [x] **[Epic 77: Metadata Encryption](epics/epic-77-metadata-encryption.md)** — Per-record DO storage keys, encrypted call history, hash-chained audit log
+
+### Client Privacy Layer
+- [ ] **[Epic 75: Native Call-Receiving Clients](epics/epic-75-native-call-clients.md)** — Tauri desktop (macOS/Windows), React Native mobile (iOS/Android). Separate repos. *Future work.*
+- [x] **[Epic 78: Client-Side Transcription](epics/epic-78-client-side-transcription.md)** — @huggingface/transformers ONNX Whisper in browser, AudioWorklet ring buffer, Web Worker isolation, settings UI, auto-save encrypted transcript on hangup
+
+### Trust Verification — COMPLETE
+- [x] **[Epic 79: Reproducible Builds](epics/epic-79-reproducible-builds.md)** — Deterministic build config, Dockerfile.build, verify-build.sh, CHECKSUMS.txt in GitHub Releases, SLSA provenance
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

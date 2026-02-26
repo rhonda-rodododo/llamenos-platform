@@ -104,6 +104,10 @@ export class SettingsDO extends DurableObject<Env> {
     this.router.put('/settings/hub/:hubId/telephony-provider', async (req, { hubId }) => this.setHubTelephonyProvider(hubId, await req.json()))
     this.router.get('/settings/hub-by-phone/:phone', (_req, { phone }) => this.getHubByPhone(phone))
 
+    // --- Hub Key Management ---
+    this.router.get('/settings/hub/:id/key', (_req, { id }) => this.getHubKeyEnvelopes(id))
+    this.router.put('/settings/hub/:id/key', async (req, { id }) => this.setHubKeyEnvelopes(id, await req.json()))
+
     // --- Test Reset ---
     this.router.post('/reset', async () => {
       await this.ctx.storage.deleteAll()
@@ -713,5 +717,32 @@ export class SettingsDO extends DurableObject<Env> {
     const hub = hubs.find(h => h.phoneNumber === phone && h.status === 'active')
     if (!hub) return Response.json({ error: 'No hub for this number' }, { status: 404 })
     return Response.json({ hub })
+  }
+
+  // --- Hub Key Management ---
+
+  /**
+   * Get all ECIES-wrapped hub key envelopes for a hub.
+   * Each member gets an envelope they can unwrap with their secret key.
+   */
+  private async getHubKeyEnvelopes(hubId: string): Promise<Response> {
+    const envelopes = await this.ctx.storage.get<{ pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]>(`hub-key:${hubId}`) || []
+    return Response.json({ envelopes })
+  }
+
+  /**
+   * Store hub key envelopes (admin operation — replaces all envelopes for the hub).
+   * Used during initial key generation and key rotation.
+   */
+  private async setHubKeyEnvelopes(hubId: string, data: {
+    envelopes: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+  }): Promise<Response> {
+    // Validate hub exists
+    const hubs = await this.ctx.storage.get<Hub[]>('hubs') || []
+    const hub = hubs.find(h => h.id === hubId)
+    if (!hub) return new Response('Hub not found', { status: 404 })
+
+    await this.ctx.storage.put(`hub-key:${hubId}`, data.envelopes)
+    return Response.json({ ok: true })
   }
 }

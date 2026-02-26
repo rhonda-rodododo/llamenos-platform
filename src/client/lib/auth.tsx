@@ -24,6 +24,7 @@ interface AuthState {
   sessionExpiring: boolean
   sessionExpired: boolean
   adminPubkey: string
+  adminDecryptionPubkey: string
 }
 
 interface AuthContextValue extends AuthState {
@@ -40,6 +41,7 @@ interface AuthContextValue extends AuthState {
   isAuthenticated: boolean
   hasNsec: boolean
   adminPubkey: string
+  adminDecryptionPubkey: string
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -63,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionExpiring: false,
     sessionExpired: false,
     adminPubkey: '',
+    adminDecryptionPubkey: '',
   })
 
   const lastApiActivity = useRef(Date.now())
@@ -144,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             onBreak: me.onBreak ?? false,
             callPreference: me.callPreference ?? 'phone',
             adminPubkey: me.adminPubkey || '',
+            adminDecryptionPubkey: me.adminDecryptionPubkey || me.adminPubkey || '',
             sessionExpiring: false,
             sessionExpired: false,
           })
@@ -176,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             onBreak: me.onBreak ?? false,
             callPreference: me.callPreference ?? 'phone',
             adminPubkey: me.adminPubkey || '',
+            adminDecryptionPubkey: me.adminDecryptionPubkey || me.adminPubkey || '',
             sessionExpiring: false,
             sessionExpired: false,
           })
@@ -219,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onBreak: me.onBreak ?? false,
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminPubkey || '',
+        adminDecryptionPubkey: me.adminDecryptionPubkey || me.adminPubkey || '',
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -255,6 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onBreak: me.onBreak ?? false,
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminPubkey || '',
+        adminDecryptionPubkey: me.adminDecryptionPubkey || me.adminPubkey || '',
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -293,6 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onBreak: me.onBreak ?? false,
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminPubkey || '',
+        adminDecryptionPubkey: me.adminDecryptionPubkey || me.adminPubkey || '',
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -323,6 +331,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onBreak: me.onBreak ?? false,
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminPubkey || '',
+        adminDecryptionPubkey: me.adminDecryptionPubkey || me.adminPubkey || '',
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -349,6 +358,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onBreak: me.onBreak ?? false,
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminPubkey || '',
+        adminDecryptionPubkey: me.adminDecryptionPubkey || me.adminPubkey || '',
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -393,6 +403,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onBreak: false,
       callPreference: 'phone',
       adminPubkey: '',
+      adminDecryptionPubkey: '',
       sessionExpiring: false,
       sessionExpired: false,
     })

@@ -9,6 +9,15 @@
  */
 import * as esbuild from 'esbuild'
 import path from 'path'
+import fs from 'fs'
+const { readFileSync } = fs
+
+// Build-time constants for reproducible builds (Epic 79)
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
+const buildTime = process.env.SOURCE_DATE_EPOCH
+  ? new Date(parseInt(process.env.SOURCE_DATE_EPOCH) * 1000).toISOString()
+  : new Date().toISOString()
+const buildCommit = process.env.GITHUB_SHA || 'dev'
 
 await esbuild.build({
   entryPoints: ['src/platform/node/server.ts'],
@@ -30,17 +39,34 @@ await esbuild.build({
   plugins: [{
     name: 'path-aliases',
     setup(build) {
+      const { existsSync } = fs
+
+      // Try resolving with common extensions if the exact path doesn't exist
+      function resolveWithExtensions(basePath) {
+        if (existsSync(basePath)) return basePath
+        for (const ext of ['.ts', '.tsx', '.js', '.jsx']) {
+          const withExt = basePath + ext
+          if (existsSync(withExt)) return withExt
+        }
+        // Try index files
+        for (const ext of ['.ts', '.tsx', '.js']) {
+          const indexPath = path.join(basePath, 'index' + ext)
+          if (existsSync(indexPath)) return indexPath
+        }
+        return basePath
+      }
+
       // Resolve @worker/* imports
       build.onResolve({ filter: /^@worker\// }, (args) => ({
-        path: path.resolve('src/worker', args.path.replace('@worker/', '')),
+        path: resolveWithExtensions(path.resolve('src/worker', args.path.replace('@worker/', ''))),
       }))
       // Resolve @shared/* imports
       build.onResolve({ filter: /^@shared\// }, (args) => ({
-        path: path.resolve('src/shared', args.path.replace('@shared/', '')),
+        path: resolveWithExtensions(path.resolve('src/shared', args.path.replace('@shared/', ''))),
       }))
       // Resolve @/* imports (client — shouldn't be used in server code, but just in case)
       build.onResolve({ filter: /^@\// }, (args) => ({
-        path: path.resolve('src/client', args.path.replace('@/', '')),
+        path: resolveWithExtensions(path.resolve('src/client', args.path.replace('@/', ''))),
       }))
     },
   }],
@@ -63,6 +89,9 @@ const require = createRequire(import.meta.url);
   // Define build-time constants
   define: {
     'process.env.PLATFORM': '"node"',
+    '__BUILD_TIME__': JSON.stringify(buildTime),
+    '__BUILD_COMMIT__': JSON.stringify(buildCommit),
+    '__BUILD_VERSION__': JSON.stringify(pkg.version),
   },
 })
 

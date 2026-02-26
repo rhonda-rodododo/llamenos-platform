@@ -6,6 +6,17 @@ import { hkdf } from '@noble/hashes/hkdf.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import type { NotePayload } from '@shared/types'
+import {
+  LABEL_NOTE_KEY,
+  LABEL_MESSAGE,
+  LABEL_CALL_META,
+  LABEL_TRANSCRIPTION,
+  HKDF_SALT,
+  HKDF_CONTEXT_NOTES,
+  HKDF_CONTEXT_DRAFTS,
+  HKDF_CONTEXT_EXPORT,
+  AUTH_PREFIX,
+} from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
@@ -61,22 +72,35 @@ export function isValidNsec(nsec: string): boolean {
 
 // --- Encryption ---
 
-function deriveEncryptionKey(secretKey: Uint8Array, context: string): Uint8Array {
-  const salt = utf8ToBytes('llamenos:hkdf-salt:v1')
-  return hkdf(sha256, secretKey, salt, utf8ToBytes(`llamenos:${context}`), 32)
+function deriveEncryptionKey(secretKey: Uint8Array, label: string): Uint8Array {
+  const salt = utf8ToBytes(HKDF_SALT)
+  return hkdf(sha256, secretKey, salt, utf8ToBytes(label), 32)
 }
 
-// --- ECIES Key Wrapping (shared with file-crypto.ts pattern) ---
+// --- Generic ECIES Key Wrapping ---
+// Shared primitive: ECDH + SHA-256(label || sharedX) + XChaCha20-Poly1305
+// Used by notes (LABEL_NOTE_KEY), files (LABEL_FILE_KEY), hub keys (LABEL_HUB_KEY_WRAP)
 
-export interface NoteEnvelope {
-  encryptedNoteKey: string  // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
-  ephemeralPubkey: string   // hex: compressed 33-byte pubkey
+/** A symmetric key wrapped via ECIES for a single recipient. */
+export interface KeyEnvelope {
+  wrappedKey: string       // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
+  ephemeralPubkey: string  // hex: compressed 33-byte pubkey
 }
 
-function wrapKeyForPubkey(
-  noteKey: Uint8Array,
+/** A KeyEnvelope tagged with the recipient's pubkey (for multi-recipient scenarios). */
+export interface RecipientKeyEnvelope extends KeyEnvelope {
+  pubkey: string  // recipient's x-only pubkey (hex)
+}
+
+/**
+ * Wrap a 32-byte symmetric key for a recipient using ECIES.
+ * Domain separation via `label` prevents cross-context key reuse.
+ */
+export function eciesWrapKey(
+  key: Uint8Array,
   recipientPubkeyHex: string,
-): NoteEnvelope {
+  label: string,
+): KeyEnvelope {
   const ephemeralSecret = randomBytes(32)
   const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralSecret, true)
 
@@ -84,41 +108,46 @@ function wrapKeyForPubkey(
   const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
   const sharedX = shared.slice(1, 33)
 
-  const context = utf8ToBytes('llamenos:note-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const labelBytes = utf8ToBytes(label)
+  const keyInput = new Uint8Array(labelBytes.length + sharedX.length)
+  keyInput.set(labelBytes)
+  keyInput.set(sharedX, labelBytes.length)
   const symmetricKey = sha256(keyInput)
 
   const nonce = randomBytes(24)
   const cipher = xchacha20poly1305(symmetricKey, nonce)
-  const ciphertext = cipher.encrypt(noteKey)
+  const ciphertext = cipher.encrypt(key)
 
   const packed = new Uint8Array(nonce.length + ciphertext.length)
   packed.set(nonce)
   packed.set(ciphertext, nonce.length)
 
   return {
-    encryptedNoteKey: bytesToHex(packed),
+    wrappedKey: bytesToHex(packed),
     ephemeralPubkey: bytesToHex(ephemeralPublicKey),
   }
 }
 
-function unwrapNoteKey(
-  envelope: NoteEnvelope,
+/**
+ * Unwrap a 32-byte symmetric key from an ECIES envelope.
+ * Must use the same `label` that was used during wrapping.
+ */
+export function eciesUnwrapKey(
+  envelope: KeyEnvelope,
   secretKey: Uint8Array,
+  label: string,
 ): Uint8Array {
   const ephemeralPub = hexToBytes(envelope.ephemeralPubkey)
   const shared = secp256k1.getSharedSecret(secretKey, ephemeralPub)
   const sharedX = shared.slice(1, 33)
 
-  const context = utf8ToBytes('llamenos:note-key')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
+  const labelBytes = utf8ToBytes(label)
+  const keyInput = new Uint8Array(labelBytes.length + sharedX.length)
+  keyInput.set(labelBytes)
+  keyInput.set(sharedX, labelBytes.length)
   const symmetricKey = sha256(keyInput)
 
-  const data = hexToBytes(envelope.encryptedNoteKey)
+  const data = hexToBytes(envelope.wrappedKey)
   const nonce = data.slice(0, 24)
   const ciphertext = data.slice(24)
   const cipher = xchacha20poly1305(symmetricKey, nonce)
@@ -128,19 +157,21 @@ function unwrapNoteKey(
 // --- Per-Note Ephemeral Key Encryption (V2 — forward secrecy) ---
 
 export interface EncryptedNoteV2 {
-  encryptedContent: string     // hex: nonce(24) + ciphertext
-  authorEnvelope: NoteEnvelope // note key wrapped for the author
-  adminEnvelope: NoteEnvelope  // note key wrapped for the admin
+  encryptedContent: string              // hex: nonce(24) + ciphertext
+  authorEnvelope: KeyEnvelope           // note key wrapped for the author
+  adminEnvelopes: RecipientKeyEnvelope[] // note key wrapped for each admin (multi-admin)
 }
 
 /**
- * Encrypt a note with a random per-note key, wrapped for both author and admin.
+ * Encrypt a note with a random per-note key, wrapped for the author and all admins.
  * Provides forward secrecy: compromising the identity key doesn't reveal past notes.
+ *
+ * @param adminPubkeys - Array of admin decryption pubkeys (supports multi-admin)
  */
 export function encryptNoteV2(
   payload: NotePayload,
   authorPubkey: string,
-  adminPubkey: string,
+  adminPubkeys: string[],
 ): EncryptedNoteV2 {
   // Generate random per-note symmetric key
   const noteKey = randomBytes(32)
@@ -155,8 +186,11 @@ export function encryptNoteV2(
 
   return {
     encryptedContent: bytesToHex(packed),
-    authorEnvelope: wrapKeyForPubkey(noteKey, authorPubkey),
-    adminEnvelope: wrapKeyForPubkey(noteKey, adminPubkey),
+    authorEnvelope: eciesWrapKey(noteKey, authorPubkey, LABEL_NOTE_KEY),
+    adminEnvelopes: adminPubkeys.map(pk => ({
+      pubkey: pk,
+      ...eciesWrapKey(noteKey, pk, LABEL_NOTE_KEY),
+    })),
   }
 }
 
@@ -165,11 +199,11 @@ export function encryptNoteV2(
  */
 export function decryptNoteV2(
   encryptedContent: string,
-  envelope: NoteEnvelope,
+  envelope: KeyEnvelope,
   secretKey: Uint8Array,
 ): NotePayload | null {
   try {
-    const noteKey = unwrapNoteKey(envelope, secretKey)
+    const noteKey = eciesUnwrapKey(envelope, secretKey, LABEL_NOTE_KEY)
     const data = hexToBytes(encryptedContent)
     const nonce = data.slice(0, 24)
     const ciphertext = data.slice(24)
@@ -190,13 +224,117 @@ export function decryptNoteV2(
   }
 }
 
+// --- E2EE Message Encryption (Epic 74) ---
+// Same envelope pattern as notes, using LABEL_MESSAGE for domain separation.
+// Used for SMS, WhatsApp, Signal, and web report messages.
+
+export interface EncryptedMessagePayload {
+  encryptedContent: string              // hex: nonce(24) + ciphertext
+  readerEnvelopes: RecipientKeyEnvelope[] // message key wrapped for each reader
+}
+
+/**
+ * Encrypt a message for multiple readers using the envelope pattern.
+ * Generates a random per-message symmetric key, wraps it for each reader via ECIES.
+ *
+ * @param plaintext - Message text to encrypt
+ * @param readerPubkeys - Array of reader x-only pubkeys (volunteer + admins)
+ */
+export function encryptMessage(
+  plaintext: string,
+  readerPubkeys: string[],
+): EncryptedMessagePayload {
+  // Generate random per-message symmetric key
+  const messageKey = randomBytes(32)
+  const nonce = randomBytes(24)
+  const cipher = xchacha20poly1305(messageKey, nonce)
+  const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
+
+  const packed = new Uint8Array(nonce.length + ciphertext.length)
+  packed.set(nonce)
+  packed.set(ciphertext, nonce.length)
+
+  return {
+    encryptedContent: bytesToHex(packed),
+    readerEnvelopes: readerPubkeys.map(pk => ({
+      pubkey: pk,
+      ...eciesWrapKey(messageKey, pk, LABEL_MESSAGE),
+    })),
+  }
+}
+
+/**
+ * Decrypt a message using the reader's envelope.
+ * Finds the envelope matching the reader's pubkey and unwraps the message key.
+ *
+ * @param encryptedContent - hex: nonce(24) + ciphertext
+ * @param readerEnvelopes - array of per-reader ECIES envelopes
+ * @param secretKey - reader's secret key (Uint8Array)
+ * @param readerPubkey - reader's x-only pubkey (hex) to find the matching envelope
+ */
+export function decryptMessage(
+  encryptedContent: string,
+  readerEnvelopes: RecipientKeyEnvelope[],
+  secretKey: Uint8Array,
+  readerPubkey: string,
+): string | null {
+  try {
+    // Find the envelope for this reader
+    const envelope = readerEnvelopes.find(e => e.pubkey === readerPubkey)
+    if (!envelope) return null
+
+    // Unwrap the message key
+    const messageKey = eciesUnwrapKey(envelope, secretKey, LABEL_MESSAGE)
+
+    // Decrypt the message content
+    const data = hexToBytes(encryptedContent)
+    const nonce = data.slice(0, 24)
+    const ciphertext = data.slice(24)
+    const cipher = xchacha20poly1305(messageKey, nonce)
+    const plaintext = cipher.decrypt(ciphertext)
+    return new TextDecoder().decode(plaintext)
+  } catch {
+    return null
+  }
+}
+
+// --- Call Record Decryption (Epic 77) ---
+// Call history records have encrypted metadata (answeredBy, callerNumber).
+// Uses the same ECIES envelope pattern as messages but with LABEL_CALL_META.
+
+/**
+ * Decrypt a call record's encrypted metadata.
+ * Returns the decrypted fields or null if decryption fails.
+ */
+export function decryptCallRecord(
+  encryptedContent: string,
+  adminEnvelopes: RecipientKeyEnvelope[],
+  secretKey: Uint8Array,
+  readerPubkey: string,
+): { answeredBy: string | null; callerNumber: string } | null {
+  try {
+    const envelope = adminEnvelopes.find(e => e.pubkey === readerPubkey)
+    if (!envelope) return null
+
+    const recordKey = eciesUnwrapKey(envelope, secretKey, LABEL_CALL_META)
+    const data = hexToBytes(encryptedContent)
+    const nonce = data.slice(0, 24)
+    const ciphertext = data.slice(24)
+    const cipher = xchacha20poly1305(recordKey, nonce)
+    const plaintext = cipher.decrypt(ciphertext)
+    return JSON.parse(new TextDecoder().decode(plaintext))
+  } catch {
+    return null
+  }
+}
+
 // --- Legacy V1 Decryption (kept for backward compatibility with pre-V2 notes) ---
 // V1 encrypt path removed (no forward secrecy). All new notes MUST use encryptNoteV2.
 
 /** Decrypt a legacy V1 note — kept for backward compatibility only. */
 export function decryptNote(packed: string, secretKey: Uint8Array): NotePayload | null {
   try {
-    const key = deriveEncryptionKey(secretKey, 'notes')
+    const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_NOTES)
     const data = hexToBytes(packed)
     const nonce = data.slice(0, 24)
     const ciphertext = data.slice(24)
@@ -235,10 +373,10 @@ export function decryptTranscription(
     const sharedX = shared.slice(1, 33)
 
     // Derive symmetric key with same domain separation as server
-    const context = utf8ToBytes('llamenos:transcription')
-    const keyInput = new Uint8Array(context.length + sharedX.length)
-    keyInput.set(context)
-    keyInput.set(sharedX, context.length)
+    const label = utf8ToBytes(LABEL_TRANSCRIPTION)
+    const keyInput = new Uint8Array(label.length + sharedX.length)
+    keyInput.set(label)
+    keyInput.set(sharedX, label.length)
     const symmetricKey = sha256(keyInput)
 
     // Unpack: nonce (24) + ciphertext
@@ -254,53 +392,11 @@ export function decryptTranscription(
   }
 }
 
-// --- ECIES Encryption (Client-Side) ---
-// Matches the server-side encryptForPublicKey in worker/lib/crypto.ts.
-// Used for encrypting outbound messages for specific recipients.
-
-export function encryptForPublicKey(
-  plaintext: string,
-  recipientPubkeyHex: string,
-): { encryptedContent: string; ephemeralPubkey: string } {
-  // Generate ephemeral keypair
-  const ephemeralSecret = randomBytes(32)
-  const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralSecret, true)
-
-  // Nostr pubkeys are x-only (32 bytes). Prepend 02 for even-parity compressed format.
-  const recipientCompressed = hexToBytes('02' + recipientPubkeyHex)
-
-  // ECDH shared secret
-  const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
-  const sharedX = shared.slice(1, 33)
-
-  // Derive symmetric key with domain separation (same as server)
-  const context = utf8ToBytes('llamenos:transcription')
-  const keyInput = new Uint8Array(context.length + sharedX.length)
-  keyInput.set(context)
-  keyInput.set(sharedX, context.length)
-  const symmetricKey = sha256(keyInput)
-
-  // Encrypt with XChaCha20-Poly1305
-  const nonce = randomBytes(24)
-  const cipher = xchacha20poly1305(symmetricKey, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
-
-  // Pack: nonce (24) + ciphertext
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-
-  return {
-    encryptedContent: bytesToHex(packed),
-    ephemeralPubkey: bytesToHex(ephemeralPublicKey),
-  }
-}
-
 // --- Draft Encryption ---
 // Same as notes but with "drafts" domain separation for local draft auto-save
 
 export function encryptDraft(plaintext: string, secretKey: Uint8Array): string {
-  const key = deriveEncryptionKey(secretKey, 'drafts')
+  const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_DRAFTS)
   const nonce = randomBytes(24)
   const data = utf8ToBytes(plaintext)
   const cipher = xchacha20poly1305(key, nonce)
@@ -314,7 +410,7 @@ export function encryptDraft(plaintext: string, secretKey: Uint8Array): string {
 
 export function decryptDraft(packed: string, secretKey: Uint8Array): string | null {
   try {
-    const key = deriveEncryptionKey(secretKey, 'drafts')
+    const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_DRAFTS)
     const data = hexToBytes(packed)
     const nonce = data.slice(0, 24)
     const ciphertext = data.slice(24)
@@ -330,7 +426,7 @@ export function decryptDraft(packed: string, secretKey: Uint8Array): string | nu
 // Encrypts a JSON export blob so it can only be read with the user's key
 
 export function encryptExport(jsonString: string, secretKey: Uint8Array): Uint8Array {
-  const key = deriveEncryptionKey(secretKey, 'export')
+  const key = deriveEncryptionKey(secretKey, HKDF_CONTEXT_EXPORT)
   const nonce = randomBytes(24)
   const data = utf8ToBytes(jsonString)
   const cipher = xchacha20poly1305(key, nonce)
@@ -349,7 +445,7 @@ export function encryptExport(jsonString: string, secretKey: Uint8Array): Uint8A
 export function createAuthToken(secretKey: Uint8Array, timestamp: number, method: string, path: string): string {
   const publicKey = getPublicKey(secretKey)
   // Bind token to specific request method+path to prevent cross-endpoint replay
-  const message = `llamenos:auth:${publicKey}:${timestamp}:${method}:${path}`
+  const message = `${AUTH_PREFIX}${publicKey}:${timestamp}:${method}:${path}`
   const messageHash = sha256(utf8ToBytes(message))
   // Sign with Schnorr (BIP-340) — proves possession of the secret key
   const signature = schnorr.sign(messageHash, secretKey)

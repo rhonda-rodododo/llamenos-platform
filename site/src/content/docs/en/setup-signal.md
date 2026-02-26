@@ -89,7 +89,7 @@ Llamenos monitors the signal-cli bridge health:
 
 ## Voice message transcription
 
-Signal voice messages are automatically transcribed using Cloudflare Workers AI (Whisper). The transcript appears alongside the voice message in the conversation view.
+Signal voice messages can be transcribed directly in the volunteer's browser using client-side Whisper (WASM via `@huggingface/transformers`). Audio never leaves the device — the transcript is encrypted and stored alongside the voice message in the conversation view. Volunteers can enable or disable transcription in their personal settings.
 
 ## Security notes
 

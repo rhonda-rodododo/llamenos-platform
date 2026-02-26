@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
-import type { AppEnv, Volunteer } from '../types'
+import type { AppEnv, Env, Volunteer } from '../types'
 import type { MessagingChannelType, MessagingConfig, WhatsAppConfig } from '../../shared/types'
 import type { MessagingAdapter, IncomingMessage, MessageStatusUpdate } from './adapter'
-import { getDOs, getScopedDOs } from '../lib/do-access'
+import { getDOs, getScopedDOs, getNostrPublisher } from '../lib/do-access'
 import { getMessagingAdapter } from '../lib/do-access'
 import { audit } from '../services/audit'
 import { canClaimChannel } from '../../shared/permissions'
+import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '../../shared/nostr-events'
 
 const messaging = new Hono<AppEnv>()
 
@@ -96,22 +97,24 @@ messaging.post('/:channel/webhook', async (c) => {
         }))
 
         if (statusRes.ok) {
-          // Broadcast status update via WebSocket
+          // Publish status update to Nostr relay
           const result = await statusRes.json() as { conversationId?: string; messageId?: string }
           if (result.conversationId && result.messageId) {
-            c.executionCtx.waitUntil(
-              dos.calls.fetch(new Request('http://do/broadcast', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            try {
+              const publisher = getNostrPublisher(c.env)
+              publisher.publish({
+                kind: KIND_MESSAGE_NEW,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [['d', 'global'], ['t', 'llamenos:event']],
+                content: JSON.stringify({
                   type: 'message:status',
                   conversationId: result.conversationId,
                   messageId: result.messageId,
                   status: statusUpdate.status,
                   timestamp: statusUpdate.timestamp,
                 }),
-              }))
-            )
+              }).catch(() => {})
+            } catch {}
           }
         }
 
@@ -192,7 +195,7 @@ messaging.post('/:channel/webhook', async (c) => {
   // Auto-assignment for new conversations
   if (convResult.isNew && convResult.status === 'waiting') {
     c.executionCtx.waitUntil(
-      tryAutoAssign(dos, convResult.conversationId, channel, c.env.ADMIN_PUBKEY)
+      tryAutoAssign(dos, c.env, convResult.conversationId, channel, c.env.ADMIN_PUBKEY)
     )
   }
 
@@ -214,6 +217,7 @@ messaging.post('/:channel/webhook', async (c) => {
  */
 async function tryAutoAssign(
   dos: ReturnType<typeof getScopedDOs>,
+  env: Env,
   conversationId: string,
   channelType: MessagingChannelType,
   adminPubkey: string
@@ -286,17 +290,21 @@ async function tryAutoAssign(
     )
 
     if (assignRes.ok) {
-      // Broadcast assignment via WebSocket
-      await dos.calls.fetch(new Request('http://do/broadcast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'conversation:assigned',
-          conversationId,
-          assignedTo: bestCandidate,
-          autoAssigned: true,
-        }),
-      }))
+      // Publish assignment to Nostr relay
+      try {
+        const publisher = getNostrPublisher(env)
+        publisher.publish({
+          kind: KIND_CONVERSATION_ASSIGNED,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [['d', 'global'], ['t', 'llamenos:event']],
+          content: JSON.stringify({
+            type: 'conversation:assigned',
+            conversationId,
+            assignedTo: bestCandidate,
+            autoAssigned: true,
+          }),
+        }).catch(() => {})
+      } catch {}
 
       console.log(`[messaging] Auto-assigned conversation ${conversationId} to ${bestCandidate.slice(0, 8)}`)
     }

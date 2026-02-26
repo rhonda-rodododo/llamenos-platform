@@ -8,9 +8,5 @@
  *
  * - CF build (wrangler): resolves 'cloudflare:workers' natively
  * - Node build (esbuild): resolves 'cloudflare:workers' → this file
- *
- * This module re-exports the Node.js DurableObject shim and
- * sets up the WebSocketPair polyfill.
  */
-import './node/websocket-pair'
 export { DurableObject } from './node/durable-object'

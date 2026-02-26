@@ -50,14 +50,20 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
 
   // Read secrets
   const adminPubkey = readSecret('admin-pubkey', 'ADMIN_PUBKEY')
+  const adminDecryptionPubkey = process.env.ADMIN_DECRYPTION_PUBKEY || ''
   const hmacSecret = readSecret('hmac-secret', 'HMAC_SECRET')
   const twilioAccountSid = readSecret('twilio-account-sid', 'TWILIO_ACCOUNT_SID')
   const twilioAuthToken = readSecret('twilio-auth-token', 'TWILIO_AUTH_TOKEN')
   const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || ''
 
+  // Nostr relay config (self-hosted strfry)
+  const serverNostrSecret = readSecret('server-nostr-secret', 'SERVER_NOSTR_SECRET')
+  const nostrRelayUrl = process.env.NOSTR_RELAY_URL || ''
+
   // Create the env object (without DO namespaces initially)
   const env: Record<string, unknown> = {
     ADMIN_PUBKEY: adminPubkey,
+    ADMIN_DECRYPTION_PUBKEY: adminDecryptionPubkey || undefined,
     HMAC_SECRET: hmacSecret,
     HOTLINE_NAME: process.env.HOTLINE_NAME || 'Hotline',
     ENVIRONMENT: process.env.ENVIRONMENT || 'production',
@@ -67,6 +73,9 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
     ASSETS: null, // Static files served by Hono serveStatic
     AI: createTranscriptionService(),
     R2_BUCKET: createBlobStorage(),
+    // Nostr relay (Epic 76.1)
+    SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
+    NOSTR_RELAY_URL: nostrRelayUrl || undefined,
   }
 
   // Create DO namespaces that pass env to each instance

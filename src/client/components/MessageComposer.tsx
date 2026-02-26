@@ -4,13 +4,7 @@ import { Send, Lock, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface MessageComposerProps {
-  onSend: (data: {
-    encryptedContent: string
-    ephemeralPubkey: string
-    encryptedContentAdmin: string
-    ephemeralPubkeyAdmin: string
-    plaintextForSending?: string
-  }) => void
+  onSend: (plaintext: string) => void
   disabled?: boolean
   channelType: string
 }
@@ -35,13 +29,7 @@ export function MessageComposer({ onSend, disabled = false, channelType }: Messa
     const trimmed = text.trim()
     if (!trimmed || disabled) return
 
-    onSend({
-      encryptedContent: '',
-      ephemeralPubkey: '',
-      encryptedContentAdmin: '',
-      ephemeralPubkeyAdmin: '',
-      plaintextForSending: trimmed,
-    })
+    onSend(trimmed)
 
     setText('')
     // Reset textarea height after clearing

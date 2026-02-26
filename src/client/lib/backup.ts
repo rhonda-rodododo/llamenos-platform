@@ -1,41 +1,41 @@
 /**
  * Key backup & recovery utilities.
  *
- * Backup file format:
- * {
- *   version: 1,
- *   format: "llamenos-key-backup",
- *   pubkey: "hex",
- *   createdAt: "ISO",
- *   encrypted: { salt, iterations, nonce, ciphertext }  // encrypted with PIN
- * }
+ * Backup files use generic, non-identifying field names to avoid
+ * associating the file with any specific application if discovered
+ * on a seized device.
+ *
+ * Format: { v, id, t, d: { s, i, n, c }, r?: { s, i, n, c } }
+ *   v  = version (1)
+ *   id = first 6 hex chars of SHA-256(pubkey) — user identification only
+ *   t  = unix timestamp, rounded to nearest hour
+ *   d  = PIN-encrypted data: salt, iterations, nonce, ciphertext
+ *   r  = recovery key encrypted data (same structure)
  *
  * Recovery key: 128-bit random, Base32-encoded, formatted as XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
  */
 
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { RECOVERY_SALT } from '@shared/crypto-labels'
 
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 
+interface EncryptedBlock {
+  s: string  // salt (hex)
+  i: number  // PBKDF2 iterations
+  n: string  // nonce (hex)
+  c: string  // ciphertext (hex)
+}
+
 export interface BackupFile {
-  version: 1
-  format: 'llamenos-key-backup'
-  pubkey: string
-  createdAt: string
-  encrypted: {
-    salt: string
-    iterations: number
-    nonce: string
-    ciphertext: string
-  }
-  recoveryKey?: {
-    salt: string
-    iterations: number
-    nonce: string
-    ciphertext: string
-  }
+  v: 1
+  id: string         // truncated SHA-256(pubkey), first 6 hex chars
+  t: number          // unix timestamp (seconds), rounded to nearest hour
+  d: EncryptedBlock  // PIN-encrypted nsec
+  r?: EncryptedBlock // recovery-key-encrypted nsec
 }
 
 /**
@@ -58,7 +58,6 @@ export function generateRecoveryKey(): string {
   if (bits > 0) {
     base32 += BASE32_CHARS[(buffer << (5 - bits)) & 0x1f]
   }
-  // Format as XXXX-XXXX-XXXX-...
   return base32.match(/.{1,4}/g)!.join('-')
 }
 
@@ -68,8 +67,7 @@ export function generateRecoveryKey(): string {
 async function deriveFromRecoveryKey(recoveryKey: string, perBackupSalt?: Uint8Array): Promise<Uint8Array> {
   const normalized = recoveryKey.replace(/-/g, '').toUpperCase()
   const keyBytes = utf8ToBytes(normalized)
-  // Use per-backup random salt if provided, otherwise fall back to static salt for legacy backups
-  const salt = perBackupSalt ?? utf8ToBytes('llamenos:recovery')
+  const salt = perBackupSalt ?? utf8ToBytes(RECOVERY_SALT)
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     keyBytes.buffer as ArrayBuffer,
@@ -82,7 +80,7 @@ async function deriveFromRecoveryKey(recoveryKey: string, perBackupSalt?: Uint8A
       name: 'PBKDF2',
       hash: 'SHA-256',
       salt: salt.buffer as ArrayBuffer,
-      iterations: 100_000, // Fewer iterations — recovery key is high entropy
+      iterations: 100_000,
     },
     keyMaterial,
     256,
@@ -91,7 +89,7 @@ async function deriveFromRecoveryKey(recoveryKey: string, perBackupSalt?: Uint8A
 }
 
 /**
- * Derive a KEK from a PIN using PBKDF2 (same as key-store.ts).
+ * Derive a KEK from a PIN using PBKDF2.
  */
 async function deriveFromPin(pin: string, salt: Uint8Array): Promise<Uint8Array> {
   const pinBytes = utf8ToBytes(pin)
@@ -134,6 +132,24 @@ function decrypt(nonce: string, ciphertext: string, kek: Uint8Array): string | n
 }
 
 /**
+ * Create a truncated pubkey identifier (first 6 hex chars of SHA-256).
+ * Enough for the user to identify which backup is which, not enough to identify the pubkey.
+ */
+function truncatedPubkeyId(pubkey: string): string {
+  const hash = sha256(utf8ToBytes(pubkey))
+  return bytesToHex(hash).slice(0, 6)
+}
+
+/**
+ * Round a timestamp to the nearest hour to reduce timing correlation.
+ */
+function roundToHour(date: Date): number {
+  const ms = date.getTime()
+  const hourMs = 3_600_000
+  return Math.round(ms / hourMs) * hourMs / 1000
+}
+
+/**
  * Create an encrypted backup file.
  */
 export async function createBackup(
@@ -147,59 +163,55 @@ export async function createBackup(
   const kek = await deriveFromPin(pin, salt)
   const { nonce, ciphertext } = encrypt(nsec, kek)
 
-  // Recovery key encryption is mandatory
   const rSalt = new Uint8Array(16)
   crypto.getRandomValues(rSalt)
   const rKek = await deriveFromRecoveryKey(recoveryKey, rSalt)
   const { nonce: rNonce, ciphertext: rCt } = encrypt(nsec, rKek)
 
-  const backup: BackupFile = {
-    version: 1,
-    format: 'llamenos-key-backup',
-    pubkey,
-    createdAt: new Date().toISOString(),
-    encrypted: {
-      salt: bytesToHex(salt),
-      iterations: 600_000,
-      nonce,
-      ciphertext,
+  return {
+    v: 1,
+    id: truncatedPubkeyId(pubkey),
+    t: roundToHour(new Date()),
+    d: {
+      s: bytesToHex(salt),
+      i: 600_000,
+      n: nonce,
+      c: ciphertext,
     },
-    recoveryKey: {
-      salt: bytesToHex(rSalt),
-      iterations: 100_000,
-      nonce: rNonce,
-      ciphertext: rCt,
+    r: {
+      s: bytesToHex(rSalt),
+      i: 100_000,
+      n: rNonce,
+      c: rCt,
     },
   }
-
-  return backup
 }
 
 /**
  * Restore nsec from a backup file using PIN.
  */
 export async function restoreFromBackupWithPin(backup: BackupFile, pin: string): Promise<string | null> {
-  const salt = hexToBytes(backup.encrypted.salt)
+  const salt = hexToBytes(backup.d.s)
   const kek = await deriveFromPin(pin, salt)
-  return decrypt(backup.encrypted.nonce, backup.encrypted.ciphertext, kek)
+  return decrypt(backup.d.n, backup.d.c, kek)
 }
 
 /**
  * Restore nsec from a backup file using recovery key.
  */
 export async function restoreFromBackupWithRecoveryKey(backup: BackupFile, recoveryKey: string): Promise<string | null> {
-  if (!backup.recoveryKey) return null
-  // Use per-backup salt if present (new format), fall back to static salt for legacy backups
-  const perBackupSalt = backup.recoveryKey.salt ? hexToBytes(backup.recoveryKey.salt) : undefined
+  if (!backup.r) return null
+  const perBackupSalt = backup.r.s ? hexToBytes(backup.r.s) : undefined
   const rKek = await deriveFromRecoveryKey(recoveryKey, perBackupSalt)
-  return decrypt(backup.recoveryKey.nonce, backup.recoveryKey.ciphertext, rKek)
+  return decrypt(backup.r.n, backup.r.c, rKek)
 }
 
 /**
  * Download a backup file to the user's device.
+ * Uses compact JSON (no pretty-print) and generic filename.
  */
 export function downloadBackupFile(backup: BackupFile): void {
-  const content = JSON.stringify(backup, null, 2)
+  const content = JSON.stringify(backup)
   const blob = new Blob([content], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -213,13 +225,17 @@ export function downloadBackupFile(backup: BackupFile): void {
 
 /**
  * Read a backup file from a File input.
+ * Recognizes the new format by presence of "v" and "d" fields.
  */
 export async function readBackupFile(file: File): Promise<BackupFile | null> {
   try {
     const text = await file.text()
     const data = JSON.parse(text)
-    if (data.format !== 'llamenos-key-backup' || data.version !== 1) return null
-    return data as BackupFile
+    // New format: has "v" and "d" fields
+    if (data.v === 1 && data.d && typeof data.d.s === 'string') {
+      return data as BackupFile
+    }
+    return null
   } catch {
     return null
   }

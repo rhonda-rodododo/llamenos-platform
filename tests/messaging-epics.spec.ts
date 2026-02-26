@@ -338,7 +338,8 @@ test.describe('Epic 73: Enhanced Conversation UI', () => {
       !err.includes('service-worker') &&
       !err.includes('401') &&
       !err.includes('Unauthorized') &&
-      !err.includes('WebSocket') // WebSocket may fail in Docker test environment
+      !err.includes('WebSocket') && // WebSocket may fail in Docker test environment
+      !err.includes('nostr') && !err.includes('relay') // Nostr relay may not be available in test
     )
     expect(criticalErrors).toHaveLength(0)
   })

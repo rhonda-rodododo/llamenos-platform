@@ -11,7 +11,7 @@ import {
   updateConversation,
   type ConversationMessage,
 } from '@/lib/api'
-import { encryptForPublicKey } from '@/lib/crypto'
+import { encryptMessage } from '@/lib/crypto'
 import { useToast } from '@/lib/toast'
 import { ConversationList } from '@/components/ConversationList'
 import { ConversationThread } from '@/components/ConversationThread'
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/conversations')({
 
 function ConversationsPage() {
   const { t } = useTranslation()
-  const { isAdmin, hasNsec, publicKey } = useAuth()
+  const { isAdmin, hasNsec, publicKey, adminDecryptionPubkey } = useAuth()
   const { channels } = useConfig()
   const { toast } = useToast()
   const { conversations, waitingConversations } = useConversations()
@@ -84,42 +84,29 @@ function ConversationsPage() {
     }
   }, [selectedId, t, toast])
 
-  const handleSend = useCallback(async (data: {
-    encryptedContent: string
-    ephemeralPubkey: string
-    encryptedContentAdmin: string
-    ephemeralPubkeyAdmin: string
-    plaintextForSending?: string
-  }) => {
-    if (!selectedId) return
+  // Encrypt and send a message using envelope pattern
+  const handleComposerSend = useCallback(async (plaintext: string) => {
+    if (!selectedId || !hasNsec || !publicKey) return
+
+    // Build reader list: current user + admin decryption pubkey
+    const readerPubkeys = [publicKey]
+    if (adminDecryptionPubkey && adminDecryptionPubkey !== publicKey) {
+      readerPubkeys.push(adminDecryptionPubkey)
+    }
+
+    const encrypted = encryptMessage(plaintext, readerPubkeys)
+
     try {
-      const msg = await sendConversationMessage(selectedId, data)
+      const msg = await sendConversationMessage(selectedId, {
+        encryptedContent: encrypted.encryptedContent,
+        readerEnvelopes: encrypted.readerEnvelopes,
+        plaintextForSending: plaintext,
+      })
       setMessages(prev => [msg, ...prev])
     } catch {
       toast(t('conversations.sendError', { defaultValue: 'Failed to send message' }), 'error')
     }
-  }, [selectedId, t, toast])
-
-  // Wrapper that handles encryption before sending
-  const handleComposerSend = useCallback((data: { plaintextForSending?: string }) => {
-    if (!data.plaintextForSending || !hasNsec || !publicKey) return
-
-    const plaintext = data.plaintextForSending
-
-    // Encrypt for the current user (volunteer/admin)
-    const myEncrypted = encryptForPublicKey(plaintext, publicKey)
-
-    // Encrypt admin copy — if we're admin, use same; otherwise, duplicate for now
-    const adminEncrypted = myEncrypted
-
-    handleSend({
-      encryptedContent: myEncrypted.encryptedContent,
-      ephemeralPubkey: myEncrypted.ephemeralPubkey,
-      encryptedContentAdmin: adminEncrypted.encryptedContent,
-      ephemeralPubkeyAdmin: adminEncrypted.ephemeralPubkey,
-      plaintextForSending: plaintext,
-    })
-  }, [hasNsec, publicKey, handleSend])
+  }, [selectedId, hasNsec, publicKey, adminDecryptionPubkey, t, toast])
 
   const hasAnyMessaging = channels.sms || channels.whatsapp || channels.signal || channels.reports
 

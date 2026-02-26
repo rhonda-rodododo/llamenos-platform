@@ -7,6 +7,7 @@ import {
   createProvisioningRoom,
   pollProvisioningRoom,
   decryptProvisionedNsec,
+  computeSASForNewDevice,
   type ProvisioningSession,
 } from '@/lib/provisioning'
 import * as keyManager from '@/lib/key-manager'
@@ -16,14 +17,14 @@ import { LanguageSelect } from '@/components/language-select'
 import { PinInput } from '@/components/pin-input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Smartphone, Loader2, CheckCircle2, XCircle, Sun, Moon, Monitor } from 'lucide-react'
+import { Smartphone, Loader2, CheckCircle2, XCircle, ShieldCheck, Sun, Moon, Monitor } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 
 export const Route = createFileRoute('/link-device')({
   component: LinkDevicePage,
 })
 
-type Step = 'init' | 'waiting' | 'pin-create' | 'pin-confirm' | 'done' | 'error'
+type Step = 'init' | 'waiting' | 'verify-sas' | 'pin-create' | 'pin-confirm' | 'done' | 'error'
 
 function LinkDevicePage() {
   const { t } = useTranslation()
@@ -33,6 +34,8 @@ function LinkDevicePage() {
   const [step, setStep] = useState<Step>('init')
   const [session, setSession] = useState<ProvisioningSession | null>(null)
   const [error, setError] = useState('')
+  const [sasCode, setSasCode] = useState('')
+  const [encryptedNsecData, setEncryptedNsecData] = useState<{ encryptedNsec: string; primaryPubkey: string } | null>(null)
   const [nsec, setNsec] = useState('')
   const [pin1, setPin1] = useState('')
   const [pin2, setPin2] = useState('')
@@ -59,13 +62,11 @@ function LinkDevicePage() {
           if (status.status === 'ready' && status.encryptedNsec && status.primaryPubkey) {
             clearInterval(pollRef.current!)
             pollRef.current = null
-            const decryptedNsec = decryptProvisionedNsec(
-              status.encryptedNsec,
-              status.primaryPubkey,
-              s.ephemeralSecret,
-            )
-            setNsec(decryptedNsec)
-            setStep('pin-create')
+            // Compute SAS for verification before decrypting
+            const sas = computeSASForNewDevice(s.ephemeralSecret, status.primaryPubkey)
+            setSasCode(sas)
+            setEncryptedNsecData({ encryptedNsec: status.encryptedNsec, primaryPubkey: status.primaryPubkey })
+            setStep('verify-sas')
           } else if (status.status === 'expired') {
             clearInterval(pollRef.current!)
             pollRef.current = null
@@ -88,6 +89,30 @@ function LinkDevicePage() {
       if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [])
+
+  function handleSASConfirm() {
+    if (!session || !encryptedNsecData) return
+    try {
+      const decryptedNsec = decryptProvisionedNsec(
+        encryptedNsecData.encryptedNsec,
+        encryptedNsecData.primaryPubkey,
+        session.ephemeralSecret,
+      )
+      setNsec(decryptedNsec)
+      setEncryptedNsecData(null)
+      setStep('pin-create')
+    } catch {
+      setError(t('deviceLink.decryptFailed'))
+      setStep('error')
+    }
+  }
+
+  function handleSASMismatch() {
+    setEncryptedNsecData(null)
+    setSasCode('')
+    setError(t('deviceLink.sasMismatch'))
+    setStep('error')
+  }
 
   async function handlePinCreate(pin: string) {
     setPin1(pin)
@@ -182,6 +207,35 @@ function LinkDevicePage() {
                 </code>
               </div>
               <p className="text-xs text-center text-muted-foreground">{t('deviceLink.expiresIn5')}</p>
+            </CardContent>
+          </>
+        )}
+
+        {step === 'verify-sas' && (
+          <>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5" />
+                {t('deviceLink.verifySAS')}
+              </CardTitle>
+              <CardDescription>{t('deviceLink.verifySASDesc')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-6 text-center" data-testid="sas-code">
+                <p className="text-xs text-muted-foreground mb-2">{t('deviceLink.securityCode')}</p>
+                <p className="text-4xl font-mono font-bold tracking-[0.3em]">{sasCode}</p>
+              </div>
+              <p className="text-sm text-muted-foreground text-center">{t('deviceLink.compareCodes')}</p>
+              <div className="flex gap-2">
+                <Button onClick={handleSASConfirm} className="flex-1" data-testid="sas-match">
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  {t('deviceLink.codesMatch')}
+                </Button>
+                <Button onClick={handleSASMismatch} variant="destructive" className="flex-1" data-testid="sas-mismatch">
+                  <XCircle className="h-4 w-4 mr-1" />
+                  {t('deviceLink.codesDontMatch')}
+                </Button>
+              </div>
             </CardContent>
           </>
         )}

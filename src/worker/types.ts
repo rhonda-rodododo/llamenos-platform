@@ -39,16 +39,28 @@ export interface Env {
   // Blob storage (CF: R2Bucket, Node: MinIO S3 client)
   R2_BUCKET: BlobStorage
 
+  // Nostr relay service binding (CF: Fetcher to Nosflare, Node: null)
+  NOSFLARE?: { fetch(request: Request): Promise<Response> }
+
   // Plain env vars / secrets (same on both platforms)
   TWILIO_ACCOUNT_SID: string
   TWILIO_AUTH_TOKEN: string
   TWILIO_PHONE_NUMBER: string
   ADMIN_PUBKEY: string
+  ADMIN_DECRYPTION_PUBKEY?: string // Separate pubkey for note/hub key encryption (falls back to ADMIN_PUBKEY)
   HOTLINE_NAME: string
   ENVIRONMENT: string
   HMAC_SECRET: string
   E2E_TEST_SECRET?: string
   DEV_RESET_SECRET?: string
+
+  // Server Nostr identity (Epic 76.1) — hex secret for HKDF keypair derivation
+  SERVER_NOSTR_SECRET?: string
+  // Relay URL for Node.js persistent WebSocket (Docker/self-hosted)
+  NOSTR_RELAY_URL?: string
+  // Public-facing relay URL for client browser connections (e.g., wss://relay.example.com)
+  // Falls back to /nostr (reverse-proxied via Caddy) if not set but relay is configured
+  NOSTR_RELAY_PUBLIC_URL?: string
 }
 
 /** @deprecated Use roles array + permission system instead */
@@ -106,6 +118,42 @@ export interface CallRecord {
   hasRecording?: boolean
 }
 
+/**
+ * Encrypted call record for history storage (Epic 77).
+ *
+ * Active calls remain as plaintext CallRecord (routing necessity).
+ * When a call completes, sensitive metadata (answeredBy, full callerNumber)
+ * is encrypted into an envelope and stored per-record as `callrecord:${id}`.
+ *
+ * Plaintext fields: callerLast4, timestamp, duration, status, hasTranscription, hasVoicemail
+ * Encrypted fields: answeredBy, callerNumber (original hash), outcome details
+ */
+export interface EncryptedCallRecord {
+  id: string
+  callerLast4?: string           // For display (not sensitive)
+  startedAt: string              // Needed for ordering/pagination
+  endedAt?: string               // Needed for duration display
+  duration?: number              // Acceptable trade-off (no PII)
+  status: 'completed' | 'unanswered'
+  hasTranscription: boolean
+  hasVoicemail: boolean
+  hasRecording?: boolean
+  recordingSid?: string          // Twilio ID (not PII, server needs to update post-encryption)
+
+  // Envelope-pattern encryption for admin(s)
+  encryptedContent: string       // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
+  adminEnvelopes: MessageKeyEnvelope[]  // Per-record key wrapped for each admin
+}
+
+/**
+ * Plaintext inside EncryptedCallRecord.encryptedContent.
+ * Only visible after admin decryption.
+ */
+export interface CallRecordMetadata {
+  answeredBy: string | null      // Volunteer pubkey
+  callerNumber: string           // HMAC-hashed phone number
+}
+
 export interface EncryptedNote {
   id: string
   callId: string
@@ -115,8 +163,8 @@ export interface EncryptedNote {
   updatedAt: string
   ephemeralPubkey?: string // hex-encoded, present for server-encrypted transcriptions (ECIES)
   // V2 per-note ECIES envelopes (forward secrecy)
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }
 
 export interface AuditLogEntry {
@@ -125,6 +173,9 @@ export interface AuditLogEntry {
   actorPubkey: string
   details: Record<string, unknown>
   createdAt: string
+  // Tamper detection (Epic 77)
+  previousEntryHash?: string     // SHA-256 of previous entry (chain link)
+  entryHash?: string             // SHA-256 of this entry's content (for chain verification)
 }
 
 export interface SpamSettings {
@@ -207,15 +258,21 @@ export interface Conversation {
 
 export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
 
+/**
+ * Encrypted message using the envelope pattern (Epic 74).
+ *
+ * Single ciphertext encrypted with a random per-message symmetric key.
+ * The key is ECIES-wrapped separately for each authorized reader.
+ * Domain separation label: 'llamenos:message'.
+ */
 export interface EncryptedMessage {
   id: string
   conversationId: string
   direction: 'inbound' | 'outbound'
   authorPubkey: string             // volunteer pubkey or 'system:inbound'
-  encryptedContent: string         // ECIES-encrypted message text
-  ephemeralPubkey: string          // for ECIES decryption
-  encryptedContentAdmin: string    // admin copy
-  ephemeralPubkeyAdmin: string
+  encryptedContent: string         // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
+  // Per-reader key envelopes (ECIES-wrapped message key)
+  readerEnvelopes: MessageKeyEnvelope[]
   hasAttachments: boolean
   attachmentIds?: string[]         // references to R2 encrypted blobs
   createdAt: string
@@ -226,6 +283,13 @@ export interface EncryptedMessage {
   readAt?: string                  // ISO timestamp when read (if supported)
   failureReason?: string           // error message for failed messages
   retryCount?: number              // number of retry attempts
+}
+
+/** ECIES-wrapped message key for a specific reader. */
+export interface MessageKeyEnvelope {
+  pubkey: string           // reader's x-only pubkey (hex)
+  wrappedKey: string       // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
+  ephemeralPubkey: string  // hex: compressed 33-byte ephemeral pubkey
 }
 
 // --- Blast Queue ---

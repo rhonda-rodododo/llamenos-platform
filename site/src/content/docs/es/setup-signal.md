@@ -89,7 +89,7 @@ Llamenos monitorea la salud del bridge signal-cli:
 
 ## Transcripcion de mensajes de voz
 
-Los mensajes de voz de Signal se transcriben automaticamente usando Cloudflare Workers AI (Whisper). La transcripcion aparece junto al mensaje de voz en la vista de conversacion.
+Los mensajes de voz de Signal pueden transcribirse directamente en el navegador del voluntario usando Whisper del lado del cliente (WASM via `@huggingface/transformers`). El audio nunca sale del dispositivo — la transcripcion se cifra y almacena junto al mensaje de voz en la vista de conversacion. Los voluntarios pueden activar o desactivar la transcripcion en su configuracion personal.
 
 ## Notas de seguridad
 

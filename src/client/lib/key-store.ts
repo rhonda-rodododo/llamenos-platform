@@ -10,6 +10,7 @@
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { HMAC_KEYID_PREFIX } from '@shared/crypto-labels'
 
 const STORAGE_KEY = 'llamenos-encrypted-key'
 const PBKDF2_ITERATIONS = 600_000
@@ -63,7 +64,7 @@ export async function storeEncryptedKey(nsec: string, pin: string, pubkey: strin
   const ciphertext = cipher.encrypt(plaintext)
 
   // Hash pubkey for identification — never store plaintext pubkey alongside encrypted key
-  const hashInput = utf8ToBytes(`llamenos:keyid:${pubkey}`)
+  const hashInput = utf8ToBytes(`${HMAC_KEYID_PREFIX}${pubkey}`)
   const pubkeyHash = bytesToHex(new Uint8Array(
     await crypto.subtle.digest('SHA-256', hashInput.buffer as ArrayBuffer)
   )).slice(0, 16)

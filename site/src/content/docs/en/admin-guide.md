@@ -70,7 +70,7 @@ When messaging channels (SMS, WhatsApp, Signal) are enabled, a **Conversations**
 Each conversation shows:
 - Message bubbles with timestamps and direction (inbound/outbound)
 - The channel the message arrived on (SMS, WhatsApp, Signal)
-- Real-time updates via WebSocket — new messages appear instantly
+- Real-time updates via Nostr relay — new messages appear instantly
 
 Conversations are created automatically when an inbound message arrives. Volunteers can respond directly from the conversation view.
 

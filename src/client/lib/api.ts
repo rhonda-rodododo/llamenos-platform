@@ -84,6 +84,8 @@ export async function getConfig() {
     needsBootstrap?: boolean
     hubs?: import('@shared/types').Hub[]
     defaultHubId?: string
+    serverNostrPubkey?: string
+    nostrRelayUrl?: string
   }>
 }
 
@@ -114,7 +116,7 @@ export async function logout() {
 }
 
 export async function getMe() {
-  return request<{ pubkey: string; roles: string[]; permissions: string[]; primaryRole: { id: string; name: string; slug: string } | null; name: string; transcriptionEnabled: boolean; spokenLanguages: string[]; uiLanguage: string; profileCompleted: boolean; onBreak: boolean; callPreference: 'phone' | 'browser' | 'both'; webauthnRequired: boolean; webauthnRegistered: boolean; adminPubkey: string }>('/auth/me')
+  return request<{ pubkey: string; roles: string[]; permissions: string[]; primaryRole: { id: string; name: string; slug: string } | null; name: string; transcriptionEnabled: boolean; spokenLanguages: string[]; uiLanguage: string; profileCompleted: boolean; onBreak: boolean; callPreference: 'phone' | 'browser' | 'both'; webauthnRequired: boolean; webauthnRegistered: boolean; adminPubkey: string; adminDecryptionPubkey: string }>('/auth/me')
 }
 
 // --- Volunteers (admin only) ---
@@ -232,8 +234,8 @@ export async function listNotes(params?: { callId?: string; page?: number; limit
 export async function createNote(data: {
   callId: string
   encryptedContent: string
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }) {
   return request<{ note: EncryptedNote }>(hp('/notes'), {
     method: 'POST',
@@ -243,8 +245,8 @@ export async function createNote(data: {
 
 export async function updateNote(id: string, data: {
   encryptedContent: string
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }) {
   return request<{ note: EncryptedNote }>(hp(`/notes/${id}`), {
     method: 'PATCH',
@@ -266,6 +268,20 @@ export async function getCallHistory(params?: { page?: number; limit?: number; s
   if (params?.dateFrom) qs.set('dateFrom', params.dateFrom)
   if (params?.dateTo) qs.set('dateTo', params.dateTo)
   return request<{ calls: CallRecord[]; total: number }>(hp(`/calls/history?${qs}`))
+}
+
+// --- Call Actions (REST) ---
+
+export async function answerCall(callId: string) {
+  return request<{ call: ActiveCall }>(hp(`/calls/${callId}/answer`), { method: 'POST' })
+}
+
+export async function hangupCall(callId: string) {
+  return request<{ call: ActiveCall }>(hp(`/calls/${callId}/hangup`), { method: 'POST' })
+}
+
+export async function reportCallSpam(callId: string) {
+  return request<{ callId: string; callerNumber: string | null; reportedBy: string }>(hp(`/calls/${callId}/spam`), { method: 'POST' })
 }
 
 // --- Calls Today ---
@@ -637,8 +653,8 @@ export interface EncryptedNote {
   updatedAt: string
   ephemeralPubkey?: string
   // V2 per-note ECIES envelopes (forward secrecy)
-  authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-  adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
 }
 
 export interface ActiveCall {
@@ -651,16 +667,23 @@ export interface ActiveCall {
 
 export interface CallRecord {
   id: string
-  callerNumber: string
   callerLast4?: string
-  answeredBy: string
   startedAt: string
-  endedAt: string
-  duration: number
+  endedAt?: string
+  duration?: number
   hasTranscription: boolean
   hasVoicemail: boolean
   hasRecording?: boolean
+  recordingSid?: string
   status: 'completed' | 'unanswered'
+
+  // Envelope-encrypted metadata (Epic 77)
+  encryptedContent?: string
+  adminEnvelopes?: MessageKeyEnvelope[]
+
+  // Decrypted fields (populated client-side after decryption)
+  answeredBy?: string | null
+  callerNumber?: string
 }
 
 export interface AuditLogEntry {
@@ -669,6 +692,9 @@ export interface AuditLogEntry {
   actorPubkey: string
   details: Record<string, unknown>
   createdAt: string
+  // Chain integrity (Epic 77)
+  previousEntryHash?: string
+  entryHash?: string
 }
 
 export interface VolunteerPresence {
@@ -718,15 +744,20 @@ export interface Conversation {
 
 export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
 
+/** ECIES-wrapped message key for a specific reader. */
+export interface MessageKeyEnvelope {
+  pubkey: string           // reader's x-only pubkey (hex)
+  wrappedKey: string       // hex: nonce(24) + ciphertext(48)
+  ephemeralPubkey: string  // hex: compressed 33-byte ephemeral pubkey
+}
+
 export interface ConversationMessage {
   id: string
   conversationId: string
   direction: 'inbound' | 'outbound'
   authorPubkey: string
-  encryptedContent: string
-  ephemeralPubkey: string
-  encryptedContentAdmin: string
-  ephemeralPubkeyAdmin: string
+  encryptedContent: string         // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
+  readerEnvelopes: MessageKeyEnvelope[]  // per-reader ECIES-wrapped message keys
   hasAttachments: boolean
   attachmentIds?: string[]
   // Delivery status tracking (Epic 71)
@@ -771,9 +802,7 @@ export async function getConversationMessages(id: string, params?: { page?: numb
 
 export async function sendConversationMessage(id: string, data: {
   encryptedContent: string
-  ephemeralPubkey: string
-  encryptedContentAdmin: string
-  ephemeralPubkeyAdmin: string
+  readerEnvelopes: MessageKeyEnvelope[]
   plaintextForSending?: string
 }) {
   return request<ConversationMessage>(hp(`/conversations/${id}/messages`), {
@@ -887,9 +916,7 @@ export async function createReport(data: {
   title: string
   category?: string
   encryptedContent: string
-  ephemeralPubkey: string
-  encryptedContentAdmin: string
-  ephemeralPubkeyAdmin: string
+  readerEnvelopes: MessageKeyEnvelope[]
 }) {
   return request<Report>(hp('/reports'), {
     method: 'POST',
@@ -910,9 +937,7 @@ export async function getReportMessages(id: string, params?: { page?: number; li
 
 export async function sendReportMessage(id: string, data: {
   encryptedContent: string
-  ephemeralPubkey: string
-  encryptedContentAdmin: string
-  ephemeralPubkeyAdmin: string
+  readerEnvelopes: MessageKeyEnvelope[]
   attachmentIds?: string[]
 }) {
   return request<ConversationMessage>(hp(`/reports/${id}/messages`), {

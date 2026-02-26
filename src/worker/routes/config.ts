@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
+import { deriveServerKeypair } from '../lib/nostr-publisher'
 import type { EnabledChannels, Hub, SetupState } from '../../shared/types'
 
 const config = new Hono<AppEnv>()
@@ -56,6 +57,15 @@ config.get('/', async (c) => {
     }
   } catch { /* default to empty */ }
 
+  // Derive server Nostr pubkey for client event verification (Epic 76.1)
+  const serverNostrPubkey = c.env.SERVER_NOSTR_SECRET
+    ? deriveServerKeypair(c.env.SERVER_NOSTR_SECRET).pubkey
+    : undefined
+
+  // Client-facing relay URL (explicit env var, or default /nostr path if relay is configured)
+  const nostrRelayUrl = c.env.NOSTR_RELAY_PUBLIC_URL
+    || (serverNostrPubkey ? '/nostr' : undefined)
+
   return c.json({
     hotlineName: c.env.HOTLINE_NAME || 'Hotline',
     hotlineNumber,
@@ -65,6 +75,20 @@ config.get('/', async (c) => {
     needsBootstrap,
     hubs,
     defaultHubId,
+    serverNostrPubkey,
+    nostrRelayUrl,
+  })
+})
+
+// Build verification endpoint (Epic 79: Reproducible Builds)
+// Informational only — trust anchor is CHECKSUMS.txt in GitHub Releases
+config.get('/verify', (c) => {
+  return c.json({
+    version: __BUILD_VERSION__,
+    commit: __BUILD_COMMIT__,
+    buildTime: __BUILD_TIME__,
+    verificationUrl: 'https://github.com/rhonda-rodododo/llamenos/releases',
+    trustAnchor: 'GitHub Release checksums + SLSA provenance',
   })
 })
 

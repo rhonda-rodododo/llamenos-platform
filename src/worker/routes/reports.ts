@@ -1,8 +1,24 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getScopedDOs } from '../lib/do-access'
+import { getScopedDOs, getNostrPublisher } from '../lib/do-access'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
+import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '../../shared/nostr-events'
+
+/** Publish a report/conversation event to the Nostr relay */
+function publishReportEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>) {
+  try {
+    const publisher = getNostrPublisher(env)
+    publisher.publish({
+      kind,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['d', 'global'], ['t', 'llamenos:event']],
+      content: JSON.stringify(content),
+    }).catch(() => {})
+  } catch {
+    // Nostr not configured
+  }
+}
 
 const reports = new Hono<AppEnv>()
 
@@ -50,14 +66,12 @@ reports.post('/', requirePermission('reports:create'), async (c) => {
   const body = await c.req.json() as {
     title: string
     category?: string
-    // First message content (encrypted)
+    // First message content (envelope-encrypted)
     encryptedContent: string
-    ephemeralPubkey: string
-    encryptedContentAdmin: string
-    ephemeralPubkeyAdmin: string
+    readerEnvelopes: import('../types').MessageKeyEnvelope[]
   }
 
-  if (!body.encryptedContent || !body.ephemeralPubkey) {
+  if (!body.encryptedContent || !body.readerEnvelopes?.length) {
     return c.json({ error: 'Report content is required' }, 400)
   }
 
@@ -91,9 +105,7 @@ reports.post('/', requirePermission('reports:create'), async (c) => {
       direction: 'inbound',
       authorPubkey: pubkey,
       encryptedContent: body.encryptedContent,
-      ephemeralPubkey: body.ephemeralPubkey,
-      encryptedContentAdmin: body.encryptedContentAdmin,
-      ephemeralPubkeyAdmin: body.ephemeralPubkeyAdmin,
+      readerEnvelopes: body.readerEnvelopes,
     }),
   }))
 
@@ -101,16 +113,12 @@ reports.post('/', requirePermission('reports:create'), async (c) => {
     return c.json({ error: 'Failed to add report message' }, 500)
   }
 
-  // Broadcast to admins
-  try {
-    await dos.calls.fetch(new Request('http://do/broadcast', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'report:new',
-        data: { conversationId: conversation.id, category: body.category },
-      }),
-    }))
-  } catch { /* non-critical */ }
+  // Publish report event to Nostr relay
+  publishReportEvent(c.env, KIND_MESSAGE_NEW, {
+    type: 'report:new',
+    conversationId: conversation.id,
+    category: body.category,
+  })
 
   await audit(dos.records, 'reportCreated', pubkey, {
     conversationId: conversation.id,
@@ -231,9 +239,7 @@ reports.post('/:id/messages', async (c) => {
 
   const body = await c.req.json() as {
     encryptedContent: string
-    ephemeralPubkey: string
-    encryptedContentAdmin: string
-    ephemeralPubkeyAdmin: string
+    readerEnvelopes: import('../types').MessageKeyEnvelope[]
     attachmentIds?: string[]
   }
 
@@ -246,9 +252,7 @@ reports.post('/:id/messages', async (c) => {
       direction,
       authorPubkey: pubkey,
       encryptedContent: body.encryptedContent,
-      ephemeralPubkey: body.ephemeralPubkey,
-      encryptedContentAdmin: body.encryptedContentAdmin,
-      ephemeralPubkeyAdmin: body.ephemeralPubkeyAdmin,
+      readerEnvelopes: body.readerEnvelopes,
       hasAttachments: (body.attachmentIds?.length ?? 0) > 0,
       attachmentIds: body.attachmentIds,
     }),
@@ -260,13 +264,11 @@ reports.post('/:id/messages', async (c) => {
 
   const msg = await msgRes.json()
 
-  // Broadcast
-  try {
-    await dos.calls.fetch(new Request('http://do/broadcast', {
-      method: 'POST',
-      body: JSON.stringify({ type: 'message:new', data: { conversationId: id } }),
-    }))
-  } catch { /* non-critical */ }
+  // Publish message event to Nostr relay
+  publishReportEvent(c.env, KIND_MESSAGE_NEW, {
+    type: 'message:new',
+    conversationId: id,
+  })
 
   return c.json(msg)
 })
@@ -290,16 +292,12 @@ reports.post('/:id/assign', requirePermission('reports:assign'), async (c) => {
 
   await audit(dos.records, 'reportAssigned', pubkey, { reportId: id, assignedTo: body.assignedTo })
 
-  // Broadcast
-  try {
-    await dos.calls.fetch(new Request('http://do/broadcast', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'conversation:assigned',
-        data: { conversationId: id, assignedTo: body.assignedTo },
-      }),
-    }))
-  } catch { /* non-critical */ }
+  // Publish assignment event to Nostr relay
+  publishReportEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+    type: 'conversation:assigned',
+    conversationId: id,
+    assignedTo: body.assignedTo,
+  })
 
   return new Response(res.body, res)
 })

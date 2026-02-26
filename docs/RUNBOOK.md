@@ -20,6 +20,8 @@ This runbook provides procedures for common operational tasks, incident response
 8. [Scaling Considerations](#8-scaling-considerations)
 9. [Emergency Procedures](#9-emergency-procedures)
 
+> **Key Revocation and Rotation**: For cryptographic key compromise, volunteer departure key revocation, device seizure response, and hub key rotation procedures, see the dedicated [Key Revocation Runbook](security/KEY_REVOCATION_RUNBOOK.md).
+
 ---
 
 ## 1. Secret Rotation
@@ -122,6 +124,32 @@ docker compose restart app
 Alternatively, rotate credentials through the admin UI at Settings > Telephony Provider without touching `.env`.
 
 4. Revoke the old API key in the Twilio Console.
+
+### 1.6 Server Nostr Secret Rotation
+
+**Frequency**: Only when compromised, or when deliberately changing the server's Nostr identity.
+
+**WARNING**: Rotating `SERVER_NOSTR_SECRET` changes the server's Nostr keypair. All clients will see a new server pubkey after re-authenticating. Active relay subscriptions will need to be re-established.
+
+```bash
+cd /opt/llamenos/deploy/docker
+
+# 1. Generate new secret (must be exactly 64 hex characters)
+NEW_NOSTR_SECRET=$(openssl rand -hex 32)
+
+# 2. Update .env
+sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=${NEW_NOSTR_SECRET}|" .env
+
+# 3. Restart the application (relay does not need restart)
+docker compose restart app
+
+# 4. Verify
+docker compose exec app curl -sf http://localhost:3000/api/health
+```
+
+After rotation:
+- All connected clients will automatically reconnect and accept the new server identity
+- Historical events signed by the old server key will fail verification (acceptable — ephemeral events are not persisted)
 
 ### 1.5 Asterisk / Bridge Secrets Rotation
 
@@ -381,7 +409,19 @@ docker compose start app
 docker compose exec app curl -sf http://localhost:3000/api/health
 ```
 
-### 4.5 MinIO Blob Backup
+### 4.5 Nostr Relay (strfry) Backup
+
+Back up the strfry LMDB data directory:
+
+```bash
+# Back up the strfry-db Docker volume
+docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
+  alpine tar czf /backup/strfry-$(date +%Y%m%d).tar.gz -C /data .
+```
+
+**Note**: If all events are ephemeral (kind 20001), the relay database is small and contains only relay state — not user data. Backup is recommended but not critical.
+
+### 4.6 MinIO Blob Backup
 
 MinIO stores uploaded files (encrypted reports, IVR audio). Back it up separately:
 
@@ -438,6 +478,8 @@ When a security incident is suspected, follow this checklist in order:
 
 ### 5.2 Volunteer Account Compromise
 
+> **See also**: The [Key Revocation Runbook](security/KEY_REVOCATION_RUNBOOK.md) covers volunteer departure key revocation (friendly and hostile), device seizure response, and hub key rotation procedures.
+
 A volunteer's device or credentials have been compromised.
 
 ```bash
@@ -465,6 +507,8 @@ After the incident:
 - Review the audit log for any unauthorized actions during the compromise window.
 
 ### 5.3 Admin Account Compromise
+
+> **See also**: The [Key Revocation Runbook](security/KEY_REVOCATION_RUNBOOK.md) covers the full cryptographic response procedure for admin key compromise, including hub key rotation, envelope re-wrapping, GDPR assessment, and maximum response timeframes.
 
 This is the most severe account compromise scenario.
 
@@ -614,7 +658,27 @@ Docker log rotation is configured in the daemon settings (`/etc/docker/daemon.js
 
 This limits each container to 30 MB of logs (3 files x 10 MB). Adjust if you need more history.
 
-### 6.5 External Monitoring
+### 6.5 Nostr Relay Monitoring
+
+Monitor the Nostr relay (core service):
+
+```bash
+# Check relay health
+docker compose exec strfry curl -sf http://localhost:7777
+
+# View relay logs
+docker compose logs strfry --tail 50
+
+# Check LMDB database size
+docker compose exec strfry du -sh /app/strfry-db/
+
+# Check relay container resource usage
+docker stats strfry --no-stream
+```
+
+For detailed relay monitoring and troubleshooting, see [`docs/RELAY_OPERATIONS.md`](RELAY_OPERATIONS.md).
+
+### 6.6 External Monitoring
 
 Set up an external uptime monitor to alert on downtime:
 
@@ -669,20 +733,34 @@ docker compose logs caddy --tail 20
 
 **Likely causes**: The app container is still starting (wait for health check), or it crashed (check app logs).
 
-### 7.3 WebSocket Connection Fails
+### 7.3 Nostr Relay Connection Fails
 
 **Symptom**: Real-time updates (call notifications, presence indicators) do not work.
 
 ```bash
-# Test WebSocket endpoint
-# (This should return a 426 Upgrade Required since it's not a proper WS handshake)
-curl -sI https://hotline.yourorg.org/api/ws
+# Check if the relay container is running
+docker compose ps strfry
+
+# Check the relay health
+docker compose exec strfry curl -sf http://localhost:7777
+
+# Test the WebSocket proxy endpoint from outside
+curl -sI https://hotline.yourorg.org/nostr
+# Should return 426 Upgrade Required (not a proper WS handshake, but confirms routing)
+
+# Check browser console for relay errors
+# Common: "Failed to connect to wss://hotline.yourorg.org/nostr"
 ```
 
 **Common causes**:
-- Cloudflare proxy with WebSocket disabled (if using Cloudflare DNS). Enable WebSocket in Cloudflare dashboard.
-- Caddy not configured for WebSocket pass-through. The default Caddyfile handles this correctly.
-- Network firewall blocking long-lived connections.
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Relay container not running | Container stopped or failed | `docker compose up -d strfry` |
+| 502 on `/nostr` | Caddy can't reach strfry | Check `docker compose logs caddy` for upstream errors |
+| Auth failures in browser console | `SERVER_NOSTR_SECRET` missing or changed | Verify `.env` has `SERVER_NOSTR_SECRET`; restart app if changed |
+| Events not delivered | NIP-42 auth failing | Check relay logs; verify client pubkey is allowed |
+| Cloudflare 524 timeout | CF drops idle WebSocket after 100s | Enable WebSocket in Cloudflare dashboard; app sends periodic pings |
 
 ### 7.4 Database Disk Full
 
@@ -755,7 +833,7 @@ The Docker Compose deployment on a single VPS is designed for small organization
 | Resource | Capacity |
 |----------|----------|
 | Concurrent calls | ~50 (limited by telephony provider, not server) |
-| Concurrent WebSocket connections | ~500 |
+| Concurrent Nostr relay subscriptions | ~500 (strfry handles thousands; practical limit is app-side) |
 | Database storage | Limited by disk size |
 | API requests | ~1000/s (Hono on Node.js) |
 

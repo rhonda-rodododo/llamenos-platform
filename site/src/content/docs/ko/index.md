@@ -49,7 +49,7 @@ Llamenos는 Cloudflare Workers와 Durable Objects를 기반으로 하는 단일 
 | 전화 서비스 | Twilio, SignalWire, Vonage, Plivo 또는 Asterisk (TelephonyAdapter 인터페이스를 통해) |
 | 인증 | Nostr 키 쌍 (BIP-340 Schnorr) + WebAuthn |
 | 암호화 | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| 음성 변환 | Cloudflare Workers AI (Whisper) |
+| 음성 변환 | 클라이언트측 Whisper (WASM) |
 | 국제화 | i18next (12개 이상의 언어) |
 
 ## 역할

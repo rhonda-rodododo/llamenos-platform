@@ -1,12 +1,28 @@
 import { Hono } from 'hono'
 import type { AppEnv, EncryptedMessage } from '../types'
 import type { MessagingChannelType } from '../../shared/types'
-import { getScopedDOs, getMessagingAdapter } from '../lib/do-access'
+import { getScopedDOs, getMessagingAdapter, getNostrPublisher } from '../lib/do-access'
 import { checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 import { canClaimChannel, getClaimableChannels } from '../../shared/permissions'
+import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '../../shared/nostr-events'
 
 const conversations = new Hono<AppEnv>()
+
+/** Publish a conversation event to the Nostr relay */
+function publishConversationEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>) {
+  try {
+    const publisher = getNostrPublisher(env)
+    publisher.publish({
+      kind,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['d', 'global'], ['t', 'llamenos:event']],
+      content: JSON.stringify(content),
+    }).catch(() => {})
+  } catch {
+    // Nostr not configured
+  }
+}
 
 /**
  * GET /conversations — list conversations
@@ -157,7 +173,7 @@ conversations.get('/:id/messages', async (c) => {
 
 /**
  * POST /conversations/:id/messages — send outbound message
- * Body: { encryptedContent, ephemeralPubkey, encryptedContentAdmin, ephemeralPubkeyAdmin, plaintext? }
+ * Body: { encryptedContent, readerEnvelopes, plaintextForSending? }
  * If plaintext is provided, it's sent via the messaging adapter then discarded.
  */
 conversations.post('/:id/messages', async (c) => {
@@ -182,9 +198,7 @@ conversations.post('/:id/messages', async (c) => {
 
   const body = await c.req.json() as {
     encryptedContent: string
-    ephemeralPubkey: string
-    encryptedContentAdmin: string
-    ephemeralPubkeyAdmin: string
+    readerEnvelopes: import('../types').MessageKeyEnvelope[]
     plaintextForSending?: string
   }
 
@@ -195,9 +209,7 @@ conversations.post('/:id/messages', async (c) => {
     direction: 'outbound',
     authorPubkey: pubkey,
     encryptedContent: body.encryptedContent,
-    ephemeralPubkey: body.ephemeralPubkey,
-    encryptedContentAdmin: body.encryptedContentAdmin,
-    ephemeralPubkeyAdmin: body.ephemeralPubkeyAdmin,
+    readerEnvelopes: body.readerEnvelopes,
     hasAttachments: false,
     createdAt: new Date().toISOString(),
     status: 'pending',
@@ -248,18 +260,12 @@ conversations.post('/:id/messages', async (c) => {
     return c.json({ error: 'Failed to store message' }, 500)
   }
 
-  // Broadcast new message via WebSocket hub
-  await dos.calls.fetch(new Request('http://do/broadcast', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'message:new',
-      conversationId: id,
-      messageId: message.id,
-      direction: 'outbound',
-      authorPubkey: pubkey,
-    }),
-  }))
+  // Publish new message event to Nostr relay
+  publishConversationEvent(c.env, KIND_MESSAGE_NEW, {
+    type: 'message:new',
+    conversationId: id,
+    channelType: 'outbound',
+  })
 
   c.executionCtx.waitUntil(
     audit(dos.records, 'messageSent', pubkey, {
@@ -296,17 +302,14 @@ conversations.patch('/:id', async (c) => {
     body: JSON.stringify(body),
   }))
 
-  // Broadcast status change
+  // Publish status change to Nostr relay
   const updated = await res.json()
-  await dos.calls.fetch(new Request('http://do/broadcast', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: body.status === 'closed' ? 'conversation:closed' : 'conversation:assigned',
-      conversationId: id,
-      ...body,
-    }),
-  }))
+  const convEventType = body.status === 'closed' ? 'conversation:closed' : 'conversation:assigned'
+  publishConversationEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+    type: convEventType,
+    conversationId: id,
+    assignedTo: body.assignedTo,
+  })
 
   c.executionCtx.waitUntil(
     audit(dos.records, body.status === 'closed' ? 'conversationClosed' : 'conversationUpdated', pubkey, {
@@ -369,16 +372,12 @@ conversations.post('/:id/claim', async (c) => {
     return c.json({ error: err }, res.status as 400)
   }
 
-  // Broadcast assignment
-  await dos.calls.fetch(new Request('http://do/broadcast', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'conversation:assigned',
-      conversationId: id,
-      assignedTo: pubkey,
-    }),
-  }))
+  // Publish assignment to Nostr relay
+  publishConversationEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+    type: 'conversation:assigned',
+    conversationId: id,
+    assignedTo: pubkey,
+  })
 
   c.executionCtx.waitUntil(
     audit(dos.records, 'conversationClaimed', pubkey, {

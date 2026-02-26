@@ -3,6 +3,7 @@ import { schnorr } from '@noble/curves/secp256k1.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { AUTH_PREFIX } from '@shared/crypto-labels'
 
 const TOKEN_MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -33,14 +34,14 @@ export async function verifyAuthToken(auth: AuthPayload, method?: string, path?:
   try {
     // Try request-bound verification first (new format: method+path in message)
     if (method && path) {
-      const boundMessage = `llamenos:auth:${auth.pubkey}:${auth.timestamp}:${method}:${path}`
+      const boundMessage = `${AUTH_PREFIX}${auth.pubkey}:${auth.timestamp}:${method}:${path}`
       const boundHash = sha256(utf8ToBytes(boundMessage))
       if (schnorr.verify(hexToBytes(auth.token), boundHash, hexToBytes(auth.pubkey))) {
         return true
       }
       // Fallback: verify without method+path (transition period for old tokens)
     }
-    const message = `llamenos:auth:${auth.pubkey}:${auth.timestamp}`
+    const message = `${AUTH_PREFIX}${auth.pubkey}:${auth.timestamp}`
     const messageHash = sha256(utf8ToBytes(message))
     return schnorr.verify(hexToBytes(auth.token), messageHash, hexToBytes(auth.pubkey))
   } catch {

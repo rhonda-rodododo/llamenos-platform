@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
-import { decryptTranscription } from '@/lib/crypto'
+import { decryptMessage } from '@/lib/crypto'
 import * as keyManager from '@/lib/key-manager'
 import type { ConversationMessage } from '@/lib/api'
 import { Lock, ArrowDown, ArrowUp, Loader2, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react'
@@ -15,14 +15,14 @@ interface ConversationThreadProps {
 
 export function ConversationThread({ conversationId, messages, isLoading }: ConversationThreadProps) {
   const { t } = useTranslation()
-  const { hasNsec, isAdmin } = useAuth()
+  const { hasNsec, publicKey } = useAuth()
   const [decryptedContent, setDecryptedContent] = useState<Map<string, string>>(new Map())
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showScrollDown, setShowScrollDown] = useState(false)
 
   // Decrypt messages when they change
   useEffect(() => {
-    if (messages.length === 0) return
+    if (messages.length === 0 || !publicKey) return
 
     const secretKey = resolveSecretKey()
     if (!secretKey) return
@@ -30,30 +30,21 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
     const newDecrypted = new Map<string, string>()
 
     for (const msg of messages) {
-      // Try volunteer copy first, then admin copy
-      const encrypted = isAdmin ? msg.encryptedContentAdmin : msg.encryptedContent
-      const ephemeralPubkey = isAdmin ? msg.ephemeralPubkeyAdmin : msg.ephemeralPubkey
-
-      if (encrypted && ephemeralPubkey) {
-        const plaintext = decryptTranscription(encrypted, ephemeralPubkey, secretKey)
+      if (msg.encryptedContent && msg.readerEnvelopes?.length) {
+        const plaintext = decryptMessage(
+          msg.encryptedContent,
+          msg.readerEnvelopes,
+          secretKey,
+          publicKey,
+        )
         if (plaintext !== null) {
           newDecrypted.set(msg.id, plaintext)
-        } else {
-          // Try the other copy as fallback
-          const fallbackEncrypted = isAdmin ? msg.encryptedContent : msg.encryptedContentAdmin
-          const fallbackEphemeral = isAdmin ? msg.ephemeralPubkey : msg.ephemeralPubkeyAdmin
-          if (fallbackEncrypted && fallbackEphemeral) {
-            const fallback = decryptTranscription(fallbackEncrypted, fallbackEphemeral, secretKey)
-            if (fallback !== null) {
-              newDecrypted.set(msg.id, fallback)
-            }
-          }
         }
       }
     }
 
     setDecryptedContent(newDecrypted)
-  }, [messages, hasNsec, isAdmin])
+  }, [messages, hasNsec, publicKey])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

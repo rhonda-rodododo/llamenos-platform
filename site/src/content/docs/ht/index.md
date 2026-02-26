@@ -49,7 +49,7 @@ Llamenos se yon single-page application (SPA) ki fonksyone ak Cloudflare Workers
 | Telefoni | Twilio, SignalWire, Vonage, Plivo, oswa Asterisk (atravè TelephonyAdapter interface) |
 | Otantifikasyon | Nostr keypairs (BIP-340 Schnorr) + WebAuthn |
 | Chifraj | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Transkripsyon | Cloudflare Workers AI (Whisper) |
+| Transkripsyon | Whisper nan kote kliyan (WASM) |
 | i18n | i18next (12+ lang) |
 
 ## Wòl yo

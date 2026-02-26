@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, BanEntry, EncryptedNote, AuditLogEntry } from '../types'
+import { hashAuditEntry } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '../../shared/migrations/runner'
 import { migrations } from '../../shared/migrations'
@@ -8,7 +9,12 @@ import { migrations } from '../../shared/migrations'
  * RecordsDO — manages operational data:
  * - Bans
  * - Notes (encrypted)
- * - Audit log
+ * - Audit log (per-entry storage with hash chain, Epic 77)
+ *
+ * Storage strategy (Epic 77):
+ * - Notes: per-note keys `note:${id}` (scalable, no 128KB limit)
+ * - Audit: per-entry keys `audit:${id}` with hash chain for tamper detection
+ * - Bans: array (small dataset, rarely exceeds hundreds)
  */
 export class RecordsDO extends DurableObject<Env> {
   private migrated = false
@@ -117,10 +123,20 @@ export class RecordsDO extends DurableObject<Env> {
     return Response.json({ banned })
   }
 
-  // --- Note Methods ---
+  // --- Note Methods (per-note storage) ---
 
   private async getNotes(authorPubkey: string | null, callId: string | null, page?: number, limit?: number): Promise<Response> {
-    const notes = await this.ctx.storage.get<EncryptedNote[]>('notes') || []
+    const noteMap = await this.ctx.storage.list<EncryptedNote>({ prefix: 'note:' })
+    let notes = Array.from(noteMap.values())
+
+    // Fallback: check legacy array storage for migration compatibility
+    if (notes.length === 0) {
+      const legacyNotes = await this.ctx.storage.get<EncryptedNote[]>('notes')
+      if (legacyNotes && legacyNotes.length > 0) {
+        notes = legacyNotes
+      }
+    }
+
     let filtered = notes
     if (authorPubkey) {
       filtered = filtered.filter(n => n.authorPubkey === authorPubkey)
@@ -140,10 +156,9 @@ export class RecordsDO extends DurableObject<Env> {
 
   private async createNoteEntry(data: {
     callId: string; authorPubkey: string; encryptedContent: string; ephemeralPubkey?: string
-    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
   }): Promise<Response> {
-    const notes = await this.ctx.storage.get<EncryptedNote[]>('notes') || []
     const note: EncryptedNote = {
       id: crypto.randomUUID(),
       callId: data.callId,
@@ -153,31 +168,38 @@ export class RecordsDO extends DurableObject<Env> {
       updatedAt: new Date().toISOString(),
       ...(data.ephemeralPubkey ? { ephemeralPubkey: data.ephemeralPubkey } : {}),
       ...(data.authorEnvelope ? { authorEnvelope: data.authorEnvelope } : {}),
-      ...(data.adminEnvelope ? { adminEnvelope: data.adminEnvelope } : {}),
+      ...(data.adminEnvelopes ? { adminEnvelopes: data.adminEnvelopes } : {}),
     }
-    notes.push(note)
-    await this.ctx.storage.put('notes', notes)
+    await this.ctx.storage.put(`note:${note.id}`, note)
     return Response.json({ note })
   }
 
   private async updateNoteEntry(id: string, data: {
     encryptedContent: string; authorPubkey: string
-    authorEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
-    adminEnvelope?: { encryptedNoteKey: string; ephemeralPubkey: string }
+    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
   }): Promise<Response> {
-    const notes = await this.ctx.storage.get<EncryptedNote[]>('notes') || []
-    const note = notes.find(n => n.id === id)
+    let note = await this.ctx.storage.get<EncryptedNote>(`note:${id}`)
+
+    // Fallback: check legacy array storage
+    if (!note) {
+      const legacyNotes = await this.ctx.storage.get<EncryptedNote[]>('notes')
+      note = legacyNotes?.find(n => n.id === id)
+    }
+
     if (!note) return new Response('Not found', { status: 404 })
     if (note.authorPubkey !== data.authorPubkey) return new Response('Forbidden', { status: 403 })
+
     note.encryptedContent = data.encryptedContent
     if (data.authorEnvelope) note.authorEnvelope = data.authorEnvelope
-    if (data.adminEnvelope) note.adminEnvelope = data.adminEnvelope
+    if (data.adminEnvelopes) note.adminEnvelopes = data.adminEnvelopes
     note.updatedAt = new Date().toISOString()
-    await this.ctx.storage.put('notes', notes)
+
+    await this.ctx.storage.put(`note:${id}`, note)
     return Response.json({ note })
   }
 
-  // --- Audit Log Methods ---
+  // --- Audit Log Methods (per-entry storage with hash chain) ---
 
   private async getAuditLog(
     page: number,
@@ -188,7 +210,18 @@ export class RecordsDO extends DurableObject<Env> {
     dateTo?: string,
     search?: string,
   ): Promise<Response> {
-    const entries = await this.ctx.storage.get<AuditLogEntry[]>('auditLog') || []
+    const entryMap = await this.ctx.storage.list<AuditLogEntry>({ prefix: 'audit:' })
+    // Filter out chain pointer key (audit:_lastHash is a string, not an entry)
+    entryMap.delete('audit:_lastHash')
+    let entries = Array.from(entryMap.values())
+
+    // Fallback: check legacy array storage for migration compatibility
+    if (entries.length === 0) {
+      const legacyEntries = await this.ctx.storage.get<AuditLogEntry[]>('auditLog')
+      if (legacyEntries && legacyEntries.length > 0) {
+        entries = legacyEntries
+      }
+    }
 
     // Event type category mapping
     const eventCategories: Record<string, string[]> = {
@@ -198,6 +231,7 @@ export class RecordsDO extends DurableObject<Env> {
       settings: ['settingsUpdated', 'telephonyConfigured', 'transcriptionToggled', 'ivrUpdated', 'customFieldsUpdated', 'spamSettingsUpdated', 'callSettingsUpdated'],
       shifts: ['shiftCreated', 'shiftUpdated', 'shiftDeleted'],
       notes: ['noteCreated', 'noteUpdated'],
+      messaging: ['messageSent', 'conversationClaimed', 'conversationClosed', 'conversationUpdated', 'reportCreated', 'reportAssigned', 'reportUpdated'],
     }
 
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : undefined
@@ -233,16 +267,25 @@ export class RecordsDO extends DurableObject<Env> {
   }
 
   private async addAuditEntry(data: { event: string; actorPubkey: string; details: Record<string, unknown> }): Promise<Response> {
-    const entries = await this.ctx.storage.get<AuditLogEntry[]>('auditLog') || []
+    // Get the last entry's hash for chain linking
+    const lastHash = await this.ctx.storage.get<string>('audit:_lastHash') || ''
+
     const entry: AuditLogEntry = {
       id: crypto.randomUUID(),
       event: data.event,
       actorPubkey: data.actorPubkey,
       details: data.details,
       createdAt: new Date().toISOString(),
+      previousEntryHash: lastHash,
     }
-    entries.push(entry)
-    await this.ctx.storage.put('auditLog', entries)
+
+    // Compute this entry's hash for chain integrity
+    entry.entryHash = hashAuditEntry(entry)
+
+    // Store per-entry and update chain pointer
+    await this.ctx.storage.put(`audit:${entry.id}`, entry)
+    await this.ctx.storage.put('audit:_lastHash', entry.entryHash)
+
     return Response.json({ entry })
   }
 }

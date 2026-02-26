@@ -56,6 +56,7 @@ src/
   shared/           # Cross-boundary types and config (@shared alias)
     types.ts        # Shared types (CustomFieldDefinition, NotePayload, etc.)
     languages.ts    # Centralized language config (codes, labels, Twilio voice IDs)
+    crypto-labels.ts # 25 domain separation constants for all cryptographic operations
 ```
 
 **Path aliases** (tsconfig.json + vite.config.ts):
@@ -70,9 +71,15 @@ src/
 - **Parallel ringing**: All on-shift, non-busy volunteers ring simultaneously. First pickup terminates other calls.
 - **Shift routing**: Automated, recurring schedule with ring groups. Fallback group if no schedule is defined.
 - **Durable Objects**: Six singletons accessed via `idFromName()` — IdentityDO, SettingsDO, RecordsDO, ShiftManagerDO, CallRouterDO, ConversationDO. Routed via `DORouter` (lightweight method+path router).
-- **E2EE notes**: Per-note forward secrecy — unique random key per note, wrapped via ECIES for each reader. Dual-encrypted: one copy for volunteer, one for admin.
+- **E2EE notes**: Per-note forward secrecy — unique random key per note, wrapped via ECIES for each reader. Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
+- **E2EE messaging**: Per-message envelope encryption — random symmetric key, ECIES-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
 - **Key management**: PIN-encrypted local key store (`key-manager.ts`). nsec held in closure only, zeroed on lock. Device linking via ephemeral ECDH provisioning rooms.
-- **WebSocket auth**: Token sent via `Sec-WebSocket-Protocol` header, base64url encoded (no `=`/`/`).
+- **Nostr relay real-time**: Ephemeral kind 20001 events via strfry (self-hosted) or Nosflare (CF). All event content encrypted with hub key. Generic tags (`["t", "llamenos:event"]`) — relay cannot distinguish event types.
+- **Hub key distribution**: Random 32 bytes (`crypto.getRandomValues`), ECIES-wrapped individually per member via `LABEL_HUB_KEY_WRAP`. Rotation on member departure excludes departed member.
+- **Client-side transcription**: WASM Whisper via `@huggingface/transformers` ONNX runtime. AudioWorklet ring buffer → Web Worker isolation. Audio never leaves the browser.
+- **Reproducible builds**: `Dockerfile.build` with `SOURCE_DATE_EPOCH`, content-hashed filenames. `CHECKSUMS.txt` in GitHub Releases. SLSA provenance. Verification via `scripts/verify-build.sh`.
+- **Hash-chained audit log**: SHA-256 chain with `previousEntryHash` + `entryHash` for tamper detection (Epic 77).
+- **Domain separation**: All 25 crypto context constants in `src/shared/crypto-labels.ts` — NEVER use raw string literals for crypto contexts.
 
 ## Gotchas
 
@@ -81,6 +88,9 @@ src/
 - Nostr pubkeys are x-only (32 bytes) — prepend `"02"` for ECDH compressed format
 - `secp256k1.getSharedSecret()` returns 33 bytes; extract x-coord with `.slice(1, 33)`
 - Workbox `navigateFallbackDenylist` excludes `/api/` and `/telephony/` routes from SPA caching
+- Nostr relay (strfry) is a core service, not optional — always runs with Docker Compose and Helm
+- `SERVER_NOSTR_SECRET` must be exactly 64 hex chars; server derives its Nostr keypair via HKDF
+- Hub key is random bytes, NOT derived from any identity key — see `hub-key-manager.ts`
 
 ## Development Commands
 

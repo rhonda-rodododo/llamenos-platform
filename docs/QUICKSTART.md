@@ -325,6 +325,10 @@ MINIO_ACCESS_KEY=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)
 MINIO_SECRET_KEY=$(openssl rand -base64 24)
 echo "MINIO_ACCESS_KEY: $MINIO_ACCESS_KEY"
 echo "MINIO_SECRET_KEY: $MINIO_SECRET_KEY"
+
+# Generate server Nostr secret (for relay event signing)
+SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
+echo "SERVER_NOSTR_SECRET: $SERVER_NOSTR_SECRET"
 ```
 
 **SECURITY WARNING**: Record these secrets in a password manager immediately. They cannot be recovered if lost. You will need the database password for backup recovery operations.
@@ -347,6 +351,7 @@ PG_PASSWORD=<generated above>
 HMAC_SECRET=<generated above>
 MINIO_ACCESS_KEY=<generated above>
 MINIO_SECRET_KEY=<generated above>
+SERVER_NOSTR_SECRET=<generated above>
 
 # Application
 HOTLINE_NAME=Hotline
@@ -541,6 +546,13 @@ Run through this checklist to verify your deployment:
   ```
 - [ ] fail2ban is active: `sudo fail2ban-client status sshd`
 
+### Nostr Relay
+
+- [ ] Relay container is running: `docker compose ps strfry`
+- [ ] `/nostr` WebSocket endpoint responds: `curl -sI https://hotline.yourorg.org/nostr` returns 426 Upgrade Required
+- [ ] `SERVER_NOSTR_SECRET` is set in `.env`
+- [ ] Real-time events work: open two browser tabs, verify presence updates appear
+
 ### Telephony (if configured)
 
 - [ ] Call the hotline number from a phone
@@ -619,9 +631,9 @@ Storage migrations run automatically on application startup. No manual migration
 
 ## Optional: Enable Additional Services
 
-### Whisper Transcription
+### Whisper Transcription (Legacy — Server-Side)
 
-Enables automatic call transcription using a self-hosted Whisper model.
+> **Note**: As of Epic 78, transcription runs client-side in the browser via WASM Whisper. The server-side Whisper container is no longer needed for most deployments. Enable it only if you have a specific need for server-side transcription.
 
 ```bash
 cd /opt/llamenos/deploy/docker
@@ -663,3 +675,4 @@ docker compose --profile signal up -d
 - **Set up backups**: See [`docs/RUNBOOK.md`](RUNBOOK.md) for automated encrypted backup procedures.
 - **Review security**: Read [`docs/security/DEPLOYMENT_HARDENING.md`](security/DEPLOYMENT_HARDENING.md) for the full security hardening checklist.
 - **Incident response**: Familiarize yourself with the runbook at [`docs/RUNBOOK.md`](RUNBOOK.md) before you need it.
+- **Verify builds**: Before deploying updates, verify release integrity with [`docs/REPRODUCIBLE_BUILDS.md`](REPRODUCIBLE_BUILDS.md).

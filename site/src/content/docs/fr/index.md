@@ -49,7 +49,7 @@ Llamenos est une application monopage (SPA) reposant sur Cloudflare Workers et D
 | Telephonie | Twilio, SignalWire, Vonage, Plivo ou Asterisk (via l'interface TelephonyAdapter) |
 | Authentification | Cles Nostr (BIP-340 Schnorr) + WebAuthn |
 | Chiffrement | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Transcription | Cloudflare Workers AI (Whisper) |
+| Transcription | Whisper cote client (WASM) |
 | i18n | i18next (12+ langues) |
 
 ## Roles

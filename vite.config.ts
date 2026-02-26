@@ -6,6 +6,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { sriWorkboxPlugin } from './src/client/lib/sri-workbox-plugin'
 import path from 'path'
 
+import { readFileSync } from 'fs'
+
+// Build-time constants for reproducible builds (Epic 79)
+// CI sets SOURCE_DATE_EPOCH from git commit timestamp; dev builds use current time
+const buildTime = process.env.SOURCE_DATE_EPOCH
+  ? new Date(parseInt(process.env.SOURCE_DATE_EPOCH) * 1000).toISOString()
+  : new Date().toISOString()
+const buildCommit = process.env.GITHUB_SHA || 'dev'
+const buildVersion = JSON.parse(readFileSync('./package.json', 'utf-8')).version
+
 export default defineConfig({
   plugins: [
     tanstackRouter({
@@ -60,6 +70,11 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, './src/shared'),
     },
     conditions: ['import', 'module', 'default'],
+  },
+  define: {
+    '__BUILD_TIME__': JSON.stringify(buildTime),
+    '__BUILD_COMMIT__': JSON.stringify(buildCommit),
+    '__BUILD_VERSION__': JSON.stringify(buildVersion),
   },
   build: {
     outDir: 'dist/client',

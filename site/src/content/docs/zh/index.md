@@ -49,7 +49,7 @@ Llamenos 是一个单页应用（SPA），由 Cloudflare Workers 和 Durable Obj
 | 电话服务 | Twilio、SignalWire、Vonage、Plivo 或 Asterisk（通过 TelephonyAdapter 接口） |
 | 认证 | Nostr 密钥对（BIP-340 Schnorr）+ WebAuthn |
 | 加密 | ECIES（secp256k1 + XChaCha20-Poly1305） |
-| 语音转文字 | Cloudflare Workers AI（Whisper） |
+| 语音转文字 | 客户端 Whisper（WASM） |
 | 国际化 | i18next（支持 12+ 种语言） |
 
 ## 角色

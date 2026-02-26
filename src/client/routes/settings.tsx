@@ -18,6 +18,7 @@ import {
   getProvisioningRoom,
   encryptNsecForDevice,
   sendProvisionedKey,
+  computeSASForPrimaryDevice,
 } from '@/lib/provisioning'
 import { getNotificationPrefs, setNotificationPrefs } from '@/lib/notifications'
 import { useNotificationPermission } from '@/lib/use-notification-permission'
@@ -28,6 +29,12 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  TranscriptionManager,
+  getClientTranscriptionSettings,
+  setClientTranscriptionSettings,
+  type TranscriptionModel,
+} from '@/lib/transcription'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -327,7 +334,7 @@ function SettingsPage() {
         </SettingsSection>
       )}
 
-      {/* Transcription (personal toggle only) */}
+      {/* Transcription (personal toggle + client-side settings) */}
       <SettingsSection
         id="transcription"
         title={t('settings.transcriptionSettings')}
@@ -356,6 +363,8 @@ function SettingsPage() {
         ) : (
           <p className="text-sm text-muted-foreground">{t('transcription.managedByAdmin')}</p>
         )}
+
+        <ClientTranscriptionSettings />
       </SettingsSection>
 
       {/* Call Preference (WebRTC) */}
@@ -518,8 +527,9 @@ function LinkDeviceSection() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [linkCode, setLinkCode] = useState('')
-  const [status, setStatus] = useState<'idle' | 'linking' | 'success' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'linking' | 'verify-sas' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')
+  const [sasCode, setSasCode] = useState('')
 
   async function handleLinkDevice() {
     if (!linkCode.trim()) return
@@ -559,6 +569,10 @@ function LinkDeviceSection() {
       const secretKey = keyManager.getSecretKey()
       const publicKey = keyManager.getPublicKeyHex()!
 
+      // Compute SAS for display BEFORE sending nsec
+      const sas = computeSASForPrimaryDevice(secretKey, room.ephemeralPubkey)
+      setSasCode(sas)
+
       // ECDH encrypt nsec for the new device
       const encrypted = encryptNsecForDevice(nsecStr, room.ephemeralPubkey, secretKey)
 
@@ -569,8 +583,8 @@ function LinkDeviceSection() {
         'Authorization': `Bearer ${authToken}`,
       })
 
-      setStatus('success')
-      setStatusMessage(t('deviceLink.linkSuccess'))
+      setStatus('verify-sas')
+      setStatusMessage(t('deviceLink.verifySASPrimary'))
     } catch {
       setStatus('error')
       setStatusMessage(t('deviceLink.linkFailed'))
@@ -609,11 +623,101 @@ function LinkDeviceSection() {
           <Loader2 className="h-4 w-4 animate-spin" />
           {t('common.loading')}
         </div>
+      ) : status === 'verify-sas' ? (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">{statusMessage}</p>
+          <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4 text-center" data-testid="primary-sas-code">
+            <p className="text-xs text-muted-foreground mb-1">{t('deviceLink.securityCode')}</p>
+            <p className="text-3xl font-mono font-bold tracking-[0.3em]">{sasCode}</p>
+          </div>
+          <Button variant="outline" className="w-full" onClick={() => { setStatus('idle'); setLinkCode(''); setSasCode('') }}>
+            {t('common.done')}
+          </Button>
+        </div>
       ) : (
         <div className="flex items-center gap-2 text-sm text-green-600">
           <CheckCircle2 className="h-4 w-4" />
           {statusMessage}
         </div>
+      )}
+    </div>
+  )
+}
+
+function ClientTranscriptionSettings() {
+  const { t } = useTranslation()
+  const isSupported = TranscriptionManager.isSupported()
+  const [settings, setSettings] = useState(getClientTranscriptionSettings)
+
+  function update(changes: Partial<typeof settings>) {
+    const updated = setClientTranscriptionSettings(changes)
+    setSettings(updated)
+  }
+
+  const models: { value: TranscriptionModel; label: string }[] = [
+    { value: 'tiny.en', label: t('transcription.modelTinyEn') },
+    { value: 'tiny', label: t('transcription.modelTiny') },
+    { value: 'base.en', label: t('transcription.modelBaseEn') },
+    { value: 'base', label: t('transcription.modelBase') },
+  ]
+
+  return (
+    <div className="mt-4 space-y-4 rounded-lg border border-border p-4">
+      <div>
+        <h4 className="text-sm font-medium">{t('transcription.clientSide')}</h4>
+        <p className="text-xs text-muted-foreground">{t('transcription.clientSideDescription')}</p>
+      </div>
+
+      {!isSupported ? (
+        <p className="text-sm text-destructive">{t('transcription.notSupported')}</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="client-transcription-toggle" className="text-sm">
+              {t('transcription.enableClientSide')}
+            </Label>
+            <Switch
+              id="client-transcription-toggle"
+              data-testid="client-transcription-toggle"
+              checked={settings.enabled}
+              onCheckedChange={(checked) => update({ enabled: checked })}
+            />
+          </div>
+
+          {settings.enabled && (
+            <>
+              <div className="space-y-2">
+                <Label className="text-sm">{t('transcription.model')}</Label>
+                <div className="space-y-1.5">
+                  {models.map(m => (
+                    <button
+                      key={m.value}
+                      onClick={() => update({ model: m.value })}
+                      className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                        settings.model === m.value
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {settings.model === m.value && (
+                        <div className="h-2 w-2 rounded-full bg-primary" />
+                      )}
+                      <span className={settings.model !== m.value ? 'ml-4' : ''}>{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2">
+                <Mic className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">{t('transcription.localMicOnly')}</p>
+                  <p className="text-xs text-muted-foreground">{t('transcription.localMicOnlyDescription')}</p>
+                </div>
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   )

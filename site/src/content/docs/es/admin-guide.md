@@ -70,7 +70,7 @@ Cuando los canales de mensajeria (SMS, WhatsApp, Signal) estan habilitados, apar
 Cada conversacion muestra:
 - Burbujas de mensajes con marcas de tiempo y direccion (entrante/saliente)
 - El canal por el que llego el mensaje (SMS, WhatsApp, Signal)
-- Actualizaciones en tiempo real via WebSocket — los nuevos mensajes aparecen al instante
+- Actualizaciones en tiempo real via relay Nostr — los nuevos mensajes aparecen al instante
 
 Las conversaciones se crean automaticamente cuando llega un mensaje entrante. Los voluntarios pueden responder directamente desde la vista de conversacion.
 

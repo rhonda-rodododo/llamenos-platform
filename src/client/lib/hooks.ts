@@ -1,67 +1,106 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { onMessage, sendMessage } from './ws'
+import { useNostrSubscription } from './nostr/hooks'
+import { useConfig } from './config'
 import { startRinging, stopRinging } from './notifications'
-import { getMyShiftStatus, listActiveCalls, listConversations, type ActiveCall, type ShiftStatus, type Conversation } from './api'
+import {
+  getMyShiftStatus,
+  listActiveCalls,
+  listConversations,
+  answerCall as apiAnswerCall,
+  hangupCall as apiHangupCall,
+  reportCallSpam as apiReportSpam,
+  type ActiveCall,
+  type ShiftStatus,
+  type Conversation,
+} from './api'
+import {
+  KIND_CALL_RING,
+  KIND_CALL_UPDATE,
+  KIND_CALL_VOICEMAIL,
+  KIND_MESSAGE_NEW,
+  KIND_CONVERSATION_ASSIGNED,
+  KIND_PRESENCE_UPDATE,
+} from '@shared/nostr-events'
+import type { LlamenosEvent } from './nostr/types'
+
+/** All call-related Nostr event kinds */
+const CALL_KINDS = [KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE]
+
+/** All conversation-related Nostr event kinds */
+const CONVERSATION_KINDS = [KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED]
 
 /**
- * Hook to manage real-time call state via WebSocket.
+ * Hook to manage real-time call state via Nostr relay + REST polling fallback.
+ *
+ * Real-time updates arrive via Nostr subscription. REST polling (every 15s)
+ * acts as a safety net for missed events or relay downtime.
+ *
+ * Call actions (answer, hangup, spam) are POST requests to REST endpoints.
+ * The server is the sole authority for call state mutations.
  */
 export function useCalls() {
   const [calls, setCalls] = useState<ActiveCall[]>([])
   const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null)
+  const { currentHubId } = useConfig()
+  const currentCallRef = useRef(currentCall)
+  currentCallRef.current = currentCall
 
-  useEffect(() => {
-    // Sync initial state
-    const unsubSync = onMessage('calls:sync', (data) => {
-      const { calls: syncCalls } = data as { calls: ActiveCall[] }
-      setCalls(syncCalls)
-    })
-
-    const unsubIncoming = onMessage('call:incoming', (data) => {
-      const call = data as ActiveCall
-      setCalls(prev => [...prev, call])
-      // Start ringing notification (generic text only — never pass caller PII)
-      startRinging('Incoming Call!')
-    })
-
-    const unsubUpdate = onMessage('call:update', (data) => {
-      const call = data as ActiveCall
-      setCalls(prev => {
-        if (call.status === 'completed') {
-          return prev.filter(c => c.id !== call.id)
+  // --- Nostr subscription for real-time call events ---
+  useNostrSubscription(currentHubId, CALL_KINDS, (_event, content: LlamenosEvent) => {
+    switch (content.type) {
+      case 'call:ring': {
+        const call = content as LlamenosEvent & { callId: string; callerLast4?: string; startedAt: string }
+        setCalls(prev => {
+          if (prev.some(c => c.id === call.callId)) return prev
+          return [...prev, {
+            id: call.callId,
+            callerNumber: '[redacted]',
+            callerLast4: call.callerLast4,
+            answeredBy: null,
+            startedAt: call.startedAt,
+            status: 'ringing' as const,
+            hasTranscription: false,
+            hasVoicemail: false,
+          }]
+        })
+        startRinging('Incoming Call!')
+        break
+      }
+      case 'call:update': {
+        const update = content as LlamenosEvent & { callId: string; status: ActiveCall['status']; answeredBy?: string }
+        setCalls(prev => {
+          if (update.status === 'completed') {
+            return prev.filter(c => c.id !== update.callId)
+          }
+          return prev.map(c =>
+            c.id === update.callId
+              ? { ...c, status: update.status, answeredBy: update.answeredBy ?? c.answeredBy }
+              : c,
+          )
+        })
+        if (update.status === 'in-progress' || update.status === 'completed') {
+          stopRinging()
         }
-        const idx = prev.findIndex(c => c.id === call.id)
-        if (idx >= 0) {
-          const next = [...prev]
-          next[idx] = call
-          return next
+        // Update current call tracking
+        if (currentCallRef.current?.id === update.callId) {
+          if (update.status === 'completed') {
+            setCurrentCall(null)
+          } else {
+            setCurrentCall(prev => prev ? { ...prev, status: update.status, answeredBy: update.answeredBy ?? prev.answeredBy } : prev)
+          }
         }
-        return [...prev, call]
-      })
-
-      // Stop ringing when call is answered or completed
-      if (call.status === 'in-progress' || call.status === 'completed') {
+        break
+      }
+      case 'voicemail:new': {
+        const vm = content as LlamenosEvent & { callId: string }
+        setCalls(prev => prev.filter(c => c.id !== vm.callId))
         stopRinging()
+        break
       }
-
-      // Update current call if it's the one we're on
-      if (currentCall?.id === call.id) {
-        if (call.status === 'completed') {
-          setCurrentCall(null)
-        } else {
-          setCurrentCall(call)
-        }
-      }
-    })
-
-    return () => {
-      unsubSync()
-      unsubIncoming()
-      unsubUpdate()
     }
-  }, [currentCall])
+  })
 
-  // Polling fallback — safety net when WS broadcasts are missed (e.g. DO hibernation)
+  // --- REST polling fallback (every 15s) ---
   useEffect(() => {
     let mounted = true
 
@@ -70,12 +109,10 @@ export function useCalls() {
         .then(({ calls: polledCalls }) => {
           if (!mounted) return
           setCalls(prev => {
-            // Only update if the call list actually changed
             const prevIds = prev.map(c => `${c.id}:${c.status}`).sort().join(',')
             const newIds = polledCalls.map(c => `${c.id}:${c.status}`).sort().join(',')
             return prevIds === newIds ? prev : polledCalls
           })
-          // Clear currentCall if it's no longer in active list
           setCurrentCall(prev => {
             if (!prev) return prev
             return polledCalls.some(c => c.id === prev.id) ? prev : null
@@ -89,23 +126,38 @@ export function useCalls() {
     return () => { mounted = false; clearInterval(interval) }
   }, [])
 
-  const answerCall = useCallback((callId: string) => {
-    sendMessage('call:answer', { callId })
+  // --- Call actions via REST ---
+
+  const answerCall = useCallback(async (callId: string) => {
     stopRinging()
     const call = calls.find(c => c.id === callId)
     if (call) {
       setCurrentCall({ ...call, status: 'in-progress' })
     }
+    try {
+      await apiAnswerCall(callId)
+    } catch {
+      // Revert optimistic update on failure
+      setCurrentCall(null)
+    }
   }, [calls])
 
-  const hangupCall = useCallback((callId: string) => {
-    sendMessage('call:hangup', { callId })
+  const hangupCall = useCallback(async (callId: string) => {
     setCurrentCall(null)
+    try {
+      await apiHangupCall(callId)
+    } catch {
+      // Call may already be ended — safe to ignore
+    }
   }, [])
 
-  const reportSpam = useCallback((callId: string) => {
-    sendMessage('call:reportSpam', { callId })
+  const reportSpam = useCallback(async (callId: string) => {
     setCurrentCall(null)
+    try {
+      await apiReportSpam(callId)
+    } catch {
+      // Report may fail if call already ended — safe to ignore
+    }
   }, [])
 
   return {
@@ -144,70 +196,56 @@ export function useShiftStatus() {
 }
 
 /**
- * Hook to manage real-time conversation state via WebSocket.
+ * Hook to manage real-time conversation state via Nostr relay + REST polling.
+ *
+ * Nostr delivers real-time updates (new messages, assignments, closures).
+ * REST polling (every 30s) provides the full conversation list as a fallback.
  */
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const { currentHubId } = useConfig()
 
-  useEffect(() => {
-    // Initial sync from WebSocket
-    const unsubSync = onMessage('conversations:sync', (data) => {
-      const { conversations: syncConvs } = data as { conversations: Conversation[] }
-      setConversations(syncConvs)
-    })
-
-    // New conversation waiting
-    const unsubNew = onMessage('conversation:new', (data) => {
-      const conv = data as Conversation
-      setConversations(prev => {
-        if (prev.some(c => c.id === conv.id)) return prev
-        return [...prev, conv]
-      })
-    })
-
-    // Conversation assigned
-    const unsubAssigned = onMessage('conversation:assigned', (data) => {
-      const { conversationId, assignedTo } = data as { conversationId: string; assignedTo: string }
-      setConversations(prev =>
-        prev.map(c => c.id === conversationId ? { ...c, assignedTo, status: 'active' as const } : c)
-      )
-    })
-
-    // Conversation closed
-    const unsubClosed = onMessage('conversation:closed', (data) => {
-      const { conversationId } = data as { conversationId: string }
-      setConversations(prev => prev.filter(c => c.id !== conversationId))
-    })
-
-    // New message in conversation
-    const unsubMessage = onMessage('message:new', (data) => {
-      const { conversationId } = data as { conversationId: string }
-      setConversations(prev =>
-        prev.map(c => c.id === conversationId
-          ? { ...c, lastMessageAt: new Date().toISOString(), messageCount: c.messageCount + 1 }
-          : c
+  // --- Nostr subscription for conversation events ---
+  useNostrSubscription(currentHubId, CONVERSATION_KINDS, (_event, content: LlamenosEvent) => {
+    switch (content.type) {
+      case 'conversation:new': {
+        const { conversationId } = content as LlamenosEvent & { conversationId: string }
+        // We don't have the full conversation object from the event —
+        // trigger a re-fetch on the next poll cycle. For now, add a stub
+        // that will be replaced by the poll.
+        setConversations(prev => {
+          if (prev.some(c => c.id === conversationId)) return prev
+          // Return unchanged — the poll will pick up the full object
+          return prev
+        })
+        break
+      }
+      case 'conversation:assigned': {
+        const { conversationId, assignedTo } = content as LlamenosEvent & { conversationId: string; assignedTo: string }
+        setConversations(prev =>
+          prev.map(c => c.id === conversationId ? { ...c, assignedTo, status: 'active' as const } : c),
         )
-      )
-    })
-
-    // Message status update
-    const unsubStatus = onMessage('message:status', () => {
-      // Status updates trigger a refetch of messages for the active conversation
-      // This is handled by the ConversationsPage which polls messages periodically
-      // We don't need to update conversation metadata for status changes
-    })
-
-    return () => {
-      unsubSync()
-      unsubNew()
-      unsubAssigned()
-      unsubClosed()
-      unsubMessage()
-      unsubStatus()
+        break
+      }
+      case 'conversation:closed': {
+        const { conversationId } = content as LlamenosEvent & { conversationId: string }
+        setConversations(prev => prev.filter(c => c.id !== conversationId))
+        break
+      }
+      case 'message:new': {
+        const { conversationId } = content as LlamenosEvent & { conversationId: string }
+        setConversations(prev =>
+          prev.map(c => c.id === conversationId
+            ? { ...c, lastMessageAt: new Date().toISOString(), messageCount: c.messageCount + 1 }
+            : c,
+          ),
+        )
+        break
+      }
     }
-  }, [])
+  })
 
-  // Polling fallback
+  // --- REST polling fallback (every 30s) ---
   useEffect(() => {
     let mounted = true
     const poll = () => {

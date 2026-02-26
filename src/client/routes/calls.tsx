@@ -4,6 +4,8 @@ import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { getCallHistory, listVolunteers, type CallRecord, type Volunteer } from '@/lib/api'
 import { useToast } from '@/lib/toast'
+import { decryptCallRecord } from '@/lib/crypto'
+import * as keyManager from '@/lib/key-manager'
 import { PhoneIncoming, ChevronLeft, ChevronRight, Clock, Mic, Search, X, StickyNote, Voicemail, PhoneMissed, Disc } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { Card, CardContent } from '@/components/ui/card'
@@ -31,7 +33,7 @@ export const Route = createFileRoute('/calls')({
 
 function CallHistoryPage() {
   const { t } = useTranslation()
-  const { isAdmin } = useAuth()
+  const { isAdmin, hasNsec, publicKey } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate({ from: '/calls' })
   const { page, q, dateFrom, dateTo } = Route.useSearch()
@@ -62,6 +64,26 @@ function CallHistoryPage() {
   useEffect(() => {
     fetchCalls()
   }, [fetchCalls])
+
+  // Decrypt encrypted call records client-side (Epic 77)
+  useEffect(() => {
+    if (!hasNsec || !publicKey || calls.length === 0) return
+    const secretKey = keyManager.isUnlocked() ? keyManager.getSecretKey() : null
+    if (!secretKey) return
+
+    let changed = false
+    const decrypted = calls.map(call => {
+      if (call.answeredBy !== undefined) return call // already decrypted
+      if (!call.encryptedContent || !call.adminEnvelopes?.length) return call
+      const meta = decryptCallRecord(call.encryptedContent, call.adminEnvelopes, secretKey, publicKey)
+      if (meta) {
+        changed = true
+        return { ...call, answeredBy: meta.answeredBy, callerNumber: meta.callerNumber }
+      }
+      return call
+    })
+    if (changed) setCalls(decrypted)
+  }, [calls, hasNsec, publicKey])
 
   useEffect(() => {
     listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => {})

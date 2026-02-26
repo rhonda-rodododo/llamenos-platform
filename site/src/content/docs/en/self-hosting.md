@@ -22,9 +22,9 @@ Both deployment targets run the **exact same application code**. The difference 
 | **Backend runtime** | Cloudflare Workers | Node.js (via Hono) |
 | **Data storage** | Durable Objects (KV) | PostgreSQL |
 | **Blob storage** | R2 | MinIO (S3-compatible) |
-| **Transcription** | Workers AI (Whisper) | faster-whisper container |
+| **Transcription** | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
 | **Static files** | Workers Assets | Caddy / Hono serveStatic |
-| **WebSocket** | Hibernatable WebSockets | ws package (persistent) |
+| **Real-time events** | Nostr relay (Nosflare) | Nostr relay (strfry) |
 | **TLS termination** | Cloudflare edge | Caddy (automatic HTTPS) |
 | **Cost** | Usage-based (free tier available) | Your server costs |
 
