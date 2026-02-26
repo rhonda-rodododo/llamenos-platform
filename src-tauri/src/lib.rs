@@ -95,6 +95,18 @@ pub fn run() {
             crypto::ecies_unwrap_key_from_state,
             crypto::decrypt_note_from_state,
             crypto::decrypt_message_from_state,
+            crypto::decrypt_call_record_from_state,
+            crypto::decrypt_legacy_note_from_state,
+            crypto::decrypt_transcription_from_state,
+            crypto::encrypt_draft_from_state,
+            crypto::decrypt_draft_from_state,
+            crypto::encrypt_export_from_state,
+            crypto::sign_nostr_event_from_state,
+            crypto::decrypt_file_metadata_from_state,
+            crypto::unwrap_file_key_from_state,
+            crypto::unwrap_hub_key_from_state,
+            crypto::rewrap_file_key_from_state,
+            crypto::get_nsec_from_state,
             // Stateless commands (original — secret key passed as argument)
             crypto::ecies_wrap_key,
             crypto::ecies_unwrap_key,
@@ -108,6 +120,8 @@ pub fn run() {
             crypto::generate_keypair,
             crypto::get_public_key,
             crypto::verify_schnorr,
+            crypto::is_valid_nsec,
+            crypto::key_pair_from_nsec,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

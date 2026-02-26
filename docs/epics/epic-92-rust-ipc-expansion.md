@@ -1,6 +1,6 @@
 # Epic 92: Rust IPC Expansion
 
-**Status**: Planned
+**Status**: Complete
 **Depends on**: Epic 81 (Phase 1 complete)
 **Blocks**: Epic 93 (Tauri-Only TS Migration)
 

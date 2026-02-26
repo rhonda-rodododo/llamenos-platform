@@ -15,7 +15,7 @@ use std::sync::Mutex;
 
 use zeroize::Zeroize;
 
-use llamenos_core::{auth, ecies, encryption, keys};
+use llamenos_core::{auth, ecies, encryption, keys, nostr};
 
 // Re-export types for serde bridging with the frontend
 pub use llamenos_core::ecies::{KeyEnvelope, RecipientKeyEnvelope};
@@ -181,6 +181,173 @@ pub fn decrypt_message_from_state(
         .map_err(err_str)
 }
 
+/// Decrypt a call record using the key in CryptoState.
+#[tauri::command]
+pub fn decrypt_call_record_from_state(
+    state: tauri::State<'_, CryptoState>,
+    encrypted_content: String,
+    admin_envelopes: Vec<RecipientKeyEnvelope>,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    let pk = state.get_public_key()?;
+    encryption::decrypt_call_record(&encrypted_content, &admin_envelopes, &sk, &pk).map_err(err_str)
+}
+
+/// Decrypt a legacy V1 note using the key in CryptoState.
+#[tauri::command]
+pub fn decrypt_legacy_note_from_state(
+    state: tauri::State<'_, CryptoState>,
+    packed_hex: String,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    encryption::decrypt_legacy_note(&packed_hex, &sk).map_err(err_str)
+}
+
+/// Decrypt a transcription using ECIES with CryptoState.
+#[tauri::command]
+pub fn decrypt_transcription_from_state(
+    state: tauri::State<'_, CryptoState>,
+    packed_hex: String,
+    ephemeral_pubkey_hex: String,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    ecies::ecies_decrypt_content(
+        &packed_hex,
+        &ephemeral_pubkey_hex,
+        &sk,
+        llamenos_core::labels::LABEL_TRANSCRIPTION,
+    )
+    .map_err(err_str)
+}
+
+/// Encrypt a draft using the key in CryptoState.
+#[tauri::command]
+pub fn encrypt_draft_from_state(
+    state: tauri::State<'_, CryptoState>,
+    plaintext: String,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    encryption::encrypt_draft(&plaintext, &sk).map_err(err_str)
+}
+
+/// Decrypt a draft using the key in CryptoState.
+#[tauri::command]
+pub fn decrypt_draft_from_state(
+    state: tauri::State<'_, CryptoState>,
+    packed_hex: String,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    encryption::decrypt_draft(&packed_hex, &sk).map_err(err_str)
+}
+
+/// Encrypt a JSON export using the key in CryptoState. Returns base64.
+#[tauri::command]
+pub fn encrypt_export_from_state(
+    state: tauri::State<'_, CryptoState>,
+    json_string: String,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    encryption::encrypt_export(&json_string, &sk).map_err(err_str)
+}
+
+/// Sign a Nostr event using the key in CryptoState.
+#[tauri::command]
+pub fn sign_nostr_event_from_state(
+    state: tauri::State<'_, CryptoState>,
+    kind: u32,
+    created_at: u64,
+    tags: Vec<Vec<String>>,
+    content: String,
+) -> Result<nostr::SignedNostrEvent, String> {
+    let sk = state.get_secret_key()?;
+    nostr::finalize_nostr_event(kind, created_at, tags, &content, &sk).map_err(err_str)
+}
+
+/// Decrypt ECIES-encrypted file metadata using CryptoState.
+#[tauri::command]
+pub fn decrypt_file_metadata_from_state(
+    state: tauri::State<'_, CryptoState>,
+    encrypted_content_hex: String,
+    ephemeral_pubkey_hex: String,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    ecies::ecies_decrypt_content(
+        &encrypted_content_hex,
+        &ephemeral_pubkey_hex,
+        &sk,
+        llamenos_core::labels::LABEL_FILE_METADATA,
+    )
+    .map_err(err_str)
+}
+
+/// Unwrap a file key from an ECIES envelope using CryptoState.
+#[tauri::command]
+pub fn unwrap_file_key_from_state(
+    state: tauri::State<'_, CryptoState>,
+    envelope: KeyEnvelope,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    let key = ecies::ecies_unwrap_key(&envelope, &sk, llamenos_core::labels::LABEL_FILE_KEY)
+        .map_err(err_str)?;
+    Ok(hex::encode(key))
+}
+
+/// Unwrap a hub key from an ECIES envelope using CryptoState.
+#[tauri::command]
+pub fn unwrap_hub_key_from_state(
+    state: tauri::State<'_, CryptoState>,
+    envelope: KeyEnvelope,
+) -> Result<String, String> {
+    let sk = state.get_secret_key()?;
+    let key = ecies::ecies_unwrap_key(&envelope, &sk, llamenos_core::labels::LABEL_HUB_KEY_WRAP)
+        .map_err(err_str)?;
+    Ok(hex::encode(key))
+}
+
+/// Rewrap a file key for a new recipient using CryptoState.
+/// Unwraps the existing file key with the current user's key, then wraps for the new recipient.
+#[tauri::command]
+pub fn rewrap_file_key_from_state(
+    state: tauri::State<'_, CryptoState>,
+    encrypted_file_key_hex: String,
+    ephemeral_pubkey_hex: String,
+    new_recipient_pubkey_hex: String,
+) -> Result<RecipientKeyEnvelope, String> {
+    let sk = state.get_secret_key()?;
+    // Unwrap with admin key
+    let envelope = KeyEnvelope {
+        wrapped_key: encrypted_file_key_hex,
+        ephemeral_pubkey: ephemeral_pubkey_hex,
+    };
+    let file_key = ecies::ecies_unwrap_key(&envelope, &sk, llamenos_core::labels::LABEL_FILE_KEY)
+        .map_err(err_str)?;
+    // Re-wrap for new recipient
+    let new_envelope = ecies::ecies_wrap_key(
+        &file_key,
+        &new_recipient_pubkey_hex,
+        llamenos_core::labels::LABEL_FILE_KEY,
+    )
+    .map_err(err_str)?;
+    Ok(RecipientKeyEnvelope {
+        pubkey: new_recipient_pubkey_hex,
+        wrapped_key: new_envelope.wrapped_key,
+        ephemeral_pubkey: new_envelope.ephemeral_pubkey,
+    })
+}
+
+/// Get the nsec from CryptoState. Used ONLY for device provisioning and backup.
+///
+/// Security note: This is the one place the nsec intentionally crosses the IPC boundary.
+/// The Tauri capability should restrict this command to only the main window.
+#[tauri::command]
+pub fn get_nsec_from_state(state: tauri::State<'_, CryptoState>) -> Result<String, String> {
+    let sk_hex = state.get_secret_key()?;
+    let sk_bytes = hex::decode(&sk_hex).map_err(err_str)?;
+    let nsec = bech32::encode::<bech32::Bech32>(bech32::Hrp::parse("nsec").unwrap(), &sk_bytes)
+        .map_err(err_str)?;
+    Ok(nsec)
+}
+
 // ── Stateless commands (original, kept for compatibility) ────────────
 
 #[tauri::command]
@@ -293,6 +460,20 @@ pub fn verify_schnorr(
     pubkey_hex: String,
 ) -> Result<bool, String> {
     auth::verify_schnorr(&message_hex, &signature_hex, &pubkey_hex).map_err(err_str)
+}
+
+/// Validate an nsec bech32 string without loading it into CryptoState.
+/// Used during onboarding before CryptoState is initialized.
+#[tauri::command]
+pub fn is_valid_nsec(nsec: String) -> bool {
+    keys::is_valid_nsec(&nsec)
+}
+
+/// Derive a keypair from an nsec. Stateless — for onboarding flows.
+/// The nsec crosses the IPC boundary only during import.
+#[tauri::command]
+pub fn key_pair_from_nsec(nsec: String) -> Result<KeyPair, String> {
+    keys::keypair_from_nsec(&nsec).map_err(err_str)
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
