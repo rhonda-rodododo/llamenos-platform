@@ -30,34 +30,25 @@ export function performPanicWipe(): void {
     // Key may already be wiped or locked — continue
   }
 
-  // 3. Defer storage clearing and redirect — gives React one frame
-  //    to paint the overlay before localStorage.clear() triggers auth changes
+  // 3. Clear all storage synchronously — must happen before React auth
+  //    callbacks trigger a router redirect to /login
+  try { localStorage.clear() } catch { /* Storage may be unavailable */ }
+  try { sessionStorage.clear() } catch { /* Storage may be unavailable */ }
+
+  // Clear IndexedDB databases (async, fire-and-forget)
+  try {
+    if (typeof indexedDB !== 'undefined') {
+      indexedDB.databases?.().then(dbs => {
+        dbs.forEach(db => {
+          if (db.name) indexedDB.deleteDatabase(db.name)
+        })
+      }).catch(() => {})
+    }
+  } catch { /* IndexedDB may be unavailable */ }
+
+  // 4. Defer redirect — gives React one frame to paint the overlay
   setTimeout(async () => {
-    try {
-      localStorage.clear()
-    } catch {
-      // Storage may be unavailable
-    }
-    try {
-      sessionStorage.clear()
-    } catch {
-      // Storage may be unavailable
-    }
-
-    // Clear IndexedDB databases
-    try {
-      if (typeof indexedDB !== 'undefined') {
-        indexedDB.databases?.().then(dbs => {
-          dbs.forEach(db => {
-            if (db.name) indexedDB.deleteDatabase(db.name)
-          })
-        }).catch(() => {})
-      }
-    } catch {
-      // IndexedDB may be unavailable
-    }
-
-    // Clear Tauri Store
+    // Clear Tauri Store (async cleanup)
     try {
       const { Store } = await import('@tauri-apps/plugin-store')
       for (const name of ['keys.json', 'settings.json', 'drafts.json']) {
@@ -65,13 +56,9 @@ export function performPanicWipe(): void {
           const store = await Store.load(name)
           await store.clear()
           await store.save()
-        } catch {
-          // Store may not exist
-        }
+        } catch { /* Store may not exist */ }
       }
-    } catch {
-      // Tauri Store may be unavailable
-    }
+    } catch { /* Tauri Store may be unavailable */ }
 
     // Full-page redirect (destroys all React state)
     window.location.href = '/login'

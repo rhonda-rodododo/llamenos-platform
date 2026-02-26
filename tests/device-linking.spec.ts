@@ -4,7 +4,10 @@ import { loginAsAdmin } from './helpers'
 test.describe('Device linking — /link-device page', () => {
   test.beforeEach(async ({ page }) => {
     // Ensure no stored key so the page doesn't redirect to /login
-    await page.addInitScript(() => localStorage.removeItem('llamenos-encrypted-key'))
+    await page.addInitScript(() => {
+      localStorage.removeItem('llamenos-encrypted-key')
+      localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
+    })
   })
 
   test('shows start linking button on initial load', async ({ page }) => {
@@ -14,15 +17,17 @@ test.describe('Device linking — /link-device page', () => {
   })
 
   test('redirects to /login if user already has a stored key', async ({ page }) => {
-    // Override the beforeEach — inject a fake encrypted key blob
+    // Override the beforeEach — inject a fake encrypted key blob to both stores
     await page.addInitScript(() => {
-      localStorage.setItem('llamenos-encrypted-key', JSON.stringify({
+      const data = JSON.stringify({
         salt: 'aa'.repeat(16),
         iterations: 600000,
         nonce: 'bb'.repeat(24),
         ciphertext: 'cc'.repeat(32),
         pubkey: 'dd'.repeat(8),
-      }))
+      })
+      localStorage.setItem('llamenos-encrypted-key', data)
+      localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-key', data)
     })
     await page.goto('/link-device')
     await page.waitForURL(u => u.toString().includes('/login'), { timeout: 10000 })
@@ -87,14 +92,20 @@ test.describe('Device linking — settings section', () => {
 
 test.describe('Device linking — login page integration', () => {
   test('recovery view shows link-this-device button when no stored key', async ({ page }) => {
-    await page.addInitScript(() => localStorage.removeItem('llamenos-encrypted-key'))
+    await page.addInitScript(() => {
+      localStorage.removeItem('llamenos-encrypted-key')
+      localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
+    })
     await page.goto('/login')
     // No stored key → recovery view is default
     await expect(page.getByRole('link', { name: /link this device/i })).toBeVisible({ timeout: 10000 })
   })
 
   test('link-this-device button navigates to /link-device', async ({ page }) => {
-    await page.addInitScript(() => localStorage.removeItem('llamenos-encrypted-key'))
+    await page.addInitScript(() => {
+      localStorage.removeItem('llamenos-encrypted-key')
+      localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
+    })
     await page.goto('/login')
     await expect(page.getByRole('link', { name: /link this device/i })).toBeVisible({ timeout: 10000 })
 
@@ -103,15 +114,17 @@ test.describe('Device linking — login page integration', () => {
   })
 
   test('recovery options from PIN view shows link-this-device', async ({ page }) => {
-    // Inject fake stored key for PIN view
+    // Inject fake stored key for PIN view (both legacy and mock Tauri Store)
     await page.addInitScript(() => {
-      localStorage.setItem('llamenos-encrypted-key', JSON.stringify({
+      const data = JSON.stringify({
         salt: 'aa'.repeat(16),
         iterations: 600000,
         nonce: 'bb'.repeat(24),
         ciphertext: 'cc'.repeat(32),
         pubkey: 'dd'.repeat(8),
-      }))
+      })
+      localStorage.setItem('llamenos-encrypted-key', data)
+      localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-key', data)
     })
     await page.goto('/login')
 

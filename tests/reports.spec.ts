@@ -55,12 +55,17 @@ async function completeOnboarding(page: Page): Promise<string> {
     return path === '/profile-setup' || path === '/' || path === '/reports'
   }, { timeout: 15000 })
 
-  // Extract nsec from key-manager while still unlocked (in memory after onboarding)
-  const nsec = await page.evaluate(() => {
-    const km = (window as any).__TEST_KEY_MANAGER
-    return km?.getNsec?.() ?? null
+  // Extract nsec from CryptoState while still unlocked (in memory after onboarding)
+  const nsec = await page.evaluate(async () => {
+    const platform = (window as any).__TEST_PLATFORM
+    if (!platform?.getNsecFromState) return null
+    try {
+      return await platform.getNsecFromState()
+    } catch {
+      return null
+    }
   })
-  if (!nsec) throw new Error('Failed to extract nsec from key-manager after onboarding')
+  if (!nsec) throw new Error('Failed to extract nsec from CryptoState after onboarding')
   return nsec
 }
 

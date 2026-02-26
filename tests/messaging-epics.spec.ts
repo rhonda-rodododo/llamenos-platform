@@ -21,13 +21,11 @@ async function apiCall(page: Page, method: string, path: string, body?: unknown)
     if (sessionToken) {
       headers['Authorization'] = `Session ${sessionToken}`
     } else {
-      const km = (window as unknown as { __TEST_KEY_MANAGER?: {
-        isUnlocked?: () => boolean
-        createAuthToken?: (ts: number, method: string, path: string) => string
-      } }).__TEST_KEY_MANAGER
-      if (km?.isUnlocked?.()) {
+      const km = (window as any).__TEST_KEY_MANAGER
+      const platform = (window as any).__TEST_PLATFORM
+      if (km?.isUnlocked?.() && platform?.createAuthToken) {
         try {
-          const token = km.createAuthToken?.(Date.now(), method, `/api${path}`)
+          const token = await platform.createAuthToken(Date.now(), method, `/api${path}`)
           if (token) headers['Authorization'] = `Bearer ${token}`
         } catch { /* key locked or unavailable */ }
       }

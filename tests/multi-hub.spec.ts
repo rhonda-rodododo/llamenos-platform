@@ -18,14 +18,15 @@ test.describe('Multi-hub architecture', () => {
     await page.evaluate(() => {
       window.__authedFetch = async (url: string, options: RequestInit = {}) => {
         const km = (window as any).__TEST_KEY_MANAGER
+        const platform = (window as any).__TEST_PLATFORM
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           ...(options.headers as Record<string, string> || {}),
         }
-        if (km?.isUnlocked()) {
+        if (km?.isUnlocked() && platform?.createAuthToken) {
           const reqMethod = (options.method || 'GET').toUpperCase()
           const reqPath = new URL(url, location.origin).pathname
-          const token = km.createAuthToken(Date.now(), reqMethod, reqPath)
+          const token = await platform.createAuthToken(Date.now(), reqMethod, reqPath)
           headers['Authorization'] = `Bearer ${token}`
         }
         return fetch(url, { ...options, headers })

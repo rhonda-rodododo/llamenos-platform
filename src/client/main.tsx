@@ -18,6 +18,9 @@ if (typeof window !== 'undefined') {
   import('./lib/key-manager').then(km => {
     ;(window as any).__TEST_KEY_MANAGER = km
   })
+  import('./lib/platform').then(p => {
+    ;(window as any).__TEST_PLATFORM = p
+  })
 }
 
 declare module '@tanstack/react-router' {

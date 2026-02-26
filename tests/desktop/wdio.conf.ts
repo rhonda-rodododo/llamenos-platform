@@ -28,7 +28,7 @@ export const config: WebdriverIO.Config = {
   runner: 'local',
   hostname: '127.0.0.1',
   port: 4444,
-  specs: ['./specs/**/*.spec.ts'],
+  specs: ['./specs/**/*.wdio.ts'],
   maxInstances: 1,
   capabilities: [
     {

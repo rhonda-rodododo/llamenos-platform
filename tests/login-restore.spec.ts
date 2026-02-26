@@ -32,14 +32,17 @@ test.describe('Login page — stored key exists (PIN view)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login')
     // Inject a fake encrypted key blob to trigger the PIN entry UI
+    // Write to both legacy key and mock Tauri Store key
     await page.evaluate(() => {
-      localStorage.setItem('llamenos-encrypted-key', JSON.stringify({
+      const data = JSON.stringify({
         salt: 'aa'.repeat(16),
         iterations: 600000,
         nonce: 'bb'.repeat(24),
         ciphertext: 'cc'.repeat(32),
         pubkey: 'dd'.repeat(8),
-      }))
+      })
+      localStorage.setItem('llamenos-encrypted-key', data)
+      localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-key', data)
     })
     await page.reload()
   })

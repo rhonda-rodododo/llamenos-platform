@@ -15,11 +15,12 @@ async function apiCall(page: import('@playwright/test').Page, method: string, pa
     if (sessionToken) {
       headers['Authorization'] = `Session ${sessionToken}`
     } else {
-      // Use the test key manager exposed by main.tsx
+      // Use the platform module exposed by main.tsx for Schnorr auth
       const km = (window as any).__TEST_KEY_MANAGER
-      if (km?.isUnlocked?.()) {
+      const platform = (window as any).__TEST_PLATFORM
+      if (km?.isUnlocked?.() && platform?.createAuthToken) {
         try {
-          const token = km.createAuthToken(Date.now(), method, `/api${path}`)
+          const token = await platform.createAuthToken(Date.now(), method, `/api${path}`)
           headers['Authorization'] = `Bearer ${token}`
         } catch { /* key locked or unavailable */ }
       }

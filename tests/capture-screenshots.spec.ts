@@ -75,9 +75,17 @@ async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promi
     pubkey: pubkeyHash,
   }
 
+  const jsonData = JSON.stringify(data)
   await page.evaluate(
-    ({ key, value }) => localStorage.setItem(key, value),
-    { key: 'llamenos-encrypted-key', value: JSON.stringify(data) },
+    ({ legacyKey, storeKey, value }) => {
+      localStorage.setItem(legacyKey, value)
+      localStorage.setItem(storeKey, value)
+    },
+    {
+      legacyKey: 'llamenos-encrypted-key',
+      storeKey: 'tauri-store:keys.json:llamenos-encrypted-key',
+      value: jsonData,
+    },
   )
 }
 
@@ -284,6 +292,7 @@ test.describe('Screenshot Capture', () => {
     await page.evaluate(() => {
       sessionStorage.clear()
       localStorage.removeItem('llamenos-encrypted-key')
+      localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
     })
     await page.goto('/login')
     await page.waitForTimeout(500)
