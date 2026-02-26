@@ -10,6 +10,17 @@
 - [x] Documented hub URL configuration design for native clients
 - [x] Identified platform.ts is dead code (key-manager.ts imports key-store.ts directly) — documented for Epic 81
 
+### Epic 87: Desktop Auto-Updater & Distribution
+- [x] Tauri updater plugin registered with Ed25519 signing, GitHub Releases endpoint
+- [x] tauri-plugin-process for app relaunch after update
+- [x] createUpdaterArtifacts: true — signed .tar.gz, .nsis.zip, .AppImage bundles
+- [x] updater:default + process:default capabilities added
+- [x] UpdateChecker component — background check every 6h, download progress bar, restart prompt
+- [x] CI workflow (tauri-release.yml) — macOS universal, Windows, Linux matrix build
+- [x] Apple notarization support (via env secrets when configured)
+- [x] Manifest generation script (generate-update-manifest.sh) — builds latest.json from .sig artifacts
+- [x] GitHub Release publishing with all platform artifacts + latest.json
+
 ### Epic 89: Mobile UI Polish & Accessibility (`llamenos-mobile` repo)
 - [x] NativeWind dark mode with CSS variables matching web app's OKLCH teal/amber palette (light + dark tokens)
 - [x] Theme toggle (light/dark/system) persisted via MMKV settings store, synced via nativewind colorScheme.set()

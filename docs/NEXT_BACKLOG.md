@@ -191,7 +191,7 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 
 ### Desktop Verification & Distribution
 - [x] **[Epic 82: Desktop Route Verification](epics/epic-82-desktop-route-verification.md)** — Fixed Tauri capabilities, CSP hardening, platform.ts PIN encrypt/decrypt flow
-- [ ] **[Epic 87: Desktop Auto-Updater & Distribution](epics/epic-87-desktop-auto-updater.md)** — Ed25519 signed updates, CI builds (macOS/Windows/Linux), Apple notarization, GitHub Releases manifest, self-hosted endpoint support
+- [x] **[Epic 87: Desktop Auto-Updater & Distribution](epics/epic-87-desktop-auto-updater.md)** — Ed25519 signed updates, CI builds (macOS/Windows/Linux), Apple notarization, GitHub Releases manifest, self-hosted endpoint support
 
 ### Mobile Foundation & Auth
 - [x] **[Epic 83: Mobile Foundation](epics/epic-83-mobile-foundation.md)** — Full crypto layer, auth flow, NativeWind 4, Zustand/MMKV, React Query, Nostr relay, i18n, tab navigator
