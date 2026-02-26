@@ -10,41 +10,41 @@ Transform Llamenos from a "server-side encrypted" model to a **true zero-knowled
 4. **Users can verify code integrity** - Reproducible builds
 5. **Audio never leaves the device** - Client-side transcription
 
-## Current State vs Target State
+## Implemented Architecture
 
 ### Data at Rest
 
-| Data Type | Current | Target | Epic |
-| --------- | ------- | ------ | ---- |
-| Call notes | E2EE (V2) | E2EE (V2) | - |
-| Transcripts | E2EE | E2EE (client-generated, local mic only) | 78 |
-| Reports | E2EE | E2EE | - |
-| File attachments | E2EE | E2EE | - |
-| SMS messages | **Plaintext** | E2EE (envelope pattern) | 74 |
-| WhatsApp messages | **Plaintext** | E2EE (envelope pattern) | 74 |
-| Signal messages | **Plaintext** | E2EE (envelope pattern) | 74 |
-| Volunteer assignments | **Plaintext** | E2EE (multi-admin envelopes) | 77 |
-| Shift schedules | **Plaintext** | E2EE (multi-admin) + signed routing pubkeys | 77 |
-| Audit logs | **Plaintext** | Server-readable + Merkle chain + actor signatures | 77 |
-| Caller phone hashes | HMAC-SHA256 | HMAC-SHA256 | - |
+| Data Type | Status | Encryption | Epic |
+| --------- | ------ | ---------- | ---- |
+| Call notes | E2EE | XChaCha20-Poly1305 + ECIES per-note key, dual envelopes (author + admin) | — |
+| Transcripts | E2EE | Client-generated via WASM Whisper; encrypted with note key | 78 |
+| Reports | E2EE | XChaCha20-Poly1305 + ECIES per-report key | — |
+| File attachments | E2EE | XChaCha20-Poly1305 + ECIES per-file key | — |
+| SMS messages | E2EE at rest | Envelope encryption: per-message random key, ECIES for volunteer + each admin | 74 |
+| WhatsApp messages | E2EE at rest | Envelope encryption: per-message random key, ECIES for volunteer + each admin | 74 |
+| Signal messages | E2EE at rest | Envelope encryption: per-message random key, ECIES for volunteer + each admin | 74 |
+| Volunteer assignments | E2EE | Multi-admin envelopes via `LABEL_CALL_META` | 77 |
+| Shift schedules | E2EE + plaintext routing | Encrypted details via `LABEL_SHIFT_SCHEDULE`; routing pubkeys/times plaintext | 77 |
+| Audit logs | Plaintext + hash chain | Server-readable with SHA-256 hash chain (`previousEntryHash` + `entryHash`) for tamper detection | 77 |
+| Caller phone hashes | HMAC-SHA256 | HMAC-SHA256 with operator secret; last 4 digits stored plaintext | — |
 
 ### Data in Transit (Real-Time)
 
-| Event Type | Current | Target | Epic |
-| ---------- | ------- | ------ | ---- |
-| Call notifications | WebSocket to server | Nostr relay (ephemeral, E2EE) | 76 |
-| Presence updates | WebSocket to server | Nostr relay (ephemeral, E2EE, RBAC) | 76 |
-| Message notifications | WebSocket to server | Nostr relay (ephemeral, E2EE) | 76 |
-| Typing indicators | WebSocket to server | Nostr relay (ephemeral, E2EE) | 76 |
-| Call state changes | Server-authoritative | REST + Nostr relay propagation | 76 |
+| Event Type | Implementation | Epic |
+| ---------- | -------------- | ---- |
+| Call notifications | Nostr relay ephemeral kind 20001 events, hub-key encrypted, generic tags | 76 |
+| Presence updates | Nostr relay ephemeral events, hub-key encrypted (volunteer: boolean; admin: ECIES with full counts) | 76 |
+| Message notifications | Nostr relay ephemeral events, hub-key encrypted | 76 |
+| Typing indicators | Nostr relay ephemeral events, hub-key encrypted | 76 |
+| Call state changes | REST API (server-authoritative via DO serialization) + Nostr relay propagation | 76 |
 
 ### External Data Flows
 
-| Flow | Current | Target | Epic |
-| ---- | ------- | ------ | ---- |
-| Transcription audio | Sent to CF Workers AI | Local mic only (WASM, single-threaded) | 78 |
-| Volunteer phone numbers | Exposed to telephony provider | Twilio SDK only (no personal PSTN) | 75 |
-| Push notifications | Content visible to Apple/Google | Two-tier encryption (wake key + pubkey) | 75 |
+| Flow | Implementation | Epic |
+| ---- | -------------- | ---- |
+| Transcription audio | Local mic only — WASM Whisper in-browser via `@huggingface/transformers`, single-threaded AudioWorklet | 78 |
+| Volunteer phone numbers | Exposed to telephony provider (Twilio SDK) — inherent limitation of PSTN | — |
+| Push notifications | Not yet implemented — planned: two-tier encryption (wake key + pubkey) | 75 (future) |
 
 ## Architecture Layers
 
@@ -209,49 +209,51 @@ Even with Nostr relay handling all real-time events, we still need a thin REST A
 | **File uploads** | Encrypted attachments need R2/S3 | Ciphertext only |
 | **Push notification trigger** | Wake sleeping mobile clients | Encrypted payload via APNs/FCM |
 
-### Implementation Order
+### Implementation History
 
-1. **Epic 76.0: Security Foundations** (Pre-work)
-   - Domain separation label audit
+1. **Epic 76.0: Security Foundations** (Completed)
+   - Domain separation label audit → `src/shared/crypto-labels.ts` with 25 constants
    - Provisioning channel SAS fix
-   - Emergency key revocation procedures
-   - Threat model updates
-   - Backup file privacy fix
+   - Emergency key revocation procedures documented
+   - Threat model updates (6 new sections)
+   - Backup file privacy fix (generic format)
 
-2. **Epic 76.1 + 76.2: Architecture PoCs** (Pre-work)
-   - Worker-to-relay communication PoC
-   - Hub key redesign (random keys, ECIES distribution)
-   - Multi-admin support design
-   - NIP-44 correct usage
+2. **Epic 76.1 + 76.2: Architecture Redesign** (Completed)
+   - Worker-to-relay communication: `NostrPublisher` with CF (DO service binding) and Node.js (persistent WebSocket) implementations
+   - Hub key = `crypto.getRandomValues(32)`, ECIES-wrapped per member
+   - Multi-admin envelopes: `adminPubkeys[]` → `adminEnvelopes[]`
+   - Identity + decryption key separation
 
-3. **Epic 76: Nostr Relay** (Foundation)
-   - Deploy self-hosted relay (Nosflare/strfry)
-   - Delete WebSocket code
-   - Ephemeral events (kind 20001) for real-time
-   - REST for state, Nostr for events
-   - Server-authoritative call state
+3. **Epic 76: Nostr Relay Sync** (Completed)
+   - Complete WebSocket removal — deleted `ws.ts`, `websocket.ts`, `websocket-pair.ts`
+   - Nostr-only real-time via ephemeral kind 20001 events with generic tags
+   - Server-authoritative call state (REST + DO serialization, relay for notification)
 
-4. **Epic 74 + 77: E2EE Data** (Core)
-   - E2EE messaging storage (envelope pattern)
-   - Encrypted metadata (multi-admin envelopes)
-   - Audit logs with Merkle chain integrity
-   - Client-side analytics (bounded windows)
+4. **Epic 74: E2EE Messaging Storage** (Completed)
+   - Envelope encryption: per-message random key, ECIES-wrapped per reader
+   - Server encrypts inbound on webhook receipt (plaintext discarded immediately)
+   - Client-side decryption in ConversationThread component
 
-5. **Epic 75: Native Clients** (Reach)
+5. **Epic 77: Metadata Encryption** (Completed)
+   - Per-record DO storage keys (`callrecord:` prefix)
+   - Encrypted call assignments (`LABEL_CALL_META`) and shift schedules (`LABEL_SHIFT_SCHEDULE`)
+   - Hash-chained audit log (SHA-256 with `previousEntryHash` + `entryHash`)
+
+6. **Epic 78: Client-Side Transcription** (Completed)
+   - WASM Whisper via `@huggingface/transformers` ONNX runtime
+   - AudioWorklet ring buffer → Web Worker isolation
+   - Local microphone only (Twilio SDK limitation), auto-save encrypted transcript on hangup
+
+7. **Epic 79: Reproducible Builds** (Completed)
+   - Deterministic output via `SOURCE_DATE_EPOCH`, content-hashed filenames
+   - `Dockerfile.build` for isolated verification
+   - `CHECKSUMS.txt` in GitHub Releases, SLSA provenance attestation
+   - `scripts/verify-build.sh [version]` for operator verification
+
+8. **Epic 75: Native Clients** (Future)
    - Tauri desktop (macOS + Windows)
    - React Native mobile (Twilio RN SDK)
    - Two-tier push encryption (wake key + nsec)
-
-6. **Epic 78: Client-Side Transcription** (Privacy)
-   - Single-threaded WASM Whisper (no COEP conflict)
-   - Local microphone only (Twilio SDK limitation)
-   - Chunked processing (96MB memory ceiling)
-
-7. **Epic 79: Reproducible Builds** (Trust)
-   - Deterministic builds
-   - Worker bundle capture via wrangler --dry-run
-   - Checksums on GitHub Releases (not served from app)
-   - SLSA provenance
 
 ## Key Architecture Principles (From Security Audit)
 
@@ -347,6 +349,8 @@ From Epic 76.0:
 | `llamenos:file-key` | Per-file attachment key wrapping | Client crypto |
 | `llamenos:hub-event` | Hub key encryption of Nostr event content | Client Nostr encryption |
 | `llamenos:hub-key-wrap` | ECIES wrapping of hub key for member distribution | Admin client |
+| `llamenos:call-meta` | Encrypted call record metadata (assignments) | Client + server crypto |
+| `llamenos:shift-schedule` | Encrypted shift schedule details | Client + server crypto |
 | `llamenos:draft` | Draft encryption key derivation | Client crypto |
 | `llamenos:export` | Export encryption key derivation | Client crypto |
 
@@ -473,59 +477,50 @@ Server DOES see: outbound plaintext momentarily (inherent SMS/WhatsApp limitatio
 
 ## Implementation Checklist
 
-### Before Starting (Epic 76.0)
+### Before Starting (Epic 76.0) — Complete
 
-- [ ] Domain separation labels audited and fixed
-- [ ] Provisioning SAS verification implemented
-- [ ] Emergency key revocation procedures documented
-- [ ] Threat model updated with all new trust parties
-- [ ] Backup file privacy fixed
+- [x] Domain separation labels audited and fixed (`src/shared/crypto-labels.ts`, 25 constants)
+- [x] Provisioning SAS verification implemented
+- [x] Emergency key revocation procedures documented
+- [x] Threat model updated with all new trust parties
+- [x] Backup file privacy fixed
 
-### Architecture Proven (Epics 76.1 + 76.2)
+### Architecture Proven (Epics 76.1 + 76.2) — Complete
 
-- [ ] Worker-to-relay publishing PoC passing latency budget (<1s)
-- [ ] Hub key as random secret with ECIES distribution working
-- [ ] Multi-admin envelope pattern working
-- [ ] Correct NIP-44 usage verified
+- [x] Worker-to-relay publishing PoC passing latency budget (<1s)
+- [x] Hub key as random secret with ECIES distribution working
+- [x] Multi-admin envelope pattern working
+- [x] Correct NIP-44 usage verified
 
-### Per-Feature Implementation
+### Per-Feature Implementation — Complete
 
-For each feature:
+All features verified:
 
-1. [ ] Data flow designed (E2EE from the start)
-2. [ ] Correct domain separation label used
-3. [ ] Key distribution planned (multi-admin compatible)
-4. [ ] E2E tests written
-5. [ ] Performance impact assessed
-6. [ ] Documentation updated
+1. [x] Data flow designed (E2EE from the start)
+2. [x] Correct domain separation label used (all 25 labels in `crypto-labels.ts`)
+3. [x] Key distribution planned (multi-admin compatible)
+4. [x] E2E tests written
+5. [x] Performance impact assessed
+6. [x] Documentation updated
 
-### Implementation Verification
+### Implementation Verification — In Progress
 
-- [ ] Server code audit: no private keys held, no plaintext access paths
-- [ ] Database schema audit: only ciphertext stored
-- [ ] Network audit: real-time via relay only
-- [ ] Penetration test of architecture
-- [ ] Documentation complete and honest about limitations
-- [ ] Security page updated
+- [x] Server code audit: no private keys held, no plaintext access paths
+- [x] Database schema audit: only ciphertext stored for sensitive data
+- [x] Network audit: real-time via relay only (WebSocket code deleted)
+- [ ] External penetration test of architecture
+- [x] Documentation complete and honest about limitations
+- [x] Security page updated
 
-## Open Research Questions
+## Resolved Design Decisions
 
-1. **Multi-hub key management**: Volunteers in multiple hubs store multiple hub keys
-   - Each hub has independent random key
-   - UI to switch between hubs
+1. **Multi-hub key management**: Each hub has an independent random key. Clients store multiple hub keys indexed by hub ID and key version. Hub switcher UI selects the active hub context.
 
-2. **Relay federation**: Multiple relays for redundancy?
-   - Start with single self-hosted relay
-   - Add redundancy if needed
+2. **Relay architecture**: Single self-hosted relay (strfry for Docker/K8s, Nosflare for CF). Federation deferred — single relay is sufficient for the target scale. REST polling fallback for state recovery on reconnect.
 
-3. **Offline support**: How much functionality without relay/server?
-   - Notes: Full offline (local drafts)
-   - Calls: Require connectivity
-   - Messages: Queue locally, send when connected
+3. **Offline support**: Notes support full offline operation (local encrypted drafts). Calls require connectivity (telephony is inherently online). Messages queue locally and send when connected.
 
-4. **Full call transcription**: Remote audio capture requires replacing Twilio SDK with raw WebRTC
-   - Deferred to post-MVP
-   - Local mic transcription available in MVP
+4. **Transcription scope**: Local microphone only via WASM Whisper (Epic 78). Remote party audio requires replacing Twilio SDK with raw WebRTC — deferred to post-MVP. This is a known limitation documented in the security model.
 
 ## Success Metrics
 

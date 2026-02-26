@@ -1,6 +1,6 @@
 # Llámenos Cryptographic Protocol Specification
 
-**Version:** 1.1
+**Version:** 2.0
 **Date:** 2026-02-25
 **Status:** Normative
 
@@ -30,20 +30,41 @@ Identity Key (nsec / secretKey)
   └── Recovery Key Encryption (Section 9)
   └── Auth Token Signing (Section 4)
   └── ECIES Key Agreement (Sections 5-7)
+  └── NIP-42 Relay Authentication (Section 4.3)
+
+Admin Decryption Key (Epic 76.2)
+  Separate secp256k1 keypair from identity key
+  └── Note admin envelope unwrapping (Section 5)
+  └── Message admin envelope unwrapping (Section 6)
+  └── Metadata decryption (Section 14)
+
+Hub Key (Epic 76.2)
+  32-byte random: crypto.getRandomValues(new Uint8Array(32))
+  NOT derived from any identity key
+  └── Nostr event content encryption (XChaCha20-Poly1305 + HKDF per-event)
+  └── Presence encryption (volunteer-tier: boolean only)
+  └── Distribution: ECIES-wrapped individually per member ("llamenos:hub-key-wrap")
+
+Server Nostr Key (Epic 76.1)
+  Derived: HKDF-SHA256(SERVER_NOSTR_SECRET, "llamenos:server-nostr-key", "llamenos:server-nostr-key:v1")
+  └── Signs server-authoritative Nostr events (call:ring, call:answered)
+  └── Clients verify server pubkey for authoritative events
+  └── CANNOT decrypt any user content
 
 Per-Note Key
   32-byte random
   Generated per note creation/edit
   └── ECIES-wrapped for author (Section 5)
-  └── ECIES-wrapped for admin (Section 5)
+  └── ECIES-wrapped for each admin (Section 5)
 
-Per-Message Key (inherent in ECIES)
-  Ephemeral secp256k1 keypair per message
-  └── ECIES for recipient (Section 6)
-  └── ECIES for admin (Section 6)
+Per-Message Key (Epic 74)
+  32-byte random
+  Generated per message
+  └── ECIES-wrapped for assigned volunteer ("llamenos:message")
+  └── ECIES-wrapped for each admin ("llamenos:message")
 
 Per-File Key
-  32-byte random (AES-256-GCM or XChaCha20-Poly1305)
+  32-byte random (XChaCha20-Poly1305)
   └── ECIES-wrapped per recipient (Section 7)
 
 Draft Encryption Key
@@ -53,28 +74,78 @@ Draft Encryption Key
 
 ### 2.1 Domain Separation Labels
 
-Every cryptographic operation uses a unique domain separation string to prevent cross-context key reuse attacks. The authoritative source is `src/shared/crypto-labels.ts`; this table must match that file exactly.
+Every cryptographic operation uses a unique domain separation string to prevent cross-context key reuse attacks. The authoritative source is `src/shared/crypto-labels.ts`; this table must match that file exactly (25 constants).
 
-| Label | Purpose | Section |
-|-------|---------|---------|
-| `"llamenos:note-key"` | ECIES wrapping of per-note symmetric key | 5.2 |
-| `"llamenos:transcription"` | Server-side transcription ECIES encryption | 6 |
-| `"llamenos:message"` | E2EE message ECIES encryption | 6 (future) |
-| `"llamenos:file-key"` | Per-file symmetric key ECIES wrapping | 7 |
-| `"llamenos:file-metadata"` | File metadata ECIES encryption | 7 |
-| `"llamenos:hub-key-wrap"` | Hub key ECIES distribution | (future) |
-| `"llamenos:hub-event"` | Hub event HKDF derivation | (future) |
-| `"llamenos:device-provision"` | Device provisioning ECDH key derivation | 10 |
-| `"llamenos:sas"` / `"llamenos:provisioning-sas"` | SAS verification HKDF (salt / info) | 10 |
-| `"llamenos:hkdf-salt:v1"` | HKDF salt for legacy key derivation | 5.4 |
-| `"llamenos:notes"` | HKDF context for legacy note encryption | 5.4 |
-| `"llamenos:drafts"` | HKDF context for draft encryption | 8 |
-| `"llamenos:export"` | HKDF context for export encryption | — |
-| `"llamenos:auth:"` | Schnorr auth token message prefix | 4 |
-| `"llamenos:phone:"` | HMAC phone number hashing prefix | — |
-| `"llamenos:ip:"` | HMAC IP address hashing prefix | — |
-| `"llamenos:keyid:"` | Key identification hash prefix | 3.1 |
-| `"llamenos:recovery"` | Recovery key PBKDF2 fallback salt | 9 |
+#### ECIES Key Wrapping
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `LABEL_NOTE_KEY` | `"llamenos:note-key"` | Per-note symmetric key ECIES wrapping | 5.2 |
+| `LABEL_FILE_KEY` | `"llamenos:file-key"` | Per-file symmetric key ECIES wrapping | 7 |
+| `LABEL_FILE_METADATA` | `"llamenos:file-metadata"` | File metadata ECIES encryption | 7 |
+| `LABEL_HUB_KEY_WRAP` | `"llamenos:hub-key-wrap"` | Hub key ECIES distribution to members | 14 |
+
+#### Content Encryption
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `LABEL_TRANSCRIPTION` | `"llamenos:transcription"` | Transcription ECIES encryption | 6 |
+| `LABEL_MESSAGE` | `"llamenos:message"` | E2EE message envelope encryption | 6 |
+| `LABEL_CALL_META` | `"llamenos:call-meta"` | Encrypted call record metadata (assignments) | 14 |
+| `LABEL_SHIFT_SCHEDULE` | `"llamenos:shift-schedule"` | Encrypted shift schedule details | 14 |
+
+#### HKDF Derivation
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `HKDF_SALT` | `"llamenos:hkdf-salt:v1"` | HKDF salt for legacy symmetric key derivation | 5.4 |
+| `HKDF_CONTEXT_NOTES` | `"llamenos:notes"` | HKDF context for legacy V1 note encryption | 5.4 |
+| `HKDF_CONTEXT_DRAFTS` | `"llamenos:drafts"` | HKDF context for draft encryption | 8 |
+| `HKDF_CONTEXT_EXPORT` | `"llamenos:export"` | HKDF context for export encryption | — |
+| `LABEL_HUB_EVENT` | `"llamenos:hub-event"` | Hub event HKDF derivation from hub key | 14 |
+
+#### ECDH Key Agreement
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `LABEL_DEVICE_PROVISION` | `"llamenos:device-provision"` | Device provisioning ECDH shared key derivation | 10 |
+
+#### SAS Verification
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `SAS_SALT` | `"llamenos:sas"` | SAS HKDF salt for provisioning verification | 10 |
+| `SAS_INFO` | `"llamenos:provisioning-sas"` | SAS HKDF info parameter | 10 |
+
+#### Authentication
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `AUTH_PREFIX` | `"llamenos:auth:"` | Schnorr auth token message prefix | 4 |
+
+#### HMAC Domain Separation
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `HMAC_PHONE_PREFIX` | `"llamenos:phone:"` | Phone number hashing prefix | — |
+| `HMAC_IP_PREFIX` | `"llamenos:ip:"` | IP address hashing prefix | — |
+| `HMAC_KEYID_PREFIX` | `"llamenos:keyid:"` | Key identification hash prefix | 3.1 |
+| `HMAC_SUBSCRIBER` | `"llamenos:subscriber"` | Subscriber identifier HMAC key | — |
+| `HMAC_PREFERENCE_TOKEN` | `"llamenos:preference-token"` | Preference token HMAC key | — |
+
+#### Recovery / Backup
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `RECOVERY_SALT` | `"llamenos:recovery"` | Recovery key PBKDF2 fallback salt (legacy) | 9 |
+| `LABEL_BACKUP` | `"llamenos:backup"` | Generic backup encryption | 9 |
+
+#### Server Nostr Identity
+
+| Constant | Label | Purpose | Section |
+|----------|-------|---------|---------|
+| `LABEL_SERVER_NOSTR_KEY` | `"llamenos:server-nostr-key"` | HKDF derivation for server Nostr keypair from `SERVER_NOSTR_SECRET` | 14 |
+| `LABEL_SERVER_NOSTR_KEY_INFO` | `"llamenos:server-nostr-key:v1"` | HKDF info parameter for server Nostr key (versioned for rotation) | 14 |
 
 ## 3. Local Key Protection
 
@@ -166,13 +237,17 @@ token = 32 random bytes, hex-encoded
 - Check expiry (8 hours from creation)
 - Extract associated pubkey
 
-### 4.3 WebSocket Authentication
+### 4.3 Nostr Relay Authentication (NIP-42)
 
-Auth token sent via `Sec-WebSocket-Protocol` header:
-- Session token: `session-{token_hex}`
-- Schnorr token: `base64url(token_json)` (no padding)
+Clients authenticate to the Nostr relay using the NIP-42 protocol:
 
-Server echoes the first protocol value to complete the handshake.
+1. Client connects to the relay via WebSocket (`wss://domain/nostr`)
+2. Relay sends `["AUTH", <challenge_string>]`
+3. Client signs the challenge using its Nostr identity key (BIP-340 Schnorr)
+4. Client sends the signed NIP-42 auth event back to the relay
+5. Relay verifies the signature and grants access to publish/subscribe
+
+Only authenticated clients can publish events or subscribe to hub-scoped events. The relay enforces a write policy that restricts publishing to known server and member pubkeys.
 
 ## 5. Note Encryption (Per-Note Forward Secrecy)
 
@@ -225,23 +300,62 @@ legacyKey = HKDF-SHA256(secretKey, "llamenos:hkdf-salt:v1", "llamenos:notes", 32
 
 Legacy notes are identified by the absence of `authorEnvelope`/`adminEnvelope` fields.
 
-## 6. Message Encryption
+## 6. Message Encryption (Envelope Pattern)
 
-Messages (SMS, WhatsApp, Signal conversations) use per-message ECIES:
+Messages (SMS, WhatsApp, Signal conversations) use per-message envelope encryption (Epic 74), matching the note encryption pattern from Section 5.
+
+### 6.1 Encryption
+
+Each message uses a fresh random key, ECIES-wrapped for each authorized reader:
 
 ```
-encryptForPublicKey(plaintext, recipientPubkeyHex):
-  // Same ECIES as Section 5.2, but encrypts the plaintext directly
+messageKey = random(32 bytes)
+nonce = random(24 bytes)
+encryptedContent = nonce || XChaCha20-Poly1305(messageKey, nonce, messageText)
+
+// Wrap the message key for each reader
+authorEnvelope = wrapKeyForPubkey(messageKey, volunteerPubkey, "llamenos:message")
+adminEnvelopes = [
+  wrapKeyForPubkey(messageKey, admin1Pubkey, "llamenos:message"),
+  wrapKeyForPubkey(messageKey, admin2Pubkey, "llamenos:message"),
+  ...  // one envelope per admin
+]
+```
+
+### 6.2 Key Wrapping (ECIES)
+
+```
+wrapKeyForPubkey(plainKey, recipientPubkeyHex, label):
   ephemeralSecret = random(32 bytes)
   ephemeralPub = secp256k1.getPublicKey(ephemeralSecret, compressed=true)
-  shared = ECDH(ephemeralSecret, "02" || recipientPubkeyHex)
-  symmetricKey = SHA-256("llamenos:transcription" || sharedX)
+  recipientCompressed = "02" || recipientPubkeyHex  // x-only → compressed
+  shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
+  sharedX = shared[1..33]  // strip prefix byte
+  symmetricKey = SHA-256(label || sharedX)
   nonce = random(24 bytes)
-  ciphertext = XChaCha20-Poly1305(symmetricKey, nonce, plaintext)
-  return { encryptedContent: hex(nonce || ciphertext), ephemeralPubkey: hex(ephemeralPub) }
+  wrappedKey = nonce || XChaCha20-Poly1305(symmetricKey, nonce, plainKey)
+  return { encryptedFileKey: hex(wrappedKey), ephemeralPubkey: hex(ephemeralPub) }
 ```
 
-Each message is dual-encrypted: one copy for the assigned volunteer, one for admin.
+### 6.3 Inbound Message Flow
+
+For inbound messages (SMS/WhatsApp webhook → server):
+
+1. Server receives plaintext from telephony provider (inherent limitation)
+2. Server encrypts immediately using the assigned volunteer's pubkey and all admin pubkeys
+3. Server stores ONLY the encrypted fields (`encryptedContent`, `authorEnvelope`, `adminEnvelopes[]`, `nonce`)
+4. Server discards the plaintext from memory
+
+### 6.4 Outbound Message Flow
+
+For outbound messages (volunteer → SMS/WhatsApp):
+
+1. Client encrypts the message and creates all envelopes
+2. Client sends both `plaintextForSending` (for the provider) and encrypted fields to the server
+3. Server forwards the plaintext to the telephony provider (inherent limitation)
+4. Server stores ONLY the encrypted fields; discards `plaintextForSending` immediately
+
+**Important**: The server momentarily sees outbound message plaintext — this is an inherent limitation of SMS/WhatsApp channels, not a bug. See [Threat Model: SMS/WhatsApp Outbound Message Limitation](../security/THREAT_MODEL.md#smswhatsapp-outbound-message-limitation).
 
 ## 7. File Encryption
 
@@ -413,3 +527,123 @@ All cryptographic operations use audited, constant-time implementations. No cust
 | Network MITM | HTTPS/WSS. Schnorr tokens expire in 5 minutes. |
 | Compromised identity key | Per-note/per-message ephemeral keys provide forward secrecy — compromising the identity key doesn't reveal past content without also obtaining the per-artifact envelopes. |
 | Lost device | Recovery key + backup file restores access on new device. Old device's encrypted store is useless without PIN. |
+
+## 14. Hub Event Encryption
+
+### 14.1 Hub Key Distribution
+
+The hub key is a shared 32-byte symmetric key used to encrypt Nostr relay events visible to all hub members.
+
+```
+hubKey = crypto.getRandomValues(new Uint8Array(32))
+
+// Wrap for each member via ECIES
+for each memberPubkey in activeMembers:
+  wrappedHubKey = wrapKeyForPubkey(hubKey, memberPubkey, "llamenos:hub-key-wrap")
+  // Publish wrapped key to relay or store server-side
+```
+
+The hub key is **random** (not derived from any identity key). This ensures:
+- Compromising any identity key does not reveal the hub key
+- Key rotation produces a genuinely new key with no mathematical link to the old one
+
+### 14.2 Event Encryption
+
+Each Nostr event's content is encrypted with a per-event derived key:
+
+```
+// Derive per-event encryption key
+eventKey = HKDF-SHA256(hubKey, "llamenos:hub-event", eventNonce)
+
+// Encrypt event content
+nonce = random(24 bytes)
+encryptedContent = XChaCha20-Poly1305(eventKey, nonce, JSON.stringify({
+  type: "call:ring",  // Actual event type is INSIDE encrypted content
+  callId: "...",
+  callerLast4: "1234",
+  ...
+}))
+
+// Publish to relay
+Event {
+  kind: 20001,  // Ephemeral — relay forwards, never stores
+  tags: [["d", hubId], ["t", "llamenos:event"]],  // Generic tag only
+  content: hex(nonce || encryptedContent),
+  pubkey: serverPubkey
+}
+```
+
+### 14.3 Server Nostr Identity
+
+The server derives its Nostr keypair from the `SERVER_NOSTR_SECRET` environment variable:
+
+```
+ikm = hex_decode(SERVER_NOSTR_SECRET)
+serverSecretKey = HKDF-SHA256(ikm, "llamenos:server-nostr-key", "llamenos:server-nostr-key:v1", 32)
+serverPubkey = secp256k1.getPublicKey(serverSecretKey)
+```
+
+Clients learn the server pubkey during authentication and verify it on all server-signed events. This prevents event injection by unauthorized parties.
+
+### 14.4 Encrypted Metadata (Epic 77)
+
+Call record metadata and shift schedule details are encrypted using their respective domain labels:
+
+```
+// Call metadata encryption
+callMetaKey = random(32 bytes)
+encryptedCallMeta = XChaCha20-Poly1305(callMetaKey, nonce, JSON.stringify({
+  answeredBy: volunteerPubkey,
+  duration: 300,
+  ...
+}))
+adminEnvelopes = [wrapKeyForPubkey(callMetaKey, adminPubkey, "llamenos:call-meta") for each admin]
+
+// Shift schedule detail encryption
+scheduleKey = random(32 bytes)
+encryptedSchedule = XChaCha20-Poly1305(scheduleKey, nonce, JSON.stringify({
+  label: "Evening Shift",
+  description: "...",
+  ...
+}))
+adminEnvelopes = [wrapKeyForPubkey(scheduleKey, adminPubkey, "llamenos:shift-schedule") for each admin]
+```
+
+## 15. Audit Log Integrity
+
+Audit logs use a hash-chained integrity mechanism (Epic 77) for tamper detection.
+
+### 15.1 Hash Chain Construction
+
+Each audit entry includes a forward hash link:
+
+```
+entryHash = SHA-256(
+  action + "|" +
+  actorPubkey + "|" +
+  timestamp + "|" +
+  JSON.stringify(details) + "|" +
+  previousEntryHash
+)
+```
+
+The first entry uses an empty string as `previousEntryHash`.
+
+### 15.2 Verification
+
+An admin can verify chain integrity by iterating from the first entry:
+
+```
+computedHash = ""
+for each entry in chronological order:
+  expectedHash = SHA-256(entry.action + "|" + entry.actorPubkey + "|" + ...)
+  if expectedHash !== entry.entryHash:
+    TAMPER DETECTED at entry
+  computedHash = entry.entryHash
+```
+
+### 15.3 Limitations
+
+- Chain truncation from the end leaves a valid shorter chain
+- An attacker with full DB access could recompute the entire chain
+- For advanced protection, periodically export and sign checkpoints to an external append-only store
