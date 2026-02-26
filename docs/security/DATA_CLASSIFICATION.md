@@ -1,6 +1,6 @@
 # Data Classification Reference
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-02-25
 
 This document provides a complete inventory of all data stored and processed by Llamenos, with classification levels for security audits, legal review, and GDPR compliance.
@@ -37,6 +37,8 @@ This document provides a complete inventory of all data stored and processed by 
 
 #### RecordsDO — Call Records and Notes
 
+Storage keys use `callrecord:` prefix pattern (Epic 77) for per-record isolation.
+
 | Field | Classification | Retention | Notes |
 |-------|---------------|-----------|-------|
 | `callId` | Plaintext | Indefinite | Unique call identifier |
@@ -62,10 +64,12 @@ This document provides a complete inventory of all data stored and processed by 
 | Field | Classification | Retention | Notes |
 |-------|---------------|-----------|-------|
 | `shiftId` | Plaintext | Indefinite | Unique shift identifier |
-| `volunteerPubkeys` | Plaintext | Indefinite | Who is assigned to this shift |
-| `startTime` | Plaintext | Indefinite | Shift start time (HH:MM) |
-| `endTime` | Plaintext | Indefinite | Shift end time (HH:MM) |
-| `daysOfWeek` | Plaintext | Indefinite | Recurring days |
+| `volunteerPubkeys` | Plaintext | Indefinite | Who is assigned (routing requires plaintext pubkeys) |
+| `encryptedDetails` | **E2EE** | Indefinite | Encrypted schedule details (label, description) via `LABEL_SHIFT_SCHEDULE` (Epic 77) |
+| `adminEnvelopes[]` | **E2EE** | Indefinite | ECIES-wrapped schedule key (per admin) |
+| `startTime` | Plaintext | Indefinite | Shift start time (HH:MM) — plaintext for routing |
+| `endTime` | Plaintext | Indefinite | Shift end time (HH:MM) — plaintext for routing |
+| `daysOfWeek` | Plaintext | Indefinite | Recurring days — plaintext for routing |
 | `ringGroupId` | Plaintext | Indefinite | Associated ring group |
 
 #### CallRouterDO — Active Call State
@@ -85,12 +89,15 @@ This document provides a complete inventory of all data stored and processed by 
 | `channel` | Plaintext | Indefinite | `sms`, `whatsapp`, `signal` |
 | `participantHash` | Hashed (HMAC-SHA256) | Indefinite | Hashed phone/identifier |
 | `assignedVolunteer` | Plaintext | Indefinite | Volunteer pubkey |
-| `messages[].content` | **Plaintext** | Indefinite | SMS/WhatsApp not E2EE |
+| `messages[].encryptedContent` | **E2EE** | Indefinite | XChaCha20-Poly1305 ciphertext (envelope encryption, Epic 74) |
+| `messages[].authorEnvelope` | **E2EE** | Indefinite | ECIES-wrapped message key (assigned volunteer) |
+| `messages[].adminEnvelopes[]` | **E2EE** | Indefinite | ECIES-wrapped message key (per admin) |
+| `messages[].nonce` | Plaintext | Indefinite | 24-byte nonce for XChaCha20-Poly1305 |
 | `messages[].direction` | Plaintext | Indefinite | `inbound` or `outbound` |
 | `messages[].timestamp` | Plaintext | Indefinite | Message timestamp |
 | `messages[].status` | Plaintext | Indefinite | `sent`, `delivered`, `failed` |
 
-**Important**: Messaging content (SMS, WhatsApp, Signal) is stored in plaintext because these channels inherently require provider-side access. This is documented in the application and disclosed to users.
+**Important**: Messages are now E2EE at rest (Epic 74). The server encrypts inbound messages on webhook receipt and immediately discards the plaintext. Outbound SMS/WhatsApp messages are momentarily visible to the server during the send flow (inherent provider limitation) but are stored only in encrypted form. See [Threat Model: SMS/WhatsApp Outbound Message Limitation](THREAT_MODEL.md#smswhatsapp-outbound-message-limitation).
 
 #### SettingsDO — Application Configuration
 
@@ -104,6 +111,8 @@ This document provides a complete inventory of all data stored and processed by 
 
 #### AuditDO — Audit Logs
 
+Audit logs use a hash-chained integrity mechanism (Epic 77) to detect tampering.
+
 | Field | Classification | Retention | Notes |
 |-------|---------------|-----------|-------|
 | `timestamp` | Plaintext | Configurable | Event timestamp |
@@ -111,6 +120,8 @@ This document provides a complete inventory of all data stored and processed by 
 | `actorPubkey` | Plaintext | Configurable | Who did it |
 | `ipHash` | Hashed (truncated) | Configurable | 96-bit truncated IP hash |
 | `details` | Plaintext | Configurable | Action-specific metadata |
+| `entryHash` | Plaintext | Configurable | SHA-256 of (action + actorPubkey + timestamp + details + previousEntryHash) |
+| `previousEntryHash` | Plaintext | Configurable | Hash chain link to previous entry |
 
 ---
 
@@ -137,6 +148,9 @@ This document provides a complete inventory of all data stored and processed by 
 | Decrypted note content | Page lifetime | React component state |
 | Per-note encryption keys | Encryption operation | Generated fresh, never stored |
 | ECDH ephemeral keys | Encryption operation | Used once, discarded |
+| Hub key | Unlocked session | Stored in hub-key-manager closure; zeroed on lock |
+| Transcription audio (microphone) | Recording duration | Captured via AudioWorklet, processed in Web Worker, never persisted |
+| Transcription text (pre-encryption) | Seconds | Encrypted immediately after WASM Whisper processing |
 
 ---
 
@@ -158,12 +172,14 @@ This document provides a complete inventory of all data stored and processed by 
 | R2 file storage | Ciphertext | Files encrypted client-side |
 | Worker logs | Minimal | Request metadata only; no PII logged |
 
-#### Transcription (Cloudflare Workers AI)
+#### Transcription (Client-Side WASM Whisper)
 
 | Data | Classification | Retention |
 |------|---------------|-----------|
-| Audio input | Transient | ~30 seconds during processing |
+| Audio input | Memory-only | Duration of transcription processing (in-browser) |
 | Transcript output | Encrypted immediately | Stored as E2EE |
+
+**Note**: As of Epic 78, transcription is performed entirely in the browser using WASM Whisper (`@huggingface/transformers`). Audio never leaves the device — no data is sent to any external transcription service.
 
 ---
 
@@ -232,9 +248,9 @@ This document provides a complete inventory of all data stored and processed by 
                                         │ 5. Store: hash + last4  │
                                         │    Discard: full number │
                                         │                         │
-                                        │ 6. WebSocket broadcast: │
+                                        │ 6. Nostr relay event:   │
                                         │    callerLast4 only     │
-                                        │    (redacted for others)│
+                                        │    (hub-key encrypted)  │
                                         └─────────────────────────┘
 ```
 
@@ -271,4 +287,5 @@ Note: Llamenos does not currently enforce automated retention policies. Operator
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-25 | 1.1 | ZK Architecture Overhaul: Updated ConversationDO to E2EE envelope encryption (Epic 74), ShiftManagerDO encrypted details (Epic 77), AuditDO hash chain fields (Epic 77), RecordsDO callrecord: prefix, client-side transcription (Epic 78), hub key in memory-only section, replaced WebSocket broadcast with Nostr relay event |
 | 2026-02-25 | 1.0 | Initial data classification document |

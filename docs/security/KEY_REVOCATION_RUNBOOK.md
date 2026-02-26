@@ -94,6 +94,18 @@ These steps must be completed as fast as possible. The goal is to revoke the com
 
 **Maximum response timeframe**: Hub key rotation must BEGIN within 4 hours of confirmed compromise. All immediate actions (steps 1-5) must be completed within 1 hour. Short-term actions (steps 6-9) must be completed within 24 hours.
 
+### 1.4 Verification Checklist
+
+After completing all admin key compromise response actions, verify:
+
+- [ ] New admin keypair is active — admin can log in with the new nsec
+- [ ] Old admin keypair is rejected — login attempt with old nsec fails
+- [ ] Hub key has been rotated — test by publishing a hub event and verifying active members can decrypt
+- [ ] All active volunteer sessions are functional — at least one volunteer confirms they can decrypt notes
+- [ ] Audit log shows the compromise response actions (key rotation, session invalidation)
+- [ ] GDPR notification has been filed (if applicable) within the 72-hour window
+- [ ] Re-wrapping progress is tracked — note which volunteers' envelopes have been re-wrapped
+
 ---
 
 ## 2. Volunteer Key Revocation on Departure
@@ -124,6 +136,14 @@ The volunteer is cooperating and leaving on good terms. They may retain their ns
    - The departed volunteer CAN prove they were a member (their pubkey was registered). Consider whether this is a concern for your threat model.
 
 5. **Document the departure** in the audit log with the date, reason, and confirmation that hub key rotation was completed.
+
+#### Friendly Departure Verification Checklist
+
+- [ ] Volunteer is deactivated in the admin UI (status: inactive)
+- [ ] No active sessions remain for the volunteer
+- [ ] Hub key has been rotated — new key distributed to all remaining members
+- [ ] At least one remaining member confirms they can decrypt new hub events
+- [ ] Departure documented in audit log
 
 ### 2.2 Hostile Departure
 
@@ -157,6 +177,16 @@ The volunteer is leaving on bad terms, has been terminated, or is suspected of a
    - If the volunteer had admin-level access at any point, treat this as an admin key compromise (Section 1).
 
 6. **Document the incident** thoroughly in the audit log and any incident tracking system.
+
+#### Hostile Departure Verification Checklist
+
+- [ ] Volunteer is deactivated — no active sessions remain
+- [ ] Hub key has been rotated — departed volunteer's pubkey excluded from key distribution
+- [ ] All WebAuthn credentials for the volunteer are revoked
+- [ ] Access assessment documented — what data the volunteer had access to during tenure
+- [ ] GDPR notification filed (if applicable)
+- [ ] Other volunteers notified (if their identities were accessible to the departed volunteer)
+- [ ] Incident documented in audit log and any external incident tracking
 
 ---
 
@@ -247,6 +277,7 @@ The hub key is a shared symmetric key used to encrypt Nostr relay events that ar
 4. **Generate a new random 32-byte hub key**:
    - The admin UI provides a "Rotate Hub Key" function
    - Alternatively, the admin client generates the key locally: `crypto.getRandomValues(new Uint8Array(32))`
+   - The hub key is random bytes — NOT derived from any identity key. This ensures no mathematical link between old and new hub keys
 
 5. **Wrap the new hub key for each remaining member** via ECIES using each member's public key:
    - The admin client iterates over all active member pubkeys
@@ -287,6 +318,15 @@ The hub key is a shared symmetric key used to encrypt Nostr relay events that ar
     - Members who were offline during rotation will receive the wrapped key when they reconnect
     - If a member cannot unwrap their key blob, re-wrap and re-publish for that member
 
+#### Hub Key Rotation Verification Checklist
+
+- [ ] New hub key generated and distributed to all active members
+- [ ] At least one volunteer confirms they can decrypt a test hub event
+- [ ] Departed/revoked members excluded from key distribution
+- [ ] Old hub key retained by clients for historical event decryption
+- [ ] Key rotation event visible in audit log
+- [ ] Monitor for 24 hours for rotation failures (offline members)
+
 ### 4.4 Rotation Failure Recovery
 
 If the rotation ceremony fails (e.g., admin client crashes mid-rotation, network failure during publishing):
@@ -296,6 +336,27 @@ If the rotation ceremony fails (e.g., admin client crashes mid-rotation, network
 14. If members received a partial rotation (some have the new key, some do not):
     - Publish a cancellation event encrypted with the old hub key, instructing clients to discard the failed key version
     - Restart the ceremony with a new key
+
+### 4.5 Emergency Hub Key Rotation via CLI
+
+If the admin UI is not accessible (e.g., server partially down, admin locked out of UI), the hub key can be rotated using the admin nsec directly:
+
+1. Obtain the list of active member pubkeys from the database:
+   ```bash
+   docker compose exec postgres psql -U llamenos -d llamenos -c "
+     SELECT value->>'pubkey' AS pubkey
+     FROM storage
+     WHERE namespace = 'identity'
+       AND key LIKE 'volunteer:%'
+       AND (value->>'active')::boolean = true;
+   "
+   ```
+
+2. Generate a new hub key and wrap it for each member. This requires running the admin client-side crypto code outside the browser (e.g., via a Node.js script using the admin nsec). A convenience script is planned for future releases.
+
+3. Publish the key rotation event to the Nostr relay using the server's Nostr identity.
+
+**Note**: CLI rotation is an emergency-only procedure. The admin UI handles all the cryptographic operations automatically and is the recommended approach.
 
 ---
 
@@ -319,4 +380,5 @@ If the rotation ceremony fails (e.g., admin client crashes mid-rotation, network
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-02-25 | Added verification checklists, updated hub key description (random 32 bytes, not derived), added Section 4.5 emergency CLI rotation, updated adminEnvelopes[] references | -- |
 | 2026-02-25 | Initial version, per Epic 76.0 Phase 3 | -- |

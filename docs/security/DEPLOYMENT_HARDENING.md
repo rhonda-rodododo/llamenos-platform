@@ -167,7 +167,7 @@ The Helm chart provides production-grade Kubernetes deployment with security def
 ### Prerequisites
 
 - Kubernetes 1.28+ with a CNI that enforces NetworkPolicy (Calico or Cilium recommended)
-- Ingress controller (nginx-ingress or Traefik)
+- Ingress controller (Caddy-ingress or Traefik recommended; nginx is NOT recommended due to its history of security vulnerabilities)
 - cert-manager for TLS certificate management
 - External Secrets Operator or Vault for secret injection (recommended)
 
@@ -210,7 +210,7 @@ database:
 
 ingress:
   enabled: true
-  className: "nginx"
+  className: ""  # Use Caddy-ingress or Traefik; nginx is NOT recommended
   hosts:
     - host: hotline.yourdomain.org
       paths:
@@ -361,19 +361,219 @@ For the manual (non-Ansible) equivalent of each step, see the [Quick Start Guide
 
 ---
 
+## Secure Ingress (Caddy)
+
+Llamenos uses [Caddy](https://caddyserver.com/) as the reverse proxy and TLS termination layer for all deployment architectures. **nginx is NOT recommended** due to its history of security vulnerabilities (CVE-2021-23017, CVE-2022-41741, CVE-2023-44487, among others).
+
+### Why Caddy
+
+| Feature | Caddy | nginx |
+|---------|-------|-------|
+| Automatic ACME/Let's Encrypt | Built-in, zero-config | Requires certbot or external tooling |
+| OCSP stapling | Automatic | Manual configuration |
+| HTTP/2 + HTTP/3 | Enabled by default | HTTP/3 requires rebuild with quic patch |
+| TLS 1.2+ enforcement | Default | Requires explicit `ssl_protocols` directive |
+| Security headers | Simple `header` directive | Verbose `add_header` blocks |
+| WebSocket proxy (for Nostr relay) | Automatic upgrade detection | Requires explicit `proxy_set_header Upgrade` |
+| Memory safety | Written in Go (memory-safe) | Written in C (memory-unsafe) |
+
+### Production Caddyfile
+
+The Caddyfile in `deploy/docker/Caddyfile` provides:
+
+- **Automatic TLS** via Let's Encrypt with OCSP stapling
+- **Security headers**: HSTS (2 years, preload), X-Content-Type-Options, X-Frame-Options (DENY), Referrer-Policy, CSP, Permissions-Policy
+- **Nostr relay WebSocket proxy**: `/nostr` → strfry (port 7777)
+- **API/telephony/messaging reverse proxy**: `/api/*`, `/telephony/*`, `/messaging/*` → app (port 3000)
+- **SPA fallback**: All other routes → app
+- **Compression**: gzip + zstd
+
+### Rate Limiting
+
+For additional rate limiting at the ingress layer, add to the Caddyfile:
+
+```
+rate_limit {
+    zone api_limit {
+        key {remote_host}
+        events 100
+        window 1m
+    }
+}
+```
+
+Application-level rate limiting is already enforced on auth endpoints, but ingress-level rate limiting provides defense-in-depth.
+
+---
+
+## Nostr Relay Operations (strfry)
+
+The Nostr relay handles all real-time event delivery (call notifications, presence updates, typing indicators). Two implementations are supported:
+
+| Implementation | Deployment | Best For |
+|---------------|------------|----------|
+| **strfry** | Self-hosted (Docker, K8s, bare metal) | Maximum privacy — operator controls all infrastructure |
+| **Nosflare** | Cloudflare Workers (DO service binding) | Managed infrastructure — no separate relay to operate |
+
+### strfry Deployment
+
+#### Docker Compose
+
+Enable the Nostr relay profile:
+
+```bash
+docker compose --profile nostr up -d
+```
+
+Required environment variables:
+```bash
+# .env
+SERVER_NOSTR_SECRET=<64-char hex, generate with: openssl rand -hex 32>
+NOSTR_RELAY_URL=ws://strfry:7777  # Default, internal to Docker network
+```
+
+#### Kubernetes (StatefulSet)
+
+The Helm chart includes a strfry StatefulSet (disabled by default):
+
+```yaml
+# values.yaml
+nostr:
+  enabled: true
+  relayUrl: "ws://strfry:7777"
+  persistence:
+    size: 5Gi
+```
+
+Create the server Nostr secret:
+```bash
+kubectl create secret generic llamenos-nostr-secret \
+  --from-literal=server-nostr-secret=$(openssl rand -hex 32)
+```
+
+#### Cloudflare (Nosflare)
+
+For Cloudflare deployments, Nosflare runs as a Durable Object with a service binding. Set the server secret:
+```bash
+wrangler secret put SERVER_NOSTR_SECRET
+```
+
+### strfry Hardening
+
+#### NIP-42 Authentication
+
+strfry supports NIP-42 (client authentication). Configure the write policy to restrict which pubkeys can publish events:
+
+```bash
+# strfry write policy plugin (whitelist mode)
+# Only the server pubkey and authenticated clients can publish
+```
+
+The server derives its Nostr keypair from `SERVER_NOSTR_SECRET` via HKDF (`LABEL_SERVER_NOSTR_KEY` / `LABEL_SERVER_NOSTR_KEY_INFO`). Clients authenticate to the relay using NIP-42 before subscribing.
+
+#### Rate Limiting
+
+strfry supports per-connection rate limiting. Configure in the strfry config:
+
+- Max events per second per connection
+- Max subscriptions per connection
+- Max event size (default: 64KB)
+
+#### Ephemeral Event Handling
+
+Llamenos uses kind 20001 (ephemeral) for real-time events. strfry forwards these to active subscribers but **never stores them to disk**. This is a privacy feature — relay compromise does not reveal historical real-time events.
+
+#### Generic Tags
+
+All Llamenos events use `["t", "llamenos:event"]` as the only tag. The actual event type (call:ring, presence, typing, etc.) is inside the encrypted content. This prevents the relay operator from performing traffic analysis on event types.
+
+### Monitoring
+
+| Metric | How to Check |
+|--------|-------------|
+| Relay health | `curl http://strfry:7777` (returns relay info JSON) |
+| Active connections | strfry logs (connection count) |
+| Event throughput | strfry logs (events/second) |
+| LMDB database size | `du -sh /app/strfry-db/` |
+| Memory usage | `docker stats strfry` |
+
+### Backup
+
+strfry uses LMDB for storage. Back up the data directory:
+
+```bash
+# Docker Compose
+docker compose exec strfry cp -r /app/strfry-db /tmp/strfry-backup
+
+# Or back up the Docker volume directly
+docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
+  alpine tar czf /backup/strfry-$(date +%Y%m%d).tar.gz -C /data .
+```
+
+For ephemeral-only deployments (all events are kind 20001), the relay database contains only relay state — no user data. Backup is recommended but not critical.
+
+---
+
+## Reproducible Build Verification
+
+Epic 79 introduced reproducible builds to allow operators and auditors to verify that released client code matches the public source.
+
+### Verification Process
+
+```bash
+# Download and run the verification script
+scripts/verify-build.sh [version]
+
+# Or manually:
+# 1. Check out the tagged version
+git checkout v1.0.0
+
+# 2. Build in a deterministic Docker environment
+docker build -f Dockerfile.build -t llamenos-verify .
+
+# 3. Extract and compare checksums
+docker run --rm llamenos-verify cat /app/CHECKSUMS.txt
+# Compare against CHECKSUMS.txt in the GitHub Release
+```
+
+### Trust Anchor
+
+The trust anchor is the **GitHub Release** — not the running application. The app does NOT serve a `/api/config/verify` endpoint because an attacker controlling the server could serve fake checksums. Always verify against release artifacts on GitHub.
+
+### What Is Verified
+
+| Artifact | Deterministic? | Verified? |
+|----------|---------------|-----------|
+| Client JS bundles | Yes (`SOURCE_DATE_EPOCH`, content-hashed filenames) | Yes |
+| Client CSS bundles | Yes | Yes |
+| Worker/server bundle (CF) | No (Cloudflare modifies during deploy) | No |
+| Worker/server bundle (Node.js) | Yes | Yes (via Docker build) |
+
+### CI Integration
+
+GitHub Actions automatically:
+1. Builds with `SOURCE_DATE_EPOCH` set to the commit timestamp
+2. Generates `CHECKSUMS.txt` (SHA-256 of all output files)
+3. Attaches `CHECKSUMS.txt` to the GitHub Release
+4. Generates SLSA provenance attestation
+
+---
+
 ## Operational Security Procedures
 
 For detailed operational procedures including secret rotation steps, backup/recovery, incident response checklists, and troubleshooting guides, see the [Operator Runbook](../RUNBOOK.md).
 
 ### Key Management
 
-1. **Admin keypair**: Generate with `bun run bootstrap-admin`. Store the nsec in a password manager or hardware security module. NEVER reuse this keypair on public Nostr relays or other services.
+1. **Admin keypair**: Generate with `bun run bootstrap-admin`. Store the nsec in a password manager or hardware security module. NEVER reuse this keypair on public Nostr relays or other services. Note: Epic 76.2 separates the admin identity key from the decryption key — see the [Key Revocation Runbook](KEY_REVOCATION_RUNBOOK.md) for compromise procedures.
 
-2. **Volunteer onboarding**: Use the invite system. Each volunteer generates their own keypair in-browser during onboarding. The nsec never leaves their device.
+2. **Server Nostr secret**: Generate with `openssl rand -hex 32`. Set as `SERVER_NOSTR_SECRET` in `.env` (Docker) or `wrangler secret put SERVER_NOSTR_SECRET` (Cloudflare). The server derives its Nostr keypair from this secret via HKDF. Rotation changes the server's Nostr identity — all clients will see a new server pubkey.
 
-3. **Key rotation**: Currently not automated. If an admin key is compromised, generate a new keypair, re-bootstrap (after clearing the existing admin), and re-encrypt all admin-wrapped note keys. This requires all volunteers to be online to re-wrap their notes.
+3. **Hub key**: Generated automatically as `crypto.getRandomValues(32)` by the admin client during hub setup. Distributed via ECIES to each member individually. Rotation is handled via the admin UI — see [Key Revocation Runbook, Section 4](KEY_REVOCATION_RUNBOOK.md#4-hub-key-rotation-ceremony).
 
-4. **Device decommissioning**: When a volunteer leaves, deactivate their account (this revokes all sessions immediately). Their encrypted notes remain readable by admin but the volunteer can no longer log in.
+4. **Volunteer onboarding**: Use the invite system. Each volunteer generates their own keypair in-browser during onboarding. The nsec never leaves their device.
+
+5. **Device decommissioning**: When a volunteer leaves, deactivate their account (revokes all sessions immediately), then rotate the hub key so the departed volunteer cannot decrypt future hub events. See [Key Revocation Runbook](KEY_REVOCATION_RUNBOOK.md) for the full procedure.
 
 ### Incident Response
 
@@ -436,5 +636,6 @@ For detailed operational procedures including secret rotation steps, backup/reco
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-02-25 | 1.2 | ZK Architecture Overhaul: Added Secure Ingress (Caddy) section, Nostr Relay Operations (strfry) section, Reproducible Build Verification section; replaced nginx references with Caddy/Traefik recommendations; updated secrets management for SERVER_NOSTR_SECRET and hub key; updated K8s ingress className |
 | 2026-02-23 | 1.1 | Added cross-references to QUICKSTART.md, RUNBOOK.md; updated Ansible tooling to reference in-repo paths at `deploy/ansible/`; documented playbook inventory and roles |
 | 2026-02-23 | 1.0 | Initial deployment hardening guide |

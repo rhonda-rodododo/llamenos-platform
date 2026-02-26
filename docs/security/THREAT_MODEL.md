@@ -138,7 +138,6 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | Config | `GET /api/config` | No | Read-only; exposes `adminPubkey` |
 | Telephony webhooks (10 endpoints) | `POST /telephony/*` | Webhook signature | Provider-specific HMAC |
 | Messaging webhooks | `POST /messaging/*` | Webhook signature | Provider-specific validation |
-| WebSocket upgrade | `GET /api/ws` | Schnorr or Session | Token in `Sec-WebSocket-Protocol` |
 | All other API endpoints | `*/api/*` | Schnorr or Session | Auth + permission middleware |
 | IVR audio | `GET /api/ivr-audio/*` | No | Strict regex on path params |
 | Dev reset | `POST /api/test-reset*` | No (env-gated) | `ENVIRONMENT=development` check |
@@ -151,7 +150,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | Volunteer → Other volunteer's notes | Note content theft | E2EE — server has no plaintext; `notes:read-own` permission scoping |
 | Volunteer → Caller identification | PII exposure | Caller numbers hashed; only `callerLast4` sent to answering volunteer; redacted for others |
 | Admin → Excessive data access | Insider threat | Audit logging of all admin actions; admin notes are separately encrypted |
-| WebSocket message injection | Fake call events | WS rate limiting + prototype pollution guard + action authorization checks |
+| Nostr relay event injection | Fake call events | Server-signed events (clients verify server pubkey) + NIP-42 auth + hub key encryption |
 
 ## Cryptographic Properties
 
@@ -251,7 +250,7 @@ A malicious operator with server access can:
 - Cannot decrypt E2EE content without volunteer/admin private keys
 
 **Mitigations:**
-- Reproducible builds (planned) allow verification of deployed code
+- Reproducible builds (Epic 79) allow verification of deployed code
 - Multi-party deployment approval
 - Audit logging of all server access
 
@@ -313,12 +312,12 @@ A sophisticated adversary with access to APNs or FCM infrastructure (e.g., via l
 **This is an inherent limitation of mobile push infrastructure.** There is no technical mitigation beyond not using push notifications at all (which would severely degrade the volunteer experience for mobile users). Organizations operating under extreme threat models should consider:
 
 - Foreground-only operation (no push notifications; volunteers must keep the app open)
-- WebSocket-based wakeup via persistent connection (battery-intensive, unreliable on mobile)
+- Nostr relay subscription via persistent connection (battery-intensive, unreliable on mobile)
 - Accepting the risk as a necessary trade-off for mobile support
 
 ### Assessment
 
-Push notification infrastructure is a **necessary trusted party** for mobile deployments. The trust is limited to metadata and timing — with encrypted payloads, content confidentiality is preserved. Organizations whose threat model includes Apple or Google as adversaries should restrict operations to desktop browsers where WebSocket connections replace push notifications entirely.
+Push notification infrastructure is a **necessary trusted party** for mobile deployments. The trust is limited to metadata and timing — with encrypted payloads, content confidentiality is preserved. Organizations whose threat model includes Apple or Google as adversaries should restrict operations to desktop browsers where Nostr relay subscriptions replace push notifications entirely.
 
 ---
 
@@ -333,19 +332,19 @@ Cloudflare Workers is a primary deployment target for Llamenos. The zero-knowled
 | Database-only subpoena | **Strong** | If only Durable Object storage is obtained (e.g., via legal process targeting stored data), the attacker gets encrypted blobs — ciphertext for notes, encrypted Nostr events, hashed phone numbers. Without volunteer/admin private keys, this data is useless. |
 | Rogue Cloudflare employee with DB access | **Strong** | An employee with access to DO storage (but not the Workers runtime) sees only encrypted blobs. This is a realistic scenario — large organizations have many employees with partial infrastructure access. |
 | Third-party breach of Cloudflare storage | **Strong** | If an attacker compromises Cloudflare's storage layer (e.g., S3-equivalent) without gaining runtime access, all E2EE data is protected. |
-| Passive network observer | **Strong** | TLS protects data in transit. An observer on the network path sees encrypted WebSocket frames only. |
+| Passive network observer | **Strong** | TLS protects data in transit. An observer on the network path sees encrypted Nostr relay events only. |
 
 ### What Nosflare / E2EE Does NOT Protect Against
 
 | Threat | Protection Level | Explanation |
 |--------|-----------------|-------------|
-| Cloudflare as a willing adversary | **None** | Cloudflare operates the Workers runtime. They can inspect memory during execution, intercept requests before encryption, modify Worker code, and read all data that passes through the runtime. E2EE encrypts data before it reaches the server, but Cloudflare controls the server that serves the client code — they could serve modified JavaScript that exfiltrates keys. |
+| Cloudflare as a willing adversary | **None** | Cloudflare operates the Workers runtime. They can inspect memory during execution, intercept requests before encryption, modify Worker code, and read all data that passes through the runtime. E2EE encrypts data before it reaches the server, but Cloudflare controls the server that serves the client code — they could serve modified JavaScript that exfiltrates keys. Reproducible builds (Epic 79) allow operators and auditors to verify that deployed client code matches public source — but Cloudflare could serve different code selectively. |
 | Legal compulsion of Cloudflare (with runtime access) | **None** | A court order compelling Cloudflare to instrument the Workers runtime would defeat E2EE. Cloudflare would not need private keys — they could capture data in transit through the Worker. |
 | Cloudflare account compromise | **None** | An attacker who gains access to the Cloudflare account can deploy modified Worker code, read secrets, and access DO storage. They could serve a backdoored client that exfiltrates volunteer private keys. |
 
 ### What Cloudflare Can Always Observe (Regardless of E2EE)
 
-- **WebSocket connections**: IP addresses, connection timing, duration, message frequency and sizes
+- **Nostr relay connections (Nosflare)**: IP addresses, connection timing, duration, event frequency and sizes
 - **HTTP request metadata**: All API request URLs, headers, query parameters, source IPs
 - **Worker execution**: If logging is enabled, full request/response bodies. Even with logging disabled, Cloudflare has the technical capability to instrument the runtime.
 - **DO storage contents at rest**: Cloudflare holds the encryption keys for Durable Object storage — the "encryption at rest" protects against disk theft, not against Cloudflare itself
@@ -610,10 +609,153 @@ For Llamenos, the npm supply chain is a **medium-severity, low-probability** ris
 
 ---
 
+## Nostr Relay Trust Boundary
+
+The Nostr relay (strfry for self-hosted, Nosflare for Cloudflare) replaces the former WebSocket server for all real-time communication. Understanding what the relay can and cannot observe is critical for threat modeling.
+
+### What the Relay Can Observe
+
+| Observable | Detail | Severity |
+|-----------|--------|----------|
+| Event metadata | Pubkeys (pseudonymous), timestamps, event kinds | Medium |
+| Connection metadata | IP addresses, connection timing, duration, subscription filters | Medium |
+| Event sizes | Ciphertext length reveals approximate content size | Low |
+| Event frequency | Timing correlation between events (e.g., call ring → call answered) | Medium |
+| Generic tags | All events use `["t", "llamenos:event"]` — relay cannot distinguish event types | Low |
+
+### What the Relay Cannot Observe
+
+| Protected | Mechanism |
+|-----------|-----------|
+| Event content | All event content is encrypted with the hub key (XChaCha20-Poly1305 + HKDF per-event) |
+| Event type | Actual event type (call:ring, presence, typing, etc.) is inside the encrypted content |
+| Note/message content | Notes and messages are stored via REST API, not through the relay |
+| Volunteer identity | Pubkeys are pseudonymous; relay has no mapping to real identities |
+
+### Relay Compromise Scenarios
+
+| Scenario | Impact | Mitigation |
+|----------|--------|------------|
+| Relay database dump | Ephemeral events (kind 20001) are never stored; only persistent events (encrypted) remain | Hub key rotation invalidates access to future events |
+| Relay operator monitors connections | Connection metadata visible (IPs, timing) | Use Tor/VPN for relay connections in high-threat scenarios |
+| Relay injects events | Clients verify server pubkey for authoritative events; hub key encryption prevents injection of readable content | NIP-42 auth restricts who can publish |
+| Relay drops/delays events | Real-time degradation; REST polling fallback for state recovery | Monitor relay health; self-host for maximum control |
+
+---
+
+## Audit Log Tamper Detection
+
+Audit logs (Epic 77) use a hash-chained integrity mechanism to detect tampering.
+
+### Hash Chain Design
+
+Each audit log entry includes:
+
+- `entryHash`: `SHA-256(action + actorPubkey + timestamp + details + previousEntryHash)`
+- `previousEntryHash`: The `entryHash` of the preceding entry (empty string for the first entry)
+
+This creates a tamper-evident chain: modifying any historical entry invalidates all subsequent hashes. An admin can verify chain integrity by recomputing hashes from the first entry.
+
+### What This Protects Against
+
+| Threat | Protection |
+|--------|-----------|
+| Silent entry deletion | Missing entry breaks the hash chain |
+| Entry modification | Modified content produces wrong hash; chain verification fails |
+| Entry reordering | Hash depends on `previousEntryHash`; reordering breaks chain |
+
+### What This Does NOT Protect Against
+
+| Threat | Reason |
+|--------|--------|
+| Log truncation from the end | Deleting the latest N entries leaves a valid shorter chain |
+| Complete log replacement | An attacker with full DB access could recompute the entire chain with fabricated entries |
+| Operator collusion | The operator controls the server; they could disable audit logging entirely |
+
+**Mitigation for advanced threats**: Periodically export and sign audit log checkpoints to an external, append-only store (e.g., signed Git commits, blockchain anchoring). This is outside the scope of Llamenos itself but recommended for high-security deployments.
+
+---
+
+## Admin Key Separation
+
+Epic 76.2 introduced a separation between the admin's identity key and decryption key.
+
+### Design
+
+- **Identity key (nsec)**: Used for Schnorr signature authentication, signing Nostr events, and hub administration (invite/revoke)
+- **Decryption key**: A separate keypair used for ECIES envelope unwrapping (notes, messages, metadata)
+
+### Compromise Scenarios
+
+| Compromised Key | Impact | What Remains Protected |
+|----------------|--------|----------------------|
+| Identity key only | Attacker can authenticate as admin, sign events | All encrypted content (notes, messages) remains protected — decryption key is separate |
+| Decryption key only | Attacker can decrypt all admin-wrapped envelopes | Cannot authenticate or sign events; cannot impersonate admin |
+| Both keys | Full admin compromise | Nothing — equivalent to pre-separation admin compromise |
+
+### Hub Key Compromise Analysis
+
+The hub key is a random 32-byte value (`crypto.getRandomValues(new Uint8Array(32))`) — not derived from any identity key. This means:
+
+- Compromising any identity key does NOT reveal the hub key
+- Hub key rotation generates a genuinely new random key with no mathematical link to the old one
+- The hub key is distributed via ECIES (wrapped individually per member with `LABEL_HUB_KEY_WRAP`)
+- A compromised hub key reveals only hub-encrypted Nostr event content (presence, call notifications) — NOT individual notes or messages (those use per-artifact keys)
+
+**Rotation procedure**: See [Key Revocation Runbook, Section 4](KEY_REVOCATION_RUNBOOK.md#4-hub-key-rotation-ceremony).
+
+---
+
+## Reproducible Builds as Supply Chain Mitigation
+
+Epic 79 introduced reproducible builds to allow operators and auditors to verify that deployed client code matches public source.
+
+### Trust Model
+
+| Verification | What It Proves | What It Does NOT Prove |
+|-------------|---------------|----------------------|
+| `scripts/verify-build.sh [version]` passes | The client JS/CSS bundles in a GitHub Release match what the source code produces | That the deployed server is actually serving those bundles |
+| `CHECKSUMS.txt` matches | File integrity between build and release | That the release was built from unmodified source |
+| SLSA provenance attestation | The build ran in a specific GitHub Actions workflow from a specific commit | That the GitHub Actions environment was not compromised |
+
+### Trust Anchor
+
+The trust anchor is the **GitHub Release** (not the running application). The application itself does NOT serve verification endpoints — an attacker who controls the server could serve fake checksums. Verification must be performed against the release artifacts on GitHub.
+
+### Scope
+
+- **Verified**: Client JavaScript and CSS bundles (deterministic output via `SOURCE_DATE_EPOCH`, content-hashed filenames)
+- **NOT verified**: Worker/server bundle (Cloudflare modifies the bundle during deployment; Node.js builds are deterministic but server integrity depends on operator trust)
+
+---
+
+## Client-Side Transcription Trust Model
+
+Epic 78 moved transcription from Cloudflare Workers AI to in-browser WASM (Whisper via `@huggingface/transformers`).
+
+### Security Properties
+
+| Property | Before (CF Workers AI) | After (Client-Side WASM) |
+|----------|----------------------|--------------------------|
+| Audio leaves device? | Yes — sent to CF Workers AI API | **No** — processed entirely in-browser |
+| Transcription provider sees audio? | Yes — Cloudflare | **No provider involved** |
+| Transcription text E2EE? | Yes (encrypted after server returns text) | Yes (encrypted immediately after local transcription) |
+| Network required? | Yes (API call to CF) | **No** — works offline after model download |
+
+### What This Means
+
+- Audio from the volunteer's microphone is captured via `MediaRecorder`, processed in a Web Worker using Whisper WASM, and the resulting transcript text is encrypted immediately with the note's E2EE key
+- No audio data ever leaves the browser — not to the server, not to any transcription provider, not to any third party
+- The WASM model is downloaded once and cached locally
+- **Limitation**: Only the volunteer's local microphone audio is transcribed. The remote party's audio is not accessible via the Twilio SDK (it requires raw WebRTC access, deferred to post-MVP)
+
+---
+
 ## Revision History
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
+| 2026-02-25 | 1.3 | ZK Architecture Overhaul | Removed WebSocket references (replaced with Nostr relay); added Nostr relay trust boundary, audit log tamper detection, admin key separation, hub key compromise analysis, reproducible builds, client-side transcription trust model |
 | 2026-02-25 | 1.2 | Epic 76.0 Phase 4 | Added threat model gap sections: APNs/FCM trust, Cloudflare trust boundary, admin pubkey fetch trust, departed volunteer key retirement, SMS/WhatsApp outbound limitation, npm supply chain risk |
 | 2026-02-25 | 1.1 | Documentation overhaul | Added legal compulsion section; fixed phone hashing to HMAC-SHA256; fixed caller number broadcast status; added cross-references |
 | 2026-02-23 | 1.0 | Security Audit R6 | Initial threat model document |

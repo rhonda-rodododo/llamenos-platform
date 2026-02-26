@@ -42,7 +42,7 @@ If a hosting provider is legally compelled to provide data, they **can access**:
 | Volunteer public keys | Plaintext | Nostr npub format; correlatable with other Nostr activity |
 | Shift schedules | Plaintext | Who was on-call when |
 | Audit logs | Plaintext | IP hashes (truncated), timestamps, actions |
-| SMS/WhatsApp messages | Plaintext | These channels are inherently not E2EE |
+| SMS/WhatsApp messages | E2EE at rest | Encrypted on receipt (Epic 74); plaintext only in transit to/from provider (inherent channel limitation) |
 | Encrypted blobs | Ciphertext | Notes, transcripts, files — encrypted but present |
 
 ### Transient Access (During Processing)
@@ -50,7 +50,7 @@ If a hosting provider is legally compelled to provide data, they **can access**:
 | Data | Window | Mitigation |
 |------|--------|------------|
 | Voice call audio | Duration of call | Provider-dependent (Twilio, etc.); use self-hosted Asterisk for maximum privacy |
-| Transcription audio | ~30 seconds | Cloudflare Workers AI; audio discarded after transcription |
+| Transcription audio | Recording duration | Audio never leaves device — WASM Whisper processes in-browser (Epic 78) |
 | Caller phone number | Active call only | Hashed immediately; only last 4 digits retained |
 
 ## Legal Compulsion Scenarios
@@ -117,11 +117,25 @@ If a hosting provider is legally compelled to provide data, they **can access**:
 
 All cryptographic code uses audited, constant-time implementations from the `@noble` family. No custom cryptographic constructions.
 
+## Additional Security Features
+
+| Feature | Mechanism | Epic |
+|---------|-----------|------|
+| Real-time event encryption | Hub key (random 32 bytes) encrypts all Nostr relay events; generic tags prevent event-type analysis | 76/76.2 |
+| Hub key distribution | ECIES-wrapped individually per member; rotation excludes departed members | 76.2 |
+| Envelope encryption (messages) | Per-message random key, ECIES-wrapped for volunteer + each admin | 74 |
+| Hash-chained audit log | SHA-256 chain with `previousEntryHash` + `entryHash` for tamper detection | 77 |
+| Encrypted metadata | Call assignments (`LABEL_CALL_META`) and shift schedules (`LABEL_SHIFT_SCHEDULE`) encrypted | 77 |
+| Client-side transcription | WASM Whisper in-browser; audio never leaves device | 78 |
+| Reproducible builds | `SOURCE_DATE_EPOCH`, `CHECKSUMS.txt` in GitHub Releases, SLSA provenance | 79 |
+| Admin key separation | Identity key (signing) separate from decryption key (envelope unwrap) | 76.2 |
+
 ## What We Do NOT Claim
 
 - **Traffic analysis resistance**: No padding, no dummy traffic. An observer can see call timing patterns.
 - **Metadata confidentiality**: The server needs timestamps and routing data to function.
-- **SMS/WhatsApp E2EE**: These channels require provider-side plaintext. Signal via bridge is better but not true E2EE.
+- **SMS/WhatsApp transport E2EE**: These channels require provider-side plaintext during transit. Messages are E2EE at rest on the server, but the provider sees plaintext.
+- **Nostr relay metadata privacy**: The relay can observe event metadata (pubkeys, timestamps, sizes, frequency) — only content is encrypted.
 - **PIN brute-force resistance (offline)**: 4-6 digits is ~20 bits of entropy. With a seized encrypted blob and GPU resources, this is brute-forceable in hours.
 - **Deletion verification**: We cannot cryptographically prove that Cloudflare/VPS providers deleted data when requested.
 
