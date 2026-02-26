@@ -9,15 +9,13 @@ name = "llamenos_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2", features = ["isolation"] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "isolation"] }
 tauri-plugin-stronghold = "2"
 tauri-plugin-store = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-shell = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-log = "2"
@@ -28,6 +26,10 @@ serde_json = "1"
 # Shared crypto core (path dep for dev, git dep for CI)
 llamenos-core = { path = "../../llamenos-core" }
 sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = "0.12"
+zeroize = { version = "1", features = ["derive"] }
+bech32 = "0.11"
 hex = "0.4"
 tokio = { version = "1", features = ["full"] }
 

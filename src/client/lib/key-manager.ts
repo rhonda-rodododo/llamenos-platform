@@ -1,8 +1,17 @@
 /**
  * Singleton Key Manager — holds the decrypted secret key in a closure variable.
  *
- * The secretKey is NEVER stored in sessionStorage, window, or any globally
- * accessible object. It lives only in this module's closure scope.
+ * Platform behavior:
+ *
+ * **Browser**: The secretKey is a Uint8Array in this module's closure scope.
+ *   NEVER stored in sessionStorage, window, or any globally accessible object.
+ *
+ * **Desktop (Tauri)**: The nsec is loaded into Rust CryptoState via stateful
+ *   IPC commands. The platform.ts functions prefer CryptoState for all crypto
+ *   operations (nsec never sent back over IPC). However, the secretKey is
+ *   also cached in the closure for backward compatibility with call sites
+ *   that use getSecretKey() directly. Epic 81 will migrate all callers to
+ *   platform.ts and remove the nsec from the webview entirely.
  *
  * States:
  *   Locked:   secretKey === null — only session-token auth available
@@ -12,6 +21,7 @@
 import { getPublicKey, nip19 } from 'nostr-tools'
 import { decryptStoredKey, storeEncryptedKey, hasStoredKey, clearStoredKey } from './key-store'
 import { createAuthToken as _createAuthToken } from './crypto'
+import { isTauri, lockCrypto } from './platform'
 
 // --- Private state (closure-scoped, never exported) ---
 let secretKey: Uint8Array | null = null
@@ -79,8 +89,40 @@ if (typeof document !== 'undefined') {
 /**
  * Unlock the key store by decrypting the nsec with the user's PIN.
  * Returns the hex pubkey on success, null on wrong PIN.
+ *
+ * On desktop, this also loads the nsec into Rust CryptoState via
+ * platform.decryptWithPin → unlock_with_pin IPC. The stateful IPC
+ * commands in platform.ts then use CryptoState directly, so the nsec
+ * never travels from Rust → webview → Rust again.
  */
 export async function unlock(pin: string): Promise<string | null> {
+  if (isTauri()) {
+    // Desktop: unlock_with_pin loads nsec into Rust CryptoState and returns pubkey.
+    // We also decrypt locally to populate the closure for backward compatibility.
+    const { decryptWithPin: platformDecrypt } = await import('./platform')
+    const pubkey = await platformDecrypt(pin)
+    if (!pubkey) return null
+
+    // The platform returns pubkey on desktop (nsec stays in Rust).
+    // But we still need secretKey in the closure for getSecretKey() callers
+    // until Epic 81 migrates them. Decrypt locally for the closure.
+    const nsec = await decryptStoredKey(pin)
+    if (nsec) {
+      try {
+        const decoded = nip19.decode(nsec)
+        if (decoded.type === 'nsec') {
+          secretKey = decoded.data
+        }
+      } catch { /* fallthrough — CryptoState still works */ }
+    }
+
+    publicKey = pubkey
+    resetIdleTimer()
+    unlockCallbacks.forEach(cb => cb())
+    return publicKey
+  }
+
+  // Browser: existing flow
   const nsec = await decryptStoredKey(pin)
   if (!nsec) return null
 
@@ -99,6 +141,7 @@ export async function unlock(pin: string): Promise<string | null> {
 
 /**
  * Lock the key manager — zeros out the secret key bytes.
+ * Desktop: also locks the Rust CryptoState.
  */
 export function lock() {
   if (secretKey) {
@@ -109,6 +152,10 @@ export function lock() {
   if (idleTimer) {
     clearTimeout(idleTimer)
     idleTimer = null
+  }
+  // Lock Rust CryptoState (fire-and-forget)
+  if (isTauri()) {
+    lockCrypto().catch(() => {})
   }
   lockCallbacks.forEach(cb => cb())
 }
@@ -122,7 +169,14 @@ export async function importKey(nsec: string, pin: string): Promise<string> {
   const sk = decoded.data
   const pk = getPublicKey(sk)
 
-  await storeEncryptedKey(nsec, pin, pk)
+  if (isTauri()) {
+    // platform.encryptWithPin calls import_key_to_state — encrypts + loads into CryptoState
+    const { encryptWithPin } = await import('./platform')
+    await encryptWithPin(nsec, pin, pk)
+  } else {
+    await storeEncryptedKey(nsec, pin, pk)
+  }
+
   secretKey = sk
   publicKey = pk
   resetIdleTimer()

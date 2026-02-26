@@ -11,17 +11,25 @@
   },
   "app": {
     "security": {
+      "pattern": {
+        "use": "isolation",
+        "options": {
+          "dir": "./isolation"
+        }
+      },
       "csp": {
-        "default-src": "'self' customprotocol: asset:",
+        "default-src": "'self' customprotocol: asset: isolation:",
         "script-src": "'self' 'wasm-unsafe-eval'",
-        "connect-src": "ipc: http://ipc.localhost http://localhost:* ws://localhost:* https://*.llamenos.org wss://*.llamenos.org",
+        "connect-src": "ipc: http://ipc.localhost https://app.llamenos.org wss://relay.llamenos.org",
         "img-src": "'self' asset: http://asset.localhost blob: data:",
         "style-src": "'unsafe-inline' 'self'",
         "font-src": "'self' data:",
         "worker-src": "'self' blob:",
         "media-src": "'self' blob:",
         "object-src": "'none'",
-        "base-uri": "'self'"
+        "base-uri": "'self'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'"
       },
       "freezePrototype": true
     },

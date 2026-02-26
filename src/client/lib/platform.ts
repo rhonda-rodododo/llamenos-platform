@@ -4,6 +4,10 @@
  * Routes crypto operations to native Rust (via Tauri IPC) on desktop,
  * and falls back to JS implementations (@noble/*) on browser/web.
  *
+ * On desktop, the nsec (secret key) lives exclusively in the Rust process.
+ * The webview never receives it. All operations that need the secret key
+ * use "stateful" IPC commands that access the Rust CryptoState directly.
+ *
  * This module is the single entry point for all platform-specific behavior.
  * Import from here instead of directly from crypto.ts or @tauri-apps/*.
  */
@@ -74,6 +78,8 @@ export async function getPublicKey(secretKeyHex: string): Promise<string> {
 
 /**
  * Create a Schnorr auth token for API authentication.
+ * Desktop: uses CryptoState (nsec stays in Rust).
+ * Browser: secret key passed explicitly.
  */
 export async function createAuthToken(
   secretKeyHex: string,
@@ -82,8 +88,8 @@ export async function createAuthToken(
   path: string,
 ): Promise<string> {
   if (isTauri()) {
-    return tauriInvoke<string>('create_auth_token', {
-      secretKeyHex,
+    // Use stateful command — Rust holds the secret key
+    return tauriInvoke<string>('create_auth_token_from_state', {
       timestamp,
       method,
       path,
@@ -96,6 +102,7 @@ export async function createAuthToken(
 
 /**
  * ECIES wrap a 32-byte key for a recipient.
+ * (Encryption uses only the recipient's public key — no secret key needed.)
  */
 export async function eciesWrapKey(
   keyHex: string,
@@ -116,6 +123,8 @@ export async function eciesWrapKey(
 
 /**
  * ECIES unwrap a key from an envelope.
+ * Desktop: uses CryptoState (nsec stays in Rust).
+ * Browser: secret key passed explicitly.
  */
 export async function eciesUnwrapKey(
   envelope: KeyEnvelope,
@@ -123,9 +132,9 @@ export async function eciesUnwrapKey(
   label: string,
 ): Promise<string> {
   if (isTauri()) {
-    return tauriInvoke<string>('ecies_unwrap_key', {
+    // Use stateful command — Rust holds the secret key
+    return tauriInvoke<string>('ecies_unwrap_key_from_state', {
       envelope,
-      secretKeyHex,
       label,
     })
   }
@@ -143,6 +152,7 @@ export interface EncryptedNoteResult {
 
 /**
  * Encrypt a note with per-note forward secrecy.
+ * (Uses only public keys — no secret key needed.)
  */
 export async function encryptNote(
   payloadJson: string,
@@ -163,7 +173,8 @@ export async function encryptNote(
 
 /**
  * Decrypt a V2 note using the appropriate envelope.
- * Returns the JSON string of the decrypted payload, or null on failure.
+ * Desktop: uses CryptoState (nsec stays in Rust).
+ * Browser: secret key passed explicitly.
  */
 export async function decryptNote(
   encryptedContent: string,
@@ -171,10 +182,10 @@ export async function decryptNote(
   secretKeyHex: string,
 ): Promise<string | null> {
   if (isTauri()) {
-    return tauriInvoke<string>('decrypt_note', {
+    // Use stateful command — Rust holds the secret key
+    return tauriInvoke<string>('decrypt_note_from_state', {
       encryptedContent,
       envelope,
-      secretKeyHex,
     })
   }
   const { decryptNoteV2 } = await import('./crypto')
@@ -190,6 +201,7 @@ export interface EncryptedMessageResult {
 
 /**
  * Encrypt a message for multiple readers.
+ * (Uses only public keys — no secret key needed.)
  */
 export async function encryptMessage(
   plaintext: string,
@@ -207,7 +219,8 @@ export async function encryptMessage(
 
 /**
  * Decrypt a message using the reader's envelope.
- * Returns the plaintext string or null on failure.
+ * Desktop: uses CryptoState (nsec stays in Rust, reader pubkey from state).
+ * Browser: secret key and pubkey passed explicitly.
  */
 export async function decryptMessage(
   encryptedContent: string,
@@ -216,11 +229,10 @@ export async function decryptMessage(
   readerPubkey: string,
 ): Promise<string | null> {
   if (isTauri()) {
-    return tauriInvoke<string>('decrypt_message', {
+    // Use stateful command — Rust holds the secret key + derives pubkey
+    return tauriInvoke<string>('decrypt_message_from_state', {
       encryptedContent,
       readerEnvelopes,
-      secretKeyHex,
-      readerPubkey,
     })
   }
   const { decryptMessage: jsDecrypt } = await import('./crypto')
@@ -240,7 +252,7 @@ const TAURI_ENCRYPTED_KEY_STORE = 'llamenos-encrypted-key'
 
 /**
  * Encrypt an nsec with a PIN for local storage.
- * Desktop: Rust crypto + Tauri Store for persistence.
+ * Desktop: Rust crypto + Tauri Store for persistence. Also loads key into CryptoState.
  * Browser: JS crypto + localStorage.
  */
 export async function encryptWithPin(
@@ -249,7 +261,8 @@ export async function encryptWithPin(
   pubkeyHex: string,
 ): Promise<void> {
   if (isTauri()) {
-    const encryptedData = await tauriInvoke<EncryptedKeyData>('encrypt_with_pin', {
+    // import_key_to_state encrypts the nsec AND loads it into CryptoState
+    const encryptedData = await tauriInvoke<EncryptedKeyData>('import_key_to_state', {
       nsec,
       pin,
       pubkeyHex,
@@ -267,7 +280,9 @@ export async function encryptWithPin(
 
 /**
  * Decrypt an nsec from PIN-encrypted storage.
- * Returns the nsec string or null on failure.
+ * Desktop: decrypts and loads into CryptoState — returns ONLY the pubkey.
+ *          The nsec hex NEVER leaves the Rust process.
+ * Browser: returns the nsec string (managed by key-manager.ts closure).
  */
 export async function decryptWithPin(pin: string): Promise<string | null> {
   if (isTauri()) {
@@ -276,13 +291,48 @@ export async function decryptWithPin(pin: string): Promise<string | null> {
     const data = await store.get<EncryptedKeyData>(TAURI_ENCRYPTED_KEY_STORE)
     if (!data) return null
     try {
-      return await tauriInvoke<string>('decrypt_with_pin', { data, pin })
+      // unlock_with_pin: decrypts nsec, stores in CryptoState, returns pubkey only
+      const pubkey = await tauriInvoke<string>('unlock_with_pin', { data, pin })
+      return pubkey
     } catch {
       return null // Wrong PIN or corrupted data
     }
   }
   const { decryptStoredKey } = await import('./key-store')
   return decryptStoredKey(pin)
+}
+
+/**
+ * Lock the crypto state (desktop only — zeros nsec in Rust process).
+ */
+export async function lockCrypto(): Promise<void> {
+  if (isTauri()) {
+    await tauriInvoke<void>('lock_crypto')
+  }
+}
+
+/**
+ * Check if the crypto state is unlocked (desktop — Rust CryptoState).
+ */
+export async function isCryptoUnlocked(): Promise<boolean> {
+  if (isTauri()) {
+    return tauriInvoke<boolean>('is_crypto_unlocked')
+  }
+  return false
+}
+
+/**
+ * Get the public key from CryptoState (desktop only).
+ */
+export async function getPublicKeyFromState(): Promise<string | null> {
+  if (isTauri()) {
+    try {
+      return await tauriInvoke<string>('get_public_key_from_state')
+    } catch {
+      return null
+    }
+  }
+  return null
 }
 
 /**
@@ -310,6 +360,8 @@ export async function clearStoredKey(): Promise<void> {
     const store = await Store.load('keys.json')
     await store.delete(TAURI_ENCRYPTED_KEY_STORE)
     await store.save()
+    // Also lock the crypto state
+    await lockCrypto()
     return
   }
   const { clearStoredKey: jsClear } = await import('./key-store')

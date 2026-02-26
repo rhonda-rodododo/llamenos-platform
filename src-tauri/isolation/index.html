@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Isolation</title>
+</head>
+<body>
+<script>
+/**
+ * Tauri Isolation Script — IPC command allowlist.
+ *
+ * This script runs in a separate, sandboxed iframe with a unique origin.
+ * It intercepts ALL IPC calls from the webview and validates them before
+ * forwarding to the Tauri core.
+ *
+ * Even if an attacker achieves arbitrary JS execution in the webview,
+ * they cannot bypass this layer to invoke raw IPC commands.
+ */
+window.__TAURI_ISOLATION_HOOK__ = (payload) => {
+  // Commands the webview is allowed to invoke
+  const ALLOWED_COMMANDS = new Set([
+    // Stateful crypto commands (nsec stays in Rust)
+    'unlock_with_pin',
+    'import_key_to_state',
+    'lock_crypto',
+    'is_crypto_unlocked',
+    'get_public_key_from_state',
+    'create_auth_token_from_state',
+    'ecies_unwrap_key_from_state',
+    'decrypt_note_from_state',
+    'decrypt_message_from_state',
+    // Stateless crypto commands (secret key as argument)
+    'ecies_wrap_key',
+    'ecies_unwrap_key',
+    'encrypt_note',
+    'decrypt_note',
+    'encrypt_message',
+    'decrypt_message',
+    'create_auth_token',
+    'encrypt_with_pin',
+    'decrypt_with_pin',
+    'generate_keypair',
+    'get_public_key',
+    'verify_schnorr',
+    // Stronghold plugin commands
+    'plugin:stronghold|initialize',
+    'plugin:stronghold|save',
+    'plugin:stronghold|destroy',
+    // Store plugin commands (encrypted key persistence)
+    'plugin:store|get',
+    'plugin:store|set',
+    'plugin:store|delete',
+    'plugin:store|save',
+    'plugin:store|load',
+    // Notification plugin commands
+    'plugin:notification|notify',
+    'plugin:notification|is_permission_granted',
+    'plugin:notification|request_permission',
+    // Updater plugin commands
+    'plugin:updater|check',
+    'plugin:updater|download_and_install',
+    // Window state plugin commands
+    'plugin:window-state|restore_state',
+    'plugin:window-state|save_window_state',
+    // Log plugin commands
+    'plugin:log|log',
+    // Process plugin commands (for quit only)
+    'plugin:process|exit',
+  ]);
+
+  const cmd = payload?.cmd;
+  if (!cmd || !ALLOWED_COMMANDS.has(cmd)) {
+    return Promise.reject(
+      new Error(
+        "IPC command '" + cmd + "' is not allowed by the isolation policy"
+      )
+    );
+  }
+
+  return payload;
+};
+</script>
+</body>
+</html>
