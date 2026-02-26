@@ -4,21 +4,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Llámenos is a secure crisis response hotline webapp. Callers dial a phone number; calls are routed to on-shift volunteers via parallel ringing. Volunteers log notes in a webapp. Admins manage shifts, volunteers, and ban lists. The app must protect volunteer and caller identity against well-funded adversaries (nation states, right-wing groups, private hacking firms).
+Llámenos is a secure crisis response hotline app. Callers dial a phone number; calls are routed to on-shift volunteers via parallel ringing. Volunteers log notes in the app. Admins manage shifts, volunteers, and ban lists. The app must protect volunteer and caller identity against well-funded adversaries (nation states, right-wing groups, private hacking firms).
 
 **Status: Pre-production.** No legacy fallbacks or data migrations needed. No production SDLC yet.
+
+## Multi-Platform Architecture
+
+The project spans three repositories sharing a common protocol and crypto core:
+
+| Repo | Path | Purpose |
+|------|------|---------|
+| **llamenos** (this repo) | `~/projects/llamenos` | Desktop app (Tauri v2), API, protocol spec |
+| **llamenos-core** | `~/projects/llamenos-core` | Shared Rust crypto crate (native + WASM + UniFFI) |
+| **llamenos-mobile** | `~/projects/llamenos-mobile` | React Native mobile app |
+
+All three platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 
 ## Tech Stack
 
 - **Runtime/Package Manager**: Bun
-- **Frontend**: Vite + TanStack Router (SPA, no SSR) + shadcn/ui (component installer)
+- **Desktop**: Tauri v2 + Vite + TanStack Router + shadcn/ui — native Rust backend with webview frontend
 - **Backend**: Cloudflare Workers + Durable Objects (cloud) / Node.js + PostgreSQL (self-hosted)
+- **Shared Crypto**: `llamenos-core` Rust crate — single auditable implementation for all platforms
 - **Telephony**: Twilio via a `TelephonyAdapter` interface (designed for future provider swaps, e.g. SIP trunks)
 - **Auth**: Nostr keypairs (BIP-340 Schnorr signatures) + WebAuthn session tokens for multi-device support
 - **i18n**: Built-in from day one — all user-facing strings must be translatable
 - **Deployment**: Cloudflare (Workers, DOs, Tunnels), billed to EU/GDPR-compatible account
-- **Testing**: E2E only via Playwright — no unit tests
-- **PWA**: Service worker via vite-plugin-pwa + Workbox; manifest uses generic name "Hotline" for security
+- **Testing**: E2E only via Playwright — no unit tests; Rust tests via `cargo test` in llamenos-core
+- **Desktop Security**: Tauri Stronghold (encrypted vault), isolation pattern, CSP, single-instance
 
 ## Architecture Roles
 
@@ -45,7 +58,9 @@ src/
   client/           # Frontend SPA (Vite + React)
     routes/         # TanStack file-based routes
     components/     # App components + ui/ (shadcn primitives)
-    lib/            # Client utilities (auth, crypto, ws, i18n, hooks)
+    lib/            # Client utilities (auth, crypto, platform, ws, i18n, hooks)
+      platform.ts   # Platform abstraction — routes to Rust (Tauri) or JS (browser)
+      crypto.ts     # JS crypto implementations (browser fallback)
     locales/        # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
   worker/           # Cloudflare Worker backend
     api/            # REST API handlers
@@ -57,6 +72,16 @@ src/
     types.ts        # Shared types (CustomFieldDefinition, NotePayload, etc.)
     languages.ts    # Centralized language config (codes, labels, Twilio voice IDs)
     crypto-labels.ts # 25 domain separation constants for all cryptographic operations
+src-tauri/          # Tauri v2 desktop shell (Rust)
+  src/lib.rs        # Tauri setup (plugins, tray, IPC handlers)
+  src/crypto.rs     # IPC command wrappers delegating to llamenos-core
+  Cargo.toml        # Dependencies including llamenos-core path dep
+  tauri.conf.json   # Tauri config (CSP, window, bundle, plugins)
+  capabilities/     # Tauri capability permissions
+docs/
+  protocol/         # Protocol specification for cross-platform interoperability
+    PROTOCOL.md     # Complete wire format, crypto, API, permission spec
+  epics/            # Feature epic documents
 ```
 
 **Path aliases** (tsconfig.json + vite.config.ts):
@@ -73,7 +98,9 @@ src/
 - **Durable Objects**: Six singletons accessed via `idFromName()` — IdentityDO, SettingsDO, RecordsDO, ShiftManagerDO, CallRouterDO, ConversationDO. Routed via `DORouter` (lightweight method+path router).
 - **E2EE notes**: Per-note forward secrecy — unique random key per note, wrapped via ECIES for each reader. Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
 - **E2EE messaging**: Per-message envelope encryption — random symmetric key, ECIES-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
-- **Key management**: PIN-encrypted local key store (`key-manager.ts`). nsec held in closure only, zeroed on lock. Device linking via ephemeral ECDH provisioning rooms.
+- **Platform abstraction**: `src/client/lib/platform.ts` routes crypto calls to native Rust (Tauri IPC) on desktop or JS (@noble/*) on browser. Always import from `platform.ts` for new code, not directly from `crypto.ts`.
+- **llamenos-core**: Shared Rust crypto crate at `~/projects/llamenos-core`. All crypto operations (ECIES, Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305) implemented once in Rust, compiled to native (Tauri), WASM (browser), and UniFFI (mobile).
+- **Key management**: PIN-encrypted local key store (`key-manager.ts`). nsec held in closure only, zeroed on lock. Device linking via ephemeral ECDH provisioning rooms. Desktop uses Tauri Stronghold instead of localStorage.
 - **Nostr relay real-time**: Ephemeral kind 20001 events via strfry (self-hosted) or Nosflare (CF). All event content encrypted with hub key. Generic tags (`["t", "llamenos:event"]`) — relay cannot distinguish event types.
 - **Hub key distribution**: Random 32 bytes (`crypto.getRandomValues`), ECIES-wrapped individually per member via `LABEL_HUB_KEY_WRAP`. Rotation on member departure excludes departed member.
 - **Client-side transcription**: WASM Whisper via `@huggingface/transformers` ONNX runtime. AudioWorklet ring buffer → Web Worker isolation. Audio never leaves the browser.
@@ -91,6 +118,8 @@ src/
 - Nostr relay (strfry) is a core service, not optional — always runs with Docker Compose and Helm
 - `SERVER_NOSTR_SECRET` must be exactly 64 hex chars; server derives its Nostr keypair via HKDF
 - Hub key is random bytes, NOT derived from any identity key — see `hub-key-manager.ts`
+- **Tauri**: Vite config conditionally disables PWA when `TAURI_ENV_PLATFORM` is set. Use `isTauri()` from `platform.ts` for runtime detection.
+- **llamenos-core path dep**: `src-tauri/Cargo.toml` references `../../llamenos-core` — both repos must be siblings
 
 ## Development Commands
 
@@ -99,6 +128,8 @@ bun install                              # Install dependencies
 bun run dev                              # Vite dev server (frontend only)
 bun run dev:worker                       # Wrangler dev server (Worker + DOs)
 bun run build                            # Vite build → dist/client/
+bun run tauri:dev                        # Tauri desktop dev (Vite + Rust backend)
+bun run tauri:build                      # Tauri desktop release build
 bun run deploy                           # Deploy EVERYTHING (app + marketing site)
 bun run deploy:demo                      # Deploy app Worker only
 bun run deploy:site                      # Deploy marketing site only (cd site && ...)
@@ -107,6 +138,7 @@ bunx playwright test tests/smoke.spec.ts # Run a single test file
 bun run test:ui                          # Playwright UI mode
 bun run typecheck                        # Type check (tsc --noEmit)
 bun run bootstrap-admin                  # Generate admin keypair
+cd ../llamenos-core && cargo test        # Run Rust crypto tests
 ```
 
 **Deployment rules — NEVER run `wrangler pages deploy` or `wrangler deploy` directly.** Always use the root `package.json` scripts (`bun run deploy`, `bun run deploy:demo`, `bun run deploy:site`). Running `wrangler pages deploy dist` from the wrong directory will deploy the Vite app build to Pages instead of the Astro site, breaking the marketing site with 404s.

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicollasricas/tauri-settings-schema/v2/schema.json",
+  "productName": "Hotline",
+  "version": "0.1.0",
+  "identifier": "org.llamenos.hotline",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist/client"
+  },
+  "app": {
+    "security": {
+      "csp": {
+        "default-src": "'self' customprotocol: asset:",
+        "connect-src": "ipc: http://ipc.localhost https://*.llamenos.org wss://*.llamenos.org",
+        "img-src": "'self' asset: http://asset.localhost blob: data:",
+        "style-src": "'unsafe-inline' 'self'",
+        "font-src": "'self' data:"
+      },
+      "freezePrototype": true
+    },
+    "windows": [
+      {
+        "title": "Hotline",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/32x32.png",
+      "tooltip": "Hotline"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Secure crisis response hotline",
+    "longDescription": "Secure, privacy-preserving crisis response hotline with end-to-end encryption"
+  },
+  "plugins": {
+    "stronghold": {
+      "maxAge": 0
+    },
+    "updater": {
+      "active": false
+    }
+  }
+}

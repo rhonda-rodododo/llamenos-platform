@@ -175,8 +175,12 @@ Architecture overview: [`docs/architecture/E2EE_ARCHITECTURE.md`](architecture/E
 - [x] **[Epic 77: Metadata Encryption](epics/epic-77-metadata-encryption.md)** — Per-record DO storage keys, encrypted call history, hash-chained audit log
 
 ### Client Privacy Layer
-- [ ] **[Epic 75: Native Call-Receiving Clients](epics/epic-75-native-call-clients.md)** — Tauri desktop (macOS/Windows), React Native mobile (iOS/Android). Separate repos. *Future work.*
+- [ ] **[Epic 75: Native Call-Receiving Clients](epics/epic-75-native-call-clients.md)** — Tauri desktop (macOS/Windows), React Native mobile (iOS/Android). Separate repos. *In progress — scaffolding complete.*
 - [x] **[Epic 78: Client-Side Transcription](epics/epic-78-client-side-transcription.md)** — @huggingface/transformers ONNX Whisper in browser, AudioWorklet ring buffer, Web Worker isolation, settings UI, auto-save encrypted transcript on hangup
+
+### Desktop Security & Native Crypto
+- [ ] **[Epic 80: Desktop Security Hardening](epics/epic-80-desktop-security.md)** — Tauri isolation pattern, Stronghold integration, CSP hardening, IPC allowlist, auto-updater security, memory protection, reproducible builds, single instance
+- [ ] **[Epic 81: Native Crypto Migration](epics/epic-81-native-crypto.md)** — Platform detection layer, key manager migration to Stronghold, ECIES/auth/note/message migration, WASM build for browser, cross-platform test vectors
 
 ### Trust Verification — COMPLETE
 - [x] **[Epic 79: Reproducible Builds](epics/epic-79-reproducible-builds.md)** — Deterministic build config, Dockerfile.build, verify-build.sh, CHECKSUMS.txt in GitHub Releases, SLSA provenance
