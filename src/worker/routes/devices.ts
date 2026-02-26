@@ -57,6 +57,56 @@ devicesRoutes.post('/register', async (c) => {
 })
 
 /**
+ * POST /api/devices/voip-token
+ * Register a VoIP-specific push token (PushKit on iOS, FCM on Android).
+ * Stored separately from regular push tokens — used for high-priority call dispatch.
+ */
+devicesRoutes.post('/voip-token', async (c) => {
+  const pubkey = c.get('pubkey')
+  const body = await c.req.json<{
+    platform: 'ios' | 'android'
+    voipToken: string
+  }>()
+
+  if (!body.platform || !body.voipToken) {
+    return c.json({ error: 'Missing required fields: platform, voipToken' }, 400)
+  }
+
+  const dos = getDOs(c.env)
+  const res = await dos.identity.fetch(
+    new Request(`http://do/devices/${pubkey}/voip-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        platform: body.platform,
+        voipToken: body.voipToken,
+      }),
+    }),
+  )
+
+  if (!res.ok) {
+    return c.json({ error: 'Failed to register VoIP token' }, 500)
+  }
+
+  return c.body(null, 204)
+})
+
+/**
+ * DELETE /api/devices/voip-token
+ * Unregister VoIP push token for the current user.
+ */
+devicesRoutes.delete('/voip-token', async (c) => {
+  const pubkey = c.get('pubkey')
+  const dos = getDOs(c.env)
+
+  await dos.identity.fetch(
+    new Request(`http://do/devices/${pubkey}/voip-token`, { method: 'DELETE' }),
+  )
+
+  return c.body(null, 204)
+})
+
+/**
  * DELETE /api/devices
  * Remove all registered devices for the current user (called on logout).
  */

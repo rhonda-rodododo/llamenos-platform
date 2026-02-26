@@ -40,6 +40,17 @@ export interface TelephonyProviderConfig {
   apiKeySid?: string        // Twilio/SignalWire API Key SID for Access Token generation
   apiKeySecret?: string     // Twilio/SignalWire API Key Secret
   twimlAppSid?: string      // Twilio/SignalWire TwiML App SID for browser calls
+
+  // SIP VoIP (mobile native clients — Linphone SDK, Epic 91)
+  sipDomain?: string            // SIP REGISTER domain
+  sipUsername?: string          // SIP REGISTER username
+  sipPassword?: string          // SIP REGISTER password
+  sipEndpointUsername?: string  // Plivo SIP endpoint username
+  sipEndpointPassword?: string  // Plivo SIP endpoint password
+  spaceUrl?: string             // SignalWire space URL
+  asteriskGateway?: string      // Vonage→Asterisk SIP gateway host
+  asteriskSipUsername?: string  // Vonage→Asterisk SIP credentials
+  asteriskSipPassword?: string  // Vonage→Asterisk SIP credentials
 }
 
 // --- Call Preference ---
