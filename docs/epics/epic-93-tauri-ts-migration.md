@@ -1,6 +1,6 @@
 # Epic 93: Tauri-Only TypeScript Migration
 
-**Status**: Planned
+**Status**: Complete (e3aeabb)
 **Depends on**: Epic 92 (Rust IPC Expansion)
 **Blocks**: Epic 94 (Build Cleanup & Dead Code Removal)
 

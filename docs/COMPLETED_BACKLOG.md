@@ -2,6 +2,24 @@
 
 ## 2026-02-26: Multi-Platform Native Clients (`desktop` branch)
 
+### Epic 93: Tauri-Only TypeScript Migration (e3aeabb)
+
+Complete rewrite of TypeScript crypto plumbing — nsec never enters webview:
+- **platform.ts**: Removed all `isBrowser()`/`isTauri()` branching. Every function is a direct `tauriInvoke`. Dropped `secretKeyHex` from ~12 stateful functions. Added `signNostrEvent`, `decryptFileMetadata`, `unwrapFileKey`, `unwrapHubKey`, `rewrapFileKey`, `getNsecFromState`, `isValidNsec` (async), `keyPairFromNsec`, `createAuthTokenStateless`, `verifySchnorr`.
+- **key-manager.ts**: Deleted `secretKey: Uint8Array` closure, `getSecretKey()`, `getNsec()`, `createAuthToken()`. Tracks only `unlocked: boolean` + cached pubkey.
+- **auth.tsx**: Uses `createAuthTokenStateless` for sign-in (pre-CryptoState flow).
+- **api.ts**: `getAuthHeaders()` now async, uses `platform.createAuthToken()`.
+- **file-crypto.ts**: ECIES ops → Rust IPC; symmetric file content crypto stays in JS.
+- **hub-key-manager.ts**: `eciesWrapKey`/`unwrapKey` → platform.ts async IPC.
+- **nostr/relay.ts**: Removed `getSecretKey`, `handleAuth` uses `signNostrEvent`.
+- **nostr/events.ts**: `createHubEvent` uses `signNostrEvent` (no `secretKey` param).
+- **nostr/context.tsx**: Removed `getSecretKey` prop from `NostrProvider`.
+- **23 files changed**: 585 insertions, 639 deletions. All verified: zero `getSecretKey` in code, zero `isBrowser()`, zero `from '@/lib/key-store'`.
+
+### Epic 92: Rust IPC Expansion (d419584)
+
+Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `llamenos-core`. All Rust functions for Epic 93's TypeScript migration.
+
 ### Epic 81: Native Crypto Migration — Phases 1-5 (Platform Abstraction)
 
 - **Phase 1: Platform Detection Layer** — `platform.ts` extended with all crypto operation wrappers: `encryptNote`, `decryptNote`, `decryptLegacyNote`, `encryptMessage`, `decryptMessage`, `decryptCallRecord`, `decryptTranscription`, `encryptDraft`, `decryptDraft`, `encryptExport`, `isValidNsec`. Each routes to Rust IPC on desktop, JS (`@noble/*`) on browser.
