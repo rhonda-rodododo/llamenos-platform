@@ -49,7 +49,7 @@ Ang Llamenos ay isang single-page application (SPA) na sinusuportahan ng Cloudfl
 | Telephony | Twilio, SignalWire, Vonage, Plivo, o Asterisk (sa pamamagitan ng TelephonyAdapter interface) |
 | Auth | Nostr keypairs (BIP-340 Schnorr) + WebAuthn |
 | Encryption | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Transcription | Cloudflare Workers AI (Whisper) |
+| Transcription | Client-side Whisper (WASM) |
 | i18n | i18next (12+ na wika) |
 
 ## Mga Tungkulin

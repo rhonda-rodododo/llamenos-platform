@@ -49,7 +49,7 @@ Llamenos e uma aplicacao de pagina unica (SPA) baseada em Cloudflare Workers e D
 | Telefonia | Twilio, SignalWire, Vonage, Plivo ou Asterisk (via interface TelephonyAdapter) |
 | Autenticacao | Chaves Nostr (BIP-340 Schnorr) + WebAuthn |
 | Criptografia | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Transcricao | Cloudflare Workers AI (Whisper) |
+| Transcricao | Whisper no lado do cliente (WASM) |
 | i18n | i18next (12+ idiomas) |
 
 ## Funcoes

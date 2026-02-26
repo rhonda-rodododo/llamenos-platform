@@ -49,7 +49,7 @@ Llamenos ist eine Single-Page-Anwendung (SPA), die auf Cloudflare Workers und Du
 | Telefonie | Twilio, SignalWire, Vonage, Plivo oder Asterisk (ueber die TelephonyAdapter-Schnittstelle) |
 | Authentifizierung | Nostr-Schluessel (BIP-340 Schnorr) + WebAuthn |
 | Verschluesselung | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Transkription | Cloudflare Workers AI (Whisper) |
+| Transkription | Client-seitige Whisper (WASM) |
 | i18n | i18next (12+ Sprachen) |
 
 ## Rollen

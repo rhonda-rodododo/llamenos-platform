@@ -72,7 +72,7 @@ Llamenos is a single-page application (SPA) that can run on **Cloudflare Workers
 | Messaging | SMS, WhatsApp Business, Signal | Same |
 | Auth | Nostr keypairs (BIP-340 Schnorr) + WebAuthn | Same |
 | Encryption | ECIES (secp256k1 + XChaCha20-Poly1305) | Same |
-| Transcription | Workers AI (Whisper) | faster-whisper container |
+| Transcription | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
 | i18n | i18next (13 languages) | Same |
 
 ## Roles

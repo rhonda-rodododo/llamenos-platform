@@ -49,7 +49,7 @@ Llamenos là một ứng dụng trang đơn (SPA) được hỗ trợ bởi Clou
 | Dịch vụ điện thoại | Twilio, SignalWire, Vonage, Plivo hoặc Asterisk (thông qua giao diện TelephonyAdapter) |
 | Xác thực | Cặp khóa Nostr (BIP-340 Schnorr) + WebAuthn |
 | Mã hóa | ECIES (secp256k1 + XChaCha20-Poly1305) |
-| Chuyển đổi giọng nói | Cloudflare Workers AI (Whisper) |
+| Chuyển đổi giọng nói | Whisper phía máy khách (WASM) |
 | Đa ngôn ngữ | i18next (hỗ trợ 12+ ngôn ngữ) |
 
 ## Vai trò

@@ -22,9 +22,9 @@ Ambos objetivos de despliegue ejecutan **exactamente el mismo codigo de aplicaci
 | **Runtime del backend** | Cloudflare Workers | Node.js (via Hono) |
 | **Almacenamiento de datos** | Durable Objects (KV) | PostgreSQL |
 | **Almacenamiento de archivos** | R2 | MinIO (compatible con S3) |
-| **Transcripcion** | Workers AI (Whisper) | Contenedor faster-whisper |
+| **Transcripcion** | Whisper del lado del cliente (WASM) | Whisper del lado del cliente (WASM) |
 | **Archivos estaticos** | Workers Assets | Caddy / Hono serveStatic |
-| **WebSocket** | Hibernatable WebSockets | Paquete ws (persistente) |
+| **Eventos en tiempo real** | Relay Nostr (Nosflare) | Relay Nostr (strfry) |
 | **Terminacion TLS** | Edge de Cloudflare | Caddy (HTTPS automatico) |
 | **Costo** | Basado en uso (plan gratuito disponible) | Costos de tu servidor |
 
