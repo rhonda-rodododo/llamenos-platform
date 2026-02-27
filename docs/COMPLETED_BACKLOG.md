@@ -1,5 +1,50 @@
 # Completed Backlog
 
+## 2026-02-27: CI Hardening, Test Vectors, Docs & Quality (Epics 111-118)
+
+### Epic 111: CI Security Hardening
+- Pinned all GitHub Actions to SHA hashes across all 3 repos
+- Standardized Bun version to 1.3.5 in all 8 workflows
+- Added PR triggers to llamenos ci.yml
+- Added dependabot.yml to all 3 repos (GitHub Actions ecosystem only)
+- Fixed silent failures (CocoaPods continue-on-error, native lib download warnings)
+
+### Epic 112: Comprehensive Crypto Test Vectors
+- Expanded from 6 to 14 crypto operation categories in test vectors v2
+- **Critical fix**: BIP-340 Schnorr double-hashing bug — k256 `Signer::sign()` internally SHA-256 hashes, causing double-hash when combined with pre-hashing. Switched to `PrehashSigner::sign_prehash()` / `PrehashVerifier::verify_prehash()`
+- 24 JS interop tests consuming Rust vectors (up from 8)
+- Fixed all @noble/* v2 API breaking changes (sha2.js, separate schnorr export, Uint8Array inputs, HKDF salt/info types)
+
+### Epic 113: Mobile Crypto Interop Validation
+- 23 Jest unit tests in llamenos-mobile validating JS crypto against Rust vectors
+- jest.config.unit.js with @noble/* ESM transform handling
+- Unit test step added to mobile-e2e.yml CI (before Detox for faster feedback)
+
+### Epic 114: Docs Site — Mobile Content & Missing Pages
+- `architecture.md` — Three-repo diagram, data flow, encryption matrix, key hierarchy
+- `mobile-guide.md` — Download, provisioning, feature comparison, limitations
+- `troubleshooting.md` — Docker, Cloudflare, desktop, mobile, telephony, crypto errors
+- Updated sidebar with new sections, download page mobile card links to guide
+
+### Epic 115: Docs Site — i18n Completion
+- Translation of missing docs (10 per language) + pages (features, security) to 11 languages
+- API reference kept English-only (technical reference for developers)
+
+### Epic 116: Cross-Repo CI Integration
+- llamenos-core CI dispatches `core-updated` event to llamenos + llamenos-mobile on main push
+- Both downstream repos accept `repository_dispatch` trigger
+- CROSS_REPO_TOKEN setup documented in HUMAN_INSTRUCTIONS.md
+
+### Epic 117: Adversarial Crypto Tests
+- 10 new Rust adversarial tests: truncated data, tampered ciphertext, invalid keys, wrong recipients
+- 7 JS adversarial interop tests consuming adversarial vectors
+- Total: 45 Rust tests (34 unit + 11 interop), 24 JS interop tests
+
+### Epic 118: Docs Site — API Reference & Changelog
+- 1680-line API reference covering all 6 DO domains, 22+ endpoint groups
+- Permission reference with 13 domains and 76+ permissions
+- CHANGELOG.md cleanup and milestone summary
+
 ## 2026-02-27: Multi-Platform Completion & Release Readiness (Epics 100-110)
 
 ### Epic 100: llamenos-core Native Build for Mobile

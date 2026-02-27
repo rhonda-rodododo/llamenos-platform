@@ -230,15 +230,15 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 109: Desktop Polish](epics/epic-109-desktop-polish.md)** — Version sync to 0.18.0, tray menu enhancements
 - [x] **[Epic 110: Documentation](epics/epic-110-documentation.md)** — CONTRIBUTING.md, ARCHITECTURE.md, build guides, HUMAN_INSTRUCTIONS mobile sections
 
-## CI Hardening, Test Vectors, Docs & Quality (Epics 111-118) — IN PROGRESS
-- [ ] **[Epic 111: CI Security Hardening](epics/epic-111-ci-security-hardening.md)** — Pin actions to SHA, standardize Bun 1.3.5, PR triggers, dependabot
-- [ ] **[Epic 112: Comprehensive Crypto Test Vectors](epics/epic-112-crypto-test-vectors.md)** — Expand from 6 to 14 operation categories, full protocol coverage
-- [ ] **[Epic 113: Mobile Crypto Interop](epics/epic-113-mobile-crypto-interop.md)** — Jest unit tests validating mobile crypto against Rust vectors
-- [ ] **[Epic 114: Docs Site — Mobile & Missing Pages](epics/epic-114-docs-mobile-pages.md)** — Mobile guide, architecture, troubleshooting, changelog
-- [ ] **[Epic 115: Docs Site — i18n Completion](epics/epic-115-docs-i18n.md)** — 132 translation files across 11 languages
-- [ ] **[Epic 116: Cross-Repo CI Integration](epics/epic-116-cross-repo-ci.md)** — repository_dispatch from llamenos-core to downstream repos
-- [ ] **[Epic 117: Adversarial Crypto Tests](epics/epic-117-adversarial-crypto.md)** — 17+ negative tests (wrong keys, tampered data, expired tokens)
-- [ ] **[Epic 118: Docs Site — API Reference](epics/epic-118-api-reference.md)** — REST endpoint reference sourced from PROTOCOL.md
+## CI Hardening, Test Vectors, Docs & Quality (Epics 111-118)
+- [x] **[Epic 111: CI Security Hardening](epics/epic-111-ci-security-hardening.md)** — Pin actions to SHA, standardize Bun 1.3.5, PR triggers, dependabot
+- [x] **[Epic 112: Comprehensive Crypto Test Vectors](epics/epic-112-crypto-test-vectors.md)** — Expanded to 14 operation categories + adversarial vectors, 24 JS interop tests, critical Schnorr prehash bug fixed
+- [x] **[Epic 113: Mobile Crypto Interop](epics/epic-113-mobile-crypto-interop.md)** — 23 Jest unit tests validating mobile JS crypto against Rust vectors
+- [x] **[Epic 114: Docs Site — Mobile & Missing Pages](epics/epic-114-docs-mobile-pages.md)** — Mobile guide, architecture overview, troubleshooting (3 new docs + route pages)
+- [~] **[Epic 115: Docs Site — i18n Completion](epics/epic-115-docs-i18n.md)** — Translation of missing docs to 11 languages (in progress)
+- [x] **[Epic 116: Cross-Repo CI Integration](epics/epic-116-cross-repo-ci.md)** — repository_dispatch from llamenos-core to downstream repos on main push
+- [x] **[Epic 117: Adversarial Crypto Tests](epics/epic-117-adversarial-crypto.md)** — 10 new Rust adversarial tests + 7 JS adversarial interop tests
+- [x] **[Epic 118: Docs Site — API Reference](epics/epic-118-api-reference.md)** — Complete 1680-line REST API reference + CHANGELOG.md
 
 ## Future: Unified Records Architecture (Epics TBD)
 - [ ] Consolidate notes, reports, and message-channel threads into a single "Record" domain model
