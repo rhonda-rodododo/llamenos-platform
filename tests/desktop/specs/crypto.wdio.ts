@@ -14,6 +14,18 @@
 
 describe('Native Crypto IPC', () => {
   it('should detect Tauri environment', async () => {
+    // Wait for Tauri internals to be injected — on Windows WebView2, the
+    // preload script can lag behind the first test execution.
+    await browser.waitUntil(
+      async () => {
+        const ready = await browser.execute(
+          () => typeof (window as any).__TAURI_INTERNALS__?.invoke === 'function',
+        )
+        return ready === true
+      },
+      { timeout: 10_000, timeoutMsg: '__TAURI_INTERNALS__ not available after 10s' },
+    )
+
     const result = await browser.execute(() => {
       const internals = (window as any).__TAURI_INTERNALS__
       return {
