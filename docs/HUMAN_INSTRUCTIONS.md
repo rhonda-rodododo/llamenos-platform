@@ -607,6 +607,45 @@ Complete inventory of every secret the CI/CD pipelines require. Set these at
 | `CLOUDFLARE_API_TOKEN` | Worker deploy, E2E tests | Cloudflare dashboard > API Tokens | Yes -- should already be set |
 | `CLOUDFLARE_ACCOUNT_ID` | Worker deploy, E2E tests | Cloudflare dashboard > Account Home | Yes -- should already be set |
 
+### Cross-Repo CI Secrets (`llamenos-core` repo only)
+
+| Secret | Used By | How to Get | Required |
+|--------|---------|------------|----------|
+| `CROSS_REPO_TOKEN` | `notify-downstream` job | GitHub PAT (see below) | Yes -- for cross-repo CI triggers |
+
+#### Creating the `CROSS_REPO_TOKEN` GitHub PAT
+
+When `llamenos-core` CI passes on `main`, it dispatches `repository_dispatch`
+events to `llamenos` and `llamenos-mobile` so they automatically test against
+the latest crypto crate. This requires a GitHub Personal Access Token with
+permission to dispatch workflows in the downstream repos.
+
+1. Go to https://github.com/settings/tokens?type=beta (Fine-grained tokens)
+2. Click **Generate new token**
+3. **Token name**: `llamenos-cross-repo-ci`
+4. **Expiration**: 1 year (set a calendar reminder to rotate)
+5. **Repository access**: Select **Only select repositories**, then choose:
+   - `rhonda-rodododo/llamenos`
+   - `rhonda-rodododo/llamenos-mobile`
+6. **Permissions**: Under **Repository permissions**, set:
+   - **Contents**: Read (required for `repository_dispatch`)
+7. Click **Generate token** and copy the value
+8. In the `llamenos-core` repo, go to **Settings > Secrets and variables > Actions**
+9. Add a new secret named `CROSS_REPO_TOKEN` with the token value
+
+**Important**: This secret only needs to be set in `llamenos-core` -- the
+downstream repos respond to `repository_dispatch` events without needing any
+additional secrets. The downstream workflows (`ci.yml` in `llamenos`,
+`mobile-e2e.yml` in `llamenos-mobile`) already include `repository_dispatch`
+in their `on:` triggers with `types: [core-updated]`.
+
+**Verification**: After setup, push a commit to `llamenos-core` `main` and
+check that workflow runs appear in both downstream repos:
+```bash
+gh run list --repo rhonda-rodododo/llamenos --event repository_dispatch --limit 3
+gh run list --repo rhonda-rodododo/llamenos-mobile --event repository_dispatch --limit 3
+```
+
 ### Docker Secrets (`docker.yml`)
 
 | Secret | Used By | How to Get | Required |

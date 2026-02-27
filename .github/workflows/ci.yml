@@ -11,6 +11,10 @@
 #   8. Create GitHub Release with changelog
 #   (Desktop app releases are handled by tauri-release.yml)
 #
+# On repository_dispatch (core-updated) from llamenos-core:
+#   Build + E2E tests only (no version bump or deploy). Validates that the
+#   latest crypto crate changes don't break the desktop app.
+#
 # Docs-only changes (*.md files) skip E2E tests, versioning, and app deployment.
 # Site changes (site/) skip E2E tests and versioning but STILL deploy to Pages.
 # App changes require E2E tests to pass before version bump or deployment.
@@ -23,6 +27,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  repository_dispatch:
+    types: [core-updated]
 
 # Only one CI run at a time on main
 concurrency:
@@ -54,6 +60,16 @@ jobs:
       - name: Detect changes
         id: filter
         run: |
+          # repository_dispatch (e.g., core-updated from llamenos-core) means the
+          # upstream crypto crate changed — always run the full pipeline.
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "repository_dispatch event — treating as app change"
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "site=false" >> "$GITHUB_OUTPUT"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Get changed files between HEAD^ and HEAD
           CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD)
 
