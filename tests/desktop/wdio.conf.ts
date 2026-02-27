@@ -11,9 +11,33 @@
  */
 
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
+import * as net from 'net'
 import * as os from 'os'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
+
+/** Wait until a TCP port is free (not in use). */
+function waitForPortFree(port: number, timeout: number): Promise<void> {
+  const start = Date.now()
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const sock = net.createConnection({ port, host: '127.0.0.1' })
+      sock.once('connect', () => {
+        sock.destroy()
+        if (Date.now() - start > timeout) {
+          reject(new Error(`Port ${port} still in use after ${timeout}ms`))
+        } else {
+          setTimeout(check, 200)
+        }
+      })
+      sock.once('error', () => {
+        // Connection refused = port is free
+        resolve()
+      })
+    }
+    check()
+  })
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -34,7 +58,6 @@ export const config: WebdriverIO.Config = {
     {
       // @ts-expect-error -- WebdriverIO doesn't type tauri:options but tauri-driver accepts it
       'tauri:options': { application },
-      browserName: 'wry',
       maxInstances: 1,
     },
   ],
@@ -66,8 +89,12 @@ export const config: WebdriverIO.Config = {
   },
 
   // Start tauri-driver before the test session
-  beforeSession() {
+  async beforeSession() {
+    // Wait for port 4444 to be free (previous session cleanup)
+    await waitForPortFree(4444, 5000)
+
     const driverPath = path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver')
+    exitCalled = false
     tauriDriver = spawn(driverPath, [], {
       stdio: [null, process.stdout, process.stderr],
     })
@@ -82,12 +109,18 @@ export const config: WebdriverIO.Config = {
         console.error(`tauri-driver exited unexpectedly with code ${code}`)
       }
     })
+
+    // Give tauri-driver time to bind to port
+    await new Promise((r) => setTimeout(r, 500))
   },
 
   // Kill tauri-driver after test session
   afterSession() {
     exitCalled = true
-    tauriDriver?.kill()
+    if (tauriDriver?.pid) {
+      // SIGKILL ensures immediate termination and port release
+      try { process.kill(tauriDriver.pid, 'SIGKILL') } catch {}
+    }
     tauriDriver = null
   },
 }
