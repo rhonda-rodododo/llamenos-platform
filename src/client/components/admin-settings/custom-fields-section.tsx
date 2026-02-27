@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { updateCustomFields, type CustomFieldDefinition } from '@/lib/api'
-import { MAX_CUSTOM_FIELDS } from '@shared/types'
+import { updateCustomFields } from '@/lib/api'
+import type { CustomFieldDefinition, CustomFieldContext } from '@shared/types'
+import { MAX_CUSTOM_FIELDS, CUSTOM_FIELD_CONTEXT_LABELS } from '@shared/types'
 import { SettingsSection } from '@/components/settings-section'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -66,7 +67,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
           validation: editing.validation,
           visibleToVolunteers: editing.visibleToVolunteers ?? true,
           editableByVolunteers: editing.editableByVolunteers ?? true,
-          context: editing.context ?? 'both',
+          context: editing.context ?? 'all',
           order: fields.length,
           createdAt: new Date().toISOString(),
         }
@@ -112,6 +113,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 <p className="text-sm font-medium">{field.label}</p>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px]">{t(`customFields.types.${field.type}`)}</Badge>
+                  <Badge variant="outline" className="text-[10px]">{CUSTOM_FIELD_CONTEXT_LABELS[field.context as CustomFieldContext] || field.context}</Badge>
                   {field.required && <Badge variant="secondary" className="text-[10px]">{t('customFields.required')}</Badge>}
                   {!field.visibleToVolunteers && <Badge variant="secondary" className="text-[10px]">{t('customFields.adminOnly')}</Badge>}
                 </div>
@@ -174,17 +176,29 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                 <option value="select">{t('customFields.types.select')}</option>
                 <option value="checkbox">{t('customFields.types.checkbox')}</option>
                 <option value="textarea">{t('customFields.types.textarea')}</option>
+                <option value="file">{t('customFields.types.file', { defaultValue: 'File Upload' })}</option>
               </select>
             </div>
-            <div className="flex items-end gap-4">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={editing.required ?? false}
-                  onCheckedChange={checked => setEditing(prev => ({ ...prev!, required: checked }))}
-                />
-                <Label className="text-sm">{t('customFields.required')}</Label>
-              </div>
+            <div className="space-y-1">
+              <Label>{t('customFields.context', { defaultValue: 'Appears In' })}</Label>
+              <select
+                value={editing.context || 'all'}
+                onChange={e => setEditing(prev => ({ ...prev!, context: e.target.value as CustomFieldContext }))}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {(Object.entries(CUSTOM_FIELD_CONTEXT_LABELS) as [CustomFieldContext, string][]).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={editing.required ?? false}
+              onCheckedChange={checked => setEditing(prev => ({ ...prev!, required: checked }))}
+            />
+            <Label className="text-sm">{t('customFields.required')}</Label>
           </div>
 
           {/* Select options */}

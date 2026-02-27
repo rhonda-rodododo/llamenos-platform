@@ -91,12 +91,14 @@ export const PROVIDER_REQUIRED_FIELDS: Record<TelephonyProviderType, (keyof Tele
 
 // --- Custom Fields ---
 
+export type CustomFieldContext = 'call-notes' | 'conversation-notes' | 'reports' | 'all'
+
 /** Custom field definition — stored as config in SessionManager DO */
 export interface CustomFieldDefinition {
   id: string               // unique UUID
   name: string             // internal key (machine-readable, e.g. "severity")
   label: string            // display label (e.g. "Severity Rating")
-  type: 'text' | 'number' | 'select' | 'checkbox' | 'textarea'
+  type: 'text' | 'number' | 'select' | 'checkbox' | 'textarea' | 'file'
   required: boolean
   options?: string[]        // for 'select' type only
   validation?: {
@@ -107,9 +109,11 @@ export interface CustomFieldDefinition {
   }
   visibleToVolunteers: boolean
   editableByVolunteers: boolean
-  context: 'call-notes' | 'reports' | 'both'  // where this field appears
-  allowFileUpload?: boolean  // this field accepts file attachments
-  acceptedFileTypes?: string[] // e.g., ['image/*', 'video/*', 'application/pdf']
+  context: CustomFieldContext  // where this field appears
+  // File field type options
+  maxFileSize?: number        // bytes, for file type
+  allowedMimeTypes?: string[] // e.g., ['image/*', 'application/pdf']
+  maxFiles?: number           // for multi-file fields (default: 1)
   order: number
   createdAt: string
 }
@@ -175,6 +179,18 @@ export const MAX_FIELD_NAME_LENGTH = 50
 export const MAX_FIELD_LABEL_LENGTH = 200
 export const MAX_OPTION_LENGTH = 200
 export const FIELD_NAME_REGEX = /^[a-zA-Z0-9_]+$/
+
+/** Check if a custom field should appear in a given context */
+export function fieldMatchesContext(field: CustomFieldDefinition, context: CustomFieldContext): boolean {
+  return field.context === context || field.context === 'all'
+}
+
+export const CUSTOM_FIELD_CONTEXT_LABELS: Record<CustomFieldContext, string> = {
+  'call-notes': 'Call Notes',
+  'conversation-notes': 'Conversation Notes',
+  'reports': 'Reports',
+  'all': 'All Record Types',
+}
 
 // --- Messaging Channel Types ---
 

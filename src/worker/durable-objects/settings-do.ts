@@ -323,7 +323,7 @@ export class SettingsDO extends DurableObject<Env> {
         return new Response(JSON.stringify({ error: `Duplicate field name: ${field.name}` }), { status: 400 })
       }
       names.add(field.name)
-      if (!['text', 'number', 'select', 'checkbox', 'textarea'].includes(field.type)) {
+      if (!['text', 'number', 'select', 'checkbox', 'textarea', 'file'].includes(field.type)) {
         return new Response(JSON.stringify({ error: `Invalid field type: ${field.type}` }), { status: 400 })
       }
       if (field.type === 'select') {
@@ -341,11 +341,12 @@ export class SettingsDO extends DurableObject<Env> {
       }
     }
 
-    const validContexts = ['call-notes', 'reports', 'both']
+    const validContexts = ['call-notes', 'conversation-notes', 'reports', 'all']
     const normalized = fields.map((f, i) => ({
       ...f,
       order: i,
-      context: validContexts.includes(f.context) ? f.context : 'both',
+      // Migrate legacy 'both' to 'all'
+      context: (f.context as string) === 'both' ? 'all' : (validContexts.includes(f.context) ? f.context : 'all'),
     }))
     await this.ctx.storage.put('customFields', normalized)
     return Response.json({ fields: normalized })

@@ -2,7 +2,9 @@ import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { listNotes, createNote, updateNote, getCallHistory, listVolunteers, getCustomFields, type EncryptedNote, type CallRecord, type CustomFieldDefinition, type Volunteer } from '@/lib/api'
+import { listNotes, createNote, updateNote, getCallHistory, listVolunteers, getCustomFields, type EncryptedNote, type CallRecord, type Volunteer } from '@/lib/api'
+import type { CustomFieldDefinition } from '@shared/types'
+import { fieldMatchesContext } from '@shared/types'
 import { encryptNote, decryptNote, decryptLegacyNote, decryptTranscription, decryptCallRecord, encryptExport } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
 import { useToast } from '@/lib/toast'
@@ -15,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { NewNoteForm } from '@/components/notes/new-note-form'
 import { NoteEditForm } from '@/components/notes/note-edit-form'
 import { RecordingPlayer } from '@/components/recording-player'
+import { CustomFieldBadges } from '@/components/notes/custom-field-badges'
 
 type NotesSearch = { page: number; callId: string; search: string }
 
@@ -202,7 +205,9 @@ function NotesPage() {
   }, {})
 
   const totalPages = Math.ceil(total / limit)
-  const visibleFields = customFields.filter(f => isAdmin || f.visibleToVolunteers)
+  const visibleFields = customFields
+    .filter(f => fieldMatchesContext(f, 'call-notes'))
+    .filter(f => isAdmin || f.visibleToVolunteers)
 
   async function handleExport() {
     if (!hasNsec || !keyManager.isUnlocked()) return
@@ -389,20 +394,7 @@ function NotesPage() {
                           <>
                             <p className="mt-2 text-sm whitespace-pre-wrap">{note.decrypted}</p>
                             {note.payload.fields && visibleFields.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {visibleFields.map(field => {
-                                  const val = note.payload.fields?.[field.id]
-                                  if (val === undefined || val === '') return null
-                                  const displayVal = field.type === 'checkbox'
-                                    ? (val ? '\u2713' : '\u2717')
-                                    : String(val)
-                                  return (
-                                    <Badge key={field.id} variant="outline" className="text-xs">
-                                      {field.label}: {displayVal}
-                                    </Badge>
-                                  )
-                                })}
-                              </div>
+                              <CustomFieldBadges fields={visibleFields} values={note.payload.fields} />
                             )}
                           </>
                         )}

@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
-import { createReport, getReportCategories } from '@/lib/api'
+import { createReport, getReportCategories, getCustomFields } from '@/lib/api'
+import type { CustomFieldDefinition } from '@shared/types'
+import { fieldMatchesContext } from '@shared/types'
 import { encryptMessage } from '@/lib/platform'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -11,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Lock, Loader2, Send } from 'lucide-react'
+import { CustomFieldInputs, validateCustomFields } from '@/components/notes/custom-field-inputs'
 
 interface ReportFormProps {
   open: boolean
@@ -20,26 +23,39 @@ interface ReportFormProps {
 
 export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, adminDecryptionPubkey } = useAuth()
+  const { hasNsec, publicKey, isAdmin, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   const [title, setTitle] = useState('')
   const [category, setCategory] = useState('')
   const [body, setBody] = useState('')
   const [categories, setCategories] = useState<string[]>([])
+  const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>([])
+  const [fieldValues, setFieldValues] = useState<Record<string, string | number | boolean>>({})
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+
+  // Filter fields for report context
+  const reportFields = customFields
+    .filter(f => fieldMatchesContext(f, 'reports'))
+    .filter(f => isAdmin || f.visibleToVolunteers)
 
   useEffect(() => {
     if (!open) return
     getReportCategories()
       .then(({ categories: cats }) => setCategories(cats))
       .catch(() => setCategories([]))
+    getCustomFields()
+      .then(r => setCustomFields(r.fields))
+      .catch(() => setCustomFields([]))
   }, [open])
 
   const resetForm = useCallback(() => {
     setTitle('')
     setCategory('')
     setBody('')
+    setFieldValues({})
+    setValidationErrors({})
   }, [])
 
   const handleSubmit = useCallback(async () => {
@@ -53,6 +69,11 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
       return
     }
 
+    // Validate custom fields
+    const errors = validateCustomFields(reportFields, fieldValues, t, { isAdmin })
+    setValidationErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
     setSubmitting(true)
 
     try {
@@ -62,7 +83,13 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
         readerPubkeys.push(adminDecryptionPubkey)
       }
 
-      const encrypted = await encryptMessage(body.trim(), readerPubkeys)
+      // Encrypt body with custom field values as structured payload
+      const nonEmptyFields = Object.entries(fieldValues).filter(([, v]) => v !== '' && v !== undefined)
+      const payload = nonEmptyFields.length > 0
+        ? JSON.stringify({ text: body.trim(), fields: Object.fromEntries(nonEmptyFields) })
+        : body.trim()
+
+      const encrypted = await encryptMessage(payload, readerPubkeys)
 
       const report = await createReport({
         title: title.trim(),
@@ -80,7 +107,7 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
     } finally {
       setSubmitting(false)
     }
-  }, [title, body, category, hasNsec, publicKey, adminDecryptionPubkey, toast, t, resetForm, onOpenChange, onCreated])
+  }, [title, body, category, fieldValues, reportFields, hasNsec, publicKey, isAdmin, adminDecryptionPubkey, toast, t, resetForm, onOpenChange, onCreated])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -140,6 +167,16 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
               className="resize-y"
             />
           </div>
+
+          {/* Custom fields for reports */}
+          <CustomFieldInputs
+            fields={reportFields}
+            values={fieldValues}
+            onChange={setFieldValues}
+            errors={validationErrors}
+            disabled={submitting}
+            idPrefix="report"
+          />
 
           <div className="flex justify-end pt-2">
             <Button onClick={handleSubmit} disabled={submitting || !title.trim() || !body.trim()}>

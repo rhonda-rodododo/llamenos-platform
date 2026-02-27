@@ -5,7 +5,9 @@ import { useNoteSheet } from '@/lib/note-sheet-context'
 import { useDraft } from '@/lib/use-draft'
 import { encryptNote } from '@/lib/platform'
 
-import { createNote, updateNote, getCallHistory, getCustomFields, type CallRecord, type CustomFieldDefinition } from '@/lib/api'
+import { createNote, updateNote, getCallHistory, getCustomFields, type CallRecord } from '@/lib/api'
+import type { CustomFieldDefinition } from '@shared/types'
+import { fieldMatchesContext } from '@shared/types'
 import { useToast } from '@/lib/toast'
 import type { NotePayload } from '@shared/types'
 import {
@@ -20,9 +22,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Lock, Save, Clock } from 'lucide-react'
+import { CustomFieldInputs, validateCustomFields } from '@/components/notes/custom-field-inputs'
 
 export function NoteSheet() {
   const { t } = useTranslation()
@@ -65,45 +67,15 @@ export function NoteSheet() {
     }
   }, [isAdmin, isOpen])
 
-  function validateFields(): boolean {
-    const errors: Record<string, string> = {}
-    for (const field of customFields) {
-      // Volunteers can only see visible fields
-      if (!isAdmin && !field.visibleToVolunteers) continue
-      // Read-only fields for volunteers shouldn't be validated
-      if (!isAdmin && !field.editableByVolunteers) continue
-
-      const value = draft.fields[field.id]
-      if (field.required && (value === undefined || value === '' || value === false)) {
-        errors[field.id] = t('customFields.fieldRequired', { label: field.label })
-      }
-      if (field.type === 'text' || field.type === 'textarea') {
-        const str = (value as string) || ''
-        if (field.validation?.minLength && str.length > 0 && str.length < field.validation.minLength) {
-          errors[field.id] = t('customFields.tooShort', { min: field.validation.minLength })
-        }
-        if (field.validation?.maxLength && str.length > field.validation.maxLength) {
-          errors[field.id] = t('customFields.tooLong', { max: field.validation.maxLength })
-        }
-      }
-      if (field.type === 'number' && value !== undefined && value !== '') {
-        const num = Number(value)
-        if (field.validation?.min !== undefined && num < field.validation.min) {
-          errors[field.id] = t('customFields.tooLow', { min: field.validation.min })
-        }
-        if (field.validation?.max !== undefined && num > field.validation.max) {
-          errors[field.id] = t('customFields.tooHigh', { max: field.validation.max })
-        }
-      }
-    }
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
   async function handleSave() {
     if (!hasNsec || !publicKey || !draft.text.trim()) return
     if (mode === 'new' && !draft.callId.trim()) return
-    if (!validateFields()) return
+
+    // Validate custom fields
+    const errors = validateCustomFields(visibleFields, draft.fields, t, { isAdmin })
+    setValidationErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
     setSaving(true)
     try {
       // Build NotePayload with custom field values
@@ -114,7 +86,7 @@ export function NoteSheet() {
       }
       // V2 per-note ephemeral key encryption (forward secrecy)
       const authorPub = publicKey
-      const adminPub = adminDecryptionPubkey || authorPub // fallback to self if admin decryption pubkey not available
+      const adminPub = adminDecryptionPubkey || authorPub
       const { encryptedContent, authorEnvelope, adminEnvelopes } = await encryptNote(JSON.stringify(payload), authorPub, [adminPub])
 
       if (mode === 'edit' && editNoteId) {
@@ -142,8 +114,10 @@ export function NoteSheet() {
   const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
   const modKey = isMac ? '\u2318' : 'Ctrl'
 
-  // Filter fields based on role visibility
-  const visibleFields = customFields.filter(f => isAdmin || f.visibleToVolunteers)
+  // Filter fields: context match + role visibility
+  const visibleFields = customFields
+    .filter(f => fieldMatchesContext(f, 'call-notes'))
+    .filter(f => isAdmin || f.visibleToVolunteers)
 
   return (
     <Sheet open={isOpen} onOpenChange={open => { if (!open) close() }}>
@@ -199,26 +173,18 @@ export function NoteSheet() {
           </div>
 
           {/* Custom fields */}
-          {visibleFields.length > 0 && (
-            <div className="space-y-3 rounded-lg border border-border p-3">
-              <p className="text-xs font-medium text-muted-foreground">{t('customFields.title')}</p>
-              {visibleFields.map(field => {
-                const disabled = !isAdmin && !field.editableByVolunteers
-                const error = validationErrors[field.id]
-                const value = draft.fields[field.id]
-                return (
-                  <div key={field.id} className="space-y-1.5">
-                    <Label htmlFor={`field-${field.id}`} className="flex items-center gap-1.5 text-sm">
-                      {field.label}
-                      {field.required && <span className="text-destructive">*</span>}
-                    </Label>
-                    {renderFieldInput(field, value, (v) => draft.setFieldValue(field.id, v), disabled, t)}
-                    {error && <p className="text-xs text-destructive">{error}</p>}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <CustomFieldInputs
+            fields={visibleFields}
+            values={draft.fields}
+            onChange={vals => {
+              for (const [k, v] of Object.entries(vals)) {
+                draft.setFieldValue(k, v)
+              }
+            }}
+            errors={validationErrors}
+            disabled={false}
+            idPrefix="sheet"
+          />
 
           {/* Note textarea */}
           <div className="space-y-2">
@@ -260,80 +226,4 @@ export function NoteSheet() {
       </SheetContent>
     </Sheet>
   )
-}
-
-function renderFieldInput(
-  field: CustomFieldDefinition,
-  value: string | number | boolean | undefined,
-  onChange: (v: string | number | boolean) => void,
-  disabled: boolean,
-  t: (key: string) => string,
-) {
-  const id = `field-${field.id}`
-  switch (field.type) {
-    case 'text':
-      return (
-        <Input
-          id={id}
-          value={(value as string) || ''}
-          onChange={e => onChange(e.target.value)}
-          disabled={disabled}
-          maxLength={field.validation?.maxLength}
-        />
-      )
-    case 'number':
-      return (
-        <Input
-          id={id}
-          type="number"
-          value={value !== undefined ? String(value) : ''}
-          onChange={e => onChange(e.target.value ? Number(e.target.value) : '')}
-          disabled={disabled}
-          min={field.validation?.min}
-          max={field.validation?.max}
-        />
-      )
-    case 'textarea':
-      return (
-        <textarea
-          id={id}
-          value={(value as string) || ''}
-          onChange={e => onChange(e.target.value)}
-          disabled={disabled}
-          rows={3}
-          maxLength={field.validation?.maxLength}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
-        />
-      )
-    case 'checkbox':
-      return (
-        <div className="flex items-center gap-2">
-          <Switch
-            id={id}
-            checked={!!value}
-            onCheckedChange={onChange}
-            disabled={disabled}
-          />
-        </div>
-      )
-    case 'select':
-      return (
-        <Select
-          value={(value as string) || undefined}
-          onValueChange={onChange}
-          disabled={disabled}
-        >
-          <SelectTrigger id={id}>
-            <SelectValue placeholder={t('customFields.selectOption')} />
-          </SelectTrigger>
-          <SelectContent>
-            {field.options?.map(opt => (
-              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )
-    default:
-      return null
-  }
 }
