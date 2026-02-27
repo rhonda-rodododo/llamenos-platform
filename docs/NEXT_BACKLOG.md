@@ -230,6 +230,25 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 109: Desktop Polish](epics/epic-109-desktop-polish.md)** — Version sync to 0.18.0, tray menu enhancements
 - [x] **[Epic 110: Documentation](epics/epic-110-documentation.md)** — CONTRIBUTING.md, ARCHITECTURE.md, build guides, HUMAN_INSTRUCTIONS mobile sections
 
+## CI Hardening, Test Vectors, Docs & Quality (Epics 111-118) — IN PROGRESS
+- [ ] **[Epic 111: CI Security Hardening](epics/epic-111-ci-security-hardening.md)** — Pin actions to SHA, standardize Bun 1.3.5, PR triggers, dependabot
+- [ ] **[Epic 112: Comprehensive Crypto Test Vectors](epics/epic-112-crypto-test-vectors.md)** — Expand from 6 to 14 operation categories, full protocol coverage
+- [ ] **[Epic 113: Mobile Crypto Interop](epics/epic-113-mobile-crypto-interop.md)** — Jest unit tests validating mobile crypto against Rust vectors
+- [ ] **[Epic 114: Docs Site — Mobile & Missing Pages](epics/epic-114-docs-mobile-pages.md)** — Mobile guide, architecture, troubleshooting, changelog
+- [ ] **[Epic 115: Docs Site — i18n Completion](epics/epic-115-docs-i18n.md)** — 132 translation files across 11 languages
+- [ ] **[Epic 116: Cross-Repo CI Integration](epics/epic-116-cross-repo-ci.md)** — repository_dispatch from llamenos-core to downstream repos
+- [ ] **[Epic 117: Adversarial Crypto Tests](epics/epic-117-adversarial-crypto.md)** — 17+ negative tests (wrong keys, tampered data, expired tokens)
+- [ ] **[Epic 118: Docs Site — API Reference](epics/epic-118-api-reference.md)** — REST endpoint reference sourced from PROTOCOL.md
+
+## Future: Unified Records Architecture (Epics TBD)
+- [ ] Consolidate notes, reports, and message-channel threads into a single "Record" domain model
+  - Each record type (call note, report, conversation note) is a configurable variant
+  - Unified custom fields system across all record types (text, select, file attachment, etc.)
+  - Multiple report types with per-type field configurations
+  - File attachments as custom field values (not separate entity)
+  - Shared E2EE envelope encryption, shared audit log, shared search/filter UI
+  - Reduces code duplication across Notes, Reports, and Conversations
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
