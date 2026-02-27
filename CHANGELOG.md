@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-02-27
+
+### Bug Fixes
+
+- handle WebSocket upgrades directly for Node.js platform
+- fix presence endpoint — use correct ShiftManagerDO response key
+- promote Nostr relay (strfry) from optional profile to core service
+- add SERVER_NOSTR_SECRET to e2e-docker CI env
+- include .github/ in CI change detection patterns
+- CI change detection + strfry dependency for Docker E2E
+- disable strfry in Docker E2E tests, replace --wait with targeted health check
+
+### CI/CD
+
+- increase e2e-cf timeout to 20 minutes
+
+### Documentation
+
+- comprehensive security audit and zero-knowledge architecture redesign
+- sync protocol spec with code and add domain label table
+- add key revocation runbook with response procedures
+- close threat model gaps (APNs/FCM, CF trust, supply chain)
+- enrich all 9 epic files with execution context appendices
+- update backlogs with Zero-Knowledge Architecture completion status
+- update backlogs — Epic 78 client-side transcription complete
+- update security documentation for ZK architecture
+- update architecture and protocol docs for ZK architecture
+- update deployment guides for relay, Caddy ingress, reproducible builds
+- update project docs (CLAUDE.md, backlogs)
+- update marketing site docs for ZK architecture
+
+### Features
+
+- create authoritative crypto domain separation labels
+- add SAS verification to device provisioning protocol
+- generic backup file format without identifying strings
+- generic ECIES, multi-admin envelopes, admin key separation, hub key manager
+- NostrPublisher interface, server keypair, relay infrastructure
+- migrate real-time events from WebSocket to Nostr relay
+- complete WS removal — clean DO, Nostr-only broadcasts
+- E2EE messaging with envelope encryption pattern
+- metadata encryption — per-record DO storage, encrypted call history, hash-chained audit log
+- reproducible builds — deterministic output, checksums, verification tooling
+- migrate transcription to envelope encryption, remove dead ECIES code
+- client-side transcription with Whisper WASM via transformers.js
+- add DEMO_MODE env flag with CF Cron Trigger for scheduled reset
+
+### Miscellaneous
+
+- v0.19.0 [skip ci]
+
 ## [0.18.0] - 2026-02-25
 
 ### Bug Fixes
