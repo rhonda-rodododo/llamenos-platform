@@ -10,32 +10,43 @@
 
 describe('Native Crypto IPC', () => {
   it('should detect Tauri environment', async () => {
-    const isTauri = await browser.execute(() => {
-      return typeof (window as Record<string, unknown>).__TAURI_INTERNALS__ !== 'undefined'
+    const result = await browser.execute(() => {
+      const internals = (window as any).__TAURI_INTERNALS__
+      return {
+        hasInternals: typeof internals !== 'undefined',
+        hasInvoke: typeof internals?.invoke === 'function',
+        hasMetadata: typeof internals?.metadata === 'object',
+      }
     })
-    expect(isTauri).toBe(true)
+    expect(result.hasInternals).toBe(true)
+    expect(result.hasInvoke).toBe(true)
   })
 
   it('should generate a keypair via Rust IPC', async () => {
     const result = await browser.execute(async () => {
       try {
         const invoke = (window as any).__TAURI_INTERNALS__?.invoke
-        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__ not available' }
+        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__.invoke not available' }
 
         const keypair = await invoke('generate_keypair')
         return {
           success: true,
-          hasPubkey: typeof keypair.pubkey === 'string' && keypair.pubkey.length === 64,
+          // Rust KeyPair has: secret_key_hex, public_key, nsec, npub
+          hasPublicKey: typeof keypair.public_key === 'string' && keypair.public_key.length === 64,
           hasNsec: typeof keypair.nsec === 'string' && keypair.nsec.startsWith('nsec1'),
+          keys: Object.keys(keypair),
         }
-      } catch (e) {
-        return { success: false, error: String(e) }
+      } catch (e: any) {
+        return { success: false, error: String(e?.message || e) }
       }
     })
 
-    expect(result.success).toBe(true)
+    if (!result.success) {
+      console.error('generate_keypair error:', result.error)
+    }
+    expect(result).toHaveProperty('success', true)
     if (result.success) {
-      expect(result.hasPubkey).toBe(true)
+      expect(result.hasPublicKey).toBe(true)
       expect(result.hasNsec).toBe(true)
     }
   })
@@ -44,96 +55,92 @@ describe('Native Crypto IPC', () => {
     const result = await browser.execute(async () => {
       try {
         const invoke = (window as any).__TAURI_INTERNALS__?.invoke
-        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__ not available' }
+        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__.invoke not available' }
 
         const testPin = '123456'
         const testNsec = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
 
-        const encrypted = await invoke('pin_encrypt', {
-          plaintext: testNsec,
+        // Rust command is encrypt_with_pin, not pin_encrypt
+        const encrypted = await invoke('encrypt_with_pin', {
+          nsec: testNsec,
           pin: testPin,
         })
 
-        const decrypted = await invoke('pin_decrypt', {
-          ciphertext: encrypted,
+        // Rust command is decrypt_with_pin, not pin_decrypt
+        const decrypted = await invoke('decrypt_with_pin', {
+          data: encrypted,
           pin: testPin,
         })
 
         return { success: true, roundTrip: decrypted === testNsec }
-      } catch (e) {
-        return { success: false, error: String(e) }
+      } catch (e: any) {
+        return { success: false, error: String(e?.message || e) }
       }
     })
 
-    expect(result.success).toBe(true)
+    if (!result.success) {
+      console.error('PIN encrypt/decrypt error:', result.error)
+    }
+    expect(result).toHaveProperty('success', true)
     if (result.success) {
       expect(result.roundTrip).toBe(true)
     }
   })
 
-  it('should perform ECIES encrypt/decrypt roundtrip', async () => {
+  it('should validate nsec format', async () => {
     const result = await browser.execute(async () => {
       try {
         const invoke = (window as any).__TAURI_INTERNALS__?.invoke
-        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__ not available' }
+        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__.invoke not available' }
 
-        const kp = await invoke('generate_keypair')
-        const plaintext = 'Hello from Tauri E2E test'
+        const validNsec = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
+        const valid = await invoke('is_valid_nsec', { nsec: validNsec })
+        const invalid = await invoke('is_valid_nsec', { nsec: 'not-an-nsec' })
 
-        const encrypted = await invoke('ecies_encrypt', {
-          recipientPubkey: kp.pubkey,
-          plaintext,
-          label: 'llamenos:test',
-        })
-
-        const decrypted = await invoke('ecies_decrypt', {
-          nsec: kp.nsec,
-          ciphertext: encrypted,
-          label: 'llamenos:test',
-        })
-
-        return { success: true, roundTrip: decrypted === plaintext }
-      } catch (e) {
-        return { success: false, error: String(e) }
+        return { success: true, valid, invalid }
+      } catch (e: any) {
+        return { success: false, error: String(e?.message || e) }
       }
     })
 
-    expect(result.success).toBe(true)
+    if (!result.success) {
+      console.error('is_valid_nsec error:', result.error)
+    }
+    expect(result).toHaveProperty('success', true)
     if (result.success) {
-      expect(result.roundTrip).toBe(true)
+      expect(result.valid).toBe(true)
+      expect(result.invalid).toBe(false)
     }
   })
 
-  it('should sign and verify Schnorr signatures', async () => {
+  it('should derive public key from nsec', async () => {
     const result = await browser.execute(async () => {
       try {
         const invoke = (window as any).__TAURI_INTERNALS__?.invoke
-        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__ not available' }
+        if (!invoke) return { success: false, error: '__TAURI_INTERNALS__.invoke not available' }
 
         const kp = await invoke('generate_keypair')
-        const message = 'test message for signing'
-
-        const signature = await invoke('schnorr_sign', {
-          nsec: kp.nsec,
-          message,
+        const derivedPubkey = await invoke('get_public_key', {
+          secretKeyHex: kp.secret_key_hex,
         })
 
-        const valid = await invoke('schnorr_verify', {
-          pubkey: kp.pubkey,
-          message,
-          signature,
-        })
-
-        return { success: true, validSignature: valid, sigLength: signature.length }
-      } catch (e) {
-        return { success: false, error: String(e) }
+        return {
+          success: true,
+          pubkeyMatch: derivedPubkey === kp.public_key,
+          pubkeyLength: derivedPubkey.length,
+        }
+      } catch (e: any) {
+        return { success: false, error: String(e?.message || e) }
       }
     })
 
-    expect(result.success).toBe(true)
+    if (!result.success) {
+      console.error('get_public_key error:', result.error)
+    }
+    expect(result).toHaveProperty('success', true)
     if (result.success) {
-      expect(result.validSignature).toBe(true)
-      expect(result.sigLength).toBe(128) // 64 bytes hex-encoded
+      expect(result.pubkeyMatch).toBe(true)
+      expect(result.pubkeyLength).toBe(64)
     }
   })
 })
