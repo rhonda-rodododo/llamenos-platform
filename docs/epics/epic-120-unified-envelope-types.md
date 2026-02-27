@@ -1,6 +1,6 @@
 # Epic 120: Unified Envelope Types & Encryption Cleanup
 
-## Status: PROPOSED (awaiting review)
+## Status: APPROVED
 
 ## Problem Statement
 
@@ -29,6 +29,8 @@ Additionally:
 - `KeyEnvelope` in `shared/types.ts` has `recipientPubkey` while `MessageKeyEnvelope` uses `pubkey` — two names for the same field
 - Notes use `LABEL_NOTE_KEY`, messages use `LABEL_MESSAGE` — these MUST remain different (domain separation), but the envelope format should be uniform
 - `encryptMessageForStorage` (server-side) and `encryptNote` (client-side) follow different patterns for the same construction
+
+With threaded notes (Epic 123), note replies will use the same envelope pattern as messages. Unifying now prevents even more divergence.
 
 ## Goals
 
@@ -82,23 +84,40 @@ interface EncryptedNote {
 
 The author's envelope now has a `pubkey` field like every other envelope. The distinction between "author" and "admin" envelopes is no longer structural — both are `RecipientEnvelope` entries where the first entry is the author (identified by `pubkey === note.authorPubkey`).
 
-### Phase 3: Update Crypto Functions
+### Phase 3: Migrate Message Types
+
+Update `EncryptedMessage` to use unified envelopes:
+
+```typescript
+// Before
+interface EncryptedMessage {
+  readerEnvelopes: MessageKeyEnvelope[]
+}
+
+// After
+interface EncryptedMessage {
+  envelopes: RecipientEnvelope[]
+}
+```
+
+### Phase 4: Update Crypto Functions
 
 **`src/client/lib/platform.ts`** — `encryptNote` now returns `envelopes: RecipientEnvelope[]`
 **`src-tauri/src/crypto.rs`** — Rust IPC returns unified envelope format
 **`src/worker/lib/crypto.ts`** — `encryptMessageForStorage` and `encryptCallRecordForStorage` use `RecipientEnvelope`
 **`llamenos-core/src/encryption.rs`** — `encrypt_note` returns unified format
 
-### Phase 4: Deprecate Old Envelope Types
+### Phase 5: Deprecate Old Envelope Types
 
 Remove `KeyEnvelope` (with `recipientPubkey`) and `MessageKeyEnvelope` (with `pubkey`) in favor of the single `RecipientEnvelope`. Update all consumers:
 
 - `src/worker/types.ts` — Remove `MessageKeyEnvelope`, use `RecipientEnvelope`
-- `src/shared/types.ts` — Remove `KeyEnvelope`, use `RecipientEnvelope`
-- API handlers — Accept both old and new format during transition (parse `recipientPubkey || pubkey`)
+- `src/shared/types.ts` — Remove `KeyEnvelope`, `RecipientKeyEnvelope`, use `RecipientEnvelope`
 - Frontend components — Use `RecipientEnvelope` everywhere
 
-### Phase 5: Update Test Vectors
+Note: The existing `RecipientEnvelope` in `shared/types.ts` (used for file uploads with `encryptedFileKey` instead of `wrappedKey`) needs to be reconciled — rename the file-specific one to `FileRecipientEnvelope` or unify the field name.
+
+### Phase 6: Update Test Vectors
 
 **`llamenos-core/tests/interop.rs`** — Regenerate test vectors with unified envelope format
 **`tests/crypto-interop.spec.ts`** — Update consumption tests
@@ -107,7 +126,7 @@ Remove `KeyEnvelope` (with `recipientPubkey`) and `MessageKeyEnvelope` (with `pu
 ## Security Considerations
 
 - **Domain separation labels MUST remain distinct**: `LABEL_NOTE_KEY` for notes, `LABEL_MESSAGE` for messages. This prevents cross-protocol attacks where a message envelope is replayed as a note envelope.
-- The unified type is a structural change only — the crypto construction (ECDH → SHA-256(label || sharedX) → XChaCha20-Poly1305) is identical and unchanged.
+- The unified type is a structural change only — the crypto construction (ECDH -> SHA-256(label || sharedX) -> XChaCha20-Poly1305) is identical and unchanged.
 - Adding `pubkey` to author envelopes is a net security improvement — it makes envelope provenance explicit rather than implicit.
 
 ## Files Changed
@@ -134,5 +153,6 @@ Depends on **Epic 119** (Records Domain Consolidation) — the shared components
 1. All crypto interop tests pass with unified envelope format
 2. Notes encrypt/decrypt correctly with new format
 3. Messages encrypt/decrypt correctly (unchanged crypto, new type)
-4. Cross-platform (desktop Rust, browser WASM, mobile UniFFI) all produce compatible envelopes
-5. Domain separation labels remain distinct in all code paths
+4. Note replies (Epic 123) use the same envelope format
+5. Cross-platform (desktop Rust, browser WASM, mobile UniFFI) all produce compatible envelopes
+6. Domain separation labels remain distinct in all code paths

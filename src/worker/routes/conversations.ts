@@ -1,30 +1,16 @@
 import { Hono } from 'hono'
 import type { AppEnv, EncryptedMessage } from '../types'
 import type { MessagingChannelType } from '../../shared/types'
-import { getScopedDOs, getMessagingAdapter, getNostrPublisher, getDOs } from '../lib/do-access'
+import { getScopedDOs, getMessagingAdapter, getDOs } from '../lib/do-access'
 import { checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 import { canClaimChannel, getClaimableChannels } from '../../shared/permissions'
 import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '../../shared/nostr-events'
 import { createPushDispatcher } from '../lib/push-dispatch'
 import type { WakePayload, FullPushPayload } from '../types'
+import { publishNostrEvent } from '../lib/nostr-events'
 
 const conversations = new Hono<AppEnv>()
-
-/** Publish a conversation event to the Nostr relay */
-function publishConversationEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>) {
-  try {
-    const publisher = getNostrPublisher(env)
-    publisher.publish({
-      kind,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [['d', 'global'], ['t', 'llamenos:event']],
-      content: JSON.stringify(content),
-    }).catch(() => {})
-  } catch {
-    // Nostr not configured
-  }
-}
 
 /** Dispatch push notification to a specific volunteer (Epic 86) */
 function dispatchPushToVolunteer(
@@ -279,7 +265,7 @@ conversations.post('/:id/messages', async (c) => {
   }
 
   // Publish new message event to Nostr relay
-  publishConversationEvent(c.env, KIND_MESSAGE_NEW, {
+  publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: id,
     channelType: 'outbound',
@@ -323,7 +309,7 @@ conversations.patch('/:id', async (c) => {
   // Publish status change to Nostr relay
   const updated = await res.json()
   const convEventType = body.status === 'closed' ? 'conversation:closed' : 'conversation:assigned'
-  publishConversationEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+  publishNostrEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
     type: convEventType,
     conversationId: id,
     assignedTo: body.assignedTo,
@@ -391,7 +377,7 @@ conversations.post('/:id/claim', async (c) => {
   }
 
   // Publish assignment to Nostr relay
-  publishConversationEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+  publishNostrEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
     type: 'conversation:assigned',
     conversationId: id,
     assignedTo: pubkey,

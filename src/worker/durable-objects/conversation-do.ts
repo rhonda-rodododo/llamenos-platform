@@ -134,10 +134,25 @@ export class ConversationDO extends DurableObject<Env> {
     const status = url.searchParams.get('status') as ConversationStatus | null
     const assignedTo = url.searchParams.get('assignedTo')
     const channel = url.searchParams.get('channel') as MessagingChannelType | null
+    const type = url.searchParams.get('type')
+    const contactHash = url.searchParams.get('contactHash')
     const page = parseInt(url.searchParams.get('page') || '1')
     const limit = parseInt(url.searchParams.get('limit') || '50')
 
     let conversations = await this.ctx.storage.get<Conversation[]>('conversations') || []
+
+    // Filter by type (report vs conversation)
+    if (type === 'report') {
+      conversations = conversations.filter(c => c.metadata?.type === 'report')
+    } else if (!type) {
+      // Default: exclude reports from conversation listing
+      conversations = conversations.filter(c => c.metadata?.type !== 'report')
+    }
+
+    // Filter by contact hash (for contact-level queries)
+    if (contactHash) {
+      conversations = conversations.filter(c => c.contactIdentifierHash === contactHash)
+    }
 
     // Filter
     if (status) {

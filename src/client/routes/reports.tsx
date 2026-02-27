@@ -12,11 +12,11 @@ import {
   type Report,
   type ConversationMessage,
 } from '@/lib/api'
-import { encryptMessage, decryptMessage } from '@/lib/platform'
-import * as keyManager from '@/lib/key-manager'
+import { encryptMessage } from '@/lib/platform'
+import { formatRelativeTime } from '@/lib/format'
 import { ReportForm } from '@/components/ReportForm'
-import { FilePreview } from '@/components/FilePreview'
 import { FileUpload } from '@/components/FileUpload'
+import { ConversationThread } from '@/components/ConversationThread'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -362,32 +362,6 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
 }) {
   const { t } = useTranslation()
   const { hasNsec, publicKey } = useAuth()
-  const [decryptedContent, setDecryptedContent] = useState<Map<string, string>>(new Map())
-  const scrollRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) node.scrollTop = node.scrollHeight
-  }, [])
-
-  // Decrypt messages using envelope pattern
-  useEffect(() => {
-    if (messages.length === 0 || !publicKey) return
-    if (!hasNsec || !keyManager.isUnlocked()) return
-
-    ;(async () => {
-      const decrypted = new Map<string, string>()
-      for (const msg of messages) {
-        if (msg.encryptedContent && msg.readerEnvelopes?.length) {
-          const plaintext = await decryptMessage(
-            msg.encryptedContent,
-            msg.readerEnvelopes,
-          )
-          if (plaintext !== null) {
-            decrypted.set(msg.id, plaintext)
-          }
-        }
-      }
-      setDecryptedContent(decrypted)
-    })()
-  }, [messages, hasNsec, publicKey])
 
   const isReporter = hasPermission('reports:create') && !hasPermission('calls:answer')
   const canReply = report.status === 'active' || isReporter
@@ -430,57 +404,12 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
         </div>
       </div>
 
-      {/* Messages thread */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {messagesLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            {t('reports.noMessages', { defaultValue: 'No messages yet' })}
-          </div>
-        ) : (
-          messages.map(msg => {
-            const isInbound = msg.direction === 'inbound'
-            const text = decryptedContent.get(msg.id)
-
-            return (
-              <div key={msg.id} className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
-                  isInbound
-                    ? 'bg-muted text-foreground rounded-bl-md'
-                    : 'bg-primary text-primary-foreground rounded-br-md'
-                }`}>
-                  <p className="text-sm whitespace-pre-wrap break-words">
-                    {text === undefined ? (
-                      <span className="italic text-muted-foreground">
-                        {t('reports.encrypted', { defaultValue: '[Encrypted]' })}
-                      </span>
-                    ) : text}
-                  </p>
-
-                  {/* Inline file attachments */}
-                  {msg.hasAttachments && msg.attachmentIds && msg.attachmentIds.length > 0 && (
-                    <div className="mt-2 space-y-2">
-                      {msg.attachmentIds.map(fileId => (
-                        <FilePreview key={fileId} fileId={fileId} />
-                      ))}
-                    </div>
-                  )}
-
-                  <div className={`mt-1 flex items-center gap-1.5 text-xs ${
-                    isInbound ? 'text-muted-foreground' : 'text-primary-foreground/70'
-                  }`}>
-                    <Lock className="h-3 w-3" />
-                    <span>{formatTimestamp(msg.createdAt)}</span>
-                  </div>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
+      {/* Messages thread — uses shared ConversationThread */}
+      <ConversationThread
+        conversationId={report.id}
+        messages={messages}
+        isLoading={messagesLoading}
+      />
 
       {/* File upload area */}
       {showFileUpload && hasNsec && publicKey && (
@@ -558,44 +487,4 @@ function ReportStatusBadge({ status }: { status: string }) {
       {t('reports.statusClosed', { defaultValue: 'Closed' })}
     </Badge>
   )
-}
-
-
-function formatTimestamp(iso: string): string {
-  const date = new Date(iso)
-  const now = new Date()
-  const isToday =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-
-  if (isToday) {
-    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-  }
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function formatRelativeTime(iso: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  const now = Date.now()
-  const then = new Date(iso).getTime()
-  const diffMs = now - then
-
-  if (diffMs < 0) return t('conversations.justNow', { defaultValue: 'just now' })
-
-  const seconds = Math.floor(diffMs / 1000)
-  if (seconds < 60) return t('conversations.justNow', { defaultValue: 'just now' })
-
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return t('conversations.minutesAgo', { count: minutes, defaultValue: '{{count}}m ago' })
-
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return t('conversations.hoursAgo', { count: hours, defaultValue: '{{count}}h ago' })
-
-  const days = Math.floor(hours / 24)
-  return t('conversations.daysAgo', { count: days, defaultValue: '{{count}}d ago' })
 }

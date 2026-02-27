@@ -1,24 +1,11 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getScopedDOs, getNostrPublisher } from '../lib/do-access'
+import { getScopedDOs } from '../lib/do-access'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '../../shared/nostr-events'
-
-/** Publish a report/conversation event to the Nostr relay */
-function publishReportEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>) {
-  try {
-    const publisher = getNostrPublisher(env)
-    publisher.publish({
-      kind,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [['d', 'global'], ['t', 'llamenos:event']],
-      content: JSON.stringify(content),
-    }).catch(() => {})
-  } catch {
-    // Nostr not configured
-  }
-}
+import { publishNostrEvent } from '../lib/nostr-events'
+import { verifyReportAccess, isReport } from '../lib/report-access'
 
 const reports = new Hono<AppEnv>()
 
@@ -114,7 +101,7 @@ reports.post('/', requirePermission('reports:create'), async (c) => {
   }
 
   // Publish report event to Nostr relay
-  publishReportEvent(c.env, KIND_MESSAGE_NEW, {
+  publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'report:new',
     conversationId: conversation.id,
     category: body.category,
@@ -142,24 +129,12 @@ reports.get('/:id', async (c) => {
 
   const report = await res.json() as { contactIdentifierHash: string; assignedTo?: string; metadata?: { type?: string } }
 
-  // Verify it's actually a report
-  if (report.metadata?.type !== 'report') {
+  if (!isReport(report)) {
     return c.json({ error: 'Not a report' }, 404)
   }
 
-  const canReadAll = checkPermission(permissions, 'reports:read-all')
-  const canReadAssigned = checkPermission(permissions, 'reports:read-assigned')
-
-  // Users with read-all can see everything
-  if (!canReadAll) {
-    // Users with read-assigned can see assigned reports
-    if (canReadAssigned && report.assignedTo === pubkey) {
-      // OK
-    } else if (report.contactIdentifierHash === pubkey) {
-      // Own report
-    } else {
-      return c.json({ error: 'Forbidden' }, 403)
-    }
+  if (!verifyReportAccess(report, pubkey, permissions)) {
+    return c.json({ error: 'Forbidden' }, 403)
   }
 
   return c.json(report)
@@ -180,21 +155,12 @@ reports.get('/:id/messages', async (c) => {
 
   const report = await convRes.json() as { contactIdentifierHash: string; assignedTo?: string; metadata?: { type?: string } }
 
-  if (report.metadata?.type !== 'report') {
+  if (!isReport(report)) {
     return c.json({ error: 'Not a report' }, 404)
   }
 
-  const canReadAll = checkPermission(permissions, 'reports:read-all')
-  const canReadAssigned = checkPermission(permissions, 'reports:read-assigned')
-
-  if (!canReadAll) {
-    if (canReadAssigned && report.assignedTo === pubkey) {
-      // OK
-    } else if (report.contactIdentifierHash === pubkey) {
-      // Own report
-    } else {
-      return c.json({ error: 'Forbidden' }, 403)
-    }
+  if (!verifyReportAccess(report, pubkey, permissions)) {
+    return c.json({ error: 'Forbidden' }, 403)
   }
 
   const limit = Math.min(parseInt(c.req.query('limit') || '100', 10), 200)
@@ -219,7 +185,7 @@ reports.post('/:id/messages', async (c) => {
 
   const report = await convRes.json() as { contactIdentifierHash: string; assignedTo?: string; metadata?: { type?: string } }
 
-  if (report.metadata?.type !== 'report') {
+  if (!isReport(report)) {
     return c.json({ error: 'Not a report' }, 404)
   }
 
@@ -265,7 +231,7 @@ reports.post('/:id/messages', async (c) => {
   const msg = await msgRes.json()
 
   // Publish message event to Nostr relay
-  publishReportEvent(c.env, KIND_MESSAGE_NEW, {
+  publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: id,
   })
@@ -293,7 +259,7 @@ reports.post('/:id/assign', requirePermission('reports:assign'), async (c) => {
   await audit(dos.records, 'reportAssigned', pubkey, { reportId: id, assignedTo: body.assignedTo })
 
   // Publish assignment event to Nostr relay
-  publishReportEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+  publishNostrEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
     type: 'conversation:assigned',
     conversationId: id,
     assignedTo: body.assignedTo,
@@ -348,21 +314,12 @@ reports.get('/:id/files', async (c) => {
 
   const report = await convRes.json() as { contactIdentifierHash: string; assignedTo?: string; metadata?: { type?: string } }
 
-  if (report.metadata?.type !== 'report') {
+  if (!isReport(report)) {
     return c.json({ error: 'Not a report' }, 404)
   }
 
-  const canReadAll = checkPermission(permissions, 'reports:read-all')
-  const canReadAssigned = checkPermission(permissions, 'reports:read-assigned')
-
-  if (!canReadAll) {
-    if (canReadAssigned && report.assignedTo === pubkey) {
-      // OK
-    } else if (report.contactIdentifierHash === pubkey) {
-      // Own
-    } else {
-      return c.json({ error: 'Forbidden' }, 403)
-    }
+  if (!verifyReportAccess(report, pubkey, permissions)) {
+    return c.json({ error: 'Forbidden' }, 403)
   }
 
   const filesRes = await dos.conversations.fetch(new Request(`http://do/files?conversationId=${id}`))

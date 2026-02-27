@@ -1,12 +1,12 @@
 # Epic 119: Records Domain Consolidation — Unified Data Model
 
-## Status: PROPOSED (awaiting review)
+## Status: APPROVED
 
 ## Problem Statement
 
 The codebase has three overlapping domain models for content records:
 
-1. **Notes** (`RecordsDO`) — Per-call encrypted notes with custom fields, authored by volunteers
+1. **Call Notes** (`RecordsDO`) — Per-call encrypted notes with custom fields, authored by volunteers
 2. **Reports** (`ConversationDO`) — Two-way threads between reporters and volunteers/admins, web-only
 3. **Conversations** (`ConversationDO`) — Two-way threads from external channels (SMS, WhatsApp, Signal, RCS)
 
@@ -18,19 +18,30 @@ These share significant code but diverge unnecessarily. Key problems:
 - **Custom fields declared for reports but never implemented** — `CustomFieldDefinition.context = 'reports'` exists but ReportForm doesn't render custom fields
 - **Different envelope types for the same ECIES construction** — Notes use `authorEnvelope` + `adminEnvelopes[]`, messages use `readerEnvelopes[]` — the underlying crypto is identical but the type shapes diverge
 - **Conversation storage won't scale** — Single `conversations` array will hit CF DO's 128KB per-key limit
+- **Notes are single-author documents** — no way for admin/volunteer to discuss outcomes. Notes should be threaded like reports.
+
+## Design Decisions (from review)
+
+1. **Relabel "notes" as "call notes"** — all references to "notes" in UI, routes, and types become "call notes" to distinguish from the broader concept
+2. **Threaded notes** — Call notes and conversation notes become threaded discussions (like reports). Initial entry has custom fields + text; admin/volunteer can reply with comments. Same E2EE envelope pattern.
+3. **Custom fields per record type** — Each record type (call notes, conversation notes, reports) has its own configurable set of custom fields. Context enum expands: `'call-notes' | 'conversation-notes' | 'reports' | 'all'`
+4. **Contact-level unified view** — All incoming communications (calls, SMS, WhatsApp, Signal, reports) for a specific contact (phone number) visible in one aggregated timeline
+5. **Conversation notes reuse envelope shape from call notes** — same `RecipientEnvelope` pattern, same E2EE, different domain separation label context
 
 ## Goals
 
 1. Fix the report-type filtering bug
 2. Extract `ReportDetail` inline thread into reusable `ConversationThread` component
 3. DRY shared utilities (formatTimestamp, formatRelativeTime, message decryption, publish event)
-4. Implement custom fields for reports (already declared in types)
-5. Split ConversationDO into focused DOs to prevent scaling issues
+4. Split ConversationDO to extract blast/subscriber concerns into BlastDO
+5. Migrate conversation storage to per-record keys
+6. Prepare the foundation for threaded notes, expanded custom fields, and contact view (Epics 121-123)
 
 ## Non-Goals (This Epic)
 
-- Merging Notes and Conversations into a single data model — they are fundamentally different (single-author call docs vs. multi-party threads)
-- Changing the wire format or encryption labels
+- Changing the wire format or encryption labels (that's Epic 120)
+- Implementing threaded notes (that's Epic 123)
+- Adding new custom field contexts (that's Epic 121)
 - Data migration (pre-production, so clean rewrite is fine)
 
 ## Implementation
@@ -128,27 +139,14 @@ export function verifyReportAccess(
 ): { allowed: boolean; reason?: string } { ... }
 ```
 
-### Phase 3: Implement Report Custom Fields
-
-The type system already supports `CustomFieldDefinition.context = 'reports'` and `Conversation.metadata.customFieldValues`, but the UI never renders them.
-
-**Files to modify:**
-- `src/client/routes/reports.tsx` — Add custom field rendering in `ReportForm` and `ReportDetail`
-- `src/worker/routes/reports.ts` — Accept `customFieldValues` in `POST /reports` and `POST /:id/messages`
-- Settings UI already allows creating fields with `context: 'reports'` — verify this works
-
-Custom field values for reports should be encrypted within the message content (same pattern as notes), not stored as cleartext metadata.
-
-### Phase 4: Split ConversationDO
+### Phase 3: Split ConversationDO → BlastDO
 
 ConversationDO currently holds 6 concerns. Split into:
 
 | New DO | Responsibility | Storage Keys |
 |--------|---------------|--------------|
-| **ConversationDO** (slimmed) | Conversations, reports, messages, files | `conversations`, `messages:*`, `contact:*`, `external-id:*`, `fileRecords` |
+| **ConversationDO** (slimmed) | Conversations, reports, messages, files, load counters | `conv:*`, `messages:*`, `contact:*`, `external-id:*`, `file:*`, `load:*`, `volunteer-*` |
 | **BlastDO** (new) | Subscribers, blasts, blast settings | `subscribers:*`, `subscriber-index:*`, `blasts:*`, `blast-active:*`, `blast-queue:*`, `blast-settings` |
-
-This keeps the conversation/report/message domain together (they're tightly coupled) but extracts the blast/subscriber concern which is independently accessed.
 
 **Files to create:**
 - `src/worker/durable-objects/blast-do.ts`
@@ -159,18 +157,30 @@ This keeps the conversation/report/message domain together (they're tightly coup
 - `wrangler.jsonc` — Add `BLAST_DO` binding
 - `src/worker/index.ts` — Register new DO class
 
-**Migration strategy:** Since we're pre-production, no migration needed. Just move the code.
-
-### Phase 5: Per-Record Storage for Conversations
+### Phase 4: Per-Record Storage for Conversations
 
 The `conversations` single-array pattern won't scale. Migrate to per-record keys:
 
 ```
-conversation:${id}  → Conversation
-conversations:index → string[]  (list of IDs for listing/pagination)
+conv:${id}        → Conversation
+conv:_index       → string[]  (ordered list of IDs)
+conv:_counts      → { total, active, waiting, closed }
 ```
 
-This matches the `note:${id}` pattern already used by RecordsDO. Server-side filtering and pagination can be done over the index.
+Also migrate file records:
+```
+file:${id}        → FileRecord
+file:_index       → string[]
+```
+
+This matches the `note:${id}` pattern already used by RecordsDO.
+
+### Phase 5: Relabel "Notes" → "Call Notes"
+
+Update all user-facing strings, i18n keys, route labels, and component names:
+- UI: "Notes" → "Call Notes" in navigation, headings, buttons
+- i18n: Update all 13 locale files
+- Component names: Where clarity is needed (e.g., `NewNoteForm` stays as-is internally since it will handle both call and conversation notes after Epic 123)
 
 ## Files Changed (Summary)
 
@@ -190,6 +200,7 @@ This matches the `note:${id}` pattern already used by RecordsDO. Server-side fil
 | `src/client/lib/message-crypto.ts` | **NEW** — shared message decryption |
 | `wrangler.jsonc` | Add BLAST_DO binding |
 | `src/worker/index.ts` | Register BlastDO |
+| `src/client/locales/*.json` | Relabel "notes" → "call notes" |
 
 ## Verification
 
@@ -198,9 +209,9 @@ This matches the `note:${id}` pattern already used by RecordsDO. Server-side fil
 3. All existing E2E tests pass (notes, reports, conversations)
 4. Reports list only returns reports (not conversations) — verified via test
 5. Conversations list excludes reports — verified via test
-6. Report custom fields work in UI
-7. Blast routes work against new BlastDO
-8. No duplicate utility functions remain
+6. Blast routes work against new BlastDO
+7. No duplicate utility functions remain
+8. UI shows "Call Notes" instead of "Notes"
 
 ## Risks
 

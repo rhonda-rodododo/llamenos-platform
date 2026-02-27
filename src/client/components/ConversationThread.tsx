@@ -4,6 +4,8 @@ import { useAuth } from '@/lib/auth'
 import { decryptMessage } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
 import type { ConversationMessage } from '@/lib/api'
+import { formatTimestamp } from '@/lib/format'
+import { FilePreview } from '@/components/FilePreview'
 import { Lock, ArrowDown, ArrowUp, Loader2, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react'
 import type { MessageDeliveryStatus } from '@/lib/api'
 
@@ -11,9 +13,11 @@ interface ConversationThreadProps {
   conversationId: string
   messages: ConversationMessage[]
   isLoading: boolean
+  /** Compact mode for note reply threads — smaller bubbles */
+  compact?: boolean
 }
 
-export function ConversationThread({ conversationId, messages, isLoading }: ConversationThreadProps) {
+export function ConversationThread({ conversationId, messages, isLoading, compact }: ConversationThreadProps) {
   const { t } = useTranslation()
   const { hasNsec, publicKey } = useAuth()
   const [decryptedContent, setDecryptedContent] = useState<Map<string, string>>(new Map())
@@ -62,25 +66,6 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
     }
   }
 
-  function formatTimestamp(iso: string): string {
-    const date = new Date(iso)
-    const now = new Date()
-    const isToday =
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth() &&
-      date.getDate() === now.getDate()
-
-    if (isToday) {
-      return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-    }
-    return date.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-
   function StatusIcon({ status }: { status?: MessageDeliveryStatus }) {
     switch (status) {
       case 'pending':
@@ -114,6 +99,8 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
     )
   }
 
+  const bubblePadding = compact ? 'px-3 py-2' : 'px-4 py-2.5'
+
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden">
       <div
@@ -132,7 +119,7 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
               className={`flex ${isInbound ? 'justify-start' : 'justify-end'}`}
             >
               <div
-                className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+                className={`max-w-[75%] rounded-2xl ${bubblePadding} ${
                   isInbound
                     ? 'bg-muted text-foreground rounded-bl-md'
                     : 'bg-primary text-primary-foreground rounded-br-md'
@@ -145,6 +132,16 @@ export function ConversationThread({ conversationId, messages, isLoading }: Conv
                     text
                   )}
                 </p>
+
+                {/* File attachments */}
+                {msg.hasAttachments && msg.attachmentIds && msg.attachmentIds.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {msg.attachmentIds.map(fileId => (
+                      <FilePreview key={fileId} fileId={fileId} />
+                    ))}
+                  </div>
+                )}
+
                 <div
                   className={`mt-1 flex items-center gap-1.5 text-xs ${
                     isInbound ? 'text-muted-foreground' : 'text-primary-foreground/70'
