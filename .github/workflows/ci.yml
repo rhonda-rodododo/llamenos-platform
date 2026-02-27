@@ -292,6 +292,7 @@ jobs:
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
             > deploy/docker/.env
 
       - name: Build and start Docker Compose
