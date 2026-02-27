@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.18.0] - 2026-02-25
+## [Unreleased]
+
+### Added
+- API reference documentation page on docs site
+- CHANGELOG.md milestone summary
+
+## [0.18.0] - 2026-02-27
+
+### Highlights
+- Multi-platform completion and release readiness (Epics 100-110)
+- Cross-platform crypto interop test suite with deterministic test vectors
+- llamenos-core native builds for iOS (XCFramework) and Android (cargo-ndk)
+- Mobile native module integration via CocoaPods and React Native
+- Tauri v2 desktop app with native Rust crypto backend
+- Desktop security: isolation pattern, CSP, single-instance, Stronghold vault
+- Desktop release pipeline with Flatpak packaging
+- Download page with OS auto-detection
+- Developer tooling: version sync, dev-setup script
+- CONTRIBUTING.md, ARCHITECTURE.md, build guides
 
 ### Bug Fixes
 

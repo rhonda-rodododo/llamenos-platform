@@ -106,8 +106,8 @@ const LATEST_JSON = `${RELEASES_URL}/download/latest.json`;
           </a>
         </div>
 
-        <!-- Mobile (coming soon) -->
-        <div class="rounded-xl border border-border/50 bg-bg-card/50 p-5 flex flex-col opacity-60">
+        <!-- Mobile (early access) -->
+        <div class="rounded-xl border border-border bg-bg-card p-5 flex flex-col" data-platform="mobile">
           <div class="flex items-center gap-3 mb-3">
             <svg class="h-8 w-8 text-fg-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
             <div>
@@ -115,9 +115,9 @@ const LATEST_JSON = `${RELEASES_URL}/download/latest.json`;
               <p class="text-xs text-fg-muted">{t.platforms.mobile.description}</p>
             </div>
           </div>
-          <span class="mt-auto inline-flex items-center justify-center rounded-lg border border-border/50 bg-bg-soft/50 px-4 py-2 text-sm font-medium text-fg-muted cursor-default">
-            Coming soon
-          </span>
+          <a href="/docs/mobile-guide" class="mt-auto inline-flex items-center justify-center rounded-lg border border-border bg-bg-soft px-4 py-2 text-sm font-medium text-fg transition-colors hover:bg-bg-card">
+            Mobile Guide
+          </a>
         </div>
       </div>
 

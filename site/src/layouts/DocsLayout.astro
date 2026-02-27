@@ -26,6 +26,7 @@ const sections = [
     items: [
       { href: lp('/docs'), label: t.docs.overview },
       { href: lp('/docs/getting-started'), label: t.docs.gettingStarted },
+      { href: lp('/docs/architecture'), label: t.docs.architecture },
       { href: lp('/docs/self-hosting'), label: t.docs.selfHosting },
       { href: lp('/docs/deploy-docker'), label: t.docs.deployDocker },
       { href: lp('/docs/deploy-kubernetes'), label: t.docs.deployKubernetes },
@@ -37,6 +38,7 @@ const sections = [
       { href: lp('/docs/admin-guide'), label: t.docs.adminGuide },
       { href: lp('/docs/volunteer-guide'), label: t.docs.volunteerGuide },
       { href: lp('/docs/reporter-guide'), label: t.docs.reporterGuide },
+      { href: lp('/docs/mobile-guide'), label: t.docs.mobileGuide },
     ],
   },
   {
@@ -57,6 +59,18 @@ const sections = [
       { href: lp('/docs/setup-sms'), label: t.docs.setupSms },
       { href: lp('/docs/setup-whatsapp'), label: t.docs.setupWhatsapp },
       { href: lp('/docs/setup-signal'), label: t.docs.setupSignal },
+    ],
+  },
+  {
+    heading: t.docs.reference,
+    items: [
+      { href: lp('/docs/api-reference'), label: t.docs.apiReference },
+    ],
+  },
+  {
+    heading: t.docs.helpSection,
+    items: [
+      { href: lp('/docs/troubleshooting'), label: t.docs.troubleshooting },
     ],
   },
 ];
