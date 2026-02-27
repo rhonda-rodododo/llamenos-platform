@@ -235,7 +235,7 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 112: Comprehensive Crypto Test Vectors](epics/epic-112-crypto-test-vectors.md)** — Expanded to 14 operation categories + adversarial vectors, 24 JS interop tests, critical Schnorr prehash bug fixed
 - [x] **[Epic 113: Mobile Crypto Interop](epics/epic-113-mobile-crypto-interop.md)** — 23 Jest unit tests validating mobile JS crypto against Rust vectors
 - [x] **[Epic 114: Docs Site — Mobile & Missing Pages](epics/epic-114-docs-mobile-pages.md)** — Mobile guide, architecture overview, troubleshooting (3 new docs + route pages)
-- [~] **[Epic 115: Docs Site — i18n Completion](epics/epic-115-docs-i18n.md)** — Translation of missing docs to 11 languages (in progress)
+- [x] **[Epic 115: Docs Site — i18n Completion](epics/epic-115-docs-i18n.md)** — 132 translation files: 21 docs + 2 pages × 12 languages
 - [x] **[Epic 116: Cross-Repo CI Integration](epics/epic-116-cross-repo-ci.md)** — repository_dispatch from llamenos-core to downstream repos on main push
 - [x] **[Epic 117: Adversarial Crypto Tests](epics/epic-117-adversarial-crypto.md)** — 10 new Rust adversarial tests + 7 JS adversarial interop tests
 - [x] **[Epic 118: Docs Site — API Reference](epics/epic-118-api-reference.md)** — Complete 1680-line REST API reference + CHANGELOG.md

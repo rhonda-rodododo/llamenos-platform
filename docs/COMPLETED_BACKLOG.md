@@ -27,7 +27,10 @@
 - Updated sidebar with new sections, download page mobile card links to guide
 
 ### Epic 115: Docs Site — i18n Completion
-- Translation of missing docs (10 per language) + pages (features, security) to 11 languages
+- 132 new translation files: 21 docs + 2 pages × 12 languages (zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de, es)
+- Docs: deploy-docker, deploy-kubernetes, self-hosting, reporter-guide, setup-signal, setup-sms, setup-whatsapp, architecture, mobile-guide, troubleshooting + 11 pre-existing docs
+- Pages: features, security (marketing site pages with full content)
+- Site builds cleanly: 338 pages rendered across all languages
 - API reference kept English-only (technical reference for developers)
 
 ### Epic 116: Cross-Repo CI Integration
