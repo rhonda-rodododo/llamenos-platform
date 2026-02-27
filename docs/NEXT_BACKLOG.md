@@ -248,6 +248,12 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 123: Conversation Notes](epics/epic-123-conversation-notes.md)** — Attach E2EE notes to conversations/reports, NoteEditor/NoteCard shared components
 - [x] **[Epic 124: Records E2E Tests](epics/epic-124-records-e2e-tests.md)** — 13+ new E2E tests: report isolation, shared thread, custom fields, conversation notes, blast DO, pagination
 
+## Mobile Records Architecture (Epics 125-128) — PROPOSED
+- [ ] **[Epic 125: Mobile Note Threading](epics/epic-125-mobile-note-threading.md)** — Update types/API to match desktop, add reply button + thread expansion + encrypted reply sending
+- [ ] **[Epic 126: Mobile Contacts Page](epics/epic-126-mobile-contacts-page.md)** — Admin-only contacts list + unified timeline detail in admin stack
+- [ ] **[Epic 127: Mobile Conversation Notes](epics/epic-127-mobile-conversation-notes.md)** — Note form modal from conversation thread, custom field context filtering
+- [ ] **[Epic 128: Mobile Records i18n & Detox Tests](epics/epic-128-mobile-records-tests.md)** — Translation keys for 13 locales, Detox E2E tests for all new features
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
