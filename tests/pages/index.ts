@@ -99,6 +99,11 @@ export const Navigation = {
     await page.getByRole('link', { name: 'Blasts' }).click()
     await expect(page.getByRole('heading', { name: /blasts/i })).toBeVisible()
   },
+
+  async goToContacts(page: Page): Promise<void> {
+    await page.getByRole('link', { name: 'Contacts' }).click()
+    await expect(page.getByRole('heading', { name: /contacts/i })).toBeVisible()
+  },
 }
 
 // ============ Volunteer Page ============

@@ -128,7 +128,7 @@ export function NoteSheet() {
 
   return (
     <Sheet open={isOpen} onOpenChange={open => { if (!open) close() }}>
-      <SheetContent side="right" className="sm:max-w-[480px] flex flex-col" onKeyDown={handleKeyDown}>
+      <SheetContent side="right" className="sm:max-w-[480px] flex flex-col" onKeyDown={handleKeyDown} data-testid="note-sheet">
         <SheetHeader>
           <SheetTitle>
             {mode === 'edit'
@@ -213,6 +213,7 @@ export function NoteSheet() {
             <Label htmlFor="sheet-note-text">{mode === 'edit' ? t('notes.editNote') : t('notes.newNote')}</Label>
             <textarea
               id="sheet-note-text"
+              data-testid="sheet-note-text"
               value={draft.text}
               onChange={e => draft.setText(e.target.value)}
               placeholder={t('notes.notePlaceholder')}
@@ -233,7 +234,7 @@ export function NoteSheet() {
 
         <SheetFooter className="border-t border-border">
           <div className="flex items-center gap-2 w-full">
-            <Button onClick={handleSave} disabled={canSave}>
+            <Button data-testid="sheet-save-btn" onClick={handleSave} disabled={canSave}>
               <Save className="h-4 w-4" />
               {saving ? t('common.loading') : t('common.save')}
             </Button>

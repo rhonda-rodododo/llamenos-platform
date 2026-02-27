@@ -60,6 +60,13 @@ export const TestIds = {
   NOTE_FORM: 'note-form',
   NOTE_CALL_ID: 'note-call-id',
   NOTE_CONTENT: 'note-content',
+  NOTE_REPLY_BTN: 'note-reply-btn',
+  NOTE_THREAD: 'note-thread',
+  NOTE_REPLY_TEXT: 'note-reply-text',
+  NOTE_REPLY_SEND: 'note-reply-send',
+  NOTE_SHEET: 'note-sheet',
+  SHEET_NOTE_TEXT: 'sheet-note-text',
+  SHEET_SAVE_BTN: 'sheet-save-btn',
 
   // ============ Calls ============
   CALL_LIST: 'call-list',
@@ -83,6 +90,10 @@ export const TestIds = {
   CONVERSATION_ITEM: 'conversation-item',
   CONVERSATION_THREAD: 'conversation-thread',
   MESSAGE_COMPOSER: 'message-composer',
+  CONV_ADD_NOTE_BTN: 'conv-add-note-btn',
+
+  // ============ Contacts ============
+  CONTACT_ROW: 'contact-row',
 
   // ============ Blasts ============
   BLAST_LIST: 'blast-list',

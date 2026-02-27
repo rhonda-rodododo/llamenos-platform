@@ -194,7 +194,7 @@ function ConversationsPage() {
                     {t('conversations.reassign', { defaultValue: 'Reassign' })}
                   </Button>
                 )}
-                <Button size="sm" variant="outline" onClick={() => openNewConversationNote(selectedConv.id)}>
+                <Button size="sm" variant="outline" data-testid="conv-add-note-btn" onClick={() => openNewConversationNote(selectedConv.id)}>
                   <StickyNote className="h-3.5 w-3.5 mr-1" />
                   {t('notes.addNote', { defaultValue: 'Add Note' })}
                 </Button>

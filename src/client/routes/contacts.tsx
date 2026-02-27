@@ -241,6 +241,7 @@ function ContactsPage() {
             {contacts.map(contact => (
               <button
                 key={contact.contactHash}
+                data-testid="contact-row"
                 onClick={() => handleSelectContact(contact.contactHash)}
                 className="flex w-full items-center gap-4 px-6 py-4 text-left hover:bg-muted/50 transition-colors"
               >

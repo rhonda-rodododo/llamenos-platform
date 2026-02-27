@@ -476,6 +476,7 @@ function NotesPage() {
                       <Button
                         variant="ghost" size="sm"
                         className="text-xs text-muted-foreground"
+                        data-testid="note-reply-btn"
                         onClick={() => handleExpandThread(note.id)}
                       >
                         <MessageCircle className="h-3 w-3" />
@@ -487,7 +488,7 @@ function NotesPage() {
 
                     {/* Expanded thread */}
                     {expandedThreadId === note.id && (
-                      <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3" data-testid="note-thread">
                         <ConversationThread
                           conversationId={note.id}
                           messages={threadReplies}
@@ -497,6 +498,7 @@ function NotesPage() {
                         {/* Reply composer */}
                         <div className="mt-3 flex gap-2">
                           <Textarea
+                            data-testid="note-reply-text"
                             value={replyText}
                             onChange={e => setReplyText(e.target.value)}
                             placeholder={t('notes.replyPlaceholder', { defaultValue: 'Write a reply...' })}
@@ -511,6 +513,7 @@ function NotesPage() {
                           />
                           <Button
                             size="sm"
+                            data-testid="note-reply-send"
                             disabled={sendingReply || !replyText.trim()}
                             onClick={() => handleSendReply(note.id)}
                           >
