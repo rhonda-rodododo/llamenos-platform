@@ -23,7 +23,7 @@ import {
   unwrapHubKey as platformUnwrapHubKey,
   eciesWrapKey,
 } from './platform'
-import type { KeyEnvelope, RecipientKeyEnvelope } from './platform'
+import type { KeyEnvelope, RecipientEnvelope } from './platform'
 import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
@@ -48,7 +48,7 @@ export function generateHubKey(): Uint8Array {
 export async function wrapHubKeyForMember(
   hubKey: Uint8Array,
   memberPubkeyHex: string,
-): Promise<RecipientKeyEnvelope> {
+): Promise<RecipientEnvelope> {
   const hubKeyHex = bytesToHex(hubKey)
   const envelope = await eciesWrapKey(hubKeyHex, memberPubkeyHex, LABEL_HUB_KEY_WRAP)
   return {
@@ -59,12 +59,12 @@ export async function wrapHubKeyForMember(
 
 /**
  * Wrap a hub key for multiple members at once.
- * Returns an array of RecipientKeyEnvelopes.
+ * Returns an array of RecipientEnvelopes.
  */
 export async function wrapHubKeyForMembers(
   hubKey: Uint8Array,
   memberPubkeys: string[],
-): Promise<RecipientKeyEnvelope[]> {
+): Promise<RecipientEnvelope[]> {
   return Promise.all(memberPubkeys.map(pk => wrapHubKeyForMember(hubKey, pk)))
 }
 
@@ -130,7 +130,7 @@ export function decryptFromHub(
  */
 export async function rotateHubKey(
   memberPubkeys: string[],
-): Promise<{ hubKey: Uint8Array; envelopes: RecipientKeyEnvelope[] }> {
+): Promise<{ hubKey: Uint8Array; envelopes: RecipientEnvelope[] }> {
   const hubKey = generateHubKey()
   const envelopes = await wrapHubKeyForMembers(hubKey, memberPubkeys)
   return { hubKey, envelopes }

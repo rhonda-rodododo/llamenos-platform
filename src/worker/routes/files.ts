@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import type { FileRecord, RecipientEnvelope } from '../../shared/types'
+import type { FileRecord, FileKeyEnvelope } from '../../shared/types'
 import { getDOs } from '../lib/do-access'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
@@ -116,7 +116,7 @@ files.post('/:id/share', requirePermission('files:share'), async (c) => {
   const pubkey = c.get('pubkey')
 
   const body = await c.req.json() as {
-    envelope: RecipientEnvelope
+    envelope: FileKeyEnvelope
     encryptedMetadata: { pubkey: string; encryptedContent: string; ephemeralPubkey: string }
   }
 

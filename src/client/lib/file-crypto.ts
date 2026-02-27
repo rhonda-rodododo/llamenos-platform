@@ -11,7 +11,7 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import type { EncryptedFileMetadata, RecipientEnvelope } from '@shared/types'
+import type { EncryptedFileMetadata, FileKeyEnvelope } from '@shared/types'
 import { LABEL_FILE_KEY, LABEL_FILE_METADATA } from '@shared/crypto-labels'
 import {
   unwrapFileKey as platformUnwrapFileKey,
@@ -94,7 +94,7 @@ export async function decryptFileMetadata(
 
 export interface EncryptedFileUpload {
   encryptedContent: Uint8Array
-  recipientEnvelopes: RecipientEnvelope[]
+  recipientEnvelopes: FileKeyEnvelope[]
   encryptedMetadata: Array<{
     pubkey: string
     encryptedContent: string
@@ -138,7 +138,7 @@ export async function encryptFile(
 
   // Wrap the file key for each recipient using ECIES via Rust (stateless — ephemeral key)
   const fileKeyHex = bytesToHex(fileKey)
-  const recipientEnvelopes: RecipientEnvelope[] = await Promise.all(
+  const recipientEnvelopes: FileKeyEnvelope[] = await Promise.all(
     recipientPubkeys.map(async (pubkey) => {
       const { wrappedKey, ephemeralPubkey } = await eciesWrapKey(fileKeyHex, pubkey, LABEL_FILE_KEY)
       return { pubkey, encryptedFileKey: wrappedKey, ephemeralPubkey }
@@ -163,7 +163,7 @@ export async function encryptFile(
  */
 export async function decryptFile(
   encryptedContent: ArrayBuffer,
-  envelope: RecipientEnvelope,
+  envelope: FileKeyEnvelope,
 ): Promise<{ blob: Blob; checksum: string }> {
   // Unwrap the file key via Rust CryptoState (returns hex)
   const fileKeyHex = await unwrapFileKey(envelope.encryptedFileKey, envelope.ephemeralPubkey)
@@ -194,7 +194,7 @@ export async function rewrapFileKey(
   encryptedFileKeyHex: string,
   ephemeralPubkeyHex: string,
   newRecipientPubkeyHex: string,
-): Promise<RecipientEnvelope> {
+): Promise<FileKeyEnvelope> {
   const envelope = await platformRewrapFileKey(
     encryptedFileKeyHex,
     ephemeralPubkeyHex,

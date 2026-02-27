@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, Conversation, EncryptedMessage, ConversationStatus } from '../types'
 import type { IncomingMessage, MessageStatusUpdate } from '../messaging/adapter'
-import type { MessagingChannelType, FileRecord, RecipientEnvelope } from '../../shared/types'
+import type { MessagingChannelType, FileRecord, FileKeyEnvelope } from '../../shared/types'
 import { encryptMessageForStorage } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '../../shared/migrations/runner'
@@ -583,7 +583,7 @@ export class ConversationDO extends DurableObject<Env> {
     return Response.json(file)
   }
 
-  private async addFileRecipient(id: string, data: { envelope: RecipientEnvelope; encryptedMetadata: { pubkey: string; encryptedContent: string; ephemeralPubkey: string } }): Promise<Response> {
+  private async addFileRecipient(id: string, data: { envelope: FileKeyEnvelope; encryptedMetadata: { pubkey: string; encryptedContent: string; ephemeralPubkey: string } }): Promise<Response> {
     const file = await this.ctx.storage.get<FileRecord>(`file:${id}`)
     if (!file) return new Response('File not found', { status: 404 })
 

@@ -236,8 +236,8 @@ export async function listNotes(params?: { callId?: string; page?: number; limit
 export async function createNote(data: {
   callId: string
   encryptedContent: string
-  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+  authorEnvelope?: import('@shared/types').KeyEnvelope
+  adminEnvelopes?: import('@shared/types').RecipientEnvelope[]
 }) {
   return request<{ note: EncryptedNote }>(hp('/notes'), {
     method: 'POST',
@@ -247,8 +247,8 @@ export async function createNote(data: {
 
 export async function updateNote(id: string, data: {
   encryptedContent: string
-  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+  authorEnvelope?: import('@shared/types').KeyEnvelope
+  adminEnvelopes?: import('@shared/types').RecipientEnvelope[]
 }) {
   return request<{ note: EncryptedNote }>(hp(`/notes/${id}`), {
     method: 'PATCH',
@@ -655,8 +655,8 @@ export interface EncryptedNote {
   updatedAt: string
   ephemeralPubkey?: string
   // V2 per-note ECIES envelopes (forward secrecy)
-  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+  authorEnvelope?: import('@shared/types').KeyEnvelope
+  adminEnvelopes?: import('@shared/types').RecipientEnvelope[]
 }
 
 export interface ActiveCall {
@@ -681,7 +681,7 @@ export interface CallRecord {
 
   // Envelope-encrypted metadata (Epic 77)
   encryptedContent?: string
-  adminEnvelopes?: MessageKeyEnvelope[]
+  adminEnvelopes?: import('@shared/types').RecipientEnvelope[]
 
   // Decrypted fields (populated client-side after decryption)
   answeredBy?: string | null
@@ -746,12 +746,8 @@ export interface Conversation {
 
 export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
 
-/** ECIES-wrapped message key for a specific reader. */
-export interface MessageKeyEnvelope {
-  pubkey: string           // reader's x-only pubkey (hex)
-  wrappedKey: string       // hex: nonce(24) + ciphertext(48)
-  ephemeralPubkey: string  // hex: compressed 33-byte ephemeral pubkey
-}
+/** @deprecated Import RecipientEnvelope from @shared/types instead. */
+export type { RecipientEnvelope as MessageKeyEnvelope } from '@shared/types'
 
 export interface ConversationMessage {
   id: string
@@ -759,7 +755,7 @@ export interface ConversationMessage {
   direction: 'inbound' | 'outbound'
   authorPubkey: string
   encryptedContent: string         // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
-  readerEnvelopes: MessageKeyEnvelope[]  // per-reader ECIES-wrapped message keys
+  readerEnvelopes: import('@shared/types').RecipientEnvelope[]  // per-reader ECIES-wrapped message keys
   hasAttachments: boolean
   attachmentIds?: string[]
   // Delivery status tracking (Epic 71)
@@ -804,7 +800,7 @@ export async function getConversationMessages(id: string, params?: { page?: numb
 
 export async function sendConversationMessage(id: string, data: {
   encryptedContent: string
-  readerEnvelopes: MessageKeyEnvelope[]
+  readerEnvelopes: import('@shared/types').RecipientEnvelope[]
   plaintextForSending?: string
 }) {
   return request<ConversationMessage>(hp(`/conversations/${id}/messages`), {
@@ -918,7 +914,7 @@ export async function createReport(data: {
   title: string
   category?: string
   encryptedContent: string
-  readerEnvelopes: MessageKeyEnvelope[]
+  readerEnvelopes: import('@shared/types').RecipientEnvelope[]
 }) {
   return request<Report>(hp('/reports'), {
     method: 'POST',
@@ -939,7 +935,7 @@ export async function getReportMessages(id: string, params?: { page?: number; li
 
 export async function sendReportMessage(id: string, data: {
   encryptedContent: string
-  readerEnvelopes: MessageKeyEnvelope[]
+  readerEnvelopes: import('@shared/types').RecipientEnvelope[]
   attachmentIds?: string[]
 }) {
   return request<ConversationMessage>(hp(`/reports/${id}/messages`), {
@@ -1017,7 +1013,7 @@ export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
 }
 
 export async function getFileEnvelopes(fileId: string) {
-  return request<{ envelopes: import('@shared/types').RecipientEnvelope[] }>(`/files/${fileId}/envelopes`)
+  return request<{ envelopes: import('@shared/types').FileKeyEnvelope[] }>(`/files/${fileId}/envelopes`)
 }
 
 export async function getFileMetadata(fileId: string) {
@@ -1025,7 +1021,7 @@ export async function getFileMetadata(fileId: string) {
 }
 
 export async function shareFile(fileId: string, data: {
-  envelope: import('@shared/types').RecipientEnvelope
+  envelope: import('@shared/types').FileKeyEnvelope
   encryptedMetadata: { pubkey: string; encryptedContent: string; ephemeralPubkey: string }
 }) {
   return request<{ ok: true }>(`/files/${fileId}/share`, {

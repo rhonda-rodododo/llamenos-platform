@@ -6,7 +6,7 @@ import { decryptFile, decryptFileMetadata } from '@/lib/file-crypto'
 import * as keyManager from '@/lib/key-manager'
 import { FileIcon, ImageIcon, VideoIcon, Music, Download, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { EncryptedFileMetadata, RecipientEnvelope } from '@shared/types'
+import type { EncryptedFileMetadata, FileKeyEnvelope } from '@shared/types'
 
 interface FilePreviewProps {
   fileId: string
@@ -48,7 +48,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
 
         // Find our envelope
         const myPubkey = publicKey
-        let envelope: RecipientEnvelope | undefined
+        let envelope: FileKeyEnvelope | undefined
         if (myPubkey) {
           envelope = envelopes.find(e => e.pubkey === myPubkey)
         }

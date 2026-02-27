@@ -202,7 +202,7 @@ conversations.post('/:id/messages', async (c) => {
 
   const body = await c.req.json() as {
     encryptedContent: string
-    readerEnvelopes: import('../types').MessageKeyEnvelope[]
+    readerEnvelopes: import('../../shared/types').RecipientEnvelope[]
     plaintextForSending?: string
   }
 

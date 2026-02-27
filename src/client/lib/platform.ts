@@ -11,7 +11,7 @@
  */
 
 // Type re-exports from shared types
-export type { KeyEnvelope, RecipientKeyEnvelope } from '@shared/types'
+export type { KeyEnvelope, RecipientEnvelope, RecipientKeyEnvelope } from '@shared/types'
 
 // ── Tauri IPC wrapper ────────────────────────────────────────────────
 
@@ -42,12 +42,12 @@ export interface SignedNostrEvent {
 export interface EncryptedNoteResult {
   encryptedContent: string
   authorEnvelope: import('@shared/types').KeyEnvelope
-  adminEnvelopes: import('@shared/types').RecipientKeyEnvelope[]
+  adminEnvelopes: import('@shared/types').RecipientEnvelope[]
 }
 
 export interface EncryptedMessageResult {
   encryptedContent: string
-  readerEnvelopes: import('@shared/types').RecipientKeyEnvelope[]
+  readerEnvelopes: import('@shared/types').RecipientEnvelope[]
 }
 
 export interface EncryptedKeyData {
@@ -209,7 +209,7 @@ export async function encryptMessage(
  */
 export async function decryptMessage(
   encryptedContent: string,
-  readerEnvelopes: import('@shared/types').RecipientKeyEnvelope[],
+  readerEnvelopes: import('@shared/types').RecipientEnvelope[],
 ): Promise<string | null> {
   try {
     return await tauriInvoke<string>('decrypt_message_from_state', {
@@ -228,7 +228,7 @@ export async function decryptMessage(
  */
 export async function decryptCallRecord(
   encryptedContent: string,
-  adminEnvelopes: import('@shared/types').RecipientKeyEnvelope[],
+  adminEnvelopes: import('@shared/types').RecipientEnvelope[],
 ): Promise<{ answeredBy: string | null; callerNumber: string } | null> {
   try {
     const json = await tauriInvoke<string>('decrypt_call_record_from_state', {
@@ -360,8 +360,8 @@ export async function rewrapFileKey(
   encryptedFileKeyHex: string,
   ephemeralPubkeyHex: string,
   newRecipientPubkeyHex: string,
-): Promise<import('@shared/types').RecipientKeyEnvelope> {
-  return tauriInvoke<import('@shared/types').RecipientKeyEnvelope>('rewrap_file_key_from_state', {
+): Promise<import('@shared/types').RecipientEnvelope> {
+  return tauriInvoke<import('@shared/types').RecipientEnvelope>('rewrap_file_key_from_state', {
     encryptedFileKeyHex,
     ephemeralPubkeyHex,
     newRecipientPubkeyHex,

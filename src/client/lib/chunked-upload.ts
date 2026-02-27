@@ -1,12 +1,12 @@
 import { initUpload, uploadChunk, completeUpload, getUploadStatus } from './api'
-import type { RecipientEnvelope, UploadInit } from '@shared/types'
+import type { FileKeyEnvelope, UploadInit } from '@shared/types'
 
 const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
 
 export interface ChunkedUploadOptions {
   encryptedContent: Uint8Array
   conversationId: string
-  recipientEnvelopes: RecipientEnvelope[]
+  recipientEnvelopes: FileKeyEnvelope[]
   encryptedMetadata: Array<{ pubkey: string; encryptedContent: string; ephemeralPubkey: string }>
   chunkSize?: number
   onProgress?: (completed: number, total: number) => void

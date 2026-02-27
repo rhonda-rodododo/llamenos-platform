@@ -1,5 +1,5 @@
 import type { BlobStorage, TranscriptionService } from '../platform/types'
-import type { MessagingChannelType } from '../shared/types'
+import type { MessagingChannelType, RecipientEnvelope, KeyEnvelope } from '../shared/types'
 
 /**
  * Environment bindings.
@@ -187,7 +187,7 @@ export interface EncryptedCallRecord {
 
   // Envelope-pattern encryption for admin(s)
   encryptedContent: string       // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
-  adminEnvelopes: MessageKeyEnvelope[]  // Per-record key wrapped for each admin
+  adminEnvelopes: RecipientEnvelope[]  // Per-record key wrapped for each admin
 }
 
 /**
@@ -208,8 +208,8 @@ export interface EncryptedNote {
   updatedAt: string
   ephemeralPubkey?: string // hex-encoded, present for server-encrypted transcriptions (ECIES)
   // V2 per-note ECIES envelopes (forward secrecy)
-  authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-  adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+  authorEnvelope?: KeyEnvelope
+  adminEnvelopes?: RecipientEnvelope[]
 }
 
 export interface AuditLogEntry {
@@ -317,7 +317,7 @@ export interface EncryptedMessage {
   authorPubkey: string             // volunteer pubkey or 'system:inbound'
   encryptedContent: string         // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
   // Per-reader key envelopes (ECIES-wrapped message key)
-  readerEnvelopes: MessageKeyEnvelope[]
+  readerEnvelopes: RecipientEnvelope[]
   hasAttachments: boolean
   attachmentIds?: string[]         // references to R2 encrypted blobs
   createdAt: string
@@ -330,12 +330,8 @@ export interface EncryptedMessage {
   retryCount?: number              // number of retry attempts
 }
 
-/** ECIES-wrapped message key for a specific reader. */
-export interface MessageKeyEnvelope {
-  pubkey: string           // reader's x-only pubkey (hex)
-  wrappedKey: string       // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
-  ephemeralPubkey: string  // hex: compressed 33-byte ephemeral pubkey
-}
+/** @deprecated Use RecipientEnvelope from @shared/types instead. */
+export type MessageKeyEnvelope = RecipientEnvelope
 
 // --- Blast Queue ---
 

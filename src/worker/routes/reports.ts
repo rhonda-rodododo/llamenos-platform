@@ -55,7 +55,7 @@ reports.post('/', requirePermission('reports:create'), async (c) => {
     category?: string
     // First message content (envelope-encrypted)
     encryptedContent: string
-    readerEnvelopes: import('../types').MessageKeyEnvelope[]
+    readerEnvelopes: import('../../shared/types').RecipientEnvelope[]
   }
 
   if (!body.encryptedContent || !body.readerEnvelopes?.length) {
@@ -205,7 +205,7 @@ reports.post('/:id/messages', async (c) => {
 
   const body = await c.req.json() as {
     encryptedContent: string
-    readerEnvelopes: import('../types').MessageKeyEnvelope[]
+    readerEnvelopes: import('../../shared/types').RecipientEnvelope[]
     attachmentIds?: string[]
   }
 

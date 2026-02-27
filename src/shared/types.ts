@@ -1,16 +1,25 @@
 // --- ECIES Key Envelopes ---
 // Used across notes, messages, files, and hub key wrapping.
 
-/** A symmetric key wrapped via ECIES for a single recipient. */
-export interface KeyEnvelope {
-  wrappedKey: string       // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
-  ephemeralPubkey: string  // hex: compressed 33-byte pubkey
+/**
+ * Unified ECIES-wrapped symmetric key for one recipient.
+ * Used everywhere: notes, messages, call records, hub keys.
+ * The same ECIES construction with different domain separation labels.
+ */
+export interface RecipientEnvelope {
+  /** Recipient's x-only public key (hex). */
+  pubkey: string
+  /** Nonce (24 bytes) + ciphertext: ECIES-wrapped symmetric key (hex). */
+  wrappedKey: string
+  /** Ephemeral secp256k1 compressed public key used for ECDH (hex). */
+  ephemeralPubkey: string
 }
 
-/** A KeyEnvelope tagged with the recipient's pubkey (for multi-recipient scenarios). */
-export interface RecipientKeyEnvelope extends KeyEnvelope {
-  pubkey: string  // recipient's x-only pubkey (hex)
-}
+/** @deprecated Use RecipientEnvelope instead. Kept for gradual migration. */
+export type KeyEnvelope = Omit<RecipientEnvelope, 'pubkey'>
+
+/** @deprecated Use RecipientEnvelope instead. */
+export type RecipientKeyEnvelope = RecipientEnvelope
 
 // --- Telephony Provider Config ---
 
@@ -116,7 +125,8 @@ export interface EncryptedFileMetadata {
   checksum: string   // SHA-256 of plaintext for integrity verification
 }
 
-export interface RecipientEnvelope {
+/** ECIES-wrapped file encryption key for one recipient. */
+export interface FileKeyEnvelope {
   pubkey: string
   encryptedFileKey: string
   ephemeralPubkey: string
@@ -127,7 +137,7 @@ export interface FileRecord {
   conversationId: string
   messageId?: string
   uploadedBy: string         // pubkey of uploader
-  recipientEnvelopes: RecipientEnvelope[]
+  recipientEnvelopes: FileKeyEnvelope[]
   encryptedMetadata: Array<{
     pubkey: string
     encryptedContent: string
@@ -145,7 +155,7 @@ export interface UploadInit {
   totalSize: number
   totalChunks: number
   conversationId: string
-  recipientEnvelopes: RecipientEnvelope[]
+  recipientEnvelopes: FileKeyEnvelope[]
   encryptedMetadata: Array<{
     pubkey: string
     encryptedContent: string

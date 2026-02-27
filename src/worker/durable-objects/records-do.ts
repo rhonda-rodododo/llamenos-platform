@@ -156,8 +156,8 @@ export class RecordsDO extends DurableObject<Env> {
 
   private async createNoteEntry(data: {
     callId: string; authorPubkey: string; encryptedContent: string; ephemeralPubkey?: string
-    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+    authorEnvelope?: import('../../shared/types').KeyEnvelope
+    adminEnvelopes?: import('../../shared/types').RecipientEnvelope[]
   }): Promise<Response> {
     const note: EncryptedNote = {
       id: crypto.randomUUID(),
@@ -176,8 +176,8 @@ export class RecordsDO extends DurableObject<Env> {
 
   private async updateNoteEntry(id: string, data: {
     encryptedContent: string; authorPubkey: string
-    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+    authorEnvelope?: import('../../shared/types').KeyEnvelope
+    adminEnvelopes?: import('../../shared/types').RecipientEnvelope[]
   }): Promise<Response> {
     let note = await this.ctx.storage.get<EncryptedNote>(`note:${id}`)
 

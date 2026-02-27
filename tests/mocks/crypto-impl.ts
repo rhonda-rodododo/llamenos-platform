@@ -81,16 +81,9 @@ function deriveEncryptionKey(secretKey: Uint8Array, label: string): Uint8Array {
 // Shared primitive: ECDH + SHA-256(label || sharedX) + XChaCha20-Poly1305
 // Used by notes (LABEL_NOTE_KEY), files (LABEL_FILE_KEY), hub keys (LABEL_HUB_KEY_WRAP)
 
-/** A symmetric key wrapped via ECIES for a single recipient. */
-export interface KeyEnvelope {
-  wrappedKey: string       // hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
-  ephemeralPubkey: string  // hex: compressed 33-byte pubkey
-}
-
-/** A KeyEnvelope tagged with the recipient's pubkey (for multi-recipient scenarios). */
-export interface RecipientKeyEnvelope extends KeyEnvelope {
-  pubkey: string  // recipient's x-only pubkey (hex)
-}
+// Re-export envelope types from shared — single source of truth
+export type { KeyEnvelope, RecipientEnvelope as RecipientKeyEnvelope } from '../../src/shared/types'
+import type { KeyEnvelope, RecipientEnvelope as RecipientKeyEnvelope } from '../../src/shared/types'
 
 /**
  * Wrap a 32-byte symmetric key for a recipient using ECIES.

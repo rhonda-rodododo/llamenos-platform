@@ -30,8 +30,8 @@ notes.post('/', requirePermission('notes:create'), async (c) => {
   const body = await c.req.json() as {
     callId: string
     encryptedContent: string
-    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+    authorEnvelope?: import('../../shared/types').KeyEnvelope
+    adminEnvelopes?: import('../../shared/types').RecipientEnvelope[]
   }
   const res = await dos.records.fetch(new Request('http://do/notes', {
     method: 'POST',
@@ -47,8 +47,8 @@ notes.patch('/:id', requirePermission('notes:update-own'), async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json() as {
     encryptedContent: string
-    authorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
-    adminEnvelopes?: { pubkey: string; wrappedKey: string; ephemeralPubkey: string }[]
+    authorEnvelope?: import('../../shared/types').KeyEnvelope
+    adminEnvelopes?: import('../../shared/types').RecipientEnvelope[]
   }
   const res = await dos.records.fetch(new Request(`http://do/notes/${id}`, {
     method: 'PATCH',

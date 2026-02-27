@@ -5,7 +5,7 @@ import { hmac } from '@noble/hashes/hmac.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { LABEL_MESSAGE, LABEL_CALL_META, HMAC_PHONE_PREFIX, HMAC_IP_PREFIX } from '@shared/crypto-labels'
-import type { MessageKeyEnvelope } from '../types'
+import type { RecipientEnvelope } from '../../shared/types'
 
 /**
  * Hash a phone number for storage (one-way — compare by re-hashing).
@@ -82,7 +82,7 @@ function eciesWrapKeyServer(
 export function encryptMessageForStorage(
   plaintext: string,
   readerPubkeys: string[],
-): { encryptedContent: string; readerEnvelopes: MessageKeyEnvelope[] } {
+): { encryptedContent: string; readerEnvelopes: RecipientEnvelope[] } {
   // Generate random per-message symmetric key
   const messageKey = new Uint8Array(32)
   crypto.getRandomValues(messageKey)
@@ -117,7 +117,7 @@ export function encryptMessageForStorage(
 export function encryptCallRecordForStorage(
   metadata: Record<string, unknown>,
   adminPubkeys: string[],
-): { encryptedContent: string; adminEnvelopes: MessageKeyEnvelope[] } {
+): { encryptedContent: string; adminEnvelopes: RecipientEnvelope[] } {
   const recordKey = new Uint8Array(32)
   crypto.getRandomValues(recordKey)
 
