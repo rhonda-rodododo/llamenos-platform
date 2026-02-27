@@ -1,21 +1,32 @@
 # Docker Compose override for E2E tests
 #
 # Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build app
+#   # Then wait for health: timeout 120 bash -c 'until curl -sf http://localhost:3000/api/health; do sleep 2; done'
 #
 # Changes from production:
 #   - Exposes app port 3000 directly (bypasses Caddy)
 #   - Sets ENVIRONMENT=development (enables /api/test-reset endpoint)
 #   - Disables read_only to allow SQLite WAL files in tmpfs
-#   - Makes strfry dependency optional (app falls back to NoopNostrPublisher)
+#   - Disables strfry (moved to "nostr" profile) — app falls back to NoopNostrPublisher
+#     strfry's NOFILES limit (1M) exceeds CI ulimit (65536), causing crash in GitHub Actions
 
 services:
+  # Disable strfry in tests — put behind a profile so it never starts.
+  # strfry crashes in CI with "Unable to set NOFILES limit to 1000000, exceeds max of 65536".
+  # The app gracefully falls back to NoopNostrPublisher when no relay is available.
+  strfry:
+    profiles:
+      - nostr
+
   app:
     ports:
       - "3000:3000"
     read_only: false
     environment:
       - ENVIRONMENT=development
+      # Point at nonexistent relay to make NoopNostrPublisher activate faster
+      - NOSTR_RELAY_URL=ws://localhost:7777
     depends_on:
       postgres:
         condition: service_healthy

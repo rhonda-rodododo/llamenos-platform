@@ -291,8 +291,16 @@ jobs:
       - name: Build and start Docker Compose
         working-directory: deploy/docker
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+          # Don't use --wait (it checks ALL containers, including strfry which is disabled
+          # but would crash in CI due to NOFILES ulimit). Instead, wait for app only.
+          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build app
         timeout-minutes: 10
+
+      - name: Wait for app to be healthy
+        run: |
+          echo "Waiting for app to be healthy..."
+          timeout 120 bash -c 'until curl -sf http://localhost:3000/api/health >/dev/null 2>&1; do sleep 2; done'
+          echo "App is healthy and ready for E2E tests"
 
       - name: Show container status
         if: ${{ !cancelled() }}
@@ -300,12 +308,6 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.test.yml ps
           docker compose -f docker-compose.yml -f docker-compose.test.yml logs --tail=50
-
-      - name: Verify app health
-        run: |
-          curl -sf http://localhost:3000/api/health
-          echo ""
-          echo "App is healthy!"
 
       - name: Run E2E tests (Docker / Node.js)
         run: bunx playwright test --config playwright.docker.config.ts
