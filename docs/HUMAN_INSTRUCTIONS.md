@@ -20,6 +20,10 @@ that operating systems will block.
 6. [Google Play Store (future -- mobile)](#6-google-play-store-future----mobile)
 7. [GitHub Repository Secrets Checklist](#7-github-repository-secrets-checklist)
 8. [Version Sync Checklist](#8-version-sync-checklist)
+9. [Mobile: Google Play Console Setup](#9-mobile-google-play-console-setup)
+10. [Mobile: Apple Developer Account for iOS](#10-mobile-apple-developer-account-for-ios)
+11. [Mobile: F-Droid Submission](#11-mobile-f-droid-submission)
+12. [Mobile: Push Notification Certificates](#12-mobile-push-notification-certificates)
 
 ---
 
@@ -728,3 +732,114 @@ script to keep all four version files in sync.
 The desktop release is independent of the API release. Version numbers should
 be coordinated but do not need to match exactly -- the desktop app connects to
 a versioned API endpoint.
+
+**Update (Epic 108)**: The `scripts/bump-version.ts` has been updated to sync
+all 5 version files (package.json, tauri.conf.json, Cargo.toml, Chart.yaml,
+metainfo.xml). Use `./scripts/sync-versions.sh --fix` to verify/fix sync.
+
+---
+
+## 9. Mobile: Google Play Console Setup
+
+### Creating the app listing
+
+1. Create a [Google Play Console](https://play.google.com/console) developer account ($25 one-time fee)
+2. Create a new app: "Hotline" → category "Communication"
+3. Complete the app content declaration (privacy policy URL, data safety form)
+4. Set up an internal testing track first
+
+### APK signing
+
+Google Play requires AAB (Android App Bundle) for new apps. For sideloading, APK works.
+
+**Option A: Google-managed signing (recommended)**
+1. Upload the first AAB — Google generates and manages the signing key
+2. You only need an upload key (different from the signing key)
+
+**Option B: Self-managed signing**
+1. Generate a keystore: `keytool -genkey -v -keystore release.keystore -alias hotline -keyalg RSA -keysize 2048 -validity 10000`
+2. Store keystore password and alias as GitHub Secrets:
+   - `ANDROID_KEYSTORE_BASE64` — base64-encoded `.keystore` file
+   - `ANDROID_KEYSTORE_PASSWORD`
+   - `ANDROID_KEY_ALIAS`
+   - `ANDROID_KEY_PASSWORD`
+
+### GitHub Secrets for Android
+
+| Secret | Description |
+|--------|-------------|
+| `ANDROID_KEYSTORE_BASE64` | Base64-encoded release keystore |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Key alias (e.g., "hotline") |
+| `ANDROID_KEY_PASSWORD` | Key password |
+
+---
+
+## 10. Mobile: Apple Developer Account for iOS
+
+### TestFlight setup
+
+1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/) ($99/year)
+2. Create an App ID with bundle identifier `net.riseup.llamenos`
+3. Create a distribution certificate (Apple Distribution)
+4. Create a provisioning profile (App Store)
+
+### Code signing for CI
+
+Export the distribution certificate as `.p12` and encode:
+```bash
+base64 < Certificates.p12 | pbcopy
+```
+
+### GitHub Secrets for iOS
+
+| Secret | Description |
+|--------|-------------|
+| `APPLE_CERTIFICATE_BASE64` | Base64 .p12 distribution cert |
+| `APPLE_CERTIFICATE_PASSWORD` | .p12 password |
+| `APPLE_PROVISIONING_PROFILE_BASE64` | Base64 provisioning profile |
+| `APPLE_TEAM_ID` | Apple Developer Team ID |
+| `APPLE_BUNDLE_ID` | `net.riseup.llamenos` |
+| `APP_STORE_CONNECT_API_KEY_ID` | App Store Connect API key |
+| `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect issuer |
+| `APP_STORE_CONNECT_API_KEY_BASE64` | Base64 .p8 API key |
+
+---
+
+## 11. Mobile: F-Droid Submission
+
+F-Droid requires reproducible builds from source. Steps:
+
+1. Ensure the app builds from source without proprietary dependencies
+2. Create an F-Droid metadata file at `metadata/net.riseup.llamenos.yml`
+3. Submit to [F-Droid Data](https://gitlab.com/fdroid/fdroiddata) via merge request
+4. F-Droid builders compile from source on each release
+
+Note: Since llamenos-core is Rust compiled to native libraries, F-Droid builds
+need Rust toolchain and Android NDK in their build environment.
+
+---
+
+## 12. Mobile: Push Notification Certificates
+
+### APNs (iOS)
+
+1. In Apple Developer portal → Certificates → create "Apple Push Notification service SSL"
+2. Download `.p12` certificate
+3. Or use APNs Auth Key (`.p8`) — recommended, doesn't expire
+
+| Secret | Description |
+|--------|-------------|
+| `APNS_KEY_ID` | APNs auth key ID |
+| `APNS_KEY_BASE64` | Base64 .p8 APNs key |
+| `APNS_TEAM_ID` | Apple Developer Team ID |
+
+### FCM (Android)
+
+1. In Firebase Console → Project Settings → Cloud Messaging
+2. Generate a service account JSON key
+3. Or use the FCM v1 API with a server key
+
+| Secret | Description |
+|--------|-------------|
+| `FCM_SERVICE_ACCOUNT_JSON` | Firebase service account JSON |

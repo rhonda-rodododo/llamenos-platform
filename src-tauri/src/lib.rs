@@ -1,6 +1,6 @@
 mod crypto;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 use crate::crypto::CryptoState;
 
@@ -47,21 +47,64 @@ pub fn run() {
         .manage(CryptoState::new())
         .setup(|app| {
             // System tray setup
-            use tauri::menu::{Menu, MenuItem};
+            use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
             use tauri::tray::TrayIconBuilder;
 
-            let show = MenuItem::with_id(app, "show", "Show Hotline", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let show_hide =
+                MenuItem::with_id(app, "show_hide", "Show / Hide", true, None::<&str>)?;
+            #[cfg(feature = "updater")]
+            let check_updates = MenuItem::with_id(
+                app,
+                "check_updates",
+                "Check for Updates\u{2026}",
+                true,
+                None::<&str>,
+            )?;
+            let about = MenuItem::with_id(
+                app,
+                "about",
+                &format!("About Hotline v{}", env!("CARGO_PKG_VERSION")),
+                true,
+                None::<&str>,
+            )?;
+            let separator = PredefinedMenuItem::separator(app)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit Hotline", true, None::<&str>)?;
+
+            #[cfg(feature = "updater")]
+            let menu = Menu::with_items(
+                app,
+                &[&show_hide, &separator, &check_updates, &about, &separator, &quit],
+            )?;
+            #[cfg(not(feature = "updater"))]
+            let menu =
+                Menu::with_items(app, &[&show_hide, &separator, &about, &separator, &quit])?;
 
             TrayIconBuilder::new()
                 .menu(&menu)
                 .tooltip("Hotline")
                 .on_menu_event(move |app, event| match event.id().as_ref() {
-                    "show" => {
+                    "show_hide" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                                let _ = window.unminimize();
+                            }
+                        }
+                    }
+                    #[cfg(feature = "updater")]
+                    "check_updates" => {
+                        // Emit event to frontend so the UI can show update progress
+                        let _ = app.emit("check-for-updates", ());
+                    }
+                    "about" => {
+                        // Show the main window with focus (about info shown in-app)
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
+                            let _ = app.emit("navigate", "/settings");
                         }
                     }
                     "quit" => {
@@ -72,6 +115,15 @@ pub fn run() {
                         app.exit(0);
                     }
                     _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                        if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = window.unminimize();
+                        }
+                    }
                 })
                 .build(app)?;
 
