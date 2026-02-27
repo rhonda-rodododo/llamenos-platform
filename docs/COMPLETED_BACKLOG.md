@@ -1,5 +1,65 @@
 # Completed Backlog
 
+## 2026-02-27: Multi-Platform Completion & Release Readiness (Epics 100-110)
+
+### Epic 100: llamenos-core Native Build for Mobile
+- `scripts/build-mobile.sh` — builds Android .so (4 arch via cargo-ndk) and iOS .a (device + sim → XCFramework), generates UniFFI Swift/Kotlin bindings
+- `rust-toolchain.toml` — pins stable toolchain with all 11 targets (desktop, mobile, WASM)
+- `.github/workflows/release.yml` — added `build-mobile-android` and `build-mobile-ios` jobs, release artifacts
+
+### Epic 101: Mobile Native Module Integration
+- `modules/llamenos-core/ios/LlamenosCore.podspec` — CocoaPods podspec for vendored XCFramework
+- `scripts/download-core-libs.sh` — downloads pre-built native libs from GitHub Releases
+- `.gitignore` updated for native lib directories
+
+### Epic 102: Mobile Static Build Pipeline
+- `.github/workflows/mobile-build.yml` — APK + iOS simulator .app builds on tags
+- `eas.json` — preview (APK + simulator) and production profiles
+
+### Epic 103: Mobile App Feature Completion
+- All 5 admin settings sections implemented: Telephony, Spam, Calls, Custom Fields, Roles
+- 14+ API client methods added for settings CRUD, custom fields, roles, volunteer management
+- Volunteer delete/invite/add APIs wired to backend
+
+### Epic 104: Mobile E2E Test Expansion
+- 6 new Detox test files: conversations, settings, admin-settings, admin-volunteers, navigation, error-states
+- Expanded auth.test.ts (PIN retry, nsec import) and notes.test.ts (detail view, pagination)
+- testID additions across admin settings, volunteers, offline banner
+- CI fixes: applesimutils install, CocoaPods caching, headless emulator flags
+
+### Epic 105: Cross-Platform Crypto Verification
+- `tests/interop.rs` — 5 test suites generating deterministic test vectors (JSON fixtures)
+- `tests/crypto-interop.spec.ts` — Playwright tests consuming Rust-generated vectors
+- Synced Rust labels with TypeScript (added LABEL_PUSH_WAKE, LABEL_PUSH_FULL → 28 labels)
+
+### Epic 106: Mobile UX Refinements
+- Deep linking config (`llamenos://` scheme) for iOS and Android
+- KeyboardDismissWrapper for tap-to-dismiss across all screens
+- Skeleton loaders: DashboardSkeleton, SkeletonLoader, audit screen
+- Accessibility: roles, labels, hints on login, onboarding, admin screens
+- Pull-to-refresh with haptic feedback and themed tint color
+
+### Epic 107: Multi-Platform Security Hardening
+- `src/lib/security-checks.ts` — advisory jailbreak/root detection (warns, doesn't block)
+- HTTPS transport enforcement in mobile API client
+- expo-device for emulator detection
+
+### Epic 108: Version Sync & Developer Tooling
+- Rewrote `scripts/bump-version.ts` to sync all 5 version files
+- `scripts/sync-versions.sh` — checks/fixes version mismatches across repos
+- `scripts/dev-setup.sh` — developer environment bootstrapping (all three repos)
+
+### Epic 109: Desktop Polish & Release Prep
+- Version synced to 0.18.0 across tauri.conf.json and Cargo.toml
+- Enhanced tray menu: Show/Hide toggle, Check for Updates, About with version, separators, double-click handler
+
+### Epic 110: Documentation & Guides
+- `CONTRIBUTING.md` — coding standards, adding crypto ops, adding API endpoints, E2E tests
+- `docs/ARCHITECTURE.md` — three-repo structure, data flow, encryption, DOs, security layers
+- `docs/DESKTOP_BUILD.md` — prerequisites, dev/release builds, Flatpak, troubleshooting
+- `docs/MOBILE_BUILD.md` (in llamenos-mobile) — prerequisites, dev, APK/iOS builds, Detox
+- `docs/HUMAN_INSTRUCTIONS.md` — added sections 9-12: Google Play, Apple Developer, F-Droid, Push Notifications
+
 ## 2026-02-26: Release Pipeline & Distribution (`desktop` branch)
 
 ### Epic 99: Human Setup Guide (HUMAN_INSTRUCTIONS.md)

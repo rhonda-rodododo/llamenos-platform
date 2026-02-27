@@ -217,6 +217,19 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 98: Download Experience](epics/epic-98-download-experience.md)** — /download page with OS detection, platform cards, i18n (13 langs), hero CTA update
 - [x] **[Epic 99: Human Setup Guide](epics/epic-99-human-setup.md)** — HUMAN_INSTRUCTIONS.md with signing keys, certificates, secrets checklist
 
+## Multi-Platform Completion & Release Readiness (Epics 100-110) — COMPLETE
+- [x] **[Epic 100: llamenos-core Mobile Build](epics/epic-100-core-mobile-build.md)** — build-mobile.sh, CI release workflow, rust-toolchain.toml with mobile targets
+- [x] **[Epic 101: Mobile Native Integration](epics/epic-101-mobile-native-integration.md)** — iOS podspec, download-core-libs.sh, vendored XCFramework setup
+- [x] **[Epic 102: Mobile Build Pipeline](epics/epic-102-mobile-build-pipeline.md)** — mobile-build.yml CI, APK + iOS sim .app on tags, eas.json
+- [x] **[Epic 103: Mobile Feature Completion](epics/epic-103-mobile-feature-completion.md)** — 5 admin settings sections, 14+ API client methods, volunteer CRUD wired
+- [x] **[Epic 104: Mobile E2E Expansion](epics/epic-104-mobile-e2e-expansion.md)** — 6 new Detox test files, expanded auth/notes, CI fixes
+- [x] **[Epic 105: Cross-Platform Crypto](epics/epic-105-cross-platform-crypto.md)** — Rust interop tests, JSON test vectors, Playwright consumer, label sync (28 labels)
+- [x] **[Epic 106: Mobile UX Refinements](epics/epic-106-mobile-ux-refinements.md)** — Deep links, keyboard handling, skeletons, accessibility, haptic pull-to-refresh
+- [x] **[Epic 107: Security Hardening](epics/epic-107-security-hardening.md)** — Jailbreak/root detection, HTTPS enforcement, emulator detection
+- [x] **[Epic 108: Version Sync & Tooling](epics/epic-108-version-sync-tooling.md)** — bump-version.ts rewrite, sync-versions.sh, dev-setup.sh (all repos)
+- [x] **[Epic 109: Desktop Polish](epics/epic-109-desktop-polish.md)** — Version sync to 0.18.0, tray menu enhancements
+- [x] **[Epic 110: Documentation](epics/epic-110-documentation.md)** — CONTRIBUTING.md, ARCHITECTURE.md, build guides, HUMAN_INSTRUCTIONS mobile sections
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
