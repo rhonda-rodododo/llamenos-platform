@@ -240,14 +240,13 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 117: Adversarial Crypto Tests](epics/epic-117-adversarial-crypto.md)** — 10 new Rust adversarial tests + 7 JS adversarial interop tests
 - [x] **[Epic 118: Docs Site — API Reference](epics/epic-118-api-reference.md)** — Complete 1680-line REST API reference + CHANGELOG.md
 
-## Future: Unified Records Architecture (Epics TBD)
-- [ ] Consolidate notes, reports, and message-channel threads into a single "Record" domain model
-  - Each record type (call note, report, conversation note) is a configurable variant
-  - Unified custom fields system across all record types (text, select, file attachment, etc.)
-  - Multiple report types with per-type field configurations
-  - File attachments as custom field values (not separate entity)
-  - Shared E2EE envelope encryption, shared audit log, shared search/filter UI
-  - Reduces code duplication across Notes, Reports, and Conversations
+## Unified Records Architecture (Epics 119-124) — PROPOSED
+- [ ] **[Epic 119: Records Domain Consolidation](epics/epic-119-records-domain-consolidation.md)** — Fix report type filtering bug (CRITICAL), extract shared ConversationThread, DRY up utilities
+- [ ] **[Epic 120: Unified Envelope Types](epics/epic-120-unified-envelope-types.md)** — Single `RecipientEnvelope` type for notes + messages, standardize naming
+- [ ] **[Epic 121: Custom Fields Generalization](epics/epic-121-custom-fields-generalization.md)** — Report custom fields UI, file attachment field type, shared components
+- [ ] **[Epic 122: Conversation Storage Scaling](epics/epic-122-conversation-storage-scaling.md)** — Per-record keys, BlastDO extraction, pagination, auto-migration
+- [ ] **[Epic 123: Conversation Notes](epics/epic-123-conversation-notes.md)** — Attach E2EE notes to conversations/reports, NoteEditor/NoteCard shared components
+- [ ] **[Epic 124: Records E2E Tests](epics/epic-124-records-e2e-tests.md)** — 13+ new E2E tests: report isolation, shared thread, custom fields, conversation notes, blast DO, pagination
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
