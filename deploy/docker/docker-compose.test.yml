@@ -1,17 +1,31 @@
 # Docker Compose override for E2E tests
 #
 # Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build app
+#   # Then wait for health: timeout 120 bash -c 'until curl -sf http://localhost:3000/api/health; do sleep 2; done'
 #
 # Changes from production:
 #   - Exposes app port 3000 directly (bypasses Caddy)
 #   - Sets ENVIRONMENT=development (enables /api/test-reset endpoint)
 #   - Disables read_only to allow SQLite WAL files in tmpfs
+#   - Fixes strfry NOFILES config for CI (default 1M exceeds GitHub Actions ulimit of 65536)
 
 services:
+  # Fix strfry for CI: mount config with nofiles=0 (don't attempt to set ulimit)
+  strfry:
+    volumes:
+      - ./strfry-test.conf:/etc/strfry.conf:ro
+
   app:
     ports:
       - "3000:3000"
     read_only: false
     environment:
       - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      strfry:
+        condition: service_healthy

@@ -29,3 +29,11 @@ apps/ios/.build/
 apps/ios/*.xcodeproj/
 apps/ios/DerivedData/
 apps/ios/LlamenosCoreFFI.xcframework/
+
+# Rust/Tauri build
+target/
+apps/desktop/gen/
+apps/desktop/target/
+
+# Crypto build outputs
+packages/crypto/dist/

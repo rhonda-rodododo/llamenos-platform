@@ -8,22 +8,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- API reference documentation page on docs site
-- CHANGELOG.md milestone summary
-
-## [0.18.0] - 2026-02-27
-
-### Highlights
-- Multi-platform completion and release readiness (Epics 100-110)
-- Cross-platform crypto interop test suite with deterministic test vectors
-- llamenos-core native builds for iOS (XCFramework) and Android (cargo-ndk)
-- Mobile native module integration via CocoaPods and React Native
 - Tauri v2 desktop app with native Rust crypto backend
 - Desktop security: isolation pattern, CSP, single-instance, Stronghold vault
-- Desktop release pipeline with Flatpak packaging
-- Download page with OS auto-detection
-- Developer tooling: version sync, dev-setup script
-- CONTRIBUTING.md, ARCHITECTURE.md, build guides
+- Multi-platform monorepo (desktop, iOS, Android, shared crypto, protocol codegen)
+
+## [0.19.2] - 2026-02-27
+
+### Miscellaneous
+
+- add AGPL-3.0-or-later license
+- v0.19.2 [skip ci]
+
+## [0.19.1] - 2026-02-27
+
+### Bug Fixes
+
+- fix strfry config for CI instead of disabling it
+
+### Miscellaneous
+
+- v0.19.1 [skip ci]
+
+## [0.19.0] - 2026-02-27
+
+### Bug Fixes
+
+- handle WebSocket upgrades directly for Node.js platform
+- fix presence endpoint — use correct ShiftManagerDO response key
+- promote Nostr relay (strfry) from optional profile to core service
+- add SERVER_NOSTR_SECRET to e2e-docker CI env
+- include .github/ in CI change detection patterns
+- CI change detection + strfry dependency for Docker E2E
+- disable strfry in Docker E2E tests, replace --wait with targeted health check
+
+### CI/CD
+
+- increase e2e-cf timeout to 20 minutes
+
+### Documentation
+
+- comprehensive security audit and zero-knowledge architecture redesign
+- sync protocol spec with code and add domain label table
+- add key revocation runbook with response procedures
+- close threat model gaps (APNs/FCM, CF trust, supply chain)
+- enrich all 9 epic files with execution context appendices
+- update backlogs with Zero-Knowledge Architecture completion status
+- update backlogs — Epic 78 client-side transcription complete
+- update security documentation for ZK architecture
+- update architecture and protocol docs for ZK architecture
+- update deployment guides for relay, Caddy ingress, reproducible builds
+- update project docs (CLAUDE.md, backlogs)
+- update marketing site docs for ZK architecture
+
+### Features
+
+- create authoritative crypto domain separation labels
+- add SAS verification to device provisioning protocol
+- generic backup file format without identifying strings
+- generic ECIES, multi-admin envelopes, admin key separation, hub key manager
+- NostrPublisher interface, server keypair, relay infrastructure
+- migrate real-time events from WebSocket to Nostr relay
+- complete WS removal — clean DO, Nostr-only broadcasts
+- E2EE messaging with envelope encryption pattern
+- metadata encryption — per-record DO storage, encrypted call history, hash-chained audit log
+- reproducible builds — deterministic output, checksums, verification tooling
+- migrate transcription to envelope encryption, remove dead ECIES code
+- client-side transcription with Whisper WASM via transformers.js
+- add DEMO_MODE env flag with CF Cron Trigger for scheduled reset
+
+### Miscellaneous
+
+- v0.19.0 [skip ci]
+
+## [0.18.0] - 2026-02-25
 
 ### Bug Fixes
 

@@ -10,9 +10,9 @@
 #   8. Create GitHub Release with changelog
 #   (Desktop app releases are handled by tauri-release.yml)
 #
-# Docs-only changes (*.md files) skip E2E tests, versioning, and app deployment.
-# Site changes (site/) skip E2E tests and versioning but STILL deploy to Pages.
-# App changes require E2E tests to pass before version bump or deployment.
+# Docs-only changes (*.md and site/ files) skip E2E tests, versioning, and app deploy.
+# Site changes still deploy to Pages even without a version bump.
+# Everything else (app code, CI, config, etc.) triggers the full E2E → deploy chain.
 # The created tag also triggers docker.yml for Docker image builds.
 
 name: CI
@@ -59,39 +59,32 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED"
 
-          # Patterns that indicate app code changes (require E2E tests)
-          APP_PATTERNS="^src/|^apps/|^packages/|^tests/|^playwright|^wrangler|^vite|^tsconfig|^package\.json|^bun\.lockb|^deploy/"
+          # Patterns for files that DON'T need E2E tests (inverted logic)
+          # Only markdown files and site/ files can skip E2E. Everything else triggers it.
+          SKIP_E2E_PATTERN="\.md$|^site/"
 
-          # Check if any changed file matches app patterns
-          APP_CHANGED="false"
-          while IFS= read -r file; do
-            if [[ -n "$file" ]] && echo "$file" | grep -qE "$APP_PATTERNS"; then
-              APP_CHANGED="true"
-              echo "App file changed: $file"
-              break
-            fi
-          done <<< "$CHANGED"
-
-          echo "app=$APP_CHANGED" >> "$GITHUB_OUTPUT"
-
-          # Check if site files changed (need to deploy site even without version bump)
+          # Check if ALL changed files match the skip pattern
+          DOCS_ONLY="true"
           SITE_CHANGED="false"
           while IFS= read -r file; do
-            if [[ -n "$file" ]] && [[ "$file" == site/* ]]; then
+            [[ -z "$file" ]] && continue
+            if [[ "$file" == site/* ]]; then
               SITE_CHANGED="true"
-              echo "Site file changed: $file"
-              break
+            fi
+            if ! echo "$file" | grep -qE "$SKIP_E2E_PATTERN"; then
+              DOCS_ONLY="false"
+              echo "Non-docs file changed: $file"
             fi
           done <<< "$CHANGED"
-          echo "site=$SITE_CHANGED" >> "$GITHUB_OUTPUT"
 
-          # docs_only is true when NO app files changed
-          if [[ "$APP_CHANGED" == "false" ]]; then
-            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "site=$SITE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "docs_only=$DOCS_ONLY" >> "$GITHUB_OUTPUT"
+
+          if [[ "$DOCS_ONLY" == "true" ]]; then
             echo "Only docs/site files changed — E2E tests will be skipped"
           else
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            echo "App files changed — E2E tests required"
+            echo "App/infra files changed — E2E tests required"
           fi
 
   # ─── Build & Validate ──────────────────────────────────────
@@ -337,13 +330,7 @@ jobs:
         working-directory: deploy/docker
         run: |
           docker compose -f docker-compose.yml -f docker-compose.test.yml ps
-          docker compose -f docker-compose.yml -f docker-compose.test.yml logs app --tail=50
-
-      - name: Verify app health
-        run: |
-          curl -sf http://localhost:3000/api/health
-          echo ""
-          echo "App is healthy!"
+          docker compose -f docker-compose.yml -f docker-compose.test.yml logs --tail=50
 
       - name: Run E2E tests
         run: bunx playwright test

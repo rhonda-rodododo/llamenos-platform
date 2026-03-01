@@ -28,8 +28,10 @@ let idleTimer: ReturnType<typeof setTimeout> | null = null
 let lockCallbacks: Set<() => void> = new Set()
 let unlockCallbacks: Set<() => void> = new Set()
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+let autoLockDisabled = false
 
 function resetIdleTimer() {
+  if (autoLockDisabled) return
   if (idleTimer) clearTimeout(idleTimer)
   if (unlocked) {
     idleTimer = setTimeout(() => lock(), IDLE_TIMEOUT_MS)
@@ -65,6 +67,7 @@ export function getLockDelayMs(): number {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
+    if (autoLockDisabled) return
     if (document.hidden && unlocked) {
       const delay = getLockDelay()
       if (delay === 0) {
@@ -174,6 +177,22 @@ export function onUnlock(cb: () => void): () => void {
 export async function wipeKey() {
   lock()
   await platformClearStoredKey()
+}
+
+/**
+ * Disable auto-lock timers (idle + tab-hide).
+ * Used in demo mode where frequent lock-outs ruin the experience.
+ */
+export function disableAutoLock() {
+  autoLockDisabled = true
+  if (idleTimer) {
+    clearTimeout(idleTimer)
+    idleTimer = null
+  }
+  if (visibilityTimer) {
+    clearTimeout(visibilityTimer)
+    visibilityTimer = null
+  }
 }
 
 /**

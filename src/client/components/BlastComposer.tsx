@@ -25,6 +25,7 @@ export function BlastComposer({ onCreated, onCancel }: BlastComposerProps) {
   const channelOptions = [
     { value: 'sms', label: 'SMS' },
     { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'signal', label: 'Signal' },
     { value: 'rcs', label: 'RCS' },
   ]
 
