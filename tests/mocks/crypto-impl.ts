@@ -82,8 +82,8 @@ function deriveEncryptionKey(secretKey: Uint8Array, label: string): Uint8Array {
 // Used by notes (LABEL_NOTE_KEY), files (LABEL_FILE_KEY), hub keys (LABEL_HUB_KEY_WRAP)
 
 // Re-export envelope types from shared — single source of truth
-export type { KeyEnvelope, RecipientEnvelope as RecipientKeyEnvelope } from '../../src/shared/types'
-import type { KeyEnvelope, RecipientEnvelope as RecipientKeyEnvelope } from '../../src/shared/types'
+export type { KeyEnvelope, RecipientEnvelope as RecipientKeyEnvelope } from '../../packages/shared/types'
+import type { KeyEnvelope, RecipientEnvelope as RecipientKeyEnvelope } from '../../packages/shared/types'
 
 /**
  * Wrap a 32-byte symmetric key for a recipient using ECIES.

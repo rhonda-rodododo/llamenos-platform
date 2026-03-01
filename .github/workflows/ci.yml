@@ -77,7 +77,7 @@ jobs:
           echo "$CHANGED"
 
           # Patterns that indicate app code changes (require E2E tests)
-          APP_PATTERNS="^src/|^tests/|^playwright|^wrangler|^vite|^tsconfig|^package\.json|^bun\.lockb|^deploy/"
+          APP_PATTERNS="^src/|^apps/|^packages/|^tests/|^playwright|^wrangler|^vite|^tsconfig|^package\.json|^bun\.lockb|^deploy/"
 
           # Check if any changed file matches app patterns
           APP_CHANGED="false"

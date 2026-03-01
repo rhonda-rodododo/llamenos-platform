@@ -15,11 +15,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/client/*"],
-      "@worker/*": ["./src/worker/*"],
-      "@shared/*": ["./src/shared/*"]
+      "@worker/*": ["./apps/worker/*"],
+      "@shared/*": ["./packages/shared/*"]
     },
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["src/**/*", "vite.config.ts"],
+  "include": ["src/**/*", "apps/**/*", "packages/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

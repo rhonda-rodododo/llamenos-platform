@@ -20,7 +20,7 @@ async function main() {
   console.log('[llamenos] Environment initialized')
 
   // Import the app after setting PLATFORM
-  const { default: workerApp } = await import('../../worker/app')
+  const { default: workerApp } = await import('../../../apps/worker/app')
 
   // Create a top-level Hono app
   const app = new Hono()
@@ -63,7 +63,7 @@ async function main() {
 
     // Close Nostr publisher WebSocket
     try {
-      const { getNostrPublisher } = await import('../../worker/lib/do-access')
+      const { getNostrPublisher } = await import('../../../apps/worker/lib/do-access')
       getNostrPublisher(env as any).close()
     } catch {}
 

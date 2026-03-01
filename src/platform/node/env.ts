@@ -41,13 +41,13 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
   await initPostgresPool()
 
   // Import DO classes dynamically
-  const { IdentityDO } = await import('../../worker/durable-objects/identity-do')
-  const { SettingsDO } = await import('../../worker/durable-objects/settings-do')
-  const { RecordsDO } = await import('../../worker/durable-objects/records-do')
-  const { ShiftManagerDO } = await import('../../worker/durable-objects/shift-manager')
-  const { CallRouterDO } = await import('../../worker/durable-objects/call-router')
-  const { ConversationDO } = await import('../../worker/durable-objects/conversation-do')
-  const { BlastDO } = await import('../../worker/durable-objects/blast-do')
+  const { IdentityDO } = await import('../../../apps/worker/durable-objects/identity-do')
+  const { SettingsDO } = await import('../../../apps/worker/durable-objects/settings-do')
+  const { RecordsDO } = await import('../../../apps/worker/durable-objects/records-do')
+  const { ShiftManagerDO } = await import('../../../apps/worker/durable-objects/shift-manager')
+  const { CallRouterDO } = await import('../../../apps/worker/durable-objects/call-router')
+  const { ConversationDO } = await import('../../../apps/worker/durable-objects/conversation-do')
+  const { BlastDO } = await import('../../../apps/worker/durable-objects/blast-do')
 
   // Read secrets
   const adminPubkey = readSecret('admin-pubkey', 'ADMIN_PUBKEY')

@@ -43,12 +43,13 @@ await esbuild.build({
 
       // Try resolving with common extensions if the exact path doesn't exist
       function resolveWithExtensions(basePath) {
-        if (existsSync(basePath)) return basePath
+        if (existsSync(basePath) && !fs.statSync(basePath).isDirectory()) return basePath
+        // Try adding extensions
         for (const ext of ['.ts', '.tsx', '.js', '.jsx']) {
           const withExt = basePath + ext
           if (existsSync(withExt)) return withExt
         }
-        // Try index files
+        // Try index files in directory
         for (const ext of ['.ts', '.tsx', '.js']) {
           const indexPath = path.join(basePath, 'index' + ext)
           if (existsSync(indexPath)) return indexPath
@@ -58,11 +59,11 @@ await esbuild.build({
 
       // Resolve @worker/* imports
       build.onResolve({ filter: /^@worker\// }, (args) => ({
-        path: resolveWithExtensions(path.resolve('src/worker', args.path.replace('@worker/', ''))),
+        path: resolveWithExtensions(path.resolve('apps/worker', args.path.replace('@worker/', ''))),
       }))
       // Resolve @shared/* imports
       build.onResolve({ filter: /^@shared\// }, (args) => ({
-        path: resolveWithExtensions(path.resolve('src/shared', args.path.replace('@shared/', ''))),
+        path: resolveWithExtensions(path.resolve('packages/shared', args.path.replace('@shared/', ''))),
       }))
       // Resolve @/* imports (client — shouldn't be used in server code, but just in case)
       build.onResolve({ filter: /^@\// }, (args) => ({

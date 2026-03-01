@@ -43,7 +43,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Resolve the Tauri debug binary path
 const binaryName = process.platform === 'win32' ? 'llamenos-desktop.exe' : 'llamenos-desktop'
-const application = path.resolve(__dirname, '..', '..', 'src-tauri', 'target', 'debug', binaryName)
+const application = path.resolve(__dirname, '..', '..', 'apps', 'desktop', 'target', 'debug', binaryName)
 
 let tauriDriver: ChildProcess | null = null
 let exitCalled = false

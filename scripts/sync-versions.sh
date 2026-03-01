@@ -58,12 +58,12 @@ echo "Source version (package.json): $VERSION"
 echo ""
 echo "Checking version files:"
 
-# 1. src-tauri/tauri.conf.json
-TAURI_CONF="$ROOT/src-tauri/tauri.conf.json"
+# 1. apps/desktop/tauri.conf.json
+TAURI_CONF="$ROOT/apps/desktop/tauri.conf.json"
 check_file "$TAURI_CONF" '(?<="version": ")[^"]*'
 
-# 2. src-tauri/Cargo.toml
-CARGO_TOML="$ROOT/src-tauri/Cargo.toml"
+# 2. apps/desktop/Cargo.toml
+CARGO_TOML="$ROOT/apps/desktop/Cargo.toml"
 check_file "$CARGO_TOML" '(?<=^version = ")[^"]*'
 
 # 3. deploy/helm/llamenos/Chart.yaml
@@ -101,13 +101,13 @@ if [[ "$FIX" == true ]]; then
   if [[ -f "$TAURI_CONF" ]]; then
     # Match the top-level "version" key (not nested ones)
     sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" "$TAURI_CONF"
-    echo "  FIXED src-tauri/tauri.conf.json → $VERSION"
+    echo "  FIXED apps/desktop/tauri.conf.json → $VERSION"
   fi
 
   # Fix Cargo.toml (first version = line)
   if [[ -f "$CARGO_TOML" ]]; then
     sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" "$CARGO_TOML"
-    echo "  FIXED src-tauri/Cargo.toml → $VERSION"
+    echo "  FIXED apps/desktop/Cargo.toml → $VERSION"
   fi
 
   # Fix Chart.yaml

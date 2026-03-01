@@ -4,8 +4,8 @@
  */
 import { getPool } from './postgres-pool'
 import { PostgresStorage } from './postgres-storage'
-import { runMigrations } from '../../../shared/migrations/runner'
-import { migrations } from '../../../shared/migrations'
+import { runMigrations } from '../../../../packages/shared/migrations/runner'
+import { migrations } from '../../../../packages/shared/migrations'
 
 export async function runStartupMigrations(): Promise<void> {
   if (migrations.length === 0) {

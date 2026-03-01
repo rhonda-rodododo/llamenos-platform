@@ -58,7 +58,7 @@ describe('Single Instance', () => {
   it('should reject a second instance launch', async () => {
     const binaryName = process.platform === 'win32' ? 'llamenos-desktop.exe' : 'llamenos-desktop'
     const binaryPath = path.resolve(
-      __dirname, '..', '..', '..', 'src-tauri', 'target', 'debug', binaryName,
+      __dirname, '..', '..', '..', 'apps', 'desktop', 'target', 'debug', binaryName,
     )
 
     const result = spawnSync(binaryPath, [], {

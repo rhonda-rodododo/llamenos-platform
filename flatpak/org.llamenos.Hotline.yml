@@ -54,8 +54,8 @@ modules:
   - name: llamenos-desktop
     buildsystem: simple
     build-commands:
-      # Symlink llamenos-core as sibling (Cargo.toml expects ../../llamenos-core)
-      - ln -sf /run/build/llamenos-core ../llamenos-core
+      # Symlink llamenos-core (Cargo.toml expects ../../../llamenos-core)
+      - ln -sf /run/build/llamenos-core ../../../llamenos-core
 
       # Install Node.js dependencies (offline from generated sources)
       - npm ci --offline
@@ -64,18 +64,18 @@ modules:
       - npx vite build
 
       # Build Tauri backend without updater (Flatpak manages updates)
-      - cd src-tauri && cargo build --release --no-default-features --features custom-protocol
+      - cd apps/desktop && cargo build --release --no-default-features --features custom-protocol
 
       # Install binary
-      - install -Dm755 src-tauri/target/release/llamenos-desktop /app/bin/llamenos-desktop
+      - install -Dm755 apps/desktop/target/release/llamenos-desktop /app/bin/llamenos-desktop
 
       # Install frontend assets
       - mkdir -p /app/share/llamenos/frontend
       - cp -r dist/client/* /app/share/llamenos/frontend/
 
       # Install icons
-      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.llamenos.Hotline.png
-      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/org.llamenos.Hotline.png
+      - install -Dm644 apps/desktop/icons/128x128.png /app/share/icons/hicolor/128x128/apps/org.llamenos.Hotline.png
+      - install -Dm644 apps/desktop/icons/32x32.png /app/share/icons/hicolor/32x32/apps/org.llamenos.Hotline.png
 
       # Install desktop entry and metainfo
       - install -Dm644 flatpak/org.llamenos.Hotline.desktop /app/share/applications/org.llamenos.Hotline.desktop

@@ -61,7 +61,7 @@ jobs:
         uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
         with:
           workspaces: |
-            src-tauri
+            apps/desktop
 
       - name: Install Linux deps
         if: matrix.platform == 'ubuntu-22.04'
@@ -87,7 +87,7 @@ jobs:
       # Replace local path dep with git dep so Cargo fetches from GitHub
       - name: Use llamenos-core from GitHub
         shell: bash
-        run: sed -i 's|llamenos-core = { path = "../../llamenos-core" }|llamenos-core = { git = "https://github.com/rhonda-rodododo/llamenos-core.git" }|' src-tauri/Cargo.toml
+        run: sed -i 's|llamenos-core = { path = "../../../llamenos-core" }|llamenos-core = { git = "https://github.com/rhonda-rodododo/llamenos-core.git" }|' apps/desktop/Cargo.toml
 
       # Sync version from tag into tauri.conf.json and package.json
       - name: Sync version from tag
@@ -103,9 +103,9 @@ jobs:
           # Update tauri.conf.json
           node -e "
             const fs = require('fs');
-            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf-8'));
+            const conf = JSON.parse(fs.readFileSync('apps/desktop/tauri.conf.json', 'utf-8'));
             conf.version = '${VERSION}';
-            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+            fs.writeFileSync('apps/desktop/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
           "
 
           # Update package.json (for Vite build metadata)
@@ -157,14 +157,14 @@ jobs:
         with:
           name: tauri-${{ matrix.os_label }}
           path: |
-            src-tauri/target/**/release/bundle/**/*.app.tar.gz
-            src-tauri/target/**/release/bundle/**/*.app.tar.gz.sig
-            src-tauri/target/**/release/bundle/**/*.dmg
-            src-tauri/target/**/release/bundle/**/*.nsis.zip
-            src-tauri/target/**/release/bundle/**/*.nsis.zip.sig
-            src-tauri/target/**/release/bundle/**/*.AppImage
-            src-tauri/target/**/release/bundle/**/*.AppImage.sig
-            src-tauri/target/**/release/bundle/**/*.deb
+            apps/desktop/target/**/release/bundle/**/*.app.tar.gz
+            apps/desktop/target/**/release/bundle/**/*.app.tar.gz.sig
+            apps/desktop/target/**/release/bundle/**/*.dmg
+            apps/desktop/target/**/release/bundle/**/*.nsis.zip
+            apps/desktop/target/**/release/bundle/**/*.nsis.zip.sig
+            apps/desktop/target/**/release/bundle/**/*.AppImage
+            apps/desktop/target/**/release/bundle/**/*.AppImage.sig
+            apps/desktop/target/**/release/bundle/**/*.deb
           retention-days: 5
 
   # ─── Flatpak Build ────────────────────────────────────────────

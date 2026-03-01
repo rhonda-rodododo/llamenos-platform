@@ -21,11 +21,11 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js'
 import { secp256k1, schnorr } from '@noble/curves/secp256k1.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
-import * as labels from '../src/shared/crypto-labels'
+import * as labels from '../packages/shared/crypto-labels'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const VECTORS_PATH = resolve(__dirname, '../../llamenos-core/tests/fixtures/test-vectors.json')
+const VECTORS_PATH = resolve(__dirname, '../packages/crypto/tests/fixtures/test-vectors.json')
 
 // Skip if test vectors haven't been generated yet
 const hasVectors = existsSync(VECTORS_PATH)

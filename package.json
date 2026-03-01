@@ -3,8 +3,12 @@
   "version": "0.18.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "site"
+  ],
   "scripts": {
-    "dev": "bunx tauri dev",
+    "dev": "bunx tauri dev --project-path apps/desktop",
     "dev:vite": "vite",
     "build": "vite build",
     "deploy": "bun run deploy:api && bun run deploy:site",
@@ -27,9 +31,9 @@
     "changelog": "git-cliff --output CHANGELOG.md",
     "changelog:preview": "git-cliff --unreleased",
     "version:bump": "bun run scripts/bump-version.ts",
-    "tauri:dev": "bunx tauri dev",
-    "tauri:build": "bunx tauri build",
-    "tauri:icon": "bunx tauri icon"
+    "tauri:dev": "bunx tauri dev --project-path apps/desktop",
+    "tauri:build": "bunx tauri build --project-path apps/desktop",
+    "tauri:icon": "bunx tauri icon --project-path apps/desktop"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.993.0",

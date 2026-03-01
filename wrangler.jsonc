@@ -1,6 +1,6 @@
 {
   "name": "llamenos",
-  "main": "src/worker/index.ts",
+  "main": "apps/worker/index.ts",
   "compatibility_date": "2025-04-23",
   "compatibility_flags": ["nodejs_compat"],
 

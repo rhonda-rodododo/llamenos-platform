@@ -10,8 +10,8 @@
  *
  * This will:
  *   1. Bump the version in package.json
- *   2. Sync version to src-tauri/tauri.conf.json
- *   3. Sync version to src-tauri/Cargo.toml
+ *   2. Sync version to apps/desktop/tauri.conf.json
+ *   3. Sync version to apps/desktop/Cargo.toml
  *   4. Sync appVersion in deploy/helm/llamenos/Chart.yaml
  *   5. Sync version in flatpak/org.llamenos.Hotline.metainfo.xml (latest release)
  *   6. Commit the version change
@@ -28,8 +28,8 @@ import { resolve } from 'path'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const PKG_PATH = resolve(ROOT, 'package.json')
-const TAURI_CONF_PATH = resolve(ROOT, 'src-tauri/tauri.conf.json')
-const CARGO_TOML_PATH = resolve(ROOT, 'src-tauri/Cargo.toml')
+const TAURI_CONF_PATH = resolve(ROOT, 'apps/desktop/tauri.conf.json')
+const CARGO_TOML_PATH = resolve(ROOT, 'apps/desktop/Cargo.toml')
 const CHART_PATH = resolve(ROOT, 'deploy/helm/llamenos/Chart.yaml')
 const METAINFO_PATH = resolve(ROOT, 'flatpak/org.llamenos.Hotline.metainfo.xml')
 
@@ -56,7 +56,7 @@ function updateTauriConf(newVersion: string): void {
   const conf = JSON.parse(readFileSync(TAURI_CONF_PATH, 'utf-8'))
   conf.version = newVersion
   writeFileSync(TAURI_CONF_PATH, JSON.stringify(conf, null, 2) + '\n')
-  console.log(`  src-tauri/tauri.conf.json → ${newVersion}`)
+  console.log(`  apps/desktop/tauri.conf.json → ${newVersion}`)
 }
 
 function updateCargoToml(newVersion: string): void {
@@ -67,7 +67,7 @@ function updateCargoToml(newVersion: string): void {
     `$1"${newVersion}"`
   )
   writeFileSync(CARGO_TOML_PATH, content)
-  console.log(`  src-tauri/Cargo.toml → ${newVersion}`)
+  console.log(`  apps/desktop/Cargo.toml → ${newVersion}`)
 }
 
 function updateChartYaml(newVersion: string): void {
@@ -133,7 +133,7 @@ updateMetainfo(newVersion)
 
 // Commit version bump
 const tagMessage = description || `release v${newVersion}`
-run('git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml deploy/helm/llamenos/Chart.yaml flatpak/org.llamenos.Hotline.metainfo.xml')
+run('git add package.json apps/desktop/tauri.conf.json apps/desktop/Cargo.toml deploy/helm/llamenos/Chart.yaml flatpak/org.llamenos.Hotline.metainfo.xml')
 run(`git commit -m "chore: bump version to ${newVersion}"`)
 
 // Create annotated tag
