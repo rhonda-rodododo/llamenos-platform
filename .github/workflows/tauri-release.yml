@@ -171,8 +171,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      # Note: Flatpak manifest handles llamenos-core via its own git source + symlink.
-      # The path dep in Cargo.toml is resolved by the symlink created in the build commands.
+      # Note: Flatpak manifest builds from the monorepo — packages/crypto is in-repo.
 
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@92ae9851ad316786193b1fd3f40c4b51eb5cb101 # v6.6
