@@ -167,6 +167,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
             <div className="space-y-1">
               <Label>{t('customFields.fieldType')}</Label>
               <select
+                data-testid="field-type-select"
                 value={editing.type || 'text'}
                 onChange={e => setEditing(prev => ({ ...prev!, type: e.target.value as CustomFieldDefinition['type'] }))}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -182,6 +183,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
             <div className="space-y-1">
               <Label>{t('customFields.context', { defaultValue: 'Appears In' })}</Label>
               <select
+                data-testid="field-context-select"
                 value={editing.context || 'all'}
                 onChange={e => setEditing(prev => ({ ...prev!, context: e.target.value as CustomFieldContext }))}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"

@@ -57,7 +57,7 @@ test.describe('Custom Note Fields', () => {
     await page.getByPlaceholder('e.g. Severity Rating').fill('Category')
 
     // Change type to Select
-    await page.locator('select').selectOption('select')
+    await page.locator('[data-testid="field-type-select"]').selectOption('select')
 
     // Add options
     await page.getByRole('button', { name: /add option/i }).click()

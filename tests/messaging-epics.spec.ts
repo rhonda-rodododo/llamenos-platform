@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, completeProfileSetup, uniquePhone, navigateAfterLogin } from './helpers'
+import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, dismissNsecCard, completeProfileSetup, uniquePhone, navigateAfterLogin } from './helpers'
 
 /**
  * E2E tests for Epics 68-73: Two-way Messaging
@@ -193,24 +193,27 @@ test.describe('Epic 70: Conversation Reassignment UI', () => {
   let volunteer2Nsec: string
   let volunteer1Pubkey: string
   let volunteer2Pubkey: string
+  const suffix = Date.now()
+  const vol1Name = `Reassign Vol1 ${suffix}`
+  const vol2Name = `Reassign Vol2 ${suffix}`
 
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage()
     await loginAsAdmin(page)
 
     // Create two volunteers
-    volunteer1Nsec = await createVolunteerAndGetNsec(page, 'Reassign Vol1', uniquePhone())
-    await page.getByText('Close').click()
+    volunteer1Nsec = await createVolunteerAndGetNsec(page, vol1Name, uniquePhone())
+    await dismissNsecCard(page)
 
-    volunteer2Nsec = await createVolunteerAndGetNsec(page, 'Reassign Vol2', uniquePhone())
-    await page.getByText('Close').click()
+    volunteer2Nsec = await createVolunteerAndGetNsec(page, vol2Name, uniquePhone())
+    await dismissNsecCard(page)
 
     // Get pubkeys
     const listResult = await apiCall(page, 'GET', '/volunteers')
-    const vol1 = listResult.body.volunteers.find((v: { name: string }) => v.name === 'Reassign Vol1')
-    const vol2 = listResult.body.volunteers.find((v: { name: string }) => v.name === 'Reassign Vol2')
-    volunteer1Pubkey = vol1.pubkey
-    volunteer2Pubkey = vol2.pubkey
+    const vol1 = listResult.body.volunteers.find((v: { name: string }) => v.name === vol1Name)
+    const vol2 = listResult.body.volunteers.find((v: { name: string }) => v.name === vol2Name)
+    volunteer1Pubkey = vol1!.pubkey
+    volunteer2Pubkey = vol2!.pubkey
 
     await page.close()
   })

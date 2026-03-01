@@ -87,12 +87,12 @@ export const Navigation = {
 
   async goToReports(page: Page): Promise<void> {
     await page.getByRole('link', { name: 'Reports' }).click()
-    await expect(page.getByRole('heading', { name: /reports/i })).toBeVisible()
+    await expect(page.locator('h1', { hasText: /reports/i })).toBeVisible()
   },
 
   async goToConversations(page: Page): Promise<void> {
     await page.getByRole('link', { name: 'Conversations' }).click()
-    await expect(page.getByRole('heading', { name: /conversations/i })).toBeVisible()
+    await expect(page.locator('h1', { hasText: /conversations/i })).toBeVisible()
   },
 
   async goToBlasts(page: Page): Promise<void> {

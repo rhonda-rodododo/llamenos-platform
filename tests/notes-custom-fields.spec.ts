@@ -5,11 +5,11 @@ import { loginAsAdmin } from './helpers'
  * End-to-end: custom fields defined in admin settings → used in notes forms.
  * Tests the full lifecycle: create field → create note with field value →
  * verify badge display → edit note → verify pre-fill → update value.
+ *
+ * Each test is self-contained — creates its own prerequisites within a single
+ * page context so the Tauri IPC mock's in-memory note key store works correctly.
  */
 test.describe('Custom Fields in Notes', () => {
-  // Tests depend on each other's server-side state (field from test 1, note from test 2, etc.)
-  test.describe.configure({ mode: 'serial' })
-
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page)
   })
@@ -38,6 +38,18 @@ test.describe('Custom Fields in Notes', () => {
     await expect(page.getByText(/success/i)).toBeVisible({ timeout: 10000 })
   }
 
+  /** Create a note with a custom field value (within same page context for mock round-trip) */
+  async function createNoteWithField(page: Page, text: string, fieldLabel: string, fieldValue: string) {
+    await page.getByRole('link', { name: 'Notes' }).click()
+    await expect(page.getByRole('heading', { name: /call notes/i })).toBeVisible()
+    await page.getByRole('button', { name: /new note/i }).click()
+    await page.locator('#call-id').fill('cf-test-' + Date.now())
+    await page.locator('textarea').first().fill(text)
+    await page.getByLabel(fieldLabel).fill(fieldValue)
+    await page.getByRole('button', { name: /save/i }).click()
+    await expect(page.locator('p').filter({ hasText: text })).toBeVisible()
+  }
+
   test('custom fields appear in new note form', async ({ page }) => {
     await createCustomTextField(page, 'Priority Level')
 
@@ -49,62 +61,44 @@ test.describe('Custom Fields in Notes', () => {
     await page.getByRole('button', { name: /new note/i }).click()
 
     // Custom field label should appear in the form
-    const fieldInput = page.locator('#new-field-priority_level')
-    await expect(fieldInput).toBeVisible()
+    await expect(page.getByLabel('Priority Level')).toBeVisible()
   })
 
   test('create note with custom field value shows badge', async ({ page }) => {
-    // Field created in previous test persists (sequential, no reset between tests)
-    await page.getByRole('link', { name: 'Notes' }).click()
-    await expect(page.getByRole('heading', { name: /call notes/i })).toBeVisible()
-
-    // Create a note with custom field
-    await page.getByRole('button', { name: /new note/i }).click()
-    await page.locator('#call-id').fill('cf-test-' + Date.now())
-
-    // Fill note text (first textarea in the new note form)
-    await page.locator('textarea').first().fill('Note with priority field')
-
-    // Fill the custom field
-    await page.locator('#new-field-priority_level').fill('High')
-
-    // Save
-    await page.getByRole('button', { name: /save/i }).click()
-
-    // Note text should appear
-    await expect(page.locator('p').filter({ hasText: 'Note with priority field' })).toBeVisible()
+    await createCustomTextField(page, 'Priority Level')
+    await createNoteWithField(page, 'Note with priority field', 'Priority Level', 'High')
 
     // Custom field value should appear as a badge
     await expect(page.getByText('Priority Level: High')).toBeVisible()
   })
 
   test('edit form shows custom fields pre-filled', async ({ page }) => {
-    await page.getByRole('link', { name: 'Notes' }).click()
-    await expect(page.getByRole('heading', { name: /call notes/i })).toBeVisible()
+    await createCustomTextField(page, 'Priority Level')
+    await createNoteWithField(page, 'Note for edit prefill', 'Priority Level', 'High')
 
-    // Badge from previous test should be visible
-    await expect(page.getByText('Priority Level: High').first()).toBeVisible()
+    // Badge should be visible
+    await expect(page.getByText('Priority Level: High')).toBeVisible()
 
-    // Click edit on the note that has our badge
-    const noteCard = page.locator('.py-4').filter({ hasText: 'Note with priority field' }).first()
+    // Click edit on the note
+    const noteCard = page.locator('.py-4').filter({ hasText: 'Note for edit prefill' }).first()
     await noteCard.locator('button[aria-label="Edit"]').click()
 
     // The custom field input should be pre-filled
-    const fieldInput = page.locator('#edit-field-priority_level')
+    const fieldInput = page.getByLabel('Priority Level')
     await expect(fieldInput).toBeVisible()
     await expect(fieldInput).toHaveValue('High', { timeout: 10000 })
   })
 
   test('can update custom field value via edit', async ({ page }) => {
-    await page.getByRole('link', { name: 'Notes' }).click()
-    await expect(page.getByRole('heading', { name: /call notes/i })).toBeVisible()
+    await createCustomTextField(page, 'Priority Level')
+    await createNoteWithField(page, 'Note to update field', 'Priority Level', 'High')
 
     // Click edit on the specific note
-    const noteCard = page.locator('.py-4').filter({ hasText: 'Note with priority field' }).first()
+    const noteCard = page.locator('.py-4').filter({ hasText: 'Note to update field' }).first()
     await noteCard.locator('button[aria-label="Edit"]').click()
 
     // Change the field value
-    const fieldInput = page.locator('#edit-field-priority_level')
+    const fieldInput = page.getByLabel('Priority Level')
     await fieldInput.clear()
     await fieldInput.fill('Critical')
 
@@ -117,25 +111,25 @@ test.describe('Custom Fields in Notes', () => {
   })
 
   test('edit preserves note text when changing field value', async ({ page }) => {
-    await page.getByRole('link', { name: 'Notes' }).click()
-    await expect(page.getByRole('heading', { name: /call notes/i })).toBeVisible()
+    await createCustomTextField(page, 'Priority Level')
+    await createNoteWithField(page, 'Note text to preserve', 'Priority Level', 'Medium')
 
     // Click edit on the specific note
-    const noteCard = page.locator('.py-4').filter({ hasText: 'Note with priority field' }).first()
+    const noteCard = page.locator('.py-4').filter({ hasText: 'Note text to preserve' }).first()
     await noteCard.locator('button[aria-label="Edit"]').click()
 
     // Verify textarea has existing text
     const textarea = page.locator('textarea').first()
-    await expect(textarea).toHaveValue('Note with priority field')
+    await expect(textarea).toHaveValue('Note text to preserve')
 
     // Change field value without changing text
-    const fieldInput = page.locator('#edit-field-priority_level')
+    const fieldInput = page.getByLabel('Priority Level')
     await fieldInput.clear()
     await fieldInput.fill('Low')
     await page.getByRole('button', { name: /save/i }).click()
 
     // Both text and field should be preserved on the specific note
-    await expect(noteCard.getByText('Note with priority field')).toBeVisible()
+    await expect(noteCard.getByText('Note text to preserve')).toBeVisible()
     await expect(noteCard.getByText('Priority Level: Low')).toBeVisible()
   })
 })

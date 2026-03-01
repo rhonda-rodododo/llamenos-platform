@@ -158,8 +158,10 @@ test.describe('Shift management', () => {
     const fallbackSelect = fallbackCard.getByRole('combobox')
     await fallbackSelect.click()
 
-    // Select the volunteer
-    await page.getByRole('option', { name: new RegExp(volName) }).click()
+    // Select the volunteer (wait for the option to appear in the dropdown)
+    const option = page.getByRole('option', { name: new RegExp(volName) })
+    await option.waitFor({ state: 'visible', timeout: 5000 })
+    await option.click()
     await page.keyboard.press('Escape')
 
     // Volunteer badge should appear
