@@ -1,0 +1,263 @@
+{
+  "version": "2",
+  "generatedBy": "llamenos-core interop test v2",
+  "keys": {
+    "secretKeyHex": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+    "publicKeyHex": "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+    "nsec": "nsec17aq95wjlmw8hk28us9xf58kehpq8f8p7uj7klh0u57j5u6hjsfysnvf87w",
+    "npub": "npub1l63xpsxh0mj570dmtqtsw7fze22m8k65zlzdvdeux9vhmpgp9t0qugqefd",
+    "adminSecretKeyHex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "adminPublicKeyHex": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+    "wrongSecretKeyHex": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+    "wrongPublicKeyHex": "4deb5e4bf849790657361d0559b96d9277fdfcf02f6f78f021e834b7282c9db8"
+  },
+  "ecies": {
+    "envelope": {
+      "wrappedKey": "4b960b15d16eadad79bb6a9d2010ea74f5561fa115c1b936ac1f7ce39b527d4338fa5eaf8aaf8b8da7357583c098361f3398bead6d0ef6c6d1b7feec9cbe4854b8ac67f6a0f352fb",
+      "ephemeralPubkey": "026a04d64d60e2582105c96862db70e407aaf32fcfc243f14425c764f6467b6a9f"
+    },
+    "originalKeyHex": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+    "label": "llamenos:note-key",
+    "recipientPubkeyHex": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f"
+  },
+  "noteEncryption": {
+    "plaintextJson": "{\"text\":\"Test note for interop\",\"fields\":{\"severity\":\"high\"}}",
+    "authorPubkey": "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+    "adminPubkeys": [
+      "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f"
+    ],
+    "encrypted": {
+      "encryptedContent": "5c4c2648fdafe1323c6bdd0670f6b94902e66b1ba31d3a3554a418e749caa7dc254c2f47d05d5b2fd7ea02ceec8704ca67b7c899c41fb94281effcc4b26b81222dd982f31a8f5d52d4e76caf0954f6a25a408731737d1a7f71b93f7ee0b97e95e0dd329d5e",
+      "authorEnvelope": {
+        "wrappedKey": "8cf93488d3784a647eb25676a7219acfa7c9f4c9edf4d664c9b711e91f604d7c5e7fb0a4f7e5ace3774693d0dd43db67e568cf65b92146a7daad4d6f8a6b7cdfb96cf3cff1783c6f",
+        "ephemeralPubkey": "024e911ad29338a4845598186dc7902cfa9ff1f442592ca37ebd46d575a89993a2"
+      },
+      "adminEnvelopes": [
+        {
+          "pubkey": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+          "wrappedKey": "18c32a1025bf18c9c79b1d0b25502ce3c5edd552a068cf363ce19537b29645171f08a249b7451424fd49b3e10d732d6ca5df6fc4292e4b80da562807be014a70bf1a4f0418f4c32e",
+          "ephemeralPubkey": "02e658d90b61df6131f1cbe113177d9027c4557f4dbb87a74a9a06489c564c7e12"
+        }
+      ]
+    },
+    "authorCanDecrypt": true,
+    "adminCanDecrypt": true
+  },
+  "auth": {
+    "secretKeyHex": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+    "timestamp": 1708900000000,
+    "method": "POST",
+    "path": "/api/notes",
+    "token": {
+      "pubkey": "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+      "timestamp": 1708900000000,
+      "token": "34711b58bb7523a45cacce77377308ab323c78a91f0d3e87c05e084b1a39609647c88602359b7f4d63c39767855b1f632087457b8f4fea76c8397265da1d3904"
+    },
+    "valid": true
+  },
+  "pinEncryption": {
+    "pin": "1234",
+    "nsec": "nsec17aq95wjlmw8hk28us9xf58kehpq8f8p7uj7klh0u57j5u6hjsfysnvf87w",
+    "pubkeyHex": "fea260c0d77ee54f3dbb5817077922ca95b3db5417c4d6373c31597d85012ade",
+    "encrypted": {
+      "salt": "06bdf55cceb4929cea684337c9c09785",
+      "iterations": 600000,
+      "nonce": "460c8f32d0666cc2f785674a09f543945865a674e6ce1a7d",
+      "ciphertext": "93ac5784f479de9bacdfd41482d322b379a6cbbf15b1f7fd3fc4e4cc9c6c244b0119803922512e9fd2a48951f3bf9f4330c78224738dba3a8e05c9ac36ae5aa080b437995eca59fabaad77791d9571",
+      "pubkey": "78cdcd6b9eaf74e1"
+    },
+    "decryptable": true
+  },
+  "draftEncryption": {
+    "plaintext": "Draft note content for interop test",
+    "secretKeyHex": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+    "encryptedHex": "efd023db02acb1c877e87e128d304506d315ed5a9e8a08c3f13cc66953622259144c357d9acfba2f529d59be5e07e68aa29d013df4b624bf659a7b71cce91790314daaa4b6dae2875a9765",
+    "decryptable": true
+  },
+  "labels": {
+    "labelNoteKey": "llamenos:note-key",
+    "labelFileKey": "llamenos:file-key",
+    "labelFileMetadata": "llamenos:file-metadata",
+    "labelHubKeyWrap": "llamenos:hub-key-wrap",
+    "labelTranscription": "llamenos:transcription",
+    "labelMessage": "llamenos:message",
+    "labelCallMeta": "llamenos:call-meta",
+    "labelShiftSchedule": "llamenos:shift-schedule",
+    "hkdfSalt": "llamenos:hkdf-salt:v1",
+    "hkdfContextNotes": "llamenos:notes",
+    "hkdfContextDrafts": "llamenos:drafts",
+    "hkdfContextExport": "llamenos:export",
+    "labelHubEvent": "llamenos:hub-event",
+    "labelDeviceProvision": "llamenos:device-provision",
+    "sasSalt": "llamenos:sas",
+    "sasInfo": "llamenos:provisioning-sas",
+    "authPrefix": "llamenos:auth:",
+    "hmacPhonePrefix": "llamenos:phone:",
+    "hmacIpPrefix": "llamenos:ip:",
+    "hmacKeyidPrefix": "llamenos:keyid:",
+    "hmacSubscriber": "llamenos:subscriber",
+    "hmacPreferenceToken": "llamenos:preference-token",
+    "recoverySalt": "llamenos:recovery",
+    "labelBackup": "llamenos:backup",
+    "labelServerNostrKey": "llamenos:server-nostr-key",
+    "labelServerNostrKeyInfo": "llamenos:server-nostr-key:v1",
+    "labelPushWake": "llamenos:push-wake",
+    "labelPushFull": "llamenos:push-full"
+  },
+  "messageEncryption": {
+    "plaintext": "Hello from volunteer — E2EE message interop test",
+    "readerPubkeys": [
+      "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+      "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f"
+    ],
+    "encrypted": {
+      "encryptedContent": "279fecd442f57ae4a67ed60fe4741eb25249e33527eead0221b65f8c079210bae056ac68f4d73bc27ddb83b1a8213086417f1a65ea44e2c4561cab8e3ca5735c7cbf2ea9f2423bb44b99da7d20a614fd6efd0d4c753aa1ce0aa8",
+      "readerEnvelopes": [
+        {
+          "pubkey": "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+          "wrappedKey": "8f62fb3045fa494a731278df85d6dd30a83a6aba54b17af4b9f5865ad23f4e0a84f7e944dc3a8b652e646bf783051132a091784b2e63e5adf0bad21feeab52f37c0899b88ec76fa8",
+          "ephemeralPubkey": "0352c6b2b03a0d86ca8a7249e87687c4c4b34cb473e49abc4410244f9782349516"
+        },
+        {
+          "pubkey": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+          "wrappedKey": "c85ad73f3cb7c23ba1b943d943c16966a68d2e2bb8d5d5e1846d4d3a65c482f5ef5d783c2a36a371190e8b1828b6484758675917203db5dfcd27fa26fe74261d6fcaea53bea6f965",
+          "ephemeralPubkey": "0204f68f054e033850366e769ea33ef0481d31f771cc1421028c0688d21a0f791e"
+        }
+      ]
+    },
+    "volunteerCanDecrypt": true,
+    "adminCanDecrypt": true
+  },
+  "hubKey": {
+    "hubKeyHex": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe",
+    "memberPubkeys": [
+      "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+      "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f"
+    ],
+    "wrappedEnvelopes": [
+      {
+        "wrappedKey": "c45f93d2ce85cf8d9e5520c3f85f8f329589aedcbb61c2c0be269f73fa6b19ed67bc0a3a95d302360fbeff56bbd84376fb46f8b4219ab5f7b52ffefdbb64bf287f4b038999c74656",
+        "ephemeralPubkey": "022e5fed9d6c900b43d837e5da3812b1f148005a103c1e0c5aa845b2fb13ef6c64"
+      },
+      {
+        "wrappedKey": "1ea322fc01c9cdfb9a723d5a6a8898f2e53ba4a7f91f588a8e9b3c88f6ed272c861fac8c4e2c12f27e63ad66971625ab3160d0ba0f91a0dac1987e79fb30e44fba47efb15fc1a159",
+        "ephemeralPubkey": "033ef5f1e2f24a2bb52727b65c089da0033b61ccf6baca4037dc5c54c26dfbfbb9"
+      }
+    ],
+    "label": "llamenos:hub-key-wrap"
+  },
+  "nostrEvent": {
+    "event": {
+      "id": "d9f792804335b457f70825d689158558ffd9713d22b9e5044f7f45eb9dc73e7e",
+      "pubkey": "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+      "createdAt": 1700000000,
+      "kind": 20001,
+      "tags": [
+        [
+          "d",
+          "test-hub-id"
+        ],
+        [
+          "t",
+          "llamenos:event"
+        ]
+      ],
+      "content": "encrypted-payload-for-interop",
+      "sig": "465e608019fbcac04652ad0d1198f5de6d45d2684773883e548c7bd61563a74f78013cb9be9a13f9ccfd7a2efaf62fd8f96ffdd2c089aa316f00b1f1cc1c1d8f"
+    },
+    "canonicalJson": "[0,\"142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9\",1700000000,20001,[[\"d\",\"test-hub-id\"],[\"t\",\"llamenos:event\"]],\"encrypted-payload-for-interop\"]"
+  },
+  "exportEncryption": {
+    "plaintextJson": "{\"notes\":[{\"id\":\"abc\",\"text\":\"test\"}],\"exportedAt\":\"2024-01-01T00:00:00Z\"}",
+    "secretKeyHex": "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+    "encryptedBase64": "K1deqQxom2vMhEMQEnHKWgDpwjGiS3UflCztCouOeJCeUgFQgtZEBxfymDY99kPo2zXplspmLsN8J95rtUleOvmzab6Yjumu2juhgWk/ptFsJWFI0c/fwYZm75ZiOKJCBM5C4YItzabpk5Bg3RiTTTl9"
+  },
+  "callRecord": {
+    "plaintextJson": "{\"answeredBy\":\"vol-pubkey-here\",\"callerNumber\":\"+15551234567\",\"duration\":120}",
+    "adminPubkeys": [
+      "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f"
+    ],
+    "encryptedContent": "0be147c1de4f5bd8139b8cd4c9fc238779dfe3e0c15190fe168f85c2be0852eef62da0142406e402518514f6fe05b2369a915a4ba63abe9ecc2256aa71fde2600c47a9410aa74105c5cda57972593d685c09b057af2ee98b69b77c6959a95f9fff00569217fed0f932fbd1dbd83029fc47a245427d",
+    "adminEnvelopes": [
+      {
+        "pubkey": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+        "wrappedKey": "421da56b42f52ca26c2c653080b149bcb1634c282270928f57fc63244c57e9eede009ed8cc696f0cacd63dc54020a85278b79c51e76f21a065d3a1191251a5c9bcbe4a1cf7b13686",
+        "ephemeralPubkey": "0388ade600115123221f0c96091ee85f6d66b5696a5315877ddef9110e2275dcda"
+      }
+    ],
+    "adminCanDecrypt": true
+  },
+  "domainSeparation": {
+    "originalKeyHex": "1111111111111111111111111111111111111111111111111111111111111111",
+    "recipientPubkeyHex": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+    "wrappedWithNoteLabel": {
+      "wrappedKey": "37b87fe2d184170a8a1be4dac74f769b5ad093b0b52f5c3b102ea8328acc27775629ba92f6c1149a812e79dcf436b2b14b29819a6c1b28561ac5750093ba01e2160dfcc537ff3ac6",
+      "ephemeralPubkey": "023f39bfcb89fcee0f9127aa6948c9d6590cc62eb14a19a2e0b2f53631b0aa3d09"
+    },
+    "wrappedWithMessageLabel": {
+      "wrappedKey": "11161916302e73db53a5ea8baf3d8e9be6ed7bf96761fbffe041aa3f86afe91d6fd31641f1cf1bb7b1b108ace5331db1766fdb6a910b835a215ef4870f8d0caea424a3d57de0e61c",
+      "ephemeralPubkey": "02b47c6944d68ff94e0dbebd9e03bbceec1b91e1b89b763f8fb6c96b1ddaad5017"
+    },
+    "wrappedWithHubLabel": {
+      "wrappedKey": "27a886d393e892c92868572e3d649c39ed8bb39d32cc3b7e9875035d696e702c13905ae30ae03535c350c24658c3a90d2fb1230464fd7d89ee553dceab83c39f4e966b5b2c060581",
+      "ephemeralPubkey": "03169bd0d7148218d46175056ab345ec98dbfd6914d39e646a92a997e5a6b1262f"
+    }
+  },
+  "adversarial": {
+    "ecies": {
+      "validEnvelope": {
+        "wrappedKey": "44b5a563e6ee88ebdc1d1cea4d94d433e936c9ffdc71a726497ec2a83c9c106a105a153194c5eacddc8c8f4962bafe04c480925e76abb61b579cf5ccc9dc00776266adc8101ce08e",
+        "ephemeralPubkey": "035fb562b66f20d80f54fb9f12047bba9393826ee9945f14488aea2913e98d4287"
+      },
+      "validLabel": "llamenos:note-key",
+      "tamperedWrappedKey": "44b5a563e6ee88ebdc1d1cea4d94d433e936c9ffdc71a726497ec2a83c9c106a105a153194c5eacddc8c8f4962bafe04c480925e76abb61b579cf5ccc9dc00776266adc8101ce08f",
+      "truncatedWrappedKey": "44b5a563e6ee88ebdc1d1cea4d94d433e936c9ffdc71a726497ec2a83c9c106a105a153194c5eacddc8c8f4962bafe04c480925e76abb61b579cf5ccc9dc00776266adc8101ce0"
+    },
+    "note": {
+      "validEncrypted": {
+        "encryptedContent": "3641b962fee97a0a133464ad222dbefe2b13669ada345ea2b8d8ad6f0737b359d5d7fc20489f411232b5e326f9ea862e077ab93dbd897cd8ccfff7f64c3fb38ec9a0155fa03a498a4d0e2462113d9e4591d4aeea3a994e08464361ed7176ffc29c446ec407",
+        "authorEnvelope": {
+          "wrappedKey": "1cdb42f2f74fb46ba7483f52390493df0370261b42d3396ebaa3b27cbea563470c711fc074daaed5fa0e3129d4ceeb71059b726d5e16e2369f706b2d389a58608268a4e8a4b9dde8",
+          "ephemeralPubkey": "02ff9dde9c70acec466c3fc814665f05e16952fde1d07215437382b59852e7dfa5"
+        },
+        "adminEnvelopes": [
+          {
+            "pubkey": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+            "wrappedKey": "a542fe075289468b44f41ae44967e626644da2af6830287b2b584077cc266666d243ee5665f5f9caa0c0e01ed52ca18be4103ec9270f907b3e3a9eea88824d839c58e3dff120c49d",
+            "ephemeralPubkey": "03a033b1fec946784809f68708dfdabaabb87251b1d68b19192fce85b539d47f6a"
+          }
+        ]
+      },
+      "tamperedContent": "3641b962fee97a0a133464ad222dbefe2b13669ada345ea2b8d8ad6f0737b359d5d7fc20489f411232b5e326f9ea862e077ab93dbd897cd8ccfff7f64c3fb38ec9a0155fa03a498a4d0e2462113d9e4591d4aeea3a994e08464361ed7176ffc29c446ec406"
+    },
+    "auth": {
+      "validToken": {
+        "pubkey": "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+        "timestamp": 1708900000000,
+        "token": "a7822590cb6f26339ec6565cf0fe5f847d9be7f160bd069300cd547f88821bc023ad76c6c425a373ff8f6d01cf9b4fa3c512407ae44cd2621815b48bfda45107"
+      },
+      "validMethod": "GET",
+      "validPath": "/api/notes",
+      "expiredTimestamp": 1708899640000,
+      "wrongMethod": "POST",
+      "wrongPath": "/api/calls"
+    },
+    "message": {
+      "validEncrypted": {
+        "encryptedContent": "fcd3ad7aa36259d157d44c99835629243c513393e2bec6b673f2934b1e9482dc49d13235dc52b98a0b4e41f930fa5881863a3d137568806845c7d5",
+        "readerEnvelopes": [
+          {
+            "pubkey": "142715675faf8da1ecc4d51e0b9e539fa0d52fdd96ed60dbe99adb15d6b05ad9",
+            "wrappedKey": "7f52b76a0b471635cbfb3a074da4c74658406f4424792dfd5a8f2ac1896d8c461c6ecbc50a211356d427d6a24ec0d7769fdcf74d85551a968f4ed3c91b5afe66b15d9737873d8d42",
+            "ephemeralPubkey": "03f058abe9e644d0852f900f7f2106a30ca3430dea7d8d40ea142a435721bccb12"
+          },
+          {
+            "pubkey": "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+            "wrappedKey": "fc6d1587e2d3d83ffd1f8e92b314261625710adc43afabd21832b653ee48d880c8b389fbaf54423090ba6f6e95c215edab4c921ea948ba78587b41ee7984402d1842ec16cb391629",
+            "ephemeralPubkey": "0389658b75f92f85396c05b8fdd450b9ba82a32d1bd6f615634dfc585c0e6d5866"
+          }
+        ]
+      }
+    }
+  }
+}

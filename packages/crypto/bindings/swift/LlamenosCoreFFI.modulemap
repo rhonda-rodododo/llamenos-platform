@@ -1,0 +1,4 @@
+module LlamenosCoreFFI {
+    header "LlamenosCoreFFI.h"
+    export *
+}

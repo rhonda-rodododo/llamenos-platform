@@ -1,0 +1,345 @@
+# Release workflow for llamenos-core shared crypto crate.
+#
+# Triggered on version tags (v*). Builds native libraries for all platforms,
+# generates UniFFI bindings (Swift + Kotlin), builds WASM package, builds
+# mobile libraries (Android + iOS), and creates a GitHub Release with all artifacts.
+#
+# Epic 96: llamenos-core CI/CD Pipeline.
+# Epic 100: Mobile build pipeline.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ─── Run tests before releasing ───────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    name: Validate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Clippy
+        run: cargo clippy --all-features -- -D warnings
+
+  # ─── Build native libraries ───────────────────────────────────
+  build-native:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: libllamenoscore-linux-x64
+            lib_ext: so
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: libllamenoscore-macos-x64
+            lib_ext: dylib
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: libllamenoscore-macos-arm64
+            lib_ext: dylib
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: llamenoscore-windows-x64
+            lib_ext: dll
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.target }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload native library
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            target/${{ matrix.target }}/release/*.a
+            target/${{ matrix.target }}/release/*.dylib
+            target/${{ matrix.target }}/release/*.so
+            target/${{ matrix.target }}/release/*.dll
+            target/${{ matrix.target }}/release/*.lib
+          retention-days: 5
+
+  # ─── Build WASM package ───────────────────────────────────────
+  build-wasm:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Build (WASM)
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build WASM package
+        run: wasm-pack build --target web --features wasm --no-default-features --out-dir pkg
+
+      - name: Upload WASM package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wasm-package
+          path: pkg/
+          retention-days: 5
+
+  # ─── Generate UniFFI bindings ─────────────────────────────────
+  build-bindings:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Generate Bindings
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+
+      - name: Generate bindings
+        run: ./scripts/generate-bindings.sh
+
+      - name: Upload Swift bindings
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bindings-swift
+          path: bindings/swift/
+          retention-days: 5
+
+      - name: Upload Kotlin bindings
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bindings-kotlin
+          path: bindings/kotlin/
+          retention-days: 5
+
+  # ─── Build mobile Android libraries ──────────────────────────
+  build-mobile-android:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Build (Android)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build Android libraries
+        run: |
+          mkdir -p dist/android/jniLibs
+          cargo ndk \
+            -t arm64-v8a \
+            -t armeabi-v7a \
+            -t x86 \
+            -t x86_64 \
+            --platform 24 \
+            -o dist/android/jniLibs \
+            build --release --features mobile
+
+      - name: Generate Kotlin bindings
+        run: |
+          cargo build --profile release-bindgen --features uniffi-bindgen
+          mkdir -p dist/android/kotlin
+          cargo run --features uniffi-bindgen --bin uniffi-bindgen -- \
+            generate --library target/release-bindgen/libllamenos_core.so \
+            --language kotlin --out-dir dist/android/kotlin
+
+      - name: Upload Android libraries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-libs
+          path: dist/android/
+          retention-days: 5
+
+  # ─── Build mobile iOS libraries ──────────────────────────────
+  build-mobile-ios:
+    needs: test
+    runs-on: macos-14
+    name: Build (iOS)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+
+      - name: Build iOS device library
+        run: cargo build --release --target aarch64-apple-ios --features mobile
+
+      - name: Build iOS simulator library
+        run: cargo build --release --target aarch64-apple-ios-sim --features mobile
+
+      - name: Generate Swift bindings
+        run: |
+          cargo build --profile release-bindgen --features uniffi-bindgen
+          mkdir -p dist/ios
+          cargo run --features uniffi-bindgen --bin uniffi-bindgen -- \
+            generate --library target/release-bindgen/libllamenos_core.dylib \
+            --language swift --out-dir dist/ios
+
+      - name: Create XCFramework
+        run: |
+          # Wrap static libraries in .framework bundles before creating XCFramework.
+          # CocoaPods has a known bug (issues #9528, #11372) where vendored_frameworks
+          # with XCFrameworks containing raw .a files doesn't correctly extract them
+          # for linking. Using .framework bundles avoids this issue.
+          FW_NAME="LlamenosCoreFFI"
+
+          for PAIR in \
+            "target/aarch64-apple-ios/release/libllamenos_core.a:/tmp/device" \
+            "target/aarch64-apple-ios-sim/release/libllamenos_core.a:/tmp/simulator"; do
+            LIB="${PAIR%%:*}"
+            OUT="${PAIR##*:}"
+            FW_PATH="$OUT/${FW_NAME}.framework"
+            mkdir -p "$FW_PATH/Headers" "$FW_PATH/Modules"
+            cp "$LIB" "$FW_PATH/$FW_NAME"
+            cp dist/ios/LlamenosCoreFFI.h "$FW_PATH/Headers/"
+            cat > "$FW_PATH/Modules/module.modulemap" <<MODULEMAP
+          framework module $FW_NAME {
+            header "LlamenosCoreFFI.h"
+            export *
+          }
+          MODULEMAP
+          done
+
+          # Create XCFramework from .framework bundles
+          xcodebuild -create-xcframework \
+            -framework "/tmp/device/${FW_NAME}.framework" \
+            -framework "/tmp/simulator/${FW_NAME}.framework" \
+            -output dist/ios/LlamenosCoreFFI.xcframework
+
+      - name: Upload iOS libraries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-libs
+          path: dist/ios/
+          retention-days: 5
+
+  # ─── Create GitHub Release ────────────────────────────────────
+  release:
+    needs: [build-native, build-wasm, build-bindings, build-mobile-android, build-mobile-ios]
+    runs-on: ubuntu-latest
+    name: Publish Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+
+      - name: Package artifacts
+        run: |
+          mkdir -p release-assets
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Package native libraries
+          for dir in artifacts/libllamenoscore-* artifacts/llamenoscore-*; do
+            [ -d "$dir" ] || continue
+            name=$(basename "$dir")
+            tar czf "release-assets/${name}.tar.gz" -C "$dir" .
+          done
+
+          # Package WASM
+          if [ -d artifacts/wasm-package ]; then
+            tar czf "release-assets/llamenos-core-wasm-${VERSION}.tar.gz" -C artifacts/wasm-package .
+          fi
+
+          # Package Swift bindings
+          if [ -d artifacts/bindings-swift ]; then
+            tar czf "release-assets/llamenos-core-swift-${VERSION}.tar.gz" -C artifacts/bindings-swift .
+          fi
+
+          # Package Kotlin bindings
+          if [ -d artifacts/bindings-kotlin ]; then
+            tar czf "release-assets/llamenos-core-kotlin-${VERSION}.tar.gz" -C artifacts/bindings-kotlin .
+          fi
+
+          # Package Android mobile libraries (jniLibs + Kotlin bindings)
+          if [ -d artifacts/android-libs ]; then
+            tar czf "release-assets/llamenos-core-android-v${VERSION}.tar.gz" -C artifacts/android-libs .
+          fi
+
+          # Package iOS mobile libraries (XCFramework + Swift bindings)
+          if [ -d artifacts/ios-libs ]; then
+            tar czf "release-assets/llamenos-core-ios-v${VERSION}.tar.gz" -C artifacts/ios-libs .
+          fi
+
+          ls -la release-assets/
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "llamenos-core v${VERSION}" \
+            --generate-notes \
+            release-assets/*

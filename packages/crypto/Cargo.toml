@@ -1,0 +1,80 @@
+[package]
+name = "llamenos-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared cryptographic core for Llamenos — ECIES, XChaCha20-Poly1305, BIP-340, HKDF, PBKDF2"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/rhonda-rodododo/llamenos-core"
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+# Elliptic curve cryptography (secp256k1 ECDH + Schnorr BIP-340)
+k256 = { version = "0.13", features = ["ecdh", "schnorr", "serde"] }
+elliptic-curve = { version = "0.13", features = ["sec1"] }
+
+# Symmetric encryption
+chacha20poly1305 = "0.10"
+
+# Key derivation
+hkdf = "0.12"
+pbkdf2 = { version = "0.12", features = ["simple"] }
+
+# Hashing
+sha2 = "0.10"
+hmac = "0.12"
+
+# Memory safety for key material
+zeroize = { version = "1", features = ["derive"] }
+
+# Encoding
+hex = "0.4"
+base64 = "0.22"
+
+# Randomness
+rand = "0.8"
+getrandom = "0.2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+
+# Nostr bech32 encoding (nsec/npub)
+bech32 = "0.11"
+
+# UniFFI for Swift/Kotlin bindings (React Native)
+uniffi = { version = "0.28", optional = true }
+
+# WASM bindings for web browser
+wasm-bindgen = { version = "0.2", optional = true }
+
+[features]
+default = []
+mobile = ["dep:uniffi"]
+uniffi-bindgen = ["mobile", "uniffi/cli"]
+wasm = ["dep:wasm-bindgen", "getrandom/js"]
+
+[[bin]]
+name = "uniffi-bindgen"
+required-features = ["uniffi-bindgen"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+serde_json = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+# UniFFI bindgen needs unstripped binary to read metadata symbols.
+# Use this profile when generating bindings: cargo build --profile release-bindgen
+[profile.release-bindgen]
+inherits = "release"
+strip = false

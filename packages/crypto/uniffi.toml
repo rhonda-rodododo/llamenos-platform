@@ -1,0 +1,7 @@
+[bindings.swift]
+module_name = "LlamenosCore"
+generate_immutable_records = true
+
+[bindings.kotlin]
+package_name = "org.llamenos.core"
+generate_immutable_records = true
