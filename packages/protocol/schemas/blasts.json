@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llamenos.org/schemas/blasts.json",
+  "title": "Blast Types",
+  "description": "Message blast types for subscriber communication",
+  "$defs": {
+    "SubscriberChannel": {
+      "type": "object",
+      "required": ["type", "verified"],
+      "properties": {
+        "type": { "$ref": "channels.json#/$defs/MessagingChannelType" },
+        "verified": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "Subscriber": {
+      "type": "object",
+      "required": ["id", "identifierHash", "channels", "tags", "language", "subscribedAt", "status", "doubleOptInConfirmed", "preferenceToken"],
+      "properties": {
+        "id": { "type": "string" },
+        "identifierHash": { "type": "string", "description": "HMAC hash of phone/identifier" },
+        "channels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SubscriberChannel" }
+        },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "language": { "type": "string", "description": "Preferred language code" },
+        "subscribedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "paused", "unsubscribed"] },
+        "doubleOptInConfirmed": { "type": "boolean" },
+        "preferenceToken": { "type": "string", "description": "HMAC token for self-service preferences" }
+      },
+      "additionalProperties": false
+    },
+    "BlastContent": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "smsText": { "type": "string" },
+        "whatsappTemplateId": { "type": "string" },
+        "rcsRichCard": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "BlastStats": {
+      "type": "object",
+      "required": ["totalRecipients", "sent", "delivered", "failed", "optedOut"],
+      "properties": {
+        "totalRecipients": { "type": "number" },
+        "sent": { "type": "number" },
+        "delivered": { "type": "number" },
+        "failed": { "type": "number" },
+        "optedOut": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "Blast": {
+      "type": "object",
+      "required": ["id", "name", "content", "status", "targetChannels", "targetTags", "targetLanguages", "createdBy", "createdAt", "updatedAt", "stats"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "content": { "$ref": "#/$defs/BlastContent" },
+        "status": { "type": "string", "enum": ["draft", "scheduled", "sending", "sent", "cancelled"] },
+        "targetChannels": {
+          "type": "array",
+          "items": { "$ref": "channels.json#/$defs/MessagingChannelType" }
+        },
+        "targetTags": { "type": "array", "items": { "type": "string" } },
+        "targetLanguages": { "type": "array", "items": { "type": "string" } },
+        "scheduledAt": { "type": "string" },
+        "sentAt": { "type": "string" },
+        "cancelledAt": { "type": "string" },
+        "createdBy": { "type": "string", "description": "Pubkey" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "stats": { "$ref": "#/$defs/BlastStats" }
+      },
+      "additionalProperties": false
+    },
+    "BlastSettings": {
+      "type": "object",
+      "required": ["subscribeKeyword", "unsubscribeKeyword", "confirmationMessage", "unsubscribeMessage", "doubleOptIn", "optOutFooter", "maxBlastsPerDay", "rateLimitPerSecond"],
+      "properties": {
+        "subscribeKeyword": { "type": "string" },
+        "unsubscribeKeyword": { "type": "string" },
+        "confirmationMessage": { "type": "string" },
+        "unsubscribeMessage": { "type": "string" },
+        "doubleOptIn": { "type": "boolean" },
+        "optOutFooter": { "type": "string" },
+        "maxBlastsPerDay": { "type": "number" },
+        "rateLimitPerSecond": { "type": "number" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

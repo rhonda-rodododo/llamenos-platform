@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llamenos.org/schemas/telephony.json",
+  "title": "Telephony Types",
+  "description": "Telephony provider configuration",
+  "$defs": {
+    "TelephonyProviderType": {
+      "type": "string",
+      "enum": ["twilio", "signalwire", "vonage", "plivo", "asterisk"]
+    },
+    "CallPreference": {
+      "type": "string",
+      "enum": ["phone", "browser", "both"]
+    },
+    "TelephonyProviderConfig": {
+      "type": "object",
+      "required": ["type", "phoneNumber"],
+      "properties": {
+        "type": { "$ref": "#/$defs/TelephonyProviderType" },
+        "phoneNumber": { "type": "string", "description": "E.164 hotline number" },
+        "accountSid": { "type": "string" },
+        "authToken": { "type": "string" },
+        "signalwireSpace": { "type": "string", "description": "SignalWire only: {space}.signalwire.com" },
+        "apiKey": { "type": "string" },
+        "apiSecret": { "type": "string" },
+        "applicationId": { "type": "string" },
+        "privateKey": { "type": "string", "description": "Vonage Application private key (PEM)" },
+        "authId": { "type": "string" },
+        "ariUrl": { "type": "string", "description": "e.g. https://asterisk.example.com:8089/ari" },
+        "ariUsername": { "type": "string" },
+        "ariPassword": { "type": "string" },
+        "bridgeCallbackUrl": { "type": "string" },
+        "webrtcEnabled": { "type": "boolean" },
+        "apiKeySid": { "type": "string", "description": "Twilio/SignalWire API Key SID" },
+        "apiKeySecret": { "type": "string", "description": "Twilio/SignalWire API Key Secret" },
+        "twimlAppSid": { "type": "string", "description": "TwiML App SID for browser calls" },
+        "sipDomain": { "type": "string" },
+        "sipUsername": { "type": "string" },
+        "sipPassword": { "type": "string" },
+        "sipEndpointUsername": { "type": "string" },
+        "sipEndpointPassword": { "type": "string" },
+        "spaceUrl": { "type": "string" },
+        "asteriskGateway": { "type": "string" },
+        "asteriskSipUsername": { "type": "string" },
+        "asteriskSipPassword": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

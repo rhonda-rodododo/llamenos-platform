@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llamenos.org/schemas/hub.json",
+  "title": "Hub Types",
+  "description": "Multi-tenant hub types and setup state",
+  "$defs": {
+    "Hub": {
+      "type": "object",
+      "required": ["id", "name", "slug", "status", "createdBy", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "type": "string", "description": "UUID" },
+        "name": { "type": "string", "description": "Display name" },
+        "slug": { "type": "string", "description": "URL-safe identifier" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "suspended", "archived"] },
+        "phoneNumber": { "type": "string", "description": "Primary hotline number" },
+        "createdBy": { "type": "string", "description": "Super admin pubkey" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "HubRoleAssignment": {
+      "type": "object",
+      "required": ["hubId", "roleIds"],
+      "properties": {
+        "hubId": { "type": "string" },
+        "roleIds": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "SetupState": {
+      "type": "object",
+      "required": ["setupCompleted", "completedSteps", "pendingChannels", "selectedChannels"],
+      "properties": {
+        "setupCompleted": { "type": "boolean" },
+        "completedSteps": { "type": "array", "items": { "type": "string" } },
+        "pendingChannels": {
+          "type": "array",
+          "items": { "$ref": "channels.json#/$defs/ChannelType" }
+        },
+        "selectedChannels": {
+          "type": "array",
+          "items": { "$ref": "channels.json#/$defs/ChannelType" }
+        },
+        "demoMode": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "EnabledChannels": {
+      "type": "object",
+      "required": ["voice", "sms", "whatsapp", "signal", "rcs", "reports"],
+      "properties": {
+        "voice": { "type": "boolean" },
+        "sms": { "type": "boolean" },
+        "whatsapp": { "type": "boolean" },
+        "signal": { "type": "boolean" },
+        "rcs": { "type": "boolean" },
+        "reports": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llamenos.org/schemas/channels.json",
+  "title": "Channel Types",
+  "description": "Channel type enumerations and transport security",
+  "$defs": {
+    "MessagingChannelType": {
+      "type": "string",
+      "enum": ["sms", "whatsapp", "signal", "rcs"]
+    },
+    "ChannelType": {
+      "type": "string",
+      "enum": ["voice", "sms", "whatsapp", "signal", "rcs", "reports"]
+    },
+    "TransportSecurity": {
+      "type": "string",
+      "enum": ["none", "provider-encrypted", "e2ee-to-bridge", "e2ee"]
+    }
+  }
+}

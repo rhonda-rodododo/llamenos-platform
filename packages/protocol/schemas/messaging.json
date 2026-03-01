@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llamenos.org/schemas/messaging.json",
+  "title": "Messaging Types",
+  "description": "Messaging channel configurations",
+  "$defs": {
+    "SMSConfig": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "autoResponse": { "type": "string", "description": "Auto-reply on first contact" },
+        "afterHoursResponse": { "type": "string", "description": "Auto-reply outside shift hours" }
+      },
+      "additionalProperties": false
+    },
+    "WhatsAppConfig": {
+      "type": "object",
+      "required": ["integrationMode"],
+      "properties": {
+        "integrationMode": { "type": "string", "enum": ["twilio", "direct"] },
+        "phoneNumberId": { "type": "string" },
+        "businessAccountId": { "type": "string" },
+        "accessToken": { "type": "string" },
+        "verifyToken": { "type": "string" },
+        "appSecret": { "type": "string" },
+        "autoResponse": { "type": "string" },
+        "afterHoursResponse": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SignalConfig": {
+      "type": "object",
+      "required": ["bridgeUrl", "bridgeApiKey", "webhookSecret", "registeredNumber"],
+      "properties": {
+        "bridgeUrl": { "type": "string", "description": "e.g., https://signal-bridge.internal:8080" },
+        "bridgeApiKey": { "type": "string" },
+        "webhookSecret": { "type": "string" },
+        "registeredNumber": { "type": "string" },
+        "autoResponse": { "type": "string" },
+        "afterHoursResponse": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "RCSConfig": {
+      "type": "object",
+      "required": ["agentId", "serviceAccountKey", "fallbackToSms"],
+      "properties": {
+        "agentId": { "type": "string" },
+        "serviceAccountKey": { "type": "string", "description": "JSON string of Google service account key" },
+        "webhookSecret": { "type": "string" },
+        "fallbackToSms": { "type": "boolean" },
+        "autoResponse": { "type": "string" },
+        "afterHoursResponse": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "MessagingConfig": {
+      "type": "object",
+      "required": ["enabledChannels", "sms", "whatsapp", "signal", "rcs", "autoAssign", "inactivityTimeout", "maxConcurrentPerVolunteer"],
+      "properties": {
+        "enabledChannels": {
+          "type": "array",
+          "items": { "$ref": "channels.json#/$defs/MessagingChannelType" }
+        },
+        "sms": {
+          "oneOf": [
+            { "$ref": "#/$defs/SMSConfig" },
+            { "type": "null" }
+          ]
+        },
+        "whatsapp": {
+          "oneOf": [
+            { "$ref": "#/$defs/WhatsAppConfig" },
+            { "type": "null" }
+          ]
+        },
+        "signal": {
+          "oneOf": [
+            { "$ref": "#/$defs/SignalConfig" },
+            { "type": "null" }
+          ]
+        },
+        "rcs": {
+          "oneOf": [
+            { "$ref": "#/$defs/RCSConfig" },
+            { "type": "null" }
+          ]
+        },
+        "autoAssign": { "type": "boolean" },
+        "inactivityTimeout": { "type": "number", "description": "Minutes before auto-close" },
+        "maxConcurrentPerVolunteer": { "type": "number" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
