@@ -191,8 +191,13 @@ bun run deploy:api                       # Deploy Worker only
 bun run deploy:site                      # Deploy marketing site only
 
 # Mobile (requires platform toolchains)
-# iOS:  cd apps/ios && xcodebuild build -scheme Llamenos
-# Android: cd apps/android && ./gradlew assembleDebug
+# iOS:  cd apps/ios && swift build                         # Debug build
+# iOS:  cd apps/ios && xcodebuild archive -scheme Llamenos # Release archive
+# Android: cd apps/android && ./gradlew assembleDebug      # Debug APK
+# Android: cd apps/android && ./gradlew bundleRelease      # Release AAB (needs signing env vars)
+
+# Version Management
+bun run version:bump <major|minor|patch> [description]     # Bump version across ALL platforms
 
 # Utilities
 bun run bootstrap-admin                  # Generate admin keypair

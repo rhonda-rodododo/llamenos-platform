@@ -464,6 +464,45 @@ jobs:
           NEW_VERSION="${{ steps.version.outputs.new_version }}"
           sed -i "s/^appVersion:.*/appVersion: \"$NEW_VERSION\"/" deploy/helm/llamenos/Chart.yaml
 
+      - name: Bump Android version
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          sed -i "s/versionName = \"[^\"]*\"/versionName = \"$NEW_VERSION\"/" apps/android/app/build.gradle.kts
+          # Increment versionCode
+          CURRENT_CODE=$(grep -oP 'versionCode = \K\d+' apps/android/app/build.gradle.kts)
+          NEW_CODE=$((CURRENT_CODE + 1))
+          sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" apps/android/app/build.gradle.kts
+
+      - name: Bump iOS version
+        if: steps.version.outputs.should_release == 'true'
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          # Update CFBundleShortVersionString
+          sed -i "s|<key>CFBundleShortVersionString</key>|<key>CFBundleShortVersionString</key>|" apps/ios/Sources/App/Info.plist
+          python3 -c "
+          import re
+          with open('apps/ios/Sources/App/Info.plist', 'r') as f:
+              content = f.read()
+          content = re.sub(
+              r'(<key>CFBundleShortVersionString</key>\s*<string>)[^<]*(</string>)',
+              r'\g<1>${NEW_VERSION}\g<2>',
+              content
+          )
+          # Increment build number
+          import re as re2
+          m = re2.search(r'<key>CFBundleVersion</key>\s*<string>(\d+)</string>', content)
+          if m:
+              new_build = int(m.group(1)) + 1
+              content = re2.sub(
+                  r'(<key>CFBundleVersion</key>\s*<string>)\d+(</string>)',
+                  rf'\g<1>{new_build}\g<2>',
+                  content
+              )
+          with open('apps/ios/Sources/App/Info.plist', 'w') as f:
+              f.write(content)
+          "
+
       - name: Generate changelog and commit release
         if: steps.version.outputs.should_release == 'true'
         run: |
@@ -473,7 +512,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # Stage version files
-          git add package.json deploy/helm/llamenos/Chart.yaml
+          git add package.json deploy/helm/llamenos/Chart.yaml apps/android/app/build.gradle.kts apps/ios/Sources/App/Info.plist
 
           # Create tag so git-cliff can generate notes for this version
           git commit -m "chore(release): v${NEW_VERSION} [skip ci]"

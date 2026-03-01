@@ -1,5 +1,33 @@
 # Completed Backlog
 
+## 2026-03-01: Mobile Feature Parity & Release Prep (Epics 208-210)
+
+### Epic 208: Feature Parity Phase 1
+- iOS & Android: Notes with E2EE (per-note forward secrecy, ECIES key wrapping)
+- iOS & Android: Shifts with clock in/out, weekly schedule, signup/drop
+- iOS & Android: Push notification encryption (two-tier wake key)
+- iOS & Android: Tab-based navigation (Dashboard, Notes, Shifts, Settings)
+- iOS & Android: WebSocket real-time events via Nostr relay
+- iOS & Android: Settings screens (identity, hub, connection, lock/logout)
+- UI tests: 7 note flow + 10 shift flow tests per platform
+
+### Epic 209: Feature Parity Phase 2
+- iOS & Android: E2EE conversations (SMS/WhatsApp/Signal channels)
+- iOS & Android: Admin panel (volunteers CRUD, ban list, audit log, invites)
+- iOS & Android: QR-based device linking with ECDH + SAS verification
+- iOS: CameraX QR scanning via AVCaptureSession
+- Android: CameraX + ML Kit barcode scanning
+- iOS & Android: Enhanced settings (notifications, language, auto-lock, biometric)
+- UI tests: 6 conversation + 6 admin tests per platform
+
+### Epic 210: Release Prep
+- Android: Release signing config (env-var keystore, ProGuard rules)
+- iOS: Info.plist with version tracking, capabilities, usage descriptions
+- CI/CD: `mobile-release.yml` workflow (build + sign + upload to TestFlight/Play Store)
+- CI/CD: Version bump in `ci.yml` now includes Android `build.gradle.kts` + iOS `Info.plist`
+- Version sync: `bump-version.ts` updated for Android versionName/versionCode + iOS CFBundleShortVersionString/CFBundleVersion
+- Documentation: CLAUDE.md updated with mobile build/release commands
+
 ## 2026-03-01: Monorepo Foundation & Multi-Platform (Epics 200-207)
 
 ### Epic 200: Monorepo Foundation

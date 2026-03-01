@@ -32,6 +32,8 @@ const TAURI_CONF_PATH = resolve(ROOT, 'apps/desktop/tauri.conf.json')
 const CARGO_TOML_PATH = resolve(ROOT, 'apps/desktop/Cargo.toml')
 const CHART_PATH = resolve(ROOT, 'deploy/helm/llamenos/Chart.yaml')
 const METAINFO_PATH = resolve(ROOT, 'flatpak/org.llamenos.Hotline.metainfo.xml')
+const ANDROID_GRADLE_PATH = resolve(ROOT, 'apps/android/app/build.gradle.kts')
+const IOS_PLIST_PATH = resolve(ROOT, 'apps/ios/Sources/App/Info.plist')
 
 type BumpType = 'major' | 'minor' | 'patch'
 
@@ -96,6 +98,58 @@ function updateMetainfo(newVersion: string): void {
   }
 }
 
+function updateAndroidGradle(newVersion: string): void {
+  try {
+    let content = readFileSync(ANDROID_GRADLE_PATH, 'utf-8')
+    // Update versionName
+    content = content.replace(
+      /versionName\s*=\s*"[^"]*"/,
+      `versionName = "${newVersion}"`
+    )
+    // Auto-increment versionCode (extract current, +1)
+    const codeMatch = content.match(/versionCode\s*=\s*(\d+)/)
+    if (codeMatch) {
+      const newCode = parseInt(codeMatch[1], 10) + 1
+      content = content.replace(
+        /versionCode\s*=\s*\d+/,
+        `versionCode = ${newCode}`
+      )
+      console.log(`  apps/android/app/build.gradle.kts → ${newVersion} (versionCode ${newCode})`)
+    } else {
+      console.log(`  apps/android/app/build.gradle.kts → ${newVersion}`)
+    }
+    writeFileSync(ANDROID_GRADLE_PATH, content)
+  } catch {
+    console.log('  apps/android/app/build.gradle.kts — skipped (file not found)')
+  }
+}
+
+function updateIOSPlist(newVersion: string): void {
+  try {
+    let content = readFileSync(IOS_PLIST_PATH, 'utf-8')
+    // Update CFBundleShortVersionString
+    content = content.replace(
+      /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]*(<\/string>)/,
+      `$1${newVersion}$2`
+    )
+    // Auto-increment CFBundleVersion (build number)
+    const buildMatch = content.match(/<key>CFBundleVersion<\/key>\s*<string>(\d+)<\/string>/)
+    if (buildMatch) {
+      const newBuild = parseInt(buildMatch[1], 10) + 1
+      content = content.replace(
+        /(<key>CFBundleVersion<\/key>\s*<string>)\d+(<\/string>)/,
+        `$1${newBuild}$2`
+      )
+      console.log(`  apps/ios/Sources/App/Info.plist → ${newVersion} (build ${newBuild})`)
+    } else {
+      console.log(`  apps/ios/Sources/App/Info.plist → ${newVersion}`)
+    }
+    writeFileSync(IOS_PLIST_PATH, content)
+  } catch {
+    console.log('  apps/ios/Sources/App/Info.plist — skipped (file not found)')
+  }
+}
+
 // --- Main ---
 
 const [bumpType, ...descParts] = process.argv.slice(2)
@@ -130,10 +184,12 @@ updateTauriConf(newVersion)
 updateCargoToml(newVersion)
 updateChartYaml(newVersion)
 updateMetainfo(newVersion)
+updateAndroidGradle(newVersion)
+updateIOSPlist(newVersion)
 
 // Commit version bump
 const tagMessage = description || `release v${newVersion}`
-run('git add package.json apps/desktop/tauri.conf.json apps/desktop/Cargo.toml deploy/helm/llamenos/Chart.yaml flatpak/org.llamenos.Hotline.metainfo.xml')
+run('git add package.json apps/desktop/tauri.conf.json apps/desktop/Cargo.toml deploy/helm/llamenos/Chart.yaml flatpak/org.llamenos.Hotline.metainfo.xml apps/android/app/build.gradle.kts apps/ios/Sources/App/Info.plist')
 run(`git commit -m "chore: bump version to ${newVersion}"`)
 
 // Create annotated tag
