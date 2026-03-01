@@ -285,6 +285,9 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [ ] **[Epic 213: Production Hardening](epics/epic-213-production-hardening.md)** — Error monitoring, crash reporting, network resilience, performance optimization, security review
 - [ ] **[Epic 214: Mobile Crypto Integration](epics/epic-214-mobile-crypto-integration.md)** — UniFFI linking for real Rust crypto on iOS and Android (replace stand-ins)
 
+### Documentation
+- [x] **[Epic 215: Documentation Update](epics/epic-215-documentation-update.md)** — CLAUDE.md monorepo structure, mobile dev/test commands, working style updates
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
