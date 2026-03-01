@@ -278,7 +278,7 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 ## Production Readiness & Quality (Epics 211-214) — IN PROGRESS
 
 ### Testing & CI
-- [ ] **[Epic 211: Mobile CI Testing Pipeline](epics/epic-211-mobile-ci-testing.md)** — Android + iOS build/test jobs in ci.yml, ci-status gate update
+- [x] **[Epic 211: Mobile CI Testing Pipeline](epics/epic-211-mobile-ci-testing.md)** — Android + iOS build/test jobs in ci.yml, ci-status gate update
 - [ ] **[Epic 212: Test Coverage Enhancement](epics/epic-212-test-coverage-enhancement.md)** — BDD patterns, cross-platform crypto test vectors, expanded unit + UI tests
 
 ### Hardening & Crypto

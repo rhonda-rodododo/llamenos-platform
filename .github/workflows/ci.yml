@@ -221,6 +221,61 @@ jobs:
         # can't always be fixed without upstream updates
         run: bun audit --audit-level=critical
 
+  # ─── Android Build & Test ───────────────────────────────────
+  android-build-test:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Java 17
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972fe187c82e2fd2858a # v4.4.1
+
+      - name: Run unit tests
+        working-directory: apps/android
+        run: ./gradlew testDebugUnitTest
+
+      - name: Lint
+        working-directory: apps/android
+        run: ./gradlew lintDebug
+
+      - name: Build debug APK
+        working-directory: apps/android
+        run: ./gradlew assembleDebug
+
+  # ─── iOS Build & Test ──────────────────────────────────────
+  ios-build-test:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Resolve Swift packages
+        working-directory: apps/ios
+        run: swift package resolve
+
+      - name: Build
+        working-directory: apps/ios
+        run: swift build
+
+      - name: Run unit tests
+        working-directory: apps/ios
+        run: swift test
+
   # ─── E2E Tests: Cloudflare Workers (wrangler dev) ──────────
   e2e-cf:
     needs: [changes, build]
@@ -364,7 +419,7 @@ jobs:
 
   # ─── Version Bump & Changelog ──────────────────────────────
   version:
-    needs: [changes, build, audit, crypto-tests, e2e-cf, e2e-docker]
+    needs: [changes, build, audit, crypto-tests, e2e-cf, e2e-docker, android-build-test, ios-build-test]
     # Skip version bump for docs-only changes and PRs; require E2E success for app changes
     if: |
       always() &&
@@ -374,7 +429,9 @@ jobs:
       needs.audit.result == 'success' &&
       (needs.crypto-tests.result == 'success' || needs.crypto-tests.result == 'skipped') &&
       needs.e2e-cf.result == 'success' &&
-      needs.e2e-docker.result == 'success'
+      needs.e2e-docker.result == 'success' &&
+      (needs.android-build-test.result == 'success' || needs.android-build-test.result == 'skipped') &&
+      (needs.ios-build-test.result == 'success' || needs.ios-build-test.result == 'skipped')
     runs-on: ubuntu-latest
 
     permissions:
@@ -675,7 +732,7 @@ jobs:
   # Single status check for branch protection rules.
   # All required jobs must pass for PRs to be mergeable.
   ci-status:
-    needs: [build, audit, crypto-tests, e2e-cf, e2e-docker]
+    needs: [build, audit, crypto-tests, e2e-cf, e2e-docker, android-build-test, ios-build-test]
     if: always()
     runs-on: ubuntu-latest
 
@@ -700,6 +757,14 @@ jobs:
           fi
           if [[ "${{ needs.e2e-docker.result }}" != "success" && "${{ needs.e2e-docker.result }}" != "skipped" ]]; then
             echo "e2e-docker failed"
+            exit 1
+          fi
+          if [[ "${{ needs.android-build-test.result }}" != "success" && "${{ needs.android-build-test.result }}" != "skipped" ]]; then
+            echo "android-build-test failed"
+            exit 1
+          fi
+          if [[ "${{ needs.ios-build-test.result }}" != "success" && "${{ needs.ios-build-test.result }}" != "skipped" ]]; then
+            echo "ios-build-test failed"
             exit 1
           fi
           echo "All required checks passed!"
