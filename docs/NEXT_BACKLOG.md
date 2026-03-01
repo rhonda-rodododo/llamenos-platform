@@ -266,14 +266,24 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 204: CI/CD Consolidation](epics/epic-204-cicd-consolidation.md)** — crypto-tests job, ci-status gate
 - [x] **[Epic 205: i18n Package Extraction](epics/epic-205-i18n-package-extraction.md)** — Locale package with mobile codegen
 
-### Native Mobile Foundation (Batch 3) — IN PROGRESS
+### Native Mobile Foundation (Batch 3) — COMPLETE
 - [x] **[Epic 206: iOS Client Foundation](epics/epic-206-ios-client-foundation.md)** — SwiftUI app with crypto, keychain, auth flow
 - [x] **[Epic 207: Android Client Foundation](epics/epic-207-android-client-foundation.md)** — Kotlin/Compose app with crypto, keystore, auth flow
 
-### Feature Parity & Release (Batch 4) — PENDING
-- [ ] **[Epic 208: Feature Parity Phase 1](epics/epic-208-feature-parity-p1.md)** — Dashboard, notes (E2EE), shifts, push notifications
-- [ ] **[Epic 209: Feature Parity Phase 2](epics/epic-209-feature-parity-p2.md)** — Voice calls, conversations, admin, device linking
-- [ ] **[Epic 210: Release Prep](epics/epic-210-release-prep.md)** — Store listings, signing, CI/CD, docs update
+### Feature Parity & Release (Batch 4) — COMPLETE
+- [x] **[Epic 208: Feature Parity Phase 1](epics/epic-208-feature-parity-p1.md)** — Dashboard, notes (E2EE), shifts, push notifications
+- [x] **[Epic 209: Feature Parity Phase 2](epics/epic-209-feature-parity-p2.md)** — Voice calls, conversations, admin, device linking
+- [x] **[Epic 210: Release Prep](epics/epic-210-release-prep.md)** — Store listings, signing, CI/CD, docs update
+
+## Production Readiness & Quality (Epics 211-214) — IN PROGRESS
+
+### Testing & CI
+- [ ] **[Epic 211: Mobile CI Testing Pipeline](epics/epic-211-mobile-ci-testing.md)** — Android + iOS build/test jobs in ci.yml, ci-status gate update
+- [ ] **[Epic 212: Test Coverage Enhancement](epics/epic-212-test-coverage-enhancement.md)** — BDD patterns, cross-platform crypto test vectors, expanded unit + UI tests
+
+### Hardening & Crypto
+- [ ] **[Epic 213: Production Hardening](epics/epic-213-production-hardening.md)** — Error monitoring, crash reporting, network resilience, performance optimization, security review
+- [ ] **[Epic 214: Mobile Crypto Integration](epics/epic-214-mobile-crypto-integration.md)** — UniFFI linking for real Rust crypto on iOS and Android (replace stand-ins)
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

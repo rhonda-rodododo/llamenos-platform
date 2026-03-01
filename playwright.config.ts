@@ -47,7 +47,7 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "PLAYWRIGHT_TEST=true bun run build && bunx wrangler dev --config apps/worker/wrangler.jsonc --port 8788",
+        command: "PLAYWRIGHT_TEST=true bun run build && bunx wrangler dev --config apps/worker/wrangler.jsonc --port 8788 --var ENVIRONMENT:development",
         url: "http://localhost:8788",
         reuseExistingServer: !process.env.CI,
       },
