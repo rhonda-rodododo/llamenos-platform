@@ -1,5 +1,28 @@
 # Completed Backlog
 
+## 2026-03-01: Playwright Test Restoration (Epic 216)
+
+### Epic 216: Restore All Playwright E2E Tests on Desktop Branch
+- **Result**: 361 passed, 5 skipped (live telephony), 0 failed
+- **Tauri IPC mock fixes** (`tests/mocks/tauri-core.ts`):
+  - Fixed PIN encryption: correct PBKDF2 iteration count (600k), encrypt nsec bech32 string (not raw hex)
+  - Fixed @noble/curves v2: pass Uint8Array to `schnorr.sign()`/`schnorr.getPublicKey()` (not hex strings)
+  - Fixed auth token format: return JSON `{ pubkey, timestamp, token }` with `AUTH_PREFIX` in signed message
+  - Added `noteKeyStore` Map for within-page note encryption round-trip (replacing static mock response)
+- **PinInput stale closure fix** (`src/client/components/pin-input.tsx`):
+  - `handleInput()` had a stale closure bug — rapid sequential keyboard input caused data loss because each call read `digits` from the render scope before React re-rendered
+  - Fixed with `valueRef` that's updated optimistically in the handler
+- **Test selector fixes** (strict mode violations):
+  - Added `data-testid="field-type-select"` / `data-testid="field-context-select"` to custom-fields-section.tsx
+  - Changed `getByRole('link', { name: /settings/i })` → `{ name: 'Settings', exact: true }`
+  - Changed `getByRole('heading', { name: /conversations/i })` → `page.locator('h1', ...)`
+  - Changed `#new-field-priority_level` → `page.getByLabel('Priority Level')` (field IDs are UUIDs)
+- **Test isolation fixes**:
+  - Made notes-custom-fields tests self-contained (each creates own prerequisites)
+  - Added `Date.now()` suffix to volunteer names in messaging-epics tests
+  - Added `option.waitFor()` before click in shift-management combobox test
+- **Config**: `workers: 3` for parallel execution
+
 ## 2026-03-01: Android UniFFI Crypto Integration (Epic 214)
 
 ### Epic 214: Mobile Crypto Integration (Android)

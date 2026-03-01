@@ -291,7 +291,7 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 ## Testing Infrastructure (Epics 216+)
 
 ### Playwright Restoration
-- [ ] **[Epic 216: Playwright Test Restoration](epics/epic-216-playwright-test-restoration.md)** — Restore 355+ E2E tests using Docker Compose backend (replaces Wrangler dev)
+- [x] **[Epic 216: Playwright Test Restoration](epics/epic-216-playwright-test-restoration.md)** — Restore 361 E2E tests (361 passed, 5 skipped) on desktop branch
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
