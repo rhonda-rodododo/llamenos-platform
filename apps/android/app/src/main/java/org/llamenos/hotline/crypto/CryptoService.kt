@@ -494,7 +494,7 @@ class CryptoService @Inject constructor() {
         val secretBytes = ourSecret.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val publicBytes = theirPublic.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val sharedBytes = ByteArray(32) { i ->
-            (secretBytes.getOrElse(i) { 0 } xor publicBytes.getOrElse(i) { 0 }).toByte()
+            (secretBytes.getOrElse(i) { 0.toByte() }.toInt() xor publicBytes.getOrElse(i) { 0.toByte() }.toInt()).toByte()
         }
 
         return sharedBytes.joinToString("") { "%02x".format(it) }

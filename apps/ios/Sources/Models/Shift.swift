@@ -127,7 +127,7 @@ struct ShiftSignupRequest: Encodable, Sendable {
 // MARK: - ShiftDay
 
 /// Helper for grouping shifts by day in the calendar view.
-struct ShiftDay: Identifiable {
+struct ShiftDay: Identifiable, Sendable {
     let id: Int          // day index 0-6
     let name: String     // full weekday name
     let shortName: String

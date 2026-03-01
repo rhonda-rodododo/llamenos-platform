@@ -43,7 +43,7 @@ enum KeychainKey {
 /// `org.llamenos.hotline` service identifier and restricted to
 /// `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` — they do not sync to iCloud
 /// Keychain or migrate to new devices.
-final class KeychainService {
+final class KeychainService: @unchecked Sendable {
     private let service = "org.llamenos.hotline"
 
     /// Store data in the Keychain. If an item with the same key already exists, it is updated.

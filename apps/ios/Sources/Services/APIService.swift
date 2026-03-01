@@ -33,7 +33,7 @@ enum APIError: LocalizedError {
 /// URLSession-based REST client for the Llamenos hub API. Injects CryptoService to
 /// generate Schnorr auth tokens for each request. The auth token is sent as a Bearer
 /// header containing a JSON object with pubkey, timestamp, and BIP-340 signature.
-final class APIService {
+final class APIService: @unchecked Sendable {
     private var baseURL: URL?
     private let cryptoService: CryptoService
     private let session: URLSession
