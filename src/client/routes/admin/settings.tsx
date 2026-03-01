@@ -36,6 +36,7 @@ import { CustomFieldsSection } from '@/components/admin-settings/custom-fields-s
 import { SpamSection } from '@/components/admin-settings/spam-section'
 import { RolesSection } from '@/components/admin-settings/roles-section'
 import { RCSChannelSection } from '@/components/admin-settings/rcs-channel-section'
+import { SignalChannelSection } from '@/components/admin-settings/signal-channel-section'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
@@ -270,6 +271,16 @@ function AdminSettingsPage() {
           expanded={expanded.has('rcs-channel')}
           onToggle={(open) => toggleSection('rcs-channel', open)}
           statusSummary={messagingConfig.rcs ? t('common.configured', { defaultValue: 'Configured' }) : t('settings.notConfigured', { defaultValue: 'Not configured' })}
+        />
+      )}
+
+      {messagingConfig && (
+        <SignalChannelSection
+          config={messagingConfig}
+          onConfigChange={setMessagingConfig}
+          expanded={expanded.has('signal-channel')}
+          onToggle={(open) => toggleSection('signal-channel', open)}
+          statusSummary={messagingConfig.signal ? t('common.configured', { defaultValue: 'Configured' }) : t('settings.notConfigured', { defaultValue: 'Not configured' })}
         />
       )}
 
