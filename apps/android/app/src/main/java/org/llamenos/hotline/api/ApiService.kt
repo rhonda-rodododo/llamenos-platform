@@ -28,17 +28,19 @@ class ApiException(val code: Int, override val message: String) : Exception("HTT
 @Singleton
 class ApiService @Inject constructor(
     authInterceptor: AuthInterceptor,
-    private val keystoreService: KeystoreService,
+    @PublishedApi internal val keystoreService: KeystoreService,
 ) {
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
+    @PublishedApi
+    internal val client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(authInterceptor)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    val json: Json = Json {
+    @PublishedApi
+    internal val json: Json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
         isLenient = true
@@ -140,7 +142,8 @@ class ApiService @Inject constructor(
     /**
      * Get the configured hub URL from secure storage.
      */
-    fun getBaseUrl(): String {
+    @PublishedApi
+    internal fun getBaseUrl(): String {
         return keystoreService.retrieve(KeystoreService.KEY_HUB_URL)
             ?: throw IllegalStateException("Hub URL not configured")
     }

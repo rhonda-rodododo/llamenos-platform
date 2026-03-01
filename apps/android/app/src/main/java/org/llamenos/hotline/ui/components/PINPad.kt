@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Backspace
+import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -133,7 +133,7 @@ fun PINPad(
                                     .testTag("pin-backspace"),
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Backspace,
+                                    imageVector = Icons.AutoMirrored.Outlined.Backspace,
                                     contentDescription = stringResource(R.string.pin_backspace),
                                     tint = MaterialTheme.colorScheme.onSurface,
                                 )

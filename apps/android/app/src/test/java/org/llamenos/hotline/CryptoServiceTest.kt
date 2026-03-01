@@ -192,7 +192,7 @@ class CryptoServiceTest {
     }
 
     @Test(expected = CryptoException::class)
-    fun `encrypt note fails when locked`() = runBlocking {
+    fun `encrypt note fails when locked`(): Unit = runBlocking {
         cryptoService.encryptNote("""{"text":"test"}""", emptyList())
     }
 }

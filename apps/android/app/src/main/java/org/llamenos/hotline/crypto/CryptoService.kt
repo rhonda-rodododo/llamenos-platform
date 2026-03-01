@@ -170,9 +170,8 @@ class CryptoService @Inject constructor() {
         java.security.SecureRandom().nextBytes(nonceBytes)
 
         EncryptedKeyData(
-            ciphertext = android.util.Base64.encodeToString(
-                secret.toByteArray(Charsets.UTF_8),
-                android.util.Base64.NO_WRAP
+            ciphertext = java.util.Base64.getEncoder().encodeToString(
+                secret.toByteArray(Charsets.UTF_8)
             ),
             salt = saltBytes.joinToString("") { "%02x".format(it) },
             nonce = nonceBytes.joinToString("") { "%02x".format(it) },
@@ -198,7 +197,7 @@ class CryptoService @Inject constructor() {
             }
 
             // Placeholder: decode the Base64 ciphertext
-            val decoded = android.util.Base64.decode(data.ciphertext, android.util.Base64.NO_WRAP)
+            val decoded = java.util.Base64.getDecoder().decode(data.ciphertext)
             val secretHex = String(decoded, Charsets.UTF_8)
 
             nsecHex = secretHex
@@ -287,9 +286,8 @@ class CryptoService @Inject constructor() {
             }
 
             EncryptedNote(
-                ciphertext = android.util.Base64.encodeToString(
-                    ciphertextBytes,
-                    android.util.Base64.NO_WRAP
+                ciphertext = java.util.Base64.getEncoder().encodeToString(
+                    ciphertextBytes
                 ),
                 envelopes = envelopes,
             )
