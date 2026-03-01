@@ -154,6 +154,19 @@ export class SettingsDO extends DurableObject<Env> {
       }))
       await this.ctx.storage.put('roles', roles)
     }
+    // Mark setup as completed in demo mode so users skip the wizard
+    if (this.env.DEMO_MODE === 'true') {
+      const setupState = await this.ctx.storage.get<SetupState>('setupState')
+      if (!setupState || !setupState.setupCompleted) {
+        await this.ctx.storage.put<SetupState>('setupState', {
+          setupCompleted: true,
+          completedSteps: ['welcome', 'telephony', 'channels'],
+          pendingChannels: [],
+          selectedChannels: ['voice'],
+          demoMode: true,
+        })
+      }
+    }
   }
 
   async fetch(request: Request): Promise<Response> {

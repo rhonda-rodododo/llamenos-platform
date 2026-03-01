@@ -3,6 +3,7 @@ import type { Env, Volunteer, InviteCode, WebAuthnCredential, WebAuthnSettings, 
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '../../shared/migrations/runner'
 import { migrations } from '../../shared/migrations'
+import { DEMO_ACCOUNTS } from '../../shared/demo-accounts'
 
 /**
  * IdentityDO — manages people and auth:
@@ -122,8 +123,32 @@ export class IdentityDO extends DurableObject<Env> {
         onBreak: false,
         callPreference: 'phone',
       }
-      await this.ctx.storage.put('volunteers', volunteers)
     }
+
+    // Seed demo volunteer accounts when DEMO_MODE is enabled
+    if (this.env.DEMO_MODE === 'true') {
+      for (const account of DEMO_ACCOUNTS) {
+        if (!volunteers[account.pubkey]) {
+          volunteers[account.pubkey] = {
+            pubkey: account.pubkey,
+            name: account.name,
+            phone: account.phone,
+            roles: account.roleIds,
+            active: account.name !== 'Fatima Al-Rashid', // Fatima is the deactivated demo account
+            createdAt: new Date().toISOString(),
+            encryptedSecretKey: '',
+            transcriptionEnabled: true,
+            spokenLanguages: account.spokenLanguages,
+            uiLanguage: 'en',
+            profileCompleted: true,
+            onBreak: false,
+            callPreference: 'phone',
+          }
+        }
+      }
+    }
+
+    await this.ctx.storage.put('volunteers', volunteers)
 
     if (!(await this.ctx.storage.get('webauthnSettings'))) {
       await this.ctx.storage.put<WebAuthnSettings>('webauthnSettings', {
