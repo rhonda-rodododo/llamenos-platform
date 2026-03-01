@@ -48,6 +48,8 @@ export function DemoAccountPicker() {
     try {
       // Import key with demo PIN so it persists in local storage
       await keyManager.importKey(nsec, DEMO_PIN)
+      // Disable auto-lock in demo mode — frequent tab switches shouldn't force re-login
+      keyManager.disableAutoLock()
       await signIn(nsec)
       navigate({ to: '/' })
     } catch {

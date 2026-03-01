@@ -66,9 +66,12 @@ config.get('/', async (c) => {
     ? deriveServerKeypair(c.env.SERVER_NOSTR_SECRET).pubkey
     : undefined
 
-  // Client-facing relay URL (explicit env var, or default /nostr path if relay is configured)
+  // Client-facing relay URL:
+  // - Explicit env var takes priority (any deployment)
+  // - /nostr fallback only for self-hosted (NOSTR_RELAY_URL set = strfry behind Caddy)
+  // - CF deployments use NOSFLARE service binding (server-side only, no client WebSocket)
   const nostrRelayUrl = c.env.NOSTR_RELAY_PUBLIC_URL
-    || (serverNostrPubkey ? '/nostr' : undefined)
+    || (c.env.NOSTR_RELAY_URL ? '/nostr' : undefined)
 
   return c.json({
     hotlineName: c.env.HOTLINE_NAME || 'Hotline',
