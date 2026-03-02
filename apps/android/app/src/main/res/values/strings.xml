@@ -74,6 +74,9 @@
     <string name="note_date">Date</string>
     <string name="note_copy">Copy text</string>
     <string name="note_copied">Note copied</string>
+    <string name="notes_search">Search notes\u2026</string>
+    <string name="note_edit">Edit</string>
+    <string name="note_editing">Editing</string>
 
     <!-- Shifts -->
     <string name="shifts_title">Shifts</string>

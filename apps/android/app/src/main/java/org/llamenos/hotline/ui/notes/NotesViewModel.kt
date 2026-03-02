@@ -49,7 +49,10 @@ data class NotesUiState(
     val totalNotes: Int = 0,
     val hasMorePages: Boolean = false,
 
-    // Note creation
+    // Search
+    val searchQuery: String = "",
+
+    // Note creation / editing
     val customFields: List<CustomFieldDefinition> = emptyList(),
     val isSaving: Boolean = false,
     val saveError: String? = null,
@@ -57,6 +60,7 @@ data class NotesUiState(
 
     // Note detail
     val selectedNote: DecryptedNote? = null,
+    val isEditing: Boolean = false,
 )
 
 /**
@@ -262,6 +266,116 @@ class NotesViewModel @Inject constructor(
      */
     fun clearSaveError() {
         _uiState.update { it.copy(saveError = null) }
+    }
+
+    // ---- Search ----
+
+    /**
+     * Set the search query for filtering notes.
+     */
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    /**
+     * Get notes filtered by the current search query.
+     */
+    fun filteredNotes(): List<DecryptedNote> {
+        val query = _uiState.value.searchQuery.lowercase()
+        if (query.isBlank()) return _uiState.value.notes
+        return _uiState.value.notes.filter { note ->
+            note.text.lowercase().contains(query)
+        }
+    }
+
+    // ---- Note Editing ----
+
+    /**
+     * Enter edit mode for the selected note.
+     */
+    fun startEditing() {
+        _uiState.update { it.copy(isEditing = true) }
+    }
+
+    /**
+     * Cancel editing and return to read mode.
+     */
+    fun cancelEditing() {
+        _uiState.update { it.copy(isEditing = false) }
+    }
+
+    /**
+     * Update an existing note with new encrypted content.
+     *
+     * @param noteId The note to update
+     * @param text Updated plaintext note body
+     * @param fieldValues Updated custom field values
+     */
+    fun updateNote(noteId: String, text: String, fieldValues: Map<String, String>) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, saveError = null) }
+
+            try {
+                val fields: Map<String, JsonElement>? = if (fieldValues.isNotEmpty()) {
+                    fieldValues.mapValues { (name, value) ->
+                        val fieldDef = _uiState.value.customFields.find { it.name == name }
+                        when (fieldDef?.type) {
+                            "checkbox" -> JsonPrimitive(value.toBooleanStrictOrNull() ?: false)
+                            "number" -> {
+                                val num = value.toIntOrNull()
+                                if (num != null) JsonPrimitive(num) else JsonPrimitive(value)
+                            }
+                            else -> JsonPrimitive(value)
+                        }
+                    }
+                } else {
+                    null
+                }
+
+                val payload = NotePayload(text = text, fields = fields)
+                val payloadJson = json.encodeToString(NotePayload.serializer(), payload)
+
+                val encrypted = cryptoService.encryptNote(payloadJson, emptyList())
+
+                val envelopes = encrypted.envelopes.map { env ->
+                    CreateNoteEnvelope(
+                        pubkey = env.recipientPubkey,
+                        wrappedKey = env.wrappedKey,
+                        ephemeralPubkey = env.ephemeralPubkey,
+                    )
+                }
+
+                val request = CreateNoteRequest(
+                    encryptedContent = encrypted.ciphertext,
+                    recipientEnvelopes = envelopes,
+                )
+
+                apiService.request<NoteResponse>("PUT", "/api/notes/$noteId", request)
+
+                // Update local state with edited content
+                val updatedNote = _uiState.value.selectedNote?.copy(
+                    text = text,
+                    fields = fields,
+                )
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        isEditing = false,
+                        selectedNote = updatedNote,
+                        saveSuccess = true,
+                    )
+                }
+
+                refresh()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        saveError = e.message ?: "Failed to update note",
+                    )
+                }
+            }
+        }
     }
 
     /**

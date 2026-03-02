@@ -1,6 +1,7 @@
 package org.llamenos.hotline.ui.notes
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,8 +15,11 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -25,6 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -32,10 +37,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -46,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
+import org.llamenos.hotline.ui.components.LoadingOverlay
 import org.llamenos.hotline.util.DateFormatUtils
 
 /**
@@ -73,45 +82,106 @@ fun NoteDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val copiedMessage = stringResource(R.string.note_copied)
+    var editText by remember { mutableStateOf("") }
 
+    // Sync edit text when entering edit mode
+    LaunchedEffect(uiState.isEditing) {
+        if (uiState.isEditing && note != null) {
+            editText = note.text
+        }
+    }
+
+    // Show save errors in snackbar
+    LaunchedEffect(uiState.saveError) {
+        uiState.saveError?.let { error ->
+            scope.launch {
+                snackbarHostState.showSnackbar(error)
+                viewModel.clearSaveError()
+            }
+        }
+    }
+
+    Box(modifier = modifier) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = stringResource(R.string.note_detail),
+                        text = if (uiState.isEditing) {
+                            stringResource(R.string.note_editing)
+                        } else {
+                            stringResource(R.string.note_detail)
+                        },
                         modifier = Modifier.testTag("note-detail-title"),
                     )
                 },
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            viewModel.clearSelectedNote()
-                            onNavigateBack()
+                            if (uiState.isEditing) {
+                                viewModel.cancelEditing()
+                            } else {
+                                viewModel.clearSelectedNote()
+                                onNavigateBack()
+                            }
                         },
                         modifier = Modifier.testTag("note-detail-back"),
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = if (uiState.isEditing) {
+                                Icons.Filled.Close
+                            } else {
+                                Icons.AutoMirrored.Filled.ArrowBack
+                            },
                             contentDescription = stringResource(R.string.nav_dashboard),
                         )
                     }
                 },
                 actions = {
                     if (note != null) {
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(AnnotatedString(note.text))
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(copiedMessage)
-                                }
-                            },
-                            modifier = Modifier.testTag("note-copy-button"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.ContentCopy,
-                                contentDescription = stringResource(R.string.note_copy),
-                            )
+                        if (uiState.isEditing) {
+                            // Save button in edit mode
+                            IconButton(
+                                onClick = {
+                                    if (editText.isNotBlank()) {
+                                        viewModel.updateNote(note.id, editText.trim(), emptyMap())
+                                    }
+                                },
+                                enabled = editText.isNotBlank() && !uiState.isSaving,
+                                modifier = Modifier.testTag("note-save-button"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Save,
+                                    contentDescription = stringResource(R.string.note_save),
+                                )
+                            }
+                        } else {
+                            // Edit button
+                            IconButton(
+                                onClick = { viewModel.startEditing() },
+                                modifier = Modifier.testTag("note-edit-button"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Edit,
+                                    contentDescription = stringResource(R.string.note_edit),
+                                )
+                            }
+
+                            // Copy button
+                            IconButton(
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(note.text))
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(copiedMessage)
+                                    }
+                                },
+                                modifier = Modifier.testTag("note-copy-button"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ContentCopy,
+                                    contentDescription = stringResource(R.string.note_copy),
+                                )
+                            }
                         }
                     }
                 },
@@ -121,7 +191,6 @@ fun NoteDetailScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        modifier = modifier,
     ) { paddingValues ->
         if (note == null) {
             // Note not found — should not happen in normal flow
@@ -149,15 +218,29 @@ fun NoteDetailScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Main note text
-                SelectionContainer {
-                    Text(
-                        text = note.text,
-                        style = MaterialTheme.typography.bodyLarge,
+                // Main note text — read or edit mode
+                if (uiState.isEditing) {
+                    OutlinedTextField(
+                        value = editText,
+                        onValueChange = { editText = it },
+                        label = { Text(stringResource(R.string.note_text_hint)) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("note-detail-text"),
+                            .height(200.dp)
+                            .testTag("note-edit-input"),
+                        maxLines = 10,
+                        singleLine = false,
                     )
+                } else {
+                    SelectionContainer {
+                        Text(
+                            text = note.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("note-detail-text"),
+                        )
+                    }
                 }
 
                 // Custom fields
@@ -290,4 +373,11 @@ fun NoteDetailScreen(
             }
         }
     }
+
+    // Loading overlay during save
+    LoadingOverlay(
+        isLoading = uiState.isSaving,
+        message = stringResource(R.string.note_saving),
+    )
+    } // Close Box
 }

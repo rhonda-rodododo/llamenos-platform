@@ -18,8 +18,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -28,7 +30,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -68,12 +72,13 @@ fun NotesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val filteredNotes = viewModel.filteredNotes()
 
     // Paginate when reaching the end of the list
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisibleItem >= uiState.notes.size - 3 && uiState.hasMorePages && !uiState.isLoading
+            lastVisibleItem >= filteredNotes.size - 3 && uiState.hasMorePages && !uiState.isLoading
         }
     }
 
@@ -104,6 +109,39 @@ fun NotesScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Search bar
+                OutlinedTextField(
+                    value = uiState.searchQuery,
+                    onValueChange = { viewModel.setSearchQuery(it) },
+                    placeholder = { Text(stringResource(R.string.notes_search)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    trailingIcon = {
+                        if (uiState.searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { viewModel.setSearchQuery("") },
+                                modifier = Modifier.testTag("notes-search-clear"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Clear,
+                                    contentDescription = stringResource(R.string.dismiss),
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .testTag("notes-search-input"),
+                )
+
             when {
                 uiState.isLoading && uiState.notes.isEmpty() -> {
                     // Loading state
@@ -158,7 +196,7 @@ fun NotesScreen(
                             .testTag("notes-list"),
                     ) {
                         items(
-                            items = uiState.notes,
+                            items = filteredNotes,
                             key = { it.id },
                         ) { note ->
                             NoteCard(
@@ -189,6 +227,7 @@ fun NotesScreen(
                     }
                 }
             }
+            } // Close Column
 
             // Error message
             if (uiState.error != null) {
