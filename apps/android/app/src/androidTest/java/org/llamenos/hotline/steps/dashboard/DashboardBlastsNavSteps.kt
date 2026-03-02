@@ -23,7 +23,7 @@ class DashboardBlastsNavSteps : BaseSteps() {
 
     @When("I tap the view blasts button")
     fun iTapTheViewBlastsButton() {
-        onNodeWithTag("view-blasts").performClick()
+        onNodeWithTag("blasts-card").performClick()
         composeRule.waitForIdle()
     }
 

@@ -20,7 +20,7 @@ class ContactsListSteps : BaseSteps() {
 
     @When("I tap the view contacts button")
     fun iTapTheViewContactsButton() {
-        onNodeWithTag("view-contacts").performClick()
+        onNodeWithTag("contacts-card").performClick()
         composeRule.waitForIdle()
     }
 

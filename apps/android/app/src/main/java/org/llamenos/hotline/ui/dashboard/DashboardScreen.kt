@@ -445,152 +445,50 @@ fun DashboardScreen(
                     }
                 }
 
-                // Reports card
-                Card(
+                // Quick actions grid (2x2)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(onClick = onNavigateToReports)
-                        .testTag("reports-card"),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+                        .testTag("quick-actions-grid"),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Assessment,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.reports_title),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                        TextButton(
-                            onClick = onNavigateToReports,
-                            modifier = Modifier.testTag("view-reports"),
-                        ) {
-                            Text(stringResource(R.string.dashboard_view_reports))
-                        }
-                    }
+                    QuickActionCard(
+                        icon = Icons.Filled.Assessment,
+                        label = stringResource(R.string.reports_title),
+                        onClick = onNavigateToReports,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        testTag = "reports-card",
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickActionCard(
+                        icon = Icons.Filled.People,
+                        label = stringResource(R.string.contacts_title),
+                        onClick = onNavigateToContacts,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        testTag = "contacts-card",
+                        modifier = Modifier.weight(1f),
+                    )
                 }
-
-                // Contacts card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onNavigateToContacts)
-                        .testTag("contacts-card"),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.People,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.contacts_title),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                        TextButton(
-                            onClick = onNavigateToContacts,
-                            modifier = Modifier.testTag("view-contacts"),
-                        ) {
-                            Text(stringResource(R.string.dashboard_view_contacts))
-                        }
-                    }
-                }
-
-                // Blasts card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onNavigateToBlasts)
-                        .testTag("blasts-card"),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Campaign,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.blasts_title),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                        TextButton(
-                            onClick = onNavigateToBlasts,
-                            modifier = Modifier.testTag("view-blasts"),
-                        ) {
-                            Text(stringResource(R.string.dashboard_view_blasts))
-                        }
-                    }
-                }
-
-                // Help card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onNavigateToHelp)
-                        .testTag("help-card"),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.HelpOutline,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.help_title),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                        TextButton(
-                            onClick = onNavigateToHelp,
-                            modifier = Modifier.testTag("view-help"),
-                        ) {
-                            Text(stringResource(R.string.dashboard_view_help))
-                        }
-                    }
+                    QuickActionCard(
+                        icon = Icons.Filled.Campaign,
+                        label = stringResource(R.string.blasts_title),
+                        onClick = onNavigateToBlasts,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        testTag = "blasts-card",
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickActionCard(
+                        icon = Icons.Filled.HelpOutline,
+                        label = stringResource(R.string.help_title),
+                        onClick = onNavigateToHelp,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        testTag = "help-card",
+                        modifier = Modifier.weight(1f),
+                    )
                 }
 
                 // Recent notes preview
@@ -681,6 +579,49 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Compact quick action card for the 2x2 grid layout.
+ */
+@Composable
+private fun QuickActionCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    tint: androidx.compose.ui.graphics.Color,
+    testTag: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .testTag(testTag),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(28.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

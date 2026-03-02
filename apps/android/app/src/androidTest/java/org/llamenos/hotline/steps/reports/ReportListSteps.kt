@@ -21,7 +21,7 @@ class ReportListSteps : BaseSteps() {
 
     @When("I tap the view reports button")
     fun iTapTheViewReportsButton() {
-        onNodeWithTag("view-reports").performClick()
+        onNodeWithTag("reports-card").performClick()
         composeRule.waitForIdle()
     }
 
