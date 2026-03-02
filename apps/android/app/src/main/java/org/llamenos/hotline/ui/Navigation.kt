@@ -83,10 +83,10 @@ sealed interface LlamenosRoute {
         }
     }
 
-    /** Note creation form, optionally linked to a conversation. */
+    /** Note creation form, optionally linked to a conversation or call. */
     data object NoteCreate : LlamenosRoute {
         override val route = "note_create"
-        const val ROUTE_PATTERN = "note_create?conversationId={conversationId}"
+        const val ROUTE_PATTERN = "note_create?conversationId={conversationId}&callId={callId}"
     }
 
     /** Conversation detail view. */
@@ -327,14 +327,21 @@ fun LlamenosNavigation(
                     nullable = true
                     defaultValue = null
                 },
+                navArgument("callId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
             ),
         ) { backStackEntry ->
             val notesViewModel: NotesViewModel = hiltViewModel()
             val conversationId = backStackEntry.arguments?.getString("conversationId")
+            val callId = backStackEntry.arguments?.getString("callId")
             NoteCreateScreen(
                 viewModel = notesViewModel,
                 onNavigateBack = { navController.popBackStack() },
                 conversationId = conversationId,
+                callId = callId,
             )
         }
 
@@ -360,6 +367,9 @@ fun LlamenosNavigation(
             CallHistoryScreen(
                 viewModel = callHistoryViewModel,
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToNoteCreate = { callId ->
+                    navController.navigate("note_create?callId=$callId")
+                },
             )
         }
 

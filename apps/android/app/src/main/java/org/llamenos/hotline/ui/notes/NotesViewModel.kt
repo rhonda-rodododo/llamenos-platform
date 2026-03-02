@@ -194,7 +194,7 @@ class NotesViewModel @Inject constructor(
      * @param text The note body text
      * @param fieldValues Map of custom field name -> value
      */
-    fun createNote(text: String, fieldValues: Map<String, String>, conversationId: String? = null) {
+    fun createNote(text: String, fieldValues: Map<String, String>, conversationId: String? = null, callId: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, saveError = null, saveSuccess = false) }
 
@@ -235,6 +235,7 @@ class NotesViewModel @Inject constructor(
                     encryptedContent = encrypted.ciphertext,
                     recipientEnvelopes = envelopes,
                     conversationId = conversationId,
+                    callId = callId,
                 )
 
                 apiService.request<NoteResponse>("POST", "/api/notes", request)

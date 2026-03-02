@@ -22,6 +22,8 @@ data class CallHistoryUiState(
     val error: String? = null,
     val searchQuery: String = "",
     val selectedFilter: CallStatusFilter = CallStatusFilter.ALL,
+    val dateFrom: String? = null,
+    val dateTo: String? = null,
 )
 
 enum class CallStatusFilter(val queryParam: String?) {
@@ -68,6 +70,14 @@ class CallHistoryViewModel @Inject constructor(
                     if (filter.queryParam != null) {
                         append("&status=${filter.queryParam}")
                     }
+                    val from = _uiState.value.dateFrom
+                    if (from != null) {
+                        append("&dateFrom=$from")
+                    }
+                    val to = _uiState.value.dateTo
+                    if (to != null) {
+                        append("&dateTo=$to")
+                    }
                 }
                 val response = apiService.request<CallHistoryResponse>("GET", query)
                 _uiState.update {
@@ -109,6 +119,21 @@ class CallHistoryViewModel @Inject constructor(
 
     fun setFilter(filter: CallStatusFilter) {
         _uiState.update { it.copy(selectedFilter = filter) }
+        loadCalls(page = 1)
+    }
+
+    fun setDateFrom(date: String?) {
+        _uiState.update { it.copy(dateFrom = date) }
+        loadCalls(page = 1)
+    }
+
+    fun setDateTo(date: String?) {
+        _uiState.update { it.copy(dateTo = date) }
+        loadCalls(page = 1)
+    }
+
+    fun clearDateRange() {
+        _uiState.update { it.copy(dateFrom = null, dateTo = null) }
         loadCalls(page = 1)
     }
 }

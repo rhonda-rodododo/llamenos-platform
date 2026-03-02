@@ -69,6 +69,7 @@ fun NoteCreateScreen(
     viewModel: NotesViewModel,
     onNavigateBack: () -> Unit,
     conversationId: String? = null,
+    callId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -120,7 +121,7 @@ fun NoteCreateScreen(
                         IconButton(
                             onClick = {
                                 if (noteText.isNotBlank()) {
-                                    viewModel.createNote(noteText.trim(), fieldValues.toMap(), conversationId)
+                                    viewModel.createNote(noteText.trim(), fieldValues.toMap(), conversationId, callId)
                                 }
                             },
                             enabled = noteText.isNotBlank() && !uiState.isSaving,

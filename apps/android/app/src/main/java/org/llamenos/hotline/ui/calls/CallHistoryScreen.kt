@@ -17,6 +17,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhoneDisabled
 import androidx.compose.material.icons.filled.PhoneInTalk
@@ -25,6 +28,8 @@ import androidx.compose.material.icons.filled.Voicemail
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -33,15 +38,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -65,6 +77,7 @@ import org.llamenos.hotline.util.DateFormatUtils
 fun CallHistoryScreen(
     viewModel: CallHistoryViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToNoteCreate: (callId: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -160,6 +173,15 @@ fun CallHistoryScreen(
 
                 Spacer(Modifier.height(8.dp))
 
+                // Date range filter
+                DateRangeFilter(
+                    dateFrom = uiState.dateFrom,
+                    dateTo = uiState.dateTo,
+                    onDateFromSelected = { viewModel.setDateFrom(it) },
+                    onDateToSelected = { viewModel.setDateTo(it) },
+                    onClear = { viewModel.clearDateRange() },
+                )
+
                 // Content
                 when {
                     uiState.isLoading && uiState.calls.isEmpty() -> {
@@ -193,7 +215,10 @@ fun CallHistoryScreen(
                                 items = uiState.calls,
                                 key = { it.id },
                             ) { call ->
-                                CallRecordCard(call = call)
+                                CallRecordCard(
+                                    call = call,
+                                    onAddNote = { onNavigateToNoteCreate(call.id) },
+                                )
                             }
 
                             // Loading indicator at bottom for pagination
@@ -246,6 +271,7 @@ fun CallHistoryScreen(
 @Composable
 private fun CallRecordCard(
     call: CallRecord,
+    onAddNote: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isUnanswered = call.status == "unanswered"
@@ -369,6 +395,19 @@ private fun CallRecordCard(
                     }
                 }
             }
+
+            // Add Note button
+            IconButton(
+                onClick = onAddNote,
+                modifier = Modifier.testTag("call-add-note-${call.id}"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.NoteAdd,
+                    contentDescription = stringResource(R.string.call_add_note),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
@@ -401,6 +440,143 @@ private fun MetadataBadge(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/**
+ * Date range filter row with From / To date pickers and a clear button.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateRangeFilter(
+    dateFrom: String?,
+    dateTo: String?,
+    onDateFromSelected: (String?) -> Unit,
+    onDateToSelected: (String?) -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var showFromPicker by remember { mutableStateOf(false) }
+    var showToPicker by remember { mutableStateOf(false) }
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .testTag("call-date-range"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // From date button
+        FilterChip(
+            selected = dateFrom != null,
+            onClick = { showFromPicker = true },
+            label = {
+                Text(
+                    text = dateFrom ?: stringResource(R.string.call_date_from),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+            },
+            modifier = Modifier.testTag("call-date-from"),
+        )
+
+        // To date button
+        FilterChip(
+            selected = dateTo != null,
+            onClick = { showToPicker = true },
+            label = {
+                Text(
+                    text = dateTo ?: stringResource(R.string.call_date_to),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+            },
+            modifier = Modifier.testTag("call-date-to"),
+        )
+
+        // Clear button (only when a date is set)
+        if (dateFrom != null || dateTo != null) {
+            IconButton(
+                onClick = onClear,
+                modifier = Modifier
+                    .size(32.dp)
+                    .testTag("call-date-clear"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Clear,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+    }
+
+    // From date picker dialog
+    if (showFromPicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showFromPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            onDateFromSelected(dateFormat.format(Date(millis)))
+                        }
+                        showFromPicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFromPicker = false }) {
+                    Text("Cancel")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // To date picker dialog
+    if (showToPicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showToPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            onDateToSelected(dateFormat.format(Date(millis)))
+                        }
+                        showToPicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showToPicker = false }) {
+                    Text("Cancel")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
     }
 }
 
