@@ -273,6 +273,13 @@
     <string name="report_messages">Messages</string>
     <string name="report_assigned">Assigned to</string>
     <string name="report_linked_call">Call: %s\u2026</string>
+    <string name="report_create">New Report</string>
+    <string name="report_title_label">Title</string>
+    <string name="report_category_label">Category</string>
+    <string name="report_body_label">Details</string>
+    <string name="report_submit">Submit Report</string>
+    <string name="report_claim">Claim</string>
+    <string name="report_close">Close</string>
 
     <!-- Contacts -->
     <string name="contacts_title">Contacts</string>

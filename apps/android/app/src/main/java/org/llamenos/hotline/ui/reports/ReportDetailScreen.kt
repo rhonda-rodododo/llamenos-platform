@@ -9,20 +9,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -40,10 +47,8 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.util.DateFormatUtils
 
 /**
- * Report detail screen showing metadata, status, and linked entities.
- *
- * Displays the report title, category badge, status indicator, timestamps,
- * message count, assigned volunteer, and linked call ID if present.
+ * Report detail screen showing metadata, status, linked entities,
+ * and action buttons for claiming and closing reports.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,6 +166,91 @@ fun ReportDetailScreen(
                                 )
                             },
                             modifier = Modifier.testTag("report-detail-category"),
+                        )
+                    }
+                }
+
+                // Action buttons
+                if (report.status != "closed") {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("report-action-buttons"),
+                    ) {
+                        // Claim button — visible when report is waiting
+                        if (report.status == "waiting") {
+                            Button(
+                                onClick = { viewModel.claimReport(report.id) },
+                                enabled = !uiState.isClaiming,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("report-claim-button"),
+                            ) {
+                                if (uiState.isClaiming) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(stringResource(R.string.report_claim))
+                            }
+                        }
+
+                        // Close button — visible when report is active
+                        if (report.status == "active") {
+                            OutlinedButton(
+                                onClick = { viewModel.closeReport(report.id) },
+                                enabled = !uiState.isClosing,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error,
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("report-close-button"),
+                            ) {
+                                if (uiState.isClosing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(stringResource(R.string.report_close))
+                            }
+                        }
+                    }
+                }
+
+                // Error card for action failures
+                if (uiState.actionError != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("report-action-error"),
+                    ) {
+                        Text(
+                            text = uiState.actionError ?: "",
+                            modifier = Modifier.padding(12.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }

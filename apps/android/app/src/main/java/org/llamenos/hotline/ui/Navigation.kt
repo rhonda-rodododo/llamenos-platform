@@ -23,6 +23,7 @@ import org.llamenos.hotline.ui.contacts.ContactsScreen
 import org.llamenos.hotline.ui.contacts.ContactsViewModel
 import org.llamenos.hotline.ui.contacts.ContactTimelineScreen
 import org.llamenos.hotline.ui.contacts.ContactTimelineViewModel
+import org.llamenos.hotline.ui.reports.ReportCreateScreen
 import org.llamenos.hotline.ui.reports.ReportDetailScreen
 import org.llamenos.hotline.ui.reports.ReportsScreen
 import org.llamenos.hotline.ui.reports.ReportsViewModel
@@ -105,6 +106,11 @@ sealed interface LlamenosRoute {
     /** Reports list. */
     data object Reports : LlamenosRoute {
         override val route = "reports"
+    }
+
+    /** Report creation form. */
+    data object ReportCreate : LlamenosRoute {
+        override val route = "report_create"
     }
 
     /** Contacts list. */
@@ -365,6 +371,17 @@ fun LlamenosNavigation(
                 onNavigateToReportDetail = { reportId ->
                     navController.navigate("report/$reportId")
                 },
+                onNavigateToReportCreate = {
+                    navController.navigate(LlamenosRoute.ReportCreate.route)
+                },
+            )
+        }
+
+        composable(LlamenosRoute.ReportCreate.route) {
+            val reportsViewModel: ReportsViewModel = hiltViewModel()
+            ReportCreateScreen(
+                viewModel = reportsViewModel,
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

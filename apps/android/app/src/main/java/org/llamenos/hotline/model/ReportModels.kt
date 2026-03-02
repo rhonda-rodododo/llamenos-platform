@@ -52,3 +52,40 @@ data class ReportsListResponse(
 data class ReportCategoriesResponse(
     val categories: List<String>,
 )
+
+/**
+ * Request body for POST /reports (create a new report).
+ */
+@Serializable
+data class CreateReportRequest(
+    val title: String,
+    val category: String? = null,
+    val encryptedContent: String,
+    val readerEnvelopes: List<ReportEnvelope>,
+)
+
+/**
+ * ECIES envelope for a report reader.
+ */
+@Serializable
+data class ReportEnvelope(
+    val pubkey: String,
+    val wrappedKey: String,
+    val ephemeralPubkey: String,
+)
+
+/**
+ * Request body for POST /reports/:id/assign.
+ */
+@Serializable
+data class AssignReportRequest(
+    val assignedTo: String,
+)
+
+/**
+ * Request body for PATCH /reports/:id (status update).
+ */
+@Serializable
+data class UpdateReportRequest(
+    val status: String,
+)
