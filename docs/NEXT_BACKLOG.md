@@ -293,6 +293,21 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 ### Playwright Restoration
 - [x] **[Epic 216: Playwright Test Restoration](epics/epic-216-playwright-test-restoration.md)** — Restore 361 E2E tests (361 passed, 5 skipped) on desktop branch
 
+## Cross-Platform BDD E2E Test Suite (Epics 218-222)
+
+Shared Gherkin specs in `packages/test-specs/` driving Android (Compose UI Test) and iOS (XCUITest) E2E tests. Uses Gherkin-as-Specification approach with CI validation.
+
+### Framework
+- [ ] **[Epic 218: Cross-Platform BDD Test Framework](epics/epic-218-bdd-test-framework.md)** — `packages/test-specs/` structure, Gherkin conventions, CI validation script, `TestNavigationHelper` extraction
+
+### Mobile E2E Specs & Implementation
+- [ ] **[Epic 219: Auth Flow BDD Specs](epics/epic-219-auth-flow-bdd.md)** — 5 feature files (login, onboarding, PIN setup/unlock, key import), 24 scenarios
+- [ ] **[Epic 220: Core Features BDD Specs](epics/epic-220-core-features-bdd.md)** — 10 feature files (dashboard, notes, conversations, shifts, navigation), 34 scenarios
+- [ ] **[Epic 221: Admin, Settings & Access Control BDD Specs](epics/epic-221-admin-settings-bdd.md)** — 6 feature files (settings, lock/logout, device link, admin nav/tabs, access control), 27 scenarios
+- [ ] **[Epic 222: Crypto Interop E2E Verification](epics/epic-222-crypto-e2e-verification.md)** — 4 feature files (keypair gen, PIN encryption, auth tokens, crypto interop with test vectors), 21 scenarios
+
+**Total: 25 feature files, 106 E2E scenarios** (up from 31 existing tests)
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
