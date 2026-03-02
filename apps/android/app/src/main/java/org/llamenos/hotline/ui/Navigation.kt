@@ -14,6 +14,10 @@ import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.ui.admin.AdminScreen
 import org.llamenos.hotline.ui.auth.AuthViewModel
+import org.llamenos.hotline.ui.calls.CallHistoryScreen
+import org.llamenos.hotline.ui.calls.CallHistoryViewModel
+import org.llamenos.hotline.ui.reports.ReportsScreen
+import org.llamenos.hotline.ui.reports.ReportsViewModel
 import org.llamenos.hotline.ui.auth.LoginScreen
 import org.llamenos.hotline.ui.auth.OnboardingScreen
 import org.llamenos.hotline.ui.auth.PINSetScreen
@@ -79,6 +83,25 @@ sealed interface LlamenosRoute {
 
         companion object {
             const val ROUTE_PATTERN = "conversation/{conversationId}"
+        }
+    }
+
+    /** Call history list. */
+    data object CallHistory : LlamenosRoute {
+        override val route = "call_history"
+    }
+
+    /** Reports list. */
+    data object Reports : LlamenosRoute {
+        override val route = "reports"
+    }
+
+    /** Report detail view. */
+    data class ReportDetail(val reportId: String) : LlamenosRoute {
+        override val route = "report/{reportId}"
+
+        companion object {
+            const val ROUTE_PATTERN = "report/{reportId}"
         }
     }
 
@@ -220,6 +243,12 @@ fun LlamenosNavigation(
                 onNavigateToAdmin = {
                     navController.navigate(LlamenosRoute.Admin.route)
                 },
+                onNavigateToCallHistory = {
+                    navController.navigate(LlamenosRoute.CallHistory.route)
+                },
+                onNavigateToReports = {
+                    navController.navigate(LlamenosRoute.Reports.route)
+                },
                 onNavigateToDeviceLink = {
                     navController.navigate(LlamenosRoute.DeviceLink.route)
                 },
@@ -253,6 +282,25 @@ fun LlamenosNavigation(
         composable(LlamenosRoute.Admin.route) {
             AdminScreen(
                 onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.CallHistory.route) {
+            val callHistoryViewModel: CallHistoryViewModel = hiltViewModel()
+            CallHistoryScreen(
+                viewModel = callHistoryViewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.Reports.route) {
+            val reportsViewModel: ReportsViewModel = hiltViewModel()
+            ReportsScreen(
+                viewModel = reportsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToReportDetail = { reportId ->
+                    navController.navigate("report/$reportId")
+                },
             )
         }
 

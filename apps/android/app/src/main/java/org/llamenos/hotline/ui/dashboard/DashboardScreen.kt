@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -72,6 +73,8 @@ fun DashboardScreen(
     onLogout: () -> Unit,
     onNavigateToNotes: () -> Unit,
     onNavigateToNoteDetail: (String) -> Unit,
+    onNavigateToCallHistory: () -> Unit,
+    onNavigateToReports: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -315,7 +318,7 @@ fun DashboardScreen(
                             tint = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(Modifier.width(12.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.active_calls),
                                 style = MaterialTheme.typography.titleMedium,
@@ -326,6 +329,49 @@ fun DashboardScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.testTag("active-call-count"),
                             )
+                        }
+                        TextButton(
+                            onClick = onNavigateToCallHistory,
+                            modifier = Modifier.testTag("view-call-history"),
+                        ) {
+                            Text(stringResource(R.string.dashboard_view_calls))
+                        }
+                    }
+                }
+
+                // Reports card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onNavigateToReports)
+                        .testTag("reports-card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Assessment,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.reports_title),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        TextButton(
+                            onClick = onNavigateToReports,
+                            modifier = Modifier.testTag("view-reports"),
+                        ) {
+                            Text(stringResource(R.string.dashboard_view_reports))
                         }
                     }
                 }

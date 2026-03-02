@@ -94,6 +94,8 @@ fun MainScreen(
     onNavigateToNoteCreate: () -> Unit,
     onNavigateToConversationDetail: (String) -> Unit,
     onNavigateToAdmin: () -> Unit,
+    onNavigateToCallHistory: () -> Unit,
+    onNavigateToReports: () -> Unit,
     onNavigateToDeviceLink: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -164,6 +166,8 @@ fun MainScreen(
                         onLogout = onLogout,
                         onNavigateToNotes = { selectedTab = MainTab.NOTES.ordinal },
                         onNavigateToNoteDetail = onNavigateToNoteDetail,
+                        onNavigateToCallHistory = onNavigateToCallHistory,
+                        onNavigateToReports = onNavigateToReports,
                     )
                 }
 

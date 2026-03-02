@@ -205,6 +205,28 @@
     <string name="panic_wipe_message">All local data will be permanently erased.</string>
     <string name="panic_wiping">Wiping data\u2026</string>
 
+    <!-- Call History -->
+    <string name="call_history_title">Call History</string>
+    <string name="call_history_back">Back</string>
+    <string name="call_history_empty">No call history</string>
+    <string name="call_history_empty_subtitle">Completed calls will appear here</string>
+    <string name="call_filter_completed">Completed</string>
+    <string name="call_filter_unanswered">Unanswered</string>
+    <string name="call_unknown_caller">Unknown</string>
+    <string name="call_voicemail">Voicemail</string>
+    <string name="call_transcription">Transcription</string>
+    <string name="call_recording">Recording</string>
+    <string name="dashboard_view_calls">View Call History</string>
+
+    <!-- Reports -->
+    <string name="reports_title">Reports</string>
+    <string name="reports_back">Back</string>
+    <string name="reports_empty">No reports</string>
+    <string name="reports_empty_subtitle">Reports will appear here</string>
+    <string name="report_filter_waiting">Waiting</string>
+    <string name="report_untitled">Untitled Report</string>
+    <string name="dashboard_view_reports">View Reports</string>
+
     <!-- Notifications -->
     <string name="notification_channel_calls">Incoming Calls</string>
     <string name="notification_channel_shifts">Shift Reminders</string>

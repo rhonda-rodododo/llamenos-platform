@@ -1,0 +1,114 @@
+package org.llamenos.hotline.ui.calls
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import org.llamenos.hotline.api.ApiService
+import org.llamenos.hotline.model.CallHistoryResponse
+import org.llamenos.hotline.model.CallRecord
+import javax.inject.Inject
+
+data class CallHistoryUiState(
+    val calls: List<CallRecord> = emptyList(),
+    val total: Int = 0,
+    val currentPage: Int = 1,
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val error: String? = null,
+    val searchQuery: String = "",
+    val selectedFilter: CallStatusFilter = CallStatusFilter.ALL,
+)
+
+enum class CallStatusFilter(val queryParam: String?) {
+    ALL(null),
+    COMPLETED("completed"),
+    UNANSWERED("unanswered"),
+}
+
+/**
+ * ViewModel for the call history screen.
+ *
+ * Loads paginated call history from GET /calls/history with optional search
+ * and status filtering. Supports pull-to-refresh and pagination.
+ */
+@HiltViewModel
+class CallHistoryViewModel @Inject constructor(
+    private val apiService: ApiService,
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(CallHistoryUiState())
+    val uiState: StateFlow<CallHistoryUiState> = _uiState.asStateFlow()
+
+    init {
+        loadCalls()
+    }
+
+    fun loadCalls(page: Int = 1) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = page == 1 && it.calls.isEmpty(),
+                    isRefreshing = page == 1 && it.calls.isNotEmpty(),
+                    error = null,
+                )
+            }
+            try {
+                val query = buildString {
+                    append("/api/calls/history?page=$page&limit=50")
+                    val search = _uiState.value.searchQuery
+                    if (search.isNotBlank()) {
+                        append("&search=$search")
+                    }
+                    val filter = _uiState.value.selectedFilter
+                    if (filter.queryParam != null) {
+                        append("&status=${filter.queryParam}")
+                    }
+                }
+                val response = apiService.request<CallHistoryResponse>("GET", query)
+                _uiState.update {
+                    it.copy(
+                        calls = if (page == 1) response.calls else it.calls + response.calls,
+                        total = response.total,
+                        currentPage = page,
+                        isLoading = false,
+                        isRefreshing = false,
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = e.message ?: "Failed to load call history",
+                    )
+                }
+            }
+        }
+    }
+
+    fun refresh() {
+        loadCalls(page = 1)
+    }
+
+    fun loadNextPage() {
+        val state = _uiState.value
+        if (state.calls.size < state.total && !state.isLoading) {
+            loadCalls(page = state.currentPage + 1)
+        }
+    }
+
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+        loadCalls(page = 1)
+    }
+
+    fun setFilter(filter: CallStatusFilter) {
+        _uiState.update { it.copy(selectedFilter = filter) }
+        loadCalls(page = 1)
+    }
+}
