@@ -3,6 +3,7 @@ package org.llamenos.hotline.ui.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.annotation.StringRes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.llamenos.hotline.R
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.crypto.CryptoService
@@ -27,6 +29,7 @@ data class DashboardUiState(
     val connectionState: WebSocketService.ConnectionState = WebSocketService.ConnectionState.DISCONNECTED,
     val isRefreshing: Boolean = false,
     val isClockingInOut: Boolean = false,
+    @StringRes val errorRes: Int? = null,
 )
 
 /**
@@ -70,7 +73,7 @@ class DashboardViewModel @Inject constructor(
         }
 
         // Load initial shift status
-        loadShiftStatus()
+        viewModelScope.launch { loadShiftStatus() }
     }
 
     /**
@@ -122,7 +125,7 @@ class DashboardViewModel @Inject constructor(
                 }
             }
             is LlamenosEvent.ShiftUpdate -> {
-                loadShiftStatus()
+                viewModelScope.launch { loadShiftStatus() }
             }
             is LlamenosEvent.NoteCreated -> {
                 // Notes list will refresh via its own ViewModel
@@ -141,21 +144,22 @@ class DashboardViewModel @Inject constructor(
 
     /**
      * Load the current volunteer's shift status from the API.
+     * Returns true on success, false on failure.
      */
-    private fun loadShiftStatus() {
-        viewModelScope.launch {
-            try {
-                val status = apiService.request<ShiftStatusResponse>("GET", "/api/shifts/status")
-                _uiState.update {
-                    it.copy(
-                        isOnShift = status.isOnShift,
-                        shiftStartedAt = status.startedAt,
-                        activeCallCount = status.activeCallCount ?: it.activeCallCount,
-                    )
-                }
-            } catch (_: Exception) {
-                // Status fetch failure is non-critical on the dashboard
+    private suspend fun loadShiftStatus(): Boolean {
+        return try {
+            val status = apiService.request<ShiftStatusResponse>("GET", "/api/shifts/status")
+            _uiState.update {
+                it.copy(
+                    isOnShift = status.isOnShift,
+                    shiftStartedAt = status.startedAt,
+                    activeCallCount = status.activeCallCount ?: it.activeCallCount,
+                    errorRes = null,
+                )
             }
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -164,12 +168,12 @@ class DashboardViewModel @Inject constructor(
      */
     fun clockIn() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isClockingInOut = true) }
+            _uiState.update { it.copy(isClockingInOut = true, errorRes = null) }
             try {
                 apiService.request<ClockResponse>("POST", "/api/shifts/clock-in")
                 loadShiftStatus()
             } catch (_: Exception) {
-                // Silently fail — user can use the Shifts tab for error details
+                _uiState.update { it.copy(errorRes = R.string.dashboard_error_clock_in) }
             }
             _uiState.update { it.copy(isClockingInOut = false) }
         }
@@ -180,12 +184,12 @@ class DashboardViewModel @Inject constructor(
      */
     fun clockOut() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isClockingInOut = true) }
+            _uiState.update { it.copy(isClockingInOut = true, errorRes = null) }
             try {
                 apiService.request<ClockResponse>("POST", "/api/shifts/clock-out")
                 loadShiftStatus()
             } catch (_: Exception) {
-                // Silently fail — user can use the Shifts tab for error details
+                _uiState.update { it.copy(errorRes = R.string.dashboard_error_clock_out) }
             }
             _uiState.update { it.copy(isClockingInOut = false) }
         }
@@ -195,9 +199,21 @@ class DashboardViewModel @Inject constructor(
      * Pull-to-refresh on the dashboard.
      */
     fun refresh() {
-        _uiState.update { it.copy(isRefreshing = true) }
-        loadShiftStatus()
-        _uiState.update { it.copy(isRefreshing = false) }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true, errorRes = null) }
+            val success = loadShiftStatus()
+            if (!success) {
+                _uiState.update { it.copy(errorRes = R.string.dashboard_error_refresh) }
+            }
+            _uiState.update { it.copy(isRefreshing = false) }
+        }
+    }
+
+    /**
+     * Dismiss the error message.
+     */
+    fun dismissError() {
+        _uiState.update { it.copy(errorRes = null) }
     }
 
     override fun onCleared() {

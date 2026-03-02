@@ -401,6 +401,10 @@
     <string name="help_faq_spam_q">How do I deal with spam calls?</string>
     <string name="help_faq_spam_a">Use the Ban List in Administration to block phone numbers. You can add individual bans or bulk import numbers.</string>
     <string name="dashboard_view_help">Help &amp; Reference</string>
+    <string name="dashboard_error_clock_in">Failed to clock in. Try again or use the Shifts tab.</string>
+    <string name="dashboard_error_clock_out">Failed to clock out. Try again or use the Shifts tab.</string>
+    <string name="dashboard_error_refresh">Failed to refresh. Check your connection.</string>
+    <string name="dismiss">Dismiss</string>
 
     <!-- Admin Settings -->
     <string name="admin_transcription_desc">Automatic transcription of call recordings using on-device processing</string>
