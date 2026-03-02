@@ -451,26 +451,13 @@ private fun ShiftCard(
 private fun EmptyShiftsState(
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(32.dp)
-            .testTag("shifts-empty"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.CalendarMonth,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.shifts_empty),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    org.llamenos.hotline.ui.components.EmptyState(
+        icon = Icons.Filled.CalendarMonth,
+        title = stringResource(R.string.shifts_empty),
+        subtitle = stringResource(R.string.shifts_empty_subtitle),
+        testTag = "shifts-empty",
+        modifier = modifier,
+    )
 }
 
 

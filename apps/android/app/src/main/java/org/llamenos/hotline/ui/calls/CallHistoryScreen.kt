@@ -587,31 +587,12 @@ private fun DateRangeFilter(
 private fun EmptyCallHistory(
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .padding(32.dp)
-            .testTag("call-history-empty"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Phone,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.size(64.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.call_history_empty),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.call_history_empty_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-        )
-    }
+    org.llamenos.hotline.ui.components.EmptyState(
+        icon = Icons.Filled.Phone,
+        title = stringResource(R.string.call_history_empty),
+        subtitle = stringResource(R.string.call_history_empty_subtitle),
+        testTag = "call-history-empty",
+        modifier = modifier,
+    )
 }
 

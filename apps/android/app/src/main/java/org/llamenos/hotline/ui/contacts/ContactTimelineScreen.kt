@@ -278,30 +278,11 @@ private fun TimelineEventCard(
 private fun EmptyTimeline(
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .padding(32.dp)
-            .testTag("timeline-empty"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Timeline,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.size(64.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.timeline_empty),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.timeline_empty_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-        )
-    }
+    org.llamenos.hotline.ui.components.EmptyState(
+        icon = Icons.Filled.Timeline,
+        title = stringResource(R.string.timeline_empty),
+        subtitle = stringResource(R.string.timeline_empty_subtitle),
+        testTag = "timeline-empty",
+        modifier = modifier,
+    )
 }

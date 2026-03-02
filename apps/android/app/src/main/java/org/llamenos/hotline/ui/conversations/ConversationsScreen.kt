@@ -134,25 +134,15 @@ fun ConversationsScreen(
                     }
 
                     displayedConversations.isEmpty() && !uiState.isLoading -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(32.dp)
-                                .testTag("conversations-empty"),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Chat,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                text = stringResource(R.string.conversations_empty),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            org.llamenos.hotline.ui.components.EmptyState(
+                                icon = Icons.Filled.Chat,
+                                title = stringResource(R.string.conversations_empty),
+                                subtitle = stringResource(R.string.conversations_empty_subtitle),
+                                testTag = "conversations-empty",
                             )
                         }
                     }

@@ -81,6 +81,7 @@
     <!-- Shifts -->
     <string name="shifts_title">Shifts</string>
     <string name="shifts_empty">No shifts available</string>
+    <string name="shifts_empty_subtitle">Check with your admin for the shift schedule</string>
     <string name="shift_clock_in">Clock In</string>
     <string name="shift_clock_out">Clock Out</string>
     <string name="shift_sign_up">Sign Up</string>
@@ -107,6 +108,7 @@
     <!-- Conversations -->
     <string name="conversations_title">Conversations</string>
     <string name="conversations_empty">No conversations</string>
+    <string name="conversations_empty_subtitle">Conversations will appear when callers send messages</string>
     <string name="conversation_reply_hint">Type a message\u2026</string>
     <string name="conversation_send">Send</string>
     <string name="conversation_sms">SMS</string>
