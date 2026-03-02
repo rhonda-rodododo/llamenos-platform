@@ -1,5 +1,22 @@
 # Completed Backlog
 
+## 2026-03-02: Android UI Polish — Search, String Extraction, BDD Expansion
+
+### Search Features
+- **CallHistoryScreen**: Exposed existing ViewModel search support in UI with `OutlinedTextField` search bar
+- **ContactsScreen**: Added search capability — new `searchQuery` state in `ContactsViewModel`, API search parameter, search bar UI
+
+### String Resource Extraction (i18n Readiness)
+- Extracted 20+ hardcoded English strings to `strings.xml` across 15 files
+- Categories: search placeholders, empty states (admin tabs), settings descriptions, logout dialog, note badges, device link steps, "Save" buttons
+- Files updated: ConversationsScreen, DashboardScreen, ContactsScreen, OfflineBanner, SettingsScreen, DeviceLinkScreen, VolunteersTab, ShiftScheduleTab, BanListTab, CustomFieldsTab, AuditLogTab, InviteDialog, NotesScreen, NoteDetailScreen
+
+### BDD Coverage Expansion
+- **call-history.feature**: 6 → 10 scenarios (added: content/empty state, filter reset, pull-to-refresh, search field, back-to-dashboard)
+- **report-list.feature**: 6 → 10 scenarios (added: content/empty state, closed filter, filter reset, pull-to-refresh, back-to-dashboard)
+- **contacts-list.feature**: 3 → 8 scenarios (added: content/empty state, pull-to-refresh, dashboard card, search field, identifiers, back-to-dashboard)
+- Total: 15 → 28 new scenarios; overall 250/250 Android (100%), 288/288 Desktop (100%)
+
 ## 2026-03-02: Android Feature Expansion — Call History, Reports, Contacts
 
 ### New Screens (Desktop Parity)
