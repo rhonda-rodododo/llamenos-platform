@@ -1,0 +1,436 @@
+package org.llamenos.hotline.ui.admin
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import org.llamenos.hotline.R
+import org.llamenos.hotline.model.CustomFieldDefinition
+
+/**
+ * Custom fields administration tab in the admin panel.
+ *
+ * Allows admins to define, edit, and delete custom fields for notes
+ * and reports. Fields support text, number, select, checkbox, and textarea types.
+ */
+@Composable
+fun CustomFieldsTab(
+    viewModel: AdminViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    if (uiState.showCreateFieldDialog) {
+        CustomFieldDialog(
+            existingField = uiState.editingField,
+            onDismiss = { viewModel.dismissFieldDialog() },
+            onSave = { field -> viewModel.saveCustomField(field) },
+        )
+    }
+
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.showCreateFieldDialog() },
+                modifier = Modifier.testTag("create-field-fab"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.field_add),
+                )
+            }
+        },
+        modifier = modifier,
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+        ) {
+            when {
+                uiState.isLoadingFields -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("fields-loading"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                uiState.customFields.isEmpty() && !uiState.isLoadingFields -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp)
+                            .testTag("fields-empty"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.List,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = "No custom fields",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("fields-list"),
+                    ) {
+                        items(
+                            items = uiState.customFields,
+                            key = { it.id },
+                        ) { field ->
+                            CustomFieldCard(
+                                field = field,
+                                onEdit = { viewModel.showEditFieldDialog(field) },
+                                onDelete = { viewModel.deleteCustomField(field.id) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (uiState.fieldsError != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .testTag("fields-error"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                ) {
+                    Text(
+                        text = uiState.fieldsError ?: "",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomFieldCard(
+    field: CustomFieldDefinition,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("field-card-${field.id}"),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = field.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(field.type, style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.height(24.dp),
+                    )
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(field.context, style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.height(24.dp),
+                    )
+                    if (field.required) {
+                        AssistChip(
+                            onClick = {},
+                            label = { Text("Required", style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.height(24.dp),
+                        )
+                    }
+                }
+            }
+
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.testTag("edit-field-${field.id}"),
+            ) {
+                Icon(Icons.Filled.Edit, contentDescription = "Edit")
+            }
+
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.testTag("delete-field-${field.id}"),
+            ) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.field_delete), tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomFieldDialog(
+    existingField: CustomFieldDefinition?,
+    onDismiss: () -> Unit,
+    onSave: (CustomFieldDefinition) -> Unit,
+) {
+    var label by remember { mutableStateOf(existingField?.label ?: "") }
+    var type by remember { mutableStateOf(existingField?.type ?: "text") }
+    var context by remember { mutableStateOf(existingField?.context ?: "notes") }
+    var required by remember { mutableStateOf(existingField?.required ?: false) }
+    var visibleToVolunteers by remember { mutableStateOf(existingField?.visibleToVolunteers ?: true) }
+    var editableByVolunteers by remember { mutableStateOf(existingField?.editableByVolunteers ?: true) }
+    val options = remember { mutableStateListOf<String>().apply { existingField?.options?.let { addAll(it) } } }
+    var newOption by remember { mutableStateOf("") }
+    var typeExpanded by remember { mutableStateOf(false) }
+    var contextExpanded by remember { mutableStateOf(false) }
+
+    val fieldTypes = listOf("text", "number", "select", "checkbox", "textarea")
+    val contexts = listOf("notes", "reports", "all")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (existingField != null) "Edit Field" else stringResource(R.string.field_add)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text("Label") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("field-label-input"),
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // Type selector
+                ExposedDropdownMenuBox(
+                    expanded = typeExpanded,
+                    onExpandedChange = { typeExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = type,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Type") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                            .testTag("field-type-select"),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = typeExpanded,
+                        onDismissRequest = { typeExpanded = false },
+                    ) {
+                        fieldTypes.forEach { t ->
+                            DropdownMenuItem(
+                                text = { Text(t) },
+                                onClick = { type = t; typeExpanded = false },
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Context selector
+                ExposedDropdownMenuBox(
+                    expanded = contextExpanded,
+                    onExpandedChange = { contextExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = context,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Context") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = contextExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = contextExpanded,
+                        onDismissRequest = { contextExpanded = false },
+                    ) {
+                        contexts.forEach { c ->
+                            DropdownMenuItem(
+                                text = { Text(c) },
+                                onClick = { context = c; contextExpanded = false },
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Required", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = required,
+                        onCheckedChange = { required = it },
+                        modifier = Modifier.testTag("field-required-toggle"),
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Visible to volunteers", modifier = Modifier.weight(1f))
+                    Switch(checked = visibleToVolunteers, onCheckedChange = { visibleToVolunteers = it })
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Editable by volunteers", modifier = Modifier.weight(1f))
+                    Switch(checked = editableByVolunteers, onCheckedChange = { editableByVolunteers = it })
+                }
+
+                // Options for select type
+                if (type == "select") {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Options", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    options.forEachIndexed { index, option ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.testTag("field-option-$index"),
+                        ) {
+                            Text(option, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { options.removeAt(index) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Remove option")
+                            }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = newOption,
+                            onValueChange = { newOption = it },
+                            placeholder = { Text("New option") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                if (newOption.isNotBlank()) {
+                                    options.add(newOption)
+                                    newOption = ""
+                                }
+                            },
+                            modifier = Modifier.testTag("add-field-option"),
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = "Add option")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val slug = label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+                    val field = CustomFieldDefinition(
+                        id = existingField?.id ?: slug,
+                        name = existingField?.name ?: slug,
+                        label = label,
+                        type = type,
+                        required = required,
+                        options = if (type == "select") options.toList() else null,
+                        validation = null,
+                        visibleToVolunteers = visibleToVolunteers,
+                        editableByVolunteers = editableByVolunteers,
+                        context = context,
+                        order = existingField?.order ?: 0,
+                    )
+                    onSave(field)
+                },
+                enabled = label.isNotBlank(),
+                modifier = Modifier.testTag("confirm-field-save"),
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}

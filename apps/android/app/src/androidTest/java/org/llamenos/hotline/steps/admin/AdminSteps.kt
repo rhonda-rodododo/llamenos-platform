@@ -1,9 +1,13 @@
 package org.llamenos.hotline.steps.admin
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import io.cucumber.datatable.DataTable
 import io.cucumber.java.After
 import io.cucumber.java.en.Given
@@ -84,6 +88,7 @@ class AdminSteps : BaseSteps() {
                 "Ban List" -> "admin-tab-bans"
                 "Audit Log" -> "admin-tab-audit"
                 "Invites" -> "admin-tab-invites"
+                "Fields" -> "admin-tab-fields"
                 else -> throw IllegalArgumentException("Unknown admin tab: $tab")
             }
             onNodeWithTag(tag).assertIsDisplayed()
@@ -200,16 +205,23 @@ class AdminSteps : BaseSteps() {
         assert(found) { "Expected audit area" }
     }
 
-    // ---- Audit log filters (requires filter UI — stubs for Epic 229) ----
+    // ---- Audit log filters ----
 
     @When("I filter by {string} event type")
     fun iFilterByEventType(eventType: String) {
-        // Audit log filter UI not yet built on Android
+        onNodeWithTag("audit-event-filter").performClick()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText(eventType, substring = true, ignoreCase = true)
+            .onFirst()
+            .performClick()
+        composeRule.waitForIdle()
     }
 
     @When("I search for {string}")
     fun iSearchFor(query: String) {
-        // Audit log search UI not yet built on Android
+        onNodeWithTag("audit-search-input").performTextClearance()
+        onNodeWithTag("audit-search-input").performTextInput(query)
+        composeRule.waitForIdle()
     }
 
     @After(order = 5000)

@@ -10,8 +10,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
 
@@ -74,10 +75,11 @@ fun AdminScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
-            // Tab row
-            TabRow(
+            // Tab row — scrollable to fit 5 tabs on narrow screens
+            ScrollableTabRow(
                 selectedTabIndex = uiState.selectedTab.ordinal,
                 modifier = Modifier.testTag("admin-tabs"),
+                edgePadding = 0.dp,
             ) {
                 AdminTab.entries.forEach { tab ->
                     Tab(
@@ -90,6 +92,7 @@ fun AdminScreen(
                                     AdminTab.BANS -> stringResource(R.string.admin_bans)
                                     AdminTab.AUDIT -> stringResource(R.string.admin_audit)
                                     AdminTab.INVITES -> stringResource(R.string.admin_invites)
+                                    AdminTab.FIELDS -> stringResource(R.string.admin_fields)
                                 },
                             )
                         },
@@ -104,6 +107,7 @@ fun AdminScreen(
                 AdminTab.BANS -> BanListTab(viewModel = viewModel)
                 AdminTab.AUDIT -> AuditLogTab(viewModel = viewModel)
                 AdminTab.INVITES -> InvitesTab(viewModel = viewModel)
+                AdminTab.FIELDS -> CustomFieldsTab(viewModel = viewModel)
             }
         }
     }

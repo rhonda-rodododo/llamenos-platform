@@ -127,6 +127,29 @@
     <string name="ban_remove">Remove</string>
     <string name="ban_reason">Reason (optional)</string>
     <string name="volunteer_invite">Invite Volunteer</string>
+    <string name="volunteer_add">Add Volunteer</string>
+    <string name="volunteer_delete">Delete Volunteer</string>
+    <string name="volunteer_delete_confirm">Are you sure you want to delete this volunteer?</string>
+    <string name="admin_fields">Fields</string>
+    <string name="field_add">Add Field</string>
+    <string name="field_delete">Delete</string>
+    <string name="ban_import">Import</string>
+    <string name="ban_import_title">Bulk Import Bans</string>
+    <string name="ban_import_hint">One phone number per line (+1234567890)</string>
+    <string name="audit_search">Search audit log</string>
+    <string name="audit_all_events">All Events</string>
+    <string name="audit_clear_filters">Clear</string>
+    <string name="shift_create">Create Shift</string>
+    <string name="shift_edit">Edit Shift</string>
+    <string name="shift_delete">Delete Shift</string>
+    <string name="shift_name">Shift Name</string>
+    <string name="shift_start_time">Start Time</string>
+    <string name="shift_end_time">End Time</string>
+    <string name="shift_schedule">Shift Schedule</string>
+    <string name="fallback_group">Fallback Group</string>
+    <string name="profile_update">Update Profile</string>
+    <string name="profile_updated">Profile updated</string>
+    <string name="invalid_phone">Invalid phone number</string>
 
     <!-- Device Link -->
     <string name="device_link_title">Link Device</string>

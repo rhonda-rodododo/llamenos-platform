@@ -156,16 +156,24 @@ class BanSteps : BaseSteps() {
         onNodeWithTag("bans-list").assertIsDisplayed()
     }
 
-    // ---- Bulk import (requires UI not yet built — stubs) ----
+    // ---- Bulk import ----
 
     @When("I paste two phone numbers in the textarea")
     fun iPasteTwoPhoneNumbersInTheTextarea() {
-        // Bulk import UI not yet implemented on Android
+        onNodeWithTag("bulk-import-fab").performClick()
+        composeRule.waitForIdle()
+        val phone1 = "+15554${System.currentTimeMillis().toString().takeLast(6)}"
+        val phone2 = "+15553${System.currentTimeMillis().toString().takeLast(6)}"
+        onNodeWithTag("bulk-import-phones-input").performTextInput("$phone1\n$phone2")
+        composeRule.waitForIdle()
     }
 
     @When("I paste invalid phone numbers in the textarea")
     fun iPasteInvalidPhoneNumbersInTheTextarea() {
-        // Bulk import UI not yet implemented on Android
+        onNodeWithTag("bulk-import-fab").performClick()
+        composeRule.waitForIdle()
+        onNodeWithTag("bulk-import-phones-input").performTextInput("not-a-number\nalso-invalid")
+        composeRule.waitForIdle()
     }
 
     // ---- Access control ----

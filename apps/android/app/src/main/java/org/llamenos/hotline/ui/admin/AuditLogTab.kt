@@ -16,41 +16,56 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.llamenos.hotline.R
 import org.llamenos.hotline.model.AuditEntry
 
 /**
  * Audit log tab in the admin panel.
  *
  * Displays a hash-chained, paginated audit log of all system actions.
+ * Includes a search bar and event type filter dropdown.
  * Each entry shows the action type icon, actor pubkey (truncated),
  * optional details, and timestamp. The list supports infinite scrolling.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuditLogTab(
     viewModel: AdminViewModel,
@@ -75,9 +90,90 @@ fun AuditLogTab(
         }
     }
 
+    val eventTypes = listOf("all", "login", "logout", "call", "note", "shift", "ban", "settings", "invite")
+    var filterExpanded by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier.fillMaxSize(),
     ) {
+        // Filter bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .testTag("audit-filter-bar"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Search field
+            OutlinedTextField(
+                value = uiState.auditSearchQuery,
+                onValueChange = { viewModel.setAuditSearchQuery(it) },
+                placeholder = { Text(stringResource(R.string.audit_search)) },
+                leadingIcon = {
+                    Icon(Icons.Filled.Search, contentDescription = null)
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("audit-search-input"),
+            )
+
+            // Event type filter
+            ExposedDropdownMenuBox(
+                expanded = filterExpanded,
+                onExpandedChange = { filterExpanded = it },
+                modifier = Modifier.width(140.dp),
+            ) {
+                OutlinedTextField(
+                    value = if (uiState.auditEventFilter == "all") {
+                        stringResource(R.string.audit_all_events)
+                    } else {
+                        uiState.auditEventFilter.replaceFirstChar { it.uppercase() }
+                    },
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = filterExpanded) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        .testTag("audit-event-filter"),
+                )
+                ExposedDropdownMenu(
+                    expanded = filterExpanded,
+                    onDismissRequest = { filterExpanded = false },
+                ) {
+                    eventTypes.forEach { eventType ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (eventType == "all") stringResource(R.string.audit_all_events)
+                                    else eventType.replaceFirstChar { it.uppercase() },
+                                )
+                            },
+                            onClick = {
+                                viewModel.setAuditEventFilter(eventType)
+                                filterExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            // Clear filters button
+            if (uiState.auditSearchQuery.isNotEmpty() || uiState.auditEventFilter != "all") {
+                IconButton(
+                    onClick = { viewModel.clearAuditFilters() },
+                    modifier = Modifier.testTag("audit-clear-filters"),
+                ) {
+                    Icon(
+                        Icons.Filled.Clear,
+                        contentDescription = stringResource(R.string.audit_clear_filters),
+                    )
+                }
+            }
+        }
+
         when {
             uiState.isLoadingAudit && uiState.auditEntries.isEmpty() -> {
                 Box(

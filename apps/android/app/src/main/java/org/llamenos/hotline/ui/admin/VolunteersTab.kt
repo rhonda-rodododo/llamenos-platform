@@ -15,23 +15,38 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
@@ -42,6 +57,7 @@ import org.llamenos.hotline.model.Volunteer
  *
  * Displays a searchable list of all registered volunteers with their
  * display name, truncated pubkey, role badge, and status badge.
+ * Admins can add new volunteers via FAB and delete via card actions.
  */
 @Composable
 fun VolunteersTab(
@@ -51,111 +67,181 @@ fun VolunteersTab(
     val uiState by viewModel.uiState.collectAsState()
     val filteredVolunteers = viewModel.filteredVolunteers()
 
-    Column(
-        modifier = modifier.fillMaxSize(),
-    ) {
-        // Search bar
-        OutlinedTextField(
-            value = uiState.volunteerSearchQuery,
-            onValueChange = { viewModel.setVolunteerSearchQuery(it) },
-            placeholder = { Text("Search volunteers...") },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = null,
+    // Add volunteer dialog
+    if (uiState.showAddVolunteerDialog) {
+        AddVolunteerDialog(
+            onDismiss = { viewModel.dismissAddVolunteerDialog() },
+            onConfirm = { name, phone, role ->
+                viewModel.createVolunteer(name, phone, role)
+            },
+        )
+    }
+
+    // Delete confirmation dialog
+    if (uiState.showDeleteVolunteerDialog != null) {
+        val volunteerId = uiState.showDeleteVolunteerDialog!!
+        val volunteer = uiState.volunteers.find { it.id == volunteerId }
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDeleteVolunteerDialog() },
+            title = { Text(stringResource(R.string.volunteer_delete)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.volunteer_delete_confirm,
+                    ),
                 )
             },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .testTag("volunteer-search"),
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteVolunteer(volunteerId) },
+                    modifier = Modifier.testTag("confirm-delete-volunteer"),
+                ) {
+                    Text(stringResource(R.string.volunteer_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissDeleteVolunteerDialog() }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+            modifier = Modifier.testTag("delete-volunteer-dialog"),
         )
+    }
 
-        when {
-            uiState.isLoadingVolunteers -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("volunteers-loading"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+    // Created volunteer nsec card
+    if (uiState.createdVolunteerNsec != null) {
+        NsecDisplayDialog(
+            nsec = uiState.createdVolunteerNsec!!,
+            onDismiss = { viewModel.clearCreatedVolunteerNsec() },
+        )
+    }
+
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.showAddVolunteerDialog() },
+                modifier = Modifier.testTag("add-volunteer-fab"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.volunteer_add),
+                )
             }
-
-            filteredVolunteers.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp)
-                        .testTag("volunteers-empty"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = "No volunteers found",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            else -> {
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("volunteers-list"),
-                ) {
-                    items(
-                        items = filteredVolunteers,
-                        key = { it.id },
-                    ) { volunteer ->
-                        VolunteerCard(volunteer = volunteer)
-                    }
-                }
-            }
-        }
-
-        // Error
-        if (uiState.volunteersError != null) {
-            Card(
+        },
+        modifier = modifier,
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+        ) {
+            // Search bar
+            OutlinedTextField(
+                value = uiState.volunteerSearchQuery,
+                onValueChange = { viewModel.setVolunteerSearchQuery(it) },
+                placeholder = { Text("Search volunteers...") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = null,
+                    )
+                },
+                singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .testTag("volunteers-error"),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                ),
-            ) {
-                Text(
-                    text = uiState.volunteersError ?: "",
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag("volunteer-search"),
+            )
+
+            when {
+                uiState.isLoadingVolunteers -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("volunteers-loading"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                filteredVolunteers.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp)
+                            .testTag("volunteers-empty"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = "No volunteers found",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("volunteers-list"),
+                    ) {
+                        items(
+                            items = filteredVolunteers,
+                            key = { it.id },
+                        ) { volunteer ->
+                            VolunteerCard(
+                                volunteer = volunteer,
+                                onDelete = { viewModel.showDeleteVolunteerDialog(volunteer.id) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Error
+            if (uiState.volunteersError != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .testTag("volunteers-error"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                ) {
+                    Text(
+                        text = uiState.volunteersError ?: "",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
             }
         }
     }
 }
 
 /**
- * Card displaying a single volunteer's information.
+ * Card displaying a single volunteer's information with delete action.
  */
 @Composable
 private fun VolunteerCard(
     volunteer: Volunteer,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -204,7 +290,7 @@ private fun VolunteerCard(
                 )
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
 
             // Role badge
             AssistChip(
@@ -235,6 +321,133 @@ private fun VolunteerCard(
                     .height(28.dp)
                     .testTag("volunteer-status-${volunteer.id}"),
             )
+
+            // Delete button
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.testTag("delete-volunteer-${volunteer.id}"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.volunteer_delete),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
+}
+
+/**
+ * Dialog for adding a new volunteer.
+ */
+@Composable
+private fun AddVolunteerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, phone: String, role: String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.volunteer_add)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("volunteer-name-input"),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Phone number") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("volunteer-phone-input"),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name, phone, "role-volunteer") },
+                enabled = name.isNotBlank() && phone.isNotBlank(),
+                modifier = Modifier.testTag("confirm-add-volunteer"),
+            ) {
+                Text(stringResource(R.string.volunteer_add))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+        modifier = Modifier.testTag("add-volunteer-dialog"),
+    )
+}
+
+/**
+ * Dialog displaying the one-time nsec for a newly created volunteer.
+ */
+@Composable
+private fun NsecDisplayDialog(
+    nsec: String,
+    onDismiss: () -> Unit,
+) {
+    val clipboardManager: ClipboardManager = LocalClipboardManager.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Volunteer Created") },
+        text = {
+            Column {
+                Text(
+                    text = "Share this private key with the volunteer. It will only be shown once.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.height(12.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = nsec.take(12) + "..." + nsec.takeLast(8),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("created-volunteer-nsec"),
+                        )
+                        IconButton(
+                            onClick = { clipboardManager.setText(AnnotatedString(nsec)) },
+                            modifier = Modifier.testTag("copy-nsec-button"),
+                        ) {
+                            Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("dismiss-nsec-dialog"),
+            ) {
+                Text("Done")
+            }
+        },
+        modifier = Modifier.testTag("nsec-display-dialog"),
+    )
 }

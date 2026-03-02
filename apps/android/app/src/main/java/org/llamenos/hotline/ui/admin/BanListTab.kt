@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,7 +51,7 @@ import org.llamenos.hotline.model.BanEntry
  * Ban list management tab in the admin panel.
  *
  * Displays all banned identifiers (phone number hashes) with reasons.
- * Admins can add new bans via a FAB and remove existing bans.
+ * Admins can add new bans via a FAB, bulk import, and remove existing bans.
  */
 @Composable
 fun BanListTab(
@@ -68,16 +70,44 @@ fun BanListTab(
         )
     }
 
+    // Bulk import dialog
+    if (uiState.showBulkImportDialog) {
+        BulkImportDialog(
+            onDismiss = { viewModel.dismissBulkImportDialog() },
+            onConfirm = { phones, reason ->
+                viewModel.bulkImportBans(phones, reason)
+            },
+        )
+    }
+
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.showAddBanDialog() },
-                modifier = Modifier.testTag("add-ban-fab"),
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.ban_add),
-                )
+                // Bulk import mini-FAB
+                SmallFloatingActionButton(
+                    onClick = { viewModel.showBulkImportDialog() },
+                    modifier = Modifier.testTag("bulk-import-fab"),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Upload,
+                        contentDescription = stringResource(R.string.ban_import),
+                    )
+                }
+
+                // Add ban FAB
+                FloatingActionButton(
+                    onClick = { viewModel.showAddBanDialog() },
+                    modifier = Modifier.testTag("add-ban-fab"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.ban_add),
+                    )
+                }
             }
         },
         modifier = modifier,
@@ -301,6 +331,71 @@ private fun AddBanDialog(
             }
         },
         modifier = Modifier.testTag("add-ban-dialog"),
+    )
+}
+
+/**
+ * Dialog for bulk importing phone numbers to the ban list.
+ */
+@Composable
+private fun BulkImportDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (phones: List<String>, reason: String?) -> Unit,
+) {
+    var phonesText by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.ban_import_title)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = phonesText,
+                    onValueChange = { phonesText = it },
+                    label = { Text(stringResource(R.string.ban_import_hint)) },
+                    minLines = 4,
+                    maxLines = 8,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("bulk-import-phones-input"),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text(stringResource(R.string.ban_reason)) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("bulk-import-reason-input"),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val phones = phonesText
+                        .lines()
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                    onConfirm(phones, reason.takeIf { it.isNotBlank() })
+                },
+                enabled = phonesText.isNotBlank(),
+                modifier = Modifier.testTag("confirm-bulk-import"),
+            ) {
+                Text(stringResource(R.string.ban_import))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("cancel-bulk-import"),
+            ) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+        modifier = Modifier.testTag("bulk-import-dialog"),
     )
 }
 
