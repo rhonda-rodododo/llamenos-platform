@@ -39,6 +39,7 @@ import org.llamenos.hotline.R
 fun AdminScreen(
     onNavigateBack: () -> Unit,
     onNavigateToVolunteerDetail: (String) -> Unit = {},
+    onNavigateToShiftDetail: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AdminViewModel = hiltViewModel(),
 ) {
@@ -114,7 +115,10 @@ fun AdminScreen(
                 AdminTab.AUDIT -> AuditLogTab(viewModel = viewModel)
                 AdminTab.INVITES -> InvitesTab(viewModel = viewModel)
                 AdminTab.FIELDS -> CustomFieldsTab(viewModel = viewModel)
-                AdminTab.SHIFTS -> ShiftScheduleTab(viewModel = viewModel)
+                AdminTab.SHIFTS -> ShiftScheduleTab(
+                    viewModel = viewModel,
+                    onNavigateToShiftDetail = onNavigateToShiftDetail,
+                )
                 AdminTab.SETTINGS -> AdminSettingsTab(viewModel = viewModel)
             }
         }

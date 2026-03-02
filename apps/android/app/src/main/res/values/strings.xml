@@ -161,6 +161,10 @@
     <string name="shift_start_time">Start Time</string>
     <string name="shift_end_time">End Time</string>
     <string name="shift_schedule">Shift Schedule</string>
+    <string name="shift_detail_title">Shift Detail</string>
+    <string name="shift_not_found">Shift not found</string>
+    <string name="shift_assign_volunteers">Assign Volunteers</string>
+    <string name="shift_save_assignments">Save Assignments</string>
     <string name="fallback_group">Fallback Group</string>
     <string name="profile_update">Update Profile</string>
     <string name="profile_updated">Profile updated</string>

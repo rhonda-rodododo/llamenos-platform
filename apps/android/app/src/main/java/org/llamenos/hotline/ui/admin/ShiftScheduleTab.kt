@@ -59,6 +59,7 @@ import org.llamenos.hotline.util.DateFormatUtils
 @Composable
 fun ShiftScheduleTab(
     viewModel: AdminViewModel,
+    onNavigateToShiftDetail: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -148,6 +149,7 @@ fun ShiftScheduleTab(
                         ) { shift ->
                             ShiftCard(
                                 shift = shift,
+                                onClick = { onNavigateToShiftDetail(shift.id) },
                                 onEdit = { viewModel.showEditShiftDialog(shift) },
                                 onDelete = { viewModel.deleteShift(shift.id) },
                             )
@@ -180,11 +182,13 @@ fun ShiftScheduleTab(
 @Composable
 private fun ShiftCard(
     shift: AdminShiftDetail,
+    onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .testTag("shift-card-${shift.id}"),

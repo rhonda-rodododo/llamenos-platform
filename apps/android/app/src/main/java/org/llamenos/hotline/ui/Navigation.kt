@@ -16,6 +16,7 @@ import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.ui.admin.AdminScreen
+import org.llamenos.hotline.ui.admin.ShiftDetailScreen
 import org.llamenos.hotline.ui.admin.VolunteerDetailScreen
 import org.llamenos.hotline.ui.auth.AuthViewModel
 import org.llamenos.hotline.ui.calls.CallHistoryScreen
@@ -158,6 +159,15 @@ sealed interface LlamenosRoute {
 
         companion object {
             const val ROUTE_PATTERN = "volunteer/{pubkey}"
+        }
+    }
+
+    /** Shift detail/assignment view. */
+    data class ShiftDetail(val shiftId: String) : LlamenosRoute {
+        override val route = "shift/$shiftId"
+
+        companion object {
+            const val ROUTE_PATTERN = "shift/{shiftId}"
         }
     }
 
@@ -372,6 +382,9 @@ fun LlamenosNavigation(
                 onNavigateToVolunteerDetail = { pubkey ->
                     navController.navigate("volunteer/$pubkey")
                 },
+                onNavigateToShiftDetail = { shiftId ->
+                    navController.navigate("shift/$shiftId")
+                },
             )
         }
 
@@ -379,6 +392,14 @@ fun LlamenosNavigation(
             val pubkey = backStackEntry.arguments?.getString("pubkey") ?: ""
             VolunteerDetailScreen(
                 pubkey = pubkey,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.ShiftDetail.ROUTE_PATTERN) { backStackEntry ->
+            val shiftId = backStackEntry.arguments?.getString("shiftId") ?: ""
+            ShiftDetailScreen(
+                shiftId = shiftId,
                 onNavigateBack = { navController.popBackStack() },
             )
         }
