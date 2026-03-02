@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.AdminShiftDetail
+import org.llamenos.hotline.util.DateFormatUtils
 
 /**
  * Shift schedule administration tab in the admin panel.
@@ -264,8 +265,7 @@ private fun ShiftCard(
  * Format day-of-week integers (1=Mon, 7=Sun) into a compact display string.
  */
 private fun formatDays(days: List<Int>): String {
-    val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    return days.mapNotNull { dayNames.getOrNull(it - 1) }.joinToString(", ")
+    return DateFormatUtils.formatDayList(days)
 }
 
 @Composable

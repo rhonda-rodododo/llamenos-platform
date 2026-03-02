@@ -44,8 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.ShiftResponse
-
-private val DAY_NAMES = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+import org.llamenos.hotline.util.DateFormatUtils
 
 /**
  * Shifts screen showing clock in/out toggle and available shifts.
@@ -175,7 +174,7 @@ fun ShiftsScreen(
                         shiftsByDay.forEach { (dayIndex, dayShifts) ->
                             item {
                                 Text(
-                                    text = DAY_NAMES.getOrElse(dayIndex) { "Day $dayIndex" },
+                                    text = DateFormatUtils.shortDayName(dayIndex),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
@@ -391,7 +390,7 @@ private fun ShiftCard(
 
                 // Days
                 Text(
-                    text = shift.days.joinToString(", ") { DAY_NAMES.getOrElse(it) { "?" } },
+                    text = shift.days.joinToString(", ") { DateFormatUtils.shortDayName(it) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
