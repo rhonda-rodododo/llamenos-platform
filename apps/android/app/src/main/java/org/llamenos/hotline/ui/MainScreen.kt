@@ -90,6 +90,7 @@ fun MainScreen(
     networkMonitor: NetworkMonitor,
     onLock: () -> Unit,
     onLogout: () -> Unit,
+    onPanicWipe: () -> Unit,
     onNavigateToNoteDetail: (String) -> Unit,
     onNavigateToNoteCreate: () -> Unit,
     onNavigateToConversationDetail: (String) -> Unit,
@@ -219,6 +220,7 @@ fun MainScreen(
                         onNotifyGeneralChange = { keystoreService.store("notify_general", it.toString()) },
                         onLock = onLock,
                         onLogout = onLogout,
+                        onPanicWipe = onPanicWipe,
                         onNavigateToAdmin = onNavigateToAdmin,
                         onNavigateToDeviceLink = onNavigateToDeviceLink,
                     )

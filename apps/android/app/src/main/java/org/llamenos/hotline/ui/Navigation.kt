@@ -257,6 +257,12 @@ fun LlamenosNavigation(
                         popUpTo(0) { inclusive = true }
                     }
                 },
+                onPanicWipe = {
+                    authViewModel.resetAuthState()
+                    navController.navigate(LlamenosRoute.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
                 onNavigateToNoteDetail = { noteId ->
                     navController.navigate("note/$noteId")
                 },

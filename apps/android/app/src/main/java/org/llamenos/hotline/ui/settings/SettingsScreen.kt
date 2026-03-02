@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.AlertDialog
@@ -94,11 +95,13 @@ fun SettingsScreen(
     onNotifyGeneralChange: (Boolean) -> Unit,
     onLock: () -> Unit,
     onLogout: () -> Unit,
+    onPanicWipe: () -> Unit,
     onNavigateToAdmin: () -> Unit,
     onNavigateToDeviceLink: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showPanicWipeDialog by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -148,6 +151,47 @@ fun SettingsScreen(
                 }
             },
             modifier = Modifier.testTag("logout-confirmation-dialog"),
+        )
+    }
+
+    if (showPanicWipeDialog) {
+        AlertDialog(
+            onDismissRequest = { showPanicWipeDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
+            title = { Text(stringResource(R.string.panic_wipe_title)) },
+            text = {
+                Text(stringResource(R.string.panic_wipe_message))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPanicWipeDialog = false
+                        onPanicWipe()
+                    },
+                    modifier = Modifier.testTag("confirm-panic-wipe-button"),
+                ) {
+                    Text(
+                        text = stringResource(R.string.panic_wipe_title),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showPanicWipeDialog = false },
+                    modifier = Modifier.testTag("cancel-panic-wipe-button"),
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+            modifier = Modifier.testTag("panic-wipe-dialog"),
         )
     }
 
@@ -588,6 +632,22 @@ fun SettingsScreen(
                 Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.logout))
+            }
+
+            // Emergency wipe
+            Button(
+                onClick = { showPanicWipeDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings-panic-wipe-button"),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.panic_wipe_title))
             }
 
             // App version
