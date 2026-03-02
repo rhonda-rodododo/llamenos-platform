@@ -29,6 +29,7 @@ data class ShiftStatusResponse(
     val startedAt: String? = null,
     val activeCallCount: Int? = null,
     val recentNoteCount: Int? = null,
+    val callsToday: Int? = null,
 )
 
 /**

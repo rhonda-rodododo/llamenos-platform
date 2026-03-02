@@ -27,6 +27,7 @@ data class DashboardUiState(
     val isOnBreak: Boolean = false,
     val shiftStartedAt: String? = null,
     val activeCallCount: Int = 0,
+    val callsToday: Int = 0,
     val connectionState: WebSocketService.ConnectionState = WebSocketService.ConnectionState.DISCONNECTED,
     val isRefreshing: Boolean = false,
     val isClockingInOut: Boolean = false,
@@ -157,6 +158,7 @@ class DashboardViewModel @Inject constructor(
                     isOnBreak = status.onBreak,
                     shiftStartedAt = status.startedAt,
                     activeCallCount = status.activeCallCount ?: it.activeCallCount,
+                    callsToday = status.callsToday ?: it.callsToday,
                     errorRes = null,
                 )
             }

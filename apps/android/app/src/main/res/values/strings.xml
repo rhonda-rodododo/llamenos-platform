@@ -277,6 +277,7 @@
     <string name="call_date_from">From</string>
     <string name="call_date_to">To</string>
     <string name="dashboard_view_calls">View Call History</string>
+    <string name="dashboard_calls_today">Calls today:</string>
 
     <!-- Reports -->
     <string name="reports_title">Reports</string>

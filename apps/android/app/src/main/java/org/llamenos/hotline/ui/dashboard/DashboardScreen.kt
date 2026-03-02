@@ -406,7 +406,7 @@ fun DashboardScreen(
                     }
                 }
 
-                // Active calls card
+                // Calls stats card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -419,44 +419,69 @@ fun DashboardScreen(
                         },
                     ),
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Phone,
-                            contentDescription = null,
-                            tint = if (uiState.activeCallCount > 0) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.active_calls),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = uiState.activeCallCount.toString(),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (uiState.activeCallCount > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Phone,
+                                contentDescription = null,
+                                tint = if (uiState.activeCallCount > 0) {
                                     MaterialTheme.colorScheme.onPrimaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.primary
                                 },
-                                modifier = Modifier.testTag("active-call-count"),
                             )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.active_calls),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = uiState.activeCallCount.toString(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (uiState.activeCallCount > 0) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                    modifier = Modifier.testTag("active-call-count"),
+                                )
+                            }
+                            TextButton(
+                                onClick = onNavigateToCallHistory,
+                                modifier = Modifier.testTag("view-call-history"),
+                            ) {
+                                Text(stringResource(R.string.dashboard_view_calls))
+                            }
                         }
-                        TextButton(
-                            onClick = onNavigateToCallHistory,
-                            modifier = Modifier.testTag("view-call-history"),
+
+                        // Calls today
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(stringResource(R.string.dashboard_view_calls))
+                            Text(
+                                text = stringResource(R.string.dashboard_calls_today),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = uiState.callsToday.toString(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.testTag("calls-today-count"),
+                            )
                         }
                     }
                 }
