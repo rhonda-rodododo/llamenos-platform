@@ -1,5 +1,27 @@
 # Completed Backlog
 
+## 2026-03-02: Android Feature Expansion — Call History, Reports, Contacts
+
+### New Screens (Desktop Parity)
+- **Call History**: `CallHistoryScreen.kt` + `CallHistoryViewModel.kt` — paginated call records with status filter chips (All/Completed/Unanswered), duration display, metadata badges (voicemail/transcription/recording), infinite scroll, pull-to-refresh
+- **Reports**: `ReportsScreen.kt` + `ReportsViewModel.kt` — structured incident reports with status filter chips (All/Active/Waiting/Closed), category filtering, report cards with status dots, message counts, timestamps
+- **Contacts**: `ContactsScreen.kt` + `ContactsViewModel.kt` — paginated contact summaries with aggregated interaction counts (calls/conversations/notes), hashed identifiers with admin-only last-4 display, first/last seen timestamps
+
+### Data Models
+- `CallModels.kt` — CallRecord, ActiveCall, CallHistoryResponse, CallCountResponse (matching desktop TypeScript interfaces)
+- `ReportModels.kt` — Report, ReportMetadata, ReportsListResponse, ReportCategoriesResponse
+- `ContactModels.kt` — ContactSummary, ContactsListResponse
+
+### Navigation & Dashboard
+- Added 3 navigation routes: `CallHistory`, `Reports`, `Contacts` (standalone screens with back navigation)
+- Dashboard now shows "View Call History" link on Active Calls card, plus Reports and Contacts cards with navigation buttons
+- All 3 screens accessible from Dashboard → standalone route → back to dashboard
+
+### BDD Coverage
+- 3 new feature files: `call-history.feature` (6 scenarios), `report-list.feature` (6 scenarios), `contacts-list.feature` (3 scenarios)
+- 3 new step definition files: `CallHistorySteps.kt`, `ReportListSteps.kt`, `ContactsListSteps.kt`
+- Coverage: 237/237 Android (100%), build + lint passing
+
 ## 2026-03-02: Android Brand Alignment & UI Polish
 
 ### Brand Alignment
