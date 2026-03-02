@@ -6,9 +6,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import org.llamenos.hotline.api.NetworkMonitor
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.crypto.CryptoService
@@ -80,9 +82,10 @@ sealed interface LlamenosRoute {
         }
     }
 
-    /** Note creation form. */
+    /** Note creation form, optionally linked to a conversation. */
     data object NoteCreate : LlamenosRoute {
         override val route = "note_create"
+        const val ROUTE_PATTERN = "note_create?conversationId={conversationId}"
     }
 
     /** Conversation detail view. */
@@ -310,11 +313,22 @@ fun LlamenosNavigation(
             )
         }
 
-        composable(LlamenosRoute.NoteCreate.route) {
+        composable(
+            LlamenosRoute.NoteCreate.ROUTE_PATTERN,
+            arguments = listOf(
+                navArgument("conversationId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
             val notesViewModel: NotesViewModel = hiltViewModel()
+            val conversationId = backStackEntry.arguments?.getString("conversationId")
             NoteCreateScreen(
                 viewModel = notesViewModel,
                 onNavigateBack = { navController.popBackStack() },
+                conversationId = conversationId,
             )
         }
 
@@ -323,6 +337,9 @@ fun LlamenosNavigation(
             ConversationDetailScreen(
                 viewModel = conversationsViewModel,
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToNoteCreate = { conversationId ->
+                    navController.navigate("note_create?conversationId=$conversationId")
+                },
             )
         }
 

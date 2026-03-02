@@ -315,6 +315,8 @@
     <string name="conversation_no_volunteers">No active volunteers found</string>
     <string name="conversation_reopen">Reopen</string>
     <string name="conversation_close">Close</string>
+    <string name="conversation_e2ee">End-to-end encrypted</string>
+    <string name="conversation_add_note">Add Note</string>
 
     <!-- Note detail -->
     <string name="note_not_found">Note not found</string>

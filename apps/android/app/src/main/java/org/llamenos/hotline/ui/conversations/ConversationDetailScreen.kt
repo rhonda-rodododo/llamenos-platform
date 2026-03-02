@@ -25,6 +25,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MarkChatRead
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sms
@@ -79,6 +81,7 @@ import org.llamenos.hotline.model.DecryptedMessage
 fun ConversationDetailScreen(
     viewModel: ConversationsViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToNoteCreate: (conversationId: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -235,6 +238,17 @@ fun ConversationDetailScreen(
                 },
                 actions = {
                     if (conversation != null) {
+                        // Add note button
+                        IconButton(
+                            onClick = { onNavigateToNoteCreate(conversation.id) },
+                            modifier = Modifier.testTag("conversation-add-note-button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.NoteAdd,
+                                contentDescription = stringResource(R.string.conversation_add_note),
+                            )
+                        }
+
                         // Assign button
                         IconButton(
                             onClick = { viewModel.showAssignDialog() },
@@ -284,6 +298,30 @@ fun ConversationDetailScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
+            // E2EE indicator
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .testTag("e2ee-indicator"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = stringResource(R.string.conversation_e2ee),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             // Messages area
             Box(
                 modifier = Modifier

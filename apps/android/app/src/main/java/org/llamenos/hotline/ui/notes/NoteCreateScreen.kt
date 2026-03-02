@@ -68,6 +68,7 @@ import org.llamenos.hotline.ui.components.LoadingOverlay
 fun NoteCreateScreen(
     viewModel: NotesViewModel,
     onNavigateBack: () -> Unit,
+    conversationId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -119,7 +120,7 @@ fun NoteCreateScreen(
                         IconButton(
                             onClick = {
                                 if (noteText.isNotBlank()) {
-                                    viewModel.createNote(noteText.trim(), fieldValues.toMap())
+                                    viewModel.createNote(noteText.trim(), fieldValues.toMap(), conversationId)
                                 }
                             },
                             enabled = noteText.isNotBlank() && !uiState.isSaving,
