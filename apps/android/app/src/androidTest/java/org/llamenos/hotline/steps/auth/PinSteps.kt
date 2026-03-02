@@ -220,11 +220,7 @@ class PinSteps : BaseSteps() {
     }
 
     // ---- Reset identity ----
-
-    @Then("I should see a confirmation dialog")
-    fun iShouldSeeAConfirmationDialog() {
-        onNodeWithTag("reset-identity").assertIsDisplayed()
-    }
+    // "I should see a confirmation dialog" is defined in GenericSteps (shared across features)
 
     @When("I confirm the reset")
     fun iConfirmTheReset() {

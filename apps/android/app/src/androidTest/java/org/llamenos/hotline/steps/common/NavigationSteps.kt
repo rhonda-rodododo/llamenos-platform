@@ -3,6 +3,7 @@ package org.llamenos.hotline.steps.common
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
@@ -111,5 +112,44 @@ class NavigationSteps : BaseSteps() {
         } catch (_: AssertionError) {
             // Fine — bottom nav is not visible
         }
+    }
+
+    // ---- Admin login & page navigation ----
+
+    @Given("I am logged in as an admin")
+    fun iAmLoggedInAsAnAdmin() {
+        navigateToMainScreen()
+    }
+
+    @When("I navigate to the {string} page")
+    fun iNavigateToThePage(pageName: String) {
+        when (pageName.lowercase()) {
+            "ban list", "bans" -> navigateToAdminTab("bans")
+            "volunteers" -> navigateToAdminTab("volunteers")
+            "audit log", "audit" -> navigateToAdminTab("audit")
+            "invites" -> navigateToAdminTab("invites")
+            "shifts", "shift schedule" -> navigateToTab(NAV_SHIFTS)
+            "conversations" -> navigateToTab(NAV_CONVERSATIONS)
+            "notes" -> navigateToTab(NAV_NOTES)
+            "settings" -> navigateToTab(NAV_SETTINGS)
+            "dashboard" -> navigateToTab(NAV_DASHBOARD)
+            else -> throw IllegalArgumentException("Unknown page: $pageName")
+        }
+    }
+
+    @When("I navigate to {string}")
+    fun iNavigateToPath(path: String) {
+        // URL-based navigation doesn't directly apply to Android
+        // Deep link or intent-based navigation would be used in production
+    }
+
+    @When("I log out")
+    fun iLogOut() {
+        navigateToTab(NAV_SETTINGS)
+        onNodeWithTag("settings-logout-button").performScrollTo()
+        onNodeWithTag("settings-logout-button").performClick()
+        composeRule.waitForIdle()
+        onNodeWithTag("confirm-logout-button").performClick()
+        composeRule.waitForIdle()
     }
 }

@@ -1,5 +1,6 @@
 package org.llamenos.hotline.steps
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import javax.inject.Inject
 
 /**
@@ -90,6 +92,26 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
         return false
     }
 
+    /**
+     * Navigate to a specific admin tab by name.
+     * Navigates: Settings tab → Admin card → Target tab.
+     */
+    protected fun navigateToAdminTab(tabName: String) {
+        navigateToTab(NAV_SETTINGS)
+        onNodeWithTag("settings-admin-card").performScrollTo()
+        onNodeWithTag("settings-admin-card").performClick()
+        composeRule.waitForIdle()
+        val tabTag = when (tabName.lowercase()) {
+            "volunteers" -> "admin-tab-volunteers"
+            "bans", "ban list" -> "admin-tab-bans"
+            "audit", "audit log" -> "admin-tab-audit"
+            "invites" -> "admin-tab-invites"
+            else -> throw IllegalArgumentException("Unknown admin tab: $tabName")
+        }
+        onNodeWithTag(tabTag).performClick()
+        composeRule.waitForIdle()
+    }
+
     companion object {
         // Well-known bottom navigation tab test tags
         const val NAV_DASHBOARD = "nav-dashboard"
@@ -97,5 +119,16 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
         const val NAV_CONVERSATIONS = "nav-conversations"
         const val NAV_SHIFTS = "nav-shifts"
         const val NAV_SETTINGS = "nav-settings"
+
+        /**
+         * Matcher for nodes whose testTag starts with the given prefix.
+         */
+        fun hasTestTagPrefix(prefix: String) = SemanticsMatcher("testTag starts with '$prefix'") { node ->
+            if (SemanticsProperties.TestTag in node.config) {
+                node.config[SemanticsProperties.TestTag].startsWith(prefix)
+            } else {
+                false
+            }
+        }
     }
 }

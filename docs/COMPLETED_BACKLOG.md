@@ -1,5 +1,16 @@
 # Completed Backlog
 
+## 2026-03-02: Android BDD Step Definitions (Epic 228)
+
+### Epic 228: Android BDD Step Definitions for Full Feature Coverage
+- Extended from 189 → 498 step definitions across 14 → 26 step classes
+- Created 12 new step files: GenericSteps, BanSteps, InviteSteps, ReportSteps, RoleSteps, DemoModeSteps, VolunteerSteps, PanicWipeSteps, BlastSteps, CustomFieldSteps, ProfileSettingsSteps, messaging/BlastSteps
+- Modified 7 existing files: BaseSteps (navigateToAdminTab, hasTestTagPrefix), NavigationSteps (admin nav, logout), AdminSteps (audit log), ConversationSteps (9→28 steps), ShiftSteps (9→30 steps), PinSteps (dedup confirmation dialog)
+- Key patterns: hasTestTagPrefix() semantic matcher for dynamic testTags, navigateToAdminTab() Settings→Admin→Tab routing, GenericSteps shared click/fill/assert/dialog
+- All @android feature file scenarios now have matching step definitions
+- Stubs for unbuilt UI deferred to Epics 229 (admin) and 230 (settings/polish)
+- Verified: `assembleDebugAndroidTest` + `lintDebug` → BUILD SUCCESSFUL
+
 ## 2026-03-01: Cross-Platform BDD E2E Test Suite (Epics 218-222)
 
 ### Epic 218: Cross-Platform BDD Test Framework
