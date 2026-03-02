@@ -1,37 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary - warm terracotta / burnt orange -->
-    <color name="primary_light">#FFC75B39</color>
+    <!-- Primary — Teal (matches logo #51AFAE and desktop branding) -->
+    <color name="primary_light">#FF006A6A</color>
     <color name="on_primary_light">#FFFFFFFF</color>
-    <color name="primary_container_light">#FFFFDBCF</color>
-    <color name="on_primary_container_light">#FF3A0B00</color>
+    <color name="primary_container_light">#FF9CF1F0</color>
+    <color name="on_primary_container_light">#FF002020</color>
 
-    <color name="primary_dark">#FFFFB59D</color>
-    <color name="on_primary_dark">#FF5F1600</color>
-    <color name="primary_container_dark">#FF832200</color>
-    <color name="on_primary_container_dark">#FFFFDBCF</color>
+    <color name="primary_dark">#FF80D5D4</color>
+    <color name="on_primary_dark">#FF003737</color>
+    <color name="primary_container_dark">#FF004F4F</color>
+    <color name="on_primary_container_dark">#FF9CF1F0</color>
 
-    <!-- Secondary - warm sand / amber -->
-    <color name="secondary_light">#FF77574B</color>
+    <!-- Secondary — Teal-gray (muted complement) -->
+    <color name="secondary_light">#FF4A6363</color>
     <color name="on_secondary_light">#FFFFFFFF</color>
-    <color name="secondary_container_light">#FFFFDBCF</color>
-    <color name="on_secondary_container_light">#FF2C160D</color>
+    <color name="secondary_container_light">#FFCCE8E7</color>
+    <color name="on_secondary_container_light">#FF051F1F</color>
 
-    <color name="secondary_dark">#FFE7BDB0</color>
-    <color name="on_secondary_dark">#FF442A20</color>
-    <color name="secondary_container_dark">#FF5D4035</color>
-    <color name="on_secondary_container_dark">#FFFFDBCF</color>
+    <color name="secondary_dark">#FFB1CCCB</color>
+    <color name="on_secondary_dark">#FF1C3535</color>
+    <color name="secondary_container_dark">#FF334B4B</color>
+    <color name="on_secondary_container_dark">#FFCCE8E7</color>
 
-    <!-- Tertiary - warm golden / olive -->
-    <color name="tertiary_light">#FF6C5D2F</color>
+    <!-- Tertiary — Sage green accent -->
+    <color name="tertiary_light">#FF4E6149</color>
     <color name="on_tertiary_light">#FFFFFFFF</color>
-    <color name="tertiary_container_light">#FFF6E1A7</color>
-    <color name="on_tertiary_container_light">#FF231B00</color>
+    <color name="tertiary_container_light">#FFD0E7C8</color>
+    <color name="on_tertiary_container_light">#FF0C1F0A</color>
 
-    <color name="tertiary_dark">#FFD9C58D</color>
-    <color name="on_tertiary_dark">#FF3B2F05</color>
-    <color name="tertiary_container_dark">#FF53461A</color>
-    <color name="on_tertiary_container_dark">#FFF6E1A7</color>
+    <color name="tertiary_dark">#FFB5CBAD</color>
+    <color name="on_tertiary_dark">#FF21351E</color>
+    <color name="tertiary_container_dark">#FF374B33</color>
+    <color name="on_tertiary_container_dark">#FFD0E7C8</color>
 
     <!-- Error -->
     <color name="error_light">#FFBA1A1A</color>
@@ -45,13 +45,16 @@
     <color name="on_error_container_dark">#FFFFDAD6</color>
 
     <!-- Background / Surface -->
-    <color name="background_light">#FFFFFBFF</color>
-    <color name="on_background_light">#FF201A18</color>
-    <color name="surface_light">#FFFFFBFF</color>
-    <color name="on_surface_light">#FF201A18</color>
+    <color name="background_light">#FFFAFDFC</color>
+    <color name="on_background_light">#FF191C1C</color>
+    <color name="surface_light">#FFFAFDFC</color>
+    <color name="on_surface_light">#FF191C1C</color>
 
-    <color name="background_dark">#FF201A18</color>
-    <color name="on_background_dark">#FFEDE0DC</color>
-    <color name="surface_dark">#FF201A18</color>
-    <color name="on_surface_dark">#FFEDE0DC</color>
+    <color name="background_dark">#FF191C1C</color>
+    <color name="on_background_dark">#FFE1E3E3</color>
+    <color name="surface_dark">#FF191C1C</color>
+    <color name="on_surface_dark">#FFE1E3E3</color>
+
+    <!-- Logo brand teal -->
+    <color name="logo_teal">#FF51AFAE</color>
 </resources>

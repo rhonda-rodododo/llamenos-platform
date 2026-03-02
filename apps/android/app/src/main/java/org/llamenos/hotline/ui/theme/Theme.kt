@@ -96,6 +96,7 @@ fun LlamenosTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = LlamenosTypography,
+        shapes = LlamenosShapes,
         content = content,
     )
 }
