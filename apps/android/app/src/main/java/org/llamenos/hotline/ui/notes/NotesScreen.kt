@@ -270,7 +270,7 @@ private fun NoteCard(
                             onClick = {},
                             label = {
                                 Text(
-                                    text = "Call",
+                                    text = stringResource(R.string.badge_call),
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             },
@@ -291,7 +291,7 @@ private fun NoteCard(
                             onClick = {},
                             label = {
                                 Text(
-                                    text = "Chat",
+                                    text = stringResource(R.string.badge_chat),
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             },

@@ -293,7 +293,7 @@ fun DashboardScreen(
                         if (uiState.isOnShift && startedAt != null) {
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = "Active since ${formatDashboardTime(startedAt)}",
+                                text = stringResource(R.string.active_since, formatDashboardTime(startedAt)),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                                 modifier = Modifier.testTag("shift-timer"),

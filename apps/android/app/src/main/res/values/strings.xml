@@ -236,6 +236,47 @@
     <string name="contacts_search">Search contacts\u2026</string>
     <string name="dashboard_view_contacts">View Contacts</string>
 
+    <!-- Search placeholders -->
+    <string name="search_conversations">Search conversations\u2026</string>
+    <string name="search_volunteers">Search volunteers\u2026</string>
+
+    <!-- Settings descriptions -->
+    <string name="settings_device_link_desc">Import identity from desktop via QR code</string>
+    <string name="settings_admin_desc">Manage volunteers, bans, and invites</string>
+    <string name="settings_logout_confirm_message">This will clear your identity and all stored data. You will need your nsec to log in again.</string>
+
+    <!-- Dashboard -->
+    <string name="active_since">Active since %s</string>
+
+    <!-- Contact timestamps -->
+    <string name="contact_first_seen">First: %s</string>
+    <string name="contact_last_seen">Last: %s</string>
+
+    <!-- Note badges -->
+    <string name="badge_call">Call</string>
+    <string name="badge_chat">Chat</string>
+    <string name="note_call_id_badge">Call: %s\u2026</string>
+    <string name="note_chat_id_badge">Chat: %s\u2026</string>
+
+    <!-- Connectivity -->
+    <string name="no_internet">No internet connection</string>
+
+    <!-- Empty states (admin) -->
+    <string name="shifts_empty_scheduled">No shifts scheduled</string>
+    <string name="bans_empty">No bans</string>
+    <string name="custom_fields_empty">No custom fields</string>
+    <string name="volunteers_empty">No volunteers found</string>
+    <string name="audit_empty">No audit entries</string>
+    <string name="invites_empty">No invites</string>
+
+    <!-- Common actions -->
+    <string name="action_save">Save</string>
+
+    <!-- Device link steps -->
+    <string name="device_link_step_scan">Scan</string>
+    <string name="device_link_step_verify">Verify</string>
+    <string name="device_link_step_import">Import</string>
+
     <!-- Notifications -->
     <string name="notification_channel_calls">Incoming Calls</string>
     <string name="notification_channel_shifts">Shift Reminders</string>

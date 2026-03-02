@@ -15,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 import org.llamenos.hotline.api.NetworkMonitor
 
 /**
@@ -38,7 +40,7 @@ fun OfflineBanner(networkMonitor: NetworkMonitor) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "No internet connection",
+                text = stringResource(R.string.no_internet),
                 color = MaterialTheme.colorScheme.onError,
                 style = MaterialTheme.typography.labelMedium,
             )

@@ -139,7 +139,7 @@ fun InvitesTab(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = "No invites",
+                                text = stringResource(R.string.invites_empty),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

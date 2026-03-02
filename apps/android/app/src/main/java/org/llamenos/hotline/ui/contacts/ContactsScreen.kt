@@ -255,13 +255,13 @@ private fun ContactCard(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text = "First: ${formatContactDate(contact.firstSeen)}",
+                    text = stringResource(R.string.contact_first_seen, formatContactDate(contact.firstSeen)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.testTag("contact-first-seen"),
                 )
                 Text(
-                    text = "Last: ${formatContactDate(contact.lastSeen)}",
+                    text = stringResource(R.string.contact_last_seen, formatContactDate(contact.lastSeen)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.testTag("contact-last-seen"),

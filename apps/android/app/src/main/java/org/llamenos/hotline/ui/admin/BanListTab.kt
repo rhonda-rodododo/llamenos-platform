@@ -148,7 +148,7 @@ fun BanListTab(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = "No bans",
+                                text = stringResource(R.string.bans_empty),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

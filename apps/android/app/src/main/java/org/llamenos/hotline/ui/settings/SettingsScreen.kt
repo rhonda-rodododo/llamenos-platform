@@ -112,7 +112,7 @@ fun SettingsScreen(
             onDismissRequest = { showLogoutDialog = false },
             title = { Text(stringResource(R.string.logout)) },
             text = {
-                Text("This will clear your identity and all stored data. You will need your nsec to log in again.")
+                Text(stringResource(R.string.settings_logout_confirm_message))
             },
             confirmButton = {
                 TextButton(
@@ -396,7 +396,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
-                            text = "Import identity from desktop via QR code",
+                            text = stringResource(R.string.settings_device_link_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -438,7 +438,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
-                            text = "Manage volunteers, bans, and invites",
+                            text = stringResource(R.string.settings_admin_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

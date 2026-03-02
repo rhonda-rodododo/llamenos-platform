@@ -205,7 +205,7 @@ fun AuditLogTab(
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "No audit entries",
+                            text = stringResource(R.string.audit_empty),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

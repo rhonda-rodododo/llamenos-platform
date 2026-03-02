@@ -247,7 +247,7 @@ fun NoteDetailScreen(
                             if (note.callId != null) {
                                 AssistChip(
                                     onClick = {},
-                                    label = { Text("Call: ${note.callId.take(8)}...") },
+                                    label = { Text(stringResource(R.string.note_call_id_badge, note.callId.take(8))) },
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Filled.Phone,
@@ -261,7 +261,7 @@ fun NoteDetailScreen(
                             if (note.conversationId != null) {
                                 AssistChip(
                                     onClick = {},
-                                    label = { Text("Chat: ${note.conversationId.take(8)}...") },
+                                    label = { Text(stringResource(R.string.note_chat_id_badge, note.conversationId.take(8))) },
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Filled.Sms,

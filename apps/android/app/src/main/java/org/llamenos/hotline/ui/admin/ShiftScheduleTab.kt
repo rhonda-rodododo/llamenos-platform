@@ -125,7 +125,7 @@ fun ShiftScheduleTab(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = "No shifts scheduled",
+                                text = stringResource(R.string.shifts_empty_scheduled),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -331,7 +331,7 @@ private fun ShiftDialog(
                 enabled = name.isNotBlank() && startTime.isNotBlank() && endTime.isNotBlank(),
                 modifier = Modifier.testTag("confirm-shift-save"),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {

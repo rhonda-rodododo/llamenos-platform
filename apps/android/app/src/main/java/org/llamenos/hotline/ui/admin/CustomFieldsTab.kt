@@ -126,7 +126,7 @@ fun CustomFieldsTab(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = "No custom fields",
+                                text = stringResource(R.string.custom_fields_empty),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -424,7 +424,7 @@ private fun CustomFieldDialog(
                 enabled = label.isNotBlank(),
                 modifier = Modifier.testTag("confirm-field-save"),
             ) {
-                Text("Save")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {

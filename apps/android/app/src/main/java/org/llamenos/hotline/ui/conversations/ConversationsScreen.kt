@@ -107,7 +107,7 @@ fun ConversationsScreen(
                 OutlinedTextField(
                     value = uiState.searchQuery,
                     onValueChange = { viewModel.setSearchQuery(it) },
-                    placeholder = { Text("Search conversations...") },
+                    placeholder = { Text(stringResource(R.string.search_conversations)) },
                     leadingIcon = {
                         Icon(Icons.Filled.Search, contentDescription = null)
                     },

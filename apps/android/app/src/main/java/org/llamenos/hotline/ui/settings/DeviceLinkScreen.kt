@@ -397,7 +397,11 @@ private fun StepIndicator(
     currentStep: DeviceLinkStep,
     modifier: Modifier = Modifier,
 ) {
-    val steps = listOf("Scan", "Verify", "Import")
+    val steps = listOf(
+        stringResource(R.string.device_link_step_scan),
+        stringResource(R.string.device_link_step_verify),
+        stringResource(R.string.device_link_step_import),
+    )
     val stepIndex = when (currentStep) {
         DeviceLinkStep.SCANNING -> 0
         DeviceLinkStep.CONNECTING -> 0

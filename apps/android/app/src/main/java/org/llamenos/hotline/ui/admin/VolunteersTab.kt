@@ -139,7 +139,7 @@ fun VolunteersTab(
             OutlinedTextField(
                 value = uiState.volunteerSearchQuery,
                 onValueChange = { viewModel.setVolunteerSearchQuery(it) },
-                placeholder = { Text("Search volunteers...") },
+                placeholder = { Text(stringResource(R.string.search_volunteers)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Filled.Search,
@@ -184,7 +184,7 @@ fun VolunteersTab(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = "No volunteers found",
+                                text = stringResource(R.string.volunteers_empty),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
