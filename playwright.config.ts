@@ -1,4 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
+import { defineBddConfig } from "playwright-bdd";
+
+const bddTestDir = defineBddConfig({
+  features: "packages/test-specs/features/**/*.feature",
+  steps: "tests/steps/**/*.ts",
+  outputDir: ".features-gen",
+  featuresRoot: "packages/test-specs/features",
+  tags: "@desktop",
+});
 
 export default defineConfig({
   testDir: "./tests",
@@ -41,6 +50,12 @@ export default defineConfig({
       name: "mobile-chromium",
       use: { ...devices["Pixel 7"] },
       testMatch: /responsive\.spec\.ts/,
+      dependencies: ["setup"],
+    },
+    {
+      name: "bdd",
+      testDir: bddTestDir,
+      use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
     },
   ],

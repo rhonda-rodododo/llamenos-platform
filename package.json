@@ -107,6 +107,7 @@
     "@wdio/mocha-framework": "^9.24.0",
     "@wdio/spec-reporter": "^9.24.0",
     "esbuild": "^0.27.3",
+    "playwright-bdd": "^8.4.2",
     "quicktype-core": "^23.2.6",
     "shadcn": "^3.8.4",
     "tailwindcss": "^4.1.18",
