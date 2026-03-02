@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
+import org.llamenos.hotline.ui.components.DemoBanner
 import org.llamenos.hotline.ui.components.LoadingOverlay
 
 /**
@@ -47,6 +48,7 @@ fun LoginScreen(
     viewModel: AuthViewModel,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToPinSet: () -> Unit,
+    onDemoLogin: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -180,6 +182,40 @@ fun LoginScreen(
                         .testTag("create-identity"),
                 ) {
                     Text(stringResource(R.string.create_new_identity))
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                // Demo mode section
+                Text(
+                    text = stringResource(R.string.demo_try_demo),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("demo-mode-label"),
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { onDemoLogin("admin") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .testTag("demo-admin-button"),
+                ) {
+                    Text(stringResource(R.string.demo_admin))
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { onDemoLogin("volunteer") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .testTag("demo-volunteer-button"),
+                ) {
+                    Text(stringResource(R.string.demo_volunteer))
                 }
 
                 Spacer(Modifier.height(48.dp))

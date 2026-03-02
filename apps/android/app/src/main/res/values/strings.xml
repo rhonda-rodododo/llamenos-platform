@@ -168,6 +168,42 @@
     <string name="settings_auto_lock">Auto-Lock Timeout</string>
     <string name="settings_biometric">Biometric Unlock</string>
     <string name="settings_admin">Administration</string>
+    <string name="settings_profile">Profile</string>
+    <string name="settings_display_name">Display Name</string>
+    <string name="settings_phone">Phone Number</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_key_backup">Key Backup</string>
+    <string name="settings_transcription">Transcription</string>
+    <string name="settings_advanced">Advanced Settings</string>
+    <string name="settings_advanced_desc">Configure on desktop for technical settings</string>
+
+    <!-- Blasts -->
+    <string name="blasts_title">Blasts</string>
+    <string name="blasts_empty">No blasts sent</string>
+    <string name="blast_create">New Blast</string>
+    <string name="blast_message_hint">Message to send\u2026</string>
+    <string name="blast_recipients">Recipients</string>
+    <string name="blast_schedule">Schedule</string>
+    <string name="blast_send_now">Send Now</string>
+    <string name="blast_schedule_later">Schedule for Later</string>
+    <string name="blast_select_all">Select All Volunteers</string>
+
+    <!-- Demo mode -->
+    <string name="demo_mode">Demo Mode</string>
+    <string name="demo_try_demo">Try Demo</string>
+    <string name="demo_banner">Demo Mode — data is not real</string>
+    <string name="demo_dismiss">Dismiss</string>
+    <string name="demo_deploy">Deploy your own</string>
+    <string name="demo_admin">Admin Demo</string>
+    <string name="demo_volunteer">Volunteer Demo</string>
+
+    <!-- Panic wipe -->
+    <string name="panic_wipe_title">Emergency Wipe</string>
+    <string name="panic_wipe_message">All local data will be permanently erased.</string>
+    <string name="panic_wiping">Wiping data\u2026</string>
 
     <!-- Notifications -->
     <string name="notification_channel_calls">Incoming Calls</string>

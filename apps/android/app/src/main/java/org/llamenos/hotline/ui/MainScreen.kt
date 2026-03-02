@@ -193,6 +193,16 @@ fun MainScreen(
                         npub = cryptoService.npub ?: "",
                         hubUrl = keystoreService.retrieve(KeystoreService.KEY_HUB_URL) ?: "",
                         connectionState = connectionState,
+                        displayName = keystoreService.retrieve("display_name") ?: "",
+                        phone = keystoreService.retrieve("phone") ?: "",
+                        selectedTheme = keystoreService.retrieve("theme") ?: "system",
+                        onUpdateProfile = { name, phone ->
+                            keystoreService.store("display_name", name)
+                            keystoreService.store("phone", phone)
+                        },
+                        onThemeChange = { theme ->
+                            keystoreService.store("theme", theme)
+                        },
                         onLock = onLock,
                         onLogout = onLogout,
                         onNavigateToAdmin = onNavigateToAdmin,

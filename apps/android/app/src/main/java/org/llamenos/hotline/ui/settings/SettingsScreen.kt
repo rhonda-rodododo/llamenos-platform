@@ -1,5 +1,8 @@
 package org.llamenos.hotline.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,18 +21,26 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NavigateNext
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -40,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,30 +68,21 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.api.WebSocketService
 
 /**
- * Settings screen for identity management and app configuration.
+ * Settings screen with collapsible sections for profile, identity, theme, and more.
  *
- * Displays:
- * - Identity section: npub with copy button
- * - Hub connection info with status indicator
- * - Device link card (navigates to QR scanning flow)
- * - Admin panel card (visible to admins)
- * - Lock app button (clears key from memory, keeps stored keys)
- * - Logout button with confirmation dialog (clears all data)
- * - App version
- *
- * @param npub The user's Nostr public key in npub format
- * @param hubUrl The currently configured hub URL
- * @param connectionState WebSocket connection state
- * @param onLock Callback to lock the app
- * @param onLogout Callback to fully logout
- * @param onNavigateToAdmin Callback to navigate to admin panel
- * @param onNavigateToDeviceLink Callback to navigate to device link screen
+ * Organized into default/operational settings visible to all users,
+ * with an Advanced Settings section for technical configuration.
  */
 @Composable
 fun SettingsScreen(
     npub: String,
     hubUrl: String,
     connectionState: WebSocketService.ConnectionState,
+    displayName: String,
+    phone: String,
+    selectedTheme: String,
+    onUpdateProfile: (name: String, phone: String) -> Unit,
+    onThemeChange: (String) -> Unit,
     onLock: () -> Unit,
     onLogout: () -> Unit,
     onNavigateToAdmin: () -> Unit,
@@ -91,8 +94,19 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val copiedMessage = stringResource(R.string.settings_npub_copied)
+    val profileUpdatedMessage = stringResource(R.string.profile_updated)
 
-    // Logout confirmation dialog
+    // Profile form state
+    var editDisplayName by rememberSaveable { mutableStateOf(displayName) }
+    var editPhone by rememberSaveable { mutableStateOf(phone) }
+
+    // Section expansion state
+    var profileExpanded by rememberSaveable { mutableStateOf(true) }
+    var identityExpanded by rememberSaveable { mutableStateOf(false) }
+    var themeExpanded by rememberSaveable { mutableStateOf(false) }
+    var hubExpanded by rememberSaveable { mutableStateOf(false) }
+    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -136,9 +150,191 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // Identity section
+            // ---- Profile section (collapsible) ----
+            SettingsSection(
+                title = stringResource(R.string.settings_profile),
+                expanded = profileExpanded,
+                onToggle = { profileExpanded = !profileExpanded },
+                testTag = "settings-profile-section",
+            ) {
+                OutlinedTextField(
+                    value = editDisplayName,
+                    onValueChange = { editDisplayName = it },
+                    label = { Text(stringResource(R.string.settings_display_name)) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings-display-name-input"),
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = editPhone,
+                    onValueChange = { editPhone = it },
+                    label = { Text(stringResource(R.string.settings_phone)) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings-phone-input"),
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // npub display
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = npub,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("settings-npub"),
+                    )
+                    IconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(npub))
+                            scope.launch {
+                                snackbarHostState.showSnackbar(copiedMessage)
+                            }
+                        },
+                        modifier = Modifier.testTag("copy-npub-button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ContentCopy,
+                            contentDescription = stringResource(R.string.settings_copy_npub),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        onUpdateProfile(editDisplayName, editPhone)
+                        scope.launch {
+                            snackbarHostState.showSnackbar(profileUpdatedMessage)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings-update-profile-button"),
+                ) {
+                    Text(stringResource(R.string.profile_update))
+                }
+            }
+
+            // ---- Theme section (collapsible) ----
+            SettingsSection(
+                title = stringResource(R.string.settings_theme),
+                expanded = themeExpanded,
+                onToggle = { themeExpanded = !themeExpanded },
+                testTag = "settings-theme-section",
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ThemeButton(
+                        label = stringResource(R.string.settings_theme_light),
+                        icon = Icons.Filled.LightMode,
+                        selected = selectedTheme == "light",
+                        onClick = { onThemeChange("light") },
+                        testTag = "theme-light-button",
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeButton(
+                        label = stringResource(R.string.settings_theme_dark),
+                        icon = Icons.Filled.DarkMode,
+                        selected = selectedTheme == "dark",
+                        onClick = { onThemeChange("dark") },
+                        testTag = "theme-dark-button",
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeButton(
+                        label = stringResource(R.string.settings_theme_system),
+                        icon = Icons.Filled.PhoneAndroid,
+                        selected = selectedTheme == "system",
+                        onClick = { onThemeChange("system") },
+                        testTag = "theme-system-button",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            // ---- Identity / Hub section (collapsible) ----
+            SettingsSection(
+                title = stringResource(R.string.settings_hub),
+                expanded = hubExpanded,
+                onToggle = { hubExpanded = !hubExpanded },
+                testTag = "settings-hub-section",
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings-hub-card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    ) {
+                        if (hubUrl.isNotEmpty()) {
+                            Text(
+                                text = hubUrl,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.testTag("settings-hub-url"),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val (statusColor, statusText) = when (connectionState) {
+                                WebSocketService.ConnectionState.CONNECTED ->
+                                    MaterialTheme.colorScheme.primary to stringResource(R.string.status_connected)
+                                WebSocketService.ConnectionState.CONNECTING ->
+                                    MaterialTheme.colorScheme.tertiary to stringResource(R.string.status_connecting)
+                                WebSocketService.ConnectionState.RECONNECTING ->
+                                    MaterialTheme.colorScheme.tertiary to stringResource(R.string.status_reconnecting)
+                                WebSocketService.ConnectionState.DISCONNECTED ->
+                                    MaterialTheme.colorScheme.error to stringResource(R.string.status_disconnected)
+                            }
+
+                            Icon(
+                                imageVector = Icons.Filled.Circle,
+                                contentDescription = null,
+                                tint = statusColor,
+                                modifier = Modifier.size(10.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.testTag("settings-connection-status"),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ---- Identity card ----
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -156,115 +352,22 @@ fun SettingsScreen(
                         text = stringResource(R.string.settings_identity),
                         style = MaterialTheme.typography.titleMedium,
                     )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = npub,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("settings-npub"),
-                        )
-
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(AnnotatedString(npub))
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(copiedMessage)
-                                }
-                            },
-                            modifier = Modifier.testTag("copy-npub-button"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.ContentCopy,
-                                contentDescription = stringResource(R.string.settings_copy_npub),
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Hub connection section
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("settings-hub-card"),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                ),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                ) {
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        text = stringResource(R.string.settings_hub),
-                        style = MaterialTheme.typography.titleMedium,
+                        text = npub,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    if (hubUrl.isNotEmpty()) {
-                        Text(
-                            text = hubUrl,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.testTag("settings-hub-url"),
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-                    }
-
-                    // Connection status
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val (statusColor, statusText) = when (connectionState) {
-                            WebSocketService.ConnectionState.CONNECTED ->
-                                MaterialTheme.colorScheme.primary to stringResource(R.string.status_connected)
-
-                            WebSocketService.ConnectionState.CONNECTING ->
-                                MaterialTheme.colorScheme.tertiary to stringResource(R.string.status_connecting)
-
-                            WebSocketService.ConnectionState.RECONNECTING ->
-                                MaterialTheme.colorScheme.tertiary to stringResource(R.string.status_reconnecting)
-
-                            WebSocketService.ConnectionState.DISCONNECTED ->
-                                MaterialTheme.colorScheme.error to stringResource(R.string.status_disconnected)
-                        }
-
-                        Icon(
-                            imageVector = Icons.Filled.Circle,
-                            contentDescription = null,
-                            tint = statusColor,
-                            modifier = Modifier.size(10.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.testTag("settings-connection-status"),
-                        )
-                    }
                 }
             }
 
-            // Device link card
+            // ---- Navigation cards ----
+
+            // Device link
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -287,9 +390,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(24.dp),
                     )
                     Spacer(Modifier.width(12.dp))
-                    Column(
-                        modifier = Modifier.weight(1f),
-                    ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.settings_link_device),
                             style = MaterialTheme.typography.titleSmall,
@@ -308,7 +409,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Admin panel card
+            // Admin panel
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -331,9 +432,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(24.dp),
                     )
                     Spacer(Modifier.width(12.dp))
-                    Column(
-                        modifier = Modifier.weight(1f),
-                    ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.settings_admin),
                             style = MaterialTheme.typography.titleSmall,
@@ -352,6 +451,20 @@ fun SettingsScreen(
                 }
             }
 
+            // ---- Advanced Settings (collapsible) ----
+            SettingsSection(
+                title = stringResource(R.string.settings_advanced),
+                expanded = advancedExpanded,
+                onToggle = { advancedExpanded = !advancedExpanded },
+                testTag = "settings-advanced-section",
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_advanced_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             HorizontalDivider()
 
             // Lock app button
@@ -365,11 +478,7 @@ fun SettingsScreen(
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
+                Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.lock_app))
             }
@@ -385,18 +494,13 @@ fun SettingsScreen(
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 ),
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.logout))
             }
 
             // App version
             Spacer(Modifier.height(16.dp))
-
             Text(
                 text = "${stringResource(R.string.settings_version)}: ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
@@ -405,6 +509,96 @@ fun SettingsScreen(
                     .align(Alignment.CenterHorizontally)
                     .testTag("settings-version"),
             )
+        }
+    }
+}
+
+/**
+ * Reusable collapsible settings section with animated expand/collapse.
+ */
+@Composable
+private fun SettingsSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    testTag: String,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(16.dp)
+                    .testTag("$testTag-header"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                ) {
+                    content()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Theme selection button (light/dark/system).
+ */
+@Composable
+private fun ThemeButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    testTag: String,
+    modifier: Modifier = Modifier,
+) {
+    if (selected) {
+        FilledTonalButton(
+            onClick = onClick,
+            modifier = modifier.testTag(testTag),
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall)
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier.testTag(testTag),
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

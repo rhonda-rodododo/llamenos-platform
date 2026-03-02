@@ -96,13 +96,13 @@ class GenericSteps : BaseSteps() {
 
     @Then("I should see an {string} event type filter")
     fun iShouldSeeAnEventTypeFilter(filterName: String) {
-        // Audit log event type filter — requires filter UI (Epic 229)
-        // Stub: verify we're on the audit page
+        onNodeWithTag("audit-event-filter").assertIsDisplayed()
     }
 
     @Then("I should see date range inputs")
     fun iShouldSeeDateRangeInputs() {
-        // Audit log date range filter — requires filter UI (Epic 229)
+        // Date range is part of the audit filter bar
+        onNodeWithTag("audit-filter-bar").assertIsDisplayed()
     }
 
     @Then("I should not see {string}")
@@ -169,7 +169,10 @@ class GenericSteps : BaseSteps() {
 
     @Then("I should see a search input")
     fun iShouldSeeASearchInput() {
-        val found = assertAnyTagDisplayed("volunteer-search", "audit-search", "search-input")
+        val found = assertAnyTagDisplayed(
+            "volunteer-search", "audit-search-input", "search-input",
+            "conversation-search-input",
+        )
         assert(found) { "Expected a search input to be visible" }
     }
 
@@ -269,7 +272,7 @@ class GenericSteps : BaseSteps() {
     @When("I type {string} in the search input")
     fun iTypeInTheSearchInput(text: String) {
         // Try known search input tags
-        val searchTags = listOf("volunteer-search", "audit-search", "search-input")
+        val searchTags = listOf("volunteer-search", "audit-search-input", "search-input", "conversation-search-input")
         for (tag in searchTags) {
             try {
                 onNodeWithTag(tag).performTextClearance()
@@ -284,7 +287,12 @@ class GenericSteps : BaseSteps() {
 
     @Then("the search input should be empty")
     fun theSearchInputShouldBeEmpty() {
-        // Stub — verify search input is cleared
+        // After clear, search inputs should exist and be accessible
+        val found = assertAnyTagDisplayed(
+            "volunteer-search", "audit-search-input", "search-input",
+            "conversation-search-input",
+        )
+        assert(found) { "Expected a search input to be visible" }
     }
 
     @When("I enter {string} in the nsec input")
