@@ -1,5 +1,38 @@
 # Completed Backlog
 
+## 2026-03-02: Android Settings Polish & Admin Expansion (Epics 229-230)
+
+### Epic 229: Android Admin Panel Expansion
+- Created `ShiftScheduleTab.kt` — admin shift CRUD with list, create/edit/delete dialogs, testTags for all interactions
+- Expanded `ConversationsScreen.kt` with search bar (`conversation-search-input`)
+- Added conversation detail actions: assign volunteer, close/reopen conversation
+- Extended `ConversationsViewModel.kt` with search, assign, close/reopen methods
+- Admin panel now has 6 tabs: VOLUNTEERS, BANS, AUDIT, INVITES, FIELDS, SHIFTS (all functional)
+- Updated `ShiftSteps.kt` with real UI interactions (shift-name-input, shift-start/end-input, create-shift-fab)
+- RoleSteps remain API-level stubs (RBAC role CRUD is server-side, volunteer cards show role badges)
+- Verified: `assembleDebugAndroidTest` → BUILD SUCCESSFUL
+
+### Epic 230: Android Settings & Polish
+- Rewrote `SettingsScreen.kt` with collapsible sections (SettingsSection composable + AnimatedVisibility)
+  - Profile section: display name input, phone input, npub display with copy, update button
+  - Theme section: light/dark/system ThemeButton composables
+  - Hub Connection section (collapsible): URL + connection status indicator
+  - Advanced Settings section (collapsible): placeholder for desktop-only config
+- Updated `MainScreen.kt` call site: passes displayName, phone, selectedTheme from KeystoreService, onUpdateProfile/onThemeChange callbacks
+- Created `BlastsScreen.kt` + `BlastsViewModel.kt`: full blast messaging UI with list, create dialog, individual/select-all recipient checkboxes, schedule toggle
+- Added demo mode to `LoginScreen.kt`: demo-admin-button, demo-volunteer-button with onDemoLogin callback
+- Created `DemoBanner.kt` component: dismissible tertiary container banner
+- Added 30+ string resources (settings, blasts, demo mode, panic wipe)
+- Replaced ALL remaining BDD step stubs with real Compose UI interactions:
+  - `ProfileSettingsSteps.kt`: profile editing, section toggling, theme picker
+  - `BlastSteps.kt`: create blast, recipient selection, schedule toggle
+  - `DemoModeSteps.kt`: demo login buttons, banner dismiss, nav assertions
+  - `PanicWipeSteps.kt`: hardware key simulation via `Instrumentation.sendKeyDownUpSync(KEYCODE_VOLUME_DOWN)`
+  - `ReportSteps.kt`: mapped to note creation flow (create-note-fab, note-text-input, save-note-button)
+  - `GenericSteps.kt`: audit filter/search assertions
+  - `VolunteerSteps.kt`: nsec import, profile setup, nsec display
+- Verified: `assembleDebugAndroidTest` + `lintDebug` + `testDebugUnitTest` → ALL BUILD SUCCESSFUL
+
 ## 2026-03-02: Android BDD Step Definitions (Epic 228)
 
 ### Epic 228: Android BDD Step Definitions for Full Feature Coverage

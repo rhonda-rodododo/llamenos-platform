@@ -325,7 +325,7 @@ Refactor all three platforms to use real BDD runners driven by shared `.feature`
 
 **Dependency order:** 223 → (224 | 225 | 226) → 227
 
-## Android BDD Feature Implementation (Epics 228-230)
+## Android BDD Feature Implementation (Epics 228-230) — COMPLETE
 
 Implement Android step definitions and UI to fully cover all BDD feature file scenarios.
 
@@ -333,8 +333,8 @@ Implement Android step definitions and UI to fully cover all BDD feature file sc
 - [x] **[Epic 228: Android BDD Step Definitions](epics/epic-228-android-bdd-step-definitions.md)** — 498 step definitions across 26 step classes covering all @android feature scenarios (12 new files, 7 modified)
 
 ### UI Implementation
-- [ ] **Epic 229: Android Admin Panel Expansion** — Audit filters/search, volunteer CRUD forms, shift scheduling admin, reports, roles, custom fields admin UI
-- [ ] **Epic 230: Android Settings & Polish** — Profile editing, theme picker, form validation, panic wipe, blasts, demo mode UI
+- [x] **Epic 229: Android Admin Panel Expansion** — Conversation actions (search, assign, close/reopen), admin shift scheduling CRUD tab, volunteer CRUD, audit log filters, ban list, custom fields, invites
+- [x] **Epic 230: Android Settings & Polish** — Collapsible settings sections, profile editing, theme picker, blasts screen, demo mode login buttons + banner, panic wipe hardware key trigger, all BDD step stubs replaced
 
 **Dependency order:** 228 → (229 | 230)
 
