@@ -20,6 +20,7 @@ core-ktx = "1.15.0"
 camerax = "1.4.1"
 mlkit-barcode = "17.3.0"
 jna = "5.17.0"
+cucumber = "7.18.1"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -54,6 +55,8 @@ camerax-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", vers
 camerax-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 mlkit-barcode = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkit-barcode" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
+cucumber-android = { group = "io.cucumber", name = "cucumber-android", version.ref = "cucumber" }
+cucumber-android-hilt = { group = "io.cucumber", name = "cucumber-android-hilt", version.ref = "cucumber" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 espresso = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 test-runner = { group = "androidx.test", name = "runner", version = "1.6.2" }

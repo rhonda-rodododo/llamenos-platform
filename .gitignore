@@ -23,6 +23,7 @@ apps/android/app/build/
 apps/android/build/
 apps/android/local.properties
 apps/android/app/src/main/jniLibs/
+apps/android/app/src/androidTest/assets/features/
 
 # iOS build
 apps/ios/.build/
@@ -37,3 +38,6 @@ apps/desktop/target/
 
 # Crypto build outputs
 packages/crypto/dist/
+
+# Playwright-BDD generated test files
+.features-gen/

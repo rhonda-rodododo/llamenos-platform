@@ -18,7 +18,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        testInstrumentationRunner = "org.llamenos.hotline.HiltTestRunner"
+        testInstrumentationRunner = "org.llamenos.hotline.CucumberHiltRunner"
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -92,8 +92,15 @@ val copyTestVectors by tasks.registering(Copy::class) {
     into("src/androidTest/assets")
 }
 
+// Copy BDD feature files from shared test-specs for Cucumber test runner
+val copyFeatureFiles by tasks.registering(Copy::class) {
+    from("${rootProject.projectDir}/../../packages/test-specs/features")
+    into("src/androidTest/assets/features")
+}
+
 tasks.named("preBuild") {
     dependsOn(copyTestVectors)
+    dependsOn(copyFeatureFiles)
 }
 
 dependencies {
@@ -146,5 +153,7 @@ dependencies {
     androidTestImplementation(libs.test.runner)
     androidTestImplementation(libs.test.rules)
     androidTestImplementation(libs.hilt.android.testing)
+    androidTestImplementation(libs.cucumber.android)
+    androidTestImplementation(libs.cucumber.android.hilt)
     kaptAndroidTest(libs.hilt.compiler)
 }

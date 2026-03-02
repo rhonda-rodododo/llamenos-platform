@@ -196,7 +196,7 @@ function parseKotlinTestFile(path: string): TestMethod[] {
   const classMatch = content.match(/class\s+(\w+)/);
   const className = classMatch?.[1] ?? basename(path, ".kt");
 
-  // Match both @Test fun (JUnit) and @Given/@When/@Then (Cucumber step defs)
+  // Match @Test fun methods (JUnit-style)
   const methodRegex = /@Test\s*\n\s*fun\s+(\w+)\s*\(/g;
   let match: RegExpExecArray | null;
   while ((match = methodRegex.exec(content)) !== null) {
@@ -208,6 +208,74 @@ function parseKotlinTestFile(path: string): TestMethod[] {
   }
 
   return methods;
+}
+
+/**
+ * Parse Cucumber step phrases from a Kotlin step definition file.
+ * Extracts strings from @Given, @When, @Then, @And, @But annotations.
+ */
+function parseCucumberStepPhrases(path: string): string[] {
+  const content = readFileSync(path, "utf-8");
+  const phrases: string[] = [];
+
+  // Match @Given("..."), @When("..."), @Then("..."), @And("..."), @But("...")
+  const stepRegex = /@(?:Given|When|Then|And|But)\("([^"]+)"\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = stepRegex.exec(content)) !== null) {
+    phrases.push(match[1]);
+  }
+
+  return phrases;
+}
+
+/**
+ * Extract all Gherkin step phrases from a feature file's scenarios.
+ * Returns unique Given/When/Then/And/But phrases used in the feature.
+ */
+function extractGherkinSteps(featurePath: string): string[] {
+  const content = readFileSync(featurePath, "utf-8");
+  const lines = content.split("\n");
+  const steps: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const stepMatch = trimmed.match(/^(?:Given|When|Then|And|But)\s+(.+)$/);
+    if (stepMatch) {
+      steps.push(stepMatch[1]);
+    }
+  }
+
+  return steps;
+}
+
+/**
+ * Check if a Gherkin step text matches a Cucumber step phrase pattern.
+ * Handles Cucumber expression parameters like {string}, {int}, {word},
+ * escaped characters like \\(, and DataTable steps (ending with :).
+ */
+function stepMatchesCucumberPhrase(gherkinStep: string, cucumberPhrase: string): boolean {
+  const step = gherkinStep.trim();
+
+  // Convert cucumber expression pattern to regex
+  let pattern = cucumberPhrase
+    // Escape regex special chars (except those used by cucumber)
+    .replace(/[.*+?^${}()|[\]]/g, "\\$&")
+    // Restore cucumber expression parameters
+    .replace(/\\{string\\}/g, '"[^"]*"')
+    .replace(/\\{int\\}/g, "\\d+")
+    .replace(/\\{word\\}/g, "\\S+")
+    // Handle escaped parens in cucumber (e.g., \\( becomes literal paren)
+    .replace(/\\\\\\\(/g, "\\(")
+    .replace(/\\\\\\\)/g, "\\)")
+    ;
+
+  try {
+    const regex = new RegExp(`^${pattern}$`);
+    return regex.test(step);
+  } catch {
+    // If regex construction fails, fall back to exact match
+    return step === cucumberPhrase;
+  }
 }
 
 function parseSwiftTestFile(path: string): TestMethod[] {
@@ -232,8 +300,16 @@ function parseSwiftTestFile(path: string): TestMethod[] {
 // ---- Coverage checking per platform ----
 
 function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
-  // Look for test files in both e2e/ (current) and steps/ (Cucumber migration)
-  const testDirs = [join(ANDROID_TEST_DIR, "e2e"), join(ANDROID_TEST_DIR, "steps")];
+  const stepsDir = join(ANDROID_TEST_DIR, "steps");
+  const e2eDir = join(ANDROID_TEST_DIR, "e2e");
+  const useCucumber = existsSync(stepsDir) && findFiles(stepsDir, "Steps.kt").length > 0;
+
+  if (useCucumber) {
+    return checkAndroidCucumberCoverage(scenarios);
+  }
+
+  // Legacy: @Test method matching
+  const testDirs = [e2eDir, stepsDir];
   const allMethods: TestMethod[] = [];
 
   for (const dir of testDirs) {
@@ -287,6 +363,141 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
   }
 
   return { covered, missing };
+}
+
+/**
+ * Cucumber-specific coverage check for Android.
+ *
+ * With Cucumber, coverage is verified by checking that every Gherkin step
+ * phrase in @android-tagged feature files has a matching step definition
+ * in the steps/ directory. Scenarios are covered when all their steps
+ * have matching definitions.
+ */
+function checkAndroidCucumberCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
+  const stepsDir = join(ANDROID_TEST_DIR, "steps");
+  const stepFiles = findFiles(stepsDir, ".kt");
+
+  // Collect all cucumber step phrases from step definition files
+  const allPhrases: string[] = [];
+  for (const file of stepFiles) {
+    allPhrases.push(...parseCucumberStepPhrases(file));
+  }
+
+  console.log(
+    `  Cucumber mode: Found ${allPhrases.length} step definitions across ${stepFiles.length} step files\n`
+  );
+
+  let covered = 0;
+  let missing = 0;
+  let currentFeature = "";
+
+  for (const scenario of scenarios) {
+    if (scenario.featureFile !== currentFeature) {
+      currentFeature = scenario.featureFile;
+      console.log(`  Feature: ${scenario.featureName} (${scenario.featureFile})`);
+    }
+
+    // Extract all Gherkin steps for this scenario from the feature file
+    const featurePath = join(FEATURES_DIR, scenario.featureFile);
+    const gherkinSteps = extractScenarioSteps(featurePath, scenario.title);
+
+    if (gherkinSteps.length === 0) {
+      // No steps extracted — could be an outline with examples or empty scenario
+      console.log(`    \u2713 ${scenario.title} (no steps to validate)`);
+      covered++;
+      continue;
+    }
+
+    // Check each step has a matching definition
+    const unmatchedSteps: string[] = [];
+    for (const step of gherkinSteps) {
+      const hasMatch = allPhrases.some((phrase) =>
+        stepMatchesCucumberPhrase(step, phrase)
+      );
+      if (!hasMatch) {
+        unmatchedSteps.push(step);
+      }
+    }
+
+    if (unmatchedSteps.length === 0) {
+      console.log(
+        `    \u2713 ${scenario.title} (${gherkinSteps.length} steps matched)`
+      );
+      covered++;
+    } else {
+      console.log(
+        `    \u2717 ${scenario.title}\n      Missing step defs for:`
+      );
+      for (const step of unmatchedSteps) {
+        console.log(`        - ${step}`);
+      }
+      missing++;
+    }
+  }
+
+  return { covered, missing };
+}
+
+/**
+ * Extract the Gherkin step lines belonging to a specific scenario within a feature file.
+ */
+function extractScenarioSteps(featurePath: string, scenarioTitle: string): string[] {
+  const content = readFileSync(featurePath, "utf-8");
+  const lines = content.split("\n");
+  const steps: string[] = [];
+  let inTargetScenario = false;
+  let inBackground = false;
+  const backgroundSteps: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Track Background section
+    if (trimmed.startsWith("Background:")) {
+      inBackground = true;
+      inTargetScenario = false;
+      continue;
+    }
+
+    // Track target scenario
+    const scenarioMatch = trimmed.match(/^Scenario(?:\s+Outline)?:\s*(.+)$/);
+    if (scenarioMatch) {
+      inBackground = false;
+      inTargetScenario = scenarioMatch[1].trim() === scenarioTitle;
+      continue;
+    }
+
+    // Skip tags, empty lines, comments, examples, tables
+    if (
+      trimmed.startsWith("@") ||
+      trimmed.startsWith("#") ||
+      trimmed.startsWith("|") ||
+      trimmed.startsWith("Examples:") ||
+      trimmed.startsWith("Feature:") ||
+      trimmed === ""
+    ) {
+      if (trimmed.startsWith("@") || trimmed.startsWith("Examples:") || trimmed.startsWith("Feature:")) {
+        if (inTargetScenario && !trimmed.startsWith("|")) {
+          // End of scenario
+          break;
+        }
+      }
+      continue;
+    }
+
+    // Collect step lines
+    const stepMatch = trimmed.match(/^(?:Given|When|Then|And|But)\s+(.+)$/);
+    if (stepMatch) {
+      if (inBackground) {
+        backgroundSteps.push(stepMatch[1]);
+      } else if (inTargetScenario) {
+        steps.push(stepMatch[1]);
+      }
+    }
+  }
+
+  // Background steps apply to all scenarios
+  return [...backgroundSteps, ...steps];
 }
 
 function checkDesktopCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
