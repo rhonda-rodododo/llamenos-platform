@@ -1519,3 +1519,34 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] Remove plaintext pubkey from encrypted key-store localStorage (hashed with domain separator)
 - [x] Add notes export encryption (XChaCha20-Poly1305 with user's key, .enc format)
 - [x] Auto-clear clipboard after 30s for nsec/invite link copy
+
+## Cross-Platform BDD Runner Integration (Epics 223-226)
+
+### Epic 223: Cross-Platform BDD Specification Framework
+- [x] Platform tag system (@android @ios @desktop) for feature files
+- [x] Shared step vocabulary (STEP_VOCABULARY.md)
+- [x] Multi-platform validate-coverage.ts with tag-aware validation
+- [x] Committed: `cfe3957`
+
+### Epic 224: Android Cucumber-Android Migration
+- [x] cucumber-android 7.18.1 + Hilt integration
+- [x] CucumberHiltRunner with @CucumberOptions tag filtering
+- [x] 19 step definition classes (Base, Compose holder, Activity holder, Hilt hooks + 14 domain)
+- [x] All 25 old e2e test classes deleted, replaced with Cucumber step definitions
+- [x] Gradle copyFeatureFiles task copies shared features to androidTest assets
+- [x] assembleDebugAndroidTest, lintDebug, testDebugUnitTest all pass
+- [x] Committed: `f345205`
+
+### Epic 225: Desktop BDD Feature Specifications
+- [x] 23 new cross-platform feature files in shared directories
+- [x] 7 desktop-only feature files in desktop/ subdirectory
+- [x] 48 total feature files, 260 desktop scenarios, 222 total cross-platform scenarios
+- [x] Features organized by domain: auth, admin, bans, notes, messaging, settings, shifts, crypto
+
+### Epic 226: Playwright-BDD Integration
+- [x] playwright-bdd v8.4.2 installed and configured
+- [x] Hybrid playwright.config.ts: BDD project coexists with 358 existing .spec.ts tests
+- [x] 26 step definition files with 607 step definitions
+- [x] bddgen generates 47 spec files (224 BDD tests) with zero missing steps
+- [x] tests/steps/fixtures.ts: createBdd() for type-safe Given/When/Then exports
+- [x] Committed: `00f37cd`

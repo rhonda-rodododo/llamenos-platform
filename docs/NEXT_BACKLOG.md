@@ -313,15 +313,15 @@ Shared Gherkin specs in `packages/test-specs/` driving Android (Compose UI Test)
 Refactor all three platforms to use real BDD runners driven by shared `.feature` files. Android uses cucumber-android, Desktop uses playwright-bdd, iOS uses Gherkin-as-Specification with XCTContext.
 
 ### Abstraction Layer
-- [ ] **[Epic 223: Cross-Platform BDD Specification Framework](epics/epic-223-cross-platform-bdd-abstraction.md)** — Platform tag system, shared step vocabulary, multi-platform validate-coverage.ts
+- [x] **[Epic 223: Cross-Platform BDD Specification Framework](epics/epic-223-cross-platform-bdd-abstraction.md)** — Platform tag system, shared step vocabulary, multi-platform validate-coverage.ts
 
 ### Platform Migrations
-- [ ] **[Epic 224: Android Cucumber-Android Migration](epics/epic-224-android-cucumber-migration.md)** — cucumber-android 7.18.1 + Hilt, step definitions replace test classes
-- [ ] **[Epic 225: Desktop BDD Feature Specifications](epics/epic-225-desktop-bdd-feature-specs.md)** — ~22 new `.feature` files for desktop-specific flows
-- [ ] **[Epic 226: Playwright-BDD Integration](epics/epic-226-playwright-bdd-integration.md)** — playwright-bdd driving desktop tests from shared + desktop feature files
+- [x] **[Epic 224: Android Cucumber-Android Migration](epics/epic-224-android-cucumber-migration.md)** — cucumber-android 7.18.1 + Hilt, step definitions replace test classes
+- [x] **[Epic 225: Desktop BDD Feature Specifications](epics/epic-225-desktop-bdd-feature-specs.md)** — 48 feature files (23 cross-platform + 7 desktop-only), 260 desktop scenarios
+- [x] **[Epic 226: Playwright-BDD Integration](epics/epic-226-playwright-bdd-integration.md)** — playwright-bdd v8.4.2, 26 step files, 607 step definitions, 224 BDD tests
 
 ### iOS Preparation
-- [ ] **[Epic 227: iOS BDD E2E Foundation](epics/epic-227-ios-bdd-e2e-foundation.md)** — XCUITest with BDD naming, XCTContext.runActivity for Given/When/Then, validate-coverage.ts extension
+- [ ] **[Epic 227: iOS BDD E2E Foundation](epics/epic-227-ios-bdd-e2e-foundation.md)** — XCUITest with BDD naming, XCTContext.runActivity for Given/When/Then, validate-coverage.ts extension *(blocked: requires macOS)*
 
 **Dependency order:** 223 → (224 | 225 | 226) → 227
 
