@@ -260,6 +260,9 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("shift-card"),
+                    elevation = CardDefaults.elevatedCardElevation(
+                        defaultElevation = if (uiState.isOnShift) 4.dp else 1.dp,
+                    ),
                     colors = CardDefaults.cardColors(
                         containerColor = if (uiState.isOnShift) {
                             MaterialTheme.colorScheme.primaryContainer
@@ -411,6 +414,9 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("calls-card"),
+                    elevation = CardDefaults.elevatedCardElevation(
+                        defaultElevation = if (uiState.activeCallCount > 0) 4.dp else 1.dp,
+                    ),
                     colors = CardDefaults.cardColors(
                         containerColor = if (uiState.activeCallCount > 0) {
                             MaterialTheme.colorScheme.primaryContainer
@@ -497,7 +503,8 @@ fun DashboardScreen(
                         icon = Icons.Filled.Assessment,
                         label = stringResource(R.string.reports_title),
                         onClick = onNavigateToReports,
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = MaterialTheme.colorScheme.primary,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                         testTag = "reports-card",
                         modifier = Modifier.weight(1f),
                     )
@@ -505,7 +512,8 @@ fun DashboardScreen(
                         icon = Icons.Filled.People,
                         label = stringResource(R.string.contacts_title),
                         onClick = onNavigateToContacts,
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = MaterialTheme.colorScheme.primary,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                         testTag = "contacts-card",
                         modifier = Modifier.weight(1f),
                     )
@@ -644,13 +652,14 @@ private fun QuickActionCard(
     tint: androidx.compose.ui.graphics.Color,
     testTag: String,
     modifier: Modifier = Modifier,
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceVariant,
 ) {
     Card(
         modifier = modifier
             .clickable(onClick = onClick)
             .testTag(testTag),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = containerColor,
         ),
     ) {
         Column(
@@ -689,7 +698,7 @@ private fun RecentNoteItem(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp)
+            .padding(vertical = 4.dp)
             .clickable(onClick = onClick)
             .testTag("recent-note-${note.id}"),
         colors = CardDefaults.cardColors(
