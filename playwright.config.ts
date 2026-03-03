@@ -6,7 +6,7 @@ const bddTestDir = defineBddConfig({
   steps: "tests/steps/**/*.ts",
   outputDir: ".features-gen",
   featuresRoot: "packages/test-specs/features",
-  tags: "@desktop",
+  tags: "@desktop and not @backend",
 });
 
 export default defineConfig({

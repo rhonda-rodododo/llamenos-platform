@@ -30,6 +30,10 @@
     "test:desktop": "bunx wdio tests/desktop/wdio.conf.ts",
     "test:docker:up": "cd deploy/docker && docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app",
     "test:docker:down": "cd deploy/docker && docker compose -f docker-compose.yml -f docker-compose.test.yml down -v",
+    "test:worker": "bunx vitest run --config vitest.unit.config.ts",
+    "test:worker:unit": "bunx vitest run --config vitest.unit.config.ts",
+    "test:worker:integration": "bunx vitest run --config vitest.integration.config.ts",
+    "test:worker:watch": "bunx vitest --config vitest.unit.config.ts",
     "site:dev": "cd site && bun run dev",
     "site:build": "cd site && bun run build",
     "changelog": "git-cliff --output CHANGELOG.md",
@@ -93,6 +97,7 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.18",
     "@cloudflare/workers-types": "^4.20260207.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.1.18",
@@ -115,6 +120,7 @@
     "twilio": "^5.12.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
+    "vitest": "^4.0.18",
     "webdriverio": "^9.24.0",
     "wrangler": "^4.63.0"
   }
