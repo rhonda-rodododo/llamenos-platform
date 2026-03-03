@@ -54,6 +54,8 @@ export class ConversationDO extends DurableObject<Env> {
     this.router = new DORouter()
 
     // --- Conversation CRUD ---
+    // Static routes MUST come before parameterized routes (DORouter matches first-match)
+    this.router.get('/conversations/stats', () => this.getStats())
     this.router.get('/conversations', (req) => this.listConversations(req))
     this.router.get('/conversations/:id', (_req, { id }) => this.getConversation(id))
     this.router.patch('/conversations/:id', async (req, { id }) => this.updateConversation(id, await req.json()))
@@ -74,9 +76,6 @@ export class ConversationDO extends DurableObject<Env> {
 
     // --- Contact lookup (server-side only, for outbound sends) ---
     this.router.get('/conversations/:id/contact', async (_req, { id }) => this.getContactIdentifier(id))
-
-    // --- Stats ---
-    this.router.get('/conversations/stats', () => this.getStats())
 
     // --- File Records ---
     this.router.post('/files', async (req) => this.createFileRecord(await req.json()))

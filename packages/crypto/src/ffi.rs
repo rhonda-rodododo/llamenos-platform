@@ -6,12 +6,13 @@
 //! These are the only versions visible to Swift/Kotlin via UniFFI bindings.
 //! The original functions remain available for direct Rust consumers (Tauri, WASM).
 
-use crate::ecies::{ecies_unwrap_key, ecies_wrap_key, random_bytes_32, KeyEnvelope, RecipientKeyEnvelope};
+use crate::ecies::{ecies_unwrap_key, ecies_wrap_key, ecies_decrypt_content, random_bytes_32, KeyEnvelope, RecipientKeyEnvelope};
 use crate::encryption::{
     decrypt_call_record, decrypt_message, derive_kek_from_pin, encrypt_message, encrypt_note,
     EncryptedMessage, EncryptedNote,
 };
 use crate::errors::CryptoError;
+use crate::labels::{LABEL_DEVICE_PROVISION, SAS_SALT, SAS_INFO};
 use zeroize::Zeroize;
 
 /// Generate 32 random bytes, returned as a hex string.
@@ -106,6 +107,151 @@ pub fn derive_kek_hex(pin: &str, salt_hex: &str) -> Result<String, CryptoError> 
     Ok(hex)
 }
 
+/// Compute the ECDH shared x-coordinate for device provisioning.
+///
+/// `our_secret_hex`: 64-char hex secret key
+/// `their_pubkey_hex`: 64-char hex x-only pubkey (or 66-char compressed)
+///
+/// Returns the 32-byte shared x-coordinate as hex, which can be used
+/// for `decrypt_with_shared_key_hex` and `compute_sas_code`.
+#[uniffi::export]
+pub fn compute_shared_x_hex(
+    our_secret_hex: &str,
+    their_pubkey_hex: &str,
+) -> Result<String, CryptoError> {
+    use k256::{PublicKey, SecretKey};
+
+    let sk_bytes = hex::decode(our_secret_hex).map_err(CryptoError::HexError)?;
+    if sk_bytes.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+    let secret_key = SecretKey::from_slice(&sk_bytes)
+        .map_err(|_| CryptoError::InvalidSecretKey)?;
+
+    // Accept x-only (32 bytes / 64 hex) or compressed (33 bytes / 66 hex)
+    let compressed = if their_pubkey_hex.len() == 64 {
+        let mut c = Vec::with_capacity(33);
+        c.push(0x02);
+        c.extend_from_slice(&hex::decode(their_pubkey_hex).map_err(CryptoError::HexError)?);
+        c
+    } else {
+        hex::decode(their_pubkey_hex).map_err(CryptoError::HexError)?
+    };
+
+    let public_key = PublicKey::from_sec1_bytes(&compressed)
+        .map_err(|_| CryptoError::InvalidPublicKey)?;
+
+    let shared_point: elliptic_curve::ecdh::SharedSecret<k256::Secp256k1> =
+        k256::ecdh::diffie_hellman(
+            secret_key.to_nonzero_scalar(),
+            public_key.as_affine(),
+        );
+    let mut shared_x = [0u8; 32];
+    shared_x.copy_from_slice(shared_point.raw_secret_bytes());
+    let hex_out = hex::encode(shared_x);
+    shared_x.zeroize();
+    Ok(hex_out)
+}
+
+/// Decrypt data that was encrypted with a provisioning shared key.
+///
+/// `ciphertext_hex`: hex(nonce_24 + ciphertext) — XChaCha20-Poly1305
+/// `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
+///
+/// Derives the symmetric key via SHA-256(LABEL_DEVICE_PROVISION || shared_x),
+/// matching the desktop JS implementation.
+#[uniffi::export]
+pub fn decrypt_with_shared_key_hex(
+    ciphertext_hex: &str,
+    shared_x_hex: &str,
+) -> Result<String, CryptoError> {
+    use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+    use sha2::{Digest, Sha256};
+
+    let shared_x = hex::decode(shared_x_hex).map_err(CryptoError::HexError)?;
+    if shared_x.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+
+    // Derive symmetric key: SHA-256(LABEL_DEVICE_PROVISION || shared_x)
+    let mut hasher = Sha256::new();
+    hasher.update(LABEL_DEVICE_PROVISION.as_bytes());
+    hasher.update(&shared_x);
+    let mut symmetric_key = [0u8; 32];
+    symmetric_key.copy_from_slice(&hasher.finalize());
+
+    let data = hex::decode(ciphertext_hex).map_err(CryptoError::HexError)?;
+    if data.len() < 24 {
+        return Err(CryptoError::InvalidCiphertext);
+    }
+    let nonce = XNonce::from_slice(&data[..24]);
+    let ciphertext = &data[24..];
+
+    let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let plaintext = cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|_| CryptoError::DecryptionFailed)?;
+
+    symmetric_key.zeroize();
+    String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)
+}
+
+/// Derive a 6-digit SAS (Short Authentication String) code from an ECDH shared secret.
+///
+/// `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
+///
+/// Returns a "XXX XXX" formatted 6-digit code. Both devices compute this
+/// independently — matching codes prove no MITM is present.
+#[uniffi::export]
+pub fn compute_sas_code(shared_x_hex: &str) -> Result<String, CryptoError> {
+    use hmac::Mac;
+    type HmacSha256 = hmac::Hmac<sha2::Sha256>;
+
+    let shared_x = hex::decode(shared_x_hex).map_err(CryptoError::HexError)?;
+    if shared_x.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+
+    // HKDF-SHA256(ikm=shared_x, salt=SAS_SALT, info=SAS_INFO, length=4)
+    let prk = {
+        let mut mac = HmacSha256::new_from_slice(SAS_SALT.as_bytes())
+            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+        mac.update(&shared_x);
+        mac.finalize().into_bytes()
+    };
+    let mut mac = HmacSha256::new_from_slice(&prk)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    mac.update(SAS_INFO.as_bytes());
+    mac.update(&[1u8]); // HKDF counter byte
+    let okm = mac.finalize().into_bytes();
+    let sas_bytes = &okm[..4];
+
+    let num = ((sas_bytes[0] as u32) << 24
+        | (sas_bytes[1] as u32) << 16
+        | (sas_bytes[2] as u32) << 8
+        | (sas_bytes[3] as u32)) % 1_000_000;
+    let code = format!("{:06}", num);
+    Ok(format!("{} {}", &code[..3], &code[3..]))
+}
+
+/// Decrypt an ECIES-encrypted payload (arbitrary length content).
+///
+/// Used for wake-tier push notification decryption and other ECIES content.
+/// `packed_hex`: hex(nonce_24 + ciphertext)
+/// `ephemeral_pubkey_hex`: compressed SEC1 (33 bytes / 66 hex chars)
+/// `secret_key_hex`: recipient's secret key
+/// `label`: domain separation label (e.g., LABEL_PUSH_WAKE)
+#[uniffi::export]
+pub fn ecies_decrypt_content_hex(
+    packed_hex: &str,
+    ephemeral_pubkey_hex: &str,
+    secret_key_hex: &str,
+    label: &str,
+) -> Result<String, CryptoError> {
+    ecies_decrypt_content(packed_hex, ephemeral_pubkey_hex, secret_key_hex, label)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,5 +335,130 @@ mod tests {
         let b = random_bytes_hex();
         assert_ne!(a, b);
         assert_eq!(a.len(), 64);
+    }
+
+    #[test]
+    fn compute_shared_x_roundtrip() {
+        let alice = generate_keypair();
+        let bob = generate_keypair();
+
+        let shared_ab = compute_shared_x_hex(&alice.secret_key_hex, &bob.public_key).unwrap();
+        let shared_ba = compute_shared_x_hex(&bob.secret_key_hex, &alice.public_key).unwrap();
+        assert_eq!(shared_ab, shared_ba);
+        assert_eq!(shared_ab.len(), 64);
+    }
+
+    #[test]
+    fn provisioning_encrypt_decrypt_roundtrip() {
+        use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+        use sha2::{Digest, Sha256};
+
+        let alice = generate_keypair();
+        let bob = generate_keypair();
+
+        let shared_x_hex = compute_shared_x_hex(&alice.secret_key_hex, &bob.public_key).unwrap();
+        let shared_x = hex::decode(&shared_x_hex).unwrap();
+
+        // Encrypt with the shared key (simulating the primary device)
+        let mut hasher = Sha256::new();
+        hasher.update(crate::labels::LABEL_DEVICE_PROVISION.as_bytes());
+        hasher.update(&shared_x);
+        let symmetric_key: [u8; 32] = hasher.finalize().into();
+
+        let plaintext = "this is the nsec to transfer";
+        let mut nonce_bytes = [0u8; 24];
+        getrandom::getrandom(&mut nonce_bytes).unwrap();
+        let nonce = XNonce::from_slice(&nonce_bytes);
+        let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key).unwrap();
+        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).unwrap();
+
+        let mut packed = Vec::with_capacity(24 + ciphertext.len());
+        packed.extend_from_slice(&nonce_bytes);
+        packed.extend_from_slice(&ciphertext);
+        let ciphertext_hex = hex::encode(&packed);
+
+        // Decrypt with the other side's shared key
+        let shared_x_bob = compute_shared_x_hex(&bob.secret_key_hex, &alice.public_key).unwrap();
+        let decrypted = decrypt_with_shared_key_hex(&ciphertext_hex, &shared_x_bob).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn sas_code_format() {
+        let alice = generate_keypair();
+        let bob = generate_keypair();
+
+        let shared_x = compute_shared_x_hex(&alice.secret_key_hex, &bob.public_key).unwrap();
+        let sas = compute_sas_code(&shared_x).unwrap();
+
+        // Should be "XXX XXX" format
+        assert_eq!(sas.len(), 7);
+        assert_eq!(&sas[3..4], " ");
+        assert!(sas[..3].chars().all(|c| c.is_ascii_digit()));
+        assert!(sas[4..].chars().all(|c| c.is_ascii_digit()));
+
+        // Same input produces same output
+        let sas2 = compute_sas_code(&shared_x).unwrap();
+        assert_eq!(sas, sas2);
+
+        // Both sides derive the same code
+        let shared_x_bob = compute_shared_x_hex(&bob.secret_key_hex, &alice.public_key).unwrap();
+        let sas_bob = compute_sas_code(&shared_x_bob).unwrap();
+        assert_eq!(sas, sas_bob);
+    }
+
+    #[test]
+    fn ecies_decrypt_content_via_ffi() {
+        use k256::{ecdh::EphemeralSecret, elliptic_curve::sec1::ToEncodedPoint};
+        use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+        use sha2::{Digest, Sha256};
+        use rand::rngs::OsRng;
+
+        let recipient = generate_keypair();
+        let label = crate::labels::LABEL_PUSH_WAKE;
+        let content = r#"{"type":"call","callId":"abc123"}"#;
+
+        // Simulate server-side ECIES encryption
+        let ephemeral = EphemeralSecret::random(&mut OsRng);
+        let ephemeral_pub = ephemeral.public_key();
+
+        let compressed = {
+            let mut c = vec![0x02u8];
+            c.extend_from_slice(&hex::decode(&recipient.public_key).unwrap());
+            c
+        };
+        let recipient_pk = k256::PublicKey::from_sec1_bytes(&compressed).unwrap();
+
+        let shared_point = ephemeral.diffie_hellman(&recipient_pk);
+        let mut shared_x = [0u8; 32];
+        shared_x.copy_from_slice(shared_point.raw_secret_bytes());
+
+        let mut hasher = Sha256::new();
+        hasher.update(label.as_bytes());
+        hasher.update(&shared_x);
+        let sym_key: [u8; 32] = hasher.finalize().into();
+
+        let mut nonce_bytes = [0u8; 24];
+        getrandom::getrandom(&mut nonce_bytes).unwrap();
+        let nonce = XNonce::from_slice(&nonce_bytes);
+        let cipher = XChaCha20Poly1305::new_from_slice(&sym_key).unwrap();
+        let ct = cipher.encrypt(nonce, content.as_bytes()).unwrap();
+
+        let mut packed = Vec::with_capacity(24 + ct.len());
+        packed.extend_from_slice(&nonce_bytes);
+        packed.extend_from_slice(&ct);
+        let packed_hex = hex::encode(&packed);
+
+        let eph_encoded = ephemeral_pub.to_encoded_point(true);
+        let eph_hex = hex::encode(eph_encoded.as_bytes());
+
+        // Decrypt via FFI
+        let decrypted = ecies_decrypt_content_hex(
+            &packed_hex,
+            &eph_hex,
+            &recipient.secret_key_hex,
+            label,
+        ).unwrap();
+        assert_eq!(decrypted, content);
     }
 }

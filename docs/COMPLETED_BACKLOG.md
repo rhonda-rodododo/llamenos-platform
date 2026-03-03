@@ -1,5 +1,50 @@
 # Completed Backlog
 
+## 2026-03-03: Production Deployment & Node.js Primacy (Epics 235-237)
+
+### Epic 235: Node.js Platform E2E Test Parity
+- **79 integration tests** in `tests/integration/node/`: postgres-storage (29), alarm-poller (10), websocket-shim (17), blob-storage (9), migration (14)
+- **17 pass** without external deps (WebSocket shim), 62 skip gracefully when PostgreSQL/MinIO unavailable
+- **playwright.docker.config.ts** targeting Docker Compose Node.js server directly (no Vite)
+- **vitest.integration.node.config.ts** with 30s timeouts and path aliases
+- **CI jobs**: `e2e-node` (Playwright against Docker), `integration-node` (PostgreSQL + MinIO service containers)
+- **npm script**: `test:integration:node`
+- Commit: `99c96f2`
+
+### Epic 236: Node.js Production Deployment Primacy & Infrastructure Hardening
+**Phase 1-3 (Health, Docker, Dev Tooling):**
+- **Health endpoint**: `apps/worker/routes/health.ts` — `/health` (dependency checks), `/health/live` (liveness), `/health/ready` (readiness). Platform-aware: PostgreSQL checked only on Node.js
+- **Docker**: strfry pinned to 1.0.1, JSON logging driver (50MB rotation, 5 files), health check → `/api/health/ready`
+- **Dockerfile**: replaced fragile `sed` workspace stripping with Node.js JSON manipulation
+- **Caddyfile**: JSON access logging to stdout
+- **esbuild**: conditional sourcemaps (`process.env.NODE_ENV !== 'production'`)
+- **first-run.sh**: one-command setup (secret generation, env validation, stack startup, health wait)
+- **docker-compose.dev.yml**: backing services only (PostgreSQL, MinIO, strfry) with localhost ports
+
+**Phase 4-6 (Helm, Ansible, OpenTofu):**
+- **Helm chart 0.2.0**: MinIO Deployment → StatefulSet (data loss protection), HPA (CPU 70%, memory 80%), PDB (app + strfry), ServiceMonitor for Prometheus, split liveness/readiness probes
+- **Ansible**: MinIO backup via `mc mirror` in backup role, `playbooks/test-restore.yml` for restore verification
+- **OpenTofu**: `admin_ssh_cidrs` variable replacing hardcoded `0.0.0.0/0` in Hetzner firewall
+
+**Phase 7-9 (Observability, Dev Server, Checklist):**
+- **Structured logger**: `apps/worker/lib/logger.ts` — JSON output on Node.js, console methods on CF Workers
+- **Prometheus metrics**: `apps/worker/routes/metrics.ts` — uptime, counters, summaries at `/api/metrics`
+- **Dev server**: `scripts/dev-node.sh` (`bun run dev:node`) — starts backing services, builds, runs with `--watch`
+- **Production checklist**: `deploy/PRODUCTION_CHECKLIST.md` — 50+ items across infrastructure, security, backups, telephony, Kubernetes
+- Commit: `99c96f2`
+
+### Epic 237: iOS Build Pipeline on Local Mac M4 — PARTIAL
+- **scripts/ios-build.sh** created with 8 commands: status, setup, sync, build, test, xcframework, uitest, all
+- **npm scripts**: `ios:status`, `ios:setup`, `ios:sync`, `ios:build`, `ios:test`, `ios:xcframework`, `ios:uitest`, `ios:all`
+- **Mac M4 status**: macOS 26.3, Swift 6.2.4 (CLT), Rust not yet installed, **Xcode not installed** (blocks XCFramework, simulators)
+- **Remaining**: Install full Xcode → `ios:setup` (Rust) → `ios:xcframework` → `ios:build` → `ios:test`
+- Commit: `99c96f2`
+
+### Epics 214-iOS, 227, 234 — BLOCKED on Xcode
+- **Epic 214-iOS**: Link LlamenosCoreFFI XCFramework, remove stand-in crypto. Blocked on XCFramework build.
+- **Epic 227**: iOS BDD E2E Foundation. Blocked on 214-iOS.
+- **Epic 234**: iOS BDD Test Expansion (76→200+ tests). Blocked on 227.
+
 ## 2026-03-03: E2E Test Coverage Consolidation (Epics 231-233)
 
 ### Epic 231: Shared BDD Spec Consolidation

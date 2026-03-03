@@ -613,20 +613,19 @@ class CryptoService @Inject constructor() {
 
     /**
      * Derive a shared secret from our ephemeral secret and their ephemeral public key.
-     * Uses ECDH on secp256k1 followed by HKDF-SHA256 for key derivation.
+     * Uses ECDH on secp256k1 to compute the shared x-coordinate.
      *
      * @param ourSecret Our ephemeral secret key (hex)
-     * @param theirPublic Their ephemeral public key (hex, x-only 32 bytes)
-     * @return The derived shared secret (hex)
+     * @param theirPublic Their ephemeral public key (hex, x-only 32 bytes or compressed 33 bytes)
+     * @return The shared x-coordinate (hex)
      */
     fun deriveSharedSecret(ourSecret: String, theirPublic: String): String {
         if (nativeLibLoaded) {
-            // Use ECIES wrap/unwrap roundtrip to derive shared secret:
-            // wrap a known value with their public key using our secret,
-            // which internally does ECDH. For device linking, the protocol
-            // uses eciesWrapKeyHex/eciesUnwrapKeyHex with LABEL_DEVICE_LINK.
-            // Direct ECDH is not exposed via FFI yet — when needed, add a
-            // dedicated FFI function. For now, this path uses the placeholder.
+            return try {
+                org.llamenos.core.computeSharedXHex(ourSecret, theirPublic)
+            } catch (e: org.llamenos.core.CryptoException) {
+                throw CryptoException("ECDH shared secret derivation failed: ${e.message}", e)
+            }
         }
 
         // Placeholder: XOR-based mock derivation (NOT secure, just for structure)
@@ -643,24 +642,32 @@ class CryptoService @Inject constructor() {
      * Decrypt data that was encrypted with a shared secret (XChaCha20-Poly1305).
      * Used during device linking to decrypt the transferred nsec.
      *
-     * @param encrypted Base64-encoded ciphertext (nonce prepended)
-     * @param sharedSecret The ECDH-derived shared secret (hex)
+     * The shared secret (x-coordinate from ECDH) is hashed with SHA-256
+     * using the device provisioning domain separation label to derive the
+     * symmetric key. The ciphertext must be hex-encoded (nonce prepended).
+     *
+     * @param ciphertextHex Hex-encoded ciphertext (24-byte nonce + encrypted data + 16-byte tag)
+     * @param sharedSecretHex The ECDH-derived shared x-coordinate (hex)
      * @return Decrypted plaintext
      */
     suspend fun decryptWithSharedSecret(
-        encrypted: String,
-        sharedSecret: String,
+        ciphertextHex: String,
+        sharedSecretHex: String,
     ): String = withContext(computeDispatcher) {
-        // Direct shared-secret decryption is not exposed via FFI yet.
-        // When device linking is implemented end-to-end, add a dedicated
-        // FFI function (e.g., decrypt_with_shared_secret).
+        if (nativeLibLoaded) {
+            return@withContext try {
+                org.llamenos.core.decryptWithSharedKeyHex(ciphertextHex, sharedSecretHex)
+            } catch (e: org.llamenos.core.CryptoException) {
+                throw CryptoException("Shared secret decryption failed: ${e.message}", e)
+            }
+        }
 
-        // Placeholder: decode base64 as plaintext
+        // Placeholder: decode hex as plaintext
         try {
-            val decoded = java.util.Base64.getDecoder().decode(encrypted)
-            String(decoded, Charsets.UTF_8)
+            val bytes = ciphertextHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            String(bytes, Charsets.UTF_8)
         } catch (_: Exception) {
-            encrypted
+            ciphertextHex
         }
     }
 
@@ -669,13 +676,20 @@ class CryptoService @Inject constructor() {
      * from a shared secret. Both devices independently derive this code and
      * the user verifies they match to prevent MITM attacks.
      *
-     * @param sharedSecret The ECDH-derived shared secret (hex)
-     * @return 6-digit numeric SAS code
+     * Uses HKDF-SHA256 with protocol-defined salt and info to derive 4 bytes,
+     * then formats as "XXX XXX" (6 digits with space separator).
+     *
+     * @param sharedSecret The ECDH-derived shared x-coordinate (hex)
+     * @return Formatted SAS code ("XXX XXX")
      */
     fun deriveSASCode(sharedSecret: String): String {
-        // SAS code derivation is not exposed via FFI yet.
-        // When device linking is implemented end-to-end, add a dedicated
-        // FFI function (e.g., derive_sas_code).
+        if (nativeLibLoaded) {
+            return try {
+                org.llamenos.core.computeSasCode(sharedSecret)
+            } catch (e: org.llamenos.core.CryptoException) {
+                throw CryptoException("SAS code derivation failed: ${e.message}", e)
+            }
+        }
 
         // Placeholder: derive 6 digits from the shared secret bytes
         val bytes = sharedSecret.chunked(2).map { it.toInt(16).toByte() }.toByteArray()

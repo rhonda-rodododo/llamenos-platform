@@ -95,10 +95,13 @@ class PushService : FirebaseMessagingService() {
         Log.d(TAG, "FCM message received: type=$type, keys=${data.keys}")
 
         // Try wake-tier decryption first (available without PIN unlock)
+        // Server sends ECIES-encrypted payload as two fields:
+        // wake_payload = hex(nonce + ciphertext), wake_ephemeral = hex(compressed pubkey)
         val wakeEncrypted = data["wake_payload"]
-        if (wakeEncrypted != null) {
+        val wakeEphemeral = data["wake_ephemeral"]
+        if (wakeEncrypted != null && wakeEphemeral != null) {
             serviceScope.launch {
-                val wakePayload = wakeKeyService.decryptWakePayload(wakeEncrypted)
+                val wakePayload = wakeKeyService.decryptWakePayload(wakeEncrypted, wakeEphemeral)
                 if (wakePayload != null) {
                     Log.d(TAG, "Wake payload decrypted: type=${wakePayload.type}")
                     // Use wake payload for notification content when app is locked

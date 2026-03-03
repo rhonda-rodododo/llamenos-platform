@@ -808,8 +808,16 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_llamenos_core_fn_func_verify_auth_token(`token`: RustBuffer.ByValue,`method`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
-    fun uniffi_llamenos_core_fn_func_verify_schnorr(`messageHex`: RustBuffer.ByValue,`signatureHex`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_llamenos_core_fn_func_verify_schnorr(`messageHex`: RustBuffer.ByValue,`signatureHex`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): Byte
+    fun uniffi_llamenos_core_fn_func_compute_shared_x_hex(`ourSecretHex`: RustBuffer.ByValue,`theirPubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_llamenos_core_fn_func_decrypt_with_shared_key_hex(`ciphertextHex`: RustBuffer.ByValue,`sharedXHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_llamenos_core_fn_func_compute_sas_code(`sharedXHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+    fun uniffi_llamenos_core_fn_func_ecies_decrypt_content_hex(`packedHex`: RustBuffer.ByValue,`ephemeralPubkeyHex`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
     fun ffi_llamenos_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_llamenos_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -2029,6 +2037,67 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
 }
     )
     }
-    
+
+
+        /**
+         * Compute the ECDH shared x-coordinate from our secret key and their public key.
+         *
+         * Accepts x-only (64 hex) or compressed (66 hex) public keys.
+         */
+    @Throws(CryptoException::class) fun `computeSharedXHex`(`ourSecretHex`: kotlin.String, `theirPubkeyHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_compute_shared_x_hex(
+        FfiConverterString.lower(`ourSecretHex`),FfiConverterString.lower(`theirPubkeyHex`),_status)
+}
+    )
+    }
+
+
+        /**
+         * Decrypt ciphertext using a shared ECDH x-coordinate.
+         *
+         * Derives symmetric key via SHA-256(LABEL_DEVICE_PROVISION || sharedX),
+         * then decrypts with XChaCha20-Poly1305. Input is hex-encoded.
+         */
+    @Throws(CryptoException::class) fun `decryptWithSharedKeyHex`(`ciphertextHex`: kotlin.String, `sharedXHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_decrypt_with_shared_key_hex(
+        FfiConverterString.lower(`ciphertextHex`),FfiConverterString.lower(`sharedXHex`),_status)
+}
+    )
+    }
+
+
+        /**
+         * Derive a 6-digit SAS verification code from a shared x-coordinate.
+         *
+         * Uses HKDF-SHA256 to derive 4 bytes, formats as "XXX XXX".
+         */
+    @Throws(CryptoException::class) fun `computeSasCode`(`sharedXHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_compute_sas_code(
+        FfiConverterString.lower(`sharedXHex`),_status)
+}
+    )
+    }
+
+
+        /**
+         * Decrypt ECIES-encrypted content using the recipient's secret key.
+         *
+         * [packedHex] contains the nonce + ciphertext, [ephemeralPubkeyHex] is
+         * the sender's ephemeral public key, [label] is the domain separation constant.
+         */
+    @Throws(CryptoException::class) fun `eciesDecryptContentHex`(`packedHex`: kotlin.String, `ephemeralPubkeyHex`: kotlin.String, `secretKeyHex`: kotlin.String, `label`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_ecies_decrypt_content_hex(
+        FfiConverterString.lower(`packedHex`),FfiConverterString.lower(`ephemeralPubkeyHex`),FfiConverterString.lower(`secretKeyHex`),FfiConverterString.lower(`label`),_status)
+}
+    )
+    }
 
 

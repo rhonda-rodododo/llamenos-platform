@@ -11,7 +11,7 @@ const bddTestDir = defineBddConfig({
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: ["**/live/**", "**/desktop/**"],
+  testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -35,8 +35,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      // Exclude bootstrap tests — they delete admin state and interfere with parallel tests
-      testIgnore: /bootstrap\.spec\.ts/,
+      testIgnore: [/bootstrap\.spec\.ts/, "**/integration/**"],
       dependencies: ["setup"],
     },
     {

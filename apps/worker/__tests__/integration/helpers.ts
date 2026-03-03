@@ -1,0 +1,188 @@
+/**
+ * Test helpers for Durable Object integration tests.
+ *
+ * Provides an in-memory DurableObjectState mock and a mock Env,
+ * allowing direct instantiation and testing of DO classes without
+ * the Cloudflare runtime (@cloudflare/vitest-pool-workers requires
+ * vitest 2/3 and is not compatible with vitest 4).
+ *
+ * The storage mock implements the full DurableObjectStorage interface
+ * subset that our DOs actually use (get, put, delete, list, deleteAll,
+ * setAlarm, getAlarm).
+ */
+import type { Env, DONamespace, DOStub } from '@worker/types'
+
+/** In-memory storage that mimics DurableObjectStorage. */
+export class MockStorage {
+  private data = new Map<string, unknown>()
+  private alarm: number | null = null
+
+  async get<T = unknown>(key: string): Promise<T | undefined>
+  async get<T = unknown>(keys: string[]): Promise<Map<string, T>>
+  async get<T = unknown>(keyOrKeys: string | string[]): Promise<T | undefined | Map<string, T>> {
+    if (Array.isArray(keyOrKeys)) {
+      const result = new Map<string, T>()
+      for (const key of keyOrKeys) {
+        if (this.data.has(key)) {
+          result.set(key, structuredClone(this.data.get(key)) as T)
+        }
+      }
+      return result
+    }
+    const value = this.data.get(keyOrKeys)
+    return value !== undefined ? structuredClone(value) as T : undefined
+  }
+
+  async put(key: string, value: unknown): Promise<void>
+  async put(entries: Record<string, unknown>): Promise<void>
+  async put(keyOrEntries: string | Record<string, unknown>, value?: unknown): Promise<void> {
+    if (typeof keyOrEntries === 'string') {
+      this.data.set(keyOrEntries, structuredClone(value))
+    } else {
+      for (const [k, v] of Object.entries(keyOrEntries)) {
+        this.data.set(k, structuredClone(v))
+      }
+    }
+  }
+
+  async delete(key: string): Promise<boolean>
+  async delete(keys: string[]): Promise<number>
+  async delete(keyOrKeys: string | string[]): Promise<boolean | number> {
+    if (Array.isArray(keyOrKeys)) {
+      let count = 0
+      for (const key of keyOrKeys) {
+        if (this.data.delete(key)) count++
+      }
+      return count
+    }
+    return this.data.delete(keyOrKeys)
+  }
+
+  async deleteAll(): Promise<void> {
+    this.data.clear()
+    this.alarm = null
+  }
+
+  async list<T = unknown>(options?: { prefix?: string; limit?: number; reverse?: boolean }): Promise<Map<string, T>> {
+    const result = new Map<string, T>()
+    const prefix = options?.prefix || ''
+    const entries = Array.from(this.data.entries())
+      .filter(([key]) => key.startsWith(prefix))
+      .sort(([a], [b]) => a.localeCompare(b))
+
+    if (options?.reverse) entries.reverse()
+
+    const limited = options?.limit ? entries.slice(0, options.limit) : entries
+    for (const [key, value] of limited) {
+      result.set(key, structuredClone(value) as T)
+    }
+    return result
+  }
+
+  setAlarm(scheduledTime: number | Date): void {
+    this.alarm = typeof scheduledTime === 'number' ? scheduledTime : scheduledTime.getTime()
+  }
+
+  async getAlarm(): Promise<number | null> {
+    return this.alarm
+  }
+}
+
+/** Create a mock DurableObjectState wrapping an in-memory storage. */
+export function createMockState(): { storage: MockStorage } & Record<string, unknown> {
+  return {
+    storage: new MockStorage(),
+    id: { toString: () => 'test-id', name: 'test' },
+    waitUntil: () => {},
+    blockConcurrencyWhile: async <T>(fn: () => Promise<T>) => fn(),
+  }
+}
+
+/** Create a mock Env with all required bindings. */
+export function createMockEnv(overrides?: Partial<Env>): Env {
+  const defaultEnv: Env = {
+    CALL_ROUTER: createMockDONamespace(),
+    SHIFT_MANAGER: createMockDONamespace(),
+    IDENTITY_DO: createMockDONamespace(),
+    SETTINGS_DO: createMockDONamespace(),
+    RECORDS_DO: createMockDONamespace(),
+    CONVERSATION_DO: createMockDONamespace(),
+    BLAST_DO: createMockDONamespace(),
+    AI: { run: async () => ({}) } as unknown as Env['AI'],
+    ASSETS: null,
+    R2_BUCKET: { put: async () => ({}), get: async () => null, delete: async () => {} } as unknown as Env['R2_BUCKET'],
+    TWILIO_ACCOUNT_SID: 'AC-test',
+    TWILIO_AUTH_TOKEN: 'test-auth-token',
+    TWILIO_PHONE_NUMBER: '+15551234567',
+    // secp256k1 x-only pubkey of private key 0x01 (generator point x-coord)
+    // Needed by encryptCallRecordForStorage / encryptMessageForStorage ECIES
+    ADMIN_PUBKEY: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+    HOTLINE_NAME: 'Test Hotline',
+    ENVIRONMENT: 'test',
+    // Valid 32-byte hex — needed by hashPhone() which calls hexToBytes(secret)
+    HMAC_SECRET: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    DEMO_MODE: 'false',
+  }
+  return { ...defaultEnv, ...overrides }
+}
+
+function createMockDONamespace(): DONamespace {
+  return {
+    idFromName: (name: string) => ({ toString: () => `id:${name}` }),
+    get: () => ({
+      fetch: async () => Response.json({}),
+    }),
+  }
+}
+
+/**
+ * Helper to construct a DO instance and provide a fetch wrapper.
+ * Constructs the DO class with mock state and env, then returns
+ * helpers for making requests against its internal routes.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createDOTestHarness<T extends { fetch(request: Request): Promise<Response> }, C = any>(
+  DOClass: new (ctx: C, env: Env) => T,
+  envOverrides?: Partial<Env>,
+) {
+  const state = createMockState()
+  const env = createMockEnv(envOverrides)
+  // The DurableObject constructor expects (DurableObjectState, Env).
+  // Our mock state is structurally compatible.
+  const instance = new DOClass(state as C, env)
+
+  async function doFetch(path: string, options?: RequestInit): Promise<Response> {
+    return instance.fetch(new Request(`http://do${path}`, options))
+  }
+
+  async function doJSON<R = unknown>(path: string, options?: RequestInit): Promise<R> {
+    const res = await doFetch(path, options)
+    return res.json() as Promise<R>
+  }
+
+  function postJSON(path: string, body: unknown): Promise<Response> {
+    return doFetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  function patchJSON(path: string, body: unknown): Promise<Response> {
+    return doFetch(path, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  function putJSON(path: string, body: unknown): Promise<Response> {
+    return doFetch(path, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  return { instance, state, env, doFetch, doJSON, postJSON, patchJSON, putJSON }
+}

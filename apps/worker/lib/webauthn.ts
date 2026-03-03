@@ -5,6 +5,8 @@ import {
   verifyAuthenticationResponse,
   type VerifiedRegistrationResponse,
   type VerifiedAuthenticationResponse,
+  type RegistrationResponseJSON,
+  type AuthenticationResponseJSON,
 } from '@simplewebauthn/server'
 import type { WebAuthnCredential } from '../types'
 
@@ -32,7 +34,7 @@ export async function generateRegOptions(
 }
 
 export async function verifyRegResponse(
-  response: any,
+  response: RegistrationResponseJSON,
   challenge: string,
   origin: string,
   rpID: string,
@@ -60,7 +62,7 @@ export async function generateAuthOptions(
 }
 
 export async function verifyAuthResponse(
-  response: any,
+  response: AuthenticationResponseJSON,
   credential: WebAuthnCredential,
   challenge: string,
   origin: string,

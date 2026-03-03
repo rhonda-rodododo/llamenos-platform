@@ -34,13 +34,10 @@ data class WakePayload(
  * when [PushService] receives a message while the device is locked.
  *
  * Flow:
- * 1. On first use, [getOrCreateWakePublicKey] generates a keypair and stores it
+ * 1. On first use, [getOrCreateWakePublicKey] generates a secp256k1 keypair and stores it
  * 2. The wake public key is registered with the server (POST /api/v1/identity/device)
- * 3. Server encrypts push payloads with the device's wake public key
- * 4. [PushService] calls [decryptWakePayload] to get the plaintext metadata
- *
- * In production (post-Epic 201), ECIES operations will delegate to llamenos-core.
- * Currently uses placeholder implementations for development.
+ * 3. Server encrypts push payloads with the device's wake public key via ECIES
+ * 4. [PushService] calls [decryptWakePayload] to decrypt with llamenos-core
  */
 @Singleton
 class WakeKeyService @Inject constructor(
@@ -48,6 +45,17 @@ class WakeKeyService @Inject constructor(
 ) {
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    private var nativeLibLoaded = false
+
+    init {
+        try {
+            System.loadLibrary("llamenos_core")
+            nativeLibLoaded = true
+        } catch (_: UnsatisfiedLinkError) {
+            nativeLibLoaded = false
+        }
+    }
 
     /**
      * Get the wake public key, generating a new keypair if none exists.
@@ -57,7 +65,14 @@ class WakeKeyService @Inject constructor(
         val existing = keystoreService.retrieve(KEY_WAKE_PUBKEY)
         if (existing != null) return existing
 
-        // Generate a new wake keypair
+        if (nativeLibLoaded) {
+            val kp = org.llamenos.core.generateKeypair()
+            keystoreService.store(KEY_WAKE_SECRET, kp.secretKeyHex)
+            keystoreService.store(KEY_WAKE_PUBKEY, kp.publicKey)
+            return kp.publicKey
+        }
+
+        // Placeholder: generate random keypair bytes
         val random = SecureRandom()
         val secretBytes = ByteArray(32)
         random.nextBytes(secretBytes)
@@ -83,28 +98,35 @@ class WakeKeyService @Inject constructor(
     /**
      * Decrypt a wake-tier push notification payload.
      *
-     * The [encryptedHex] is the ECIES ciphertext from the push data envelope.
+     * The push data contains [packedHex] (nonce + ciphertext, hex) and
+     * [ephemeralPubkeyHex] (the server's ephemeral ECIES public key, hex).
      * Returns the decoded [WakePayload] or null if decryption fails.
-     *
-     * In production this will call LlamenosCore.eciesDecrypt with the wake secret.
-     * Currently returns a placeholder parsed from the hex as development stand-in.
      */
-    suspend fun decryptWakePayload(encryptedHex: String): WakePayload? =
+    suspend fun decryptWakePayload(
+        packedHex: String,
+        ephemeralPubkeyHex: String,
+    ): WakePayload? =
         withContext(Dispatchers.Default) {
             val secretHex = keystoreService.retrieve(KEY_WAKE_SECRET)
                 ?: return@withContext null
 
-            try {
-                // Production (post-Epic 201):
-                // val plaintext = LlamenosCore.eciesDecrypt(
-                //     ciphertext = encryptedHex,
-                //     secretKeyHex = secretHex,
-                //     label = LABEL_WAKE_KEY_WRAP
-                // )
-                // return@withContext json.decodeFromString<WakePayload>(plaintext)
+            if (nativeLibLoaded) {
+                return@withContext try {
+                    val plaintext = org.llamenos.core.eciesDecryptContentHex(
+                        packedHex = packedHex,
+                        ephemeralPubkeyHex = ephemeralPubkeyHex,
+                        secretKeyHex = secretHex,
+                        label = LABEL_PUSH_WAKE,
+                    )
+                    json.decodeFromString<WakePayload>(plaintext)
+                } catch (_: Exception) {
+                    null
+                }
+            }
 
-                // Placeholder: try to decode the hex as UTF-8 JSON
-                val bytes = encryptedHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            // Placeholder: try to decode the hex as UTF-8 JSON
+            try {
+                val bytes = packedHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
                 val plaintext = String(bytes, Charsets.UTF_8)
                 json.decodeFromString<WakePayload>(plaintext)
             } catch (_: Exception) {
@@ -115,5 +137,6 @@ class WakeKeyService @Inject constructor(
     companion object {
         private const val KEY_WAKE_SECRET = "wake-secret"
         private const val KEY_WAKE_PUBKEY = "wake-pubkey"
+        private const val LABEL_PUSH_WAKE = "llamenos:push-wake"
     }
 }

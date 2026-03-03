@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import type { AppEnv, WebAuthnCredential } from '../types'
 import { getDOs } from '../lib/do-access'
 import { uint8ArrayToBase64URL, checkRateLimit } from '../lib/helpers'
@@ -35,7 +36,7 @@ webauthn.post('/login/verify', async (c) => {
   const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
   const verifyLimited = await checkRateLimit(dos.settings, `webauthn-verify:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 10)
   if (verifyLimited) return c.json({ error: 'Too many requests. Try again later.' }, 429)
-  const body = await c.req.json() as { assertion: any; challengeId: string }
+  const body = await c.req.json() as { assertion: AuthenticationResponseJSON; challengeId: string }
   const origin = new URL(c.req.url).origin
   const rpID = new URL(c.req.url).hostname
   const challengeRes = await dos.identity.fetch(new Request(`http://do/webauthn/challenge/${body.challengeId}`))
@@ -95,7 +96,7 @@ webauthn.post('/register/options', async (c) => {
 webauthn.post('/register/verify', async (c) => {
   const dos = getDOs(c.env)
   const pubkey = c.get('pubkey')
-  const body = await c.req.json() as { attestation: any; label: string; challengeId: string }
+  const body = await c.req.json() as { attestation: RegistrationResponseJSON; label: string; challengeId: string }
   const origin = new URL(c.req.url).origin
   const rpID = new URL(c.req.url).hostname
   const challengeRes = await dos.identity.fetch(new Request(`http://do/webauthn/challenge/${body.challengeId}`))

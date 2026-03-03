@@ -51,6 +51,17 @@ export default defineConfig({
     outDir: 'dist/client',
     emptyOutDir: true,
     target: 'esnext',
+    chunkSizeWarningLimit: 650,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('@radix-ui')) return 'vendor-ui'
+            if (id.includes('@noble/') || id.includes('nostr-tools')) return 'vendor-crypto'
+          }
+        },
+      },
+    },
   },
   server: {
     host: process.env.TAURI_DEV_HOST || '0.0.0.0',

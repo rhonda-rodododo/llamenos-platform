@@ -1,13 +1,25 @@
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { defineConfig } from "vitest/config";
+import path from "path";
 
-export default defineWorkersConfig({
+export default defineConfig({
   test: {
     name: "worker-integration",
     include: ["apps/worker/__tests__/integration/**/*.test.ts"],
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./apps/worker/wrangler.jsonc" },
+    environment: "node",
+  },
+  resolve: {
+    alias: [
+      { find: /^@shared\/(.*)/, replacement: path.resolve(__dirname, "packages/shared/$1") },
+      { find: /^@worker\/(.*)/, replacement: path.resolve(__dirname, "apps/worker/$1") },
+      { find: /^@\/(.*)/, replacement: path.resolve(__dirname, "src/client/$1") },
+      // Mock cloudflare:workers for DurableObject base class
+      {
+        find: "cloudflare:workers",
+        replacement: path.resolve(
+          __dirname,
+          "apps/worker/__tests__/integration/cloudflare-workers-mock.ts"
+        ),
       },
-    },
+    ],
   },
 });

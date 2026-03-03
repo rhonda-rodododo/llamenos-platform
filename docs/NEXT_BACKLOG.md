@@ -358,14 +358,17 @@ DRY up the cross-platform BDD test suite: consolidate shared specs, migrate desk
 
 Architecture audit (2026-03-03) identified that Node.js + PostgreSQL is the real production path, but CF Workers is still treated as primary in docs/tests. Also, the Mac M4 unblocks iOS builds.
 
-### Node.js E2E & Documentation
-- [ ] **[Epic 235: Node.js Platform E2E Test Parity](epics/epic-235-nodejs-e2e-test-parity.md)** — Playwright tests against Docker Compose, PostgreSQL integration tests, alarm polling, MinIO, WebSocket shim, CI workflow
-- [ ] **[Epic 236: Node.js Production Deployment Primacy & Infrastructure Hardening](epics/epic-236-production-deployment-primacy.md)** — Reframe docs (Node.js primary, CF demo). Fix: health check dependency verification, Helm MinIO→StatefulSet + HPA + PDB + ServiceMonitor, Docker Compose rate limiting + logging + first-run script, Ansible MinIO backup + restore testing, OpenTofu SSH restriction, Prometheus metrics endpoint, structured JSON logging, `bun run dev:node` local dev server, production checklist
+### Node.js E2E & Documentation — COMPLETE
+- [x] **[Epic 235: Node.js Platform E2E Test Parity](epics/epic-235-nodejs-e2e-test-parity.md)** — 79 Node.js integration tests (PostgreSQL storage, alarm poller, WebSocket shim, MinIO, migrations), playwright.docker.config.ts, e2e-node + integration-node CI jobs
+- [x] **[Epic 236: Node.js Production Deployment Primacy & Infrastructure Hardening](epics/epic-236-production-deployment-primacy.md)** — Health endpoint with dependency checks (/health, /health/live, /health/ready), Helm MinIO→StatefulSet + HPA + PDB + ServiceMonitor (chart 0.2.0), Docker Compose rate limiting + JSON logging + first-run.sh, Ansible MinIO backup + restore test playbook, OpenTofu admin_ssh_cidrs variable, Prometheus /metrics endpoint, structured JSON logger, `bun run dev:node` local dev server, PRODUCTION_CHECKLIST.md
 
-### iOS Build Pipeline (Mac M4)
-- [ ] **[Epic 237: iOS Build Pipeline on Local Mac M4](epics/epic-237-ios-mac-m4-build-pipeline.md)** — XCFramework build, swift build/test, XCUITest on simulator, remote build scripts. Unblocks Epics 214 (iOS), 227, 234
+### iOS Build Pipeline (Mac M4) — PARTIAL (Xcode blocked)
+- [x] **[Epic 237: iOS Build Pipeline on Local Mac M4](epics/epic-237-ios-mac-m4-build-pipeline.md)** — scripts/ios-build.sh (status/setup/sync/build/test/xcframework/uitest/all), npm scripts. **Xcode not yet installed on Mac M4** — XCFramework build, simulator tests blocked
+- [ ] **[Epic 214-iOS: Link UniFFI XCFramework](epics/epic-214-mobile-crypto-integration.md)** — Update Package.swift, remove stand-in crypto guards in CryptoService.swift *(blocked: requires Xcode + XCFramework build from Epic 237)*
+- [ ] **[Epic 227: iOS BDD E2E Foundation](epics/epic-227-ios-bdd-e2e-foundation.md)** — XCUITest with BDD naming *(blocked: requires Epic 214-iOS)*
+- [ ] **[Epic 234: iOS BDD Test Expansion](epics/epic-234-ios-bdd-test-expansion.md)** — Expand from 76 to ~200 tests *(blocked: requires Epic 227)*
 
-**Dependency order:** 237 → (214 iOS | 227 | 234) | (235 | 236)
+**Dependency order:** 237 ✓ → 214-iOS → 227 → 234 | 235 ✓ | 236 ✓
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
