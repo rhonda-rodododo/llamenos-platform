@@ -491,3 +491,30 @@ Then('I should see the delivery status for the blast', async ({ page }) => {
   // Status indicator visible
   await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
+
+// --- Multi-hub extended ---
+
+Given('I have selected a hub', async ({ page }) => {
+  // If a hub selector is visible, select the first available hub
+  const hubSelector = page.locator('select, [role="combobox"]').first()
+  if (await hubSelector.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const options = await hubSelector.locator('option').all()
+    if (options.length > 0) {
+      await hubSelector.selectOption({ index: 0 })
+    }
+  }
+})
+
+When('I open hub settings', async ({ page }) => {
+  await page.getByRole('link', { name: 'Hub Settings' }).click()
+  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
+})
+
+Then('I should see telephony, messaging, and general tabs', async ({ page }) => {
+  const telephony = page.locator('text=/telephony/i')
+  const messaging = page.locator('text=/messaging/i')
+  const general = page.locator('text=/general|settings/i')
+  await expect(telephony.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(messaging.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(general.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
