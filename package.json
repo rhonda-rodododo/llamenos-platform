@@ -22,6 +22,10 @@
     "test": "bunx playwright test",
     "test:live": "bunx playwright test --config playwright.live.config.ts",
     "test:ui": "bunx playwright test --ui",
+    "test:worker": "bunx vitest run --config vitest.unit.config.ts",
+    "test:worker:unit": "bunx vitest run --config vitest.unit.config.ts",
+    "test:worker:integration": "bunx vitest run --config vitest.integration.config.ts",
+    "test:worker:watch": "bunx vitest --config vitest.unit.config.ts",
     "site:dev": "cd site && bun run dev",
     "site:build": "cd site && bun run build",
     "changelog": "git-cliff --output CHANGELOG.md",
@@ -61,6 +65,7 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.18",
     "@cloudflare/workers-types": "^4.20260207.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.1.18",
@@ -77,6 +82,7 @@
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.0.18",
     "wrangler": "^4.63.0"
   }
 }
