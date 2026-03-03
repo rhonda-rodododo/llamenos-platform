@@ -338,21 +338,21 @@ Implement Android step definitions and UI to fully cover all BDD feature file sc
 
 **Dependency order:** 228 → (229 | 230)
 
-## E2E Test Coverage Consolidation (Epics 231-234) — IN PROGRESS
+## E2E Test Coverage Consolidation (Epics 231-234) — 3/4 COMPLETE
 
 DRY up the cross-platform BDD test suite: consolidate shared specs, migrate desktop from .spec.ts to BDD, add Worker backend tests, expand iOS coverage.
 
 ### Shared & Desktop
-- [ ] **[Epic 231: Shared BDD Spec Consolidation](epics/epic-231-shared-bdd-spec-consolidation.md)** — Promote 5 Android-only features to shared, expand roles (+19), messaging (+9), device-link (+4), help (+4), multi-hub (+1) scenarios, tag audit
-- [ ] **[Epic 232: Desktop Spec-to-BDD Migration](epics/epic-232-desktop-spec-to-bdd-migration.md)** — Delete 32 redundant .spec.ts files (296 tests), expand step definitions for new scenarios, keep 7 infrastructure specs
+- [x] **[Epic 231: Shared BDD Spec Consolidation](epics/epic-231-shared-bdd-spec-consolidation.md)** — Promote 5 Android-only features to shared, expand roles (+19), messaging (+9), device-link (+4), help (+4), multi-hub (+1) scenarios, tag audit
+- [x] **[Epic 232: Desktop Spec-to-BDD Migration](epics/epic-232-desktop-spec-to-bdd-migration.md)** — Delete 31 redundant .spec.ts files, create 13 new step definition files + 4 new feature files, keep 7 infrastructure specs
 
 ### Backend
-- [ ] **[Epic 233: Worker Backend Test Suite](epics/epic-233-worker-backend-test-suite.md)** — Vitest + @cloudflare/vitest-pool-workers, ~290 tests across pure functions, service layer, BDD API contracts, DO integration
+- [x] **[Epic 233: Worker Backend Test Suite](epics/epic-233-worker-backend-test-suite.md)** — Vitest unit tests (295 passing), 8 backend BDD feature files, 6 integration test stubs, CI workflow updated
 
 ### iOS
 - [ ] **[Epic 234: iOS BDD Test Expansion](epics/epic-234-ios-bdd-test-expansion.md)** — Expand from 76 to ~200 tests, XCTContext.runActivity BDD naming, fix validate-coverage.ts iOS scanning *(blocked: requires macOS)*
 
-**Dependency order:** 231 → 232 | (233 in parallel) | (234 in parallel, but blocked on macOS)
+**Dependency order:** 231 ✓ → 232 ✓ | 233 ✓ | (234 blocked on macOS)
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

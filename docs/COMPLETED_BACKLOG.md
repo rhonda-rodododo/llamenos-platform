@@ -1,5 +1,34 @@
 # Completed Backlog
 
+## 2026-03-03: E2E Test Coverage Consolidation (Epics 231-233)
+
+### Epic 231: Shared BDD Spec Consolidation
+- **5 features promoted** from Android-only to shared `packages/test-specs/features/`: `calls-today`, `language-selection`, `note-thread`, `shift-detail`, `volunteer-profile`
+- **5 features expanded**: `roles.feature` (+19 → 27 total), `conversations-full.feature` (+9 → 16 total), `device-link.feature` (+4 → 10 total), `multi-hub.feature` (+1 → 6 total), `help-screen.feature` (+4 → 9 total)
+- **validate-coverage.ts** fixed: iOS path scanning, added per-platform tag counting, untagged feature warnings, duplicate feature name detection
+- **Android mirror synced**: all promoted/modified features copied, `admin/shift-detail.feature` → `shifts/shift-detail.feature`
+- Commit: `8f2bd6a`
+
+### Epic 232: Desktop Spec-to-BDD Migration
+- **31 spec files deleted** (was 39 total, now 8 remaining infrastructure specs)
+- **13 new step definition files** created in `tests/steps/`
+- **4 new feature files**: `admin-flow.feature` (17 scenarios), `auth-guards.feature` (7), `login-restore.feature` (10), `pin-challenge.feature` (3)
+- **2 features expanded**: `telephony-provider.feature` (5→10), `webrtc-settings.feature` (3→10)
+- Commit: `296efd9`
+
+### Epic 233: Worker Backend Test Suite
+- **295 unit tests** across 13 test files in `apps/worker/__tests__/unit/`: permissions (55), ssrf-guard (34), helpers (30), crypto-utils (30), auth-utils (28), do-router (21), messaging-adapter (21), telephony-adapter (19), nostr-publisher (16), audit-chain (14), crypto-labels (12), do-access (9), permission-guard (6)
+- **8 backend BDD feature files** in `packages/test-specs/features/backend/`: auth-verification, permission-system, do-routing, telephony-adapter, shift-routing, conversation-routing, note-encryption, audit-chain (all tagged `@backend`)
+- **6 integration test stubs** in `apps/worker/__tests__/integration/` (DO tests, require miniflare)
+- **CI updated**: `worker-tests` job in `.github/workflows/ci.yml`
+- **Vitest configs**: `vitest.unit.config.ts` + `vitest.integration.config.ts` at project root
+- **playwright.config.ts**: added `and not @backend` to tag filter
+- Commits: `63468ec`, `fca9025` (path fix)
+
+### Epic 234: iOS BDD Test Expansion — BLOCKED
+- Requires macOS with Xcode — cannot execute from Linux
+- Documented as pending in NEXT_BACKLOG.md
+
 ## 2026-03-02: Android UI Polish — Search, String Extraction, BDD Expansion
 
 ### Search Features
