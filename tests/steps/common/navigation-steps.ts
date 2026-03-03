@@ -76,17 +76,20 @@ Given('I am on the dashboard', async ({ page }) => {
 
 Given('I navigate to the device link screen from settings', async ({ page }) => {
   await Navigation.goToSettings(page)
-  const linkCard = page.getByTestId(TestIds.LINK_DEVICE_CARD)
-  await linkCard.scrollIntoViewIfNeeded()
-  await linkCard.click()
+  // The "linked-devices" SettingsSection has data-testid={id} from SettingsSection component
+  const linkedDevicesSection = page.locator('[data-testid="linked-devices"]')
+  await linkedDevicesSection.scrollIntoViewIfNeeded()
+  // Expand the section if collapsed
+  const isExpanded = await linkedDevicesSection.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
+  if (!isExpanded) {
+    await linkedDevicesSection.locator('[role="button"], header').first().click()
+  }
 })
 
 Given('I have navigated to the admin panel', async ({ page }) => {
-  await Navigation.goToSettings(page)
-  const adminCard = page.locator('[data-testid="admin-card"]')
-  await adminCard.scrollIntoViewIfNeeded()
-  await adminCard.click()
-  await expect(page.locator('h1', { hasText: /admin/i })).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Desktop has no "admin panel" card — admin pages are separate sidebar routes.
+  // Navigate to Volunteers as the default admin page.
+  await Navigation.goToVolunteers(page)
 })
 
 // --- When navigation steps ---
@@ -107,16 +110,14 @@ When('I tap the {string} tab', async ({ page }, tabName: string) => {
 })
 
 When('I navigate to the admin panel', async ({ page }) => {
-  const adminCard = page.locator('[data-testid="admin-card"]')
-  await adminCard.scrollIntoViewIfNeeded()
-  await adminCard.click()
-  await expect(page.locator('h1', { hasText: /admin/i })).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Desktop has no "admin panel" card — admin pages are separate sidebar routes.
+  // Navigate to Volunteers as the default admin page.
+  await Navigation.goToVolunteers(page)
 })
 
 When('I scroll to and tap the admin card', async ({ page }) => {
-  const adminCard = page.locator('[data-testid="admin-card"]')
-  await adminCard.scrollIntoViewIfNeeded()
-  await adminCard.click()
+  // Desktop has no "admin card" — navigate to Volunteers via sidebar instead
+  await Navigation.goToVolunteers(page)
 })
 
 When('I tap the back button', async ({ page }) => {
@@ -135,6 +136,9 @@ When('I visit the app root', async ({ page }) => {
 })
 
 When('I visit {string} without authentication', async ({ page }, path: string) => {
+  // Navigate first to avoid SecurityError when clearing storage on about:blank
+  await page.goto('/login')
+  await page.waitForLoadState('domcontentloaded')
   await page.evaluate(() => {
     localStorage.clear()
     sessionStorage.clear()

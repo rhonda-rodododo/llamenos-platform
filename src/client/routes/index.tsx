@@ -84,7 +84,7 @@ function DashboardPage() {
 
       {/* Status cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className={activeCalls.length > 0 ? 'border-green-500/20 bg-green-50/50 dark:bg-green-950/10' : undefined}>
+        <Card data-testid="dashboard-active-calls" className={activeCalls.length > 0 ? 'border-green-500/20 bg-green-50/50 dark:bg-green-950/10' : undefined}>
           <CardContent className="flex items-center gap-4 py-0">
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${activeCalls.length > 0 ? 'bg-green-500/15' : 'bg-muted'}`}>
               <Activity className={`h-5 w-5 ${activeCalls.length > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
@@ -95,7 +95,7 @@ function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className={onBreak ? 'border-yellow-400/30 bg-yellow-50/50 dark:border-yellow-600/30 dark:bg-yellow-950/10' : onShift ? 'border-primary/20 bg-primary/5' : undefined}>
+        <Card data-testid="dashboard-shift-status" className={onBreak ? 'border-yellow-400/30 bg-yellow-50/50 dark:border-yellow-600/30 dark:bg-yellow-950/10' : onShift ? 'border-primary/20 bg-primary/5' : undefined}>
           <CardContent className="flex items-center gap-4 py-0">
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
               onBreak ? 'bg-yellow-500/15' : onShift ? 'bg-primary/10' : 'bg-muted'
@@ -120,7 +120,7 @@ function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card data-testid="dashboard-calls-today">
           <CardContent className="flex items-center gap-4 py-0">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <BarChart3 className="h-5 w-5 text-primary" />

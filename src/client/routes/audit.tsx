@@ -183,7 +183,7 @@ function AuditPage() {
           ) : (
             <div className="divide-y divide-border">
               {entries.map(entry => (
-                <div key={entry.id} className="flex flex-wrap items-center gap-4 px-4 py-3 sm:px-6">
+                <div key={entry.id} data-testid="audit-entry" className="flex flex-wrap items-center gap-4 px-4 py-3 sm:px-6">
                   <span className="w-full text-xs text-muted-foreground whitespace-nowrap sm:w-36 sm:shrink-0">
                     {new Date(entry.createdAt).toLocaleString()}
                   </span>

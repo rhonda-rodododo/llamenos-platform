@@ -91,7 +91,7 @@ export function SettingsSection({
 
   return (
     <Collapsible open={expanded} onOpenChange={onToggle}>
-      <Card id={id}>
+      <Card id={id} data-testid={id}>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer select-none transition-colors hover:bg-muted/50">
             <div className="flex items-center justify-between">

@@ -118,6 +118,14 @@ export const TestIds = {
   PIN_CHALLENGE_ERROR: 'pin-challenge-error',
   PIN_INPUT: 'pin-input',
 
+  // ============ Audit ============
+  AUDIT_ENTRY: 'audit-entry',
+
+  // ============ Dashboard ============
+  DASHBOARD_ACTIVE_CALLS: 'dashboard-active-calls',
+  DASHBOARD_SHIFT_STATUS: 'dashboard-shift-status',
+  DASHBOARD_CALLS_TODAY: 'dashboard-calls-today',
+
   // ============ Settings ============
   SETTINGS_SECTION: 'settings-section',
   TELEPHONY_PROVIDER: 'telephony-provider',

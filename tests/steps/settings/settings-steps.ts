@@ -33,25 +33,28 @@ Then('the connection status should be displayed', async ({ page }) => {
 })
 
 Then('I should see the device link card \\(may need scroll)', async ({ page }) => {
-  const linkCard = page.getByTestId(TestIds.LINK_DEVICE_CARD)
-  await linkCard.scrollIntoViewIfNeeded()
-  await expect(linkCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // SettingsSection with id="linked-devices" now has data-testid="linked-devices"
+  const linkedDevices = page.locator('[data-testid="linked-devices"]')
+  await linkedDevices.scrollIntoViewIfNeeded()
+  await expect(linkedDevices).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the device link card should be tappable', async ({ page }) => {
-  const linkCard = page.getByTestId(TestIds.LINK_DEVICE_CARD)
-  await expect(linkCard).toBeEnabled()
+  const linkedDevices = page.locator('[data-testid="linked-devices"]')
+  await expect(linkedDevices).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the admin card \\(may need scroll)', async ({ page }) => {
-  const adminCard = page.locator('[data-testid="admin-card"]')
-  await adminCard.scrollIntoViewIfNeeded()
-  await expect(adminCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Desktop has no "admin card" — check that the admin section is visible in the sidebar
+  const adminSection = page.getByTestId(TestIds.NAV_ADMIN_SECTION)
+  await expect(adminSection).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the admin card should be tappable', async ({ page }) => {
-  const adminCard = page.locator('[data-testid="admin-card"]')
-  await expect(adminCard).toBeEnabled()
+  // Desktop: admin section links in sidebar are always clickable
+  const adminSection = page.getByTestId(TestIds.NAV_ADMIN_SECTION)
+  const firstLink = adminSection.getByRole('link').first()
+  await expect(firstLink).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the version text', async ({ page }) => {
@@ -100,9 +103,9 @@ Then('the error message should mention {string}', async ({ page }, text: string)
 })
 
 Then('the device link card should still be visible', async ({ page }) => {
-  const linkCard = page.getByTestId(TestIds.LINK_DEVICE_CARD)
-  await linkCard.scrollIntoViewIfNeeded()
-  await expect(linkCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const linkedDevices = page.locator('[data-testid="linked-devices"]')
+  await linkedDevices.scrollIntoViewIfNeeded()
+  await expect(linkedDevices).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the settings identity card should be visible', async ({ page }) => {

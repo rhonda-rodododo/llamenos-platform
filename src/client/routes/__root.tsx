@@ -202,7 +202,7 @@ function AuthenticatedLayout() {
       )}
 
       {/* Sidebar */}
-      <nav className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-sidebar-border bg-sidebar transition-transform md:static md:visible md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full invisible'}`}>
+      <nav data-testid="nav-sidebar" className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-sidebar-border bg-sidebar transition-transform md:static md:visible md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full invisible'}`}>
         <div className="border-b border-sidebar-border px-4 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -298,6 +298,7 @@ function AuthenticatedLayout() {
           {isAdmin && (
             <>
               <div className="my-2 border-t border-sidebar-border" />
+              <div data-testid="nav-admin-section">
               <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-primary">
                 {t('nav.admin', { defaultValue: 'Admin' })}
               </p>
@@ -312,6 +313,7 @@ function AuthenticatedLayout() {
               {hasPermission('system:manage-hubs') && (
                 <NavLink to="/admin/hubs" icon={<Building2 className="h-4 w-4" />}>{t('nav.hubs', { defaultValue: 'Hubs' })}</NavLink>
               )}
+              </div>
             </>
           )}
           <NavLink to="/help" icon={<HelpCircle className="h-4 w-4" />}>{t('nav.help', { defaultValue: 'Help' })}</NavLink>

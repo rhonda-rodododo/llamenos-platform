@@ -24,10 +24,12 @@
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
-import { join, relative, basename } from "path";
+import { join, relative, basename, dirname } from "path";
+import { fileURLToPath } from "url";
 
-const ROOT = join(import.meta.dir, "../../..");
-const FEATURES_DIR = join(import.meta.dir, "../features");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, "../../..");
+const FEATURES_DIR = join(__dirname, "../features");
 const ANDROID_TEST_DIR = join(
   ROOT,
   "apps/android/app/src/androidTest/java/org/llamenos/hotline"

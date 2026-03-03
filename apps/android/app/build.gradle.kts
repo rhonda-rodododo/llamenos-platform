@@ -13,6 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "org.llamenos.hotline"
+        testApplicationId = "org.llamenos.hotline"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
