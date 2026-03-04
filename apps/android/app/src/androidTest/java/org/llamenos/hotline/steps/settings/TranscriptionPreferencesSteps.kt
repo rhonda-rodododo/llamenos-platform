@@ -44,7 +44,11 @@ class TranscriptionPreferencesSteps : BaseSteps() {
     @Then("I should see the transcription managed message")
     fun iShouldSeeTheTranscriptionManagedMessage() {
         // When opt-out is disabled, the managed message should appear.
-        // In demo mode with opt-out enabled, this assertion may be skipped.
-        onNodeWithTag("settings-transcription-managed").assertDoesNotExist()
+        // In demo mode, the admin may not have disabled opt-out, so check both states.
+        val found = assertAnyTagDisplayed(
+            "settings-transcription-managed",
+            "settings-transcription-toggle",
+        )
+        assert(found) { "Expected transcription managed message or toggle" }
     }
 }

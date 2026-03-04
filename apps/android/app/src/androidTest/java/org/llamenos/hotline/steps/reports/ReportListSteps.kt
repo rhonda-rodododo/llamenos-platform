@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
@@ -21,12 +22,14 @@ class ReportListSteps : BaseSteps() {
 
     @When("I tap the view reports button")
     fun iTapTheViewReportsButton() {
+        onNodeWithTag("reports-card").performScrollTo()
         onNodeWithTag("reports-card").performClick()
         composeRule.waitForIdle()
     }
 
     @Then("I should see the reports screen")
     fun iShouldSeeTheReportsScreen() {
+        waitForNode("reports-title")
         onNodeWithTag("reports-title").assertIsDisplayed()
     }
 

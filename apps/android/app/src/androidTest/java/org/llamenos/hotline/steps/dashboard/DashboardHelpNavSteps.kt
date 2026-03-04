@@ -30,6 +30,7 @@ class DashboardHelpNavSteps : BaseSteps() {
 
     @Then("I should see the help screen")
     fun iShouldSeeTheHelpScreen() {
+        waitForNode("help-screen")
         onNodeWithTag("help-screen").assertIsDisplayed()
     }
 }

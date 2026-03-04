@@ -106,6 +106,7 @@ class ProfileSettingsSteps : BaseSteps() {
 
     @Then("they should see a phone input")
     fun theyShouldSeeAPhoneInput() {
+        ensureProfileExpanded()
         onNodeWithTag("settings-phone-input").assertIsDisplayed()
     }
 

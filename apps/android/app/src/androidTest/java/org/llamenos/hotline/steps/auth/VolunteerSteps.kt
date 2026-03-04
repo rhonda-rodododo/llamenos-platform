@@ -29,7 +29,7 @@ class VolunteerSteps : BaseSteps() {
         // Navigate to login and enter nsec — nsec would come from admin creation
         try {
             onNodeWithTag("nsec-input").performTextInput("nsec1testvolunteer${System.currentTimeMillis()}")
-            onNodeWithTag("import-key-button").performClick()
+            onNodeWithTag("import-key").performClick()
             composeRule.waitForIdle()
         } catch (_: AssertionError) {
             // Login screen may not be visible if already authenticated

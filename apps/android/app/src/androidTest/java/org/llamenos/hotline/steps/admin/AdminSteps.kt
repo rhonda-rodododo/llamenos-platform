@@ -36,6 +36,7 @@ class AdminSteps : BaseSteps() {
 
     @When("I scroll to and tap the admin card")
     fun iScrollToAndTapTheAdminCard() {
+        navigateToTab(NAV_SETTINGS)
         onNodeWithTag("settings-admin-card").performScrollTo()
         onNodeWithTag("settings-admin-card").performClick()
         composeRule.waitForIdle()
@@ -43,6 +44,7 @@ class AdminSteps : BaseSteps() {
 
     @Then("I should see the admin screen")
     fun iShouldSeeTheAdminScreen() {
+        waitForNode("admin-title")
         onNodeWithTag("admin-title").assertIsDisplayed()
     }
 
@@ -58,6 +60,7 @@ class AdminSteps : BaseSteps() {
 
     @When("I navigate to the admin panel")
     fun iNavigateToTheAdminPanel() {
+        navigateToTab(NAV_SETTINGS)
         onNodeWithTag("settings-admin-card").performScrollTo()
         onNodeWithTag("settings-admin-card").performClick()
         composeRule.waitForIdle()

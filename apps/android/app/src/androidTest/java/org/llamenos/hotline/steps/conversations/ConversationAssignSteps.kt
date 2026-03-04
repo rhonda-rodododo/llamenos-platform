@@ -1,6 +1,7 @@
 package org.llamenos.hotline.steps.conversations
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import io.cucumber.java.en.Given
@@ -22,9 +23,14 @@ class ConversationAssignSteps : BaseSteps() {
 
     @Given("I open a conversation")
     fun iOpenAConversation() {
-        // In demo mode, a conversation may or may not exist.
-        // The assign button test is structural — verify it appears on the detail screen.
+        // Tap the first available conversation card to open the detail screen
         composeRule.waitForIdle()
+        try {
+            onAllNodes(hasTestTagPrefix("conversation-card-")).onFirst().performClick()
+            composeRule.waitForIdle()
+        } catch (_: AssertionError) {
+            // No conversations available — subsequent assertions will fail with clear error
+        }
     }
 
     @Then("I should see the assign conversation button")

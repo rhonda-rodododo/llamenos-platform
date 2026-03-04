@@ -236,8 +236,8 @@ class PinSteps : BaseSteps() {
 
     @When("I confirm the reset")
     fun iConfirmTheReset() {
-        // Reset button is visible — full reset flow depends on implementation
-        onNodeWithTag("reset-identity").assertIsDisplayed()
+        onNodeWithTag("reset-identity").performClick()
+        composeRule.waitForIdle()
     }
 
     @Then("no stored keys should remain")

@@ -31,6 +31,7 @@ class EmergencyWipeSteps : BaseSteps() {
 
     @Then("I should see the emergency wipe confirmation dialog")
     fun iShouldSeeTheEmergencyWipeConfirmationDialog() {
+        waitForNode("panic-wipe-dialog")
         onNodeWithTag("panic-wipe-dialog").assertIsDisplayed()
     }
 
@@ -47,13 +48,14 @@ class EmergencyWipeSteps : BaseSteps() {
 
     @Then("all local data should be erased")
     fun allLocalDataShouldBeErased() {
-        // After wipe, we should be on login screen — crypto cleared
-        assertAnyTagDisplayed("login-screen", "hub-url-input")
+        // After wipe, we should be navigated to the login screen
+        waitForNode("create-identity", 10_000)
     }
 
     @Then("I should be returned to the login screen")
     fun iShouldBeReturnedToTheLoginScreen() {
-        assertAnyTagDisplayed("login-screen", "hub-url-input")
+        waitForNode("create-identity", 10_000)
+        onNodeWithTag("create-identity").assertIsDisplayed()
     }
 
     @When("I cancel the emergency wipe")
@@ -64,12 +66,14 @@ class EmergencyWipeSteps : BaseSteps() {
 
     @Then("the confirmation dialog should close")
     fun theConfirmationDialogShouldClose() {
+        waitForNode("settings-identity-card")
         onNodeWithTag("settings-identity-card").performScrollTo()
         onNodeWithTag("settings-identity-card").assertIsDisplayed()
     }
 
     @Then("I should still be on the settings screen")
     fun iShouldStillBeOnTheSettingsScreen() {
+        waitForNode("settings-identity-card")
         onNodeWithTag("settings-identity-card").performScrollTo()
         onNodeWithTag("settings-identity-card").assertIsDisplayed()
     }

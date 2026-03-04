@@ -304,7 +304,7 @@ class ConversationSteps : BaseSteps() {
     fun iTypeAMessageAndClickSend() {
         onNodeWithTag("reply-text-input").performTextInput("Test message ${System.currentTimeMillis()}")
         composeRule.waitForIdle()
-        onNodeWithTag("send-message-button").performClick()
+        onNodeWithTag("send-button").performClick()
         composeRule.waitForIdle()
     }
 

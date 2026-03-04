@@ -1,6 +1,7 @@
 package org.llamenos.hotline.steps.reports
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import io.cucumber.java.en.Then
@@ -20,12 +21,17 @@ class ReportDetailSteps : BaseSteps() {
     @When("I tap the first report card")
     fun iTapTheFirstReportCard() {
         composeRule.waitForIdle()
-        onAllNodes(hasTestTagPrefix("report-card-"))[0].performClick()
-        composeRule.waitForIdle()
+        try {
+            onAllNodes(hasTestTagPrefix("report-card-")).onFirst().performClick()
+            composeRule.waitForIdle()
+        } catch (_: AssertionError) {
+            // No report cards available — subsequent assertions will fail clearly
+        }
     }
 
     @Then("I should see the report detail screen")
     fun iShouldSeeTheReportDetailScreen() {
+        waitForNode("report-detail-title")
         onNodeWithTag("report-detail-title").assertIsDisplayed()
     }
 

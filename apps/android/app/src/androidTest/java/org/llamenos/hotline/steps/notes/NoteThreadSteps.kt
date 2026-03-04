@@ -1,6 +1,7 @@
 package org.llamenos.hotline.steps.notes
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -19,14 +20,18 @@ class NoteThreadSteps : BaseSteps() {
     @Given("I am on the note detail screen")
     fun iAmOnTheNoteDetailScreen() {
         // Navigate to a note detail — tap first available note card
-        val hasNotes = assertAnyTagDisplayed("notes-list", "notes-empty", "notes-loading")
-        if (hasNotes) {
-            try {
-                onAllNodes(hasTestTagPrefix("note-card-")).onFirst().performClick()
-                composeRule.waitForIdle()
-            } catch (_: AssertionError) {
-                // No note cards available — test will fail on subsequent assertions
+        composeRule.waitForIdle()
+        try {
+            composeRule.waitUntil(5000) {
+                composeRule.onAllNodesWithTag("notes-list").fetchSemanticsNodes().isNotEmpty() ||
+                    composeRule.onAllNodesWithTag("notes-empty").fetchSemanticsNodes().isNotEmpty()
             }
+            onAllNodes(hasTestTagPrefix("note-card-")).onFirst().performClick()
+            composeRule.waitForIdle()
+        } catch (_: AssertionError) {
+            // No note cards available — test will fail on subsequent assertions
+        } catch (_: androidx.compose.ui.test.ComposeTimeoutException) {
+            // Notes screen didn't load — test will fail on subsequent assertions
         }
     }
 

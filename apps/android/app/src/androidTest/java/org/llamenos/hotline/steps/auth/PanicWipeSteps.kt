@@ -34,7 +34,7 @@ class PanicWipeSteps : BaseSteps() {
     @Then("the panic wipe overlay should appear")
     fun thePanicWipeOverlayShouldAppear() {
         val found = assertAnyTagDisplayed("panic-wipe-overlay", "panic-wipe-message", "app-title")
-        // Panic wipe overlay triggers data wipe, may redirect to login
+        assert(found) { "Expected panic wipe overlay, message, or login redirect" }
     }
 
     @Then("I should be redirected to the login page")

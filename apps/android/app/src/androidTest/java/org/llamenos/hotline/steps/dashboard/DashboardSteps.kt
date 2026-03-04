@@ -47,7 +47,7 @@ class DashboardSteps : BaseSteps() {
     fun theIdentityCardShouldDisplayMyNpub() {
         onNodeWithTag("identity-card").performScrollTo()
         onNodeWithTag("identity-card").assertIsDisplayed()
-        onNodeWithTag("identity-npub").assertIsDisplayed()
+        onNodeWithTag("dashboard-npub").assertIsDisplayed()
     }
 
     // "the npub should start with {string}" step is defined in CryptoSteps
@@ -115,8 +115,8 @@ class DashboardSteps : BaseSteps() {
 
     @Given("I am on shift")
     fun iAmOnShift() {
-        // Attempt to clock in first
-        onNodeWithTag("clock-in-button").performClick()
+        // Attempt to clock in via the dashboard clock button
+        onNodeWithTag("dashboard-clock-button").performClick()
         composeRule.waitForIdle()
     }
 

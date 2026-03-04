@@ -112,7 +112,7 @@ class NoteSteps : BaseSteps() {
     @Then("I should see the full note text")
     fun iShouldSeeTheFullNoteText() {
         // Conditional — only asserts if notes exist
-        assertAnyTagDisplayed("note-detail-content")
+        assertAnyTagDisplayed("note-detail-text")
     }
 
     @Then("I should see the creation date")
@@ -138,6 +138,6 @@ class NoteSteps : BaseSteps() {
     @Then("a copy button should be visible in the top bar")
     fun aCopyButtonShouldBeVisibleInTheTopBar() {
         // Conditional on note existence
-        assertAnyTagDisplayed("note-detail-copy")
+        assertAnyTagDisplayed("note-copy-button")
     }
 }

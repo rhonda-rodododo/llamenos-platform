@@ -155,6 +155,7 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             "audit", "audit log" -> "admin-tab-audit"
             "invites" -> "admin-tab-invites"
             "fields", "custom fields" -> "admin-tab-fields"
+            "shifts", "shift schedule" -> "admin-tab-shifts"
             "settings" -> "admin-tab-settings"
             else -> throw IllegalArgumentException("Unknown admin tab: $tabName")
         }

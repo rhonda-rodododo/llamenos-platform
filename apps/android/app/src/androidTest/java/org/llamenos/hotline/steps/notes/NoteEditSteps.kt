@@ -1,6 +1,7 @@
 package org.llamenos.hotline.steps.notes
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import io.cucumber.java.en.Given
@@ -17,9 +18,13 @@ class NoteEditSteps : BaseSteps() {
 
     @Given("I open a note")
     fun iOpenANote() {
-        // In demo mode, a note may or may not exist.
-        // The edit button test is structural — verify it appears on the detail screen.
-        composeRule.waitForIdle()
+        // Tap the first available note card to open the detail screen
+        try {
+            onAllNodes(hasTestTagPrefix("note-card-")).onFirst().performClick()
+            composeRule.waitForIdle()
+        } catch (_: AssertionError) {
+            // No notes available — subsequent assertions will fail with clear error
+        }
     }
 
     @Then("I should see the note edit button")

@@ -3,6 +3,8 @@ package org.llamenos.hotline.steps.reports
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import org.llamenos.hotline.steps.BaseSteps
@@ -16,13 +18,21 @@ class ReportCreateSteps : BaseSteps() {
 
     @Given("I navigate to the reports list")
     fun iNavigateToTheReportsList() {
-        // In demo mode, navigate to reports via dashboard
+        // Navigate to the reports screen via the dashboard quick action card
+        onNodeWithTag("reports-card").performScrollTo()
+        onNodeWithTag("reports-card").performClick()
         composeRule.waitForIdle()
+        waitForNode("reports-title")
     }
 
     @Given("I navigate to the report creation form")
     fun iNavigateToTheReportCreationForm() {
-        // In demo mode, the form is navigated to via the FAB
+        // Navigate to reports first, then tap the create FAB
+        onNodeWithTag("reports-card").performScrollTo()
+        onNodeWithTag("reports-card").performClick()
+        composeRule.waitForIdle()
+        waitForNode("report-create-fab")
+        onNodeWithTag("report-create-fab").performClick()
         composeRule.waitForIdle()
     }
 
@@ -33,6 +43,7 @@ class ReportCreateSteps : BaseSteps() {
 
     @Then("I should see the report title input")
     fun iShouldSeeTheReportTitleInput() {
+        waitForNode("report-title-input")
         onNodeWithTag("report-title-input").assertIsDisplayed()
     }
 

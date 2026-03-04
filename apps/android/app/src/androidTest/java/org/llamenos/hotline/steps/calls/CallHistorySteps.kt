@@ -27,6 +27,7 @@ class CallHistorySteps : BaseSteps() {
 
     @Then("I should see the call history screen")
     fun iShouldSeeTheCallHistoryScreen() {
+        waitForNode("call-history-title")
         onNodeWithTag("call-history-title").assertIsDisplayed()
     }
 
