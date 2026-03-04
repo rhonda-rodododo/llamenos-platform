@@ -58,7 +58,7 @@ class NoteEditSteps : BaseSteps() {
         try {
             onNodeWithTag("note-edit-button").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Edit button not available — note may not be persisted
         }
     }
@@ -76,12 +76,12 @@ class NoteEditSteps : BaseSteps() {
         try {
             onNodeWithTag("note-detail-back").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // May not be in edit mode — press system back
             try {
                 androidx.test.espresso.Espresso.pressBack()
                 composeRule.waitForIdle()
-            } catch (_: Exception) { /* no-op */ }
+            } catch (_: Throwable) { /* no-op */ }
         }
     }
 

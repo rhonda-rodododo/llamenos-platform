@@ -24,7 +24,7 @@ class ReportDetailSteps : BaseSteps() {
         // Ensure we're on the reports screen — navigate via dashboard card
         try {
             navigateViaDashboardCard("reports-card")
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // May already be on reports screen
         }
         composeRule.waitForIdle()
@@ -65,12 +65,12 @@ class ReportDetailSteps : BaseSteps() {
         try {
             onNodeWithTag("report-detail-back").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Not on report detail — press system back
             try {
                 androidx.test.espresso.Espresso.pressBack()
                 composeRule.waitForIdle()
-            } catch (_: Exception) { /* no-op */ }
+            } catch (_: Throwable) { /* no-op */ }
         }
     }
 

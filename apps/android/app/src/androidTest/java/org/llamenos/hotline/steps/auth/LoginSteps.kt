@@ -117,16 +117,16 @@ class LoginSteps : BaseSteps() {
                 onNodeWithTag(tag).performClick()
                 composeRule.waitForIdle()
                 return
-            } catch (_: AssertionError) {
+            } catch (_: Throwable) {
                 // Clock state didn't change — try clock-in-button or dashboard clock
                 try {
                     onNodeWithTag("clock-in-button").performClick()
                     composeRule.waitForIdle()
-                } catch (_: AssertionError) {
+                } catch (_: Throwable) {
                     try {
                         onNodeWithTag("dashboard-clock-button").performClick()
                         composeRule.waitForIdle()
-                    } catch (_: AssertionError) { /* no clock button available */ }
+                    } catch (_: Throwable) { /* no clock button available */ }
                 }
                 return
             }

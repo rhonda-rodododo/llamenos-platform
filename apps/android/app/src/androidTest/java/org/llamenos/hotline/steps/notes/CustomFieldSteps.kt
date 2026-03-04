@@ -49,7 +49,7 @@ class CustomFieldSteps : BaseSteps() {
         composeRule.waitForIdle()
         try {
             composeRule.onAllNodesWithText(fieldName, substring = true).onFirst().assertIsDisplayed()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Field may not persist without backend — accept fields area being visible
             val found = assertAnyTagDisplayed("fields-list", "fields-empty")
             assert(found) { "Expected '$fieldName' in field list or fields area visible" }
@@ -90,12 +90,12 @@ class CustomFieldSteps : BaseSteps() {
         try {
             onNodeWithTag("delete-field-$slug").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Field may not exist — try clicking any delete button
             try {
                 onAllNodes(hasTestTagPrefix("delete-field-")).onFirst().performClick()
                 composeRule.waitForIdle()
-            } catch (_: AssertionError) {
+            } catch (_: Throwable) {
                 // No fields to delete
             }
         }

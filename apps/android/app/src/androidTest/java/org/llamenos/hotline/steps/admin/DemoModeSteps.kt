@@ -115,7 +115,7 @@ class DemoModeSteps : BaseSteps() {
         try {
             onNodeWithTag("demo-dismiss-button").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Banner may not be showing
         }
     }

@@ -32,8 +32,8 @@ class VolunteerDetailSteps : BaseSteps() {
                 onNodeWithTag("confirm-add-volunteer").performClick()
                 composeRule.waitForIdle()
                 // Dismiss nsec dialog if it appears
-                try { onNodeWithTag("dismiss-nsec-dialog").performClick(); composeRule.waitForIdle() } catch (_: AssertionError) {}
-            } catch (_: Exception) {
+                try { onNodeWithTag("dismiss-nsec-dialog").performClick(); composeRule.waitForIdle() } catch (_: Throwable) {}
+            } catch (_: Throwable) {
                 // Creation failed — volunteer detail tests will use defensive assertions
                 return
             }

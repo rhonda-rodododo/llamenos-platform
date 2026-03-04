@@ -106,7 +106,7 @@ class NavigationSteps : BaseSteps() {
                 onNodeWithTag(tag).performClick()
                 composeRule.waitForIdle()
                 return
-            } catch (_: AssertionError) {
+            } catch (_: Throwable) {
                 continue
             }
         }
@@ -189,7 +189,7 @@ class NavigationSteps : BaseSteps() {
                     val sectionTag = "settings-${section}-section"
                     try {
                         expandSettingsSection(sectionTag)
-                    } catch (_: AssertionError) { /* section may not exist */ }
+                    } catch (_: Throwable) { /* section may not exist */ }
                 }
             }
             cleanPath.startsWith("notes") -> navigateToTab(NAV_NOTES)
@@ -201,7 +201,7 @@ class NavigationSteps : BaseSteps() {
                     onNodeWithTag("settings-admin-card").performScrollTo()
                     onNodeWithTag("settings-admin-card").performClick()
                     composeRule.waitForIdle()
-                } catch (_: AssertionError) { /* admin card may not exist */ }
+                } catch (_: Throwable) { /* admin card may not exist */ }
             }
             else -> navigateToTab(NAV_DASHBOARD)
         }

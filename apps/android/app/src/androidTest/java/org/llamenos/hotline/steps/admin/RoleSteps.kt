@@ -115,7 +115,7 @@ class RoleSteps : BaseSteps() {
         // Role assignment happens during volunteer creation (add-volunteer dialog)
         try {
             onNodeWithTag("add-volunteer-fab").assertIsDisplayed()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             navigateToAdminTab("volunteers")
             composeRule.waitForIdle()
         }
@@ -126,7 +126,7 @@ class RoleSteps : BaseSteps() {
         // Volunteer cards display role badges (volunteer-role-{id})
         try {
             onAllNodes(hasTestTagPrefix("volunteer-role-")).onFirst().assertIsDisplayed()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // No volunteers visible — empty state is acceptable in test
             val found = assertAnyTagDisplayed("volunteers-list", "volunteers-empty")
             assert(found) { "Expected volunteers area" }

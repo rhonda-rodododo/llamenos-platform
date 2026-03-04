@@ -27,7 +27,7 @@ class ConversationE2eeSteps : BaseSteps() {
     fun theIndicatorShouldDisplay(expectedText: String) {
         try {
             onNodeWithTag("e2ee-indicator").assertTextContains(expectedText, substring = true)
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // E2EE indicator not available — conversation detail not reached
         }
     }

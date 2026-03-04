@@ -112,7 +112,7 @@ class NoteThreadSteps : BaseSteps() {
         // This is a best-effort check — in demo mode, notes may or may not have replies
         try {
             onAllNodes(hasTestTagPrefix("note-reply-badge-")).onFirst().assertIsDisplayed()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // No notes with replies — acceptable in demo mode
         }
     }

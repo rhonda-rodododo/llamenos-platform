@@ -75,7 +75,7 @@ class BanSteps : BaseSteps() {
         val year = Calendar.getInstance().get(Calendar.YEAR).toString()
         try {
             onAllNodesWithText(year, substring = true).onFirst().assertIsDisplayed()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Year text may not be visible if ban list shows hashed identifiers only
             val found = assertAnyTagDisplayed("bans-list", "bans-empty")
             assert(found) { "Expected bans area visible" }

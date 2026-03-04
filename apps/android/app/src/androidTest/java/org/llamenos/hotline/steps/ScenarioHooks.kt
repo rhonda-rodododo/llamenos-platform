@@ -79,7 +79,7 @@ class ScenarioHooks {
         try {
             keystoreService.clear()
             cryptoService.lock()
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             // Cleanup is best-effort
         }
     }

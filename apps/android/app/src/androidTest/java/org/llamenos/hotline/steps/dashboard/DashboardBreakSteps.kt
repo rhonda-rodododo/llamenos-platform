@@ -21,7 +21,7 @@ class DashboardBreakSteps : BaseSteps() {
         try {
             onNodeWithTag("dashboard-clock-button").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Clock button may not be visible — shift state depends on server
         }
     }
@@ -33,7 +33,7 @@ class DashboardBreakSteps : BaseSteps() {
         try {
             onNodeWithTag("dashboard-break-button").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Break button only visible when on shift
         }
     }

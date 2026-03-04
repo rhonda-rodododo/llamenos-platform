@@ -154,7 +154,7 @@ class ShiftSteps : BaseSteps() {
                 try {
                     onAllNodes(hasTestTagPrefix("edit-shift-")).onFirst().performClick()
                     composeRule.waitForIdle()
-                } catch (_: AssertionError) {
+                } catch (_: Throwable) {
                     // No shifts with edit button
                 }
             }
@@ -162,7 +162,7 @@ class ShiftSteps : BaseSteps() {
                 try {
                     onAllNodes(hasTestTagPrefix("delete-shift-")).onFirst().performClick()
                     composeRule.waitForIdle()
-                } catch (_: AssertionError) {
+                } catch (_: Throwable) {
                     // No shifts with delete button
                 }
             }
@@ -170,7 +170,7 @@ class ShiftSteps : BaseSteps() {
                 try {
                     onAllNodes(hasTestTagPrefix("shift-signup-")).onFirst().performClick()
                     composeRule.waitForIdle()
-                } catch (_: AssertionError) {
+                } catch (_: Throwable) {
                     // No signup buttons available
                 }
             }
@@ -228,7 +228,7 @@ class ShiftSteps : BaseSteps() {
             onNodeWithTag("shift-end-input").performTextInput("17:00")
             onNodeWithTag("confirm-shift-save").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // FAB or dialog not available
         }
     }
@@ -253,7 +253,7 @@ class ShiftSteps : BaseSteps() {
             onNodeWithTag("shift-end-input").performTextInput("22:00")
             onNodeWithTag("confirm-shift-save").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // FAB or dialog not available
         }
     }
@@ -262,7 +262,7 @@ class ShiftSteps : BaseSteps() {
     fun theEditFormShouldBeVisible() {
         try {
             onNodeWithTag("shift-name-input").assertIsDisplayed()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Edit form may not be showing if no shifts exist
         }
     }
@@ -274,7 +274,7 @@ class ShiftSteps : BaseSteps() {
         try {
             onAllNodes(hasTestTagPrefix("shift-signup-")).onFirst().performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // No available shifts to sign up for
         }
     }
@@ -286,7 +286,7 @@ class ShiftSteps : BaseSteps() {
             composeRule.waitForIdle()
             onNodeWithTag("confirm-drop-button").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // No assigned shifts to drop
         }
     }

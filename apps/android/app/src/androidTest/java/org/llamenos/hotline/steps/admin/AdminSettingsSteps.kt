@@ -54,7 +54,7 @@ class AdminSettingsSteps : BaseSteps() {
         try {
             onNodeWithTag("transcription-enabled-toggle").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Toggle not available — admin settings may be loading
         }
     }

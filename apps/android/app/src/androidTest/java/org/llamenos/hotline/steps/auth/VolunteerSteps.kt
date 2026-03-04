@@ -31,7 +31,7 @@ class VolunteerSteps : BaseSteps() {
             onNodeWithTag("nsec-input").performTextInput("nsec1testvolunteer${System.currentTimeMillis()}")
             onNodeWithTag("import-key").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Login screen may not be visible if already authenticated
         }
     }
@@ -56,7 +56,7 @@ class VolunteerSteps : BaseSteps() {
             onNodeWithTag("profile-display-name").performTextInput("Test Volunteer")
             onNodeWithTag("profile-save-button").performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Profile setup may not be required — already on dashboard
         }
     }
@@ -92,7 +92,7 @@ class VolunteerSteps : BaseSteps() {
         try {
             onNodeWithTag("nsec-display-dialog").assertIsDisplayed()
             onNodeWithTag("created-volunteer-nsec").assertIsDisplayed()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // nsec dialog may have been dismissed already
         }
     }

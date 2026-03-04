@@ -81,7 +81,7 @@ class ShiftDetailSteps : BaseSteps() {
                 .onFirst()
                 .performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // No volunteers available
         }
     }

@@ -165,7 +165,7 @@ class ProfileSettingsSteps : BaseSteps() {
         try {
             onAllNodesWithText(text, ignoreCase = true).onFirst().performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Element not found
         }
     }

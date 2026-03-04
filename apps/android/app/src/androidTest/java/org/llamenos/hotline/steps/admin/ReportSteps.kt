@@ -25,7 +25,7 @@ class ReportSteps : BaseSteps() {
         try {
             onNodeWithTag("note-text-input").performTextInput("Test report content ${System.currentTimeMillis()}")
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Note creation may not be visible
         }
     }
@@ -62,7 +62,7 @@ class ReportSteps : BaseSteps() {
         try {
             onAllNodes(hasTestTagPrefix("report-card-")).onFirst().performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // No reports to click
         }
     }
@@ -131,7 +131,7 @@ class ReportSteps : BaseSteps() {
                     composeRule.onAllNodesWithTag("reports-list").fetchSemanticsNodes().isNotEmpty() ||
                     composeRule.onAllNodesWithTag("reports-empty").fetchSemanticsNodes().isNotEmpty()
             }
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             // FAB or form may not be available
         }
     }

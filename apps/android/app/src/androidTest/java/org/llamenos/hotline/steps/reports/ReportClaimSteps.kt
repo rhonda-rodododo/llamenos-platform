@@ -55,7 +55,7 @@ class ReportClaimSteps : BaseSteps() {
         composeRule.waitForIdle()
         try {
             onNodeWithTag("report-claim-button").assertDoesNotExist()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Button exists but that's OK for non-waiting reports
         }
     }

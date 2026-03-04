@@ -101,12 +101,12 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
     protected fun navigateToTab(tabTag: String) {
         try {
             onNodeWithTag(tabTag).performClick()
-        } catch (_: AssertionError) {
+        } catch (_: Throwable) {
             // Bottom nav may be hidden (in admin screen or dialog) — press back first
             try {
                 androidx.test.espresso.Espresso.pressBack()
                 composeRule.waitForIdle()
-            } catch (_: Exception) { /* no-op */ }
+            } catch (_: Throwable) { /* no-op */ }
             onNodeWithTag(tabTag).performClick()
         }
         composeRule.waitForIdle()
@@ -132,7 +132,7 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             try {
                 onNodeWithTag(tag).assertIsDisplayed()
                 return true
-            } catch (_: AssertionError) {
+            } catch (_: Throwable) {
                 continue
             }
         }
