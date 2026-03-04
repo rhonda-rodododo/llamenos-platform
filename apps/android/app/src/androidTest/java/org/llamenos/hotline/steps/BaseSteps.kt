@@ -6,13 +6,13 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.platform.app.InstrumentationRegistry
 
 /**
@@ -184,17 +184,22 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             else -> throw IllegalArgumentException("Unknown admin tab: $tabName")
         }
         // Admin tabs are in a horizontal ScrollableTabRow — performScrollTo() uses
-        // vertical scroll semantics and fails. Instead, just click the tab directly;
-        // ScrollableTabRow auto-scrolls to bring the clicked tab into view.
-        // If the tab is off-screen, try scrolling the tab row to the target first.
-        try {
-            onNodeWithTag(tabTag).performClick()
-        } catch (_: AssertionError) {
-            // Tab may be off-screen — scroll the tab row container then retry
-            composeRule.onNodeWithTag("admin-tabs")
-                .performScrollToNode(hasTestTag(tabTag))
-            onNodeWithTag(tabTag).performClick()
+        // vertical scroll semantics and fails. Instead, just click the tab directly.
+        // If the tab is off-screen, swipe the tab row left to reveal later tabs.
+        for (attempt in 0..3) {
+            try {
+                onNodeWithTag(tabTag).performClick()
+                composeRule.waitForIdle()
+                return
+            } catch (_: AssertionError) {
+                // Tab is off-screen — swipe the tab row left to reveal more tabs
+                composeRule.onNodeWithTag("admin-tabs")
+                    .performTouchInput { swipeLeft() }
+                composeRule.waitForIdle()
+            }
         }
+        // Final attempt after swiping
+        onNodeWithTag(tabTag).performClick()
         composeRule.waitForIdle()
     }
 
