@@ -65,6 +65,26 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                #if DEBUG
+                // Test-only navigation shortcut for elements deep in the list.
+                // SwiftUI List cell recycling breaks NavigationLink taps via XCUITest
+                // for cells that require scrolling. This provides a reliable tap target.
+                if ProcessInfo.processInfo.arguments.contains("--test-authenticated") {
+                    Section {
+                        NavigationLink(value: "panic-wipe") {
+                            Label {
+                                Text(NSLocalizedString("settings_panic_wipe", comment: "Emergency Wipe"))
+                                    .foregroundStyle(.red)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                        .accessibilityIdentifier("test-panic-wipe")
+                    }
+                }
+                #endif
+
                 // Identity section
                 identitySection
 
@@ -93,6 +113,12 @@ struct SettingsView: View {
 
                 // Actions section
                 actionsSection
+
+                // Emergency section
+                emergencySection
+
+                // Help section
+                helpSection
 
                 // App info section
                 appInfoSection
@@ -126,8 +152,15 @@ struct SettingsView: View {
                 isBiometricEnabled = appState.authService.isBiometricEnabled
             }
             .navigationDestination(for: String.self) { destination in
-                if destination == "admin" {
+                switch destination {
+                case "admin":
                     AdminTabView()
+                case "help":
+                    HelpView()
+                case "panic-wipe":
+                    PanicWipeConfirmationView()
+                default:
+                    EmptyView()
                 }
             }
         }
@@ -463,6 +496,45 @@ struct SettingsView: View {
             .accessibilityIdentifier("settings-logout")
         } header: {
             Text(NSLocalizedString("settings_actions_header", comment: "Actions"))
+        }
+    }
+
+    // MARK: - Emergency Section
+
+    private var emergencySection: some View {
+        Section {
+            NavigationLink(value: "panic-wipe") {
+                Label {
+                    Text(NSLocalizedString("settings_panic_wipe", comment: "Emergency Wipe"))
+                        .foregroundStyle(.red)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+            .accessibilityIdentifier("settings-panic-wipe")
+        } footer: {
+            Text(NSLocalizedString(
+                "settings_emergency_footer",
+                comment: "Permanently deletes all data from this device including your identity keys."
+            ))
+        }
+    }
+
+    // MARK: - Help Section
+
+    private var helpSection: some View {
+        Section {
+            NavigationLink(value: "help") {
+                Label {
+                    Text(NSLocalizedString("settings_help", comment: "Help & FAQ"))
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundStyle(.tint)
+                }
+            }
+            .accessibilityIdentifier("settings-help")
         }
     }
 

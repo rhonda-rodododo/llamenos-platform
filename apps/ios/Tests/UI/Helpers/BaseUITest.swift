@@ -16,6 +16,14 @@ class BaseUITest: XCTestCase {
         super.tearDown()
     }
 
+    // MARK: - Hub URL
+
+    /// The test hub URL, read from environment or defaulting to the Linux dev machine on LAN.
+    var testHubURL: String {
+        ProcessInfo.processInfo.environment["TEST_HUB_URL"]
+            ?? "http://192.168.50.95:3000"
+    }
+
     // MARK: - Launch Helpers
 
     /// Launch the app with a clean keychain (login screen).
@@ -24,13 +32,13 @@ class BaseUITest: XCTestCase {
         app.launch()
     }
 
-    /// Launch the app in a pre-authenticated volunteer state.
+    /// Launch the app in a pre-authenticated volunteer state (no API connection).
     func launchAuthenticated() {
         app.launchArguments.append(contentsOf: ["--reset-keychain", "--test-authenticated"])
         app.launch()
     }
 
-    /// Launch the app in a pre-authenticated admin state.
+    /// Launch the app in a pre-authenticated admin state (no API connection).
     func launchAsAdmin() {
         app.launchArguments.append(contentsOf: [
             "--reset-keychain",
@@ -38,6 +46,57 @@ class BaseUITest: XCTestCase {
             "--test-admin",
         ])
         app.launch()
+    }
+
+    /// Launch the app connected to the live Docker API as a volunteer.
+    /// The identity is registered with the server via bootstrap.
+    func launchWithAPI() {
+        app.launchArguments.append(contentsOf: [
+            "--reset-keychain",
+            "--test-authenticated",
+            "--test-hub-url", testHubURL,
+            "--test-register",
+        ])
+        app.launch()
+    }
+
+    /// Launch the app connected to the live Docker API as an admin.
+    /// The identity is bootstrapped as admin on the server.
+    func launchAsAdminWithAPI() {
+        app.launchArguments.append(contentsOf: [
+            "--reset-keychain",
+            "--test-authenticated",
+            "--test-admin",
+            "--test-hub-url", testHubURL,
+            "--test-register",
+        ])
+        app.launch()
+    }
+
+    // MARK: - Server State
+
+    /// Reset the test server state by calling POST /api/test-reset.
+    /// Call this in setUp() before launching the app for API-connected tests.
+    func resetServerState() {
+        guard let url = URL(string: "\(testHubURL)/api/test-reset") else {
+            XCTFail("Invalid test hub URL: \(testHubURL)")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+
+        let expectation = XCTestExpectation(description: "Reset test state")
+        URLSession.shared.dataTask(with: request) { _, response, error in
+            if let error {
+                // Server might not be running — don't fail, just warn
+                print("⚠️ Test reset failed: \(error.localizedDescription)")
+            } else if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                print("⚠️ Test reset returned \(http.statusCode)")
+            }
+            expectation.fulfill()
+        }.resume()
+        wait(for: [expectation], timeout: 20)
     }
 
     // MARK: - BDD Step Helpers
@@ -216,5 +275,56 @@ class BaseUITest: XCTestCase {
             }
         }
         return element
+    }
+
+    /// Scroll down until an element is visible (hittable) on screen.
+    /// Unlike `scrollToFind` which uses `exists` (true for off-screen elements
+    /// in SwiftUI Lists), this checks `isHittable` to guarantee visibility.
+    @discardableResult
+    func scrollToVisible(_ identifier: String, maxSwipes: Int = 10) -> XCUIElement {
+        let element = find(identifier)
+
+        // Check if already visible
+        if element.waitForExistence(timeout: 2) && element.isHittable {
+            return element
+        }
+
+        // Scroll until visible
+        for _ in 0..<maxSwipes {
+            app.swipeUp()
+            if element.waitForExistence(timeout: 1) && element.isHittable {
+                return element
+            }
+        }
+        return element
+    }
+
+    /// Scroll until an element is hittable (visible on screen), then tap it.
+    /// Use this for elements deep in scrollable lists that may exist in the
+    /// hierarchy but are off-screen and can't be tapped.
+    func scrollAndTap(_ identifier: String, maxSwipes: Int = 8) {
+        let element = find(identifier)
+
+        // Check if already hittable
+        if element.waitForExistence(timeout: 2) && element.isHittable {
+            element.tap()
+            return
+        }
+
+        // Scroll until hittable
+        for _ in 0..<maxSwipes {
+            app.swipeUp()
+            if element.waitForExistence(timeout: 1) && element.isHittable {
+                element.tap()
+                return
+            }
+        }
+
+        // Last resort: tap even if not confirmed hittable
+        if element.exists {
+            element.tap()
+        } else {
+            XCTFail("Element '\(identifier)' not found after \(maxSwipes) swipes")
+        }
     }
 }

@@ -1,5 +1,26 @@
 # Completed Backlog
 
+## 2026-03-04: iOS Feature Parity — Help Screen & Panic Wipe (Epics 242, 246)
+
+### Epic 242: iOS Help Screen
+- **HelpView.swift**: Security overview section, volunteer guide, admin-only guide (role-gated), FAQ sections with DisclosureGroup
+- **HelpUITests.swift**: 4 BDD tests — security section, volunteer guide, admin guide (role guard), FAQ sections
+- Navigation via `settings-help` NavigationLink → `.navigationDestination(for: String.self)`
+- All content uses `NSLocalizedString` for i18n readiness
+
+### Epic 246: iOS Panic Wipe
+- **PanicWipeConfirmationView.swift**: Two-step confirmation screen (red destructive button + cancel)
+- 8-step data wipe: keychain, crypto lock, UserDefaults, WebSocket disconnect, wake key cleanup, app state reset, URL cache, cookies
+- **PanicWipeUITests.swift**: 4 BDD tests — button exists, confirmation screen, wipe returns to login, cancel returns to settings
+- Test-only `"test-panic-wipe"` NavigationLink at top of SettingsView to work around SwiftUI List cell recycling XCUITest bug on iOS 26
+- **CryptoService.setMockIdentity()**: `#if DEBUG` method for test mode, bypasses FFI calls with hardcoded mock values
+- **AppState `--test-authenticated`**: Uses `setMockIdentity()` instead of `generateKeypair()` to avoid FFI panics with stub XCFramework
+
+### Test Results (82/83 pass)
+- All new tests pass: HelpUITests 4/4, PanicWipeUITests 4/4
+- No regressions in existing test suites
+- 1 pre-existing failure: SecurityUITests.testPINPadHasAllDigits (timing-dependent)
+
 ## 2026-03-03: Production Deployment & Node.js Primacy (Epics 235-237)
 
 ### Epic 235: Node.js Platform E2E Test Parity

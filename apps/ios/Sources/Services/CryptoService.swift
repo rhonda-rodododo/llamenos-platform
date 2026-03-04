@@ -297,4 +297,17 @@ final class CryptoService: @unchecked Sendable {
         nsecHex = nil
         nsecBech32 = nil
     }
+
+    // MARK: - Test Support
+
+    #if DEBUG
+    /// Set mock identity state without calling through to FFI.
+    /// Used by XCUITest launch arguments when the real Rust crypto library is unavailable.
+    func setMockIdentity() {
+        self.nsecHex = String(repeating: "ab", count: 32)
+        self.nsecBech32 = "nsec1mock"
+        self.pubkey = String(repeating: "cd", count: 32)
+        self.npub = "npub1mock"
+    }
+    #endif
 }

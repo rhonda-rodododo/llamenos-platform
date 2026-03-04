@@ -100,15 +100,59 @@ final class AppState {
             authService.logout()
         }
 
+        // Configure hub URL for API access (must come before --test-register)
+        if let hubIndex = args.firstIndex(of: "--test-hub-url"),
+           hubIndex + 1 < args.count {
+            let hubURL = args[hubIndex + 1]
+            try? apiService.configure(hubURLString: hubURL)
+            try? authService.setHubURL(hubURL)
+        }
+
         if args.contains("--test-authenticated") {
-            // Generate a fresh keypair and unlock the crypto service
-            _ = cryptoService.generateKeypair()
+            // Set mock identity without calling through to FFI.
+            // The stub XCFramework panics on real crypto calls.
+            cryptoService.setMockIdentity()
             isLocked = false
         }
 
         if args.contains("--test-admin") {
             userRole = .admin
         }
+
+        // Register identity with server (must come after keypair + hub URL)
+        if args.contains("--test-register") && cryptoService.isUnlocked {
+            bootstrapTestIdentity()
+        }
+    }
+
+    /// Synchronously register the test identity as admin via POST /api/auth/bootstrap.
+    /// Blocks the main thread briefly — acceptable for test setup only.
+    private func bootstrapTestIdentity() {
+        guard let hubURL = authService.hubURL,
+              let baseURL = URL(string: hubURL) else { return }
+
+        guard let token = try? cryptoService.createAuthToken(
+            method: "POST", path: "/api/auth/bootstrap"
+        ) else { return }
+
+        let url = baseURL.appendingPathComponent("api/auth/bootstrap")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 10
+
+        let body: [String: Any] = [
+            "pubkey": token.pubkey,
+            "timestamp": token.timestamp,
+            "token": token.token,
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        let semaphore = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { _, _, _ in
+            semaphore.signal()
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 10)
     }
     #endif
 

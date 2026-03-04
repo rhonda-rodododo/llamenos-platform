@@ -370,6 +370,46 @@ Architecture audit (2026-03-03) identified that Node.js + PostgreSQL is the real
 
 **Dependency order:** 237 ✓ → 214-iOS ✓ → 227 ✓ → 234 ✓ | 235 ✓ | 236 ✓
 
+## Desktop BDD Behavioral Recovery (Epics 247-251) — IN PROGRESS
+
+Recover the ~400 behavioral tests lost in the Epic 232 BDD migration. Original .spec.ts files had 5,833 lines of deep behavioral tests (API verification, CRUD cycles, permission enforcement, serial state chains). Current step definitions are ~80% presence-only checks. Recovery uses BDD approach: expand feature files + rewrite step definitions.
+
+### Admin & Infrastructure
+- [ ] **[Epic 247: Admin CRUD Behavioral Recovery](epics/epic-247-desktop-bdd-admin-crud.md)** — Volunteer, ban, shift CRUD with API verification. API helpers foundation.
+- [ ] **[Epic 248: Notes & Custom Fields Behavioral Recovery](epics/epic-248-desktop-bdd-notes-custom-fields.md)** — Note create/edit/save/verify, custom field CRUD + badge display, call ID grouping.
+
+### RBAC & Permissions
+- [ ] **[Epic 249: RBAC & Permissions Behavioral Recovery](epics/epic-249-desktop-bdd-rbac-permissions.md)** — Role CRUD via API, cross-role permission enforcement (admin/volunteer/reporter/custom), multi-role union, wildcard permissions.
+
+### Reports, Conversations & Audit
+- [ ] **[Epic 250: Reports, Conversations & Audit Behavioral Recovery](epics/epic-250-desktop-bdd-reports-conversations-audit.md)** — Report lifecycle (create→claim→close→filter), reporter role onboarding, audit log filtering/search, conversation assign/close/reopen.
+
+### Settings & Auth Guards
+- [ ] **[Epic 251: Settings, Auth Guards & Desktop Flows](epics/epic-251-desktop-bdd-settings-auth-guards.md)** — Settings/theme/language persistence, auth guard enforcement, volunteer navigation restrictions, admin settings sections.
+
+**Dependency order:** 247 (API helpers) → (248 | 249 | 250 | 251) in parallel
+
+## iOS Feature Parity (Epics 240-246) — IN PROGRESS
+
+Catch iOS up to Android feature set with native SwiftUI design. BDD-first: write XCUITest specs, then implement features to pass them. Tests hit live Docker API.
+
+### Infrastructure
+- [ ] **[Epic 240: iOS Docker Test Infrastructure](epics/epic-240-ios-docker-test-infra.md)** — Connect XCUITests to live Docker Compose API backend (`--test-hub-url`, `resetServerState()`, identity registration)
+
+### Core Features
+- [ ] **[Epic 241: iOS Reports](epics/epic-241-ios-reports.md)** — Full reports CRUD (create, list, detail, claim, close) with E2EE envelope encryption
+- [x] **[Epic 242: iOS Help Screen](epics/epic-242-ios-help-screen.md)** — Security overview, role-based guides, FAQ with DisclosureGroup sections
+
+### Admin Features
+- [ ] **[Epic 243: iOS Contacts & Timeline](epics/epic-243-ios-contacts-timeline.md)** — Admin-only contacts list with per-contact interaction timeline
+- [ ] **[Epic 244: iOS Admin Custom Fields](epics/epic-244-ios-admin-custom-fields.md)** — Custom fields management tab in admin panel (CRUD with field type picker)
+- [ ] **[Epic 245: iOS Blasts](epics/epic-245-ios-blasts.md)** — Admin broadcast messaging (compose, send/schedule to subscribers)
+
+### Security
+- [x] **[Epic 246: iOS Panic Wipe](epics/epic-246-ios-panic-wipe.md)** — Emergency data deletion in Settings with two-step confirmation
+
+**Dependency order:** 240 → (241 | 242 | 243 | 244 | 245 | 246)
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
