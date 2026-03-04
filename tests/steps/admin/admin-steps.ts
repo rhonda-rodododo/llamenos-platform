@@ -6,6 +6,8 @@
  *   - packages/test-specs/features/admin/admin-tabs.feature
  *
  * Desktop uses sidebar navigation for admin pages (no "admin panel" or tab list).
+ *
+ * Behavioral depth: Hard assertions, no if(visible) guards.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
@@ -15,31 +17,17 @@ import { Timeouts } from '../../helpers'
 // --- Admin navigation steps ---
 
 Then('I should see the admin screen', async ({ page }) => {
-  const adminSection = page.getByTestId(TestIds.NAV_ADMIN_SECTION)
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const adminVisible = await adminSection.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!adminVisible) {
-    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  await expect(page.getByTestId(TestIds.NAV_ADMIN_SECTION)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the admin title should be displayed', async ({ page }) => {
-  const adminSection = page.getByTestId(TestIds.NAV_ADMIN_SECTION)
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const adminVisible = await adminSection.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!adminVisible) {
-    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the admin tabs should be visible', async ({ page }) => {
-  // Desktop has sidebar nav links instead of tab list.
-  // Check that admin nav links are visible in the sidebar.
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  await expect(sidebar).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Verify at least one admin nav link is visible
-  const adminSection = page.getByTestId(TestIds.NAV_ADMIN_SECTION)
-  await expect(adminSection).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Desktop has sidebar nav links instead of tab list
+  await expect(page.getByTestId(TestIds.NAV_SIDEBAR)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.NAV_ADMIN_SECTION)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Admin tabs steps ---
@@ -49,10 +37,8 @@ Then('I should see the following tabs:', async ({ page }, dataTable) => {
   for (const [tabName] of rows) {
     const testId = navTestIdMap[tabName]
     if (testId) {
-      const navLink = page.getByTestId(testId)
-      await expect(navLink).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
     } else {
-      // Fallback: look for text in sidebar
       const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
       await expect(sidebar.getByText(tabName, { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
     }
@@ -60,17 +46,15 @@ Then('I should see the following tabs:', async ({ page }, dataTable) => {
 })
 
 Then('the {string} tab should be selected by default', async ({ page }, _tabName: string) => {
-  // Desktop: "selected tab" = current page — verify page title is visible
+  // Desktop: "selected tab" = current page — verify page title
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('{word} content should be displayed \\(loading, empty, or list)', async ({ page }, _tabContent: string) => {
-  // Generic content check for any admin tab (volunteers, bans, audit, invites)
-  // Use .or() instead of broken CSS text= pattern
-  const content = page.getByTestId(TestIds.VOLUNTEER_LIST)
-    .or(page.getByTestId(TestIds.EMPTY_STATE))
-    .or(page.getByTestId(TestIds.LOADING_SKELETON))
-    .or(page.getByTestId(TestIds.PAGE_TITLE))
+  // Generic content check for any admin tab
+  const content = page.locator(
+    `[data-testid="${TestIds.VOLUNTEER_LIST}"], [data-testid="${TestIds.EMPTY_STATE}"], [data-testid="${TestIds.LOADING_SKELETON}"]`,
+  )
   await expect(content.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -81,7 +65,6 @@ Then('I should be on the Volunteers tab', async ({ page }) => {
 // --- Access control steps ---
 
 Given('the crypto service is locked', async ({ page }) => {
-  // Navigate to a page first to avoid SecurityError when clearing storage on about:blank
   const url = page.url()
   if (url === 'about:blank' || url === '') {
     await page.goto('/login')
@@ -103,9 +86,7 @@ Given('a stored identity exists', async ({ page }) => {
 })
 
 Then('I should not be able to access any tab', async ({ page }) => {
-  // When locked, navigation should not be accessible
-  const nav = page.getByTestId(TestIds.NAV_SIDEBAR)
-  await expect(nav).not.toBeVisible()
+  await expect(page.getByTestId(TestIds.NAV_SIDEBAR)).not.toBeVisible()
 })
 
 Then('I should be able to navigate to all tabs:', async ({ page }, dataTable) => {
@@ -122,13 +103,13 @@ Then('I should be able to navigate to all tabs:', async ({ page }, dataTable) =>
 })
 
 When('I attempt to create an auth token', async () => {
-  // This is a crypto-level test — handled in crypto steps
+  // Crypto-level test — handled in crypto steps
 })
 
 When('I attempt to encrypt a note', async () => {
-  // This is a crypto-level test — handled in crypto steps
+  // Crypto-level test — handled in crypto steps
 })
 
 Then('it should throw a CryptoException', async () => {
-  // Verified at the crypto service level — if we're on the PIN screen, crypto is locked
+  // Verified at the crypto service level — if on PIN screen, crypto is locked
 })

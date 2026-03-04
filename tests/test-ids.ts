@@ -48,6 +48,7 @@ export const TestIds = {
   DISMISS_NSEC: 'dismiss-nsec',
   DISMISS_INVITE: 'dismiss-invite',
   TOGGLE_PHONE_VISIBILITY: 'toggle-phone-visibility',
+  INVITE_BTN: 'invite-btn',
   REVOKE_INVITE_BTN: 'revoke-invite-btn',
 
   // ============ Shifts ============
@@ -113,6 +114,7 @@ export const TestIds = {
   REPORT_SUBMIT_BTN: 'report-submit-btn',
   REPORT_METADATA: 'report-metadata',
   REPORT_STATUS_BADGE: 'report-status-badge',
+  REPORT_FILTER_AREA: 'report-filter-area',
   RECOVERY_KEY: 'recovery-key',
 
   // ============ Conversations ============
@@ -193,6 +195,7 @@ export const TestIds = {
   DASHBOARD_ACTIVE_CALLS: 'dashboard-active-calls',
   DASHBOARD_SHIFT_STATUS: 'dashboard-shift-status',
   DASHBOARD_CALLS_TODAY: 'dashboard-calls-today',
+  DASHBOARD_QUICK_ACTIONS: 'dashboard-quick-actions',
   BREAK_TOGGLE_BTN: 'break-toggle-btn',
 
   // ============ Settings ============

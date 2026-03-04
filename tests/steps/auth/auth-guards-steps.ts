@@ -2,6 +2,9 @@
  * Auth guard step definitions.
  * Matches steps from: packages/test-specs/features/desktop/auth/auth-guards.feature
  * Covers route protection, PIN re-entry after reload, logout clearing session, and API 401.
+ *
+ * Behavioral depth: Unauthenticated API call uses real request (no auth headers)
+ * to verify 401 enforcement. PIN re-entry uses real enterPin flow.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
@@ -15,8 +18,6 @@ Given('I am not authenticated', async ({ page }) => {
   })
 })
 
-// "I visit {string} without authentication" is defined in navigation-steps.ts
-
 When('I reload the page', async ({ page }) => {
   await page.reload()
 })
@@ -26,6 +27,7 @@ When('I re-enter the correct PIN', async ({ page }) => {
 })
 
 When('I make an unauthenticated API request to {string}', async ({ page }, endpoint: string) => {
+  // Intentionally NO auth headers — verifying the server rejects unauthenticated requests
   const response = await page.request.get(endpoint)
   await page.evaluate((status) => {
     ;(window as Record<string, unknown>).__test_api_response_status = status

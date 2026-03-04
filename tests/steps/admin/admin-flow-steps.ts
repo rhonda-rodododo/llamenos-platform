@@ -3,13 +3,21 @@
  * Matches steps from: packages/test-specs/features/desktop/admin/admin-flow.feature
  * Covers admin navigation, volunteer CRUD, shift CRUD, ban management,
  * call history, settings, and language switching.
+ *
+ * Behavioral depth: All CRUD operations verify state changes via API.
  */
 import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds, uniquePhone, Timeouts } from '../../helpers'
+import {
+  listVolunteersViaApi,
+  listShiftsViaApi,
+  listBansViaApi,
+} from '../../api-helpers'
 
 // --- State for cross-step data ---
 let lastVolunteerName = ''
+let lastVolunteerPubkey = ''
 let lastShiftName = ''
 let lastPhone = ''
 
@@ -27,44 +35,70 @@ When('I add a new volunteer with a unique name and phone', async ({ page }) => {
 })
 
 Then('I should see the generated nsec', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)).toBeVisible({ timeout: 15000 })
+  const nsecCode = page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)
+  await expect(nsecCode).toBeVisible({ timeout: 15000 })
+  // Verify the nsec looks valid (starts with nsec1)
+  const nsecText = await nsecCode.textContent()
+  expect(nsecText).toBeTruthy()
+  expect(nsecText!.startsWith('nsec1')).toBe(true)
 })
 
 When('I close the nsec card', async ({ page }) => {
   await page.getByTestId(TestIds.DISMISS_NSEC).click()
+  await expect(page.getByTestId(TestIds.DISMISS_NSEC)).not.toBeVisible({ timeout: 5000 })
 })
 
-Then('the volunteer should appear in the list', async ({ page }) => {
+Then('the volunteer should appear in the list', async ({ page, request }) => {
+  // UI verification
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: lastVolunteerName })
-  await expect(row.first()).toBeVisible()
+  await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // API verification: volunteer exists in backend
+  const volunteers = await listVolunteersViaApi(request)
+  const found = volunteers.find(v => v.name === lastVolunteerName)
+  expect(found).toBeTruthy()
+  lastVolunteerPubkey = found!.pubkey
 })
 
 When('I delete the volunteer', async ({ page }) => {
   const volRow = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: lastVolunteerName })
   await volRow.getByTestId(TestIds.VOLUNTEER_DELETE_BTN).click()
   await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 })
 })
 
-Then('the volunteer should be removed from the list', async ({ page }) => {
+Then('the volunteer should be removed from the list', async ({ page, request }) => {
+  // UI verification
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: lastVolunteerName })
-  await expect(row).not.toBeVisible()
+  await expect(row).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // API verification: volunteer is gone
+  const volunteers = await listVolunteersViaApi(request)
+  const found = volunteers.find(v => v.name === lastVolunteerName)
+  expect(found).toBeUndefined()
 })
 
 // --- Shift CRUD ---
 
-When('I create a new shift with a unique name', async ({ page }) => {
+When('I create a new shift with a unique name', async ({ page, request }) => {
   lastShiftName = `Shift ${Date.now()}`
   await page.getByTestId(TestIds.SHIFT_CREATE_BTN).click()
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(lastShiftName)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+
+  // Wait for UI confirmation
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
-  await expect(card.first()).toBeVisible()
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // API verification: shift was created in backend
+  const shifts = await listShiftsViaApi(request)
+  const found = shifts.find(s => s.name === lastShiftName)
+  expect(found).toBeTruthy()
 })
 
 Then('the shift should appear in the list', async ({ page }) => {
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
-  await expect(card.first()).toBeVisible()
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I edit the shift with a new name', async ({ page }) => {
@@ -77,9 +111,15 @@ When('I edit the shift with a new name', async ({ page }) => {
   lastShiftName = updatedName
 })
 
-Then('the updated shift name should appear', async ({ page }) => {
+Then('the updated shift name should appear', async ({ page, request }) => {
+  // UI verification
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
-  await expect(card.first()).toBeVisible()
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // API verification: updated name persisted
+  const shifts = await listShiftsViaApi(request)
+  const found = shifts.find(s => s.name === lastShiftName)
+  expect(found).toBeTruthy()
 })
 
 When('I delete the shift', async ({ page }) => {
@@ -87,9 +127,15 @@ When('I delete the shift', async ({ page }) => {
   await shiftCard.getByTestId(TestIds.SHIFT_DELETE_BTN).click()
 })
 
-Then('the shift should no longer appear', async ({ page }) => {
+Then('the shift should no longer appear', async ({ page, request }) => {
+  // UI verification
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
-  await expect(card).not.toBeVisible()
+  await expect(card).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // API verification: shift is gone
+  const shifts = await listShiftsViaApi(request)
+  const found = shifts.find(s => s.name === lastShiftName)
+  expect(found).toBeUndefined()
 })
 
 // --- Ban management ---
@@ -103,22 +149,34 @@ When('I ban a unique phone number with reason {string}', async ({ page }, reason
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 })
 
-Then('the banned phone number should appear', async ({ page }) => {
+Then('the banned phone number should appear', async ({ page, request }) => {
+  // UI verification
   const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: lastPhone })
-  await expect(row.first()).toBeVisible()
+  await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // API verification
+  const bans = await listBansViaApi(request)
+  const found = bans.find(b => b.phone === lastPhone)
+  expect(found).toBeTruthy()
 })
 
 When('I remove the ban for that phone number', async ({ page }) => {
   const banRow = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: lastPhone })
-  await expect(banRow.first()).toBeVisible()
+  await expect(banRow.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   await banRow.getByTestId(TestIds.BAN_REMOVE_BTN).click()
   await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
-  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 })
 })
 
-Then('the phone number should no longer appear', async ({ page }) => {
+Then('the phone number should no longer appear', async ({ page, request }) => {
+  // UI verification
   const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: lastPhone })
-  await expect(row).not.toBeVisible()
+  await expect(row).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // API verification
+  const bans = await listBansViaApi(request)
+  const found = bans.find(b => b.phone === lastPhone)
+  expect(found).toBeUndefined()
 })
 
 // --- Phone validation ---
@@ -132,7 +190,7 @@ When('I try to add a volunteer with an invalid phone number', async ({ page }) =
 })
 
 Then('I should see an invalid phone error', async ({ page }) => {
-  await expect(page.getByText(/invalid phone/i)).toBeVisible()
+  await expect(page.getByText(/invalid phone/i)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Call history ---
@@ -143,7 +201,7 @@ When('I search for a phone number in call history', async ({ page }) => {
 })
 
 Then('I should see the clear filters button', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.CALL_CLEAR_FILTERS)).toBeVisible()
+  await expect(page.getByTestId(TestIds.CALL_CLEAR_FILTERS)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I click the clear filters button', async ({ page }) => {
@@ -151,7 +209,7 @@ When('I click the clear filters button', async ({ page }) => {
 })
 
 Then('the clear filters button should not be visible', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.CALL_CLEAR_FILTERS)).not.toBeVisible()
+  await expect(page.getByTestId(TestIds.CALL_CLEAR_FILTERS)).not.toBeVisible({ timeout: 5000 })
 })
 
 // --- Settings toggles ---
@@ -167,26 +225,26 @@ Then('I should see at least one toggle switch', async ({ page }) => {
 When('I switch the language to Espanol', async ({ page }) => {
   await page.getByRole('combobox', { name: /switch to/i }).click()
   await page.getByRole('option', { name: /español/i }).click()
+  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I switch the language back to English', async ({ page }) => {
   await page.getByRole('combobox', { name: /cambiar a/i }).click()
   await page.getByRole('option', { name: /english/i }).click()
+  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Settings summaries ---
 
 Then('the telephony provider card should be visible', async ({ page }) => {
-  await page.waitForTimeout(1000)
-  await expect(page.getByTestId(TestIds.TELEPHONY_PROVIDER)).toBeVisible()
+  await expect(page.getByTestId(TestIds.TELEPHONY_PROVIDER)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the transcription card should be visible', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.TRANSCRIPTION_SECTION)).toBeVisible()
+  await expect(page.getByTestId(TestIds.TRANSCRIPTION_SECTION)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('at least one status summary should be visible', async ({ page }) => {
-  // Content assertion — verify settings status summaries are rendered
   const statusCount = await page
     .getByText(
       /(Enabled|Disabled|Not configured|Not required|languages|fields|None|CAPTCHA|Default|Customized)/i,

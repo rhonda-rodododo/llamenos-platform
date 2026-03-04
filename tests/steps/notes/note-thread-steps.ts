@@ -1,22 +1,34 @@
 /**
  * Note thread reply step definitions.
  * Matches steps from: packages/test-specs/features/notes/note-thread.feature
+ *
+ * Behavioral depth: Hard assertions, no expect(true).toBe(true),
+ * no if(visible) guards hiding failures.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { Navigation } from '../../pages/index'
+import { listNotesViaApi } from '../../api-helpers'
 
-Given('I am on the note detail screen', async ({ page }) => {
-  // Navigate to notes and open first note if available
-  await Navigation.goToNotes(page)
-  const noteCard = page.getByTestId(TestIds.NOTE_CARD)
-  const exists = await noteCard.first().isVisible({ timeout: 3000 }).catch(() => false)
-  if (exists) {
-    await noteCard.first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
+Given('I am on the note detail screen', async ({ page, request }) => {
+  // Ensure at least one note exists
+  const { notes } = await listNotesViaApi(request)
+  if (notes.length === 0) {
+    await Navigation.goToNotes(page)
+    await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
+    await page.getByTestId(TestIds.NOTE_CONTENT).fill('Test note for thread')
+    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
+  } else {
+    await Navigation.goToNotes(page)
   }
+  // Open first note
+  const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
+  await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await noteCard.click()
+  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Given('the note has no replies', async () => {
@@ -39,31 +51,19 @@ Then('I should see the reply input field', async ({ page }) => {
 })
 
 Then('I should see the no replies message', async ({ page }) => {
-  // Either the empty state within the thread or the thread section itself
-  const emptyState = page.getByTestId(TestIds.NOTE_THREAD).locator(`[data-testid="${TestIds.EMPTY_STATE}"]`)
-  const emptyFallback = page.getByTestId(TestIds.NOTE_THREAD)
-  // Check for empty state within thread, fall back to thread section being visible
-  const hasEmptyState = await emptyState.isVisible({ timeout: 2000 }).catch(() => false)
-  if (hasEmptyState) {
-    await expect(emptyState).toBeVisible()
-  } else {
-    await expect(emptyFallback).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  // The empty state should be within the thread section
+  const threadSection = page.getByTestId(TestIds.NOTE_THREAD)
+  await expect(threadSection).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const emptyState = threadSection.locator(`[data-testid="${TestIds.EMPTY_STATE}"]`)
+  await expect(emptyState).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the reply count in the thread header', async ({ page }) => {
-  // Reply count is displayed within the thread section — content assertion scoped to thread
   const threadSection = page.getByTestId(TestIds.NOTE_THREAD)
-  const threadVisible = await threadSection.isVisible({ timeout: 2000 }).catch(() => false)
-  if (threadVisible) {
-    // Reply count may show as "N replies" or just a number — content assertion is appropriate
-    const replyCount = threadSection.locator('text=/\\d+\\s*(repl|comment)/i')
-    const countVisible = await replyCount.first().isVisible({ timeout: 2000 }).catch(() => false)
-    // May also show "0 replies" or just the section header — thread being visible is sufficient
-    if (!countVisible) {
-      await expect(threadSection).toBeVisible()
-    }
-  }
+  await expect(threadSection).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Reply count shows as "N replies" or "N comments" in the thread header
+  const replyCount = threadSection.locator('text=/\\d+\\s*(repl|comment)/i')
+  await expect(replyCount.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the send reply button', async ({ page }) => {
@@ -71,15 +71,10 @@ Then('I should see the send reply button', async ({ page }) => {
 })
 
 Then('notes with replies should show a reply count badge', async ({ page }) => {
-  // On the notes list, cards may show reply count badges
+  // On the notes list, cards with replies show a reply count badge
   const noteCards = page.getByTestId(TestIds.NOTE_CARD)
-  const anyCard = await noteCards.first().isVisible({ timeout: 3000 }).catch(() => false)
-  if (anyCard) {
-    // Look for any reply count indicator on any note card
-    const badge = noteCards.first().locator('text=/\\d+\\s*repl/i')
-    // Badge is only visible if notes have replies — may not be present in test env
-    const hasBadge = await badge.first().isVisible({ timeout: 2000 }).catch(() => false)
-    // This assertion is conditional — empty test data may not have replies
-    expect(true).toBe(true)
-  }
+  await expect(noteCards.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // At least one card should have a reply count indicator
+  const badge = noteCards.locator('text=/\\d+\\s*repl/i')
+  await expect(badge.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
