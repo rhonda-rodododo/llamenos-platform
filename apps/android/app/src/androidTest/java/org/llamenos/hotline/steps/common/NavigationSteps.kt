@@ -173,9 +173,33 @@ class NavigationSteps : BaseSteps() {
     @When("I navigate to {string}")
     fun iNavigateToPath(path: String) {
         // URL-based navigation doesn't directly apply to Android
-        // Launch the app and navigate to the first available screen
-        activityScenarioHolder.launch()
-        composeRule.waitForIdle()
+        // Parse the path and navigate to the closest matching screen
+        val cleanPath = path.split("?").first().trimStart('/')
+        when {
+            cleanPath.startsWith("settings") -> {
+                navigateToTab(NAV_SETTINGS)
+                // If a section query param is specified, expand it
+                val section = Regex("[?&]section=([^&]+)").find(path)?.groupValues?.get(1)
+                if (section != null) {
+                    val sectionTag = "settings-${section}-section"
+                    try {
+                        expandSettingsSection(sectionTag)
+                    } catch (_: AssertionError) { /* section may not exist */ }
+                }
+            }
+            cleanPath.startsWith("notes") -> navigateToTab(NAV_NOTES)
+            cleanPath.startsWith("conversations") -> navigateToTab(NAV_CONVERSATIONS)
+            cleanPath.startsWith("shifts") -> navigateToTab(NAV_SHIFTS)
+            cleanPath.startsWith("admin") -> {
+                navigateToTab(NAV_SETTINGS)
+                try {
+                    onNodeWithTag("settings-admin-card").performScrollTo()
+                    onNodeWithTag("settings-admin-card").performClick()
+                    composeRule.waitForIdle()
+                } catch (_: AssertionError) { /* admin card may not exist */ }
+            }
+            else -> navigateToTab(NAV_DASHBOARD)
+        }
     }
 
     @When("I log out")

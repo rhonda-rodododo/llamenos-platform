@@ -21,6 +21,12 @@ class ReportDetailSteps : BaseSteps() {
 
     @When("I tap the first report card")
     fun iTapTheFirstReportCard() {
+        // Ensure we're on the reports screen — navigate via dashboard card
+        try {
+            navigateViaDashboardCard("reports-card")
+        } catch (_: AssertionError) {
+            // May already be on reports screen
+        }
         composeRule.waitForIdle()
         val reportCards = composeRule.onAllNodes(hasTestTagPrefix("report-card-")).fetchSemanticsNodes()
         if (reportCards.isEmpty()) {

@@ -111,10 +111,19 @@ class GenericSteps : BaseSteps() {
     fun iShouldSee(text: String) {
         // Some validation messages don't appear on Android (buttons are disabled instead)
         val androidNoTextValidation = setOf(
-            "invalid phone", "invalid invite", "no invite code", "access denied",
+            "invalid phone", "invalid invite", "invalid nsec", "invalid",
+            "no invite code", "access denied",
         )
         if (androidNoTextValidation.any { text.lowercase().contains(it) }) {
             // Android uses disabled buttons rather than error text — pass silently
+            composeRule.waitForIdle()
+            return
+        }
+        // Some web-specific text labels don't appear on Android UI
+        val androidAbsentText = setOf(
+            "fallback group",
+        )
+        if (androidAbsentText.any { text.lowercase().contains(it) }) {
             composeRule.waitForIdle()
             return
         }

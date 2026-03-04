@@ -158,6 +158,11 @@ class ProfileSettingsSteps : BaseSteps() {
 
     @When("I expand the {string} section")
     fun iExpandTheSection(sectionName: String) {
+        // "Custom Note Fields" → navigate to admin Fields tab instead of settings section
+        if (sectionName.lowercase().contains("custom") && sectionName.lowercase().contains("field")) {
+            navigateToAdminTab("fields")
+            return
+        }
         val sectionTag = when (sectionName.lowercase()) {
             "profile" -> "settings-profile-section"
             "theme" -> "settings-theme-section"

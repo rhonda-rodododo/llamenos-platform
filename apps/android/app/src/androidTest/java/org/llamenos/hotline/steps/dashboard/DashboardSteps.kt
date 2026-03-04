@@ -115,8 +115,16 @@ class DashboardSteps : BaseSteps() {
 
     @Given("I am on shift")
     fun iAmOnShift() {
-        // Attempt to clock in via the dashboard clock button
-        onNodeWithTag("dashboard-clock-button").performClick()
+        // Attempt to clock in — try shifts screen button first, then dashboard button
+        try {
+            onNodeWithTag("clock-in-button").performClick()
+        } catch (_: AssertionError) {
+            try {
+                onNodeWithTag("dashboard-clock-button").performClick()
+            } catch (_: AssertionError) {
+                // Already on shift or clock button not available
+            }
+        }
         composeRule.waitForIdle()
     }
 

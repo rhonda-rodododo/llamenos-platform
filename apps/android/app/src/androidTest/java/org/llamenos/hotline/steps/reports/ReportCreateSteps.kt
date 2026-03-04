@@ -19,18 +19,14 @@ class ReportCreateSteps : BaseSteps() {
     @Given("I navigate to the reports list")
     fun iNavigateToTheReportsList() {
         // Navigate to the reports screen via the dashboard quick action card
-        onNodeWithTag("reports-card").performScrollTo()
-        onNodeWithTag("reports-card").performClick()
-        composeRule.waitForIdle()
+        navigateViaDashboardCard("reports-card")
         waitForNode("reports-title")
     }
 
     @Given("I navigate to the report creation form")
     fun iNavigateToTheReportCreationForm() {
         // Navigate to reports first, then tap the create FAB
-        onNodeWithTag("reports-card").performScrollTo()
-        onNodeWithTag("reports-card").performClick()
-        composeRule.waitForIdle()
+        navigateViaDashboardCard("reports-card")
         waitForNode("report-create-fab")
         onNodeWithTag("report-create-fab").performClick()
         composeRule.waitForIdle()

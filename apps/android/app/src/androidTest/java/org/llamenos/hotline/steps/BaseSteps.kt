@@ -6,10 +6,12 @@ import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 
@@ -96,9 +98,19 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
 
     /**
      * Navigate to a bottom nav tab by its test tag.
+     * Uses Espresso back press to dismiss any open dialogs/screens first if needed.
      */
     protected fun navigateToTab(tabTag: String) {
-        onNodeWithTag(tabTag).performClick()
+        try {
+            onNodeWithTag(tabTag).performClick()
+        } catch (_: AssertionError) {
+            // Bottom nav may be hidden (in admin screen or dialog) — press back first
+            try {
+                androidx.test.espresso.Espresso.pressBack()
+                composeRule.waitForIdle()
+            } catch (_: Exception) { /* no-op */ }
+            onNodeWithTag(tabTag).performClick()
+        }
         composeRule.waitForIdle()
     }
 
@@ -160,6 +172,7 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
         onNodeWithTag("settings-admin-card").performScrollTo()
         onNodeWithTag("settings-admin-card").performClick()
         composeRule.waitForIdle()
+        waitForNode("admin-tabs")
         val tabTag = when (tabName.lowercase()) {
             "volunteers" -> "admin-tab-volunteers"
             "bans", "ban list" -> "admin-tab-bans"
@@ -170,9 +183,18 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             "settings" -> "admin-tab-settings"
             else -> throw IllegalArgumentException("Unknown admin tab: $tabName")
         }
-        // Admin tabs are in a ScrollableTabRow — scroll to ensure visibility
-        onNodeWithTag(tabTag).performScrollTo()
-        onNodeWithTag(tabTag).performClick()
+        // Admin tabs are in a horizontal ScrollableTabRow — performScrollTo() uses
+        // vertical scroll semantics and fails. Instead, just click the tab directly;
+        // ScrollableTabRow auto-scrolls to bring the clicked tab into view.
+        // If the tab is off-screen, try scrolling the tab row to the target first.
+        try {
+            onNodeWithTag(tabTag).performClick()
+        } catch (_: AssertionError) {
+            // Tab may be off-screen — scroll the tab row container then retry
+            composeRule.onNodeWithTag("admin-tabs")
+                .performScrollToNode(hasTestTag(tabTag))
+            onNodeWithTag(tabTag).performClick()
+        }
         composeRule.waitForIdle()
     }
 
