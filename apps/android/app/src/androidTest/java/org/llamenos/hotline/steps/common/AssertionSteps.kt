@@ -43,7 +43,7 @@ class AssertionSteps : BaseSteps() {
 
     @Then("I should return to the settings screen")
     fun iShouldReturnToTheSettingsScreen() {
-        onNodeWithTag("settings-identity-card").assertIsDisplayed()
+        onNodeWithTag("settings-profile-section").assertIsDisplayed()
     }
 
     @Then("I should arrive at the dashboard")

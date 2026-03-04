@@ -69,7 +69,7 @@ class CryptoSteps : BaseSteps() {
             assertTrue("npub should start with '$prefix'", generatedNpub!!.startsWith(prefix))
         } else {
             // Dashboard context: just verify the npub display node exists
-            onNodeWithTag("identity-npub").assertIsDisplayed()
+            onNodeWithTag("dashboard-npub").assertIsDisplayed()
         }
     }
 

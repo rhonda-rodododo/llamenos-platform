@@ -43,6 +43,10 @@ class GenericSteps : BaseSteps() {
             "Update Profile" to listOf("settings-update-profile-button"),
             "New Report" to listOf("report-create-fab"),
             "New Blast" to listOf("create-blast-fab"),
+            "New Note" to listOf("create-note-fab"),
+            "Add Field" to listOf("create-field-fab"),
+            "Go to Dashboard" to listOf("go-to-dashboard"),
+            "Create Invite" to listOf("create-invite-fab"),
             "Cancel" to listOf("cancel-ban-button", "cancel-shift-button", "cancel-logout-button"),
         )
         val tags = tagMap[text]
@@ -72,6 +76,9 @@ class GenericSteps : BaseSteps() {
             "Add Volunteer" to "add-volunteer-fab",
             "New Report" to "report-create-fab",
             "New Blast" to "create-blast-fab",
+            "New Note" to "create-note-fab",
+            "Add Field" to "create-field-fab",
+            "Create Invite" to "create-invite-fab",
         )
         val tag = tagMap[buttonText]
         if (tag != null) {

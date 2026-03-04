@@ -498,55 +498,55 @@ private fun QRScannerContent(
 
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                     cameraProviderFuture.addListener({
-                        val cameraProvider = cameraProviderFuture.get()
+                        try {
+                            val cameraProvider = cameraProviderFuture.get()
 
-                        val preview = Preview.Builder()
-                            .build()
-                            .also { it.surfaceProvider = previewView.surfaceProvider }
+                            val preview = Preview.Builder()
+                                .build()
+                                .also { it.surfaceProvider = previewView.surfaceProvider }
 
-                        val imageAnalysis = ImageAnalysis.Builder()
-                            .setResolutionSelector(
-                                androidx.camera.core.resolutionselector.ResolutionSelector.Builder()
-                                    .setAspectRatioStrategy(
-                                        androidx.camera.core.resolutionselector.AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
-                                    )
-                                    .build()
-                            )
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-
-                        val scanner = BarcodeScanning.getClient()
-                        val executor = Executors.newSingleThreadExecutor()
-
-                        imageAnalysis.setAnalyzer(executor) { imageProxy ->
-                            val mediaImage = imageProxy.image
-                            if (mediaImage != null && !hasScanned) {
-                                val inputImage = InputImage.fromMediaImage(
-                                    mediaImage,
-                                    imageProxy.imageInfo.rotationDegrees,
+                            val imageAnalysis = ImageAnalysis.Builder()
+                                .setResolutionSelector(
+                                    androidx.camera.core.resolutionselector.ResolutionSelector.Builder()
+                                        .setAspectRatioStrategy(
+                                            androidx.camera.core.resolutionselector.AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
+                                        )
+                                        .build()
                                 )
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build()
 
-                                scanner.process(inputImage)
-                                    .addOnSuccessListener { barcodes ->
-                                        for (barcode in barcodes) {
-                                            if (barcode.format == Barcode.FORMAT_QR_CODE) {
-                                                val value = barcode.rawValue
-                                                if (value != null && !hasScanned) {
-                                                    hasScanned = true
-                                                    onQRScanned(value)
+                            val scanner = BarcodeScanning.getClient()
+                            val executor = Executors.newSingleThreadExecutor()
+
+                            imageAnalysis.setAnalyzer(executor) { imageProxy ->
+                                val mediaImage = imageProxy.image
+                                if (mediaImage != null && !hasScanned) {
+                                    val inputImage = InputImage.fromMediaImage(
+                                        mediaImage,
+                                        imageProxy.imageInfo.rotationDegrees,
+                                    )
+
+                                    scanner.process(inputImage)
+                                        .addOnSuccessListener { barcodes ->
+                                            for (barcode in barcodes) {
+                                                if (barcode.format == Barcode.FORMAT_QR_CODE) {
+                                                    val value = barcode.rawValue
+                                                    if (value != null && !hasScanned) {
+                                                        hasScanned = true
+                                                        onQRScanned(value)
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                    .addOnCompleteListener {
-                                        imageProxy.close()
-                                    }
-                            } else {
-                                imageProxy.close()
+                                        .addOnCompleteListener {
+                                            imageProxy.close()
+                                        }
+                                } else {
+                                    imageProxy.close()
+                                }
                             }
-                        }
 
-                        try {
                             cameraProvider.unbindAll()
                             cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
@@ -554,8 +554,9 @@ private fun QRScannerContent(
                                 preview,
                                 imageAnalysis,
                             )
-                        } catch (_: Exception) {
-                            // Camera initialization can fail on some devices
+                        } catch (e: Exception) {
+                            // Camera unavailable (e.g. emulator without camera config)
+                            android.util.Log.w("DeviceLink", "Camera init failed: ${e.message}")
                         }
                     }, ContextCompat.getMainExecutor(ctx))
 

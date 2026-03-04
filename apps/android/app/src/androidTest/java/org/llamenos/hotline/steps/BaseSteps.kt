@@ -141,6 +141,17 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
     }
 
     /**
+     * Navigate to a dashboard card by its test tag.
+     * Navigates: Dashboard tab → Scroll to card → Click.
+     */
+    protected fun navigateViaDashboardCard(cardTag: String) {
+        navigateToTab(NAV_DASHBOARD)
+        onNodeWithTag(cardTag).performScrollTo()
+        onNodeWithTag(cardTag).performClick()
+        composeRule.waitForIdle()
+    }
+
+    /**
      * Navigate to a specific admin tab by name.
      * Navigates: Settings tab → Admin card → Target tab.
      */

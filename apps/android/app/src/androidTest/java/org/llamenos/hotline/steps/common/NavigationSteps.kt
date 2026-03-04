@@ -157,14 +157,15 @@ class NavigationSteps : BaseSteps() {
             "volunteers" -> navigateToAdminTab("volunteers")
             "audit log", "audit" -> navigateToAdminTab("audit")
             "invites" -> navigateToAdminTab("invites")
-            "reports" -> navigateToAdminTab("audit")
+            "reports" -> navigateViaDashboardCard("reports-card")
             "hub settings" -> navigateToTab(NAV_SETTINGS)
-            "blasts" -> navigateToTab(NAV_CONVERSATIONS)
+            "blasts" -> navigateViaDashboardCard("blasts-card")
             "shifts", "shift schedule" -> navigateToAdminTab("shifts")
             "conversations" -> navigateToTab(NAV_CONVERSATIONS)
             "notes" -> navigateToTab(NAV_NOTES)
             "settings" -> navigateToTab(NAV_SETTINGS)
             "dashboard" -> navigateToTab(NAV_DASHBOARD)
+            "custom fields", "fields" -> navigateToAdminTab("fields")
             else -> throw IllegalArgumentException("Unknown page: $pageName")
         }
     }

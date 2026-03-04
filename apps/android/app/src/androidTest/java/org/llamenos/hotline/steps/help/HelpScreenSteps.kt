@@ -135,14 +135,14 @@ class HelpScreenSteps : BaseSteps() {
 
     @Then("I should see the getting started checklist")
     fun iShouldSeeTheGettingStartedChecklist() {
-        onNodeWithTag("help-getting-started").performScrollTo()
-        onNodeWithTag("help-getting-started").assertIsDisplayed()
+        onNodeWithTag("faq-getting-started").performScrollTo()
+        onNodeWithTag("faq-getting-started").assertIsDisplayed()
     }
 
     @When("I click a getting started item")
     fun iClickAGettingStartedItem() {
-        onNodeWithTag("getting-started-item-0").performScrollTo()
-        onNodeWithTag("getting-started-item-0").performClick()
+        onNodeWithTag("faq-getting-started-header").performScrollTo()
+        onNodeWithTag("faq-getting-started-header").performClick()
         composeRule.waitForIdle()
     }
 

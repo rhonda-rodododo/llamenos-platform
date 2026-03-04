@@ -82,7 +82,7 @@ class LoginSteps : BaseSteps() {
 
     @Then("I should see the error {string}")
     fun iShouldSeeTheError(errorMessage: String) {
-        onNodeWithTag("login-error").assertIsDisplayed()
+        waitForNode("login-error", 5000)
     }
 
     @When("I tap {string}")
@@ -119,7 +119,7 @@ class LoginSteps : BaseSteps() {
 
     @Then("I should see an error message")
     fun iShouldSeeAnErrorMessage() {
-        onNodeWithTag("login-error").assertIsDisplayed()
+        waitForNode("login-error", 5000)
     }
 
     @When("I enter a valid 63-character nsec")
