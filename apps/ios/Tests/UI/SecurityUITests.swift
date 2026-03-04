@@ -16,7 +16,7 @@ final class SecurityUITests: BaseUITest {
         }
         then("the app should not crash") {
             // Verify the login screen is stable
-            let hubInput = app.textFields["hub-url-input"]
+            let hubInput = find("hub-url-input")
             XCTAssertTrue(
                 hubInput.waitForExistence(timeout: 5),
                 "Login screen should be stable and accessible"
@@ -31,10 +31,10 @@ final class SecurityUITests: BaseUITest {
         when("I lock the app") {
             let lockButton = find("lock-app")
             guard lockButton.waitForExistence(timeout: 10) else {
-                // Try settings lock button
+                // Try settings lock button (may need scrolling)
                 navigateToSettings()
-                let settingsLock = find("settings-lock-app")
-                guard settingsLock.waitForExistence(timeout: 10) else {
+                let settingsLock = scrollToFind("settings-lock-app")
+                guard settingsLock.exists else {
                     XCTFail("No lock button found")
                     return
                 }
@@ -67,8 +67,8 @@ final class SecurityUITests: BaseUITest {
                 lockButton.tap()
             } else {
                 navigateToSettings()
-                let settingsLock = find("settings-lock-app")
-                guard settingsLock.waitForExistence(timeout: 5) else { return }
+                let settingsLock = scrollToFind("settings-lock-app")
+                guard settingsLock.exists else { return }
                 settingsLock.tap()
             }
             let pinPad = find("pin-pad")
@@ -97,13 +97,16 @@ final class SecurityUITests: BaseUITest {
             launchClean()
         }
         when("I start the identity creation flow") {
-            let hubInput = app.textFields["hub-url-input"]
+            let hubInput = find("hub-url-input")
             guard hubInput.waitForExistence(timeout: 5) else { return }
             hubInput.tap()
             hubInput.typeText("https://test.example.org")
 
+            // Dismiss keyboard before tapping create button
+            dismissKeyboard()
+
             let createButton = find("create-identity")
-            guard createButton.waitForExistence(timeout: 3) else { return }
+            guard createButton.waitForExistence(timeout: 5) else { return }
             createButton.tap()
 
             // Confirm backup
@@ -136,13 +139,16 @@ final class SecurityUITests: BaseUITest {
             launchClean()
         }
         when("I navigate to the PIN set screen") {
-            let hubInput = app.textFields["hub-url-input"]
+            let hubInput = find("hub-url-input")
             guard hubInput.waitForExistence(timeout: 5) else { return }
             hubInput.tap()
             hubInput.typeText("https://test.example.org")
 
+            // Dismiss keyboard
+            dismissKeyboard()
+
             let createButton = find("create-identity")
-            guard createButton.waitForExistence(timeout: 3) else { return }
+            guard createButton.waitForExistence(timeout: 5) else { return }
             createButton.tap()
 
             let confirmBackup = find("confirm-backup")
@@ -160,5 +166,13 @@ final class SecurityUITests: BaseUITest {
                 XCTAssertTrue(true, "PIN dots indicator is displayed")
             }
         }
+    }
+
+    // MARK: - Helpers
+
+    /// Dismiss the keyboard if visible.
+    private func dismissKeyboard() {
+        let coordinate = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+        coordinate.tap()
     }
 }

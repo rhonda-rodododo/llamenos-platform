@@ -129,6 +129,7 @@ struct NotesView: View {
             .buttonStyle(.bordered)
             .accessibilityIdentifier("create-first-note")
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("notes-empty-state")
     }
 
@@ -166,6 +167,7 @@ struct NotesView: View {
             }
             .buttonStyle(.bordered)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("notes-error")
     }
 

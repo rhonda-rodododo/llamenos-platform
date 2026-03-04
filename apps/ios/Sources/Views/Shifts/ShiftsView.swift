@@ -296,6 +296,7 @@ struct ShiftsView: View {
                 comment: "No shifts have been configured yet. Contact your administrator."
             ))
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("shifts-empty-state")
     }
 
@@ -311,6 +312,7 @@ struct ShiftsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("shifts-loading")
     }
 

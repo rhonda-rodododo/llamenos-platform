@@ -71,7 +71,7 @@ class BaseUITest: XCTestCase {
 
     /// Tab indices: 0=Dashboard, 1=Notes, 2=Conversations, 3=Shifts, 4=Settings
     func navigateToTab(index: Int) {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         guard tabView.waitForExistence(timeout: 10) else {
             XCTFail("Main tab view should be visible")
             return
@@ -98,14 +98,14 @@ class BaseUITest: XCTestCase {
     func navigateToAdminPanel() {
         navigateToSettings()
 
-        let adminButton = app.buttons["settings-admin-panel"].firstMatch
+        let adminButton = find("settings-admin-panel")
         guard adminButton.waitForExistence(timeout: 10) else {
             XCTFail("Admin panel button should exist for admin users")
             return
         }
         adminButton.tap()
 
-        let adminTabView = app.otherElements["admin-tab-view"]
+        let adminTabView = find("admin-tab-view")
         _ = adminTabView.waitForExistence(timeout: 5)
     }
 
@@ -113,7 +113,7 @@ class BaseUITest: XCTestCase {
 
     func enterPIN(_ pin: String) {
         for char in pin {
-            let button = app.buttons["pin-\(char)"]
+            let button = find("pin-\(char)")
             if button.waitForExistence(timeout: 2) {
                 button.tap()
             }
@@ -123,32 +123,32 @@ class BaseUITest: XCTestCase {
     /// Navigate through full onboarding: create identity, confirm backup, set PIN, reach dashboard.
     func completeOnboarding(hubURL: String = "https://test.example.org", pin: String = "1234") {
         // Enter hub URL
-        let hubURLInput = app.textFields["hub-url-input"]
+        let hubURLInput = find("hub-url-input")
         if hubURLInput.waitForExistence(timeout: 5) {
             hubURLInput.tap()
             hubURLInput.typeText(hubURL)
         }
 
         // Create identity
-        let createButton = app.buttons["create-identity"]
+        let createButton = find("create-identity")
         if createButton.waitForExistence(timeout: 3) {
             createButton.tap()
         }
 
         // Confirm backup
-        let confirmBackup = app.buttons["confirm-backup"].firstMatch
+        let confirmBackup = find("confirm-backup")
         if confirmBackup.waitForExistence(timeout: 5) {
             confirmBackup.tap()
         }
 
         // Continue to PIN
-        let continueButton = app.buttons["continue-to-pin"].firstMatch
+        let continueButton = find("continue-to-pin")
         if continueButton.waitForExistence(timeout: 3) {
             continueButton.tap()
         }
 
         // Wait for PIN pad
-        let pinPad = app.otherElements["pin-pad"]
+        let pinPad = find("pin-pad")
         _ = pinPad.waitForExistence(timeout: 5)
 
         // Enter PIN + confirm
@@ -156,7 +156,7 @@ class BaseUITest: XCTestCase {
         enterPIN(pin)
 
         // Wait for dashboard
-        let dashboardTitle = app.staticTexts["dashboard-title"].firstMatch
+        let dashboardTitle = find("dashboard-title")
         _ = dashboardTitle.waitForExistence(timeout: 10)
     }
 
@@ -190,5 +190,24 @@ class BaseUITest: XCTestCase {
             }
         }
         return false
+    }
+
+    /// Scroll down in the current view to find an element that may be off-screen.
+    /// Swipes up on the app's main scrollable area until the element is found or max attempts reached.
+    @discardableResult
+    func scrollToFind(_ identifier: String, maxSwipes: Int = 5, timeout: TimeInterval = 2) -> XCUIElement {
+        let element = find(identifier)
+        if element.waitForExistence(timeout: timeout) {
+            return element
+        }
+
+        // Try swiping up to scroll down
+        for _ in 0..<maxSwipes {
+            app.swipeUp()
+            if element.waitForExistence(timeout: 1) {
+                return element
+            }
+        }
+        return element
     }
 }

@@ -37,6 +37,21 @@ final class ShiftFlowUITests: XCTestCase {
         return false
     }
 
+    @discardableResult
+    private func scrollToFind(_ identifier: String, maxSwipes: Int = 5, timeout: TimeInterval = 2) -> XCUIElement {
+        let element = find(identifier)
+        if element.waitForExistence(timeout: timeout) {
+            return element
+        }
+        for _ in 0..<maxSwipes {
+            app.swipeUp()
+            if element.waitForExistence(timeout: 1) {
+                return element
+            }
+        }
+        return element
+    }
+
     // MARK: - Tab Navigation
 
     func testShiftsTabExists() {
@@ -186,9 +201,10 @@ final class ShiftFlowUITests: XCTestCase {
     func testSettingsLockButton() {
         navigateToSettingsTab()
 
-        let lockButton = find("settings-lock-app")
+        // Lock button is near the bottom of the settings list — scroll to find it
+        let lockButton = scrollToFind("settings-lock-app")
         XCTAssertTrue(
-            lockButton.waitForExistence(timeout: 10),
+            lockButton.exists,
             "Lock app button should exist in settings"
         )
     }
@@ -196,9 +212,10 @@ final class ShiftFlowUITests: XCTestCase {
     func testSettingsLogoutButton() {
         navigateToSettingsTab()
 
-        let logoutButton = find("settings-logout")
+        // Logout button is near the bottom of the settings list — scroll to find it
+        let logoutButton = scrollToFind("settings-logout")
         XCTAssertTrue(
-            logoutButton.waitForExistence(timeout: 10),
+            logoutButton.exists,
             "Logout button should exist in settings"
         )
     }

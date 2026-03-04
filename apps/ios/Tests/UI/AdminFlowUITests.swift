@@ -204,9 +204,9 @@ final class AdminFlowUITests: XCTestCase {
     func testDeviceLinkButtonExists() {
         navigateToSettingsTab()
 
-        let linkButton = find("settings-link-device")
+        let linkButton = scrollToFind("settings-link-device")
         XCTAssertTrue(
-            linkButton.waitForExistence(timeout: 10),
+            linkButton.exists,
             "Link device button should exist in settings"
         )
     }
@@ -222,6 +222,21 @@ final class AdminFlowUITests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    @discardableResult
+    private func scrollToFind(_ identifier: String, maxSwipes: Int = 5, timeout: TimeInterval = 2) -> XCUIElement {
+        let element = find(identifier)
+        if element.waitForExistence(timeout: timeout) {
+            return element
+        }
+        for _ in 0..<maxSwipes {
+            app.swipeUp()
+            if element.waitForExistence(timeout: 1) {
+                return element
+            }
+        }
+        return element
+    }
 
     private func anyElementExists(_ identifiers: [String], timeout: TimeInterval = 10) -> Bool {
         for (i, id) in identifiers.enumerated() {
@@ -255,8 +270,8 @@ final class AdminFlowUITests: XCTestCase {
     private func navigateToAdminPanel() {
         navigateToSettingsTab()
 
-        let adminButton = find("settings-admin-panel")
-        guard adminButton.waitForExistence(timeout: 10) else {
+        let adminButton = scrollToFind("settings-admin-panel")
+        guard adminButton.exists else {
             // Not visible — might not be admin. Skip gracefully.
             return
         }

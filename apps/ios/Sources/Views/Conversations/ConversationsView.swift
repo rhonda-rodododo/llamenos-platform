@@ -102,6 +102,7 @@ struct ConversationsView: View {
                 comment: "Incoming messages from SMS, WhatsApp, and Signal will appear here."
             ))
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("conversations-empty-state")
     }
 
@@ -139,6 +140,7 @@ struct ConversationsView: View {
             }
             .buttonStyle(.bordered)
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("conversations-error")
     }
 

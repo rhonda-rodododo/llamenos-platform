@@ -28,11 +28,18 @@ final class AuthFlowUITests: XCTestCase {
         return app.descendants(matching: .any)[identifier].firstMatch
     }
 
+    /// Dismiss the keyboard if visible.
+    private func dismissKeyboard() {
+        // Tap on a non-interactive area to dismiss keyboard
+        let coordinate = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+        coordinate.tap()
+    }
+
     // MARK: - Login Screen
 
     func testLoginScreenShowsRequiredElements() {
         // Hub URL input should be visible
-        let hubURLInput = app.textFields["hub-url-input"]
+        let hubURLInput = find("hub-url-input")
         XCTAssertTrue(hubURLInput.waitForExistence(timeout: 5), "Hub URL input should exist")
 
         // Create Identity button
@@ -48,13 +55,18 @@ final class AuthFlowUITests: XCTestCase {
 
     func testOnboardingFlowCreateIdentity() {
         // Enter hub URL
-        let hubURLInput = app.textFields["hub-url-input"]
+        let hubURLInput = find("hub-url-input")
         XCTAssertTrue(hubURLInput.waitForExistence(timeout: 5))
         hubURLInput.tap()
         hubURLInput.typeText("https://test-hub.example.org")
+        dismissKeyboard()
 
         // Tap "Create New Identity"
         let createButton = find("create-identity")
+        guard createButton.waitForExistence(timeout: 5) else {
+            XCTFail("Create identity button should exist")
+            return
+        }
         createButton.tap()
 
         // Nsec should be displayed on the onboarding screen
@@ -145,7 +157,7 @@ final class AuthFlowUITests: XCTestCase {
         importButton.tap()
 
         // Nsec input should appear
-        let nsecInput = app.secureTextFields["nsec-input"]
+        let nsecInput = find("nsec-input")
         XCTAssertTrue(
             nsecInput.waitForExistence(timeout: 5),
             "Nsec input field should appear"
@@ -211,6 +223,13 @@ final class AuthFlowUITests: XCTestCase {
         navigateToOnboarding()
         navigateToPINSet()
 
+        // Wait for PIN pad to be fully rendered
+        let pinPad = find("pin-pad")
+        guard pinPad.waitForExistence(timeout: 5) else {
+            XCTFail("PIN pad should exist")
+            return
+        }
+
         // Verify all digit buttons exist
         for digit in 0...9 {
             let button = find("pin-\(digit)")
@@ -225,6 +244,13 @@ final class AuthFlowUITests: XCTestCase {
     func testPINPadBackspace() {
         navigateToOnboarding()
         navigateToPINSet()
+
+        // Wait for PIN pad
+        let pinPad = find("pin-pad")
+        guard pinPad.waitForExistence(timeout: 5) else {
+            XCTFail("PIN pad should exist")
+            return
+        }
 
         // Enter 2 digits
         find("pin-1").tap()
@@ -243,7 +269,6 @@ final class AuthFlowUITests: XCTestCase {
 
         // Should transition to confirm (PIN was 1345, then we need to confirm)
         // The PIN pad should reset for confirmation
-        let pinPad = find("pin-pad")
         XCTAssertTrue(pinPad.exists)
     }
 
@@ -251,16 +276,15 @@ final class AuthFlowUITests: XCTestCase {
 
     /// Navigate from login to the onboarding screen.
     private func navigateToOnboarding() {
-        let hubURLInput = app.textFields["hub-url-input"]
-        if hubURLInput.waitForExistence(timeout: 5) {
-            hubURLInput.tap()
-            hubURLInput.typeText("https://test.example.org")
-        }
+        let hubURLInput = find("hub-url-input")
+        guard hubURLInput.waitForExistence(timeout: 5) else { return }
+        hubURLInput.tap()
+        hubURLInput.typeText("https://test.example.org")
+        dismissKeyboard()
 
         let createButton = find("create-identity")
-        if createButton.waitForExistence(timeout: 3) {
-            createButton.tap()
-        }
+        guard createButton.waitForExistence(timeout: 5) else { return }
+        createButton.tap()
     }
 
     /// Navigate from onboarding to the PIN set screen.
