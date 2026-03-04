@@ -159,7 +159,7 @@ class NavigationSteps : BaseSteps() {
             "reports" -> navigateToAdminTab("audit")
             "hub settings" -> navigateToTab(NAV_SETTINGS)
             "blasts" -> navigateToTab(NAV_CONVERSATIONS)
-            "shifts", "shift schedule" -> navigateToTab(NAV_SHIFTS)
+            "shifts", "shift schedule" -> navigateToAdminTab("shifts")
             "conversations" -> navigateToTab(NAV_CONVERSATIONS)
             "notes" -> navigateToTab(NAV_NOTES)
             "settings" -> navigateToTab(NAV_SETTINGS)

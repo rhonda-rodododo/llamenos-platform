@@ -29,7 +29,7 @@ FEATURE_DIR="$PROJECT_ROOT/packages/test-specs/features"
 ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 
-NUM_EMU_SHARDS="${1:-4}"
+NUM_EMU_SHARDS=4         # Default; overridden by positional arg or --emulators-only
 BASE_EMU_PORT=5554       # Emulator ports: 5554, 5556, 5558, 5560, ...
 BASE_APP_PORT=3001       # Docker backend ports: 3001, 3002, 3003, 3004, ...
 DOCKER_PROJECT_PREFIX="llamenos-test"
