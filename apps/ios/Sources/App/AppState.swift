@@ -109,8 +109,7 @@ final class AppState {
         }
 
         if args.contains("--test-authenticated") {
-            // Set mock identity without calling through to FFI.
-            // The stub XCFramework panics on real crypto calls.
+            // Set deterministic mock identity for UI test automation.
             cryptoService.setMockIdentity()
             isLocked = false
         }

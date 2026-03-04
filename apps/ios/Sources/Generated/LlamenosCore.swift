@@ -1379,6 +1379,38 @@ fileprivate struct FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRus
     }
 }
 /**
+ * Derive a 6-digit SAS (Short Authentication String) code from an ECDH shared secret.
+ *
+ * `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
+ *
+ * Returns a "XXX XXX" formatted 6-digit code. Both devices compute this
+ * independently — matching codes prove no MITM is present.
+ */
+public func computeSasCode(sharedXHex: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_llamenos_core_fn_func_compute_sas_code(
+        FfiConverterString.lower(sharedXHex),$0
+    )
+})
+}
+/**
+ * Compute the ECDH shared x-coordinate for device provisioning.
+ *
+ * `our_secret_hex`: 64-char hex secret key
+ * `their_pubkey_hex`: 64-char hex x-only pubkey (or 66-char compressed)
+ *
+ * Returns the 32-byte shared x-coordinate as hex, which can be used
+ * for `decrypt_with_shared_key_hex` and `compute_sas_code`.
+ */
+public func computeSharedXHex(ourSecretHex: String, theirPubkeyHex: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_llamenos_core_fn_func_compute_shared_x_hex(
+        FfiConverterString.lower(ourSecretHex),
+        FfiConverterString.lower(theirPubkeyHex),$0
+    )
+})
+}
+/**
  * Create a Schnorr auth token for API authentication.
  *
  * The message is bound to the specific request method + path to prevent
@@ -1455,6 +1487,23 @@ public func decryptWithPin(data: EncryptedKeyData, pin: String)throws  -> String
 })
 }
 /**
+ * Decrypt data that was encrypted with a provisioning shared key.
+ *
+ * `ciphertext_hex`: hex(nonce_24 + ciphertext) — XChaCha20-Poly1305
+ * `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
+ *
+ * Derives the symmetric key via SHA-256(LABEL_DEVICE_PROVISION || shared_x),
+ * matching the desktop JS implementation.
+ */
+public func decryptWithSharedKeyHex(ciphertextHex: String, sharedXHex: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_llamenos_core_fn_func_decrypt_with_shared_key_hex(
+        FfiConverterString.lower(ciphertextHex),
+        FfiConverterString.lower(sharedXHex),$0
+    )
+})
+}
+/**
  * Derive a 32-byte KEK from a PIN using PBKDF2-SHA256, returned as hex.
  *
  * `salt_hex` is a hex-encoded salt (typically 16 bytes / 32 hex chars).
@@ -1464,6 +1513,25 @@ public func deriveKekHex(pin: String, saltHex: String)throws  -> String {
     uniffi_llamenos_core_fn_func_derive_kek_hex(
         FfiConverterString.lower(pin),
         FfiConverterString.lower(saltHex),$0
+    )
+})
+}
+/**
+ * Decrypt an ECIES-encrypted payload (arbitrary length content).
+ *
+ * Used for wake-tier push notification decryption and other ECIES content.
+ * `packed_hex`: hex(nonce_24 + ciphertext)
+ * `ephemeral_pubkey_hex`: compressed SEC1 (33 bytes / 66 hex chars)
+ * `secret_key_hex`: recipient's secret key
+ * `label`: domain separation label (e.g., LABEL_PUSH_WAKE)
+ */
+public func eciesDecryptContentHex(packedHex: String, ephemeralPubkeyHex: String, secretKeyHex: String, label: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_llamenos_core_fn_func_ecies_decrypt_content_hex(
+        FfiConverterString.lower(packedHex),
+        FfiConverterString.lower(ephemeralPubkeyHex),
+        FfiConverterString.lower(secretKeyHex),
+        FfiConverterString.lower(label),$0
     )
 })
 }
@@ -1639,6 +1707,12 @@ private var initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_llamenos_core_checksum_func_compute_sas_code() != 40395) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_compute_shared_x_hex() != 11861) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_llamenos_core_checksum_func_create_auth_token() != 62800) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -1657,7 +1731,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_decrypt_with_pin() != 5372) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_llamenos_core_checksum_func_decrypt_with_shared_key_hex() != 496) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_llamenos_core_checksum_func_derive_kek_hex() != 32027) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_ecies_decrypt_content_hex() != 56402) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_ecies_unwrap_key_hex() != 45205) {

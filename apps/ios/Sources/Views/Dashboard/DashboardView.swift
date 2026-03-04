@@ -30,6 +30,9 @@ struct DashboardView: View {
                     // Recent notes preview
                     recentNotesCard(vm: vm)
 
+                    // Reports quick action
+                    reportsQuickAction
+
                     // Error message
                     if let error = vm.errorMessage {
                         errorCard(error)
@@ -319,6 +322,42 @@ struct DashboardView: View {
                 .fill(Color(.systemBackground).opacity(0.6))
         )
         .accessibilityIdentifier("recent-note-\(note.id)")
+    }
+
+    // MARK: - Reports Quick Action
+
+    private var reportsQuickAction: some View {
+        NavigationLink {
+            ReportsView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text.fill")
+                    .font(.title3)
+                    .foregroundStyle(.indigo)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(NSLocalizedString("dashboard_reports", comment: "Reports"))
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(NSLocalizedString("dashboard_reports_subtitle", comment: "File or review incident reports"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("dashboard-reports-action")
     }
 
     // MARK: - Error Card

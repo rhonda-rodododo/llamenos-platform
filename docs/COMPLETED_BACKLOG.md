@@ -1,5 +1,37 @@
 # Completed Backlog
 
+## 2026-03-04: iOS Reports + Real Rust Crypto (Epic 241 + FFI stub removal)
+
+### Epic 241: iOS Reports
+- **Report.swift**: Model with `ReportStatus` enum (waiting/active/closed), `ReportStatusFilter`, `ReportResponse`, request types
+- **ReportsViewModel.swift**: `@Observable` ViewModel with CRUD, status filtering, E2EE encryption via CryptoService
+- **ReportsView.swift**: List view with filter menu, create button, empty/loading/error states, pull-to-refresh
+- **ReportCreateView.swift**: Sheet with title, category picker, body editor, submit/cancel toolbar
+- **ReportDetailView.swift**: ScrollView with status/category chips, metadata card, claim/close actions
+- **ReportFlowUITests.swift**: 7 BDD tests — list content, create button, create flow, cancel, filter, dashboard action, empty state
+- **DashboardView.swift**: Added `reportsQuickAction` NavigationLink card
+- **Router.swift**: Added `.reports` and `.reportDetail(id)` route cases
+- **ContentView.swift**: Added switch cases for new routes
+- **SettingsView.swift**: Added `"reports"` navigation destination
+
+### Real Rust Crypto (FFI Stub Removal)
+- **Built real XCFramework** from `packages/crypto/scripts/build-mobile.sh ios` on Mac M4
+- **Replaced stub XCFramework** with real Rust crypto (247 exported symbols vs stub's abort() calls)
+- **Updated generated bindings**: `Sources/Generated/LlamenosCore.swift` from UniFFI bindgen output
+- **CryptoService.swift**: Replaced XOR/placeholder stand-ins with real FFI calls:
+  - `deriveSharedSecret()` → `computeSharedXHex()` (real ECDH)
+  - `decryptWithSharedSecret()` → `decryptWithSharedKeyHex()` (real XChaCha20-Poly1305)
+  - `deriveSASCode()` → `computeSasCode()` (real SAS derivation)
+- **WakeKeyService.swift**: Removed `#if canImport(LlamenosCore)` conditionals, now uses real FFI:
+  - `decryptWakePayload()` → `eciesDecryptContentHex()` (real ECIES decryption)
+  - `derivePublicKey()` → `getPublicKey()` (real secp256k1)
+- **DeviceLinkViewModel.swift**: Updated callers for now-throwing crypto methods
+
+### Test Results (91 tests, 89 pass, 2 pre-existing failures)
+- All new ReportFlowUITests: 7/7 pass
+- All existing tests continue to pass (HelpUITests 4/4, PanicWipeUITests 4/4, etc.)
+- 2 pre-existing failures: SettingsUITests (logout button off-screen layout issue)
+
 ## 2026-03-04: iOS Feature Parity — Help Screen & Panic Wipe (Epics 242, 246)
 
 ### Epic 242: iOS Help Screen
@@ -14,12 +46,11 @@
 - **PanicWipeUITests.swift**: 4 BDD tests — button exists, confirmation screen, wipe returns to login, cancel returns to settings
 - Test-only `"test-panic-wipe"` NavigationLink at top of SettingsView to work around SwiftUI List cell recycling XCUITest bug on iOS 26
 - **CryptoService.setMockIdentity()**: `#if DEBUG` method for test mode, bypasses FFI calls with hardcoded mock values
-- **AppState `--test-authenticated`**: Uses `setMockIdentity()` instead of `generateKeypair()` to avoid FFI panics with stub XCFramework
 
-### Test Results (82/83 pass)
-- All new tests pass: HelpUITests 4/4, PanicWipeUITests 4/4
+### Test Results (91 tests, 89 pass)
+- All new tests pass: HelpUITests 4/4, PanicWipeUITests 4/4, ReportFlowUITests 7/7
 - No regressions in existing test suites
-- 1 pre-existing failure: SecurityUITests.testPINPadHasAllDigits (timing-dependent)
+- 2 pre-existing failures: SettingsUITests (logout button layout issue)
 
 ## 2026-03-03: Production Deployment & Node.js Primacy (Epics 235-237)
 

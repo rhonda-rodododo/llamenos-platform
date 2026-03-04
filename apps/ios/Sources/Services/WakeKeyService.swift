@@ -117,11 +117,7 @@ final class WakeKeyService: @unchecked Sendable {
 
         let privateKeyHex = privateKeyBytes.map { String(format: "%02x", $0) }.joined()
 
-        // Derive public key using CryptoService stand-in
-        // In production, this would use LlamenosCore.publicKeyFromSecret()
-        // For now, we use a simplified derivation (the real implementation will come
-        // when LlamenosCore XCFramework is linked)
-        let publicKey = derivePublicKey(from: privateKeyHex)
+        let publicKey = try derivePublicKey(from: privateKeyHex)
 
         // Store private key with kSecAttrAccessibleAfterFirstUnlock
         // This is a custom Keychain write because we need a different accessibility level
@@ -230,45 +226,27 @@ final class WakeKeyService: @unchecked Sendable {
     func decryptWakePayload(encryptedHex: String) throws -> String {
         let privateKeyHex = try retrieveWakePrivateKey()
 
-        // ECIES decryption using LlamenosCore
-        // Format: ephemeralPubkey (33 bytes) + ciphertext (variable) + tag (16 bytes)
-        #if canImport(LlamenosCore)
-        return try LlamenosCore.eciesDecrypt(
-            ciphertextHex: encryptedHex,
-            privateKeyHex: privateKeyHex,
+        guard encryptedHex.count >= 66 else {
+            throw WakeKeyError.decryptionFailed("Payload too short")
+        }
+
+        // ECIES payload format: ephemeralPubkey (33 bytes = 66 hex) + packed(nonce + ciphertext)
+        let ephemeralPubkeyHex = String(encryptedHex.prefix(66))
+        let packedHex = String(encryptedHex.dropFirst(66))
+
+        return try eciesDecryptContentHex(
+            packedHex: packedHex,
+            ephemeralPubkeyHex: ephemeralPubkeyHex,
+            secretKeyHex: privateKeyHex,
             label: "llamenos:wake-key"
         )
-        #else
-        // Stand-in: return a placeholder decrypted payload
-        // This will be replaced when LlamenosCore is linked
-        guard !encryptedHex.isEmpty else {
-            throw WakeKeyError.decryptionFailed("Empty ciphertext")
-        }
-        // Simulate decryption by returning the first 64 chars as "decrypted" content
-        let simulatedPayload = """
-        {"type":"call-incoming","callId":"sim-\(encryptedHex.prefix(8))"}
-        """
-        return simulatedPayload
-        #endif
     }
 
-    // MARK: - Key Derivation (Stand-in)
+    // MARK: - Key Derivation
 
-    /// Derive a public key from a private key hex string.
-    /// Stand-in implementation — real derivation via LlamenosCore secp256k1.
-    private func derivePublicKey(from privateKeyHex: String) -> String {
-        #if canImport(LlamenosCore)
-        return LlamenosCore.publicKeyFromSecret(secretKeyHex: privateKeyHex)
-        #else
-        // Stand-in: hash the private key to produce a deterministic "public key"
-        // This is NOT real elliptic curve math — just a placeholder
-        var hash = [UInt8](repeating: 0, count: 32)
-        let data = Array(privateKeyHex.utf8)
-        for (i, byte) in data.enumerated() {
-            hash[i % 32] ^= byte
-        }
-        return hash.map { String(format: "%02x", $0) }.joined()
-        #endif
+    /// Derive a public key from a private key hex string via secp256k1.
+    private func derivePublicKey(from privateKeyHex: String) throws -> String {
+        try getPublicKey(secretKeyHex: privateKeyHex)
     }
 
     // MARK: - Cleanup

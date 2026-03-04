@@ -277,12 +277,17 @@ final class DeviceLinkViewModel {
 
             // Derive shared secret
             guard let ourSecret = ephemeralSecret else { return }
-            let shared = cryptoService.deriveSharedSecret(ourSecret: ourSecret, theirPublic: theirPubkey)
-            sharedSecret = shared
+            do {
+                let shared = try cryptoService.deriveSharedSecret(ourSecret: ourSecret, theirPublic: theirPubkey)
+                sharedSecret = shared
 
-            // Derive and display SAS code
-            let sas = cryptoService.deriveSASCode(sharedSecret: shared)
-            currentStep = .verifying(sasCode: sas)
+                // Derive and display SAS code
+                let sas = try cryptoService.deriveSASCode(sharedSecret: shared)
+                currentStep = .verifying(sasCode: sas)
+            } catch {
+                currentStep = .error(error.localizedDescription)
+                return
+            }
 
         case "encrypted-nsec":
             // Received the encrypted nsec from the desktop

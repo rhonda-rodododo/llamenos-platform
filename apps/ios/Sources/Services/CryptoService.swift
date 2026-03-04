@@ -44,6 +44,18 @@ private func ffiDecryptMessageForReader(encryptedContent: String, readerEnvelope
     try decryptMessageForReader(encryptedContent: encryptedContent, readerEnvelopes: readerEnvelopes, secretKeyHex: secretKeyHex, readerPubkey: readerPubkey)
 }
 
+private func ffiComputeSharedXHex(ourSecretHex: String, theirPubkeyHex: String) throws -> String {
+    try computeSharedXHex(ourSecretHex: ourSecretHex, theirPubkeyHex: theirPubkeyHex)
+}
+
+private func ffiDecryptWithSharedKeyHex(ciphertextHex: String, sharedXHex: String) throws -> String {
+    try decryptWithSharedKeyHex(ciphertextHex: ciphertextHex, sharedXHex: sharedXHex)
+}
+
+private func ffiComputeSasCode(sharedXHex: String) throws -> String {
+    try computeSasCode(sharedXHex: sharedXHex)
+}
+
 // MARK: - CryptoService
 
 enum CryptoServiceError: LocalizedError {
@@ -243,32 +255,21 @@ final class CryptoService: @unchecked Sendable {
     /// Compute an ECDH shared secret from our ephemeral secret and their ephemeral public key.
     /// Used in the device linking protocol to establish a shared encryption key.
     ///
-    /// NOTE: Stand-in implementation until dedicated ECDH is exported via UniFFI.
-    ///
     /// - Parameters:
     ///   - ourSecret: Our ephemeral private key in hex.
-    ///   - theirPublic: Their ephemeral public key in hex.
-    /// - Returns: The shared secret in hex (32 bytes).
-    func deriveSharedSecret(ourSecret: String, theirPublic: String) -> String {
-        // Stand-in: XOR-based derivation until dedicated ECDH is exported via UniFFI.
-        var result = [UInt8](repeating: 0, count: 32)
-        let ourBytes = Array(ourSecret.utf8)
-        let theirBytes = Array(theirPublic.utf8)
-        for i in 0..<min(32, min(ourBytes.count, theirBytes.count)) {
-            result[i] = ourBytes[i] ^ theirBytes[i]
-        }
-        return result.map { String(format: "%02x", $0) }.joined()
+    ///   - theirPublic: Their ephemeral public key in hex (x-only or compressed).
+    /// - Returns: The shared x-coordinate in hex (32 bytes).
+    func deriveSharedSecret(ourSecret: String, theirPublic: String) throws -> String {
+        try ffiComputeSharedXHex(ourSecretHex: ourSecret, theirPubkeyHex: theirPublic)
     }
 
     /// Decrypt data encrypted with a shared secret (XChaCha20-Poly1305 with HKDF-derived key).
     /// Used during device linking to decrypt the nsec sent from the desktop.
-    ///
-    /// NOTE: Stand-in implementation until dedicated ECDH decryption is exported via UniFFI.
     func decryptWithSharedSecret(encrypted: String, sharedSecret: String) throws -> String {
         guard !encrypted.isEmpty else {
             throw CryptoServiceError.decryptionFailed("Empty ciphertext")
         }
-        return "decrypted-nsec-data-stand-in"
+        return try ffiDecryptWithSharedKeyHex(ciphertextHex: encrypted, sharedXHex: sharedSecret)
     }
 
     // MARK: - SAS Code
@@ -276,17 +277,8 @@ final class CryptoService: @unchecked Sendable {
     /// Derive a 6-digit Short Authentication String from the ECDH shared secret.
     /// Both devices derive the same SAS code independently; the user visually confirms
     /// the codes match to prevent MITM attacks during device linking.
-    ///
-    /// NOTE: Stand-in implementation until SAS derivation is exported via UniFFI.
-    func deriveSASCode(sharedSecret: String) -> String {
-        let chars = Array(sharedSecret.prefix(6))
-        let digits = chars.map { c -> Character in
-            if let val = UInt8(String(c), radix: 16) {
-                return Character(String(val % 10))
-            }
-            return "0"
-        }
-        return String(digits)
+    func deriveSASCode(sharedSecret: String) throws -> String {
+        try ffiComputeSasCode(sharedXHex: sharedSecret)
     }
 
     // MARK: - Lock
@@ -301,8 +293,8 @@ final class CryptoService: @unchecked Sendable {
     // MARK: - Test Support
 
     #if DEBUG
-    /// Set mock identity state without calling through to FFI.
-    /// Used by XCUITest launch arguments when the real Rust crypto library is unavailable.
+    /// Set a deterministic mock identity for XCUITest automation.
+    /// Avoids generating real keys during UI tests where crypto correctness isn't under test.
     func setMockIdentity() {
         self.nsecHex = String(repeating: "ab", count: 32)
         self.nsecBech32 = "nsec1mock"

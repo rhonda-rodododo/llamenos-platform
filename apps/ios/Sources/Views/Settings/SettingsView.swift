@@ -159,6 +159,8 @@ struct SettingsView: View {
                     HelpView()
                 case "panic-wipe":
                     PanicWipeConfirmationView()
+                case "reports":
+                    ReportsView()
                 default:
                     EmptyView()
                 }

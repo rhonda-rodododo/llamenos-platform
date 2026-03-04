@@ -397,7 +397,7 @@ Catch iOS up to Android feature set with native SwiftUI design. BDD-first: write
 - [ ] **[Epic 240: iOS Docker Test Infrastructure](epics/epic-240-ios-docker-test-infra.md)** — Connect XCUITests to live Docker Compose API backend (`--test-hub-url`, `resetServerState()`, identity registration)
 
 ### Core Features
-- [ ] **[Epic 241: iOS Reports](epics/epic-241-ios-reports.md)** — Full reports CRUD (create, list, detail, claim, close) with E2EE envelope encryption
+- [x] **[Epic 241: iOS Reports](epics/epic-241-ios-reports.md)** — Full reports CRUD (create, list, detail, claim, close) with E2EE envelope encryption
 - [x] **[Epic 242: iOS Help Screen](epics/epic-242-ios-help-screen.md)** — Security overview, role-based guides, FAQ with DisclosureGroup sections
 
 ### Admin Features
