@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import org.llamenos.hotline.steps.BaseSteps
@@ -19,14 +20,29 @@ class ShiftDetailSteps : BaseSteps() {
     @When("I tap a shift card")
     fun iTapAShiftCard() {
         composeRule.waitForIdle()
-        try {
-            composeRule.onAllNodes(hasTestTagPrefix("shift-card-"))
-                .onFirst()
-                .performClick()
-            composeRule.waitForIdle()
-        } catch (_: AssertionError) {
-            // No shifts in demo mode — skip gracefully
+        val shiftCards = composeRule.onAllNodes(hasTestTagPrefix("shift-card-")).fetchSemanticsNodes()
+        if (shiftCards.isEmpty()) {
+            // No shifts — create one via the FAB
+            try {
+                onNodeWithTag("create-shift-fab").performClick()
+                composeRule.waitForIdle()
+                onNodeWithTag("shift-name-input").performTextInput("E2E Test Shift")
+                onNodeWithTag("shift-start-input").performTextInput("09:00")
+                onNodeWithTag("shift-end-input").performTextInput("17:00")
+                onNodeWithTag("confirm-shift-save").performClick()
+                composeRule.waitForIdle()
+                // Wait for shift cards to appear
+                composeRule.waitUntil(5000) {
+                    composeRule.onAllNodes(hasTestTagPrefix("shift-card-")).fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch (_: Exception) {
+                return
+            }
         }
+        composeRule.onAllNodes(hasTestTagPrefix("shift-card-"))
+            .onFirst()
+            .performClick()
+        composeRule.waitForIdle()
     }
 
     @Then("I should see the shift detail screen")

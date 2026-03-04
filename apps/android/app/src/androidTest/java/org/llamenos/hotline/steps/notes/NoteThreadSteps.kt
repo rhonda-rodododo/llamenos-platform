@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import org.llamenos.hotline.steps.BaseSteps
@@ -19,20 +20,36 @@ class NoteThreadSteps : BaseSteps() {
 
     @Given("I am on the note detail screen")
     fun iAmOnTheNoteDetailScreen() {
-        // Navigate to a note detail — tap first available note card
+        // Navigate to a note detail — create one if none exist, then tap first card
         composeRule.waitForIdle()
         try {
             composeRule.waitUntil(5000) {
                 composeRule.onAllNodesWithTag("notes-list").fetchSemanticsNodes().isNotEmpty() ||
                     composeRule.onAllNodesWithTag("notes-empty").fetchSemanticsNodes().isNotEmpty()
             }
-            onAllNodes(hasTestTagPrefix("note-card-")).onFirst().performClick()
-            composeRule.waitForIdle()
-        } catch (_: AssertionError) {
-            // No note cards available — test will fail on subsequent assertions
         } catch (_: androidx.compose.ui.test.ComposeTimeoutException) {
-            // Notes screen didn't load — test will fail on subsequent assertions
+            // Notes screen didn't load
+            return
         }
+        val noteCards = composeRule.onAllNodes(hasTestTagPrefix("note-card-")).fetchSemanticsNodes()
+        if (noteCards.isEmpty()) {
+            // Create a note first
+            onNodeWithTag("create-note-fab").performClick()
+            composeRule.waitForIdle()
+            onNodeWithTag("note-text-input").performTextInput("E2E test note for thread")
+            onNodeWithTag("note-save-button").performClick()
+            composeRule.waitForIdle()
+            // Wait for notes list to reload
+            try {
+                composeRule.waitUntil(5000) {
+                    composeRule.onAllNodes(hasTestTagPrefix("note-card-")).fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch (_: androidx.compose.ui.test.ComposeTimeoutException) {
+                return
+            }
+        }
+        onAllNodes(hasTestTagPrefix("note-card-")).onFirst().performClick()
+        composeRule.waitForIdle()
     }
 
     @Given("the note has no replies")

@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import org.llamenos.hotline.steps.BaseSteps
@@ -21,12 +22,27 @@ class ReportDetailSteps : BaseSteps() {
     @When("I tap the first report card")
     fun iTapTheFirstReportCard() {
         composeRule.waitForIdle()
-        try {
-            onAllNodes(hasTestTagPrefix("report-card-")).onFirst().performClick()
-            composeRule.waitForIdle()
-        } catch (_: AssertionError) {
-            // No report cards available — subsequent assertions will fail clearly
+        val reportCards = composeRule.onAllNodes(hasTestTagPrefix("report-card-")).fetchSemanticsNodes()
+        if (reportCards.isEmpty()) {
+            // No reports — create one via the FAB
+            try {
+                onNodeWithTag("report-create-fab").performClick()
+                composeRule.waitForIdle()
+                onNodeWithTag("report-title-input").performTextInput("E2E Test Report")
+                onNodeWithTag("report-body-input").performTextInput("Test report body for E2E")
+                onNodeWithTag("report-submit-button").performClick()
+                composeRule.waitForIdle()
+                // After creation, may return to list — wait for report cards
+                composeRule.waitUntil(5000) {
+                    composeRule.onAllNodes(hasTestTagPrefix("report-card-")).fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch (_: Exception) {
+                // FAB or form may not be available
+                return
+            }
         }
+        onAllNodes(hasTestTagPrefix("report-card-")).onFirst().performClick()
+        composeRule.waitForIdle()
     }
 
     @Then("I should see the report detail screen")

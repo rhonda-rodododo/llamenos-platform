@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import org.llamenos.hotline.steps.BaseSteps
@@ -18,17 +19,32 @@ class VolunteerDetailSteps : BaseSteps() {
 
     @When("I tap a volunteer card")
     fun iTapAVolunteerCard() {
-        // Wait for volunteer list or empty state
         composeRule.waitForIdle()
-        try {
-            // Try to tap first volunteer card in the list
-            composeRule.onAllNodes(hasTestTagPrefix("volunteer-card-"))
-                .onFirst()
-                .performClick()
-            composeRule.waitForIdle()
-        } catch (_: AssertionError) {
-            // No volunteers in demo mode — skip gracefully
+        val volunteerCards = composeRule.onAllNodes(hasTestTagPrefix("volunteer-card-")).fetchSemanticsNodes()
+        if (volunteerCards.isEmpty()) {
+            // No volunteers — create one via the FAB
+            try {
+                onNodeWithTag("add-volunteer-fab").performClick()
+                composeRule.waitForIdle()
+                val uniquePhone = "+15551${System.currentTimeMillis().toString().takeLast(6)}"
+                onNodeWithTag("volunteer-name-input").performTextInput("Test Volunteer")
+                onNodeWithTag("volunteer-phone-input").performTextInput(uniquePhone)
+                onNodeWithTag("confirm-add-volunteer").performClick()
+                composeRule.waitForIdle()
+                // Dismiss nsec dialog if it appears
+                try { onNodeWithTag("dismiss-nsec-dialog").performClick(); composeRule.waitForIdle() } catch (_: AssertionError) {}
+                // Wait for volunteer cards to appear
+                composeRule.waitUntil(5000) {
+                    composeRule.onAllNodes(hasTestTagPrefix("volunteer-card-")).fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch (_: Exception) {
+                return
+            }
         }
+        composeRule.onAllNodes(hasTestTagPrefix("volunteer-card-"))
+            .onFirst()
+            .performClick()
+        composeRule.waitForIdle()
     }
 
     @Then("I should see the volunteer detail screen")
