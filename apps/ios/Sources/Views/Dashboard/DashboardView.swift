@@ -36,8 +36,22 @@ struct DashboardView: View {
                 }
                 .padding(.horizontal, 20)
             }
-            .navigationTitle(NSLocalizedString("dashboard_title", comment: "Dashboard"))
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(NSLocalizedString("dashboard_title", comment: "Dashboard"))
+                        .font(.headline)
+                        .accessibilityIdentifier("dashboard-title")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        appState.lockApp()
+                    } label: {
+                        Image(systemName: "lock.fill")
+                    }
+                    .accessibilityIdentifier("lock-app")
+                }
+            }
             .refreshable {
                 await vm.refresh()
             }
