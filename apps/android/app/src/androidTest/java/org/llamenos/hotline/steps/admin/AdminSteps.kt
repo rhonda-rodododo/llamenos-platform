@@ -116,12 +116,16 @@ class AdminSteps : BaseSteps() {
 
     @Then("I should be on the Volunteers tab")
     fun iShouldBeOnTheVolunteersTab() {
+        composeRule.waitForIdle()
+        onNodeWithTag("admin-tab-volunteers").performScrollTo()
         onNodeWithTag("admin-tab-volunteers").assertIsDisplayed()
     }
 
     @Then("no crashes should occur")
     fun noCrashesShouldOccur() {
-        onNodeWithTag("admin-tab-volunteers").assertIsDisplayed()
+        // Verify we're still on a valid admin screen
+        val found = assertAnyTagDisplayed("admin-tabs", "admin-title")
+        assert(found) { "Expected admin screen to be visible after tab switching" }
     }
 
     // ---- Access control ----

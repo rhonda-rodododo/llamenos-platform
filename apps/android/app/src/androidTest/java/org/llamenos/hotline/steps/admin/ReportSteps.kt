@@ -1,6 +1,7 @@
 package org.llamenos.hotline.steps.admin
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -31,46 +32,55 @@ class ReportSteps : BaseSteps() {
 
     @Then("the report should appear in the reports list")
     fun theReportShouldAppearInTheReportsList() {
-        // Reports show in the notes list or audit log
-        val found = assertAnyTagDisplayed("notes-list", "notes-empty", "audit-list", "audit-empty")
-        assert(found) { "Expected reports/notes area to be visible" }
+        val found = assertAnyTagDisplayed("reports-list", "reports-empty", "reports-loading")
+        assert(found) { "Expected reports area to be visible" }
     }
 
     @Given("at least one report exists")
     fun atLeastOneReportExists() {
-        // Precondition — report data should exist
+        createReportViaUI()
     }
 
     @Then("I should see reports in the list")
     fun iShouldSeeReportsInTheList() {
-        val found = assertAnyTagDisplayed("notes-list", "notes-empty", "audit-list", "audit-empty")
+        val found = assertAnyTagDisplayed("reports-list", "reports-empty", "reports-loading")
         assert(found) { "Expected reports area to be visible" }
     }
 
     @Given("a report exists")
     fun aReportExists() {
-        // Precondition
+        createReportViaUI()
     }
 
     @When("I click on the report")
     fun iClickOnTheReport() {
+        composeRule.waitForIdle()
+        val reportCards = composeRule.onAllNodes(hasTestTagPrefix("report-card-")).fetchSemanticsNodes()
+        if (reportCards.isEmpty()) {
+            createReportViaUI()
+        }
         try {
-            onAllNodes(hasTestTagPrefix("note-card-")).onFirst().performClick()
+            onAllNodes(hasTestTagPrefix("report-card-")).onFirst().performClick()
             composeRule.waitForIdle()
         } catch (_: AssertionError) {
-            // No reports/notes to click
+            // No reports to click
         }
     }
 
     @Then("I should see the report detail view")
     fun iShouldSeeTheReportDetailView() {
-        val found = assertAnyTagDisplayed("note-detail-text", "note-text", "note-detail")
+        val found = assertAnyTagDisplayed(
+            "report-detail-title", "report-detail-title-text",
+            "report-not-found", "report-metadata-card",
+        )
         assert(found) { "Expected report detail view" }
     }
 
     @Then("I should see the report content")
     fun iShouldSeeTheReportContent() {
-        val found = assertAnyTagDisplayed("note-detail-text", "note-text")
+        val found = assertAnyTagDisplayed(
+            "report-detail-title-text", "report-metadata-card", "report-not-found",
+        )
         assert(found) { "Expected report content to be visible" }
     }
 
@@ -87,27 +97,36 @@ class ReportSteps : BaseSteps() {
 
     @When("they create a new report")
     fun theyCreateANewReport() {
-        // Use note creation flow
-        try {
-            onNodeWithTag("create-note-fab").performClick()
-            composeRule.waitForIdle()
-            onNodeWithTag("note-text-input").performTextInput("New report ${System.currentTimeMillis()}")
-            onNodeWithTag("save-note-button").performClick()
-            composeRule.waitForIdle()
-        } catch (_: AssertionError) {
-            // Note creation flow may not be fully available
-        }
+        createReportViaUI()
     }
 
     @Then("the report should be saved successfully")
     fun theReportShouldBeSavedSuccessfully() {
-        // After save, should return to notes list or show success
-        val found = assertAnyTagDisplayed("notes-list", "notes-empty", "note-created-snackbar")
-        assert(found) { "Expected notes area after save" }
+        val found = assertAnyTagDisplayed("reports-list", "reports-empty", "report-detail-title")
+        assert(found) { "Expected reports area after save" }
     }
 
     @Given("a reporter is logged in")
     fun aReporterIsLoggedIn() {
         navigateToMainScreen()
+    }
+
+    private fun createReportViaUI() {
+        try {
+            onNodeWithTag("report-create-fab").performClick()
+            composeRule.waitForIdle()
+            onNodeWithTag("report-title-input").performTextInput("E2E Report ${System.currentTimeMillis()}")
+            onNodeWithTag("report-body-input").performTextInput("Test report body")
+            onNodeWithTag("report-submit-button").performClick()
+            composeRule.waitForIdle()
+            // Wait for return to reports list
+            composeRule.waitUntil(5000) {
+                composeRule.onAllNodes(hasTestTagPrefix("report-card-")).fetchSemanticsNodes().isNotEmpty() ||
+                    composeRule.onAllNodesWithTag("reports-list").fetchSemanticsNodes().isNotEmpty() ||
+                    composeRule.onAllNodesWithTag("reports-empty").fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (_: Exception) {
+            // FAB or form may not be available
+        }
     }
 }

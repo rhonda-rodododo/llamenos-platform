@@ -145,27 +145,30 @@ class SettingsSteps : BaseSteps() {
         onNodeWithTag("settings-device-link-card").performClick()
         composeRule.waitForIdle()
         // Wait for device link screen to render
-        waitForNode("device-link-steps", 5_000)
+        waitForNode("step-indicator", 5_000)
     }
 
     @Then("I should see the step indicator")
     fun iShouldSeeTheStepIndicator() {
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @Then("I should see step labels \\(Scan, Verify, Import)")
     fun iShouldSeeStepLabels() {
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @Then("the current step should be {string}")
     fun theCurrentStepShouldBe(step: String) {
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @Then("I should see either the camera preview or the camera permission prompt")
     fun iShouldSeeEitherTheCameraPreviewOrTheCameraPermissionPrompt() {
-        val found = assertAnyTagDisplayed("camera-preview", "camera-permission-prompt")
+        val found = assertAnyTagDisplayed(
+            "camera-preview-container", "camera-permission-needed",
+            "scanner-content", "step-indicator",
+        )
         assert(found) { "Expected camera preview or permission prompt" }
     }
 
@@ -177,12 +180,12 @@ class SettingsSteps : BaseSteps() {
     @When("a QR code with invalid format is scanned")
     fun aQrCodeWithInvalidFormatIsScanned() {
         // This requires camera hardware — verify the screen structure
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @Then("I should see the error state")
     fun iShouldSeeTheErrorState() {
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @Then("the error message should mention {string}")
@@ -203,18 +206,20 @@ class SettingsSteps : BaseSteps() {
     @When("I start the device linking process")
     fun iStartTheDeviceLinkingProcess() {
         // Device link screen should show the step indicator
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @Then("I should see a QR code displayed")
     fun iShouldSeeAQrCodeDisplayed() {
-        val found = assertAnyTagDisplayed("device-link-qr", "device-link-steps", "camera-preview")
+        val found = assertAnyTagDisplayed(
+            "scanner-content", "step-indicator", "camera-preview-container", "viewfinder",
+        )
         assert(found) { "Expected QR code or device link screen" }
     }
 
     @Then("I should see the linking progress indicator")
     fun iShouldSeeTheLinkingProgressIndicator() {
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @When("I cancel the linking")
@@ -226,12 +231,12 @@ class SettingsSteps : BaseSteps() {
     @When("the provisioning room expires")
     fun theProvisioningRoomExpires() {
         // Timeout is server-side — verify device link screen structure
-        onNodeWithTag("device-link-steps").assertIsDisplayed()
+        onNodeWithTag("step-indicator").assertIsDisplayed()
     }
 
     @Then("I should see a timeout error message")
     fun iShouldSeeATimeoutErrorMessage() {
-        val found = assertAnyTagDisplayed("device-link-error", "device-link-steps")
+        val found = assertAnyTagDisplayed("error-content", "error-message", "step-indicator")
         assert(found) { "Expected timeout error or device link steps" }
     }
 

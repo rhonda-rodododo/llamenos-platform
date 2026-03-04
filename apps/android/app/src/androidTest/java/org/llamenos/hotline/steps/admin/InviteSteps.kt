@@ -23,6 +23,8 @@ class InviteSteps : BaseSteps() {
 
     @When("I create an invite for a new volunteer")
     fun iCreateAnInviteForANewVolunteer() {
+        // Ensure we're on the invites tab
+        navigateToAdminTab("invites")
         onNodeWithTag("create-invite-fab").performClick()
         composeRule.waitForIdle()
         onNodeWithTag("create-volunteer-invite").performClick()
