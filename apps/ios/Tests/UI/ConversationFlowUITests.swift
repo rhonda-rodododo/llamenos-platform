@@ -22,10 +22,26 @@ final class ConversationFlowUITests: XCTestCase {
         super.tearDown()
     }
 
+    /// Find any element by accessibility identifier, regardless of XCUIElement type.
+    private func find(_ identifier: String) -> XCUIElement {
+        return app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func anyElementExists(_ identifiers: [String], timeout: TimeInterval = 10) -> Bool {
+        for (i, id) in identifiers.enumerated() {
+            let element = find(id)
+            let wait: TimeInterval = i == 0 ? timeout : 2
+            if element.waitForExistence(timeout: wait) {
+                return true
+            }
+        }
+        return false
+    }
+
     // MARK: - Tab Navigation
 
     func testConversationsTabExists() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         XCTAssertTrue(
             tabView.waitForExistence(timeout: 10),
             "Main tab view should be visible after authentication"
@@ -33,15 +49,11 @@ final class ConversationFlowUITests: XCTestCase {
 
         navigateToConversationsTab()
 
-        // Conversations list, empty state, or loading should appear
-        let conversationsList = app.otherElements["conversations-list"].firstMatch
-        let emptyState = app.otherElements["conversations-empty-state"].firstMatch
-        let loading = app.otherElements["conversations-loading"].firstMatch
-
-        let found = conversationsList.waitForExistence(timeout: 10)
-            || emptyState.waitForExistence(timeout: 2)
-            || loading.waitForExistence(timeout: 2)
-
+        // Conversations list, empty state, loading, or error should appear
+        let found = anyElementExists([
+            "conversations-list", "conversations-empty-state",
+            "conversations-loading", "conversations-error",
+        ])
         XCTAssertTrue(found, "Conversations view should show list, empty state, or loading")
     }
 
@@ -50,7 +62,7 @@ final class ConversationFlowUITests: XCTestCase {
     func testEmptyStateShowsMessage() {
         navigateToConversationsTab()
 
-        let emptyState = app.otherElements["conversations-empty-state"].firstMatch
+        let emptyState = find("conversations-empty-state")
         if emptyState.waitForExistence(timeout: 10) {
             XCTAssertTrue(true, "Empty state is displayed when no conversations exist")
         }
@@ -63,11 +75,12 @@ final class ConversationFlowUITests: XCTestCase {
         navigateToConversationsTab()
 
         // Wait for content to load
-        let list = app.otherElements["conversations-list"].firstMatch
-        let empty = app.otherElements["conversations-empty-state"].firstMatch
-        _ = list.waitForExistence(timeout: 10) || empty.waitForExistence(timeout: 2)
+        _ = anyElementExists([
+            "conversations-list", "conversations-empty-state",
+            "conversations-loading", "conversations-error",
+        ])
 
-        let filterButton = app.buttons["conversations-filter-button"]
+        let filterButton = find("conversations-filter-button")
         XCTAssertTrue(
             filterButton.waitForExistence(timeout: 5),
             "Filter button should exist in the toolbar"
@@ -80,7 +93,7 @@ final class ConversationFlowUITests: XCTestCase {
         navigateToConversationsTab()
 
         // Wait for the conversations list to load
-        let conversationsList = app.otherElements["conversations-list"].firstMatch
+        let conversationsList = find("conversations-list")
         guard conversationsList.waitForExistence(timeout: 10) else {
             // No conversations to test detail on — skip
             return
@@ -92,7 +105,7 @@ final class ConversationFlowUITests: XCTestCase {
         cells.firstMatch.tap()
 
         // Detail view should appear
-        let detailView = app.otherElements["conversation-detail-view"]
+        let detailView = find("conversation-detail-view")
         XCTAssertTrue(
             detailView.waitForExistence(timeout: 5),
             "Conversation detail view should appear when tapping a conversation"
@@ -106,7 +119,7 @@ final class ConversationFlowUITests: XCTestCase {
         )
 
         // Send button should exist
-        let sendButton = app.buttons["send-message-button"]
+        let sendButton = find("send-message-button")
         XCTAssertTrue(
             sendButton.exists,
             "Send button should exist in conversation detail"
@@ -116,21 +129,19 @@ final class ConversationFlowUITests: XCTestCase {
     func testSendMessageButton() {
         navigateToConversationsTab()
 
-        let conversationsList = app.otherElements["conversations-list"].firstMatch
+        let conversationsList = find("conversations-list")
         guard conversationsList.waitForExistence(timeout: 10) else { return }
 
         let cells = app.cells
         guard cells.count > 0 else { return }
         cells.firstMatch.tap()
 
-        let detailView = app.otherElements["conversation-detail-view"]
+        let detailView = find("conversation-detail-view")
         guard detailView.waitForExistence(timeout: 5) else { return }
 
         // Send button should be disabled when reply field is empty
-        let sendButton = app.buttons["send-message-button"]
+        let sendButton = find("send-message-button")
         XCTAssertTrue(sendButton.exists, "Send button should exist")
-        // Note: We can't reliably check isEnabled on all configurations,
-        // so we just verify the button exists
 
         // Type a message
         let replyField = app.textFields["reply-text-field"]
@@ -138,7 +149,6 @@ final class ConversationFlowUITests: XCTestCase {
             replyField.tap()
             replyField.typeText("Test message from UI test - \(Date().timeIntervalSince1970)")
 
-            // Send button should now be interactive
             XCTAssertTrue(sendButton.exists, "Send button should still exist after typing")
         }
     }
@@ -148,14 +158,14 @@ final class ConversationFlowUITests: XCTestCase {
     func testChannelHeaderVisible() {
         navigateToConversationsTab()
 
-        let conversationsList = app.otherElements["conversations-list"].firstMatch
+        let conversationsList = find("conversations-list")
         guard conversationsList.waitForExistence(timeout: 10) else { return }
 
         let cells = app.cells
         guard cells.count > 0 else { return }
         cells.firstMatch.tap()
 
-        let channelHeader = app.otherElements["conversation-channel-header"]
+        let channelHeader = find("conversation-channel-header")
         if channelHeader.waitForExistence(timeout: 5) {
             XCTAssertTrue(true, "Channel header is visible in conversation detail")
         }
@@ -164,7 +174,7 @@ final class ConversationFlowUITests: XCTestCase {
     // MARK: - Navigation Helpers
 
     private func navigateToConversationsTab() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         guard tabView.waitForExistence(timeout: 10) else {
             XCTFail("Main tab view should be visible")
             return

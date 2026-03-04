@@ -27,7 +27,7 @@ final class DashboardUITests: BaseUITest {
             // Already on dashboard
         }
         then("I should see the shift status card") {
-            let shiftCard = app.otherElements["shift-status-card"].firstMatch
+            let shiftCard = find("shift-status-card")
             XCTAssertTrue(
                 shiftCard.waitForExistence(timeout: 10),
                 "Shift status card should exist on dashboard"
@@ -40,7 +40,7 @@ final class DashboardUITests: BaseUITest {
             // Already on dashboard
         }
         then("I should see my npub displayed") {
-            let npubDisplay = app.staticTexts["dashboard-npub"]
+            let npubDisplay = find("dashboard-npub")
             XCTAssertTrue(
                 npubDisplay.waitForExistence(timeout: 5),
                 "Dashboard should display the user's npub"
@@ -53,7 +53,7 @@ final class DashboardUITests: BaseUITest {
             // Already on dashboard
         }
         then("I should see a lock button") {
-            let lockButton = app.buttons["lock-app"]
+            let lockButton = find("lock-app")
             XCTAssertTrue(
                 lockButton.waitForExistence(timeout: 5),
                 "Lock button should exist on dashboard"
@@ -66,7 +66,7 @@ final class DashboardUITests: BaseUITest {
             // Already on dashboard
         }
         then("I should see the dashboard title") {
-            let title = app.staticTexts["dashboard-title"].firstMatch
+            let title = find("dashboard-title")
             XCTAssertTrue(
                 title.waitForExistence(timeout: 10),
                 "Dashboard title should be displayed"
@@ -81,7 +81,7 @@ final class DashboardUITests: BaseUITest {
             // Already on dashboard
         }
         then("the shift status card should show a status label") {
-            let shiftCard = app.otherElements["shift-status-card"].firstMatch
+            let shiftCard = find("shift-status-card")
             guard shiftCard.waitForExistence(timeout: 10) else {
                 XCTFail("Shift status card should exist")
                 return
@@ -98,12 +98,12 @@ final class DashboardUITests: BaseUITest {
             // Already on dashboard
         }
         when("I tap the lock button") {
-            let lockButton = app.buttons["lock-app"]
+            let lockButton = find("lock-app")
             XCTAssertTrue(lockButton.waitForExistence(timeout: 5))
             lockButton.tap()
         }
         then("I should see the PIN unlock screen") {
-            let pinPad = app.otherElements["pin-pad"]
+            let pinPad = find("pin-pad")
             XCTAssertTrue(
                 pinPad.waitForExistence(timeout: 5),
                 "PIN pad should appear after locking"
@@ -135,7 +135,9 @@ final class DashboardUITests: BaseUITest {
             navigateToNotes()
         }
         then("I should see notes content") {
-            let found = anyElementExists(["notes-list", "notes-empty-state", "notes-loading", "notes-error"])
+            let found = anyElementExists([
+                "notes-list", "notes-empty-state", "notes-loading", "notes-error",
+            ])
             XCTAssertTrue(found, "Notes view should show content after tab navigation")
         }
     }

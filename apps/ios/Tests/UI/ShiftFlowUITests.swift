@@ -21,10 +21,26 @@ final class ShiftFlowUITests: XCTestCase {
         super.tearDown()
     }
 
+    /// Find any element by accessibility identifier, regardless of XCUIElement type.
+    private func find(_ identifier: String) -> XCUIElement {
+        return app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func anyElementExists(_ identifiers: [String], timeout: TimeInterval = 10) -> Bool {
+        for (i, id) in identifiers.enumerated() {
+            let element = find(id)
+            let wait: TimeInterval = i == 0 ? timeout : 2
+            if element.waitForExistence(timeout: wait) {
+                return true
+            }
+        }
+        return false
+    }
+
     // MARK: - Tab Navigation
 
     func testShiftsTabExists() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         XCTAssertTrue(
             tabView.waitForExistence(timeout: 10),
             "Main tab view should be visible after authentication"
@@ -33,14 +49,10 @@ final class ShiftFlowUITests: XCTestCase {
         navigateToShiftsTab()
 
         // Shifts content should appear (loading, empty, or schedule)
-        let clockInButton = app.buttons["clock-in-button"].firstMatch
-        let emptyState = app.otherElements["shifts-empty-state"].firstMatch
-        let loading = app.otherElements["shifts-loading"].firstMatch
-
-        let found = clockInButton.waitForExistence(timeout: 10)
-            || emptyState.waitForExistence(timeout: 2)
-            || loading.waitForExistence(timeout: 2)
-
+        let found = anyElementExists([
+            "clock-in-button", "clock-out-button",
+            "shifts-empty-state", "shifts-loading",
+        ])
         XCTAssertTrue(found, "Shifts view should show clock button, empty state, or loading")
     }
 
@@ -50,19 +62,14 @@ final class ShiftFlowUITests: XCTestCase {
         navigateToShiftsTab()
 
         // Either clock-in or clock-out button should exist
-        let clockInButton = app.buttons["clock-in-button"].firstMatch
-        let clockOutButton = app.buttons["clock-out-button"].firstMatch
-
-        let found = clockInButton.waitForExistence(timeout: 10)
-            || clockOutButton.waitForExistence(timeout: 2)
-
+        let found = anyElementExists(["clock-in-button", "clock-out-button"])
         XCTAssertTrue(found, "Clock in or clock out button should exist")
     }
 
     func testShiftStatusLabelExists() {
         navigateToShiftsTab()
 
-        let statusLabel = app.staticTexts["shift-status-label"]
+        let statusLabel = find("shift-status-label")
         XCTAssertTrue(
             statusLabel.waitForExistence(timeout: 10),
             "Shift status label should exist"
@@ -80,16 +87,16 @@ final class ShiftFlowUITests: XCTestCase {
         navigateToShiftsTab()
 
         // If we're on shift, the clock out button exists
-        let clockOutButton = app.buttons["clock-out-button"].firstMatch
+        let clockOutButton = find("clock-out-button")
         guard clockOutButton.waitForExistence(timeout: 5) else {
             // Not on shift — try clocking in first
-            let clockInButton = app.buttons["clock-in-button"].firstMatch
+            let clockInButton = find("clock-in-button")
             guard clockInButton.waitForExistence(timeout: 5) else { return }
             clockInButton.tap()
 
             // Wait for clock out button to appear (shift started)
-            guard app.buttons["clock-out-button"].firstMatch.waitForExistence(timeout: 10) else { return }
-            app.buttons["clock-out-button"].firstMatch.tap()
+            guard find("clock-out-button").waitForExistence(timeout: 10) else { return }
+            find("clock-out-button").tap()
 
             // Confirmation dialog should appear
             let alertExists = app.alerts.firstMatch.waitForExistence(timeout: 5)
@@ -121,11 +128,11 @@ final class ShiftFlowUITests: XCTestCase {
         navigateToShiftsTab()
 
         // Wait for content to load
-        let clockButton = app.buttons["clock-in-button"].firstMatch
+        let clockButton = find("clock-in-button")
         guard clockButton.waitForExistence(timeout: 10) else { return }
 
         // Weekly schedule header should exist if there are shifts
-        let scheduleHeader = app.staticTexts["weekly-schedule-header"]
+        let scheduleHeader = find("weekly-schedule-header")
         // It's okay if the schedule is empty (no shifts configured)
         if scheduleHeader.waitForExistence(timeout: 3) {
             XCTAssertTrue(true, "Weekly schedule header exists")
@@ -135,12 +142,12 @@ final class ShiftFlowUITests: XCTestCase {
     func testTodayBadgeExists() {
         navigateToShiftsTab()
 
-        let clockButton = app.buttons["clock-in-button"].firstMatch
+        let clockButton = find("clock-in-button")
         guard clockButton.waitForExistence(timeout: 10) else { return }
 
         // If the weekly schedule is showing, today's day section should be highlighted
         let today = Calendar.current.component(.weekday, from: Date()) - 1  // 0-indexed
-        let todaySection = app.otherElements["shift-day-\(today)"]
+        let todaySection = find("shift-day-\(today)")
 
         if todaySection.waitForExistence(timeout: 3) {
             XCTAssertTrue(true, "Today's day section exists in the schedule")
@@ -153,7 +160,7 @@ final class ShiftFlowUITests: XCTestCase {
         navigateToShiftsTab()
 
         // If there's an error (e.g., hub not configured), it should display
-        let errorView = app.otherElements["shifts-error"]
+        let errorView = find("shifts-error")
         if errorView.waitForExistence(timeout: 5) {
             XCTAssertTrue(true, "Error message is displayed when hub connection fails")
         }
@@ -163,7 +170,7 @@ final class ShiftFlowUITests: XCTestCase {
     // MARK: - Settings Tab
 
     func testSettingsTabShowsIdentity() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         guard tabView.waitForExistence(timeout: 10) else {
             XCTFail("Main tab view should be visible")
             return
@@ -171,20 +178,15 @@ final class ShiftFlowUITests: XCTestCase {
 
         navigateToSettingsTab()
 
-        // Identity section should show npub
-        let npubRow = app.otherElements["settings-npub"].firstMatch
-        let versionRow = app.otherElements["settings-version"].firstMatch
-
-        let found = npubRow.waitForExistence(timeout: 10)
-            || versionRow.waitForExistence(timeout: 2)
-
+        // Identity section should show npub or version
+        let found = anyElementExists(["settings-npub", "settings-version"])
         XCTAssertTrue(found, "Settings should show identity or version info")
     }
 
     func testSettingsLockButton() {
         navigateToSettingsTab()
 
-        let lockButton = app.buttons["settings-lock-app"]
+        let lockButton = find("settings-lock-app")
         XCTAssertTrue(
             lockButton.waitForExistence(timeout: 10),
             "Lock app button should exist in settings"
@@ -194,7 +196,7 @@ final class ShiftFlowUITests: XCTestCase {
     func testSettingsLogoutButton() {
         navigateToSettingsTab()
 
-        let logoutButton = app.buttons["settings-logout"]
+        let logoutButton = find("settings-logout")
         XCTAssertTrue(
             logoutButton.waitForExistence(timeout: 10),
             "Logout button should exist in settings"
@@ -204,7 +206,7 @@ final class ShiftFlowUITests: XCTestCase {
     // MARK: - Navigation Helpers
 
     private func navigateToShiftsTab() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         guard tabView.waitForExistence(timeout: 10) else {
             XCTFail("Main tab view should be visible")
             return
@@ -212,7 +214,6 @@ final class ShiftFlowUITests: XCTestCase {
 
         let tabBar = app.tabBars.firstMatch
         guard tabBar.waitForExistence(timeout: 5) else { return }
-        // Fourth tab = Shifts (0: Dashboard, 1: Notes, 2: Conversations, 3: Shifts)
         let shiftsTabButton = tabBar.buttons.element(boundBy: 3)
         if shiftsTabButton.exists {
             shiftsTabButton.tap()
@@ -220,7 +221,7 @@ final class ShiftFlowUITests: XCTestCase {
     }
 
     private func navigateToSettingsTab() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         guard tabView.waitForExistence(timeout: 10) else {
             XCTFail("Main tab view should be visible")
             return
@@ -228,7 +229,6 @@ final class ShiftFlowUITests: XCTestCase {
 
         let tabBar = app.tabBars.firstMatch
         guard tabBar.waitForExistence(timeout: 5) else { return }
-        // Fifth tab = Settings (0: Dashboard, 1: Notes, 2: Conversations, 3: Shifts, 4: Settings)
         let settingsTabButton = tabBar.buttons.element(boundBy: 4)
         if settingsTabButton.exists {
             settingsTabButton.tap()

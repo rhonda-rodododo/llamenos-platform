@@ -29,11 +29,11 @@ final class SecurityUITests: BaseUITest {
             launchAuthenticated()
         }
         when("I lock the app") {
-            let lockButton = app.buttons["lock-app"]
+            let lockButton = find("lock-app")
             guard lockButton.waitForExistence(timeout: 10) else {
                 // Try settings lock button
                 navigateToSettings()
-                let settingsLock = app.buttons["settings-lock-app"]
+                let settingsLock = find("settings-lock-app")
                 guard settingsLock.waitForExistence(timeout: 10) else {
                     XCTFail("No lock button found")
                     return
@@ -44,14 +44,14 @@ final class SecurityUITests: BaseUITest {
             lockButton.tap()
         }
         then("I should see the PIN pad on the lock screen") {
-            let pinPad = app.otherElements["pin-pad"]
+            let pinPad = find("pin-pad")
             XCTAssertTrue(
                 pinPad.waitForExistence(timeout: 5),
                 "PIN pad should be displayed on lock screen"
             )
         }
         and("I should see the locked npub") {
-            let lockedNpub = app.staticTexts["locked-npub"]
+            let lockedNpub = find("locked-npub")
             if lockedNpub.waitForExistence(timeout: 3) {
                 XCTAssertTrue(true, "Locked npub is displayed")
             }
@@ -62,30 +62,30 @@ final class SecurityUITests: BaseUITest {
         given("the app is locked") {
             launchAuthenticated()
             // Lock it
-            let lockButton = app.buttons["lock-app"]
+            let lockButton = find("lock-app")
             if lockButton.waitForExistence(timeout: 10) {
                 lockButton.tap()
             } else {
                 navigateToSettings()
-                let settingsLock = app.buttons["settings-lock-app"]
+                let settingsLock = find("settings-lock-app")
                 guard settingsLock.waitForExistence(timeout: 5) else { return }
                 settingsLock.tap()
             }
-            let pinPad = app.otherElements["pin-pad"]
+            let pinPad = find("pin-pad")
             _ = pinPad.waitForExistence(timeout: 5)
         }
         when("I enter the wrong PIN") {
             enterPIN("9999")
         }
         then("I should see an error message") {
-            let pinError = app.staticTexts["pin-error"]
+            let pinError = find("pin-error")
             XCTAssertTrue(
                 pinError.waitForExistence(timeout: 5),
                 "PIN error should be displayed for wrong PIN"
             )
         }
         and("the PIN pad should still be visible") {
-            let pinPad = app.otherElements["pin-pad"]
+            let pinPad = find("pin-pad")
             XCTAssertTrue(pinPad.exists, "PIN pad should remain for retry")
         }
     }
@@ -102,31 +102,31 @@ final class SecurityUITests: BaseUITest {
             hubInput.tap()
             hubInput.typeText("https://test.example.org")
 
-            let createButton = app.buttons["create-identity"]
+            let createButton = find("create-identity")
             guard createButton.waitForExistence(timeout: 3) else { return }
             createButton.tap()
 
             // Confirm backup
-            let confirmBackup = app.buttons["confirm-backup"].firstMatch
+            let confirmBackup = find("confirm-backup")
             if confirmBackup.waitForExistence(timeout: 5) {
                 confirmBackup.tap()
             }
-            let continueButton = app.buttons["continue-to-pin"].firstMatch
+            let continueButton = find("continue-to-pin")
             if continueButton.waitForExistence(timeout: 3) {
                 continueButton.tap()
             }
         }
         then("the PIN pad should have digits 0-9 and backspace") {
-            let pinPad = app.otherElements["pin-pad"]
+            let pinPad = find("pin-pad")
             guard pinPad.waitForExistence(timeout: 5) else {
                 XCTFail("PIN pad should appear")
                 return
             }
             for digit in 0...9 {
-                let button = app.buttons["pin-\(digit)"]
+                let button = find("pin-\(digit)")
                 XCTAssertTrue(button.exists, "PIN button \(digit) should exist")
             }
-            let backspace = app.buttons["pin-backspace"]
+            let backspace = find("pin-backspace")
             XCTAssertTrue(backspace.exists, "Backspace button should exist")
         }
     }
@@ -141,21 +141,21 @@ final class SecurityUITests: BaseUITest {
             hubInput.tap()
             hubInput.typeText("https://test.example.org")
 
-            let createButton = app.buttons["create-identity"]
+            let createButton = find("create-identity")
             guard createButton.waitForExistence(timeout: 3) else { return }
             createButton.tap()
 
-            let confirmBackup = app.buttons["confirm-backup"].firstMatch
+            let confirmBackup = find("confirm-backup")
             if confirmBackup.waitForExistence(timeout: 5) {
                 confirmBackup.tap()
             }
-            let continueButton = app.buttons["continue-to-pin"].firstMatch
+            let continueButton = find("continue-to-pin")
             if continueButton.waitForExistence(timeout: 3) {
                 continueButton.tap()
             }
         }
         then("I should see the PIN dots indicator") {
-            let pinDots = app.otherElements["pin-dots"]
+            let pinDots = find("pin-dots")
             if pinDots.waitForExistence(timeout: 5) {
                 XCTAssertTrue(true, "PIN dots indicator is displayed")
             }

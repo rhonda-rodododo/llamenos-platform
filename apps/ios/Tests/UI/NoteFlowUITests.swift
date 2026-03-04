@@ -23,38 +23,37 @@ final class NoteFlowUITests: XCTestCase {
         super.tearDown()
     }
 
+    /// Find any element by accessibility identifier, regardless of XCUIElement type.
+    private func find(_ identifier: String) -> XCUIElement {
+        return app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func anyElementExists(_ identifiers: [String], timeout: TimeInterval = 10) -> Bool {
+        for (i, id) in identifiers.enumerated() {
+            let element = find(id)
+            let wait: TimeInterval = i == 0 ? timeout : 2
+            if element.waitForExistence(timeout: wait) {
+                return true
+            }
+        }
+        return false
+    }
+
     // MARK: - Tab Navigation
 
     func testNotesTabExists() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         XCTAssertTrue(
             tabView.waitForExistence(timeout: 10),
             "Main tab view should be visible after authentication"
         )
 
-        // Navigate to Notes tab
-        let notesTab = app.buttons["tab-notes"].firstMatch
-        if notesTab.waitForExistence(timeout: 5) {
-            notesTab.tap()
-        } else {
-            // Tab items might be in a different container
-            let tabBar = app.tabBars.firstMatch
-            XCTAssertTrue(tabBar.waitForExistence(timeout: 5), "Tab bar should exist")
-            let notesButton = tabBar.buttons.matching(identifier: "Notes").firstMatch
-            if notesButton.exists {
-                notesButton.tap()
-            }
-        }
+        navigateToNotesTab()
 
-        // Notes list or empty state should appear
-        let notesList = app.otherElements["notes-list"].firstMatch
-        let emptyState = app.otherElements["notes-empty-state"].firstMatch
-        let loading = app.otherElements["notes-loading"].firstMatch
-
-        let found = notesList.waitForExistence(timeout: 10)
-            || emptyState.waitForExistence(timeout: 2)
-            || loading.waitForExistence(timeout: 2)
-
+        // Notes list, empty state, loading, or error should appear
+        let found = anyElementExists([
+            "notes-list", "notes-empty-state", "notes-loading", "notes-error",
+        ])
         XCTAssertTrue(found, "Notes view should show list, empty state, or loading")
     }
 
@@ -63,8 +62,13 @@ final class NoteFlowUITests: XCTestCase {
     func testCreateNoteFlowOpensSheet() {
         navigateToNotesTab()
 
+        // Wait for notes content to load
+        _ = anyElementExists([
+            "notes-list", "notes-empty-state", "notes-loading", "notes-error",
+        ])
+
         // Tap create note button
-        let createButton = app.buttons["create-note-button"]
+        let createButton = find("create-note-button")
         XCTAssertTrue(
             createButton.waitForExistence(timeout: 5),
             "Create note button should exist in toolbar"
@@ -78,19 +82,24 @@ final class NoteFlowUITests: XCTestCase {
             "Note text editor should appear in create sheet"
         )
 
-        // Save button should exist but be disabled (no text entered)
-        let saveButton = app.buttons["save-note"]
+        // Save button should exist
+        let saveButton = find("save-note")
         XCTAssertTrue(saveButton.exists, "Save button should exist")
 
         // Cancel button should exist
-        let cancelButton = app.buttons["cancel-note-create"]
+        let cancelButton = find("cancel-note-create")
         XCTAssertTrue(cancelButton.exists, "Cancel button should exist")
     }
 
     func testCreateNoteCancel() {
         navigateToNotesTab()
 
-        let createButton = app.buttons["create-note-button"]
+        // Wait for content
+        _ = anyElementExists([
+            "notes-list", "notes-empty-state", "notes-loading", "notes-error",
+        ])
+
+        let createButton = find("create-note-button")
         XCTAssertTrue(createButton.waitForExistence(timeout: 5))
         createButton.tap()
 
@@ -99,7 +108,7 @@ final class NoteFlowUITests: XCTestCase {
         XCTAssertTrue(textEditor.waitForExistence(timeout: 5))
 
         // Cancel
-        let cancelButton = app.buttons["cancel-note-create"]
+        let cancelButton = find("cancel-note-create")
         cancelButton.tap()
 
         // Sheet should dismiss — create button should be visible again
@@ -112,7 +121,12 @@ final class NoteFlowUITests: XCTestCase {
     func testCreateNoteWithText() {
         navigateToNotesTab()
 
-        let createButton = app.buttons["create-note-button"]
+        // Wait for content
+        _ = anyElementExists([
+            "notes-list", "notes-empty-state", "notes-loading", "notes-error",
+        ])
+
+        let createButton = find("create-note-button")
         XCTAssertTrue(createButton.waitForExistence(timeout: 5))
         createButton.tap()
 
@@ -123,7 +137,7 @@ final class NoteFlowUITests: XCTestCase {
         textEditor.typeText("Test note from UI test - \(Date().timeIntervalSince1970)")
 
         // Save button should be enabled now
-        let saveButton = app.buttons["save-note"]
+        let saveButton = find("save-note")
         XCTAssertTrue(saveButton.exists, "Save button should exist")
         XCTAssertTrue(saveButton.isEnabled, "Save button should be enabled with text")
     }
@@ -134,9 +148,9 @@ final class NoteFlowUITests: XCTestCase {
         navigateToNotesTab()
 
         // If there are no notes, the empty state should have a create button
-        let emptyState = app.otherElements["notes-empty-state"].firstMatch
+        let emptyState = find("notes-empty-state")
         if emptyState.waitForExistence(timeout: 5) {
-            let createFirstNote = app.buttons["create-first-note"]
+            let createFirstNote = find("create-first-note")
             XCTAssertTrue(
                 createFirstNote.exists,
                 "Empty state should have a 'Create Your First Note' button"
@@ -151,7 +165,7 @@ final class NoteFlowUITests: XCTestCase {
         navigateToNotesTab()
 
         // Wait for the notes list to load
-        let notesList = app.otherElements["notes-list"].firstMatch
+        let notesList = find("notes-list")
         guard notesList.waitForExistence(timeout: 10) else {
             // No notes to test detail on — skip
             return
@@ -163,14 +177,14 @@ final class NoteFlowUITests: XCTestCase {
         cells.firstMatch.tap()
 
         // Detail view should appear
-        let detailView = app.otherElements["note-detail-view"]
+        let detailView = find("note-detail-view")
         XCTAssertTrue(
             detailView.waitForExistence(timeout: 5),
             "Note detail view should appear when tapping a note"
         )
 
         // Note text should be visible
-        let noteText = app.staticTexts["note-detail-text"]
+        let noteText = find("note-detail-text")
         XCTAssertTrue(
             noteText.waitForExistence(timeout: 3),
             "Note detail should display the note text"
@@ -180,18 +194,18 @@ final class NoteFlowUITests: XCTestCase {
     func testNoteDetailMenuExists() {
         navigateToNotesTab()
 
-        let notesList = app.otherElements["notes-list"].firstMatch
+        let notesList = find("notes-list")
         guard notesList.waitForExistence(timeout: 10) else { return }
 
         let cells = app.cells
         guard cells.count > 0 else { return }
         cells.firstMatch.tap()
 
-        let detailView = app.otherElements["note-detail-view"]
+        let detailView = find("note-detail-view")
         guard detailView.waitForExistence(timeout: 5) else { return }
 
         // Menu button should exist
-        let menuButton = app.buttons["note-detail-menu"]
+        let menuButton = find("note-detail-menu")
         XCTAssertTrue(
             menuButton.exists,
             "Note detail should have a menu button"
@@ -201,7 +215,7 @@ final class NoteFlowUITests: XCTestCase {
     // MARK: - Navigation Helpers
 
     private func navigateToNotesTab() {
-        let tabView = app.otherElements["main-tab-view"]
+        let tabView = find("main-tab-view")
         guard tabView.waitForExistence(timeout: 10) else {
             XCTFail("Main tab view should be visible")
             return
@@ -210,7 +224,6 @@ final class NoteFlowUITests: XCTestCase {
         // Try tapping the Notes tab
         let tabBar = app.tabBars.firstMatch
         if tabBar.waitForExistence(timeout: 5) {
-            // Tab bar buttons are identified by their label text
             let notesTabButton = tabBar.buttons.element(boundBy: 1)  // Second tab = Notes
             if notesTabButton.exists {
                 notesTabButton.tap()

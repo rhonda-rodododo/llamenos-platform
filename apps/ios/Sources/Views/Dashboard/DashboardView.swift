@@ -15,6 +15,9 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Title bar with lock button
+                    titleBar
+
                     // Connection status + Identity
                     headerSection(vm: vm)
 
@@ -36,22 +39,7 @@ struct DashboardView: View {
                 }
                 .padding(.horizontal, 20)
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(NSLocalizedString("dashboard_title", comment: "Dashboard"))
-                        .font(.headline)
-                        .accessibilityIdentifier("dashboard-title")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        appState.lockApp()
-                    } label: {
-                        Image(systemName: "lock.fill")
-                    }
-                    .accessibilityIdentifier("lock-app")
-                }
-            }
+            .navigationBarHidden(true)
             .refreshable {
                 await vm.refresh()
             }
@@ -64,6 +52,28 @@ struct DashboardView: View {
             }
         }
     }
+
+    // MARK: - Title Bar
+
+    private var titleBar: some View {
+        HStack {
+            Text(NSLocalizedString("dashboard_title", comment: "Dashboard"))
+                .font(.title2)
+                .fontWeight(.bold)
+                .accessibilityIdentifier("dashboard-title")
+
+            Spacer()
+
+            Button {
+                appState.lockApp()
+            } label: {
+                Image(systemName: "lock.fill")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityIdentifier("lock-app")
+        }
+        .padding(.top, 4)
 
     // MARK: - Header Section
 
@@ -184,6 +194,7 @@ struct DashboardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemGray6))
         )
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("shift-status-card")
     }
 
@@ -222,6 +233,7 @@ struct DashboardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemGray6))
         )
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("active-calls-card")
     }
 
@@ -268,6 +280,7 @@ struct DashboardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemGray6))
         )
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("recent-notes-card")
     }
 

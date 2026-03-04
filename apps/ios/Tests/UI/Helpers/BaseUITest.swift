@@ -162,10 +162,17 @@ class BaseUITest: XCTestCase {
 
     // MARK: - Element Helpers
 
+    /// Find any element by accessibility identifier, regardless of XCUIElement type.
+    /// SwiftUI exposes elements as varying types (cells, groups, other, etc.)
+    /// depending on container context. This helper avoids type-mismatch failures.
+    func find(_ identifier: String) -> XCUIElement {
+        return app.descendants(matching: .any)[identifier].firstMatch
+    }
+
     /// Wait for an element by accessibility identifier, asserting it exists.
     @discardableResult
     func waitForElement(_ identifier: String, timeout: TimeInterval = 5) -> XCUIElement {
-        let element = app.descendants(matching: .any)[identifier].firstMatch
+        let element = find(identifier)
         XCTAssertTrue(
             element.waitForExistence(timeout: timeout),
             "Element '\(identifier)' should exist within \(timeout)s"
@@ -176,7 +183,7 @@ class BaseUITest: XCTestCase {
     /// Check if any of the given elements exist (returns true if at least one is found).
     func anyElementExists(_ identifiers: [String], timeout: TimeInterval = 10) -> Bool {
         for (i, id) in identifiers.enumerated() {
-            let element = app.descendants(matching: .any)[id].firstMatch
+            let element = find(id)
             let wait: TimeInterval = i == 0 ? timeout : 2
             if element.waitForExistence(timeout: wait) {
                 return true
