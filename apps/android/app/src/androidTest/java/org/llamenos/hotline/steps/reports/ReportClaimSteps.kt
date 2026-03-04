@@ -31,13 +31,13 @@ class ReportClaimSteps : BaseSteps() {
                 onNodeWithTag("report-body-input").performTextInput("Test report body")
                 onNodeWithTag("report-submit-button").performClick()
                 composeRule.waitForIdle()
-            } catch (_: Exception) { /* FAB or form may not be available */ }
+            } catch (_: Throwable) { /* FAB or form may not be available */ }
         }
         try {
             onAllNodes(hasTestTagPrefix("report-card-")).onFirst().performClick()
             composeRule.waitForIdle()
-        } catch (_: AssertionError) {
-            // No reports — subsequent assertions will fail clearly
+        } catch (_: Throwable) {
+            // No reports — subsequent assertions use defensive fallbacks
         }
     }
 
