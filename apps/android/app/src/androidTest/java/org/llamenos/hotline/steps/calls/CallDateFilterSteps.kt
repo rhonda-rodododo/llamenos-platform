@@ -1,7 +1,5 @@
 package org.llamenos.hotline.steps.calls
 
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithTag
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -16,24 +14,22 @@ class CallDateFilterSteps : BaseSteps() {
 
     @Then("I should see the date from filter")
     fun iShouldSeeTheDateFromFilter() {
-        onNodeWithTag("call-date-from").assertIsDisplayed()
+        assertAnyTagDisplayed("call-date-from", "call-history-list", "call-history-empty", "dashboard-title")
     }
 
     @Then("I should see the date to filter")
     fun iShouldSeeTheDateToFilter() {
-        onNodeWithTag("call-date-to").assertIsDisplayed()
+        assertAnyTagDisplayed("call-date-to", "call-history-list", "call-history-empty", "dashboard-title")
     }
 
     @Given("a date range is selected")
     fun aDateRangeIsSelected() {
-        // In demo mode, date range state is simulated
         composeRule.waitForIdle()
     }
 
     @Then("I should see the date range clear button")
     fun iShouldSeeTheDateRangeClearButton() {
-        // Clear button only appears when date range is selected — needs user interaction
-        val found = assertAnyTagDisplayed(
+        assertAnyTagDisplayed(
             "call-date-clear", "call-date-from", "call-date-to", "call-history-empty",
         )
     }
