@@ -153,8 +153,5 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.test.runner)
     androidTestImplementation(libs.test.rules)
-    androidTestImplementation(libs.hilt.android.testing)
     androidTestImplementation(libs.cucumber.android)
-    androidTestImplementation(libs.cucumber.android.hilt)
-    kaptAndroidTest(libs.hilt.compiler)
 }

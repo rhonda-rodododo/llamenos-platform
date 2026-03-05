@@ -33,6 +33,12 @@ struct DashboardView: View {
                     // Reports quick action
                     reportsQuickAction
 
+                    // Admin-only quick actions
+                    if appState.isAdmin {
+                        contactsQuickAction
+                        blastsQuickAction
+                    }
+
                     // Error message
                     if let error = vm.errorMessage {
                         errorCard(error)
@@ -358,6 +364,78 @@ struct DashboardView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("dashboard-reports-action")
+    }
+
+    // MARK: - Contacts Quick Action
+
+    private var contactsQuickAction: some View {
+        NavigationLink {
+            ContactsView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "person.crop.circle.badge.clock")
+                    .font(.title3)
+                    .foregroundStyle(.teal)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(NSLocalizedString("dashboard_contacts", comment: "Contacts"))
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(NSLocalizedString("dashboard_contacts_subtitle", comment: "View caller interaction history"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("dashboard-contacts-action")
+    }
+
+    // MARK: - Blasts Quick Action
+
+    private var blastsQuickAction: some View {
+        NavigationLink {
+            BlastsView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "megaphone.fill")
+                    .font(.title3)
+                    .foregroundStyle(.pink)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(NSLocalizedString("dashboard_blasts", comment: "Message Blasts"))
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(NSLocalizedString("dashboard_blasts_subtitle", comment: "Send broadcast messages to subscribers"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("dashboard-blasts-action")
     }
 
     // MARK: - Error Card

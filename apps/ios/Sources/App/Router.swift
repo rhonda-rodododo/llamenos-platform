@@ -28,6 +28,12 @@ enum Route: Hashable {
     case reports
     /// Report detail view.
     case reportDetail(id: String)
+    /// Contacts list (admin only).
+    case contacts
+    /// Contact timeline detail.
+    case contactTimeline(hash: String, displayIdentifier: String)
+    /// Message blasts (admin only).
+    case blasts
     /// Admin management screens.
     case admin
     /// Device linking flow (QR scan + ECDH).

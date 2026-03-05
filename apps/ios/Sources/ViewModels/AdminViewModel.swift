@@ -9,6 +9,7 @@ enum AdminTab: String, CaseIterable, Sendable {
     case bans
     case auditLog
     case invites
+    case customFields
 
     var title: String {
         switch self {
@@ -16,6 +17,7 @@ enum AdminTab: String, CaseIterable, Sendable {
         case .bans: return NSLocalizedString("admin_tab_bans", comment: "Ban List")
         case .auditLog: return NSLocalizedString("admin_tab_audit", comment: "Audit Log")
         case .invites: return NSLocalizedString("admin_tab_invites", comment: "Invites")
+        case .customFields: return NSLocalizedString("admin_tab_fields", comment: "Fields")
         }
     }
 
@@ -25,6 +27,7 @@ enum AdminTab: String, CaseIterable, Sendable {
         case .bans: return "hand.raised.fill"
         case .auditLog: return "list.clipboard.fill"
         case .invites: return "envelope.open.fill"
+        case .customFields: return "list.bullet.rectangle.fill"
         }
     }
 }
@@ -113,6 +116,20 @@ final class AdminViewModel {
 
     /// Selected role for new invite.
     var newInviteRole: UserRole = .volunteer
+
+    // MARK: - Custom Fields State
+
+    /// All custom field definitions.
+    var customFields: [CustomFieldDefinition] = []
+
+    /// Whether custom fields are loading.
+    var isLoadingFields: Bool = false
+
+    /// Whether the field editor sheet is showing.
+    var showFieldEditor: Bool = false
+
+    /// The field being edited (nil for create).
+    var editingField: CustomFieldDefinition?
 
     // MARK: - Shared State
 
@@ -360,6 +377,67 @@ final class AdminViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Custom Fields
+
+    /// Load custom field definitions from the API.
+    func loadCustomFields() async {
+        guard !isLoadingFields else { return }
+        isLoadingFields = true
+        errorMessage = nil
+
+        do {
+            let response: CustomFieldsResponse = try await apiService.request(
+                method: "GET",
+                path: "/api/settings/custom-fields?role=admin"
+            )
+            customFields = response.fields.sorted { $0.order < $1.order }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingFields = false
+    }
+
+    /// Save the entire custom fields list (PUT replaces all).
+    func saveCustomFields() async {
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            let body = ["fields": customFields]
+            try await apiService.request(
+                method: "PUT",
+                path: "/api/settings/custom-fields",
+                body: body
+            )
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            successMessage = NSLocalizedString("admin_fields_saved", comment: "Custom fields saved")
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Add or update a field in the local list, then save to server.
+    func saveField(_ field: CustomFieldDefinition) async {
+        if let index = customFields.firstIndex(where: { $0.id == field.id }) {
+            customFields[index] = field
+        } else {
+            customFields.append(field)
+        }
+        await saveCustomFields()
+        showFieldEditor = false
+        editingField = nil
+    }
+
+    /// Delete a field by ID, then save to server.
+    func deleteField(id: String) async {
+        customFields.removeAll { $0.id == id }
+        await saveCustomFields()
     }
 
     // MARK: - Deletion Confirmation

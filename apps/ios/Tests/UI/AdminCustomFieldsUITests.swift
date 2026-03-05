@@ -1,0 +1,183 @@
+import XCTest
+
+/// BDD tests for the Admin Custom Fields feature (Epic 244).
+/// Tests the custom fields tab, field creation, editing, and deletion.
+final class AdminCustomFieldsUITests: BaseUITest {
+
+    // MARK: - Helper: Navigate to Custom Fields Tab
+
+    /// Navigate to the admin panel and switch to the Custom Fields tab.
+    private func navigateToCustomFields() {
+        navigateToAdminPanel()
+
+        // Switch to Custom Fields tab (index 4: Volunteers=0, Bans=1, AuditLog=2, Invites=3, Fields=4)
+        let tabPicker = find("admin-tab-picker")
+        guard tabPicker.waitForExistence(timeout: 5) else {
+            XCTFail("Admin tab picker should exist")
+            return
+        }
+
+        let segments = tabPicker.buttons
+        if segments.count >= 5 {
+            segments.element(boundBy: 4).tap()
+        }
+
+        _ = anyElementExists([
+            "custom-fields-list", "custom-fields-empty-state", "custom-fields-loading",
+        ])
+    }
+
+    // MARK: - Scenario: Custom fields tab shows content or empty state
+
+    func testCustomFieldsTabShowsContent() {
+        given("I am authenticated as admin") {
+            launchAsAdmin()
+        }
+        when("I navigate to the custom fields tab") {
+            navigateToCustomFields()
+        }
+        then("I should see the fields list or empty state") {
+            let found = anyElementExists([
+                "custom-fields-list", "custom-fields-empty-state", "custom-fields-loading",
+            ])
+            XCTAssertTrue(found, "Custom fields view should show list, empty state, or loading")
+        }
+    }
+
+    // MARK: - Scenario: Add field button exists
+
+    func testAddFieldButtonExists() {
+        given("I am authenticated as admin") {
+            launchAsAdmin()
+        }
+        when("I navigate to the custom fields tab") {
+            navigateToCustomFields()
+        }
+        then("I should see the add field button") {
+            let addButton = anyElementExists(["add-field-button", "add-first-field"], timeout: 5)
+            XCTAssertTrue(addButton, "Add field button should exist in toolbar or empty state")
+        }
+    }
+
+    // MARK: - Scenario: Create field sheet opens
+
+    func testCreateFieldSheetOpens() {
+        given("I am authenticated as admin") {
+            launchAsAdmin()
+        }
+        when("I navigate to custom fields and tap add") {
+            navigateToCustomFields()
+
+            // Try toolbar button first, then empty state button
+            let addButton = find("add-field-button")
+            if addButton.waitForExistence(timeout: 3) {
+                addButton.tap()
+            } else {
+                let addFirst = find("add-first-field")
+                if addFirst.waitForExistence(timeout: 3) {
+                    addFirst.tap()
+                }
+            }
+        }
+        then("I should see the field editor form") {
+            let labelInput = find("field-label-input")
+            XCTAssertTrue(
+                labelInput.waitForExistence(timeout: 5),
+                "Field label input should appear in editor sheet"
+            )
+
+            let typePicker = find("field-type-picker")
+            XCTAssertTrue(typePicker.exists, "Field type picker should exist")
+
+            let contextPicker = find("field-context-picker")
+            XCTAssertTrue(contextPicker.exists, "Field context picker should exist")
+
+            let requiredToggle = find("field-required-toggle")
+            XCTAssertTrue(requiredToggle.exists, "Required toggle should exist")
+
+            let saveButton = find("field-save-button")
+            XCTAssertTrue(saveButton.exists, "Save button should exist")
+        }
+    }
+
+    // MARK: - Scenario: Cancel field creation
+
+    func testCancelFieldCreation() {
+        given("I am authenticated as admin") {
+            launchAsAdmin()
+        }
+        when("I open the create field sheet and cancel") {
+            navigateToCustomFields()
+
+            let addButton = find("add-field-button")
+            if addButton.waitForExistence(timeout: 3) {
+                addButton.tap()
+            } else {
+                let addFirst = find("add-first-field")
+                if addFirst.waitForExistence(timeout: 3) {
+                    addFirst.tap()
+                }
+            }
+
+            let labelInput = find("field-label-input")
+            _ = labelInput.waitForExistence(timeout: 5)
+
+            let cancelButton = find("cancel-field-edit")
+            cancelButton.tap()
+        }
+        then("I should be back on the custom fields screen") {
+            let found = anyElementExists([
+                "custom-fields-list", "custom-fields-empty-state", "add-field-button",
+            ])
+            XCTAssertTrue(found, "Should return to custom fields after cancel")
+        }
+    }
+
+    // MARK: - Scenario: Save button disabled without label
+
+    func testSaveButtonDisabledWithoutLabel() {
+        given("I am authenticated as admin") {
+            launchAsAdmin()
+        }
+        when("I open the create field sheet without entering a label") {
+            navigateToCustomFields()
+
+            let addButton = find("add-field-button")
+            if addButton.waitForExistence(timeout: 3) {
+                addButton.tap()
+            } else {
+                let addFirst = find("add-first-field")
+                if addFirst.waitForExistence(timeout: 3) {
+                    addFirst.tap()
+                }
+            }
+
+            let labelInput = find("field-label-input")
+            _ = labelInput.waitForExistence(timeout: 5)
+        }
+        then("the save button should be disabled") {
+            let saveButton = find("field-save-button")
+            XCTAssertTrue(saveButton.exists, "Save button should exist")
+            XCTAssertFalse(saveButton.isEnabled, "Save button should be disabled without label")
+        }
+    }
+
+    // MARK: - Scenario: Empty state shows create button
+
+    func testEmptyStateShowsCreateButton() {
+        given("I am authenticated as admin") {
+            launchAsAdmin()
+        }
+        when("I navigate to custom fields") {
+            navigateToCustomFields()
+        }
+        then("the empty state should have a create button if no fields exist") {
+            let emptyState = find("custom-fields-empty-state")
+            if emptyState.waitForExistence(timeout: 5) {
+                let createFirst = find("add-first-field")
+                XCTAssertTrue(createFirst.exists, "Empty state should have a create button")
+            }
+            // If fields exist, that's fine too
+        }
+    }
+}

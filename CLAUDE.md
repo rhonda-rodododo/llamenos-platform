@@ -191,7 +191,11 @@ bun run deploy                           # Deploy EVERYTHING (Worker + marketing
 bun run deploy:api                       # Deploy Worker only
 bun run deploy:site                      # Deploy marketing site only
 
-# Mobile (requires platform toolchains)
+# Android
+bun run test:android                     # Unit tests + lint + build androidTest APK
+bun run test:android:e2e                 # Cucumber BDD E2E on connected device/emulator
+
+# Mobile builds (requires platform toolchains)
 # iOS:  cd apps/ios && swift build                         # Debug build
 # iOS:  cd apps/ios && xcodebuild archive -scheme Llamenos # Release archive
 # Android: cd apps/android && ./gradlew assembleDebug      # Debug APK
@@ -211,7 +215,8 @@ bun run bootstrap-admin                  # Generate admin keypair
 ## Claude Code Working Style
 
 - **Always run `bun run typecheck` and `bun run build` before committing and pushing.** Never push code that doesn't build. If typecheck or build fails, fix it before committing.
-- **For Android changes**, also run `cd apps/android && ./gradlew testDebugUnitTest && ./gradlew lintDebug` before committing. iOS (`swift build && swift test`) requires macOS — verified in CI.
+- **For Android changes**, also run `bun run test:android` (unit + lint + androidTest compilation) before committing. When a device is connected, also run `bun run test:android:e2e` for full Cucumber BDD E2E coverage. iOS (`swift build && swift test`) requires macOS — verified in CI.
+- **Full E2E verification** means running ALL platforms: `bun run test` (Playwright desktop), `bun run test:android:e2e` (Android Cucumber on device), and `bun run test:worker:integration` (DO integration). Never consider E2E complete without Android.
 - Implement features completely — no stubs, no shortcuts, no TODOs left behind.
 - **Every feature or fix must include tests.** Desktop: Playwright E2E tests in `tests/`. Android: unit tests (`src/test/`) and UI tests (`src/androidTest/`). iOS: XCTest unit + UI tests in `Tests/`. A feature is not complete until its tests are written and passing.
 - Edit files in place; never create copies. Git history is the backup. Commit regularly when work is complete, don't worry about accidentally committing unrelated changes.

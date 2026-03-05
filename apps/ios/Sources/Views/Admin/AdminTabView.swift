@@ -39,6 +39,8 @@ struct AdminTabView: View {
                     AuditLogView(viewModel: vm)
                 case .invites:
                     InviteView(viewModel: vm)
+                case .customFields:
+                    CustomFieldsView(viewModel: vm)
                 }
             }
         }

@@ -70,6 +70,12 @@ struct ContentView: View {
         case .reportDetail:
             // Handled within the Reports view's own NavigationStack
             EmptyView()
+        case .contacts:
+            ContactsView()
+        case .contactTimeline(let hash, let displayIdentifier):
+            ContactTimelineView(contactHash: hash, displayIdentifier: displayIdentifier)
+        case .blasts:
+            BlastsView()
         case .conversations:
             ConversationsView()
         case .conversationDetail(let id):
