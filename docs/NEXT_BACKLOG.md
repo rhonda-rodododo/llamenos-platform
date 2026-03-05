@@ -410,6 +410,24 @@ Catch iOS up to Android feature set with native SwiftUI design. BDD-first: write
 
 **Dependency order:** 240 → (241 | 242 | 243 | 244 | 245 | 246)
 
+## iOS Native Design Overhaul (Epics 252-255) — NOT STARTED
+
+Redesign iOS app to follow native Apple HIG patterns with web app branding. Currently displays raw localization keys, uses Android-style card layouts, has no brand identity (logo, colors, fonts), and has undersized text/UI elements.
+
+### Localization (Critical — do first)
+- [ ] **[Epic 252: iOS Localization Integration](epics/epic-252-ios-localization-integration.md)** — Wire up i18n codegen pipeline, add ~80 missing keys to en.json, bundle .strings files in project.yml. Currently ALL text shows raw keys.
+
+### Branding & Design System
+- [ ] **[Epic 255: iOS Branding & Design System](epics/epic-255-ios-branding-design-system.md)** — App icon, Llamenos logo, DM Sans font, brand teal/amber colors from web app, text/UI scale fixes (row padding, font sizes, touch targets). Asset catalog setup.
+
+### Navigation & Layout
+- [ ] **[Epic 253: iOS Dashboard & Navigation Overhaul](epics/epic-253-ios-dashboard-navigation-overhaul.md)** — Replace Android-style card layouts with native iOS List patterns on Dashboard, Shifts, Admin. Admin segmented control → List navigation.
+
+### Form Polish
+- [ ] **[Epic 254: iOS Detail & Create Form Polish](epics/epic-254-ios-detail-views-polish.md)** — Convert create forms to SwiftUI Form, extract shared DateFormatting utility. Light-touch — most views already well-designed.
+
+**Dependency order:** 252 → 255 → (253 | 254) in parallel
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
