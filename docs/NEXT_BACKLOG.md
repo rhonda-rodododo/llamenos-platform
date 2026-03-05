@@ -410,21 +410,21 @@ Catch iOS up to Android feature set with native SwiftUI design. BDD-first: write
 
 **Dependency order:** 240 → (241 | 242 | 243 | 244 | 245 | 246)
 
-## iOS Native Design Overhaul (Epics 252-255) — NOT STARTED
+## iOS Native Design Overhaul (Epics 252-255) — COMPLETE
 
-Redesign iOS app to follow native Apple HIG patterns with web app branding. Currently displays raw localization keys, uses Android-style card layouts, has no brand identity (logo, colors, fonts), and has undersized text/UI elements.
+Redesign iOS app to follow native Apple HIG patterns with web app branding.
 
 ### Localization (Critical — do first)
-- [ ] **[Epic 252: iOS Localization Integration](epics/epic-252-ios-localization-integration.md)** — Wire up i18n codegen pipeline, add ~80 missing keys to en.json, bundle .strings files in project.yml. Currently ALL text shows raw keys.
+- [x] **[Epic 252: iOS Localization Integration](epics/epic-252-ios-localization-integration.md)** — 1235 localized keys across 13 locales, codegen outputs directly to iOS app resources, .strings bundled via project.yml.
 
 ### Branding & Design System
-- [ ] **[Epic 255: iOS Branding & Design System](epics/epic-255-ios-branding-design-system.md)** — App icon, Llamenos logo, DM Sans font, brand teal/amber colors from web app, text/UI scale fixes (row padding, font sizes, touch targets). Asset catalog setup.
+- [x] **[Epic 255: iOS Branding & Design System](epics/epic-255-ios-branding-design-system.md)** — DM Sans variable font, brand teal/amber colors via asset catalog, BrandColors + BrandFonts extensions, all views migrated to brand colors.
 
 ### Navigation & Layout
-- [ ] **[Epic 253: iOS Dashboard & Navigation Overhaul](epics/epic-253-ios-dashboard-navigation-overhaul.md)** — Replace Android-style card layouts with native iOS List patterns on Dashboard, Shifts, Admin. Admin segmented control → List navigation.
+- [x] **[Epic 253: iOS Dashboard & Navigation Overhaul](epics/epic-253-ios-dashboard-navigation-overhaul.md)** — Dashboard → insetGrouped List, Shifts → List with day sections, Admin → List navigation (replaced 5-segment picker).
 
 ### Form Polish
-- [ ] **[Epic 254: iOS Detail & Create Form Polish](epics/epic-254-ios-detail-views-polish.md)** — Convert create forms to SwiftUI Form, extract shared DateFormatting utility. Light-touch — most views already well-designed.
+- [x] **[Epic 254: iOS Detail & Create Form Polish](epics/epic-254-ios-detail-views-polish.md)** — All create forms already use SwiftUI Form. DateFormatting utility extracted (10 duplicate functions removed).
 
 **Dependency order:** 252 → 255 → (253 | 254) in parallel
 

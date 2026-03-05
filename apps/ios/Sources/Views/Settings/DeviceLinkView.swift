@@ -68,7 +68,7 @@ struct DeviceLinkView: View {
             VStack(spacing: 12) {
                 Image(systemName: "qrcode.viewfinder")
                     .font(.system(size: 56))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(.brandPrimary)
                     .accessibilityHidden(true)
 
                 Text(NSLocalizedString(

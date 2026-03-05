@@ -1,5 +1,43 @@
 # Completed Backlog
 
+## 2026-03-04: iOS Native Design Overhaul (Epics 252-255)
+
+### Epic 252: iOS Localization Integration
+- Identified 405 NSLocalizedString keys in iOS code, added all to en.json (total: 1235 flattened keys)
+- Modified i18n codegen to output directly to `apps/ios/Resources/Localizable/` (no manual copy)
+- Fixed .strings escaping (double quotes, backslashes, newlines)
+- All 13 locales propagated with English placeholders for new keys
+- Bundled via project.yml `sources` entry for .lproj handling
+
+### Epic 255: iOS Branding & Design System
+- Created asset catalog with BrandPrimary (#51AFAE/#0D7377) and BrandAccent (#D4A033/#C09030) adaptive color sets
+- Downloaded DM Sans variable fonts (240KB + 285KB), registered in Info.plist UIAppFonts
+- Created `BrandColors.swift` (Color extensions) and `BrandFonts.swift` (Font.brand() helper)
+- Migrated all 20+ view files from generic SwiftUI colors to brand colors
+- Extracted `DateFormatting.swift` utility, removed 10 duplicate `parseDate()` functions across codebase
+
+### Epic 253: iOS Dashboard & Navigation Overhaul
+- **DashboardView**: Rewrote from ScrollView+VStack+Cards to `List(.insetGrouped)` with LabeledContent rows
+  - Identity, Hub, Connection as compact LabeledContent rows
+  - Shift status, activity stats as grouped sections
+  - Quick actions as native NavigationLink rows
+  - Lock button moved to toolbar (standard iOS placement)
+- **ShiftsView**: Rewrote from ScrollView+VStack to `List(.insetGrouped)` with ForEach sections per day
+  - Clock in/out section as prominent top section
+  - Day headers with Today badge
+  - Shift cards as native List rows
+- **AdminTabView**: Replaced 5-segment segmented picker with List-based navigation
+  - Each admin section (Volunteers, Bans, Audit, Invites, Fields) is a NavigationLink
+  - Resolves truncated labels on iPhone
+- Updated all affected XCUITests (AdminFlowUITests, AdminCustomFieldsUITests)
+  - Replaced `admin-tab-picker` segment taps with named identifier taps
+  - All accessibility identifiers preserved for backward compatibility
+
+### Epic 254: iOS Detail & Create Form Polish
+- All create forms (ReportCreateView, CreateBlastView, NoteCreateView, CustomFieldEditView) already used Form
+- DateFormatting utility extracted (completed as part of Epic 255)
+- No additional work needed
+
 ## 2026-03-04: iOS Epics 243 (Contacts), 244 (Custom Fields), 245 (Blasts) + Mac M4 Setup
 
 ### Platform Transition

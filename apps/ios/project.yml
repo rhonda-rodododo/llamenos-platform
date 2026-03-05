@@ -22,6 +22,9 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Resources/Localizable
+      - path: Resources/Assets.xcassets
+      - path: Resources/Fonts
     dependencies:
       - framework: LlamenosCoreFFI.xcframework
         embed: false

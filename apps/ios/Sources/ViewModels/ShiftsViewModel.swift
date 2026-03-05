@@ -220,7 +220,7 @@ final class ShiftsViewModel {
             activeCallCount = status.activeCallCount ?? 0
 
             if status.onShift, let startedAtString = status.startedAt {
-                shiftStartedAt = parseDate(startedAtString)
+                shiftStartedAt = DateFormatting.parseISO(startedAtString)
                 startTimer()
             } else {
                 shiftStartedAt = nil
@@ -277,13 +277,6 @@ final class ShiftsViewModel {
         }
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 
     deinit {
         timerTask?.cancel()

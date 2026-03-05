@@ -6,21 +6,16 @@ final class AdminCustomFieldsUITests: BaseUITest {
 
     // MARK: - Helper: Navigate to Custom Fields Tab
 
-    /// Navigate to the admin panel and switch to the Custom Fields tab.
+    /// Navigate to the admin panel and tap the Custom Fields navigation link.
     private func navigateToCustomFields() {
         navigateToAdminPanel()
 
-        // Switch to Custom Fields tab (index 4: Volunteers=0, Bans=1, AuditLog=2, Invites=3, Fields=4)
-        let tabPicker = find("admin-tab-picker")
-        guard tabPicker.waitForExistence(timeout: 5) else {
-            XCTFail("Admin tab picker should exist")
+        let customFieldsLink = find("admin-custom-fields")
+        guard customFieldsLink.waitForExistence(timeout: 5) else {
+            XCTFail("Custom Fields link should exist in admin panel")
             return
         }
-
-        let segments = tabPicker.buttons
-        if segments.count >= 5 {
-            segments.element(boundBy: 4).tap()
-        }
+        customFieldsLink.tap()
 
         _ = anyElementExists([
             "custom-fields-list", "custom-fields-empty-state", "custom-fields-loading",

@@ -19,7 +19,7 @@ struct PINSetView: View {
             VStack(spacing: 12) {
                 Image(systemName: vm.phase == .confirm ? "lock.fill" : "lock.open.fill")
                     .font(.system(size: 36))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(.brandPrimary)
                     .accessibilityHidden(true)
                     .animation(.easeInOut, value: vm.phase)
 

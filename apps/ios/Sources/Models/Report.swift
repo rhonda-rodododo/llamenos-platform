@@ -19,8 +19,8 @@ enum ReportStatus: String, CaseIterable, Sendable {
 
     var color: Color {
         switch self {
-        case .waiting: return .orange
-        case .active: return .blue
+        case .waiting: return .brandAccent
+        case .active: return .brandPrimary
         case .closed: return .secondary
         }
     }

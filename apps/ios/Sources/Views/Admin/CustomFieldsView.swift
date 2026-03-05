@@ -166,9 +166,9 @@ struct FieldRowView: View {
         Text(label)
             .font(.caption2)
             .fontWeight(.medium)
-            .foregroundStyle(.purple)
+            .foregroundStyle(.brandDarkTeal)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Capsule().fill(Color.purple.opacity(0.12)))
+            .background(Capsule().fill(Color.brandDarkTeal.opacity(0.12)))
     }
 }

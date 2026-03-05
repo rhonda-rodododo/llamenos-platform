@@ -223,7 +223,7 @@ struct InviteRowView: View {
                                 .foregroundStyle(.green)
                         } else {
                             Image(systemName: "doc.on.doc")
-                                .foregroundStyle(.tint)
+                                .foregroundStyle(.brandPrimary)
                         }
                     }
                     .font(.caption)
@@ -239,13 +239,13 @@ struct InviteRowView: View {
                 Text(invite.inviteRole.displayName)
                     .font(.caption2)
                     .fontWeight(.medium)
-                    .foregroundStyle(invite.inviteRole == .admin ? .purple : .blue)
+                    .foregroundStyle(invite.inviteRole == .admin ? .brandDarkTeal : .brandPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(
                         Capsule()
                             .fill(
-                                (invite.inviteRole == .admin ? Color.purple : Color.blue)
+                                (invite.inviteRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
                                     .opacity(0.12)
                             )
                     )

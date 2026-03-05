@@ -43,7 +43,7 @@ struct ContactTimelineView: View {
                 HStack(spacing: 16) {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(.brandPrimary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(displayIdentifier)
                             .font(.system(.headline, design: .monospaced))
@@ -174,7 +174,7 @@ struct TimelineEventRow: View {
 
                 // Timestamp + duration
                 HStack(spacing: 8) {
-                    if let date = parseDate(event.timestamp) {
+                    if let date = DateFormatting.parseISO(event.timestamp) {
                         Text(date.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
@@ -191,13 +191,6 @@ struct TimelineEventRow: View {
         .padding(.vertical, 2)
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 
     private func formatDuration(_ seconds: Int) -> String {
         let mins = seconds / 60

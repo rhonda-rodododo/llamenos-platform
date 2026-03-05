@@ -209,7 +209,7 @@ struct ConversationDetailView: View {
         switch channel {
         case .sms: return .blue
         case .whatsapp: return .green
-        case .signal: return .indigo
+        case .signal: return .brandPrimary
         }
     }
 

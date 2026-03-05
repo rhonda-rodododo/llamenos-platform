@@ -158,38 +158,38 @@ struct ContactRowView: View {
             // Interaction badges
             HStack(spacing: 10) {
                 if contact.callCount > 0 {
-                    interactionBadge(icon: "phone.fill", count: contact.callCount, color: .blue)
+                    interactionBadge(icon: "phone.fill", count: contact.callCount, color: .brandPrimary)
                 }
                 if contact.conversationCount > 0 {
                     interactionBadge(icon: "message.fill", count: contact.conversationCount, color: .green)
                 }
                 if contact.noteCount > 0 {
-                    interactionBadge(icon: "doc.text.fill", count: contact.noteCount, color: .purple)
+                    interactionBadge(icon: "doc.text.fill", count: contact.noteCount, color: .brandDarkTeal)
                 }
                 if contact.reportCount > 0 {
-                    interactionBadge(icon: "exclamationmark.triangle.fill", count: contact.reportCount, color: .orange)
+                    interactionBadge(icon: "exclamationmark.triangle.fill", count: contact.reportCount, color: .brandAccent)
                 }
 
                 Spacer()
 
                 // Last seen
-                if let date = parseDate(contact.lastSeen) {
+                if let date = DateFormatting.parseISO(contact.lastSeen) {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
     private func interactionBadge(icon: String, count: Int, color: Color) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.caption2)
+                .font(.caption)
             Text("\(count)")
-                .font(.caption2)
+                .font(.caption)
                 .fontWeight(.medium)
         }
         .foregroundStyle(color)
@@ -198,11 +198,4 @@ struct ContactRowView: View {
         .background(Capsule().fill(color.opacity(0.12)))
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 }

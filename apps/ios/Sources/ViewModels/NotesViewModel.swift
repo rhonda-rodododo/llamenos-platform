@@ -184,8 +184,8 @@ final class NotesViewModel {
                 authorPubkey: encrypted.authorPubkey,
                 callId: encrypted.callId,
                 conversationId: encrypted.conversationId,
-                createdAt: parseDate(encrypted.createdAt) ?? Date(),
-                updatedAt: encrypted.updatedAt.flatMap(parseDate)
+                createdAt: DateFormatting.parseISO(encrypted.createdAt) ?? Date(),
+                updatedAt: encrypted.updatedAt.flatMap(DateFormatting.parseISO)
             )
         } catch {
             // Decryption failed — return nil (note won't appear in list)
@@ -238,11 +238,4 @@ final class NotesViewModel {
         }
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 }

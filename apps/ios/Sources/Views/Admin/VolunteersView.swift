@@ -49,7 +49,7 @@ struct VolunteersView: View {
                         title: NSLocalizedString("admin_admin_count", comment: "Admins"),
                         value: "\(viewModel.volunteers.filter { $0.userRole == .admin }.count)",
                         icon: "shield.fill",
-                        color: .purple
+                        color: .brandDarkTeal
                     )
 
                     StatCard(
@@ -142,12 +142,12 @@ struct VolunteerRowView: View {
             // Avatar
             Image(systemName: volunteer.userRole == .admin ? "shield.fill" : "person.fill")
                 .font(.title3)
-                .foregroundStyle(volunteer.userRole == .admin ? .purple : .blue)
+                .foregroundStyle(volunteer.userRole == .admin ? .brandDarkTeal : .brandPrimary)
                 .frame(width: 36, height: 36)
                 .background(
                     Circle()
                         .fill(
-                            (volunteer.userRole == .admin ? Color.purple : Color.blue)
+                            (volunteer.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
                                 .opacity(0.12)
                         )
                 )
@@ -201,13 +201,13 @@ struct VolunteerRowView: View {
         Text(volunteer.userRole.displayName)
             .font(.caption2)
             .fontWeight(.semibold)
-            .foregroundStyle(volunteer.userRole == .admin ? .purple : .blue)
+            .foregroundStyle(volunteer.userRole == .admin ? .brandDarkTeal : .brandPrimary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 Capsule()
                     .fill(
-                        (volunteer.userRole == .admin ? Color.purple : Color.blue)
+                        (volunteer.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
                             .opacity(0.12)
                     )
             )

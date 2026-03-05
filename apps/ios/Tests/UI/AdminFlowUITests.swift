@@ -63,11 +63,11 @@ final class AdminFlowUITests: XCTestCase {
             "Admin tab view should appear when tapping admin panel"
         )
 
-        // Tab picker should exist
-        let tabPicker = find("admin-tab-picker")
+        // Navigation list items should exist
+        let volunteersLink = find("admin-volunteers")
         XCTAssertTrue(
-            tabPicker.waitForExistence(timeout: 3),
-            "Admin tab picker should exist"
+            volunteersLink.waitForExistence(timeout: 5),
+            "Admin panel should show navigation items"
         )
     }
 
@@ -76,7 +76,12 @@ final class AdminFlowUITests: XCTestCase {
     func testVolunteersTabShowsContent() {
         navigateToAdminPanel()
 
-        // Volunteers list, empty state, or loading should appear (default tab)
+        // Tap Volunteers link
+        let volunteersLink = find("admin-volunteers")
+        guard volunteersLink.waitForExistence(timeout: 5) else { return }
+        volunteersLink.tap()
+
+        // Volunteers list, empty state, or loading should appear
         let found = anyElementExists([
             "volunteers-list", "volunteers-empty-state", "volunteers-loading",
         ])
@@ -86,12 +91,15 @@ final class AdminFlowUITests: XCTestCase {
     func testVolunteerSearchExists() {
         navigateToAdminPanel()
 
+        // Tap Volunteers link
+        let volunteersLink = find("admin-volunteers")
+        guard volunteersLink.waitForExistence(timeout: 5) else { return }
+        volunteersLink.tap()
+
         // Wait for content
         _ = anyElementExists(["volunteers-list", "volunteers-empty-state", "volunteers-loading"])
 
         // Search bar should be accessible
-        // Note: SearchBar accessibility varies by iOS version, so we just check
-        // that the volunteers view loaded successfully
         XCTAssertTrue(true, "Volunteers tab loaded successfully")
     }
 
@@ -100,15 +108,10 @@ final class AdminFlowUITests: XCTestCase {
     func testBanListTabShowsContent() {
         navigateToAdminPanel()
 
-        // Switch to Ban List tab
-        let tabPicker = find("admin-tab-picker")
-        guard tabPicker.waitForExistence(timeout: 5) else { return }
-
-        // Tap the bans segment (index 1)
-        let segments = tabPicker.buttons
-        if segments.count >= 2 {
-            segments.element(boundBy: 1).tap()
-        }
+        // Tap Bans link
+        let bansLink = find("admin-bans")
+        guard bansLink.waitForExistence(timeout: 5) else { return }
+        bansLink.tap()
 
         // Ban list, empty state, or loading should appear
         let found = anyElementExists([
@@ -120,14 +123,10 @@ final class AdminFlowUITests: XCTestCase {
     func testAddBanButtonExists() {
         navigateToAdminPanel()
 
-        // Switch to Ban List tab
-        let tabPicker = find("admin-tab-picker")
-        guard tabPicker.waitForExistence(timeout: 5) else { return }
-
-        let segments = tabPicker.buttons
-        if segments.count >= 2 {
-            segments.element(boundBy: 1).tap()
-        }
+        // Tap Bans link
+        let bansLink = find("admin-bans")
+        guard bansLink.waitForExistence(timeout: 5) else { return }
+        bansLink.tap()
 
         // Wait for content to load
         _ = anyElementExists(["ban-list", "bans-empty-state", "bans-loading"])
@@ -142,14 +141,10 @@ final class AdminFlowUITests: XCTestCase {
     func testAuditLogTabShowsContent() {
         navigateToAdminPanel()
 
-        // Switch to Audit Log tab
-        let tabPicker = find("admin-tab-picker")
-        guard tabPicker.waitForExistence(timeout: 5) else { return }
-
-        let segments = tabPicker.buttons
-        if segments.count >= 3 {
-            segments.element(boundBy: 2).tap()
-        }
+        // Tap Audit Log link
+        let auditLink = find("admin-audit-log")
+        guard auditLink.waitForExistence(timeout: 5) else { return }
+        auditLink.tap()
 
         // Audit log list, empty state, or loading should appear
         let found = anyElementExists([
@@ -163,14 +158,10 @@ final class AdminFlowUITests: XCTestCase {
     func testInvitesTabShowsContent() {
         navigateToAdminPanel()
 
-        // Switch to Invites tab
-        let tabPicker = find("admin-tab-picker")
-        guard tabPicker.waitForExistence(timeout: 5) else { return }
-
-        let segments = tabPicker.buttons
-        if segments.count >= 4 {
-            segments.element(boundBy: 3).tap()
-        }
+        // Tap Invites link
+        let invitesLink = find("admin-invites")
+        guard invitesLink.waitForExistence(timeout: 5) else { return }
+        invitesLink.tap()
 
         // Invites list, empty state, or loading should appear
         let found = anyElementExists([
@@ -182,14 +173,10 @@ final class AdminFlowUITests: XCTestCase {
     func testCreateInviteButtonExists() {
         navigateToAdminPanel()
 
-        // Switch to Invites tab
-        let tabPicker = find("admin-tab-picker")
-        guard tabPicker.waitForExistence(timeout: 5) else { return }
-
-        let segments = tabPicker.buttons
-        if segments.count >= 4 {
-            segments.element(boundBy: 3).tap()
-        }
+        // Tap Invites link
+        let invitesLink = find("admin-invites")
+        guard invitesLink.waitForExistence(timeout: 5) else { return }
+        invitesLink.tap()
 
         // Wait for content
         _ = anyElementExists(["invites-list", "invites-empty-state", "invites-loading"])

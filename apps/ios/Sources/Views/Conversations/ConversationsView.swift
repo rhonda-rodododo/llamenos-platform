@@ -186,7 +186,7 @@ struct ConversationRowView: View {
                     Spacer()
 
                     Text(conversation.lastMessageRelativeTime)
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.tertiary)
                 }
 
@@ -201,7 +201,7 @@ struct ConversationRowView: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Channel Badge
@@ -220,9 +220,9 @@ struct ConversationRowView: View {
 
     private var channelColor: Color {
         switch conversation.channel {
-        case .sms: return .blue
+        case .sms: return .brandPrimary
         case .whatsapp: return .green
-        case .signal: return .indigo
+        case .signal: return .brandPrimary
         }
     }
 
@@ -230,7 +230,7 @@ struct ConversationRowView: View {
 
     private var statusBadge: some View {
         Text(conversation.conversationStatus.displayName)
-            .font(.caption2)
+            .font(.caption)
             .fontWeight(.medium)
             .foregroundStyle(statusColor)
             .padding(.horizontal, 6)
@@ -253,7 +253,7 @@ struct ConversationRowView: View {
 
     private var unreadBadge: some View {
         Text("\(conversation.unreadCount)")
-            .font(.caption2)
+            .font(.caption)
             .fontWeight(.bold)
             .foregroundStyle(.white)
             .padding(.horizontal, 6)

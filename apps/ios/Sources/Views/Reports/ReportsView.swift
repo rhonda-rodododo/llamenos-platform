@@ -233,39 +233,39 @@ struct ReportRowView: View {
                 if let category = report.reportCategory {
                     HStack(spacing: 3) {
                         Image(systemName: "tag.fill")
-                            .font(.caption2)
+                            .font(.caption)
                         Text(category)
-                            .font(.caption2)
+                            .font(.caption)
                             .fontWeight(.medium)
                     }
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(.brandDarkTeal)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(
-                        Capsule().fill(Color.purple.opacity(0.12))
+                        Capsule().fill(Color.brandDarkTeal.opacity(0.12))
                     )
                 }
 
                 Spacer()
 
                 // Date
-                if let date = parseDate(report.createdAt) {
+                if let date = DateFormatting.parseISO(report.createdAt) {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
     private func statusBadge(_ status: ReportStatus) -> some View {
         HStack(spacing: 3) {
             Image(systemName: status.icon)
-                .font(.caption2)
+                .font(.caption)
             Text(status.displayName)
-                .font(.caption2)
+                .font(.caption)
                 .fontWeight(.medium)
         }
         .foregroundStyle(status.color)
@@ -276,13 +276,6 @@ struct ReportRowView: View {
         )
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 }
 
 // MARK: - Preview
