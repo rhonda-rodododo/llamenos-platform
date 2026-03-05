@@ -1236,4 +1236,381 @@
     <string name="ws_disconnected">Disconnected</string>
     <string name="ws_reconnecting">Reconnecting (%d)...</string>
     <string name="yes">Yes</string>
+
+    <!-- Notification channels and content -->
+    <string name="notification_channel_calls">Incoming Calls</string>
+    <string name="notification_channel_general">General Notifications</string>
+    <string name="notification_channel_shifts">Shift Reminders</string>
+    <string name="incoming_call">Incoming Call</string>
+    <string name="incoming_call_body">Someone is calling the hotline</string>
+    <string name="shift_reminder">Shift Reminder</string>
+    <string name="shift_reminder_body">Your shift is starting soon</string>
+    <string name="announcement">Announcement</string>
+    <string name="announcement_body">You have a new announcement</string>
+
+    <!-- Common actions -->
+    <string name="action_copy">Copy</string>
+    <string name="action_done">Done</string>
+    <string name="action_save">Save</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="lock_app">Lock App</string>
+    <string name="login_or">or</string>
+    <string name="logout">Logout</string>
+    <string name="no_internet">No internet connection</string>
+    <string name="import_key">Import Existing Key</string>
+    <string name="create_new_identity">Create New Identity</string>
+    <string name="reset_identity">Reset Identity</string>
+    <string name="confirm_backup">I have saved my recovery key</string>
+
+    <!-- Auth / Login -->
+    <string name="hub_url_label">Hub URL</string>
+    <string name="hub_url_placeholder">https://hub.example.org</string>
+    <string name="nsec_label">Secret Key (nsec)</string>
+    <string name="nsec_placeholder">nsec1…</string>
+    <string name="nsec_warning">Keep your secret key safe. Never share it with anyone.</string>
+    <string name="your_identity">Your Identity</string>
+    <string name="your_public_key">Your Public Key</string>
+    <string name="your_private_key">Your Private Key</string>
+    <string name="onboarding_subtitle">Secure crisis response hotline</string>
+
+    <!-- PIN / Unlock -->
+    <string name="pin_dot_filled">Filled</string>
+    <string name="pin_dot_empty">Empty</string>
+    <string name="unlock_title">Welcome Back</string>
+    <string name="unlock_subtitle">Enter your PIN to unlock</string>
+    <string name="use_biometric">Use Biometrics</string>
+    <string name="encrypting_keys">Encrypting your keys…</string>
+    <string name="decrypting_keys">Decrypting your keys…</string>
+    <string name="panic_wipe_message">This will permanently delete all app data from this device. This action cannot be undone.</string>
+
+    <!-- Demo mode -->
+    <string name="demo_banner">Demo Mode — data is not persisted</string>
+    <string name="demo_dismiss">Dismiss</string>
+    <string name="demo_try_demo">Try Demo</string>
+    <string name="demo_admin">Admin Demo</string>
+    <string name="demo_volunteer">Volunteer Demo</string>
+
+    <!-- Dashboard -->
+    <string name="active_calls">Active Calls</string>
+    <string name="active_since">Active since %1$s</string>
+    <string name="on_shift">On Shift</string>
+    <string name="off_shift">Off Shift</string>
+    <string name="dashboard_calls_today">Calls Today</string>
+    <string name="dashboard_view_all_notes">View All Notes</string>
+    <string name="dashboard_view_calls">View Calls</string>
+    <string name="dashboard_no_recent_notes">No recent notes</string>
+    <string name="dashboard_go_on_break">Take a Break</string>
+    <string name="dashboard_end_break">End Break</string>
+    <string name="dashboard_on_break">On Break</string>
+    <string name="dashboard_error_break">Failed to update break status</string>
+    <string name="dashboard_error_clock_in">Failed to clock in</string>
+    <string name="dashboard_error_clock_out">Failed to clock out</string>
+    <string name="dashboard_error_refresh">Failed to refresh dashboard</string>
+
+    <!-- Connection status -->
+    <string name="status_connected">Connected</string>
+    <string name="status_connecting">Connecting</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_reconnecting">Reconnecting</string>
+
+    <!-- Shift status -->
+    <string name="shift_status">Shift Status</string>
+    <string name="shift_clock_in">Clock In</string>
+    <string name="shift_clock_out">Clock Out</string>
+    <string name="shift_since">On shift since %1$s</string>
+    <string name="shift_assigned">Assigned</string>
+    <string name="shift_available">Available</string>
+    <string name="shift_schedule">Shift Schedule</string>
+    <string name="shift_create">Create Shift</string>
+    <string name="shift_edit">Edit Shift</string>
+    <string name="shift_delete">Delete Shift</string>
+    <string name="shift_name">Shift Name</string>
+    <string name="shift_start_time">Start Time</string>
+    <string name="shift_end_time">End Time</string>
+    <string name="shift_detail_title">Shift Details</string>
+    <string name="shift_not_found">Shift not found</string>
+    <string name="shift_assign_volunteers">Assign Volunteers</string>
+    <string name="shift_save_assignments">Save Assignments</string>
+    <string name="shift_sign_up">Sign Up</string>
+    <string name="shift_drop">Drop Shift</string>
+    <string name="shift_drop_confirm">Are you sure you want to drop this shift?</string>
+    <string name="shifts_empty">No Shifts</string>
+    <string name="shifts_empty_scheduled">No shifts scheduled</string>
+    <string name="shifts_empty_subtitle">Create a shift to start routing calls to volunteers.</string>
+
+    <!-- Admin tabs -->
+    <string name="admin_volunteers">Volunteers</string>
+    <string name="admin_bans">Ban List</string>
+    <string name="admin_audit">Audit Log</string>
+    <string name="admin_invites">Invites</string>
+    <string name="admin_fields">Custom Fields</string>
+
+    <!-- Admin transcription settings -->
+    <string name="admin_transcription_desc">Manage call transcription settings for your hub.</string>
+    <string name="admin_transcription_enable">Enable Transcription</string>
+    <string name="admin_transcription_enable_desc">Enable automatic call transcription for all volunteers.</string>
+    <string name="admin_transcription_optout">Allow Opt-out</string>
+    <string name="admin_transcription_optout_desc">Allow volunteers to disable transcription for their calls.</string>
+
+    <!-- Audit log -->
+    <string name="audit_all_events">All Events</string>
+    <string name="audit_clear_filters">Clear filters</string>
+    <string name="audit_empty">No audit log entries</string>
+    <string name="audit_search">Search audit log…</string>
+
+    <!-- Ban list -->
+    <string name="ban_add">Add Ban</string>
+    <string name="ban_identifier_label">Identifier Hash</string>
+    <string name="ban_import">Import Bans</string>
+    <string name="ban_import_hint">Phone numbers (one per line)</string>
+    <string name="ban_import_title">Import Ban List</string>
+    <string name="ban_reason">Reason</string>
+    <string name="ban_remove">Remove Ban</string>
+    <string name="bans_empty">No banned numbers</string>
+
+    <!-- Invites -->
+    <string name="invite_code">Invite Code</string>
+    <string name="invite_code_copied">Invite code copied to clipboard</string>
+    <string name="invite_create">Create Invite</string>
+    <string name="invite_select_role">Select role</string>
+    <string name="invites_empty">No invites</string>
+    <string name="invite_share">Share invite</string>
+    <string name="invite_status_active">Active</string>
+    <string name="invite_status_claimed">Claimed</string>
+    <string name="invite_status_expired">Expired</string>
+
+    <!-- Custom fields -->
+    <string name="custom_fields_empty">No custom fields defined</string>
+    <string name="field_add">Add Field</string>
+    <string name="field_edit">Edit Field</string>
+    <string name="field_edit_action">Edit</string>
+    <string name="field_delete">Delete Field</string>
+    <string name="field_label">Label</string>
+    <string name="field_visible_to_volunteers">Visible to volunteers</string>
+    <string name="field_editable_by_volunteers">Editable by volunteers</string>
+    <string name="field_option_add">Add option</string>
+    <string name="field_option_new">New option</string>
+    <string name="field_option_remove">Remove option</string>
+
+    <!-- Volunteers -->
+    <string name="volunteer_add">Add Volunteer</string>
+    <string name="volunteer_delete">Remove Volunteer</string>
+    <string name="volunteer_delete_confirm">Are you sure you want to remove this volunteer?</string>
+    <string name="volunteer_detail_title">Volunteer Details</string>
+    <string name="volunteer_joined">Joined %1$s</string>
+    <string name="volunteer_not_found">Volunteer not found</string>
+    <string name="volunteer_assigned_shifts">Assigned Shifts</string>
+    <string name="volunteer_recent_activity">Recent Activity</string>
+    <string name="volunteer_no_activity">No activity recorded</string>
+    <string name="volunteer_unnamed">Unnamed Volunteer</string>
+    <string name="volunteers_empty">No volunteers</string>
+    <string name="search_volunteers">Search volunteers…</string>
+
+    <!-- Notes -->
+    <string name="note_create">New Note</string>
+    <string name="note_save">Save Note</string>
+    <string name="note_saving">Encrypting &amp; saving…</string>
+    <string name="note_edit">Edit Note</string>
+    <string name="note_editing">Editing Note</string>
+    <string name="note_copy">Copy Note</string>
+    <string name="note_detail">Note Details</string>
+    <string name="note_author">Author</string>
+    <string name="note_date">Date</string>
+    <string name="note_updated">Updated %1$s</string>
+    <string name="note_text_hint">Write your notes here…</string>
+    <string name="note_not_found">Note not found</string>
+    <string name="note_replies">Replies</string>
+    <string name="note_no_replies">No replies yet</string>
+    <string name="note_reply_hint">Write a reply…</string>
+    <string name="note_reply_send">Send Reply</string>
+    <string name="note_call_id_badge">Call %1$s</string>
+    <string name="note_chat_id_badge">Chat %1$s</string>
+    <string name="notes_empty">No Notes</string>
+    <string name="notes_empty_subtitle">Create a note to document a call or conversation.</string>
+    <string name="notes_search">Search notes…</string>
+    <string name="badge_call">Call</string>
+    <string name="badge_chat">Chat</string>
+
+    <!-- Call History -->
+    <string name="call_history_title">Call History</string>
+    <string name="call_history_back">Back</string>
+    <string name="call_history_search">Search calls…</string>
+    <string name="call_history_empty">No Call History</string>
+    <string name="call_history_empty_subtitle">Calls will appear here once the hotline is active.</string>
+    <string name="call_add_note">Add Note</string>
+    <string name="call_date_from">From date</string>
+    <string name="call_date_to">To date</string>
+    <string name="call_filter_completed">Completed</string>
+    <string name="call_filter_unanswered">Unanswered</string>
+    <string name="call_unknown_caller">Unknown Caller</string>
+    <string name="call_recording">Recording</string>
+    <string name="call_transcription">Transcription</string>
+    <string name="call_voicemail">Voicemail</string>
+
+    <!-- Contacts -->
+    <string name="contacts_back">Back</string>
+    <string name="contacts_search">Search contacts…</string>
+    <string name="contacts_empty">No Contacts</string>
+    <string name="contacts_empty_subtitle">Contact history will appear after interactions.</string>
+    <string name="contact_first_seen">First seen %1$s</string>
+    <string name="contact_last_seen">Last seen %1$s</string>
+
+    <!-- Timeline -->
+    <string name="timeline_title">Contact Timeline</string>
+    <string name="timeline_contact_id">Contact %1$s</string>
+    <string name="timeline_empty">No Interactions</string>
+    <string name="timeline_empty_subtitle">No interaction history found for this contact.</string>
+
+    <!-- Conversations -->
+    <string name="search_conversations">Search conversations…</string>
+    <string name="conversations_empty">No Messages</string>
+    <string name="conversations_empty_subtitle">Conversations will appear when messages arrive.</string>
+    <string name="conversation_add_note">Add Note</string>
+    <string name="conversation_assign">Assign</string>
+    <string name="conversation_assign_title">Assign Conversation</string>
+    <string name="conversation_assign_desc">Select a volunteer to assign this conversation to.</string>
+    <string name="conversation_close">Close Conversation</string>
+    <string name="conversation_reopen">Reopen Conversation</string>
+    <string name="conversation_decrypting">Decrypting messages…</string>
+    <string name="conversation_e2ee">End-to-end encrypted</string>
+    <string name="conversation_no_volunteers">No volunteers available</string>
+    <string name="conversation_reply_hint">Type a message…</string>
+    <string name="conversation_sms">SMS</string>
+    <string name="conversation_whatsapp">WhatsApp</string>
+    <string name="conversation_signal">Signal</string>
+
+    <!-- Blasts -->
+    <string name="blast_create">New Blast</string>
+    <string name="blast_message_hint">Message content</string>
+    <string name="blast_recipient_count">%1$d recipients</string>
+    <string name="blast_recipient_count_one">1 recipient</string>
+    <string name="blast_recipients">Recipients</string>
+    <string name="blast_schedule">Schedule</string>
+    <string name="blast_schedule_later">Schedule for later</string>
+    <string name="blast_select_all">Select All</string>
+    <string name="blast_send_now">Send Now</string>
+    <string name="blasts_empty">No blasts yet</string>
+
+    <!-- Reports -->
+    <string name="report_create">New Report</string>
+    <string name="report_created">Created</string>
+    <string name="report_updated">Updated</string>
+    <string name="report_assigned">Assigned To</string>
+    <string name="report_messages">Messages</string>
+    <string name="report_not_found">Report not found</string>
+    <string name="report_filter_waiting">Waiting</string>
+    <string name="report_linked_call">Linked to call %1$s</string>
+    <string name="reports_back">Back</string>
+    <string name="reports_empty">No Reports</string>
+    <string name="reports_empty_subtitle">Reports will appear here once submitted.</string>
+
+    <!-- Device Link -->
+    <string name="device_link_camera_permission">Camera permission is required to scan QR codes</string>
+    <string name="device_link_complete">Device linked successfully!</string>
+    <string name="device_link_connecting">Connecting to primary device…</string>
+    <string name="device_link_importing">Importing your identity…</string>
+    <string name="device_link_scan">Scan QR Code</string>
+    <string name="device_link_step_scan">Scan</string>
+    <string name="device_link_step_verify">Verify</string>
+    <string name="device_link_step_import">Import</string>
+    <string name="device_link_verify">Verify Security Code</string>
+    <string name="device_link_verify_subtitle">Compare this code with the one on your primary device.</string>
+
+    <!-- Profile / Settings -->
+    <string name="profile_update">Update Profile</string>
+    <string name="profile_updated">Profile updated</string>
+    <string name="settings_profile">Profile</string>
+    <string name="settings_display_name">Display Name</string>
+    <string name="settings_phone">Phone Number</string>
+    <string name="settings_identity">Identity</string>
+    <string name="settings_hub">Hub Settings</string>
+    <string name="settings_admin_desc">Manage volunteers, bans, invites, and more.</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_key_backup">Key Backup</string>
+    <string name="settings_key_backup_desc">Download an encrypted backup of your secret key.</string>
+    <string name="settings_key_backup_warning">Store this backup securely. Anyone with this file and your PIN can access your identity.</string>
+    <string name="settings_device_link_desc">Link a new device to your account.</string>
+    <string name="settings_language_desc">Choose the app display language.</string>
+    <string name="settings_spoken_languages">Spoken Languages</string>
+    <string name="settings_spoken_languages_desc">Languages you can take calls in.</string>
+    <string name="settings_spoken_languages_none">No languages selected</string>
+    <string name="settings_notifications_desc">Configure call and shift notification preferences.</string>
+    <string name="settings_notify_calls">Incoming Calls</string>
+    <string name="settings_notify_general">General</string>
+    <string name="settings_notify_shifts">Shift Reminders</string>
+    <string name="settings_npub_copied">Public key copied to clipboard</string>
+    <string name="settings_logout_confirm_message">Are you sure you want to log out? You will need your secret key to log back in.</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_auto_lock_1min">1 minute</string>
+    <string name="settings_auto_lock_5min">5 minutes</string>
+    <string name="settings_auto_lock_15min">15 minutes</string>
+    <string name="settings_auto_lock_30min">30 minutes</string>
+    <string name="settings_auto_lock_never">Never</string>
+    <string name="settings_auto_lock_desc">Lock the app after a period of inactivity.</string>
+    <string name="settings_transcription">Transcription</string>
+    <string name="settings_transcription_desc">Configure call transcription settings.</string>
+    <string name="settings_transcription_enable">Enable Transcription</string>
+    <string name="settings_transcription_enable_desc">Transcribe your calls using on-device AI.</string>
+    <string name="settings_transcription_managed">Transcription settings are managed by your admin.</string>
+    <string name="settings_debug_logging">Debug Logging</string>
+    <string name="settings_debug_logging_desc">Enable verbose logging for troubleshooting.</string>
+    <string name="settings_clear_cache">Clear Cache</string>
+    <string name="settings_clear_cache_confirm">Are you sure you want to clear the app cache?</string>
+    <string name="settings_clear_cache_desc">Clear locally cached data to free storage.</string>
+    <string name="settings_cache_cleared">Cache cleared</string>
+    <string name="settings_collapse">Collapse</string>
+    <string name="settings_expand">Expand</string>
+
+    <!-- Help -->
+    <string name="help_subtitle">Get help with using the hotline app.</string>
+    <string name="help_faq_title">Frequently Asked Questions</string>
+    <string name="help_faq_getting_started">Getting Started</string>
+    <string name="help_faq_calls">Calls</string>
+    <string name="help_faq_notes">Notes</string>
+    <string name="help_faq_admin">Admin</string>
+    <string name="help_faq_login_q">How do I log in?</string>
+    <string name="help_faq_login_a">Enter your hub URL and secret key (nsec) on the login screen. Your key never leaves your device.</string>
+    <string name="help_faq_key_q">What is an nsec?</string>
+    <string name="help_faq_key_a">Your nsec is your secret key — like a password that proves your identity. It\'s generated on your device and never sent to the server.</string>
+    <string name="help_faq_device_q">Can I use multiple devices?</string>
+    <string name="help_faq_device_a">Yes. Use the Device Link feature in Settings to securely transfer your identity to another device.</string>
+    <string name="help_faq_ring_q">How does call routing work?</string>
+    <string name="help_faq_ring_a">All on-shift volunteers ring simultaneously. The first to answer handles the call.</string>
+    <string name="help_faq_break_q">How do I take a break?</string>
+    <string name="help_faq_break_a">Tap the break button on the dashboard. You won\'t receive calls while on break but stay logged in.</string>
+    <string name="help_faq_encrypt_q">Are my notes encrypted?</string>
+    <string name="help_faq_encrypt_a">Yes. Notes are end-to-end encrypted with a unique key per note. Only you and your admins can read them.</string>
+    <string name="help_faq_export_q">Can I export my notes?</string>
+    <string name="help_faq_export_a">Notes can be exported in encrypted form. You\'ll need your nsec key to decrypt them.</string>
+    <string name="help_faq_invite_q">How do I invite a volunteer?</string>
+    <string name="help_faq_invite_a">Go to Admin Panel, create an invite code, and share it securely with the new volunteer.</string>
+    <string name="help_faq_shifts_q">How do I manage shifts?</string>
+    <string name="help_faq_shifts_a">Use the Shift Schedule tab in the Admin Panel to create recurring shifts and assign volunteers.</string>
+    <string name="help_faq_spam_q">How do I block spam callers?</string>
+    <string name="help_faq_spam_a">Add numbers to the Ban List in the Admin Panel. You can also enable voice CAPTCHA and rate limiting.</string>
+    <string name="help_security_title">Security</string>
+    <string name="help_sec_auth">Authentication</string>
+    <string name="help_sec_auth_detail">Nostr keypair (BIP-340 Schnorr signatures)</string>
+    <string name="help_sec_notes">Notes</string>
+    <string name="help_sec_notes_detail">End-to-end encrypted (per-note keys)</string>
+    <string name="help_sec_reports">Reports</string>
+    <string name="help_sec_reports_detail">End-to-end encrypted</string>
+    <string name="help_sec_sessions">Sessions</string>
+    <string name="help_sec_sessions_detail">Encrypted device tokens</string>
+    <string name="help_volunteer_guide">Volunteer Guide</string>
+    <string name="help_volunteer_intro">Welcome! Here is everything you need to know as a volunteer.</string>
+    <string name="help_volunteer_tip1">Clock in at the start of your shift to begin receiving calls.</string>
+    <string name="help_volunteer_tip2">Use break mode when you need a pause — you\'ll stay logged in.</string>
+    <string name="help_volunteer_tip3">Create notes during or after each call to document the interaction.</string>
+    <string name="help_volunteer_tip4">Lock the app when stepping away from your device.</string>
+    <string name="help_volunteer_tip5">Back up your secret key in a safe place.</string>
+    <string name="help_admin_guide">Admin Guide</string>
+    <string name="help_admin_intro">As an admin, you manage the hub, volunteers, and settings.</string>
+    <string name="help_admin_tip1">Create invite codes for new volunteers in the Admin Panel.</string>
+    <string name="help_admin_tip2">Set up a shift schedule so calls are always covered.</string>
+    <string name="help_admin_tip3">Review audit logs to monitor hub activity.</string>
+    <string name="help_admin_tip4">Configure spam mitigation to protect your hotline.</string>
+    <string name="help_admin_tip5">Define custom fields to standardize note-taking.</string>
 </resources>
