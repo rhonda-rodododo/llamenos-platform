@@ -160,7 +160,7 @@ struct DashboardView: View {
             LabeledContent {
                 Text("\(vm.activeCallCount)")
                     .fontWeight(.bold)
-                    .foregroundStyle(.brandPrimary)
+                    .foregroundStyle(Color.brandPrimary)
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("active-call-count")
             } label: {
@@ -174,7 +174,7 @@ struct DashboardView: View {
             LabeledContent {
                 Text("\(vm.recentNoteCount)")
                     .fontWeight(.bold)
-                    .foregroundStyle(.brandAccent)
+                    .foregroundStyle(Color.brandAccent)
                     .contentTransition(.numericText())
                     .accessibilityIdentifier("recent-note-count")
             } label: {
@@ -209,7 +209,7 @@ struct DashboardView: View {
                             if note.hasCall {
                                 Image(systemName: "phone.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(.brandPrimary)
+                                    .foregroundStyle(Color.brandPrimary)
                             }
                             if note.hasConversation {
                                 Image(systemName: "message.fill")

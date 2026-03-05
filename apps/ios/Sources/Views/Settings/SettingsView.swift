@@ -186,7 +186,7 @@ struct SettingsView: View {
                         } label: {
                             Image(systemName: "doc.on.doc")
                                 .font(.caption)
-                                .foregroundStyle(.brandPrimary)
+                                .foregroundStyle(Color.brandPrimary)
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("copy-npub")
@@ -197,7 +197,7 @@ struct SettingsView: View {
                         Text(NSLocalizedString("settings_npub", comment: "Public Key"))
                     } icon: {
                         Image(systemName: "key.horizontal.fill")
-                            .foregroundStyle(.brandPrimary)
+                            .foregroundStyle(Color.brandPrimary)
                     }
                 }
                 .accessibilityIdentifier("settings-npub")
@@ -238,13 +238,13 @@ struct SettingsView: View {
                 Text(appState.userRole.displayName)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(appState.isAdmin ? .brandDarkTeal : .brandPrimary)
+                    .foregroundStyle(appState.isAdmin ? Color.brandDarkTeal : Color.brandPrimary)
             } label: {
                 Label {
                     Text(NSLocalizedString("settings_role", comment: "Role"))
                 } icon: {
                     Image(systemName: appState.isAdmin ? "shield.fill" : "person.fill")
-                        .foregroundStyle(appState.isAdmin ? .brandDarkTeal : .brandPrimary)
+                        .foregroundStyle(appState.isAdmin ? Color.brandDarkTeal : Color.brandPrimary)
                 }
             }
             .accessibilityIdentifier("settings-role")
@@ -269,7 +269,7 @@ struct SettingsView: View {
                         Text(NSLocalizedString("settings_hub_url", comment: "Hub URL"))
                     } icon: {
                         Image(systemName: "link")
-                            .foregroundStyle(.brandPrimary)
+                            .foregroundStyle(Color.brandPrimary)
                     }
                 }
                 .accessibilityIdentifier("settings-hub-url")
@@ -310,7 +310,7 @@ struct SettingsView: View {
                     Text(NSLocalizedString("settings_connection", comment: "Relay Connection"))
                 } icon: {
                     Image(systemName: "antenna.radiowaves.left.and.right")
-                        .foregroundStyle(.brandDarkTeal)
+                        .foregroundStyle(Color.brandDarkTeal)
                 }
             }
             .accessibilityIdentifier("settings-connection")
@@ -345,7 +345,7 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "qrcode.viewfinder")
-                        .foregroundStyle(.brandPrimary)
+                        .foregroundStyle(Color.brandPrimary)
                 }
             }
             .accessibilityIdentifier("settings-link-device")
@@ -368,7 +368,7 @@ struct SettingsView: View {
                     Text(NSLocalizedString("settings_call_sounds", comment: "Call Sounds"))
                 } icon: {
                     Image(systemName: "phone.arrow.down.left")
-                        .foregroundStyle(.brandPrimary)
+                        .foregroundStyle(Color.brandPrimary)
                 }
             }
             .accessibilityIdentifier("settings-call-sounds")
@@ -378,7 +378,7 @@ struct SettingsView: View {
                     Text(NSLocalizedString("settings_message_alerts", comment: "Message Alerts"))
                 } icon: {
                     Image(systemName: "bell.badge")
-                        .foregroundStyle(.brandAccent)
+                        .foregroundStyle(Color.brandAccent)
                 }
             }
             .accessibilityIdentifier("settings-message-alerts")
@@ -400,7 +400,7 @@ struct SettingsView: View {
                     Text(NSLocalizedString("settings_language", comment: "Language"))
                 } icon: {
                     Image(systemName: "globe")
-                        .foregroundStyle(.brandPrimary)
+                        .foregroundStyle(Color.brandPrimary)
                 }
             }
             .accessibilityIdentifier("settings-language-picker")
@@ -422,7 +422,7 @@ struct SettingsView: View {
                     Text(NSLocalizedString("settings_auto_lock", comment: "Auto-Lock Timeout"))
                 } icon: {
                     Image(systemName: "timer")
-                        .foregroundStyle(.brandAccent)
+                        .foregroundStyle(Color.brandAccent)
                 }
             }
             .accessibilityIdentifier("settings-auto-lock-picker")
@@ -454,7 +454,7 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "shield.lefthalf.filled")
-                        .foregroundStyle(.brandDarkTeal)
+                        .foregroundStyle(Color.brandDarkTeal)
                 }
             }
             .accessibilityIdentifier("settings-admin-panel")
@@ -480,7 +480,7 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "lock.fill")
-                        .foregroundStyle(.brandAccent)
+                        .foregroundStyle(Color.brandAccent)
                 }
             }
             .accessibilityIdentifier("settings-lock-app")
@@ -533,7 +533,7 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "questionmark.circle")
-                        .foregroundStyle(.brandPrimary)
+                        .foregroundStyle(Color.brandPrimary)
                 }
             }
             .accessibilityIdentifier("settings-help")

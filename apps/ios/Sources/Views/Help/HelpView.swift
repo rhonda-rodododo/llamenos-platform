@@ -51,7 +51,7 @@ struct HelpView: View {
             )
             securityRow(
                 icon: "shield.fill",
-                color: .brandDarkTeal,
+                color: Color.brandDarkTeal,
                 title: NSLocalizedString("help_security_sessions", comment: "Sessions"),
                 detail: NSLocalizedString("help_security_sessions_detail", comment: "Encrypted device tokens")
             )

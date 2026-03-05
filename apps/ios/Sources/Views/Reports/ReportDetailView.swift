@@ -87,7 +87,7 @@ struct ReportDetailView: View {
                         .font(.caption)
                         .fontWeight(.semibold)
                 }
-                .foregroundStyle(.brandDarkTeal)
+                .foregroundStyle(Color.brandDarkTeal)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(

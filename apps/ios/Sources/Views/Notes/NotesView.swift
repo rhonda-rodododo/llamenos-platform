@@ -94,7 +94,7 @@ struct NotesView: View {
                         } label: {
                             Text(NSLocalizedString("notes_load_more", comment: "Load More"))
                                 .font(.subheadline)
-                                .foregroundStyle(.brandPrimary)
+                                .foregroundStyle(Color.brandPrimary)
                         }
                         .padding()
                     }
@@ -212,7 +212,7 @@ struct NoteRowView: View {
 
                 // Call/Conversation badge
                 if note.callId != nil {
-                    badgeView(icon: "phone.fill", text: NSLocalizedString("notes_call_badge", comment: "Call"), color: .brandPrimary)
+                    badgeView(icon: "phone.fill", text: NSLocalizedString("notes_call_badge", comment: "Call"), color: Color.brandPrimary)
                 }
                 if note.conversationId != nil {
                     badgeView(icon: "message.fill", text: NSLocalizedString("notes_conversation_badge", comment: "Chat"), color: .green)

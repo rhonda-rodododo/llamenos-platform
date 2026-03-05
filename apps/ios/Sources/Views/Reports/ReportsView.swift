@@ -238,7 +238,7 @@ struct ReportRowView: View {
                             .font(.caption)
                             .fontWeight(.medium)
                     }
-                    .foregroundStyle(.brandDarkTeal)
+                    .foregroundStyle(Color.brandDarkTeal)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(

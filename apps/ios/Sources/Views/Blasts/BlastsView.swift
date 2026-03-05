@@ -64,12 +64,12 @@ struct BlastsView: View {
                         statBadge(
                             label: NSLocalizedString("blast_stat_total", comment: "Total"),
                             count: stats.total,
-                            color: .brandPrimary
+                            color: Color.brandPrimary
                         )
                         statBadge(
                             label: NSLocalizedString("blast_stat_paused", comment: "Paused"),
                             count: stats.paused,
-                            color: .brandAccent
+                            color: Color.brandAccent
                         )
                     }
                     .frame(maxWidth: .infinity)
@@ -211,7 +211,7 @@ struct BlastRowView: View {
                     Text(channel)
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundStyle(.brandAccent)
+                        .foregroundStyle(Color.brandAccent)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(Color.brandAccent.opacity(0.12)))

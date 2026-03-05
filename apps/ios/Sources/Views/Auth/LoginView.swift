@@ -19,7 +19,7 @@ struct LoginView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "phone.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(.brandPrimary)
+                        .foregroundStyle(Color.brandPrimary)
                         .accessibilityHidden(true)
 
                     Text(NSLocalizedString("app_name", comment: "Llamenos"))
@@ -133,7 +133,7 @@ struct ImportKeyView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "key.horizontal.fill")
                         .font(.system(size: 40))
-                        .foregroundStyle(.brandPrimary)
+                        .foregroundStyle(Color.brandPrimary)
                         .accessibilityHidden(true)
 
                     Text(NSLocalizedString("import_title", comment: "Import Your Key"))

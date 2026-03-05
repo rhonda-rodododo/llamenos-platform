@@ -19,7 +19,7 @@ struct PINUnlockView: View {
             VStack(spacing: 12) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(.brandPrimary)
+                    .foregroundStyle(Color.brandPrimary)
                     .accessibilityHidden(true)
 
                 Text(vm.titleText)

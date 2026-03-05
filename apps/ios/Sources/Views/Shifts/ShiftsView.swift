@@ -89,7 +89,7 @@ struct ShiftsView: View {
                     if vm.isOnShift, vm.activeCallCount > 0 {
                         HStack(spacing: 8) {
                             Image(systemName: "phone.fill")
-                                .foregroundStyle(.brandPrimary)
+                                .foregroundStyle(Color.brandPrimary)
                             Text(String(
                                 format: NSLocalizedString("shifts_active_calls", comment: "%d active call(s)"),
                                 vm.activeCallCount

@@ -43,7 +43,7 @@ struct ContactTimelineView: View {
                 HStack(spacing: 16) {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 36))
-                        .foregroundStyle(.brandPrimary)
+                        .foregroundStyle(Color.brandPrimary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(displayIdentifier)
                             .font(.system(.headline, design: .monospaced))

@@ -158,16 +158,16 @@ struct ContactRowView: View {
             // Interaction badges
             HStack(spacing: 10) {
                 if contact.callCount > 0 {
-                    interactionBadge(icon: "phone.fill", count: contact.callCount, color: .brandPrimary)
+                    interactionBadge(icon: "phone.fill", count: contact.callCount, color: Color.brandPrimary)
                 }
                 if contact.conversationCount > 0 {
                     interactionBadge(icon: "message.fill", count: contact.conversationCount, color: .green)
                 }
                 if contact.noteCount > 0 {
-                    interactionBadge(icon: "doc.text.fill", count: contact.noteCount, color: .brandDarkTeal)
+                    interactionBadge(icon: "doc.text.fill", count: contact.noteCount, color: Color.brandDarkTeal)
                 }
                 if contact.reportCount > 0 {
-                    interactionBadge(icon: "exclamationmark.triangle.fill", count: contact.reportCount, color: .brandAccent)
+                    interactionBadge(icon: "exclamationmark.triangle.fill", count: contact.reportCount, color: Color.brandAccent)
                 }
 
                 Spacer()

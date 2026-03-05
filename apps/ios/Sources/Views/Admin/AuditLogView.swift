@@ -41,7 +41,7 @@ struct AuditLogView: View {
                         .font(.subheadline)
                     } icon: {
                         Image(systemName: "list.clipboard.fill")
-                            .foregroundStyle(.brandPrimary)
+                            .foregroundStyle(Color.brandPrimary)
                     }
 
                     Spacer()
@@ -75,7 +75,7 @@ struct AuditLogView: View {
                             } label: {
                                 Text(NSLocalizedString("admin_load_more", comment: "Load More"))
                                     .font(.subheadline)
-                                    .foregroundStyle(.brandPrimary)
+                                    .foregroundStyle(Color.brandPrimary)
                             }
                             .padding()
                             .accessibilityIdentifier("load-more-audit")
