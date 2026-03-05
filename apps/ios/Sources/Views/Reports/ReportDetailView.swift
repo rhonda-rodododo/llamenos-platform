@@ -87,11 +87,11 @@ struct ReportDetailView: View {
                         .font(.caption)
                         .fontWeight(.semibold)
                 }
-                .foregroundStyle(.purple)
+                .foregroundStyle(Color.brandDarkTeal)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(
-                    Capsule().fill(Color.purple.opacity(0.12))
+                    Capsule().fill(Color.brandDarkTeal.opacity(0.12))
                 )
                 .accessibilityIdentifier("report-category")
             }
@@ -106,7 +106,7 @@ struct ReportDetailView: View {
                 .font(.headline)
 
             LabeledContent {
-                if let date = parseDate(report.createdAt) {
+                if let date = DateFormatting.parseISO(report.createdAt) {
                     Text(date.formatted(date: .long, time: .shortened))
                         .foregroundStyle(.primary)
                 }
@@ -135,7 +135,7 @@ struct ReportDetailView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let updatedAt = report.updatedAt, let date = parseDate(updatedAt) {
+            if let updatedAt = report.updatedAt, let date = DateFormatting.parseISO(updatedAt) {
                 LabeledContent {
                     Text(date.formatted(date: .long, time: .shortened))
                         .foregroundStyle(.primary)
@@ -205,13 +205,6 @@ struct ReportDetailView: View {
         return "\(pubkey.prefix(8))...\(pubkey.suffix(6))"
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 }
 
 // MARK: - Preview

@@ -158,48 +158,61 @@ docs/
 
 ## Development Commands
 
+### Multi-Machine Workflow
+
+Development is split across two machines:
+- **Mac M4** (this machine): iOS builds, XCUITests, Rust crypto, xcodegen
+- **Linux** (192.168.50.95): Desktop (Tauri), backend (Workers), Android, Docker, Playwright E2E
+
+Coordinate via git push/pull on the `desktop` branch.
+
 ```bash
-# Desktop (primary dev workflow)
+# iOS (runs locally on Mac M4)
+bun run ios:status                       # Check Xcode, Rust, xcodegen status
+bun run ios:setup                        # First-time: install Rust targets, xcodegen, xcbeautify
+bun run ios:build                        # Build iOS app (auto-generates .xcodeproj)
+bun run ios:test                         # Run unit tests (LlamenosTests)
+bun run ios:uitest                       # Run XCUITests on simulator
+bun run ios:xcframework                  # Build LlamenosCoreFFI XCFramework from Rust
+bun run ios:all                          # xcframework + build + test + uitest
+bun run crypto:test:mobile               # Rust crypto tests with mobile FFI
+
+# Desktop (runs on Linux machine)
 bun install                              # Install dependencies
 bun run tauri:dev                        # Tauri desktop dev (Vite + Rust backend)
 bun run tauri:build                      # Tauri desktop release build
 bun run dev                              # Vite dev server (test builds only — no Rust backend)
 
-# Backend
+# Backend (runs on Linux machine)
 bun run dev:worker                       # Wrangler dev server (Worker + DOs)
 
-# Build & Test
+# Build & Test (runs on Linux machine)
 bun run build                            # Vite build → dist/client/
 bun run typecheck                        # Type check (tsc --noEmit)
 bun run test                             # Run all Playwright E2E tests (auto-builds with mocks)
 bun run test:ui                          # Playwright UI mode
 bun run test:build                       # Vite build with Tauri IPC mocks (for Playwright)
 
-# Crypto (Rust)
+# Crypto (Rust — runs on either machine)
 bun run crypto:test                      # cargo test on packages/crypto
+bun run crypto:test:mobile               # cargo test with --features mobile (FFI tests)
 bun run crypto:clippy                    # cargo clippy on packages/crypto
 bun run crypto:fmt                       # cargo fmt --check on packages/crypto
 
-# Codegen
+# Codegen (runs on either machine)
 bun run codegen                          # Generate TS/Swift/Kotlin types from JSON Schemas
 bun run codegen:check                    # Verify generated files are up-to-date (CI)
 bun run i18n:codegen                     # Generate iOS .strings + Android strings.xml
 bun run i18n:validate                    # Check locale completeness
 
-# Deploy
+# Deploy (runs on Linux machine)
 bun run deploy                           # Deploy EVERYTHING (Worker + marketing site)
 bun run deploy:api                       # Deploy Worker only
 bun run deploy:site                      # Deploy marketing site only
 
-# Android
+# Android (runs on Linux machine)
 bun run test:android                     # Unit tests + lint + build androidTest APK
 bun run test:android:e2e                 # Cucumber BDD E2E on connected device/emulator
-
-# Mobile builds (requires platform toolchains)
-# iOS:  cd apps/ios && swift build                         # Debug build
-# iOS:  cd apps/ios && xcodebuild archive -scheme Llamenos # Release archive
-# Android: cd apps/android && ./gradlew assembleDebug      # Debug APK
-# Android: cd apps/android && ./gradlew bundleRelease      # Release AAB (needs signing env vars)
 
 # Version Management
 bun run version:bump <major|minor|patch> [description]     # Bump version across ALL platforms

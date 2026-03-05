@@ -94,7 +94,7 @@ struct NotesView: View {
                         } label: {
                             Text(NSLocalizedString("notes_load_more", comment: "Load More"))
                                 .font(.subheadline)
-                                .foregroundStyle(.tint)
+                                .foregroundStyle(Color.brandPrimary)
                         }
                         .padding()
                     }
@@ -204,7 +204,7 @@ struct NoteRowView: View {
                 // Author
                 HStack(spacing: 4) {
                     Image(systemName: "person.fill")
-                        .font(.caption2)
+                        .font(.caption)
                     Text(note.authorDisplayName)
                         .font(.caption)
                 }
@@ -212,7 +212,7 @@ struct NoteRowView: View {
 
                 // Call/Conversation badge
                 if note.callId != nil {
-                    badgeView(icon: "phone.fill", text: NSLocalizedString("notes_call_badge", comment: "Call"), color: .blue)
+                    badgeView(icon: "phone.fill", text: NSLocalizedString("notes_call_badge", comment: "Call"), color: Color.brandPrimary)
                 }
                 if note.conversationId != nil {
                     badgeView(icon: "message.fill", text: NSLocalizedString("notes_conversation_badge", comment: "Chat"), color: .green)
@@ -222,20 +222,20 @@ struct NoteRowView: View {
 
                 // Date
                 Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
     private func badgeView(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.caption2)
+                .font(.caption)
             Text(text)
-                .font(.caption2)
+                .font(.caption)
                 .fontWeight(.medium)
         }
         .foregroundStyle(color)

@@ -7,13 +7,10 @@ final class ReportFlowUITests: BaseUITest {
     // MARK: - Helper: Navigate to Reports
 
     /// Navigate to the reports screen via the Dashboard quick action card.
+    /// The quick actions section is below identity, shift, and activity sections in the List,
+    /// so we must scroll down to find it.
     private func navigateToReports() {
-        let dashboardReports = find("dashboard-reports-action")
-        XCTAssertTrue(
-            dashboardReports.waitForExistence(timeout: 10),
-            "Dashboard reports quick action should exist"
-        )
-        dashboardReports.tap()
+        scrollAndTap("dashboard-reports-action")
 
         // Wait for reports content to appear
         _ = anyElementExists([
@@ -138,9 +135,9 @@ final class ReportFlowUITests: BaseUITest {
             launchAuthenticated()
         }
         then("the dashboard should show a reports quick action") {
-            let reportsAction = find("dashboard-reports-action")
+            let reportsAction = scrollToFind("dashboard-reports-action")
             XCTAssertTrue(
-                reportsAction.waitForExistence(timeout: 10),
+                reportsAction.exists,
                 "Dashboard should have a reports quick action card"
             )
         }

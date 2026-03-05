@@ -190,7 +190,7 @@ final class DashboardViewModel {
             recentNoteCount = status.recentNoteCount ?? 0
 
             if status.onShift, let startedAtString = status.startedAt {
-                shiftStartedAt = parseDate(startedAtString)
+                shiftStartedAt = DateFormatting.parseISO(startedAtString)
                 startTimer()
             } else {
                 shiftStartedAt = nil
@@ -254,7 +254,7 @@ final class DashboardViewModel {
                     return RecentNotePreview(
                         id: encrypted.id,
                         preview: previewText,
-                        createdAt: parseDate(encrypted.createdAt) ?? Date(),
+                        createdAt: DateFormatting.parseISO(encrypted.createdAt) ?? Date(),
                         hasCall: encrypted.callId != nil,
                         hasConversation: encrypted.conversationId != nil
                     )
@@ -270,13 +270,6 @@ final class DashboardViewModel {
         }
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 
     deinit {
         eventTask?.cancel()

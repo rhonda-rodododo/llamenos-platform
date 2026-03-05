@@ -2,47 +2,66 @@ import SwiftUI
 
 // MARK: - AdminTabView
 
-/// Container view for admin management screens. Provides a segmented picker
-/// for switching between Volunteers, Ban List, Audit Log, and Invites.
+/// Container view for admin management screens. Provides a list-based navigation
+/// menu (replacing the segmented picker) for Volunteers, Ban List, Audit Log,
+/// Invites, and Custom Fields.
 struct AdminTabView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel: AdminViewModel?
-    @State private var selectedTab: AdminTab = .volunteers
 
     var body: some View {
         let vm = resolvedViewModel
 
-        VStack(spacing: 0) {
-            // Segmented tab picker
-            Picker(
-                NSLocalizedString("admin_section", comment: "Admin Section"),
-                selection: $selectedTab
-            ) {
-                ForEach(AdminTab.allCases, id: \.self) { tab in
-                    Label(tab.title, systemImage: tab.icon)
-                        .tag(tab)
-                }
+        List {
+            NavigationLink {
+                VolunteersView(viewModel: vm)
+            } label: {
+                Label(
+                    NSLocalizedString("admin_tab_volunteers", comment: "Volunteers"),
+                    systemImage: "person.3.fill"
+                )
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .accessibilityIdentifier("admin-tab-picker")
+            .accessibilityIdentifier("admin-volunteers")
 
-            // Tab content
-            ZStack {
-                switch selectedTab {
-                case .volunteers:
-                    VolunteersView(viewModel: vm)
-                case .bans:
-                    BanListView(viewModel: vm)
-                case .auditLog:
-                    AuditLogView(viewModel: vm)
-                case .invites:
-                    InviteView(viewModel: vm)
-                case .customFields:
-                    CustomFieldsView(viewModel: vm)
-                }
+            NavigationLink {
+                BanListView(viewModel: vm)
+            } label: {
+                Label(
+                    NSLocalizedString("admin_tab_bans", comment: "Ban List"),
+                    systemImage: "hand.raised.fill"
+                )
             }
+            .accessibilityIdentifier("admin-bans")
+
+            NavigationLink {
+                AuditLogView(viewModel: vm)
+            } label: {
+                Label(
+                    NSLocalizedString("admin_tab_audit", comment: "Audit Log"),
+                    systemImage: "list.clipboard.fill"
+                )
+            }
+            .accessibilityIdentifier("admin-audit-log")
+
+            NavigationLink {
+                InviteView(viewModel: vm)
+            } label: {
+                Label(
+                    NSLocalizedString("admin_tab_invites", comment: "Invites"),
+                    systemImage: "envelope.open.fill"
+                )
+            }
+            .accessibilityIdentifier("admin-invites")
+
+            NavigationLink {
+                CustomFieldsView(viewModel: vm)
+            } label: {
+                Label(
+                    NSLocalizedString("admin_tab_fields", comment: "Custom Fields"),
+                    systemImage: "list.bullet.rectangle.fill"
+                )
+            }
+            .accessibilityIdentifier("admin-custom-fields")
         }
         .navigationTitle(NSLocalizedString("admin_title", comment: "Admin"))
         .navigationBarTitleDisplayMode(.large)
@@ -89,7 +108,7 @@ struct AdminTabView: View {
 // MARK: - Preview
 
 #if DEBUG
-#Preview("Admin Tab View") {
+#Preview("Admin Panel") {
     NavigationStack {
         AdminTabView()
             .environment(AppState())

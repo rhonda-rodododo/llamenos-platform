@@ -6,7 +6,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Navigation } from '../../pages/index'
 import { TestIds, navTestIdMap } from '../../test-ids'
-import { Timeouts, navigateAfterLogin, loginAsAdmin } from '../../helpers'
+import { Timeouts, navigateAfterLogin } from '../../helpers'
 
 // --- Parameterised navigation (covers most "navigate to X page" steps) ---
 
@@ -82,13 +82,7 @@ Given('I am on the settings screen', async ({ page }) => {
 })
 
 Given('I am on the dashboard', async ({ page }) => {
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const isVisible = await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)
-  if (!isVisible) {
-    // Not authenticated yet — login first
-    await loginAsAdmin(page)
-  }
-  await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('I navigate to the device link screen from settings', async ({ page }) => {
@@ -115,22 +109,15 @@ When('I tap the {string} tab', async ({ page }, tabName: string) => {
   const testId = navTestIdMap[tabName]
   if (testId) {
     const navLink = page.getByTestId(testId)
-    const isVisible = await navLink.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (isVisible) {
-      await navLink.click()
-      return
-    }
-  }
-  // Fallback: look for text in sidebar (handles i18n labels)
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const textLink = sidebar.getByText(tabName, { exact: true }).first()
-  const isTextVisible = await textLink.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isTextVisible) {
-    await textLink.click()
+    await expect(navLink).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await navLink.click()
     return
   }
-  // If nav item not found, the admin section may not be visible (non-admin user)
-  // or the sidebar may be closed on mobile — just log and continue
+  // Fallback: look for text in sidebar
+  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+  const textLink = sidebar.getByText(tabName, { exact: true }).first()
+  await expect(textLink).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await textLink.click()
 })
 
 When('I navigate to the admin panel', async ({ page }) => {
@@ -203,11 +190,10 @@ Then('I should see the nsec input', async ({ page }) => {
 })
 
 Then('I should see a validation error', async ({ page }) => {
-  const errorMsg = page.getByTestId(TestIds.ERROR_MESSAGE)
-  if (await errorMsg.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  const alert = page.locator('[role="alert"]')
-  if (await alert.first().isVisible({ timeout: 2000 }).catch(() => false)) return
-  await expect(page.locator('.text-destructive').first()).toBeVisible({ timeout: 2000 })
+  const errorEl = page.getByTestId(TestIds.ERROR_MESSAGE)
+    .or(page.locator('[role="alert"]'))
+    .or(page.locator('.text-destructive'))
+  await expect(errorEl.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the response should be successful', async ({ page }) => {
@@ -221,12 +207,7 @@ Then('the response should contain {string}', async ({ page }, text: string) => {
 })
 
 Then('I should see the dashboard', async ({ page }) => {
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const isTitle = await pageTitle.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isTitle) return
-  // May be on login page (cascading from auth failure) — accept if any page rendered
-  const loginForm = page.locator('#nsec, [data-testid="login-submit-btn"], input[aria-label="PIN digit 1"]').first()
-  await expect(loginForm).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the notes screen', async ({ page }) => {

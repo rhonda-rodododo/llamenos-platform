@@ -34,10 +34,7 @@ Then('the text {string} should be displayed', async ({ page }, text: string) => 
 })
 
 Then('the create note FAB should be visible', async ({ page }) => {
-  const fab = page.getByTestId(TestIds.NOTE_NEW_BTN)
-  const isFab = await fab.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isFab) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.NOTE_NEW_BTN)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('custom fields are configured for notes', async ({ request }) => {
@@ -72,10 +69,7 @@ When('I tap the create note FAB', async ({ page }) => {
 })
 
 Then('I should see the note creation screen', async ({ page }) => {
-  const noteForm = page.getByTestId(TestIds.NOTE_FORM)
-  const isForm = await noteForm.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isForm) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.NOTE_FORM)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the note text input should be visible', async ({ page }) => {
@@ -90,13 +84,9 @@ Then('the back button should be visible', async ({ page }) => {
   // Notes page uses cancel button on forms instead of a dedicated back button.
   // Check for either the back-btn testid (volunteer detail) or cancel/back controls.
   const backBtn = page.getByTestId(TestIds.BACK_BTN)
-  const isBack = await backBtn.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isBack) return
   const cancelBtn = page.getByTestId(TestIds.FORM_CANCEL_BTN)
-  const isCancel = await cancelBtn.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isCancel) return
-  const browserBack = page.getByRole('button', { name: /back|cancel/i }).first()
-  await expect(browserBack).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const browserBack = page.getByRole('button', { name: /back|cancel/i })
+  await expect(backBtn.or(cancelBtn).or(browserBack).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Note detail steps ---
@@ -116,15 +106,10 @@ Given('at least one note exists', async ({ page, request }) => {
 })
 
 When('I navigate to a note\'s detail view', async ({ page }) => {
-  // Ensure we're on the notes page first
-  const { Navigation } = await import('../../pages/index')
-  await Navigation.goToNotes(page)
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-  const hasNote = await noteCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasNote) {
-    await noteCard.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
-  }
+  await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await noteCard.click()
+  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see the full note text', async ({ page }) => {
@@ -156,15 +141,10 @@ Then('I should see the author pubkey', async ({ page }) => {
 })
 
 When('I am on a note detail view', async ({ page }) => {
-  // Ensure we're on the notes page first
-  const { Navigation } = await import('../../pages/index')
-  await Navigation.goToNotes(page)
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-  const hasNote = await noteCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasNote) {
-    await noteCard.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
-  }
+  await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await noteCard.click()
+  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('a copy button should be visible in the top bar', async ({ page }) => {
@@ -172,8 +152,8 @@ Then('a copy button should be visible in the top bar', async ({ page }) => {
   const copyBtn = page.locator('button[aria-label="Copy"], button:has-text("Copy"), [data-testid="copy-btn"]')
   // Note: copy button may not exist in all UI variants — verify the detail view is showing
   const noteSheet = page.getByTestId(TestIds.NOTE_SHEET)
-  if (await noteSheet.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  await expect(page.getByTestId(TestIds.NOTE_CARD).first()).toBeVisible({ timeout: 2000 })
+  const noteCard = page.getByTestId(TestIds.NOTE_CARD)
+  await expect(noteSheet.or(noteCard.first())).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Note edit steps (note-edit.feature) ---
@@ -215,24 +195,18 @@ When('I tap the note edit button', async ({ page }) => {
 })
 
 Then('I should see the note edit input', async ({ page }) => {
-  const editInput = page.getByTestId(TestIds.NOTE_EDIT_INPUT)
-  if (await editInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  await expect(page.getByTestId(TestIds.NOTE_CONTENT)).toBeVisible({ timeout: 2000 })
+  const editInput = page.getByTestId(TestIds.NOTE_EDIT_INPUT).or(page.getByTestId(TestIds.NOTE_CONTENT))
+  await expect(editInput.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I cancel editing', async ({ page }) => {
-  const backBtn = page.getByTestId(TestIds.BACK_BTN)
-  if (await backBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await backBtn.click()
-    return
-  }
-  await page.getByTestId(TestIds.FORM_CANCEL_BTN).click()
+  const cancelBtn = page.getByTestId(TestIds.BACK_BTN).or(page.getByTestId(TestIds.FORM_CANCEL_BTN))
+  await cancelBtn.first().click()
 })
 
 Then('I should see the note detail text', async ({ page }) => {
-  const detailText = page.getByTestId(TestIds.NOTE_DETAIL_TEXT)
-  if (await detailText.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  await expect(page.getByTestId(TestIds.NOTE_CARD).first()).toBeVisible({ timeout: 2000 })
+  const detailText = page.getByTestId(TestIds.NOTE_DETAIL_TEXT).or(page.getByTestId(TestIds.NOTE_CARD).first())
+  await expect(detailText.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Notes search steps (notes-search.feature) ---
@@ -266,12 +240,6 @@ When('I clear the notes search', async ({ page }) => {
 })
 
 Then('I should see the full notes list', async ({ page }) => {
-  const noteList = page.getByTestId(TestIds.NOTE_LIST)
-  const isList = await noteList.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isList) return
-  const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  const isEmpty = await emptyState.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isEmpty) return
-  // Fallback: verify page rendered
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const noteList = page.getByTestId(TestIds.NOTE_LIST).or(page.getByTestId(TestIds.EMPTY_STATE))
+  await expect(noteList.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

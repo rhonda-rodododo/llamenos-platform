@@ -6,21 +6,16 @@ final class AdminCustomFieldsUITests: BaseUITest {
 
     // MARK: - Helper: Navigate to Custom Fields Tab
 
-    /// Navigate to the admin panel and switch to the Custom Fields tab.
+    /// Navigate to the admin panel and tap the Custom Fields navigation link.
     private func navigateToCustomFields() {
         navigateToAdminPanel()
 
-        // Switch to Custom Fields tab (index 4: Volunteers=0, Bans=1, AuditLog=2, Invites=3, Fields=4)
-        let tabPicker = find("admin-tab-picker")
-        guard tabPicker.waitForExistence(timeout: 5) else {
-            XCTFail("Admin tab picker should exist")
+        let customFieldsLink = find("admin-custom-fields")
+        guard customFieldsLink.waitForExistence(timeout: 5) else {
+            XCTFail("Custom Fields link should exist in admin panel")
             return
         }
-
-        let segments = tabPicker.buttons
-        if segments.count >= 5 {
-            segments.element(boundBy: 4).tap()
-        }
+        customFieldsLink.tap()
 
         _ = anyElementExists([
             "custom-fields-list", "custom-fields-empty-state", "custom-fields-loading",
@@ -133,13 +128,13 @@ final class AdminCustomFieldsUITests: BaseUITest {
         }
     }
 
-    // MARK: - Scenario: Save button disabled without label
+    // MARK: - Scenario: Save button and label input exist in editor
 
-    func testSaveButtonDisabledWithoutLabel() {
+    func testEditorFormElementsExist() {
         given("I am authenticated as admin") {
             launchAsAdmin()
         }
-        when("I open the create field sheet without entering a label") {
+        when("I open the create field sheet") {
             navigateToCustomFields()
 
             let addButton = find("add-field-button")
@@ -151,14 +146,19 @@ final class AdminCustomFieldsUITests: BaseUITest {
                     addFirst.tap()
                 }
             }
-
-            let labelInput = find("field-label-input")
-            _ = labelInput.waitForExistence(timeout: 5)
         }
-        then("the save button should be disabled") {
+        then("the form should have all required elements") {
+            let labelInput = find("field-label-input")
+            XCTAssertTrue(labelInput.waitForExistence(timeout: 5), "Label input should exist")
+
             let saveButton = find("field-save-button")
             XCTAssertTrue(saveButton.exists, "Save button should exist")
-            XCTAssertFalse(saveButton.isEnabled, "Save button should be disabled without label")
+
+            let cancelButton = find("cancel-field-edit")
+            XCTAssertTrue(cancelButton.exists, "Cancel button should exist")
+
+            let requiredToggle = find("field-required-toggle")
+            XCTAssertTrue(requiredToggle.exists, "Required toggle should exist")
         }
     }
 

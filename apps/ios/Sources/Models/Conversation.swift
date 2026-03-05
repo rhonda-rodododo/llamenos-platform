@@ -86,12 +86,12 @@ struct Conversation: Codable, Identifiable, Sendable {
     /// Parsed last message date.
     var lastMessageDate: Date? {
         guard let str = lastMessageAt else { return nil }
-        return Self.parseDate(str)
+        return DateFormatting.parseISO(str)
     }
 
     /// Parsed creation date.
     var createdDate: Date? {
-        Self.parseDate(createdAt)
+        DateFormatting.parseISO(createdAt)
     }
 
     /// Relative time string for the last message.
@@ -102,13 +102,6 @@ struct Conversation: Codable, Identifiable, Sendable {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 
-    private static func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 }
 
 // MARK: - ConversationMessage

@@ -32,12 +32,8 @@ Then('I should see the identity card', async ({ page }) => {
   // Desktop dashboard doesn't have a separate identity card — identity info is in settings/sidebar.
   // Check for any dashboard content (shift status or active calls cards).
   const shiftCard = page.getByTestId(TestIds.DASHBOARD_SHIFT_STATUS)
-  const isShift = await shiftCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isShift) return
   const callsCard = page.getByTestId(TestIds.DASHBOARD_ACTIVE_CALLS)
-  const isCalls = await callsCard.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isCalls) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(shiftCard.or(callsCard).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the identity card should display my npub', async ({ page }) => {
@@ -53,13 +49,10 @@ Then('the identity card should display my npub', async ({ page }) => {
 
 Then('the npub should start with {string}', async ({ page }, prefix: string) => {
   // npub is content-based — getByText is acceptable for content assertions
-  // Desktop dashboard may not display npub (it's shown in settings instead)
   const npubEl = page.getByText(/npub1/).first()
-  const isVisible = await npubEl.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    const text = await npubEl.textContent()
-    expect(text).toContain(prefix)
-  }
+  await expect(npubEl).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const text = await npubEl.textContent()
+  expect(text).toContain(prefix)
 })
 
 Then('the connection card should show a status text', async ({ page }) => {
@@ -107,31 +100,18 @@ Then('the recent notes card should be displayed', async ({ page }) => {
 Then('either recent notes or {string} message should appear', async ({ page }, _emptyMsg: string) => {
   // Either notes are present or the dashboard cards are visible
   const callsCard = page.getByTestId(TestIds.DASHBOARD_CALLS_TODAY)
-  const isCalls = await callsCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isCalls) return
   const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  const isEmpty = await emptyState.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isEmpty) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(callsCard.or(emptyState).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the lock button should be visible in the top bar', async ({ page }) => {
   // Desktop may not have a separate Lock button — check for logout in the sidebar footer
-  const logoutBtn = page.getByTestId(TestIds.LOGOUT_BTN)
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const isLogout = await logoutBtn.isVisible({ timeout: Timeouts.AUTH }).catch(() => false)
-  if (isLogout) return
-  // Fallback: sidebar is visible (page loaded, button might be in footer below fold)
-  await expect(sidebar).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.LOGOUT_BTN)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the logout button should be visible in the top bar', async ({ page }) => {
   // Desktop: logout is in the sidebar footer
-  const logoutBtn = page.getByTestId(TestIds.LOGOUT_BTN)
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const isLogout = await logoutBtn.isVisible({ timeout: Timeouts.AUTH }).catch(() => false)
-  if (isLogout) return
-  await expect(sidebar).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.LOGOUT_BTN)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Shift status steps ---
@@ -154,10 +134,6 @@ Then('the dashboard clock button should say {string}', async ({ page }, text: st
     'Clock Out': 'End Break',
   }
   const actualText = textMap[text] || text
-  // Shift state may vary depending on test order — accept either break text
-  const btnText = await clockBtn.textContent() || ''
-  const isBreakText = btnText.includes('Take a Break') || btnText.includes('End Break')
-  if (isBreakText) return // Button is showing a valid break action label
   await expect(clockBtn).toContainText(actualText)
 })
 

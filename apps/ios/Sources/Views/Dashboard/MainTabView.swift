@@ -82,6 +82,7 @@ struct MainTabView: View {
                 }
                 .tag(Tab.settings)
         }
+        .tint(.brandPrimary)
         .accessibilityIdentifier("main-tab-view")
         .task {
             await fetchUnreadCount()

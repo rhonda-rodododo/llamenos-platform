@@ -64,12 +64,12 @@ struct BlastsView: View {
                         statBadge(
                             label: NSLocalizedString("blast_stat_total", comment: "Total"),
                             count: stats.total,
-                            color: .blue
+                            color: Color.brandPrimary
                         )
                         statBadge(
                             label: NSLocalizedString("blast_stat_paused", comment: "Paused"),
                             count: stats.paused,
-                            color: .orange
+                            color: Color.brandAccent
                         )
                     }
                     .frame(maxWidth: .infinity)
@@ -164,7 +164,7 @@ struct BlastsView: View {
                 .fontWeight(.bold)
                 .foregroundStyle(color)
             Text(label)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -209,19 +209,19 @@ struct BlastRowView: View {
             HStack(spacing: 8) {
                 ForEach(blast.targetChannels, id: \.self) { channel in
                     Text(channel)
-                        .font(.caption2)
+                        .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(Color.brandAccent)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                        .background(Capsule().fill(Color.brandAccent.opacity(0.12)))
                 }
 
                 Spacer()
 
-                if let date = parseDate(blast.createdAt) {
+                if let date = DateFormatting.parseISO(blast.createdAt) {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption2)
+                        .font(.footnote)
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -238,20 +238,20 @@ struct BlastRowView: View {
                     .font(.caption)
                 }
                 .buttonStyle(.bordered)
-                .tint(.blue)
+                .tint(.brandPrimary)
                 .accessibilityIdentifier("send-blast-\(blast.id)")
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
     private func statusBadge(_ status: BlastStatus) -> some View {
         HStack(spacing: 4) {
             Image(systemName: status.icon)
-                .font(.caption2)
+                .font(.caption)
             Text(status.displayName)
-                .font(.caption2)
+                .font(.caption)
                 .fontWeight(.medium)
         }
         .foregroundStyle(status.color)
@@ -260,11 +260,4 @@ struct BlastRowView: View {
         .background(Capsule().fill(status.color.opacity(0.12)))
     }
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 }

@@ -88,24 +88,15 @@ async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promi
 
 /**
  * Enter a PIN into the PinInput component.
- * Types each digit into its individual input element for maximum reliability.
- * The PinInput component auto-advances focus, but Playwright's keyboard.type()
- * may not reliably follow DOM focus changes between characters, so we
- * explicitly target each input.
+ * Uses keyboard typing since the component auto-advances focus on each digit.
  */
 export async function enterPin(page: Page, pin: string) {
+  // Focus the first PIN digit input
   const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
   await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
-
-  // Type each digit into its corresponding input
-  for (let i = 0; i < pin.length; i++) {
-    const digit = page.locator(`input[aria-label="PIN digit ${i + 1}"]`)
-    await digit.waitFor({ state: 'visible', timeout: 2000 })
-    await digit.focus()
-    await digit.pressSequentially(pin[i], { delay: 30 })
-    // Small delay for React state updates and focus transitions
-    await page.waitForTimeout(50)
-  }
+  await firstDigit.click()
+  // Type each digit — PinInput handles focus advance automatically
+  await page.keyboard.type(pin, { delay: 50 })
 }
 
 /**
@@ -174,7 +165,6 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
  */
 export async function loginAsAdmin(page: Page) {
   await page.goto('/login')
-  await page.waitForLoadState('domcontentloaded')
   await page.evaluate(() => sessionStorage.clear())
   await preloadEncryptedKey(page, ADMIN_NSEC, TEST_PIN)
   await page.reload()
@@ -185,43 +175,17 @@ export async function loginAsAdmin(page: Page) {
 
 /**
  * Login as volunteer: pre-loads encrypted key into localStorage, then enters PIN.
- * Handles first-time volunteers who land on /profile-setup (onboarding).
  */
 export async function loginAsVolunteer(page: Page, nsec: string) {
   await page.goto('/login')
-  await page.waitForLoadState('domcontentloaded')
   await page.evaluate(() => sessionStorage.clear())
   await preloadEncryptedKey(page, nsec, TEST_PIN)
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await enterPin(page, TEST_PIN)
-  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
-
-  // First-time volunteers may land on / briefly then redirect to /profile-setup.
-  // Wait a moment for React auth guards to settle, then check for profile-setup.
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
-
-  // Check if we ended up on profile-setup (first-time volunteer onboarding)
-  if (page.url().includes('/profile-setup')) {
-    // Click "Complete Setup" (the button text is i18n: profile.getStarted)
-    const completeBtn = page.getByRole('button', { name: /complete setup|get started|comenzar/i })
-    const hasBtnVisible = await completeBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (hasBtnVisible) {
-      await completeBtn.click()
-      // Wait for redirect to dashboard after profile completion
-      await page.waitForURL(url => !url.toString().includes('/profile-setup'), { timeout: Timeouts.AUTH })
-      await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
-    }
-  }
-
+  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.API })
   // Wait for the authenticated layout to be visible
-  // The sidebar appears only when both isAuthenticated AND profileCompleted are true
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const isSidebar = await sidebar.isVisible({ timeout: Timeouts.AUTH }).catch(() => false)
-  if (!isSidebar) {
-    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
   // Short delay for initial API calls to complete
   await page.waitForTimeout(Timeouts.UI_SETTLE)
 }

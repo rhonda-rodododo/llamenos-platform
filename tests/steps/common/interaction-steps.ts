@@ -17,7 +17,6 @@ const buttonTestIdMap: Record<string, string> = {
   'Save': TestIds.FORM_SAVE_BTN,
   'Cancel': TestIds.FORM_CANCEL_BTN,
   'Submit': TestIds.FORM_SUBMIT_BTN,
-  'Submit Report': 'report-submit-btn',
   'OK': TestIds.CONFIRM_DIALOG_OK,
   'Confirm': TestIds.CONFIRM_DIALOG_OK,
   'Add Volunteer': TestIds.VOLUNTEER_ADD_BTN,
@@ -31,16 +30,12 @@ const buttonTestIdMap: Record<string, string> = {
   'New Blast': TestIds.BLAST_NEW_BTN,
   'Log Out': TestIds.LOGOUT_BTN,
   'Logout': TestIds.LOGOUT_BTN,
-  'Lock App': TestIds.LOGOUT_BTN, // Desktop doesn't have a separate Lock button — Lock = Logout + PIN on next launch
   'Log In': TestIds.LOGIN_SUBMIT_BTN,
   'Log in': TestIds.LOGIN_SUBMIT_BTN,
   'Recovery Options': TestIds.RECOVERY_OPTIONS_BTN,
   'Recovery options': TestIds.RECOVERY_OPTIONS_BTN,
   'Clock In': TestIds.BREAK_TOGGLE_BTN,
   'Clock Out': TestIds.BREAK_TOGGLE_BTN,
-  'Next': TestIds.SETUP_NEXT_BTN,
-  'Back': TestIds.SETUP_BACK_BTN,
-  'Skip': 'setup-skip-btn',
 }
 
 /**
@@ -55,9 +50,6 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
       await el.click()
       return
     }
-    // If mapped testid wasn't visible but we're on the login page (e.g., after logout),
-    // the element we're trying to click doesn't exist anymore — skip gracefully.
-    if (page.url().includes('/login')) return
   }
   // 2. Check nav test ID map — deterministic, wait longer
   const navTestId = navTestIdMap[text]
@@ -84,13 +76,7 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
     await tab.click()
     return
   }
-  // Final fallback: try text click with timeout
-  const textEl = page.getByText(text, { exact: true }).first()
-  const textVisible = await textEl.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (textVisible) {
-    await textEl.click()
-  }
-  // If nothing was clickable, the next assertion step will catch the failure
+  await page.getByText(text, { exact: true }).first().click()
 }
 
 // --- Click/Tap patterns ---
@@ -142,12 +128,9 @@ When('I enter {string} in the {string} field', async ({ page }, value: string, f
 
 When('I enter {string} in the {string} input', async ({ page }, value: string, field: string) => {
   const slug = field.replace(/\s/g, '-').toLowerCase()
-  const idInput = page.locator(`#${slug}`)
-  if (await idInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await idInput.fill(value)
-    return
-  }
-  await page.getByLabel(field).fill(value)
+  const input = page.locator(`#${slug}`)
+    .or(page.getByLabel(field))
+  await input.first().fill(value)
 })
 
 When('I clear the {string} field', async ({ page }, field: string) => {
@@ -178,62 +161,28 @@ When('I fill in a valid phone number', async ({ page }) => {
 })
 
 When('I fill in reason with {string}', async ({ page }, reason: string) => {
-  const label = page.getByLabel(/reason/i)
-  const isLabel = await label.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isLabel) {
-    await label.fill(reason)
-  } else {
-    // Fallback: try textarea or input with placeholder containing "reason"
-    const fallback = page.locator('textarea, input[placeholder*="reason" i]').first()
-    const isFallback = await fallback.isVisible({ timeout: 3000 }).catch(() => false)
-    if (isFallback) await fallback.fill(reason)
-  }
+  await page.getByLabel(/reason/i).fill(reason)
 })
 
 When('I fill in the reason with {string}', async ({ page }, reason: string) => {
-  const label = page.getByLabel(/reason/i)
-  const isLabel = await label.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isLabel) {
-    await label.fill(reason)
-  } else {
-    const fallback = page.locator('textarea, input[placeholder*="reason" i]').first()
-    const isFallback = await fallback.isVisible({ timeout: 3000 }).catch(() => false)
-    if (isFallback) await fallback.fill(reason)
-  }
+  await page.getByLabel(/reason/i).fill(reason)
 })
 
 // --- Section expand/collapse ---
 
 When('I expand the {string} section', async ({ page }, sectionName: string) => {
   const slug = sectionName.toLowerCase().replace(/\s+/g, '-')
-  let el = page.locator(`[data-testid="${slug}"]`)
-  if (!await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    el = page.locator(`[data-testid="settings-section-${slug}"]`)
-  }
+  const section = page.locator(`[data-testid="${slug}"]`)
+    .or(page.locator(`[data-testid="settings-section-${slug}"]`))
+  const el = section.first()
   if (await el.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await el.scrollIntoViewIfNeeded().catch(() => {})
-    // Check if already expanded (data-state="open" present)
-    const isExpanded = await el.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
-    if (!isExpanded) {
-      // Click the collapsible trigger (.cursor-pointer header) not the section itself
-      const trigger = el.locator('.cursor-pointer').first()
-      if (await trigger.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await trigger.click()
-      } else {
-        await el.click()
-      }
-      await page.waitForTimeout(500)
-    }
+    await el.scrollIntoViewIfNeeded()
+    await el.click()
   } else {
-    // Fallback: try by section title text (case-insensitive)
-    const regex = new RegExp(sectionName, 'i')
-    const byText = page.getByText(regex).first()
-    const textVisible = await byText.isVisible({ timeout: 3000 }).catch(() => false)
-    if (textVisible) {
-      await byText.scrollIntoViewIfNeeded().catch(() => {})
-      await byText.click().catch(() => {})
-    }
-    // If nothing found, the step will pass silently — the next assertion step will catch it
+    // Last resort: find by text
+    const byText = page.getByText(sectionName, { exact: true }).first()
+    await byText.scrollIntoViewIfNeeded()
+    await byText.click()
   }
 })
 
@@ -260,33 +209,19 @@ When('I log out', async ({ page }) => {
 Then('the {string} button should be disabled', async ({ page }, name: string) => {
   const testId = buttonTestIdMap[name]
   const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name })
-  const isVisible = await btn.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    await expect(btn.first()).toBeDisabled()
-  }
-  // If button doesn't exist, step passes — the UI state doesn't match the test precondition
+  await expect(btn).toBeDisabled()
 })
 
 Then('the {string} button should be enabled', async ({ page }, name: string) => {
   const testId = buttonTestIdMap[name]
   const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name })
-  const isVisible = await btn.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    await expect(btn.first()).toBeEnabled()
-  }
+  await expect(btn).toBeEnabled()
 })
 
 Then('the {string} button should be visible', async ({ page }, name: string) => {
   const testId = buttonTestIdMap[name]
-  if (testId) {
-    const byTestId = page.getByTestId(testId)
-    const isTestId = await byTestId.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (isTestId) return
-    const byRole = page.getByRole('button', { name: new RegExp(name, 'i') }).first()
-    await expect(byRole).toBeVisible({ timeout: Timeouts.ELEMENT })
-  } else {
-    await expect(page.getByRole('button', { name }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name })
+  await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the {string} button should not be visible', async ({ page }, name: string) => {
@@ -330,17 +265,7 @@ Then('I should see {string}', async ({ page }, text: string) => {
 })
 
 Then('I should see the {string} heading', async ({ page }, heading: string) => {
-  // Try heading role first, then page-title testid, then any text match
-  const headingEl = page.getByRole('heading', { name: heading }).first()
-  const isHeading = await headingEl.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isHeading) return
-
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const isTitle = await pageTitle.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isTitle) return
-
-  const textEl = page.getByText(heading, { exact: true }).first()
-  await expect(textEl).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByRole('heading', { name: heading }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see a {string} button', async ({ page }, text: string) => {
@@ -372,33 +297,24 @@ Then('{string} should not be visible', async ({ page }, text: string) => {
 })
 
 Then('I should see a success message', async ({ page }) => {
-  // Toast system uses role="status" for success — check sequentially to avoid strict mode
-  const toast = page.getByTestId(TestIds.SUCCESS_TOAST)
-  if (await toast.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  const status = page.locator('[role="status"]')
-  if (await status.first().isVisible({ timeout: 2000 }).catch(() => false)) return
-  const successText = page.getByText(/saved|success|updated|complete/i).first()
-  if (await successText.isVisible({ timeout: 2000 }).catch(() => false)) return
-  // Fallback: page rendered successfully (action may not show toast in test env)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Toast system uses role="status" for success, role="alert" for errors
+  const successEl = page.getByTestId(TestIds.SUCCESS_TOAST)
+    .or(page.locator('[role="status"]'))
+    .or(page.getByText(/saved|success|updated/i))
+  await expect(successEl.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see a connection error', async ({ page }) => {
-  const errorMsg = page.getByTestId(TestIds.ERROR_MESSAGE)
-  if (await errorMsg.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  await expect(page.locator('[role="alert"]').first()).toBeVisible({ timeout: 2000 })
+  const errorEl = page.getByTestId(TestIds.ERROR_MESSAGE)
+    .or(page.locator('[role="alert"]'))
+  await expect(errorEl.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see either a success or error result', async ({ page }) => {
-  // Check sequentially to avoid strict mode violations
-  const toast = page.getByTestId(TestIds.SUCCESS_TOAST)
-  if (await toast.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  const error = page.getByTestId(TestIds.ERROR_MESSAGE)
-  if (await error.isVisible({ timeout: 2000 }).catch(() => false)) return
-  const alert = page.locator('[role="alert"]')
-  if (await alert.first().isVisible({ timeout: 2000 }).catch(() => false)) return
-  // Fallback: page rendered (action result may not show in test env)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const result = page.getByTestId(TestIds.SUCCESS_TOAST)
+    .or(page.getByTestId(TestIds.ERROR_MESSAGE))
+    .or(page.locator('[role="alert"]'))
+  await expect(result.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Navigation visibility (they/I patterns for role-based tests) ---
@@ -406,57 +322,25 @@ Then('I should see either a success or error result', async ({ page }) => {
 Then('I should see {string} in the navigation', async ({ page }, text: string) => {
   const testId = navTestIdMap[text]
   if (testId) {
-    const el = page.getByTestId(testId)
-    const isVisible = await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (isVisible) return
+    await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  } else {
+    const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+    await expect(sidebar.getByText(text, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
-  // Fallback: search sidebar for exact or case-insensitive text
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const exact = sidebar.getByText(text, { exact: true }).first()
-  const exactVisible = await exact.isVisible({ timeout: 2000 }).catch(() => false)
-  if (exactVisible) return
-
-  const caseInsensitive = sidebar.getByText(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')).first()
-  const ciVisible = await caseInsensitive.isVisible({ timeout: 2000 }).catch(() => false)
-  if (ciVisible) return
-
-  // Final fallback: sidebar itself is visible (navigation rendered)
-  await expect(sidebar).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the navigation should show {string}', async ({ page }, text: string) => {
   const testId = navTestIdMap[text]
   if (testId) {
-    const el = page.getByTestId(testId)
-    const isVisible = await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (isVisible) return
+    await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  } else {
+    const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+    await expect(sidebar.getByText(text, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
-  // Fallback: search sidebar for exact or case-insensitive text
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const exact = sidebar.getByText(text, { exact: true }).first()
-  const exactVisible = await exact.isVisible({ timeout: 2000 }).catch(() => false)
-  if (exactVisible) return
-
-  const caseInsensitive = sidebar.getByText(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')).first()
-  const ciVisible = await caseInsensitive.isVisible({ timeout: 2000 }).catch(() => false)
-  if (ciVisible) return
-
-  // Final fallback: sidebar itself is visible (navigation rendered)
-  await expect(sidebar).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('they should see {string}', async ({ page }, text: string) => {
-  // Try exact match first, fall back to case-insensitive, then page-title
-  const exact = page.getByText(text, { exact: true }).first()
-  const exactVisible = await exact.isVisible({ timeout: 2000 }).catch(() => false)
-  if (exactVisible) return
-
-  const caseInsensitive = page.getByText(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')).first()
-  const ciVisible = await caseInsensitive.isVisible({ timeout: 2000 }).catch(() => false)
-  if (ciVisible) return
-
-  // Final fallback: page-title visible means page rendered
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByText(text, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('they should see the {string} section', async ({ page }, text: string) => {
@@ -559,23 +443,15 @@ Then('they should arrive at the profile setup or dashboard', async ({ page }) =>
 // --- Dismiss patterns ---
 
 When('I dismiss the demo banner', async ({ page }) => {
-  const dismissTestId = page.getByTestId('dismiss-demo-banner')
-  if (await dismissTestId.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await dismissTestId.click()
-    return
-  }
-  const dismissAria = page.locator('button[aria-label="Dismiss"]')
-  if (await dismissAria.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await dismissAria.first().click()
+  const dismissBtn = page.getByTestId('dismiss-demo-banner')
+    .or(page.locator('button[aria-label="Dismiss"]'))
+  if (await dismissBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+    await dismissBtn.first().click()
   }
 })
 
 When('I dismiss the invite link card', async ({ page }) => {
-  const dismissBtn = page.getByTestId(TestIds.DISMISS_INVITE)
-  const isVisible = await dismissBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    await dismissBtn.click()
-  }
+  await page.getByTestId(TestIds.DISMISS_INVITE).click()
 })
 
 // --- Page state ---
@@ -604,21 +480,7 @@ Then('I should be redirected away from login', async ({ page }) => {
 })
 
 Then('I should still be on the dashboard', async ({ page }) => {
-  // After panic wipe non-trigger, page should still show dashboard content
-  // Accept page-title OR sidebar OR not being on login as valid
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const notOnLogin = !page.url().includes('/login')
-  if (notOnLogin) {
-    // Sequential check to avoid strict mode violations
-    const isTitle = await pageTitle.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (!isTitle) {
-      await expect(sidebar).toBeVisible({ timeout: Timeouts.ELEMENT })
-    }
-  } else {
-    // If we ended up on login, the panic wipe triggered — fail clearly
-    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the toggle should be off by default', async ({ page }) => {

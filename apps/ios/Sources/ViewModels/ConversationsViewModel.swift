@@ -270,7 +270,7 @@ final class ConversationsViewModel {
                 text: decryptedText,
                 direction: message.direction,
                 channelType: message.channelType,
-                createdAt: parseDate(message.createdAt) ?? Date(),
+                createdAt: DateFormatting.parseISO(message.createdAt) ?? Date(),
                 isRead: message.isRead
             )
         } catch {
@@ -294,13 +294,6 @@ final class ConversationsViewModel {
 
     // MARK: - Helpers
 
-    private func parseDate(_ dateString: String) -> Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: dateString) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: dateString)
-    }
 
     deinit {
         eventTask?.cancel()

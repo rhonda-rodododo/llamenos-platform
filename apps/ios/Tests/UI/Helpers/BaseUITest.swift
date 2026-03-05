@@ -157,8 +157,8 @@ class BaseUITest: XCTestCase {
     func navigateToAdminPanel() {
         navigateToSettings()
 
-        let adminButton = find("settings-admin-panel")
-        guard adminButton.waitForExistence(timeout: 10) else {
+        let adminButton = scrollToFind("settings-admin-panel", maxSwipes: 5, timeout: 10)
+        guard adminButton.exists else {
             XCTFail("Admin panel button should exist for admin users")
             return
         }

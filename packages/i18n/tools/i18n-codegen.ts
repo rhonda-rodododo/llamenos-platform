@@ -21,6 +21,10 @@ const __dirname = dirname(__filename)
 const LOCALES_DIR = resolve(__dirname, '../locales')
 const GENERATED_DIR = resolve(__dirname, '../generated')
 
+// Direct output paths for mobile apps (no manual copy needed)
+const IOS_RESOURCES_DIR = resolve(__dirname, '../../../apps/ios/Resources/Localizable')
+const ANDROID_RESOURCES_DIR = resolve(__dirname, '../../../apps/android/app/src/main/res')
+
 // Locale code mapping for platform-specific formats
 const IOS_LOCALE_MAP: Record<string, string> = {
   zh: 'zh-Hans',
@@ -46,13 +50,17 @@ function flattenKeys(obj: Record<string, unknown>, prefix = ''): Record<string, 
   return result
 }
 
-// Convert i18next interpolation to iOS format
+// Convert i18next interpolation to iOS format and escape special characters
 function toIOSString(value: string): string {
   let index = 0
-  return value.replace(/\{\{(\w+)\}\}/g, () => {
-    index++
-    return index === 1 ? '%@' : `%${index}$@`
-  })
+  return value
+    .replace(/\\/g, '\\\\')     // escape backslashes first
+    .replace(/"/g, '\\"')       // escape double quotes
+    .replace(/\n/g, '\\n')      // escape newlines
+    .replace(/\{\{(\w+)\}\}/g, () => {
+      index++
+      return index === 1 ? '%@' : `%${index}$@`
+    })
 }
 
 // Escape special characters for iOS .strings format
@@ -126,15 +134,27 @@ function main() {
 
     // Generate iOS
     const iosLocale = IOS_LOCALE_MAP[locale] || locale
-    const iosDir = join(GENERATED_DIR, 'ios', `${iosLocale}.lproj`)
-    mkdirSync(iosDir, { recursive: true })
-    writeFileSync(join(iosDir, 'Localizable.strings'), generateIOS(keys))
+    const iosContent = generateIOS(keys)
+    // Write to generated dir (for CI validation)
+    const iosGenDir = join(GENERATED_DIR, 'ios', `${iosLocale}.lproj`)
+    mkdirSync(iosGenDir, { recursive: true })
+    writeFileSync(join(iosGenDir, 'Localizable.strings'), iosContent)
+    // Write directly to iOS app resources (no manual copy needed)
+    const iosAppDir = join(IOS_RESOURCES_DIR, `${iosLocale}.lproj`)
+    mkdirSync(iosAppDir, { recursive: true })
+    writeFileSync(join(iosAppDir, 'Localizable.strings'), iosContent)
 
     // Generate Android
     const androidLocale = ANDROID_LOCALE_MAP[locale] || locale
-    const androidDir = join(GENERATED_DIR, 'android', locale === 'en' ? 'values' : `values-${androidLocale}`)
-    mkdirSync(androidDir, { recursive: true })
-    writeFileSync(join(androidDir, 'strings.xml'), generateAndroid(keys))
+    const androidContent = generateAndroid(keys)
+    // Write to generated dir (for CI validation)
+    const androidGenDir = join(GENERATED_DIR, 'android', locale === 'en' ? 'values' : `values-${androidLocale}`)
+    mkdirSync(androidGenDir, { recursive: true })
+    writeFileSync(join(androidGenDir, 'strings.xml'), androidContent)
+    // Write directly to Android app resources (no manual copy needed)
+    const androidAppDir = join(ANDROID_RESOURCES_DIR, locale === 'en' ? 'values' : `values-${androidLocale}`)
+    mkdirSync(androidAppDir, { recursive: true })
+    writeFileSync(join(androidAppDir, 'strings.xml'), androidContent)
   }
 
   if (validate && hasErrors) {

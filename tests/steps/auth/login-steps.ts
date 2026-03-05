@@ -44,7 +44,12 @@ When('I enter a valid 63-character nsec', async ({ page }) => {
 // 'I start typing in the nsec field' is defined in key-import-steps.ts (shared)
 // 'the error should disappear' is defined in key-import-steps.ts (shared)
 
-// NOTE: 'I see the error {string}' is defined in key-import-steps.ts — do NOT duplicate here.
+When('I see the error {string}', async ({ page }, _text: string) => {
+  // Wait for any error to appear
+  const error = page.locator('.text-destructive')
+    .or(page.getByTestId(TestIds.ERROR_MESSAGE))
+  await expect(error.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
 
 Then('I should see the PIN setup screen', async ({ page }) => {
   const pinInput = page.getByTestId(TestIds.PIN_INPUT).first()
