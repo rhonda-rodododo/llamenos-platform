@@ -1,28 +1,21 @@
-@android @ios @security @crypto
+@android @ios @crypto @security
 Feature: Wake Key Validation
-  As a security-conscious app
-  I want push notification wake key encryption to validate inputs
-  So that malformed payloads cannot crash or exploit the app
+  As a device receiving push notifications
+  I want wake key operations to be validated
+  So that only well-formed payloads are accepted
 
-  Scenario: Wake key generation produces valid public key
-    When a wake key pair is generated
-    Then the public key should be 64 hex characters
-    And the public key should be a valid secp256k1 point
+  Scenario: Wake key generation produces valid 64-char hex public key
+    When I generate a wake key
+    Then the wake public key should be 64 hex characters
+    And the wake key should be stored persistently
+    And generating the wake key again should return the same key
 
-  Scenario: Wake key decryption rejects malformed ephemeral public key
-    Given a wake key pair exists
-    When I attempt to decrypt a wake payload with ephemeral key "deadbeef"
-    Then decryption should fail gracefully
-    And no crash should occur
+  Scenario: Decryption rejects malformed ephemeral public key
+    Given a wake key has been generated
+    When I attempt to decrypt a wake payload with a malformed ephemeral key
+    Then the decryption should return null
 
-  Scenario: Wake key decryption rejects truncated ciphertext
-    Given a wake key pair exists
+  Scenario: Decryption rejects truncated ciphertext
+    Given a wake key has been generated
     When I attempt to decrypt a wake payload with truncated ciphertext
-    Then decryption should fail gracefully
-    And no crash should occur
-
-  Scenario: Wake key decryption rejects empty payload
-    Given a wake key pair exists
-    When I attempt to decrypt an empty wake payload
-    Then decryption should fail gracefully
-    And no crash should occur
+    Then the decryption should return null

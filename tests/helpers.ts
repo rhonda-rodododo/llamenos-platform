@@ -203,16 +203,37 @@ export async function loginAsAdmin(page: Page) {
 }
 
 /**
- * Login as volunteer: pre-loads encrypted key into localStorage, then enters PIN.
+ * Login as volunteer: uses the app's own platform layer to encrypt/store the key,
+ * then enters PIN to unlock. Both encrypt and decrypt happen in the same browser
+ * context, avoiding any Node.js-vs-browser crypto mismatch.
  */
 export async function loginAsVolunteer(page: Page, nsec: string) {
   await page.goto('/login')
-  await page.evaluate(() => sessionStorage.clear())
-  await preloadEncryptedKey(page, nsec, TEST_PIN)
+  await page.evaluate(() => {
+    sessionStorage.clear()
+    localStorage.removeItem('llamenos-encrypted-key')
+    localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
+  })
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+
+  // Wait for __TEST_PLATFORM to be loaded
+  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+
+  // Encrypt and store via the browser's platform layer (same context as decrypt)
+  await page.evaluate(async ({ nsec, pin }) => {
+    const platform = (window as any).__TEST_PLATFORM
+    const kp = await platform.keyPairFromNsec(nsec)
+    if (!kp) throw new Error('Failed to parse volunteer nsec')
+    await platform.encryptWithPin(nsec, pin, kp.publicKey)
+    await platform.lockCrypto()
+  }, { nsec, pin: TEST_PIN })
+
+  // Reload to trigger PIN screen
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await enterPin(page, TEST_PIN)
-  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.API })
+  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   // Wait for the authenticated layout to be visible
   await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
   // Short delay for initial API calls to complete

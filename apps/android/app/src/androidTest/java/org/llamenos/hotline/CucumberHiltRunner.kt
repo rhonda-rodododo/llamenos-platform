@@ -19,6 +19,6 @@ import io.cucumber.junit.CucumberOptions
 @CucumberOptions(
     features = ["features"],
     glue = ["org.llamenos.hotline.steps"],
-    tags = "@android",
+    tags = "@android and not @wip",
 )
 class CucumberHiltRunner : CucumberAndroidJUnitRunner()

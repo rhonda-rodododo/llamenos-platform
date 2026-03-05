@@ -1,8 +1,14 @@
-@android @ios @desktop @security
+@android @ios @desktop @security @wip
 Feature: SAS Verification Gate
   As a security-conscious app
   I want device linking to require SAS code confirmation
   So that man-in-the-middle attacks on provisioning are prevented
+
+  # NOTE: These scenarios require a live Nostr relay and provisioning room.
+  # SAS gate logic is covered by unit tests:
+  #   - Android: DeviceLinkViewModelTest (22 tests)
+  #   - iOS: SecurityHardeningTests.testDeviceLinkStepsRequireSASBeforeImport
+  # The @wip tag excludes these from automated runs until relay mocking is available.
 
   Background:
     Given I am authenticated

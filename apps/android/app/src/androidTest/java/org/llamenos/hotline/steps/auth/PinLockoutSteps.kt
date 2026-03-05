@@ -249,11 +249,4 @@ class PinLockoutSteps : BaseSteps() {
         }
         assertAnyTagDisplayed("pin-error", "pin-pad", "create-identity", "dashboard-title")
     }
-
-    @Then("I should see a PIN error message")
-    fun iShouldSeeAPinErrorMessage() {
-        // Used by pin-lockout.feature and pin-unlock.feature.
-        // AuthViewModel sets error = "Incorrect PIN" for a single wrong attempt.
-        assertAnyTagDisplayed("pin-error", "pin-pad", "dashboard-title")
-    }
 }

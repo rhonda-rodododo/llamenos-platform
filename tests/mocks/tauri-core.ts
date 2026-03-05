@@ -345,6 +345,12 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
   return await handler(args || {}) as T
 }
 
+// Expose invoke on window for test helpers (page.evaluate can't use dynamic imports
+// because Vite aliases are resolved at build time, not at runtime)
+if (typeof window !== 'undefined') {
+  (window as Record<string, unknown>).__TEST_INVOKE = invoke
+}
+
 export function convertFileSrc(path: string): string { return path }
 export function isTauri(): boolean { return false }
 

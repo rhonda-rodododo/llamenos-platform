@@ -12,12 +12,22 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { enterPin, Timeouts } from '../../helpers'
 
+/**
+ * Invoke a Tauri IPC mock command via the browser's window.__TEST_INVOKE.
+ * This avoids the dynamic import('@tauri-apps/api/core') issue in page.evaluate.
+ */
+async function testInvoke(page: import('@playwright/test').Page, cmd: string, args?: Record<string, unknown>) {
+  return page.evaluate(async ({ cmd, args }) => {
+    const invoke = (window as Record<string, unknown>).__TEST_INVOKE as
+      (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+    if (!invoke) throw new Error('__TEST_INVOKE not available — is the Tauri mock loaded?')
+    return invoke(cmd, args)
+  }, { cmd, args })
+}
+
 // Helper: seed N failed PIN attempts via the mock's test command
 async function seedFailedAttempts(page: import('@playwright/test').Page, count: number) {
-  await page.evaluate(async (n) => {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('set_pin_failed_attempts', { count: n })
-  }, count)
+  await testInvoke(page, 'set_pin_failed_attempts', { count })
 }
 
 // NOTE: "I should see a PIN error message" is defined in assertion-steps.ts
@@ -31,7 +41,7 @@ Then('I should not see a lockout timer', async ({ page }) => {
 
 Given('I have {int} failed PIN attempts', async ({ page }, count: number) => {
   // Seed the mock with N failed attempts
-  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_INVOKE, { timeout: 10000 })
   await seedFailedAttempts(page, count)
 })
 
@@ -42,11 +52,7 @@ Then('I should see a lockout message', async ({ page }) => {
 })
 
 Then('the lockout duration should be approximately {int} seconds', async ({ page }, seconds: number) => {
-  // Verify the lockout message contains the expected duration
-  const lockoutState = await page.evaluate(async () => {
-    const { invoke } = await import('@tauri-apps/api/core')
-    return invoke('get_pin_lockout_state') as Promise<{ failedAttempts: number; lockoutUntil: number }>
-  })
+  const lockoutState = await testInvoke(page, 'get_pin_lockout_state') as { failedAttempts: number; lockoutUntil: number }
   const remainingMs = lockoutState.lockoutUntil - Date.now()
   // Allow 5 seconds of tolerance
   expect(remainingMs).toBeGreaterThan((seconds - 5) * 1000)
@@ -54,10 +60,7 @@ Then('the lockout duration should be approximately {int} seconds', async ({ page
 })
 
 Then('the lockout duration should be approximately {int} minutes', async ({ page }, minutes: number) => {
-  const lockoutState = await page.evaluate(async () => {
-    const { invoke } = await import('@tauri-apps/api/core')
-    return invoke('get_pin_lockout_state') as Promise<{ failedAttempts: number; lockoutUntil: number }>
-  })
+  const lockoutState = await testInvoke(page, 'get_pin_lockout_state') as { failedAttempts: number; lockoutUntil: number }
   const remainingMs = lockoutState.lockoutUntil - Date.now()
   const expectedMs = minutes * 60 * 1000
   // Allow 10 seconds of tolerance
@@ -94,10 +97,7 @@ Then('I should be redirected to the setup or login screen', async ({ page }) => 
 })
 
 Then('the failed attempt counter should be reset', async ({ page }) => {
-  const lockoutState = await page.evaluate(async () => {
-    const { invoke } = await import('@tauri-apps/api/core')
-    return invoke('get_pin_lockout_state') as Promise<{ failedAttempts: number; lockoutUntil: number }>
-  })
+  const lockoutState = await testInvoke(page, 'get_pin_lockout_state') as { failedAttempts: number; lockoutUntil: number }
   expect(lockoutState.failedAttempts).toBe(0)
 })
 
@@ -123,11 +123,8 @@ Then('I should not be able to enter a PIN until lockout expires', async ({ page 
 
 Given('the lockout has expired', async ({ page }) => {
   // Reset lockout timer to allow retry
-  await page.evaluate(async () => {
-    const { invoke } = await import('@tauri-apps/api/core')
-    await invoke('reset_pin_lockout')
-    // Re-seed the attempts but clear the lockout time
-    await invoke('set_pin_failed_attempts', { count: 5 })
-  })
+  await testInvoke(page, 'reset_pin_lockout')
+  // Re-seed the attempts but clear the lockout time
+  await testInvoke(page, 'set_pin_failed_attempts', { count: 5 })
   // The lockoutUntil is reset to 0, so retry is allowed
 })

@@ -65,12 +65,10 @@ When('I have not yet confirmed the SAS code', async ({ page }) => {
 Then('the nsec should not be imported', async ({ page }) => {
   // Verify no key was imported — crypto state should not have changed
   const hasNewKey = await page.evaluate(async () => {
-    try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      return await invoke('is_crypto_unlocked')
-    } catch {
-      return false
-    }
+    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as
+      { isCryptoUnlocked: () => Promise<boolean> } | undefined
+    if (!platform) return false
+    return platform.isCryptoUnlocked()
   })
   // In the context of device linking, the nsec should not be imported yet
   // This is a soft assertion based on provisioning state
