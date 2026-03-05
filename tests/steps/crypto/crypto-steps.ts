@@ -235,6 +235,26 @@ Then('decryption should fail with {string}', async ({ page }, errorText: string)
   await expect(errorEl.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
+Then('the crypto service should be unlocked', async ({ page }) => {
+  // After unlock, we should be on a page past login (dashboard visible or at least not on PIN screen)
+  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
+  const isTitle = await pageTitle.isVisible({ timeout: Timeouts.AUTH }).catch(() => false)
+  if (isTitle) return
+  // Fallback: not on PIN/login screen means crypto is unlocked
+  const pinInput = page.locator('input[aria-label="PIN digit 1"]')
+  const onPinScreen = await pinInput.isVisible({ timeout: 2000 }).catch(() => false)
+  expect(onPinScreen).toBe(false)
+})
+
+Then('the crypto service should be locked', async ({ page }) => {
+  // When locked, should show PIN unlock screen or login screen
+  const pinInput = page.locator('input[aria-label="PIN digit 1"]')
+  const nsecInput = page.locator('#nsec')
+  const isPin = await pinInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  const isNsec = await nsecInput.isVisible({ timeout: 2000 }).catch(() => false)
+  expect(isPin || isNsec).toBe(true)
+})
+
 Then('the crypto service should remain locked', async ({ page }) => {
   const pinInput = page.locator('input[aria-label="PIN digit 1"]')
   await expect(pinInput).toBeVisible({ timeout: Timeouts.ELEMENT })

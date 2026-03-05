@@ -167,7 +167,9 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
 }
 
 /**
- * Login as admin: pre-loads encrypted key into localStorage, then enters PIN.
+ * Login as admin: uses the app's own platform layer to encrypt/store the key,
+ * then enters PIN to unlock. Both encrypt and decrypt happen in the same browser
+ * context, avoiding any Node.js-vs-browser crypto mismatch.
  */
 export async function loginAsAdmin(page: Page) {
   await page.goto('/login')
@@ -179,27 +181,21 @@ export async function loginAsAdmin(page: Page) {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
 
-  // Use the app's own encryptWithPin via the Tauri IPC mock to store the key.
-  // This avoids any Node.js-vs-browser crypto mismatch since both encrypt
-  // and decrypt happen in the same browser context.
+  // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
+  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+
+  // Use the app's own platform layer (which routes through the Tauri IPC mock)
+  // to encrypt and store the key. This ensures encrypt and decrypt use the same
+  // crypto implementation (browser-side @noble/ciphers).
   await page.evaluate(async ({ nsec, pin }) => {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const { Store } = await import('@tauri-apps/plugin-store')
-
-    // Import key — this encrypts with PIN and loads into CryptoState
-    const kp = await invoke('key_pair_from_nsec', { nsec }) as { publicKey: string }
-    const encData = await invoke('import_key_to_state', { nsec, pin, pubkeyHex: kp.publicKey })
-
-    // Store encrypted data
-    const store = await Store.load('keys.json')
-    await store.set('llamenos-encrypted-key', encData)
-    await store.save()
-
-    // Lock CryptoState so PIN is needed to unlock
-    await invoke('lock_crypto')
+    const platform = (window as any).__TEST_PLATFORM
+    const kp = await platform.keyPairFromNsec(nsec)
+    if (!kp) throw new Error('Failed to parse admin nsec')
+    await platform.encryptWithPin(nsec, pin, kp.publicKey)
+    await platform.lockCrypto()
   }, { nsec: ADMIN_NSEC, pin: TEST_PIN })
 
-  // Reload to trigger PIN screen
+  // Reload to trigger PIN screen — the encrypted key persists in localStorage
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await enterPin(page, TEST_PIN)

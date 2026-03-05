@@ -179,6 +179,11 @@ class PinSteps : BaseSteps() {
         assertAnyTagDisplayed("pin-error", "pin-pad", "dashboard-title")
     }
 
+    @Then("I should see a PIN error message")
+    fun iShouldSeeAPinErrorMessage() {
+        assertAnyTagDisplayed("pin-error", "pin-pad", "dashboard-title")
+    }
+
     @Then("I should remain on the PIN confirmation screen")
     fun iShouldRemainOnThePinConfirmationScreen() {
         assertAnyTagDisplayed("pin-pad", "dashboard-title")

@@ -46,6 +46,8 @@ export default defineConfig({
     '__BUILD_TIME__': JSON.stringify(buildTime),
     '__BUILD_COMMIT__': JSON.stringify(buildCommit),
     '__BUILD_VERSION__': JSON.stringify(buildVersion),
+    // Make PLAYWRIGHT_TEST available as import.meta.env.PLAYWRIGHT_TEST in the browser
+    ...(isTestBuild ? { 'import.meta.env.PLAYWRIGHT_TEST': JSON.stringify('true') } : {}),
   },
   build: {
     outDir: 'dist/client',
@@ -79,5 +81,18 @@ export default defineConfig({
         },
       },
     } : {}),
+  },
+  // Preview proxy (for `vite preview` used by Playwright tests)
+  preview: {
+    proxy: {
+      '/api': {
+        target: process.env.API_URL || 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: process.env.API_URL?.replace('http', 'ws') || 'ws://localhost:3000',
+        ws: true,
+      },
+    },
   },
 })

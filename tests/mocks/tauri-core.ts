@@ -27,6 +27,42 @@ let secretKeyHex: string | null = null
 let publicKeyHex: string | null = null
 let mockProvisioningToken: string | null = null
 
+// PIN lockout tracking (mirrors Rust crypto.rs)
+let pinFailedAttempts = 0
+let pinLockoutUntil = 0 // epoch ms
+
+function getLockoutDuration(attempts: number): number {
+  if (attempts < 5) return 0
+  if (attempts < 7) return 30_000
+  if (attempts < 9) return 120_000
+  if (attempts < 10) return 600_000
+  return -1 // wipe
+}
+
+function checkLockout(): void {
+  if (pinLockoutUntil > Date.now()) {
+    const remaining = Math.ceil((pinLockoutUntil - Date.now()) / 1000)
+    throw new Error(`Locked out for ${remaining} seconds`)
+  }
+}
+
+function recordFailedAttempt(): void {
+  pinFailedAttempts++
+  const duration = getLockoutDuration(pinFailedAttempts)
+  if (duration === -1) {
+    // Wipe
+    secretKeyHex = null
+    publicKeyHex = null
+    pinFailedAttempts = 0
+    pinLockoutUntil = 0
+    throw new Error('Keys wiped after too many failed attempts')
+  }
+  if (duration > 0) {
+    pinLockoutUntil = Date.now() + duration
+    throw new Error(`Locked out for ${duration / 1000} seconds`)
+  }
+}
+
 // Store note keys for round-trip encryption/decryption in tests
 const noteKeyStore = new Map<string, string>() // encryptedContent → noteKeyHex
 
@@ -150,14 +186,32 @@ const commands: Record<string, (a: Args) => unknown | Promise<unknown>> = {
       const sk = nsecDecode(a.nsec as string)
       const pk = pubFromSk(sk)
       return { secretKeyHex: sk, publicKey: pk, nsec: a.nsec, npub: npubEncode(pk) }
-    } catch { return null }
+    } catch {
+      return null
+    }
   },
 
   import_key_to_state: async (a) =>
     pinEncrypt(a.nsec as string, a.pin as string, a.pubkeyHex as string),
 
-  unlock_with_pin: async (a) =>
-    pinDecrypt(a.data as { salt: string; nonce: string; ciphertext: string; pubkey: string }, a.pin as string),
+  unlock_with_pin: async (a) => {
+    checkLockout()
+    try {
+      const pubkey = await pinDecrypt(
+        a.data as { salt: string; nonce: string; ciphertext: string; pubkey: string },
+        a.pin as string,
+      )
+      // Success — reset counter
+      pinFailedAttempts = 0
+      pinLockoutUntil = 0
+      return pubkey
+    } catch {
+      // Wrong PIN — record failed attempt (may throw lockout/wipe)
+      recordFailedAttempt()
+      // If recordFailedAttempt didn't throw, return null (wrong PIN, no lockout yet)
+      throw new Error('Wrong PIN')
+    }
+  },
 
   create_auth_token_from_state: (a) => {
     const sk = requireUnlocked()
@@ -268,6 +322,19 @@ const commands: Record<string, (a: Args) => unknown | Promise<unknown>> = {
   },
   lock_crypto: () => { secretKeyHex = null },
   is_crypto_unlocked: () => secretKeyHex !== null,
+  // Test-only: get/set lockout state for PIN lockout step definitions
+  get_pin_lockout_state: () => ({
+    failedAttempts: pinFailedAttempts,
+    lockoutUntil: pinLockoutUntil,
+  }),
+  set_pin_failed_attempts: (a) => {
+    pinFailedAttempts = a.count as number
+    pinLockoutUntil = 0
+  },
+  reset_pin_lockout: () => {
+    pinFailedAttempts = 0
+    pinLockoutUntil = 0
+  },
 }
 
 // ── Public API ────────────────────────────────────────────────────
