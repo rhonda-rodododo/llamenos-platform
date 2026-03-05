@@ -459,7 +459,7 @@ i18n alignment, codegen validation, BDD test orchestration, and Android tooling 
 - [x] **[Epic 267: BDD Test Orchestration Overhaul](epics/epic-267-bdd-test-orchestration-overhaul.md)** — Unified codegen→build→test pipeline, cross-platform scripts, test:all/test:changed/test:feature commands
 
 ### Android Tooling
-- [ ] **[Epic 268: Android Tooling Upgrade](epics/epic-268-android-tooling-upgrade.md)** — AGP 9.1, Gradle 9.x, Kotlin 2.3, Compose BOM 2026.02, kapt→KSP, compileSdk 36
+- [x] **[Epic 268: Android Tooling Upgrade](epics/epic-268-android-tooling-upgrade.md)** — AGP 9.1, Gradle 9.4, Kotlin 2.3, Compose BOM 2026.02, kapt→KSP, compileSdk 36
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

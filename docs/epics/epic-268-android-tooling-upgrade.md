@@ -1,6 +1,6 @@
 # Epic 268: Android Tooling Upgrade
 
-**Status:** Planned
+**Status:** Complete
 **Priority:** High
 **Risk:** High — major version bumps across the entire toolchain
 **Dependencies:** Epic 265 (i18n alignment) should complete first so we start with a green build
@@ -30,9 +30,10 @@ The current toolchain is over a year behind latest stable releases. AGP 9.x depr
 
 | Component | Target Version |
 |-----------|---------------|
-| Gradle | 9.3.x (latest 9.x) |
-| AGP | 9.1.0 (latest stable) |
-| Kotlin | 2.3.x (required by AGP 9.1) |
+| Gradle | 9.4.0 |
+| AGP | 9.1.0 |
+| Kotlin | 2.3.0 |
+| KSP | 2.3.6 |
 | Compose BOM | 2026.02.01 |
 | Annotation Processing | KSP (kapt fully removed) |
 | compileSdk | 36 |

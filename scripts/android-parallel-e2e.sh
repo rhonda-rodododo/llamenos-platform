@@ -26,14 +26,19 @@ ANDROID_DIR="$PROJECT_ROOT/apps/android"
 DOCKER_DIR="$PROJECT_ROOT/deploy/docker"
 FEATURE_DIR="$PROJECT_ROOT/packages/test-specs/features"
 
-ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
-export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
+# Auto-detect Java on Mac
+if [[ -d "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home" ]]; then
+  export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+fi
+export PATH="${JAVA_HOME:-}/bin:/usr/bin:/bin:/usr/sbin:/sbin:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:/opt/homebrew/bin:$PATH"
 
-NUM_EMU_SHARDS=4         # Default; overridden by positional arg or --emulators-only
-BASE_EMU_PORT=5554       # Emulator ports: 5554, 5556, 5558, 5560, ...
-BASE_APP_PORT=3001       # Docker backend ports: 3001, 3002, 3003, 3004, ...
+NUM_EMU_SHARDS=3         # Default; 3 emulators for 16GB RAM (2GB each + headroom)
+BASE_EMU_PORT=5554       # Emulator ports: 5554, 5556, 5558, ...
+BASE_APP_PORT=3001       # Docker backend ports: 3001, 3002, 3003, ...
 DOCKER_PROJECT_PREFIX="llamenos-test"
 TEST_ADMIN_PUBKEY="ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
+AVD_PREFIX="llamenos_e2e"  # AVDs: llamenos_e2e_1, llamenos_e2e_2, llamenos_e2e_3
 BOOT_TIMEOUT=300         # Seconds to wait for emulator boot
 BACKEND_TIMEOUT=120      # Seconds to wait for Docker backend health
 
@@ -66,7 +71,7 @@ kill_emulators() {
     # Give emulators a moment to shut down
     sleep 2
     # Force kill any remaining emulator processes
-    pkill -f "emulator.*test-emu" 2>/dev/null || true
+    pkill -f "emulator.*${AVD_PREFIX}" 2>/dev/null || true
 }
 
 stop_docker_stacks() {
@@ -166,7 +171,7 @@ ENV
 # ── Start Emulator ──────────────────────────────────────────
 start_emulator() {
     local shard_idx="$1"
-    local avd_name="test-emu-${shard_idx}"
+    local avd_name="${AVD_PREFIX}_$((shard_idx + 1))"
     local port=$((BASE_EMU_PORT + shard_idx * 2))
     local serial="emulator-${port}"
 
@@ -181,9 +186,11 @@ start_emulator() {
         -no-window \
         -no-audio \
         -no-boot-anim \
+        -no-snapshot-load \
         -no-snapshot-save \
         -read-only \
         -gpu swiftshader_indirect \
+        -memory 2048 \
         -camera-back none \
         -camera-front none \
         </dev/null &>/tmp/emulator-${shard_idx}.log &

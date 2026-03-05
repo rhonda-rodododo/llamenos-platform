@@ -30,7 +30,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 - **Runtime/Package Manager**: Bun (monorepo with `workspaces`)
 - **Desktop**: Tauri v2 + Vite + TanStack Router + shadcn/ui — native Rust backend with webview frontend
 - **iOS**: Native SwiftUI (iOS 17+, `@Observable`, SPM)
-- **Android**: Native Kotlin/Compose (minSdk 26, Material 3, Hilt DI, Gradle version catalogs)
+- **Android**: Native Kotlin 2.3/Compose (minSdk 26, Material 3, Hilt DI + KSP, AGP 9.1, Gradle 9.4)
 - **Backend**: Cloudflare Workers + Durable Objects (cloud) / Node.js + PostgreSQL (self-hosted)
 - **Shared Crypto**: `packages/crypto/` Rust crate — single auditable implementation for all platforms (native, WASM, UniFFI)
 - **Protocol**: `packages/protocol/` JSON Schema → codegen (TypeScript, Swift, Kotlin via quicktype-core)

@@ -1,5 +1,30 @@
 # Completed Backlog
 
+## 2026-03-05: Android Tooling Upgrade — Epic 268
+
+### Epic 268: Android Tooling Upgrade
+- **Gradle**: 8.9 → 9.4.0
+- **AGP**: 8.7.3 → 9.1.0 (built-in Kotlin — removed `kotlin-android` plugin)
+- **Kotlin**: 2.0.21 → 2.3.0
+- **KSP**: New (2.3.6) — fully replaced kapt (removed `kotlin-kapt` plugin, `kapt {}` block, all `kapt()` deps)
+- **Compose BOM**: 2024.12.01 → 2026.02.01
+- **compileSdk/targetSdk**: 35 → 36
+- **Hilt**: 2.53.1 → 2.59.2 (kapt→KSP, AGP 9 required)
+- **OkHttp**: 4.12.0 → 5.3.2
+- **Navigation**: 2.8.5 → 2.9.7
+- **Coroutines**: 1.9.0 → 1.10.2
+- **Lifecycle**: 2.8.7 → 2.10.0
+- **Activity Compose**: 1.9.3 → 1.12.4
+- **kotlinx-serialization**: 1.7.3 → 1.10.0
+- **Core KTX**: 1.15.0 → 1.17.0
+- **CameraX**: 1.4.1 → 1.5.1
+- **JNA**: 5.17.0 → 5.18.1
+- **Hilt Navigation**: 1.2.0 → 1.3.0
+- **compose-ui-test**: Removed standalone version, now managed by BOM
+- Migrated `kotlinOptions { jvmTarget = "17" }` → `kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_17 } }`
+- Fixed deprecated `jniLibs.srcDirs()` → `jniLibs.directories.add()`
+- Verified on Mac M4: assembleDebug, testDebugUnitTest, lintDebug, compileDebugAndroidTestKotlin — all pass
+
 ## 2026-03-05: Tooling & Test Orchestration — Epics 265-267
 
 ### Epic 265: i18n Android String Alignment

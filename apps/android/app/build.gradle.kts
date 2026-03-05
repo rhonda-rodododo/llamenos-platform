@@ -1,21 +1,20 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
-    id("kotlin-kapt")
+    alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "org.llamenos.hotline"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "org.llamenos.hotline"
         testApplicationId = "org.llamenos.hotline"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
 
@@ -61,10 +60,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -72,7 +67,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.srcDirs("src/main/jniLibs")
+            jniLibs.directories.add("src/main/jniLibs")
         }
     }
 
@@ -83,8 +78,10 @@ android {
     }
 }
 
-kapt {
-    correctErrorTypes = true
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
 }
 
 // Copy shared test vectors from packages/crypto for E2E crypto interop tests
@@ -118,7 +115,7 @@ dependencies {
     implementation(libs.core.ktx)
 
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation)
 
     implementation(libs.okhttp)
@@ -150,6 +147,7 @@ dependencies {
     testImplementation(libs.coroutines.test)
 
     androidTestImplementation(libs.espresso)
+    androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.test.runner)
     androidTestImplementation(libs.test.rules)
