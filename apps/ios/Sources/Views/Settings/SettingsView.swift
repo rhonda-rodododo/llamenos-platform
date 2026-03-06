@@ -47,23 +47,11 @@ struct SupportedLanguage: Identifiable, Hashable {
 
 // MARK: - SettingsView
 
-/// Settings tab showing identity info, hub connection details, device linking,
-/// notification preferences, language selection, admin access, lock/logout actions,
-/// and app version.
+/// Settings navigation hub. Sub-pages handle Account and Preferences details.
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
 
     @State private var showLogoutConfirmation: Bool = false
-    @State private var showCopyConfirmation: Bool = false
-    @State private var showDeviceLink: Bool = false
-    @State private var isBiometricEnabled: Bool = false
-
-    /// M26: Auto-lock timeout persisted via @AppStorage, shared with LlamenosApp.
-    @AppStorage("autoLockTimeout") private var autoLockTimeoutValue: TimeInterval = 300
-    @State private var selectedAutoLockTimeout: AutoLockTimeout = .fiveMinutes
-    @State private var callSoundsEnabled: Bool = true
-    @State private var messageAlertsEnabled: Bool = true
-    @State private var selectedLanguage: String = "en"
 
     var body: some View {
         NavigationStack {
@@ -88,44 +76,22 @@ struct SettingsView: View {
                 }
                 #endif
 
-                // Identity section
-                identitySection
+                // Identity card summary
+                identityCardSection
 
-                // Hub connection section
-                hubSection
+                // Navigation links to sub-pages
+                navigationSection
 
-                // WebSocket connection section
-                connectionSection
-
-                // Device linking section
-                deviceLinkSection
-
-                // Notification preferences section
-                notificationPreferencesSection
-
-                // Language section
-                languageSection
-
-                // Security section
-                securitySection
-
-                // Admin section (visible only to admins)
-                if appState.isAdmin {
-                    adminSection
-                }
-
-                // Actions section
+                // Actions section (lock, logout)
                 actionsSection
 
                 // Emergency section
                 emergencySection
 
-                // Help section
-                helpSection
-
                 // App info section
                 appInfoSection
             }
+            .listStyle(.insetGrouped)
             .navigationTitle(NSLocalizedString("settings_title", comment: "Settings"))
             .navigationBarTitleDisplayMode(.large)
             .alert(
@@ -142,24 +108,12 @@ struct SettingsView: View {
                     comment: "This will remove your identity from this device. Make sure you have backed up your secret key."
                 ))
             }
-            .sheet(isPresented: $showDeviceLink) {
-                DeviceLinkView()
-            }
-            .overlay(alignment: .bottom) {
-                if showCopyConfirmation {
-                    copyConfirmationBanner
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .onAppear {
-                isBiometricEnabled = appState.authService.isBiometricEnabled
-                // M26: Restore auto-lock timeout from @AppStorage
-                if let timeout = AutoLockTimeout(rawValue: Int(autoLockTimeoutValue)) {
-                    selectedAutoLockTimeout = timeout
-                }
-            }
             .navigationDestination(for: String.self) { destination in
                 switch destination {
+                case "account":
+                    AccountSettingsView()
+                case "preferences":
+                    PreferencesSettingsView()
                 case "admin":
                     AdminTabView()
                 case "help":
@@ -175,307 +129,111 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Identity Section
+    // MARK: - Identity Card Section
 
-    private var identitySection: some View {
+    private var identityCardSection: some View {
         Section {
-            if let npub = appState.cryptoService.npub {
-                LabeledContent {
-                    HStack(spacing: 8) {
+            HStack(spacing: 14) {
+                if let npub = appState.cryptoService.npub {
+                    GeneratedAvatar(hash: npub, size: 48)
+                } else {
+                    GeneratedAvatar(hash: "unknown", size: 48)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    if let npub = appState.cryptoService.npub {
                         Text(npub.truncatedNpub())
-                            .font(.brandMono(.body))
-                            .foregroundStyle(.primary)
+                            .font(.brandMono(.subheadline))
+                            .foregroundStyle(Color.brandForeground)
                             .lineLimit(1)
-
-                        Button {
-                            UIPasteboard.general.string = npub
-                            showCopyFeedback()
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.caption)
-                                .foregroundStyle(Color.brandPrimary)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("copy-npub")
-                        .accessibilityLabel(NSLocalizedString("settings_copy_npub", comment: "Copy npub"))
+                            .accessibilityIdentifier("settings-npub")
                     }
-                } label: {
-                    Label {
-                        Text(NSLocalizedString("settings_npub", comment: "Public Key"))
-                    } icon: {
-                        Image(systemName: "key.horizontal.fill")
-                            .foregroundStyle(Color.brandPrimary)
-                    }
-                }
-                .accessibilityIdentifier("settings-npub")
-            }
 
-            if let pubkey = appState.cryptoService.pubkey {
-                LabeledContent {
                     HStack(spacing: 8) {
-                        Text(pubkey.truncatedPubkey())
-                            .font(.brandMono(.caption))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        BadgeView(
+                            text: appState.userRole.displayName,
+                            icon: appState.isAdmin ? "shield.fill" : "person.fill",
+                            color: appState.isAdmin ? Color.brandDarkTeal : Color.brandPrimary,
+                            style: .subtle
+                        )
+                        .accessibilityIdentifier("settings-role")
 
-                        Button {
-                            UIPasteboard.general.string = pubkey
-                            showCopyFeedback()
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                        if let hubURL = appState.authService.hubURL {
+                            Text(hubURL)
+                                .font(.brand(.caption2))
+                                .foregroundStyle(Color.brandMutedForeground)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .accessibilityIdentifier("settings-hub-url")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("copy-pubkey")
-                    }
-                } label: {
-                    Label {
-                        Text(NSLocalizedString("settings_pubkey", comment: "Hex Pubkey"))
-                    } icon: {
-                        Image(systemName: "number")
-                            .foregroundStyle(.secondary)
                     }
                 }
-                .accessibilityIdentifier("settings-pubkey")
-            }
 
-            // Role badge
-            LabeledContent {
-                Text(appState.userRole.displayName)
-                    .font(.brand(.subheadline))
-                    .fontWeight(.medium)
-                    .foregroundStyle(appState.isAdmin ? Color.brandDarkTeal : Color.brandPrimary)
-            } label: {
-                Label {
-                    Text(NSLocalizedString("settings_role", comment: "Role"))
-                } icon: {
-                    Image(systemName: appState.isAdmin ? "shield.fill" : "person.fill")
-                        .foregroundStyle(appState.isAdmin ? Color.brandDarkTeal : Color.brandPrimary)
-                }
-            }
-            .accessibilityIdentifier("settings-role")
-        } header: {
-            Text(NSLocalizedString("settings_identity_header", comment: "Identity"))
-        }
-    }
+                Spacer()
 
-    // MARK: - Hub Section
-
-    private var hubSection: some View {
-        Section {
-            if let hubURL = appState.authService.hubURL {
-                LabeledContent {
-                    Text(hubURL)
-                        .font(.brand(.subheadline))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                } label: {
-                    Label {
-                        Text(NSLocalizedString("settings_hub_url", comment: "Hub URL"))
-                    } icon: {
-                        Image(systemName: "link")
-                            .foregroundStyle(Color.brandPrimary)
-                    }
-                }
-                .accessibilityIdentifier("settings-hub-url")
-            } else {
-                LabeledContent {
-                    Text(NSLocalizedString("settings_not_configured", comment: "Not configured"))
-                        .font(.brand(.subheadline))
-                        .foregroundStyle(.tertiary)
-                } label: {
-                    Label {
-                        Text(NSLocalizedString("settings_hub_url", comment: "Hub URL"))
-                    } icon: {
-                        Image(systemName: "link")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        } header: {
-            Text(NSLocalizedString("settings_hub_header", comment: "Hub"))
-        }
-    }
-
-    // MARK: - Connection Section
-
-    private var connectionSection: some View {
-        Section {
-            LabeledContent {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(appState.webSocketService.connectionState.color)
                         .frame(width: 8, height: 8)
                     Text(appState.webSocketService.connectionState.displayText)
-                        .font(.brand(.subheadline))
-                        .foregroundStyle(.primary)
+                        .font(.brand(.caption2))
+                        .foregroundStyle(Color.brandMutedForeground)
                 }
-            } label: {
-                Label {
-                    Text(NSLocalizedString("settings_connection", comment: "Relay Connection"))
-                } icon: {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .foregroundStyle(Color.brandDarkTeal)
-                }
+                .accessibilityIdentifier("settings-connection")
             }
-            .accessibilityIdentifier("settings-connection")
-
-            LabeledContent {
-                Text("\(appState.webSocketService.eventCount)")
-                    .font(.brand(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.numericText())
-            } label: {
-                Label {
-                    Text(NSLocalizedString("settings_events", comment: "Events Received"))
-                } icon: {
-                    Image(systemName: "arrow.down.circle")
-                        .foregroundStyle(.secondary)
-                }
-            }
-        } header: {
-            Text(NSLocalizedString("settings_connection_header", comment: "Connection"))
+            .padding(.vertical, 4)
         }
     }
 
-    // MARK: - Device Link Section
+    // MARK: - Navigation Section
 
-    private var deviceLinkSection: some View {
+    private var navigationSection: some View {
         Section {
-            Button {
-                showDeviceLink = true
-            } label: {
+            NavigationLink(value: "account") {
                 Label {
-                    Text(NSLocalizedString("settings_link_device", comment: "Link Device"))
+                    Text(NSLocalizedString("settings_account_title", comment: "Account"))
                         .foregroundStyle(.primary)
                 } icon: {
-                    Image(systemName: "qrcode.viewfinder")
+                    Image(systemName: "person.crop.circle")
                         .foregroundStyle(Color.brandPrimary)
                 }
             }
-            .accessibilityIdentifier("settings-link-device")
-        } header: {
-            Text(NSLocalizedString("settings_devices_header", comment: "Devices"))
-        } footer: {
-            Text(NSLocalizedString(
-                "settings_link_device_footer",
-                comment: "Scan a QR code from your desktop app to securely transfer your identity to this device."
-            ))
-        }
-    }
+            .accessibilityIdentifier("settings-account-link")
 
-    // MARK: - Notification Preferences Section
-
-    private var notificationPreferencesSection: some View {
-        Section {
-            Toggle(isOn: $callSoundsEnabled) {
+            NavigationLink(value: "preferences") {
                 Label {
-                    Text(NSLocalizedString("settings_call_sounds", comment: "Call Sounds"))
-                } icon: {
-                    Image(systemName: "phone.arrow.down.left")
-                        .foregroundStyle(Color.brandPrimary)
-                }
-            }
-            .accessibilityIdentifier("settings-call-sounds")
-
-            Toggle(isOn: $messageAlertsEnabled) {
-                Label {
-                    Text(NSLocalizedString("settings_message_alerts", comment: "Message Alerts"))
-                } icon: {
-                    Image(systemName: "bell.badge")
-                        .foregroundStyle(Color.brandAccent)
-                }
-            }
-            .accessibilityIdentifier("settings-message-alerts")
-        } header: {
-            Text(NSLocalizedString("settings_notifications_header", comment: "Notifications"))
-        }
-    }
-
-    // MARK: - Language Section
-
-    private var languageSection: some View {
-        Section {
-            Picker(selection: $selectedLanguage) {
-                ForEach(SupportedLanguage.all) { language in
-                    Text(language.name).tag(language.id)
-                }
-            } label: {
-                Label {
-                    Text(NSLocalizedString("settings_language", comment: "Language"))
-                } icon: {
-                    Image(systemName: "globe")
-                        .foregroundStyle(Color.brandPrimary)
-                }
-            }
-            .accessibilityIdentifier("settings-language-picker")
-        } header: {
-            Text(NSLocalizedString("settings_language_header", comment: "Language"))
-        }
-    }
-
-    // MARK: - Security Section
-
-    private var securitySection: some View {
-        Section {
-            Picker(selection: $selectedAutoLockTimeout) {
-                ForEach(AutoLockTimeout.allCases) { timeout in
-                    Text(timeout.displayName).tag(timeout)
-                }
-            } label: {
-                Label {
-                    Text(NSLocalizedString("settings_auto_lock", comment: "Auto-Lock Timeout"))
-                } icon: {
-                    Image(systemName: "timer")
-                        .foregroundStyle(Color.brandAccent)
-                }
-            }
-            .accessibilityIdentifier("settings-auto-lock-picker")
-            // M26: Persist timeout to @AppStorage so LlamenosApp reads the same value
-            .onChange(of: selectedAutoLockTimeout) { _, newValue in
-                autoLockTimeoutValue = TimeInterval(newValue.rawValue)
-            }
-
-            Toggle(isOn: $isBiometricEnabled) {
-                Label {
-                    Text(NSLocalizedString("settings_biometric", comment: "Biometric Unlock"))
-                } icon: {
-                    Image(systemName: "faceid")
-                        .foregroundStyle(.green)
-                }
-            }
-            .accessibilityIdentifier("settings-biometric-toggle")
-            .onChange(of: isBiometricEnabled) { _, newValue in
-                try? appState.authService.setBiometricEnabled(newValue)
-            }
-        } header: {
-            Text(NSLocalizedString("settings_security_header", comment: "Security"))
-        }
-    }
-
-    // MARK: - Admin Section
-
-    private var adminSection: some View {
-        Section {
-            NavigationLink(value: "admin") {
-                Label {
-                    Text(NSLocalizedString("settings_admin", comment: "Admin Panel"))
+                    Text(NSLocalizedString("settings_preferences_title", comment: "Preferences"))
                         .foregroundStyle(.primary)
                 } icon: {
-                    Image(systemName: "shield.lefthalf.filled")
-                        .foregroundStyle(Color.brandDarkTeal)
+                    Image(systemName: "gearshape")
+                        .foregroundStyle(Color.brandPrimary)
                 }
             }
-            .accessibilityIdentifier("settings-admin-panel")
-        } header: {
-            Text(NSLocalizedString("settings_admin_header", comment: "Administration"))
-        } footer: {
-            Text(NSLocalizedString(
-                "settings_admin_footer",
-                comment: "Manage volunteers, ban list, audit log, and invites."
-            ))
+            .accessibilityIdentifier("settings-preferences-link")
+
+            if appState.isAdmin {
+                NavigationLink(value: "admin") {
+                    Label {
+                        Text(NSLocalizedString("settings_admin", comment: "Admin Panel"))
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "shield.lefthalf.filled")
+                            .foregroundStyle(Color.brandDarkTeal)
+                    }
+                }
+                .accessibilityIdentifier("settings-admin-link")
+            }
+
+            NavigationLink(value: "help") {
+                Label {
+                    Text(NSLocalizedString("settings_help", comment: "Help & FAQ"))
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundStyle(Color.brandPrimary)
+                }
+            }
+            .accessibilityIdentifier("settings-help")
         }
     }
 
@@ -519,10 +277,10 @@ struct SettingsView: View {
             NavigationLink(value: "panic-wipe") {
                 Label {
                     Text(NSLocalizedString("settings_panic_wipe", comment: "Emergency Wipe"))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.brandDestructive)
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.brandDestructive)
                 }
             }
             .accessibilityIdentifier("settings-panic-wipe")
@@ -531,23 +289,6 @@ struct SettingsView: View {
                 "settings_emergency_footer",
                 comment: "Permanently deletes all data from this device including your identity keys."
             ))
-        }
-    }
-
-    // MARK: - Help Section
-
-    private var helpSection: some View {
-        Section {
-            NavigationLink(value: "help") {
-                Label {
-                    Text(NSLocalizedString("settings_help", comment: "Help & FAQ"))
-                        .foregroundStyle(.primary)
-                } icon: {
-                    Image(systemName: "questionmark.circle")
-                        .foregroundStyle(Color.brandPrimary)
-                }
-            }
-            .accessibilityIdentifier("settings-help")
         }
     }
 
@@ -590,27 +331,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Copy Confirmation
-
-    private var copyConfirmationBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-            Text(NSLocalizedString("copied_to_clipboard", comment: "Copied to clipboard"))
-                .font(.brand(.subheadline))
-                .fontWeight(.medium)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .shadow(radius: 8)
-        )
-        .padding(.bottom, 16)
-        .accessibilityIdentifier("copy-confirmation")
-    }
-
     // MARK: - Helpers
 
     private var appVersion: String {
@@ -619,22 +339,6 @@ struct SettingsView: View {
 
     private var buildNumber: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-    }
-
-    private func showCopyFeedback() {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showCopyConfirmation = true
-        }
-
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showCopyConfirmation = false
-            }
-        }
     }
 }
 
