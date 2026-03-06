@@ -108,7 +108,7 @@ private struct PINDigitButton: View {
     var body: some View {
         Button(action: action) {
             Text(digit)
-                .font(.title)
+                .font(.brand(.title))
                 .fontWeight(.medium)
                 .foregroundStyle(.primary)
                 .frame(width: 72, height: 72)

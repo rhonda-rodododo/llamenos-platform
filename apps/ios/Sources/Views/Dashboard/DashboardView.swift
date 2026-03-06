@@ -38,7 +38,7 @@ struct DashboardView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                             Text(error)
-                                .font(.footnote)
+                                .font(.brand(.footnote))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -88,8 +88,8 @@ struct DashboardView: View {
         Section {
             if let npub = appState.cryptoService.npub {
                 LabeledContent {
-                    Text(truncatedNpub(npub))
-                        .font(.system(.caption, design: .monospaced))
+                    Text(npub.truncatedNpub())
+                        .font(.brandMono(.caption))
                         .accessibilityIdentifier("dashboard-npub")
                 } label: {
                     Label(
@@ -102,7 +102,7 @@ struct DashboardView: View {
             if let hubURL = appState.authService.hubURL {
                 LabeledContent {
                     Text(hubURL)
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .accessibilityIdentifier("dashboard-hub-url")
@@ -117,10 +117,10 @@ struct DashboardView: View {
             LabeledContent {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(connectionColor)
+                        .fill(appState.webSocketService.connectionState.color)
                         .frame(width: 8, height: 8)
                     Text(appState.webSocketService.connectionState.displayText)
-                        .font(.caption)
+                        .font(.brand(.caption))
                 }
             } label: {
                 Label(
@@ -152,7 +152,7 @@ struct DashboardView: View {
 
                 if vm.isOnShift {
                     Text(vm.elapsedTimeDisplay)
-                        .font(.system(.body, design: .monospaced))
+                        .font(.brandMono(.body))
                         .foregroundStyle(.green)
                         .contentTransition(.numericText())
                         .accessibilityIdentifier("shift-elapsed-timer")
@@ -206,14 +206,14 @@ struct DashboardView: View {
             ForEach(vm.recentNotes) { note in
                 HStack(alignment: .top, spacing: 10) {
                     Text(note.preview)
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(note.createdAt.formatted(date: .omitted, time: .shortened))
-                            .font(.footnote)
+                            .font(.brand(.footnote))
                             .foregroundStyle(.tertiary)
 
                         HStack(spacing: 4) {
@@ -302,16 +302,6 @@ struct DashboardView: View {
         case blasts
     }
 
-    // MARK: - Connection Color
-
-    private var connectionColor: Color {
-        switch appState.webSocketService.connectionState {
-        case .connected: return .green
-        case .connecting, .reconnecting: return .yellow
-        case .disconnected: return .red
-        }
-    }
-
     // MARK: - Shift Status Badge
 
     @ViewBuilder
@@ -319,7 +309,7 @@ struct DashboardView: View {
         switch status {
         case .onShift:
             Text(NSLocalizedString("badge_on_shift", comment: "On Shift"))
-                .font(.caption)
+                .font(.brand(.caption))
                 .fontWeight(.semibold)
                 .foregroundStyle(.green)
                 .padding(.horizontal, 8)
@@ -327,7 +317,7 @@ struct DashboardView: View {
                 .background(Capsule().fill(Color.green.opacity(0.15)))
         case .onCall:
             Text(NSLocalizedString("badge_on_call", comment: "On Call"))
-                .font(.caption)
+                .font(.brand(.caption))
                 .fontWeight(.semibold)
                 .foregroundStyle(.blue)
                 .padding(.horizontal, 8)
@@ -335,7 +325,7 @@ struct DashboardView: View {
                 .background(Capsule().fill(Color.blue.opacity(0.15)))
         case .offShift:
             Text(NSLocalizedString("badge_off_shift", comment: "Off Shift"))
-                .font(.caption)
+                .font(.brand(.caption))
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
@@ -348,15 +338,6 @@ struct DashboardView: View {
             Image(systemName: "exclamationmark.circle.fill")
                 .foregroundStyle(.red)
         }
-    }
-
-    // MARK: - Helpers
-
-    private func truncatedNpub(_ npub: String) -> String {
-        guard npub.count > 20 else { return npub }
-        let prefix = npub.prefix(12)
-        let suffix = npub.suffix(6)
-        return "\(prefix)...\(suffix)"
     }
 
     // MARK: - ViewModel Resolution

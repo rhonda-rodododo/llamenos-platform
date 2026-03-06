@@ -113,7 +113,7 @@ struct ConversationsView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("conversations_loading", comment: "Loading conversations..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -178,7 +178,7 @@ struct ConversationRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(conversation.contactDisplayHash)
-                        .font(.system(.body, design: .monospaced))
+                        .font(.brandMono(.body))
                         .fontWeight(conversation.unreadCount > 0 ? .semibold : .regular)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -186,7 +186,7 @@ struct ConversationRowView: View {
                     Spacer()
 
                     Text(conversation.lastMessageRelativeTime)
-                        .font(.footnote)
+                        .font(.brand(.footnote))
                         .foregroundStyle(.tertiary)
                 }
 
@@ -230,7 +230,7 @@ struct ConversationRowView: View {
 
     private var statusBadge: some View {
         Text(conversation.conversationStatus.displayName)
-            .font(.caption)
+            .font(.brand(.caption))
             .fontWeight(.medium)
             .foregroundStyle(statusColor)
             .padding(.horizontal, 6)
@@ -253,7 +253,7 @@ struct ConversationRowView: View {
 
     private var unreadBadge: some View {
         Text("\(conversation.unreadCount)")
-            .font(.caption)
+            .font(.brand(.caption))
             .fontWeight(.bold)
             .foregroundStyle(.white)
             .padding(.horizontal, 6)

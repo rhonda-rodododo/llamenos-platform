@@ -182,8 +182,8 @@ struct SettingsView: View {
             if let npub = appState.cryptoService.npub {
                 LabeledContent {
                     HStack(spacing: 8) {
-                        Text(truncatedNpub(npub))
-                            .font(.system(.body, design: .monospaced))
+                        Text(npub.truncatedNpub())
+                            .font(.brandMono(.body))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
 
@@ -213,8 +213,8 @@ struct SettingsView: View {
             if let pubkey = appState.cryptoService.pubkey {
                 LabeledContent {
                     HStack(spacing: 8) {
-                        Text(truncatedPubkey(pubkey))
-                            .font(.system(.caption, design: .monospaced))
+                        Text(pubkey.truncatedPubkey())
+                            .font(.brandMono(.caption))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
 
@@ -243,7 +243,7 @@ struct SettingsView: View {
             // Role badge
             LabeledContent {
                 Text(appState.userRole.displayName)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .fontWeight(.medium)
                     .foregroundStyle(appState.isAdmin ? Color.brandDarkTeal : Color.brandPrimary)
             } label: {
@@ -267,7 +267,7 @@ struct SettingsView: View {
             if let hubURL = appState.authService.hubURL {
                 LabeledContent {
                     Text(hubURL)
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -283,7 +283,7 @@ struct SettingsView: View {
             } else {
                 LabeledContent {
                     Text(NSLocalizedString("settings_not_configured", comment: "Not configured"))
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .foregroundStyle(.tertiary)
                 } label: {
                     Label {
@@ -306,10 +306,10 @@ struct SettingsView: View {
             LabeledContent {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(connectionColor)
+                        .fill(appState.webSocketService.connectionState.color)
                         .frame(width: 8, height: 8)
                     Text(appState.webSocketService.connectionState.displayText)
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .foregroundStyle(.primary)
                 }
             } label: {
@@ -324,7 +324,7 @@ struct SettingsView: View {
 
             LabeledContent {
                 Text("\(appState.webSocketService.eventCount)")
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
                     .contentTransition(.numericText())
             } label: {
@@ -557,7 +557,7 @@ struct SettingsView: View {
         Section {
             LabeledContent {
                 Text(appVersion)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
             } label: {
                 Label {
@@ -571,7 +571,7 @@ struct SettingsView: View {
 
             LabeledContent {
                 Text(buildNumber)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.tertiary)
             } label: {
                 Label {
@@ -597,7 +597,7 @@ struct SettingsView: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
             Text(NSLocalizedString("copied_to_clipboard", comment: "Copied to clipboard"))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .fontWeight(.medium)
         }
         .padding(.horizontal, 20)
@@ -612,24 +612,6 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
-
-    private var connectionColor: Color {
-        switch appState.webSocketService.connectionState {
-        case .connected: return .green
-        case .connecting, .reconnecting: return .yellow
-        case .disconnected: return .red
-        }
-    }
-
-    private func truncatedNpub(_ npub: String) -> String {
-        guard npub.count > 20 else { return npub }
-        return "\(npub.prefix(12))...\(npub.suffix(6))"
-    }
-
-    private func truncatedPubkey(_ pubkey: String) -> String {
-        guard pubkey.count > 16 else { return pubkey }
-        return "\(pubkey.prefix(8))...\(pubkey.suffix(6))"
-    }
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"

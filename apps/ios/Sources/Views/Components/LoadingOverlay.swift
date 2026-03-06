@@ -79,7 +79,7 @@ extension View {
     ZStack {
         Color.blue.opacity(0.2).ignoresSafeArea()
         Text("Background Content")
-            .font(.largeTitle)
+            .font(.brand(.largeTitle))
     }
     .overlay {
         LoadingOverlay(message: NSLocalizedString("loading_verifying_pin", comment: "Verifying PIN..."))

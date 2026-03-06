@@ -70,14 +70,14 @@ struct ShiftsView: View {
                             ? NSLocalizedString("shifts_on_shift", comment: "On Shift")
                             : NSLocalizedString("shifts_off_shift", comment: "Off Shift")
                         )
-                        .font(.headline)
+                        .font(.brand(.headline))
                         .accessibilityIdentifier("shift-status-label")
 
                         Spacer()
 
                         if vm.isOnShift {
                             Text(vm.elapsedTimeDisplay)
-                                .font(.system(.title3, design: .monospaced))
+                                .font(.brandMono(.title3))
                                 .fontWeight(.medium)
                                 .foregroundStyle(.green)
                                 .contentTransition(.numericText())
@@ -94,7 +94,7 @@ struct ShiftsView: View {
                                 format: NSLocalizedString("shifts_active_calls", comment: "%d active call(s)"),
                                 vm.activeCallCount
                             ))
-                            .font(.subheadline)
+                            .font(.brand(.subheadline))
                             .foregroundStyle(.secondary)
                             Spacer()
                         }
@@ -138,7 +138,7 @@ struct ShiftsView: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                         Text(error)
-                            .font(.footnote)
+                            .font(.brand(.footnote))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -151,7 +151,7 @@ struct ShiftsView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                         Text(success)
-                            .font(.footnote)
+                            .font(.brand(.footnote))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -164,7 +164,7 @@ struct ShiftsView: View {
                     Section {
                         if shiftDay.shifts.isEmpty {
                             Text(NSLocalizedString("shifts_none_scheduled", comment: "No shifts scheduled"))
-                                .font(.caption)
+                                .font(.brand(.caption))
                                 .foregroundStyle(.tertiary)
                         } else {
                             ForEach(shiftDay.shifts) { shift in
@@ -178,7 +178,7 @@ struct ShiftsView: View {
 
                             if shiftDay.isToday {
                                 Text(NSLocalizedString("shifts_today", comment: "Today"))
-                                    .font(.caption2)
+                                    .font(.brand(.caption2))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 6)
@@ -192,7 +192,7 @@ struct ShiftsView: View {
                                 format: NSLocalizedString("shifts_count", comment: "%d shift(s)"),
                                 shiftDay.shifts.count
                             ))
-                            .font(.caption)
+                            .font(.brand(.caption))
                             .foregroundStyle(.tertiary)
                         }
                         .accessibilityIdentifier("weekly-schedule-header")
@@ -211,12 +211,12 @@ struct ShiftsView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(shift.timeRangeDisplay)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .fontWeight(.medium)
 
                 if let name = shift.name {
                     Text(name)
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -228,7 +228,7 @@ struct ShiftsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("\(shift.volunteerCount)")
-                    .font(.caption)
+                    .font(.brand(.caption))
                     .foregroundStyle(.secondary)
             }
 
@@ -236,7 +236,7 @@ struct ShiftsView: View {
                 Task { await vm.signUp(for: shift) }
             } label: {
                 Text(NSLocalizedString("shifts_sign_up", comment: "Sign Up"))
-                    .font(.caption)
+                    .font(.brand(.caption))
                     .fontWeight(.medium)
             }
             .buttonStyle(.bordered)
@@ -271,7 +271,7 @@ struct ShiftsView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("shifts_loading", comment: "Loading schedule..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

@@ -24,12 +24,12 @@ struct PINSetView: View {
                     .animation(.easeInOut, value: vm.phase)
 
                 Text(vm.titleText)
-                    .font(.title2)
+                    .font(.brand(.title2))
                     .fontWeight(.bold)
                     .animation(.easeInOut, value: vm.phase)
 
                 Text(vm.subtitleText)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
@@ -37,7 +37,7 @@ struct PINSetView: View {
             // Error message
             if let error = vm.errorMessage {
                 Text(error)
-                    .font(.footnote)
+                    .font(.brand(.footnote))
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)

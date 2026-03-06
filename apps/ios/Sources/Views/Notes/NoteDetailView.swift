@@ -62,7 +62,7 @@ struct NoteDetailView: View {
     private var noteTextSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(note.payload.text)
-                .font(.body)
+                .font(.brand(.body))
                 .textSelection(.enabled)
                 .privacySensitive()  // M28: Redact note content in screenshots
                 .accessibilityIdentifier("note-detail-text")
@@ -75,19 +75,19 @@ struct NoteDetailView: View {
     private func customFieldsSection(_ fields: [String: AnyCodableValue]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(NSLocalizedString("note_detail_fields", comment: "Details"))
-                .font(.headline)
+                .font(.brand(.headline))
                 .accessibilityIdentifier("note-detail-fields-header")
 
             ForEach(orderedFields(fields), id: \.key) { field in
                 LabeledContent {
                     Text(field.value.displayValue)
-                        .font(.body)
+                        .font(.brand(.body))
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.trailing)
                         .privacySensitive()  // M28: Redact custom field values in screenshots
                 } label: {
                     Text(labelForField(named: field.key))
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityIdentifier("note-field-\(field.key)")
@@ -105,11 +105,11 @@ struct NoteDetailView: View {
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(NSLocalizedString("note_detail_metadata", comment: "Info"))
-                .font(.headline)
+                .font(.brand(.headline))
 
             LabeledContent {
                 Text(note.authorDisplayName)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.brandMono(.body))
                     .foregroundStyle(.primary)
             } label: {
                 Text(NSLocalizedString("note_detail_author", comment: "Author"))
@@ -140,10 +140,10 @@ struct NoteDetailView: View {
                 LabeledContent {
                     HStack(spacing: 4) {
                         Image(systemName: "phone.fill")
-                            .font(.caption)
+                            .font(.brand(.caption))
                             .foregroundStyle(.blue)
                         Text(String(callId.prefix(12)))
-                            .font(.system(.body, design: .monospaced))
+                            .font(.brandMono(.body))
                             .foregroundStyle(.blue)
                     }
                 } label: {
@@ -157,10 +157,10 @@ struct NoteDetailView: View {
                 LabeledContent {
                     HStack(spacing: 4) {
                         Image(systemName: "message.fill")
-                            .font(.caption)
+                            .font(.brand(.caption))
                             .foregroundStyle(.green)
                         Text(String(conversationId.prefix(12)))
-                            .font(.system(.body, design: .monospaced))
+                            .font(.brandMono(.body))
                             .foregroundStyle(.green)
                     }
                 } label: {
@@ -184,7 +184,7 @@ struct NoteDetailView: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
             Text(NSLocalizedString("note_copied", comment: "Note text copied"))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .fontWeight(.medium)
         }
         .padding(.horizontal, 20)

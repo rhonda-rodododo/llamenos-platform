@@ -75,14 +75,14 @@ struct DeviceLinkView: View {
                     "device_link_scan_title",
                     comment: "Scan QR Code"
                 ))
-                .font(.title2)
+                .font(.brand(.title2))
                 .fontWeight(.bold)
 
                 Text(NSLocalizedString(
                     "device_link_scan_instructions",
                     comment: "Open Settings > Link Device on your desktop app and scan the QR code shown there."
                 ))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -123,7 +123,7 @@ struct DeviceLinkView: View {
                 "device_link_no_camera",
                 comment: "Camera access is required to scan the QR code."
             ))
-            .font(.subheadline)
+            .font(.brand(.subheadline))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
 
@@ -156,14 +156,14 @@ struct DeviceLinkView: View {
                 "device_link_connecting",
                 comment: "Connecting to relay..."
             ))
-            .font(.title3)
+            .font(.brand(.title3))
             .fontWeight(.medium)
 
             Text(NSLocalizedString(
                 "device_link_connecting_detail",
                 comment: "Establishing secure connection with your desktop."
             ))
-            .font(.subheadline)
+            .font(.brand(.subheadline))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 32)
@@ -191,14 +191,14 @@ struct DeviceLinkView: View {
                     "device_link_verify_title",
                     comment: "Verify Connection"
                 ))
-                .font(.title2)
+                .font(.brand(.title2))
                 .fontWeight(.bold)
 
                 Text(NSLocalizedString(
                     "device_link_verify_instructions",
                     comment: "Confirm this code matches the one shown on your desktop:"
                 ))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -275,14 +275,14 @@ struct DeviceLinkView: View {
                 "device_link_importing",
                 comment: "Importing identity..."
             ))
-            .font(.title3)
+            .font(.brand(.title3))
             .fontWeight(.medium)
 
             Text(NSLocalizedString(
                 "device_link_importing_detail",
                 comment: "Decrypting and importing your key to this device."
             ))
-            .font(.subheadline)
+            .font(.brand(.subheadline))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 32)
@@ -307,14 +307,14 @@ struct DeviceLinkView: View {
                 "device_link_success",
                 comment: "Device Linked!"
             ))
-            .font(.title)
+            .font(.brand(.title))
             .fontWeight(.bold)
 
             Text(NSLocalizedString(
                 "device_link_success_detail",
                 comment: "Your identity has been securely transferred to this device. Set a PIN to protect it."
             ))
-            .font(.subheadline)
+            .font(.brand(.subheadline))
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 32)
@@ -352,11 +352,11 @@ struct DeviceLinkView: View {
                 "device_link_error_title",
                 comment: "Linking Failed"
             ))
-            .font(.title2)
+            .font(.brand(.title2))
             .fontWeight(.bold)
 
             Text(message)
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)

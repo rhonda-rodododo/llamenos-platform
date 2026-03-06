@@ -122,7 +122,7 @@ struct VolunteersView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("admin_loading_volunteers", comment: "Loading members..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -155,14 +155,14 @@ struct VolunteerRowView: View {
             // Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(volunteer.displayLabel)
-                    .font(.body)
+                    .font(.brand(.body))
                     .fontWeight(.medium)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
                     Text(volunteer.truncatedPubkey)
-                        .font(.system(.caption, design: .monospaced))
+                        .font(.brandMono(.caption))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
 
@@ -199,7 +199,7 @@ struct VolunteerRowView: View {
 
     private var roleBadge: some View {
         Text(volunteer.userRole.displayName)
-            .font(.caption2)
+            .font(.brand(.caption2))
             .fontWeight(.semibold)
             .foregroundStyle(volunteer.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
             .padding(.horizontal, 8)
@@ -219,7 +219,7 @@ struct VolunteerRowView: View {
                 .fill(statusColor)
                 .frame(width: 6, height: 6)
             Text(volunteer.volunteerStatus.displayName)
-                .font(.caption2)
+                .font(.brand(.caption2))
                 .foregroundStyle(.secondary)
         }
     }
@@ -248,11 +248,11 @@ struct StatCard: View {
                 .font(.title3)
                 .foregroundStyle(color)
             Text(value)
-                .font(.title3)
+                .font(.brand(.title3))
                 .fontWeight(.bold)
                 .foregroundStyle(.primary)
             Text(title)
-                .font(.caption2)
+                .font(.brand(.caption2))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)

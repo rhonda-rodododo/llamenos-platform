@@ -53,7 +53,7 @@ struct ReportCreateView: View {
                 Section {
                     TextEditor(text: $bodyText)
                         .frame(minHeight: 150)
-                        .font(.body)
+                        .font(.brand(.body))
                         .accessibilityIdentifier("report-body-input")
                 } header: {
                     Text(NSLocalizedString("report_body_label", comment: "Description"))
@@ -74,7 +74,7 @@ struct ReportCreateView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                             Text(error)
-                                .font(.footnote)
+                                .font(.brand(.footnote))
                                 .foregroundStyle(.secondary)
                         }
                     }

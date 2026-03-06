@@ -38,7 +38,7 @@ struct AuditLogView: View {
                             "admin_audit_total",
                             comment: "%d total entries"
                         ), viewModel.auditTotal))
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                     } icon: {
                         Image(systemName: "list.clipboard.fill")
                             .foregroundStyle(Color.brandPrimary)
@@ -50,7 +50,7 @@ struct AuditLogView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(NSLocalizedString("admin_audit_hash_chained", comment: "Hash-chained"))
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -74,7 +74,7 @@ struct AuditLogView: View {
                                 Task { await viewModel.loadMoreAuditEntries() }
                             } label: {
                                 Text(NSLocalizedString("admin_load_more", comment: "Load More"))
-                                    .font(.subheadline)
+                                    .font(.brand(.subheadline))
                                     .foregroundStyle(Color.brandPrimary)
                             }
                             .padding()
@@ -117,7 +117,7 @@ struct AuditLogView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("admin_loading_audit", comment: "Loading audit log..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -144,13 +144,13 @@ struct AuditEntryRowView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entry.actionDisplay)
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .fontWeight(.medium)
                         .foregroundStyle(.primary)
 
                     if let date = entry.timestampDate {
                         Text(date.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
+                            .font(.brand(.caption))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -176,7 +176,7 @@ struct AuditEntryRowView: View {
                 Image(systemName: "person.fill")
                     .font(.caption2)
                 Text(entry.actorDisplay)
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.brandMono(.caption))
             }
             .foregroundStyle(.secondary)
 
@@ -187,11 +187,11 @@ struct AuditEntryRowView: View {
                     if let details = entry.details, !details.isEmpty {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(NSLocalizedString("admin_audit_details", comment: "Details"))
-                                .font(.caption2)
+                                .font(.brand(.caption2))
                                 .foregroundStyle(.tertiary)
                                 .textCase(.uppercase)
                             Text(details)
-                                .font(.caption)
+                                .font(.brand(.caption))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -199,12 +199,12 @@ struct AuditEntryRowView: View {
                     // Hash chain info
                     VStack(alignment: .leading, spacing: 2) {
                         Text(NSLocalizedString("admin_audit_entry_hash", comment: "Entry Hash"))
-                            .font(.caption2)
+                            .font(.brand(.caption2))
                             .foregroundStyle(.tertiary)
                             .textCase(.uppercase)
 
                         Text(entry.truncatedEntryHash)
-                            .font(.system(.caption, design: .monospaced))
+                            .font(.brandMono(.caption))
                             .foregroundStyle(.secondary)
                     }
 
@@ -213,7 +213,7 @@ struct AuditEntryRowView: View {
                             Image(systemName: "link")
                                 .font(.caption2)
                             Text(NSLocalizedString("admin_audit_chained", comment: "Chained to previous"))
-                                .font(.caption2)
+                                .font(.brand(.caption2))
                         }
                         .foregroundStyle(.tertiary)
                     }

@@ -30,7 +30,7 @@ struct NoteCreateView: View {
                 Section {
                     TextEditor(text: $noteText)
                         .frame(minHeight: 150)
-                        .font(.body)
+                        .font(.brand(.body))
                         .accessibilityIdentifier("note-text-editor")
                 } header: {
                     Text(NSLocalizedString("note_create_text_label", comment: "Note"))
@@ -58,7 +58,7 @@ struct NoteCreateView: View {
                         NSLocalizedString("note_create_call_id_placeholder", comment: "Call ID (optional)"),
                         text: $callId
                     )
-                    .font(.system(.body, design: .monospaced))
+                    .font(.brandMono(.body))
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .accessibilityIdentifier("note-call-id-input")
@@ -73,7 +73,7 @@ struct NoteCreateView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                             Text(error)
-                                .font(.footnote)
+                                .font(.brand(.footnote))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -123,11 +123,11 @@ struct NoteCreateView: View {
         case .textarea:
             VStack(alignment: .leading, spacing: 4) {
                 Text(field.label)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
                 TextEditor(text: textBinding(for: field.name))
                     .frame(minHeight: 80)
-                    .font(.body)
+                    .font(.brand(.body))
             }
             .accessibilityIdentifier("field-\(field.name)")
 
@@ -166,7 +166,7 @@ struct NoteCreateView: View {
         if field.required {
             if case .none = fieldValues[field.name] {
                 Text(NSLocalizedString("field_required", comment: "Required"))
-                    .font(.caption2)
+                    .font(.brand(.caption2))
                     .foregroundStyle(.red)
             }
         }

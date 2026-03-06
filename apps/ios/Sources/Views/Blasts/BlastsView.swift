@@ -125,7 +125,7 @@ struct BlastsView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("blasts_loading", comment: "Loading blasts..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -160,11 +160,11 @@ struct BlastsView: View {
     private func statBadge(label: String, count: Int, color: Color) -> some View {
         VStack(spacing: 4) {
             Text("\(count)")
-                .font(.title3)
+                .font(.brand(.title3))
                 .fontWeight(.bold)
                 .foregroundStyle(color)
             Text(label)
-                .font(.caption)
+                .font(.brand(.caption))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -191,7 +191,7 @@ struct BlastRowView: View {
             // Name + status
             HStack {
                 Text(blast.name)
-                    .font(.body)
+                    .font(.brand(.body))
                     .fontWeight(.medium)
 
                 Spacer()
@@ -201,7 +201,7 @@ struct BlastRowView: View {
 
             // Message preview
             Text(blast.messagePreview)
-                .font(.caption)
+                .font(.brand(.caption))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
 
@@ -209,7 +209,7 @@ struct BlastRowView: View {
             HStack(spacing: 8) {
                 ForEach(blast.targetChannels, id: \.self) { channel in
                     Text(channel)
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .fontWeight(.medium)
                         .foregroundStyle(Color.brandAccent)
                         .padding(.horizontal, 6)
@@ -221,7 +221,7 @@ struct BlastRowView: View {
 
                 if let date = DateFormatting.parseISO(blast.createdAt) {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.footnote)
+                        .font(.brand(.footnote))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -235,7 +235,7 @@ struct BlastRowView: View {
                         NSLocalizedString("blast_send", comment: "Send Now"),
                         systemImage: "paperplane.fill"
                     )
-                    .font(.caption)
+                    .font(.brand(.caption))
                 }
                 .buttonStyle(.bordered)
                 .tint(.brandPrimary)
@@ -251,7 +251,7 @@ struct BlastRowView: View {
             Image(systemName: status.icon)
                 .font(.caption)
             Text(status.displayName)
-                .font(.caption)
+                .font(.brand(.caption))
                 .fontWeight(.medium)
         }
         .foregroundStyle(status.color)

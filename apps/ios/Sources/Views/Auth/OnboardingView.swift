@@ -25,14 +25,14 @@ struct OnboardingView: View {
                         .accessibilityHidden(true)
 
                     Text(NSLocalizedString("onboarding_title", comment: "Your Secret Key"))
-                        .font(.title)
+                        .font(.brand(.title))
                         .fontWeight(.bold)
 
                     Text(NSLocalizedString(
                         "onboarding_subtitle",
                         comment: "Write down your secret key and store it safely. You will need it to recover your account. This key will never be shown again."
                     ))
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                 }
@@ -62,7 +62,7 @@ struct OnboardingView: View {
                             : NSLocalizedString("onboarding_copy", comment: "Copy to Clipboard"),
                         systemImage: hasCopied ? "checkmark" : "doc.on.doc"
                     )
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                 }
@@ -72,12 +72,12 @@ struct OnboardingView: View {
                 // Public key display (informational)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(NSLocalizedString("onboarding_npub_label", comment: "Your Public Key"))
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
 
                     Text(npub)
-                        .font(.system(.caption, design: .monospaced))
+                        .font(.brandMono(.caption))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                         .accessibilityIdentifier("npub-display")
@@ -93,7 +93,7 @@ struct OnboardingView: View {
                         "onboarding_warning",
                         comment: "If you lose this key, you will permanently lose access to your account. There is no recovery mechanism."
                     ))
-                    .font(.footnote)
+                    .font(.brand(.footnote))
                     .foregroundStyle(.secondary)
                 }
                 .padding(16)
@@ -115,7 +115,7 @@ struct OnboardingView: View {
                             "onboarding_confirm_backup",
                             comment: "I have saved my secret key in a safe place"
                         ))
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                     }
@@ -127,7 +127,7 @@ struct OnboardingView: View {
                     router.showPINSet()
                 } label: {
                     Text(NSLocalizedString("onboarding_continue", comment: "Continue"))
-                        .font(.headline)
+                        .font(.brand(.headline))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                 }

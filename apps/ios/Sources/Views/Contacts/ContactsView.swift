@@ -102,7 +102,7 @@ struct ContactsView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("contacts_loading", comment: "Loading contacts..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -152,7 +152,7 @@ struct ContactRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Identifier
             Text(contact.displayIdentifier)
-                .font(.system(.body, design: .monospaced))
+                .font(.brandMono(.body))
                 .fontWeight(.medium)
 
             // Interaction badges
@@ -175,7 +175,7 @@ struct ContactRowView: View {
                 // Last seen
                 if let date = DateFormatting.parseISO(contact.lastSeen) {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.footnote)
+                        .font(.brand(.footnote))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -189,7 +189,7 @@ struct ContactRowView: View {
             Image(systemName: icon)
                 .font(.caption)
             Text("\(count)")
-                .font(.caption)
+                .font(.brand(.caption))
                 .fontWeight(.medium)
         }
         .foregroundStyle(color)

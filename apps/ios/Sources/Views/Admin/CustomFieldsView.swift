@@ -22,7 +22,7 @@ struct CustomFieldsView: View {
                     viewModel.showFieldEditor = true
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.body)
+                        .font(.brand(.body))
                 }
                 .accessibilityIdentifier("add-field-button")
             }
@@ -103,7 +103,7 @@ struct CustomFieldsView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("fields_loading", comment: "Loading custom fields..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,7 +119,7 @@ struct FieldRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(field.label)
-                .font(.body)
+                .font(.brand(.body))
                 .fontWeight(.medium)
 
             HStack(spacing: 8) {
@@ -131,7 +131,7 @@ struct FieldRowView: View {
 
                 if field.required {
                     Text(NSLocalizedString("field_required", comment: "Required"))
-                        .font(.caption2)
+                        .font(.brand(.caption2))
                         .fontWeight(.medium)
                         .foregroundStyle(.red)
                         .padding(.horizontal, 6)
@@ -148,7 +148,7 @@ struct FieldRowView: View {
     @ViewBuilder
     private func typeBadge(_ type: CustomFieldDefinition.FieldType) -> some View {
         Text(type.rawValue.capitalized)
-            .font(.caption2)
+            .font(.brand(.caption2))
             .fontWeight(.medium)
             .foregroundStyle(.blue)
             .padding(.horizontal, 6)
@@ -164,7 +164,7 @@ struct FieldRowView: View {
         case .both: NSLocalizedString("field_context_both", comment: "Both")
         }
         Text(label)
-            .font(.caption2)
+            .font(.brand(.caption2))
             .fontWeight(.medium)
             .foregroundStyle(Color.brandDarkTeal)
             .padding(.horizontal, 6)

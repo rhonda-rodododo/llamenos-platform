@@ -82,7 +82,7 @@ struct ReportsView: View {
             }
         } label: {
             Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.body)
+                .font(.brand(.body))
                 .symbolVariant(vm.selectedFilter != .all ? .fill : .none)
         }
         .accessibilityIdentifier("reports-filter-button")
@@ -96,7 +96,7 @@ struct ReportsView: View {
             vm.showCreateSheet = true
         } label: {
             Image(systemName: "plus.circle.fill")
-                .font(.body)
+                .font(.brand(.body))
         }
         .accessibilityIdentifier("create-report-button")
         .accessibilityLabel(NSLocalizedString("reports_create", comment: "Create Report"))
@@ -164,7 +164,7 @@ struct ReportsView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("reports_loading", comment: "Loading reports..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -219,7 +219,7 @@ struct ReportRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Title
             Text(report.reportTitle)
-                .font(.body)
+                .font(.brand(.body))
                 .fontWeight(.medium)
                 .lineLimit(2)
                 .foregroundStyle(.primary)
@@ -233,9 +233,9 @@ struct ReportRowView: View {
                 if let category = report.reportCategory {
                     HStack(spacing: 3) {
                         Image(systemName: "tag.fill")
-                            .font(.caption)
+                            .font(.brand(.caption))
                         Text(category)
-                            .font(.caption)
+                            .font(.brand(.caption))
                             .fontWeight(.medium)
                     }
                     .foregroundStyle(Color.brandDarkTeal)
@@ -251,7 +251,7 @@ struct ReportRowView: View {
                 // Date
                 if let date = DateFormatting.parseISO(report.createdAt) {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.footnote)
+                        .font(.brand(.footnote))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -263,9 +263,9 @@ struct ReportRowView: View {
     private func statusBadge(_ status: ReportStatus) -> some View {
         HStack(spacing: 3) {
             Image(systemName: status.icon)
-                .font(.caption)
+                .font(.brand(.caption))
             Text(status.displayName)
-                .font(.caption)
+                .font(.brand(.caption))
                 .fontWeight(.medium)
         }
         .foregroundStyle(status.color)

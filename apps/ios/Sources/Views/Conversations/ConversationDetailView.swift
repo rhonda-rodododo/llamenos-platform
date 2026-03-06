@@ -50,14 +50,14 @@ struct ConversationDetailView: View {
                     .foregroundStyle(channelColor(for: conversation.channel))
 
                 Text(conversation.channel.displayName)
-                    .font(.caption)
+                    .font(.brand(.caption))
                     .fontWeight(.medium)
                     .foregroundStyle(channelColor(for: conversation.channel))
 
                 Spacer()
 
                 Text(conversation.conversationStatus.displayName)
-                    .font(.caption2)
+                    .font(.brand(.caption2))
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 16)
@@ -118,7 +118,7 @@ struct ConversationDetailView: View {
                     "conversation_closed_message",
                     comment: "This conversation is closed"
                 ))
-                .font(.footnote)
+                .font(.brand(.footnote))
                 .foregroundStyle(.secondary)
             }
             .padding(12)
@@ -176,7 +176,7 @@ struct ConversationDetailView: View {
                 "conversation_no_messages",
                 comment: "No messages yet"
             ))
-            .font(.subheadline)
+            .font(.brand(.subheadline))
             .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -190,7 +190,7 @@ struct ConversationDetailView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("conversation_loading", comment: "Loading messages..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -247,14 +247,14 @@ struct MessageBubbleView: View {
             VStack(alignment: message.isInbound ? .leading : .trailing, spacing: 4) {
                 // Message text
                 Text(message.text)
-                    .font(.body)
+                    .font(.brand(.body))
                     .foregroundStyle(message.isOutbound ? .white : .primary)
                     .accessibilityIdentifier("message-text-\(message.id)")
 
                 // Timestamp and read status
                 HStack(spacing: 4) {
                     Text(message.timeDisplay)
-                        .font(.caption2)
+                        .font(.brand(.caption2))
                         .foregroundStyle(message.isOutbound ? Color.white.opacity(0.7) : Color(UIColor.tertiaryLabel))
 
                     if message.isOutbound && message.isRead {

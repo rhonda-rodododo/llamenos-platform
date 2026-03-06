@@ -23,26 +23,26 @@ struct PINUnlockView: View {
                     .accessibilityHidden(true)
 
                 Text(vm.titleText)
-                    .font(.title2)
+                    .font(.brand(.title2))
                     .fontWeight(.bold)
 
                 // Show which identity is locked (truncated npub)
                 if let npub = appState.cryptoService.npub {
-                    Text(truncatedNpub(npub))
-                        .font(.system(.caption, design: .monospaced))
+                    Text(npub.truncatedNpub())
+                        .font(.brandMono(.caption))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("locked-npub")
                 }
 
                 Text(vm.subtitleText)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
             }
 
             // Error message
             if let error = vm.errorMessage {
                 Text(error)
-                    .font(.footnote)
+                    .font(.brand(.footnote))
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
@@ -110,16 +110,6 @@ struct PINUnlockView: View {
         }
         hasAttemptedBiometric = true
         handleBiometricUnlock()
-    }
-
-    // MARK: - Helpers
-
-    /// Truncate npub for display: "npub1abc...xyz"
-    private func truncatedNpub(_ npub: String) -> String {
-        guard npub.count > 20 else { return npub }
-        let prefix = npub.prefix(12)
-        let suffix = npub.suffix(6)
-        return "\(prefix)...\(suffix)"
     }
 
     // MARK: - ViewModel Resolution

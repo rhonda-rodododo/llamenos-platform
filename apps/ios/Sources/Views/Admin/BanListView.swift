@@ -71,7 +71,7 @@ struct BanListView: View {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(NSLocalizedString("admin_ban_hash_label", comment: "Identifier Hash"))
-                            .font(.caption)
+                            .font(.brand(.caption))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
 
@@ -79,7 +79,7 @@ struct BanListView: View {
                             NSLocalizedString("admin_ban_hash_placeholder", comment: "SHA-256 hash of phone number or identifier"),
                             text: $viewModel.newBanIdentifierHash
                         )
-                        .font(.system(.body, design: .monospaced))
+                        .font(.brandMono(.body))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .accessibilityIdentifier("ban-hash-input")
@@ -87,7 +87,7 @@ struct BanListView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(NSLocalizedString("admin_ban_reason_label", comment: "Reason (Optional)"))
-                            .font(.caption)
+                            .font(.brand(.caption))
                             .foregroundStyle(.secondary)
                             .textCase(.uppercase)
 
@@ -106,13 +106,13 @@ struct BanListView: View {
                         "admin_ban_footer",
                         comment: "Enter the SHA-256 hash of the caller's phone number or identifier to ban."
                     ))
-                    .font(.caption)
+                    .font(.brand(.caption))
                 }
 
                 if let error = viewModel.errorMessage {
                     Section {
                         Text(error)
-                            .font(.footnote)
+                            .font(.brand(.footnote))
                             .foregroundStyle(.red)
                     }
                 }
@@ -178,7 +178,7 @@ struct BanListView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("admin_loading_bans", comment: "Loading ban list..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -202,7 +202,7 @@ struct BanRowView: View {
                     .foregroundStyle(.red)
 
                 Text(ban.truncatedHash)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.brandMono(.body))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
@@ -223,7 +223,7 @@ struct BanRowView: View {
             // Reason
             if let reason = ban.reason, !reason.isEmpty {
                 Text(reason)
-                    .font(.subheadline)
+                    .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
@@ -234,13 +234,13 @@ struct BanRowView: View {
                     Image(systemName: "person.fill")
                         .font(.caption2)
                     Text(ban.creatorDisplay)
-                        .font(.caption)
+                        .font(.brand(.caption))
                 }
                 .foregroundStyle(.tertiary)
 
                 if let date = ban.createdDate {
                     Text(date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.tertiary)
                 }
             }

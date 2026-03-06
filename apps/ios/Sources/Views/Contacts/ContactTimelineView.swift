@@ -46,12 +46,12 @@ struct ContactTimelineView: View {
                         .foregroundStyle(Color.brandPrimary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(displayIdentifier)
-                            .font(.system(.headline, design: .monospaced))
+                            .font(.brandMono(.headline))
                         Text(String(
                             format: NSLocalizedString("contact_interactions_count", comment: "%d interactions"),
                             vm.total
                         ))
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.secondary)
                     }
                 }
@@ -94,7 +94,7 @@ struct ContactTimelineView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("timeline_loading", comment: "Loading timeline..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -148,12 +148,12 @@ struct TimelineEventRow: View {
                 // Type + status
                 HStack(spacing: 6) {
                     Text(event.eventType.displayName)
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .fontWeight(.medium)
 
                     if let status = event.status {
                         Text(status)
-                            .font(.caption2)
+                            .font(.brand(.caption2))
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 6)
@@ -167,7 +167,7 @@ struct TimelineEventRow: View {
                 // Summary
                 if let summary = event.summary, !summary.isEmpty {
                     Text(summary)
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -176,13 +176,13 @@ struct TimelineEventRow: View {
                 HStack(spacing: 8) {
                     if let date = DateFormatting.parseISO(event.timestamp) {
                         Text(date.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption2)
+                            .font(.brand(.caption2))
                             .foregroundStyle(.tertiary)
                     }
 
                     if let duration = event.duration, duration > 0 {
                         Text(formatDuration(duration))
-                            .font(.caption2)
+                            .font(.brand(.caption2))
                             .foregroundStyle(.tertiary)
                     }
                 }

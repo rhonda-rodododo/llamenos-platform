@@ -22,7 +22,7 @@ struct SecureTextField: View {
         VStack(alignment: .leading, spacing: 8) {
             if !label.isEmpty {
                 Text(label)
-                    .font(.caption)
+                    .font(.brand(.caption))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .accessibilityHidden(true)
@@ -46,7 +46,7 @@ private struct SecureTextContent: View {
 
     var body: some View {
         Text(text)
-            .font(.system(.body, design: .monospaced))
+            .font(.brandMono(.body))
             .foregroundStyle(.primary)
             .lineLimit(nil)
             .multilineTextAlignment(.leading)

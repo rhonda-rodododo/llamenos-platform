@@ -15,13 +15,13 @@ struct PanicWipeConfirmationView: View {
                     .padding(.top, 40)
 
                 Text(NSLocalizedString("panic_wipe_title", comment: "Emergency Data Wipe"))
-                    .font(.title2.bold())
+                    .font(.brand(.title2))
 
                 Text(NSLocalizedString(
                     "panic_wipe_message",
                     comment: "This will permanently delete ALL data including your identity keys. This cannot be undone. Make sure you have backed up your secret key."
                 ))
-                .font(.body)
+                .font(.brand(.body))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)

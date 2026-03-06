@@ -23,11 +23,11 @@ struct LoginView: View {
                         .accessibilityHidden(true)
 
                     Text(NSLocalizedString("app_name", comment: "Llamenos"))
-                        .font(.largeTitle)
+                        .font(.brand(.largeTitle))
                         .fontWeight(.bold)
 
                     Text(NSLocalizedString("login_subtitle", comment: "Secure crisis response hotline"))
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
@@ -36,7 +36,7 @@ struct LoginView: View {
                 // Hub URL field
                 VStack(alignment: .leading, spacing: 8) {
                     Text(NSLocalizedString("login_hub_url_label", comment: "Hub URL"))
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
 
@@ -58,7 +58,7 @@ struct LoginView: View {
                 // Error message
                 if let error = vm.errorMessage {
                     Text(error)
-                        .font(.footnote)
+                        .font(.brand(.footnote))
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("login-error")
@@ -137,11 +137,11 @@ struct ImportKeyView: View {
                         .accessibilityHidden(true)
 
                     Text(NSLocalizedString("import_title", comment: "Import Your Key"))
-                        .font(.title2)
+                        .font(.brand(.title2))
                         .fontWeight(.bold)
 
                     Text(NSLocalizedString("import_subtitle", comment: "Paste your nsec key to restore your identity"))
-                        .font(.subheadline)
+                        .font(.brand(.subheadline))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
@@ -150,7 +150,7 @@ struct ImportKeyView: View {
                 // Nsec input
                 VStack(alignment: .leading, spacing: 8) {
                     Text(NSLocalizedString("import_nsec_label", comment: "Secret Key (nsec)"))
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
 
@@ -164,14 +164,14 @@ struct ImportKeyView: View {
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.brandMono(.body))
                     .accessibilityIdentifier("nsec-input")
                 }
 
                 // Error message
                 if let error = vm.errorMessage {
                     Text(error)
-                        .font(.footnote)
+                        .font(.brand(.footnote))
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
                         .accessibilityIdentifier("import-error")
@@ -187,7 +187,7 @@ struct ImportKeyView: View {
                         "import_security_note",
                         comment: "Your key is encrypted with your PIN and stored in the iOS Keychain. It never leaves this device."
                     ))
-                    .font(.footnote)
+                    .font(.brand(.footnote))
                     .foregroundStyle(.secondary)
                 }
                 .padding(16)

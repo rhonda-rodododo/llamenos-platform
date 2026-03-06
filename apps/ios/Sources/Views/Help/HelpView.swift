@@ -65,7 +65,7 @@ struct HelpView: View {
     private func securityRow(icon: String, color: Color, title: String, detail: String) -> some View {
         LabeledContent {
             Text(detail)
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         } label: {
             Label {
@@ -216,10 +216,10 @@ struct HelpView: View {
         } footer: {
             VStack(spacing: 4) {
                 Text(appVersion)
-                    .font(.caption)
+                    .font(.brand(.caption))
                     .foregroundStyle(.tertiary)
                 Text(NSLocalizedString("settings_footer", comment: "Llamenos - Secure Crisis Response"))
-                    .font(.caption2)
+                    .font(.brand(.caption2))
                     .foregroundStyle(.quaternary)
             }
             .frame(maxWidth: .infinity, alignment: .center)
@@ -233,12 +233,12 @@ struct HelpView: View {
     private func guideItem(title: String, detail: String) -> some View {
         DisclosureGroup {
             Text(detail)
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
                 .padding(.vertical, 4)
         } label: {
             Text(title)
-                .font(.body)
+                .font(.brand(.body))
         }
     }
 
@@ -246,12 +246,12 @@ struct HelpView: View {
     private func faqItem(question: String, answer: String) -> some View {
         DisclosureGroup {
             Text(answer)
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
                 .padding(.vertical, 4)
         } label: {
             Text(question)
-                .font(.body)
+                .font(.brand(.body))
         }
     }
 

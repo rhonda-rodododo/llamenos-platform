@@ -93,7 +93,7 @@ struct NotesView: View {
                             Task { await vm.loadMoreNotes() }
                         } label: {
                             Text(NSLocalizedString("notes_load_more", comment: "Load More"))
-                                .font(.subheadline)
+                                .font(.brand(.subheadline))
                                 .foregroundStyle(Color.brandPrimary)
                         }
                         .padding()
@@ -140,7 +140,7 @@ struct NotesView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("notes_loading", comment: "Loading notes..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -195,7 +195,7 @@ struct NoteRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Note preview text
             Text(note.preview)
-                .font(.body)
+                .font(.brand(.body))
                 .lineLimit(3)
                 .foregroundStyle(.primary)
 
@@ -204,9 +204,9 @@ struct NoteRowView: View {
                 // Author
                 HStack(spacing: 4) {
                     Image(systemName: "person.fill")
-                        .font(.caption)
+                        .font(.brand(.caption))
                     Text(note.authorDisplayName)
-                        .font(.caption)
+                        .font(.brand(.caption))
                 }
                 .foregroundStyle(.secondary)
 
@@ -222,7 +222,7 @@ struct NoteRowView: View {
 
                 // Date
                 Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.footnote)
+                    .font(.brand(.footnote))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -233,9 +233,9 @@ struct NoteRowView: View {
     private func badgeView(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.caption)
+                .font(.brand(.caption))
             Text(text)
-                .font(.caption)
+                .font(.brand(.caption))
                 .fontWeight(.medium)
         }
         .foregroundStyle(color)

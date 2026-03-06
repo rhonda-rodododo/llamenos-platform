@@ -120,13 +120,13 @@ struct InviteView: View {
                         "admin_invite_role_footer",
                         comment: "Choose the role for the person being invited. Admins have full management access."
                     ))
-                    .font(.caption)
+                    .font(.brand(.caption))
                 }
 
                 if let error = viewModel.errorMessage {
                     Section {
                         Text(error)
-                            .font(.footnote)
+                            .font(.brand(.footnote))
                             .foregroundStyle(.red)
                     }
                 }
@@ -185,7 +185,7 @@ struct InviteView: View {
             ProgressView()
                 .scaleEffect(1.2)
             Text(NSLocalizedString("admin_loading_invites", comment: "Loading invites..."))
-                .font(.subheadline)
+                .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -206,7 +206,7 @@ struct InviteRowView: View {
             // Code and share button
             HStack {
                 Text(invite.code)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.brandMono(.body))
                     .fontWeight(.medium)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -237,7 +237,7 @@ struct InviteRowView: View {
             HStack(spacing: 8) {
                 // Role badge
                 Text(invite.inviteRole.displayName)
-                    .font(.caption2)
+                    .font(.brand(.caption2))
                     .fontWeight(.medium)
                     .foregroundStyle(invite.inviteRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
                     .padding(.horizontal, 6)
@@ -258,7 +258,7 @@ struct InviteRowView: View {
                 // Expiry
                 if let expiresDate = invite.expiresDate {
                     Text(expiresDate.formatted(date: .abbreviated, time: .shortened))
-                        .font(.caption2)
+                        .font(.brand(.caption2))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -268,7 +268,7 @@ struct InviteRowView: View {
                 Image(systemName: "person.fill")
                     .font(.caption2)
                 Text(invite.creatorDisplay)
-                    .font(.system(.caption2, design: .monospaced))
+                    .font(.brandMono(.caption2))
             }
             .foregroundStyle(.tertiary)
         }
@@ -284,7 +284,7 @@ struct InviteRowView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption2)
                     Text(NSLocalizedString("admin_invite_claimed", comment: "Claimed"))
-                        .font(.caption2)
+                        .font(.brand(.caption2))
                         .fontWeight(.medium)
                 }
                 .foregroundStyle(.green)
@@ -296,7 +296,7 @@ struct InviteRowView: View {
                     Image(systemName: "clock.badge.exclamationmark")
                         .font(.caption2)
                     Text(NSLocalizedString("admin_invite_expired", comment: "Expired"))
-                        .font(.caption2)
+                        .font(.brand(.caption2))
                         .fontWeight(.medium)
                 }
                 .foregroundStyle(.red)
@@ -308,7 +308,7 @@ struct InviteRowView: View {
                     Image(systemName: "circle.fill")
                         .font(.system(size: 6))
                     Text(NSLocalizedString("admin_invite_active", comment: "Active"))
-                        .font(.caption2)
+                        .font(.brand(.caption2))
                         .fontWeight(.medium)
                 }
                 .foregroundStyle(.orange)

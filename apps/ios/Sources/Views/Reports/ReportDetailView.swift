@@ -18,7 +18,7 @@ struct ReportDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 // Title
                 Text(report.reportTitle)
-                    .font(.title2.bold())
+                    .font(.brand(.title2))
                     .foregroundStyle(.primary)
                     .accessibilityIdentifier("report-title")
 
@@ -65,9 +65,9 @@ struct ReportDetailView: View {
             // Status badge
             HStack(spacing: 4) {
                 Image(systemName: report.statusEnum.icon)
-                    .font(.caption)
+                    .font(.brand(.caption))
                 Text(report.statusEnum.displayName)
-                    .font(.caption)
+                    .font(.brand(.caption))
                     .fontWeight(.semibold)
             }
             .foregroundStyle(report.statusEnum.color)
@@ -82,9 +82,9 @@ struct ReportDetailView: View {
             if let category = report.reportCategory {
                 HStack(spacing: 4) {
                     Image(systemName: "tag.fill")
-                        .font(.caption)
+                        .font(.brand(.caption))
                     Text(category)
-                        .font(.caption)
+                        .font(.brand(.caption))
                         .fontWeight(.semibold)
                 }
                 .foregroundStyle(Color.brandDarkTeal)
@@ -103,7 +103,7 @@ struct ReportDetailView: View {
     private var metadataCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(NSLocalizedString("report_detail_info", comment: "Info"))
-                .font(.headline)
+                .font(.brand(.headline))
 
             LabeledContent {
                 if let date = DateFormatting.parseISO(report.createdAt) {
@@ -117,8 +117,8 @@ struct ReportDetailView: View {
 
             if let assignedTo = report.assignedTo {
                 LabeledContent {
-                    Text(truncatedPubkey(assignedTo))
-                        .font(.system(.body, design: .monospaced))
+                    Text(assignedTo.truncatedPubkey())
+                        .font(.brandMono(.body))
                         .foregroundStyle(.primary)
                 } label: {
                     Text(NSLocalizedString("report_detail_assigned", comment: "Assigned To"))
@@ -198,12 +198,6 @@ struct ReportDetailView: View {
         .padding(.horizontal, 4)
     }
 
-    // MARK: - Helpers
-
-    private func truncatedPubkey(_ pubkey: String) -> String {
-        guard pubkey.count > 16 else { return pubkey }
-        return "\(pubkey.prefix(8))...\(pubkey.suffix(6))"
-    }
 
 }
 
