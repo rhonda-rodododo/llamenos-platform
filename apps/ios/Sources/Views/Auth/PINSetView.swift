@@ -8,6 +8,7 @@ struct PINSetView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
     @State private var pinViewModel: PINViewModel?
+    @State private var shakeOnError = false
 
     var body: some View {
         let vm = resolvedPINViewModel
@@ -51,6 +52,7 @@ struct PINSetView: View {
                     set: { vm.pin = $0 }
                 ),
                 maxLength: vm.maxLength,
+                shake: $shakeOnError,
                 onComplete: { completedPIN in
                     vm.onPINComplete(completedPIN)
                 }
@@ -59,6 +61,11 @@ struct PINSetView: View {
             Spacer()
         }
         .padding(.horizontal, 24)
+        .onChange(of: vm.errorMessage) { _, newValue in
+            if newValue != nil {
+                shakeOnError = true
+            }
+        }
         .loadingOverlay(
             isPresented: vm.isLoading,
             message: NSLocalizedString("pin_set_encrypting", comment: "Encrypting your key...")

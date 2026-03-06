@@ -13,10 +13,21 @@ struct PINPadView: View {
     @Binding var pin: String
     let maxLength: Int
     let onComplete: (String) -> Void
+    var shake: Binding<Bool>?
 
-    init(pin: Binding<String>, maxLength: Int = 4, onComplete: @escaping (String) -> Void) {
+    @State private var shakeOffset: CGFloat = 0
+    @State private var dotScales: [CGFloat] = []
+    @State private var previousPinCount: Int = 0
+
+    init(
+        pin: Binding<String>,
+        maxLength: Int = 4,
+        shake: Binding<Bool>? = nil,
+        onComplete: @escaping (String) -> Void
+    ) {
         self._pin = pin
         self.maxLength = maxLength
+        self.shake = shake
         self.onComplete = onComplete
     }
 
@@ -32,16 +43,19 @@ struct PINPadView: View {
             // PIN dots indicator
             HStack(spacing: 12) {
                 ForEach(0..<maxLength, id: \.self) { index in
+                    let isFilled = index < pin.count
                     Circle()
-                        .fill(index < pin.count ? Color.primary : Color.clear)
+                        .fill(isFilled ? Color.brandPrimary : Color.clear)
                         .overlay(
                             Circle()
-                                .stroke(Color.secondary, lineWidth: 1.5)
+                                .stroke(isFilled ? Color.brandPrimary : Color.brandBorder, lineWidth: 1.5)
                         )
                         .frame(width: 16, height: 16)
+                        .scaleEffect(index < dotScales.count ? dotScales[index] : 1.0)
                         .animation(.easeInOut(duration: 0.15), value: pin.count)
                 }
             }
+            .offset(x: shakeOffset)
             .accessibilityIdentifier("pin-dots")
             .padding(.bottom, 8)
 
@@ -80,12 +94,43 @@ struct PINPadView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pin-pad")
+        .onAppear {
+            dotScales = Array(repeating: 1.0, count: maxLength)
+            previousPinCount = pin.count
+        }
+        .onChange(of: pin.count) { oldValue, newValue in
+            // Animate scale-up when a dot becomes filled
+            if newValue > oldValue, newValue <= maxLength, newValue - 1 < dotScales.count {
+                let filledIndex = newValue - 1
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                    dotScales[filledIndex] = 1.3
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+                        dotScales[filledIndex] = 1.0
+                    }
+                }
+            }
+        }
+        .onChange(of: shake?.wrappedValue ?? false) { _, newValue in
+            if newValue {
+                Haptics.error()
+                withAnimation(Animation.linear(duration: 0.08).repeatCount(5, autoreverses: true)) {
+                    shakeOffset = 10
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    shakeOffset = 0
+                    shake?.wrappedValue = false
+                }
+            }
+        }
     }
 
     // MARK: - Actions
 
     private func handleDigit(_ digit: String) {
         guard pin.count < maxLength else { return }
+        Haptics.impact(.light)
         pin.append(digit)
         if pin.count == maxLength {
             onComplete(pin)
@@ -94,6 +139,7 @@ struct PINPadView: View {
 
     private func handleBackspace() {
         guard !pin.isEmpty else { return }
+        Haptics.impact(.rigid)
         pin.removeLast()
     }
 }
@@ -110,11 +156,15 @@ private struct PINDigitButton: View {
             Text(digit)
                 .font(.brand(.title))
                 .fontWeight(.medium)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.brandForeground)
                 .frame(width: 72, height: 72)
                 .background(
                     Circle()
-                        .fill(Color(.systemGray6))
+                        .fill(Color.brandCard)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.brandBorder, lineWidth: 1)
                 )
         }
         .accessibilityIdentifier("pin-\(digit)")
