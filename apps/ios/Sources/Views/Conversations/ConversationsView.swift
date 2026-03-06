@@ -76,15 +76,19 @@ struct ConversationsView: View {
 
     @ViewBuilder
     private func conversationsList(vm: ConversationsViewModel) -> some View {
-        List {
-            ForEach(vm.filteredConversations) { conversation in
-                NavigationLink(value: conversation.id) {
-                    ConversationRowView(conversation: conversation)
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                ForEach(vm.filteredConversations) { conversation in
+                    NavigationLink(value: conversation.id) {
+                        ConversationRowView(conversation: conversation)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("conversation-row-\(conversation.id)")
                 }
-                .accessibilityIdentifier("conversation-row-\(conversation.id)")
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
-        .listStyle(.plain)
         .accessibilityIdentifier("conversations-list")
     }
 
@@ -171,8 +175,18 @@ struct ConversationRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Channel icon
-            channelBadge
+            // Avatar with channel overlay
+            ZStack(alignment: .bottomTrailing) {
+                GeneratedAvatar(hash: conversation.contactHash, size: 36)
+
+                Image(systemName: conversation.channel.iconName)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(Circle().fill(channelColor))
+                    .offset(x: 2, y: 2)
+                    .accessibilityLabel(conversation.channel.displayName)
+            }
 
             // Content
             VStack(alignment: .leading, spacing: 4) {
@@ -180,14 +194,14 @@ struct ConversationRowView: View {
                     Text(conversation.contactDisplayHash)
                         .font(.brandMono(.body))
                         .fontWeight(conversation.unreadCount > 0 ? .semibold : .regular)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.brandForeground)
                         .lineLimit(1)
 
                     Spacer()
 
                     Text(conversation.lastMessageRelativeTime)
-                        .font(.brand(.footnote))
-                        .foregroundStyle(.tertiary)
+                        .font(.brand(.caption2))
+                        .foregroundStyle(Color.brandMutedForeground)
                 }
 
                 HStack {
@@ -201,22 +215,16 @@ struct ConversationRowView: View {
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(12)
+        .background(Color.brandCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.brandBorder, lineWidth: 1)
+        )
     }
 
-    // MARK: - Channel Badge
-
-    private var channelBadge: some View {
-        Image(systemName: conversation.channel.iconName)
-            .font(.title3)
-            .foregroundStyle(channelColor)
-            .frame(width: 36, height: 36)
-            .background(
-                Circle()
-                    .fill(channelColor.opacity(0.12))
-            )
-            .accessibilityLabel(conversation.channel.displayName)
-    }
+    // MARK: - Channel Color
 
     private var channelColor: Color {
         switch conversation.channel {
@@ -229,23 +237,18 @@ struct ConversationRowView: View {
     // MARK: - Status Badge
 
     private var statusBadge: some View {
-        Text(conversation.conversationStatus.displayName)
-            .font(.brand(.caption))
-            .fontWeight(.medium)
-            .foregroundStyle(statusColor)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(
-                Capsule()
-                    .fill(statusColor.opacity(0.12))
-            )
+        BadgeView(
+            text: conversation.conversationStatus.displayName,
+            color: statusColor,
+            style: .subtle
+        )
     }
 
     private var statusColor: Color {
         switch conversation.conversationStatus {
-        case .active: return .green
+        case .active: return .statusActive
         case .waiting: return .orange
-        case .closed: return .secondary
+        case .closed: return .brandMutedForeground
         }
     }
 
@@ -260,7 +263,7 @@ struct ConversationRowView: View {
             .padding(.vertical, 2)
             .background(
                 Capsule()
-                    .fill(Color.red)
+                    .fill(Color.brandDestructive)
             )
             .accessibilityLabel(String(format: NSLocalizedString(
                 "conversations_unread_count",

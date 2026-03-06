@@ -56,13 +56,15 @@ struct ConversationDetailView: View {
 
                 Spacer()
 
-                Text(conversation.conversationStatus.displayName)
-                    .font(.brand(.caption2))
-                    .foregroundStyle(.secondary)
+                BadgeView(
+                    text: conversation.conversationStatus.displayName,
+                    color: statusColor(for: conversation.conversationStatus),
+                    style: .subtle
+                )
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color(.systemGray6))
+            .background(Color.brandCard)
             .accessibilityIdentifier("conversation-channel-header")
         }
     }
@@ -107,61 +109,64 @@ struct ConversationDetailView: View {
         let conversation = vm.allConversations.first { $0.id == conversationId }
         let isClosed = conversation?.conversationStatus == .closed
 
-        Divider()
-
         if isClosed {
             HStack {
                 Image(systemName: "lock.fill")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.brandMutedForeground)
                 Text(NSLocalizedString(
                     "conversation_closed_message",
                     comment: "This conversation is closed"
                 ))
                 .font(.brand(.footnote))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.brandMutedForeground)
             }
             .padding(12)
+            .background(Color.brandCard)
             .accessibilityIdentifier("conversation-closed-bar")
         } else {
-            HStack(spacing: 12) {
-                TextField(
-                    NSLocalizedString("conversation_reply_placeholder", comment: "Type a message..."),
-                    text: Binding(
-                        get: { vm.replyText },
-                        set: { vm.replyText = $0 }
-                    ),
-                    axis: .vertical
-                )
-                .lineLimit(1...5)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier("reply-text-field")
+            VStack(spacing: 0) {
+                Divider()
+                HStack(spacing: 12) {
+                    TextField(
+                        NSLocalizedString("conversation_reply_placeholder", comment: "Type a message..."),
+                        text: Binding(
+                            get: { vm.replyText },
+                            set: { vm.replyText = $0 }
+                        ),
+                        axis: .vertical
+                    )
+                    .lineLimit(1...5)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("reply-text-field")
 
-                Button {
-                    Task { await vm.sendReply() }
-                } label: {
-                    if vm.isSending {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(
-                                vm.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                    ? Color.secondary
-                                    : Color.accentColor
-                            )
+                    Button {
+                        Task { await vm.sendReply() }
+                    } label: {
+                        if vm.isSending {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(
+                                    vm.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                        ? Color.brandMutedForeground
+                                        : Color.brandPrimary
+                                )
+                        }
                     }
+                    .disabled(
+                        vm.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || vm.isSending
+                    )
+                    .accessibilityIdentifier("send-message-button")
+                    .accessibilityLabel(NSLocalizedString("conversation_send", comment: "Send message"))
                 }
-                .disabled(
-                    vm.replyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    || vm.isSending
-                )
-                .accessibilityIdentifier("send-message-button")
-                .accessibilityLabel(NSLocalizedString("conversation_send", comment: "Send message"))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .background(Color.brandCard)
         }
     }
 
@@ -207,9 +212,17 @@ struct ConversationDetailView: View {
 
     private func channelColor(for channel: ChannelType) -> Color {
         switch channel {
-        case .sms: return .blue
+        case .sms: return .brandPrimary
         case .whatsapp: return .green
         case .signal: return .brandPrimary
+        }
+    }
+
+    private func statusColor(for status: ConversationStatus) -> Color {
+        switch status {
+        case .active: return .statusActive
+        case .waiting: return .orange
+        case .closed: return .brandMutedForeground
         }
     }
 
@@ -248,14 +261,14 @@ struct MessageBubbleView: View {
                 // Message text
                 Text(message.text)
                     .font(.brand(.body))
-                    .foregroundStyle(message.isOutbound ? .white : .primary)
+                    .foregroundStyle(message.isOutbound ? .white : Color.brandForeground)
                     .accessibilityIdentifier("message-text-\(message.id)")
 
                 // Timestamp and read status
                 HStack(spacing: 4) {
                     Text(message.timeDisplay)
                         .font(.brand(.caption2))
-                        .foregroundStyle(message.isOutbound ? Color.white.opacity(0.7) : Color(UIColor.tertiaryLabel))
+                        .foregroundStyle(message.isOutbound ? Color.white.opacity(0.7) : Color.brandMutedForeground)
 
                     if message.isOutbound && message.isRead {
                         Image(systemName: "checkmark.circle.fill")
@@ -268,6 +281,12 @@ struct MessageBubbleView: View {
             .padding(.vertical, 8)
             .background(bubbleBackground)
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                message.isInbound
+                    ? RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.brandBorder, lineWidth: 1)
+                    : nil
+            )
 
             if message.isInbound {
                 Spacer(minLength: 60)
@@ -281,9 +300,9 @@ struct MessageBubbleView: View {
 
     private var bubbleBackground: some ShapeStyle {
         if message.isOutbound {
-            return AnyShapeStyle(Color.accentColor)
+            return AnyShapeStyle(Color.brandPrimary)
         } else {
-            return AnyShapeStyle(Color(.systemGray5))
+            return AnyShapeStyle(Color.brandCard)
         }
     }
 
