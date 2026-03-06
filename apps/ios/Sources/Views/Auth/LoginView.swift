@@ -13,89 +13,117 @@ struct LoginView: View {
     var body: some View {
         let vm = resolvedViewModel
 
-        ScrollView {
-            VStack(spacing: 32) {
-                // Logo and title
-                VStack(spacing: 12) {
-                    Image(systemName: "phone.fill")
-                        .font(.system(size: 48))
-                        .foregroundStyle(Color.brandPrimary)
-                        .accessibilityHidden(true)
+        ZStack(alignment: .top) {
+            // Subtle teal gradient at top
+            LinearGradient(
+                colors: [Color.brandPrimary.opacity(0.08), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: UIScreen.main.bounds.height * 0.15)
+            .ignoresSafeArea()
 
-                    Text(NSLocalizedString("app_name", comment: "Llamenos"))
-                        .font(.brand(.largeTitle))
-                        .fontWeight(.bold)
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Logo and title
+                    VStack(spacing: 12) {
+                        Image(systemName: "phone.badge.checkmark")
+                            .font(.system(size: 36))
+                            .foregroundStyle(Color.brandPrimary)
+                            .accessibilityHidden(true)
 
-                    Text(NSLocalizedString("login_subtitle", comment: "Secure crisis response hotline"))
-                        .font(.brand(.subheadline))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 40)
+                        Text(NSLocalizedString("app_name", comment: "Llamenos"))
+                            .font(.brand(.largeTitle))
+                            .fontWeight(.bold)
 
-                // Hub URL field
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(NSLocalizedString("login_hub_url_label", comment: "Hub URL"))
-                        .font(.brand(.caption))
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
+                        Text(NSLocalizedString("login_subtitle", comment: "Secure crisis response hotline"))
+                            .font(.brand(.subheadline))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 40)
 
-                    TextField(
-                        NSLocalizedString("login_hub_url_placeholder", comment: "https://hub.example.org"),
-                        text: Binding(
-                            get: { vm.hubURL },
-                            set: { vm.hubURL = $0 }
+                    // Hub URL field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(NSLocalizedString("login_hub_url_label", comment: "Hub URL"))
+                            .font(.brand(.caption))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+
+                        TextField(
+                            NSLocalizedString("login_hub_url_placeholder", comment: "https://hub.example.org"),
+                            text: Binding(
+                                get: { vm.hubURL },
+                                set: { vm.hubURL = $0 }
+                            )
                         )
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .textContentType(.URL)
-                    .keyboardType(.URL)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .accessibilityIdentifier("hub-url-input")
-                }
+                        .padding(12)
+                        .background(Color.brandCard)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.brandBorder, lineWidth: 1))
+                        .textContentType(.URL)
+                        .keyboardType(.URL)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .accessibilityIdentifier("hub-url-input")
+                    }
 
-                // Error message
-                if let error = vm.errorMessage {
-                    Text(error)
-                        .font(.brand(.footnote))
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .accessibilityIdentifier("login-error")
-                }
+                    // Error message
+                    if let error = vm.errorMessage {
+                        Text(error)
+                            .font(.brand(.footnote))
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(.center)
+                            .accessibilityIdentifier("login-error")
+                    }
 
-                // Action buttons
-                VStack(spacing: 16) {
-                    Button {
-                        vm.createNewIdentity()
-                        if case .showingNsec(let nsec, let npub) = vm.currentStep {
-                            router.showOnboarding(nsec: nsec, npub: npub)
+                    // Action buttons
+                    VStack(spacing: 16) {
+                        Button {
+                            vm.createNewIdentity()
+                            if case .showingNsec(let nsec, let npub) = vm.currentStep {
+                                router.showOnboarding(nsec: nsec, npub: npub)
+                            }
+                        } label: {
+                            Text(NSLocalizedString("login_create_identity", comment: "Create New Identity"))
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color.brandPrimary)
+                                .foregroundStyle(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                    } label: {
-                        Text(NSLocalizedString("login_create_identity", comment: "Create New Identity"))
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("create-identity")
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("create-identity")
 
-                    Button {
-                        vm.startImport()
-                        router.showImportKey()
-                    } label: {
-                        Text(NSLocalizedString("login_import_key", comment: "Import Existing Key"))
-                            .fontWeight(.medium)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                        Button {
+                            vm.startImport()
+                            router.showImportKey()
+                        } label: {
+                            Text(NSLocalizedString("login_import_key", comment: "Import Existing Key"))
+                                .fontWeight(.medium)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brandPrimary, lineWidth: 1.5))
+                                .foregroundStyle(Color.brandPrimary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("import-key")
                     }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("import-key")
+
+                    // Security tagline
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.shield")
+                            .font(.brand(.caption))
+                        Text(NSLocalizedString("login_encrypted_tagline", comment: "End-to-end encrypted"))
+                            .font(.brand(.caption))
+                    }
+                    .foregroundStyle(Color.brandMutedForeground)
+
+                    Spacer(minLength: 40)
                 }
-
-                Spacer(minLength: 40)
+                .padding(.horizontal, 24)
             }
-            .padding(.horizontal, 24)
         }
         .navigationBarBackButtonHidden()
     }
@@ -132,7 +160,7 @@ struct ImportKeyView: View {
                 // Header
                 VStack(spacing: 12) {
                     Image(systemName: "key.horizontal.fill")
-                        .font(.system(size: 40))
+                        .font(.system(size: 36))
                         .foregroundStyle(Color.brandPrimary)
                         .accessibilityHidden(true)
 
@@ -161,7 +189,10 @@ struct ImportKeyView: View {
                             set: { vm.nsecInput = $0 }
                         )
                     )
-                    .textFieldStyle(.roundedBorder)
+                    .padding(12)
+                    .background(Color.brandCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.brandBorder, lineWidth: 1))
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .font(.brandMono(.body))
@@ -178,23 +209,27 @@ struct ImportKeyView: View {
                 }
 
                 // Security note
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "lock.shield.fill")
-                        .foregroundStyle(.green)
-                        .font(.title3)
+                HStack(spacing: 0) {
+                    Color.brandPrimary
+                        .frame(width: 4)
 
-                    Text(NSLocalizedString(
-                        "import_security_note",
-                        comment: "Your key is encrypted with your PIN and stored in the iOS Keychain. It never leaves this device."
-                    ))
-                    .font(.brand(.footnote))
-                    .foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "lock.shield.fill")
+                            .foregroundStyle(Color.brandPrimary)
+                            .font(.title3)
+
+                        Text(NSLocalizedString(
+                            "import_security_note",
+                            comment: "Your key is encrypted with your PIN and stored in the iOS Keychain. It never leaves this device."
+                        ))
+                        .font(.brand(.footnote))
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(16)
                 }
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.green.opacity(0.1))
-                )
+                .background(Color.brandCard)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brandBorder, lineWidth: 1))
 
                 // Submit button
                 Button {
@@ -207,9 +242,13 @@ struct ImportKeyView: View {
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
+                        .background(Color.brandPrimary)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
                 .disabled(vm.nsecInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(vm.nsecInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1.0)
                 .accessibilityIdentifier("submit-import")
 
                 Spacer(minLength: 40)
