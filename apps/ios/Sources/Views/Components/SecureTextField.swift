@@ -53,12 +53,12 @@ private struct SecureTextContent: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray6))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.brandCard)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.systemGray4), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.brandAccent.opacity(0.6), lineWidth: 1)
             )
             // Disable all text interaction to prevent copy/paste
             .textSelection(.disabled)

@@ -9,6 +9,8 @@ struct PINUnlockView: View {
     @State private var pinViewModel: PINViewModel?
     @State private var hasAttemptedBiometric: Bool = false
     @State private var shakeOnError = false
+    @State private var breatheScale: CGFloat = 1.0
+    @State private var biometricPulse: CGFloat = 1.0
 
     var body: some View {
         let vm = resolvedPINViewModel
@@ -21,6 +23,12 @@ struct PINUnlockView: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 40))
                     .foregroundStyle(Color.brandPrimary)
+                    .scaleEffect(breatheScale)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                            breatheScale = 1.03
+                        }
+                    }
                     .accessibilityHidden(true)
 
                 Text(vm.titleText)
@@ -29,10 +37,14 @@ struct PINUnlockView: View {
 
                 // Show which identity is locked (truncated npub)
                 if let npub = appState.cryptoService.npub {
-                    Text(npub.truncatedNpub())
-                        .font(.brandMono(.caption))
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("locked-npub")
+                    BrandCard {
+                        CopyableField(
+                            label: NSLocalizedString("identity_label", comment: "Identity"),
+                            value: npub,
+                            truncated: true
+                        )
+                    }
+                    .accessibilityIdentifier("locked-npub")
                 }
 
                 Text(vm.subtitleText)
@@ -68,12 +80,26 @@ struct PINUnlockView: View {
                 BiometricButton {
                     handleBiometricUnlock()
                 }
+                .scaleEffect(biometricPulse)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                        biometricPulse = 1.05
+                    }
+                }
                 .padding(.top, 8)
             }
 
             Spacer()
         }
         .padding(.horizontal, 24)
+        .background(
+            LinearGradient(
+                colors: [Color.brandPrimary.opacity(0.05), Color.clear],
+                startPoint: .top,
+                endPoint: .center
+            )
+            .ignoresSafeArea()
+        )
         .onChange(of: vm.errorMessage) { _, newValue in
             if newValue != nil {
                 shakeOnError = true

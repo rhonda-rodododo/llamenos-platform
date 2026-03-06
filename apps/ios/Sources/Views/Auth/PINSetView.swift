@@ -9,30 +9,36 @@ struct PINSetView: View {
     @Environment(Router.self) private var router
     @State private var pinViewModel: PINViewModel?
     @State private var shakeOnError = false
+    @State private var lockRotation: Double = 0
 
     var body: some View {
         let vm = resolvedPINViewModel
 
-        VStack(spacing: 32) {
-            Spacer()
+        VStack(spacing: 24) {
+            StepIndicator(totalSteps: 3, currentStep: 3)
+                .padding(.top, 8)
 
             // Header
             VStack(spacing: 12) {
                 Image(systemName: vm.phase == .confirm ? "lock.fill" : "lock.open.fill")
                     .font(.system(size: 36))
                     .foregroundStyle(Color.brandPrimary)
+                    .rotationEffect(.degrees(lockRotation))
                     .accessibilityHidden(true)
                     .animation(.easeInOut, value: vm.phase)
 
                 Text(vm.titleText)
                     .font(.brand(.title2))
                     .fontWeight(.bold)
+                    .contentTransition(.opacity)
                     .animation(.easeInOut, value: vm.phase)
 
                 Text(vm.subtitleText)
                     .font(.brand(.subheadline))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut, value: vm.phase)
             }
 
             // Error message
@@ -58,9 +64,14 @@ struct PINSetView: View {
                 }
             )
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 24)
+        .onChange(of: vm.phase) { _, newPhase in
+            if newPhase == .confirm {
+                withAnimation(.spring()) { lockRotation = 360 }
+            }
+        }
         .onChange(of: vm.errorMessage) { _, newValue in
             if newValue != nil {
                 shakeOnError = true
