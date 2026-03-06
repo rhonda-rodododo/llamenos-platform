@@ -31,13 +31,24 @@ struct NoteCreateView: View {
                     TextEditor(text: $noteText)
                         .frame(minHeight: 150)
                         .font(.brand(.body))
+                        .foregroundStyle(Color.brandForeground)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .background(Color.brandCard)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(noteText.isEmpty ? Color.brandBorder : Color.brandPrimary.opacity(0.5), lineWidth: 1)
+                        )
                         .accessibilityIdentifier("note-text-editor")
                 } header: {
                     Text(NSLocalizedString("note_create_text_label", comment: "Note"))
+                        .font(.brand(.headline))
+                        .foregroundStyle(Color.brandForeground)
                 } footer: {
                     if noteText.isEmpty {
                         Text(NSLocalizedString("note_create_text_hint", comment: "Write your call notes here..."))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Color.brandMutedForeground)
                     }
                 }
 
@@ -49,6 +60,8 @@ struct NoteCreateView: View {
                         }
                     } header: {
                         Text(NSLocalizedString("note_create_fields_label", comment: "Details"))
+                            .font(.brand(.headline))
+                            .foregroundStyle(Color.brandForeground)
                     }
                 }
 
@@ -64,6 +77,8 @@ struct NoteCreateView: View {
                     .accessibilityIdentifier("note-call-id-input")
                 } header: {
                     Text(NSLocalizedString("note_create_call_id_label", comment: "Associated Call"))
+                        .font(.brand(.headline))
+                        .foregroundStyle(Color.brandForeground)
                 }
 
                 // Error display
@@ -74,12 +89,13 @@ struct NoteCreateView: View {
                                 .foregroundStyle(.orange)
                             Text(error)
                                 .font(.brand(.footnote))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.brandMutedForeground)
                         }
                     }
                     .accessibilityIdentifier("note-create-error")
                 }
             }
+            .tint(Color.brandPrimary)
             .navigationTitle(NSLocalizedString("note_create_title", comment: "New Note"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -92,11 +108,22 @@ struct NoteCreateView: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(NSLocalizedString("note_create_save", comment: "Save")) {
+                    Button {
                         Task { await saveNote() }
+                    } label: {
+                        Text(NSLocalizedString("note_create_save", comment: "Save"))
+                            .font(.brand(.subheadline))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color.brandPrimary)
+                                    .opacity(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving ? 0.4 : 1.0)
+                            )
                     }
                     .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
-                    .fontWeight(.semibold)
                     .accessibilityIdentifier("save-note")
                 }
             }

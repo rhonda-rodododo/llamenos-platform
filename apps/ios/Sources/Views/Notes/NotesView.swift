@@ -79,6 +79,9 @@ struct NotesView: View {
                 NavigationLink(value: note.id) {
                     NoteRowView(note: note)
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .accessibilityIdentifier("note-row-\(note.id)")
             }
 
@@ -101,6 +104,7 @@ struct NotesView: View {
                     Spacer()
                 }
                 .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
         }
         .listStyle(.plain)
@@ -141,7 +145,7 @@ struct NotesView: View {
                 .scaleEffect(1.2)
             Text(NSLocalizedString("notes_loading", comment: "Loading notes..."))
                 .font(.brand(.subheadline))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.brandMutedForeground)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
@@ -188,62 +192,80 @@ struct NotesView: View {
 // MARK: - NoteRowView
 
 /// A single note row in the list, showing preview text, metadata badges, and date.
+/// Wrapped in a BrandCard with a colored left accent border indicating note type.
 struct NoteRowView: View {
     let note: DecryptedNote
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Note preview text
-            Text(note.preview)
-                .font(.brand(.body))
-                .lineLimit(3)
-                .foregroundStyle(.primary)
-
-            // Metadata row
-            HStack(spacing: 12) {
-                // Author
-                HStack(spacing: 4) {
-                    Image(systemName: "person.fill")
-                        .font(.brand(.caption))
-                    Text(note.authorDisplayName)
-                        .font(.brand(.caption))
-                }
-                .foregroundStyle(.secondary)
-
-                // Call/Conversation badge
-                if note.callId != nil {
-                    badgeView(icon: "phone.fill", text: NSLocalizedString("notes_call_badge", comment: "Call"), color: Color.brandPrimary)
-                }
-                if note.conversationId != nil {
-                    badgeView(icon: "message.fill", text: NSLocalizedString("notes_conversation_badge", comment: "Chat"), color: .green)
-                }
-
-                Spacer()
-
-                // Date
-                Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.brand(.footnote))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.vertical, 8)
+    /// Accent color based on linked entity: teal for calls, green for conversations, default border for standalone.
+    private var accentColor: Color {
+        if note.callId != nil { return .teal }
+        if note.conversationId != nil { return .green }
+        return .brandBorder
     }
 
-    @ViewBuilder
-    private func badgeView(icon: String, text: String, color: Color) -> some View {
-        HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(.brand(.caption))
-            Text(text)
-                .font(.brand(.caption))
-                .fontWeight(.medium)
+    var body: some View {
+        HStack(spacing: 0) {
+            // Left accent border
+            RoundedRectangle(cornerRadius: 2)
+                .fill(accentColor)
+                .frame(width: 4)
+
+            // Content
+            VStack(alignment: .leading, spacing: 8) {
+                // Note preview text
+                Text(note.preview)
+                    .font(.brand(.body))
+                    .lineLimit(3)
+                    .foregroundStyle(Color.brandForeground)
+
+                // Metadata row
+                HStack(spacing: 8) {
+                    // Author
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.fill")
+                            .font(.brand(.caption2))
+                        Text(note.authorDisplayName)
+                            .font(.brand(.caption))
+                    }
+                    .foregroundStyle(Color.brandMutedForeground)
+
+                    // Call/Conversation badge
+                    if note.callId != nil {
+                        BadgeView(
+                            text: NSLocalizedString("notes_call_badge", comment: "Call"),
+                            icon: "phone.fill",
+                            color: .teal,
+                            style: .subtle
+                        )
+                    }
+                    if note.conversationId != nil {
+                        BadgeView(
+                            text: NSLocalizedString("notes_conversation_badge", comment: "Chat"),
+                            icon: "message.fill",
+                            color: .green,
+                            style: .subtle
+                        )
+                    }
+
+                    Spacer()
+
+                    // Date
+                    Text(note.createdAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.brand(.footnote))
+                        .foregroundStyle(Color.brandMutedForeground)
+                }
+            }
+            .padding(12)
         }
-        .foregroundStyle(color)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
         .background(
-            Capsule().fill(color.opacity(0.12))
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.brandCard)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.brandBorder, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
     }
 }
 

@@ -60,12 +60,16 @@ struct NoteDetailView: View {
     // MARK: - Note Text Section
 
     private var noteTextSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(note.payload.text)
-                .font(.brand(.body))
-                .textSelection(.enabled)
-                .privacySensitive()  // M28: Redact note content in screenshots
-                .accessibilityIdentifier("note-detail-text")
+        BrandCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(note.payload.text)
+                    .font(.brand(.body))
+                    .foregroundStyle(Color.brandForeground)
+                    .textSelection(.enabled)
+                    .privacySensitive()  // M28: Redact note content in screenshots
+                    .accessibilityIdentifier("note-detail-text")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -73,108 +77,95 @@ struct NoteDetailView: View {
 
     @ViewBuilder
     private func customFieldsSection(_ fields: [String: AnyCodableValue]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(NSLocalizedString("note_detail_fields", comment: "Details"))
-                .font(.brand(.headline))
-                .accessibilityIdentifier("note-detail-fields-header")
+        BrandCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(NSLocalizedString("note_detail_fields", comment: "Details"))
+                    .font(.brand(.headline))
+                    .foregroundStyle(Color.brandForeground)
+                    .accessibilityIdentifier("note-detail-fields-header")
 
-            ForEach(orderedFields(fields), id: \.key) { field in
-                LabeledContent {
-                    Text(field.value.displayValue)
-                        .font(.brand(.body))
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.trailing)
-                        .privacySensitive()  // M28: Redact custom field values in screenshots
-                } label: {
-                    Text(labelForField(named: field.key))
-                        .font(.brand(.subheadline))
-                        .foregroundStyle(.secondary)
+                ForEach(orderedFields(fields), id: \.key) { field in
+                    LabeledContent {
+                        Text(field.value.displayValue)
+                            .font(.brand(.body))
+                            .foregroundStyle(Color.brandForeground)
+                            .multilineTextAlignment(.trailing)
+                            .privacySensitive()  // M28: Redact custom field values in screenshots
+                    } label: {
+                        Text(labelForField(named: field.key))
+                            .font(.brand(.subheadline))
+                            .foregroundStyle(Color.brandMutedForeground)
+                    }
+                    .accessibilityIdentifier("note-field-\(field.key)")
                 }
-                .accessibilityIdentifier("note-field-\(field.key)")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-        )
     }
 
     // MARK: - Metadata Section
 
     private var metadataSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(NSLocalizedString("note_detail_metadata", comment: "Info"))
-                .font(.brand(.headline))
+        BrandCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(NSLocalizedString("note_detail_metadata", comment: "Info"))
+                    .font(.brand(.headline))
+                    .foregroundStyle(Color.brandForeground)
 
-            LabeledContent {
-                Text(note.authorDisplayName)
-                    .font(.brandMono(.body))
-                    .foregroundStyle(.primary)
-            } label: {
-                Text(NSLocalizedString("note_detail_author", comment: "Author"))
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityIdentifier("note-detail-author")
-
-            LabeledContent {
-                Text(note.createdAt.formatted(date: .long, time: .shortened))
-                    .foregroundStyle(.primary)
-            } label: {
-                Text(NSLocalizedString("note_detail_created", comment: "Created"))
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityIdentifier("note-detail-created")
-
-            if let updatedAt = note.updatedAt {
+                // Author
                 LabeledContent {
-                    Text(updatedAt.formatted(date: .long, time: .shortened))
-                        .foregroundStyle(.primary)
+                    Text(note.authorDisplayName)
+                        .font(.brandMono(.body))
+                        .foregroundStyle(Color.brandForeground)
                 } label: {
-                    Text(NSLocalizedString("note_detail_updated", comment: "Updated"))
-                        .foregroundStyle(.secondary)
+                    Text(NSLocalizedString("note_detail_author", comment: "Author"))
+                        .foregroundStyle(Color.brandMutedForeground)
                 }
-            }
+                .accessibilityIdentifier("note-detail-author")
 
-            if let callId = note.callId {
+                // Created date
                 LabeledContent {
-                    HStack(spacing: 4) {
-                        Image(systemName: "phone.fill")
-                            .font(.brand(.caption))
-                            .foregroundStyle(.blue)
-                        Text(String(callId.prefix(12)))
-                            .font(.brandMono(.body))
-                            .foregroundStyle(.blue)
+                    Text(note.createdAt.formatted(date: .long, time: .shortened))
+                        .font(.brand(.footnote))
+                        .foregroundStyle(Color.brandMutedForeground)
+                } label: {
+                    Text(NSLocalizedString("note_detail_created", comment: "Created"))
+                        .foregroundStyle(Color.brandMutedForeground)
+                }
+                .accessibilityIdentifier("note-detail-created")
+
+                // Updated date
+                if let updatedAt = note.updatedAt {
+                    LabeledContent {
+                        Text(updatedAt.formatted(date: .long, time: .shortened))
+                            .font(.brand(.footnote))
+                            .foregroundStyle(Color.brandMutedForeground)
+                    } label: {
+                        Text(NSLocalizedString("note_detail_updated", comment: "Updated"))
+                            .foregroundStyle(Color.brandMutedForeground)
                     }
-                } label: {
-                    Text(NSLocalizedString("note_detail_call", comment: "Call"))
-                        .foregroundStyle(.secondary)
                 }
-                .accessibilityIdentifier("note-detail-call")
-            }
 
-            if let conversationId = note.conversationId {
-                LabeledContent {
-                    HStack(spacing: 4) {
-                        Image(systemName: "message.fill")
-                            .font(.brand(.caption))
-                            .foregroundStyle(.green)
-                        Text(String(conversationId.prefix(12)))
-                            .font(.brandMono(.body))
-                            .foregroundStyle(.green)
-                    }
-                } label: {
-                    Text(NSLocalizedString("note_detail_conversation", comment: "Conversation"))
-                        .foregroundStyle(.secondary)
+                // Call ID — copyable
+                if let callId = note.callId {
+                    CopyableField(
+                        label: NSLocalizedString("note_detail_call", comment: "Call"),
+                        value: callId
+                    )
+                    .accessibilityIdentifier("note-detail-call")
                 }
-                .accessibilityIdentifier("note-detail-conversation")
+
+                // Conversation ID — copyable
+                if let conversationId = note.conversationId {
+                    CopyableField(
+                        label: NSLocalizedString("note_detail_conversation", comment: "Conversation"),
+                        value: conversationId
+                    )
+                    .accessibilityIdentifier("note-detail-conversation")
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-        )
     }
 
     // MARK: - Copy Confirmation Banner
@@ -182,17 +173,22 @@ struct NoteDetailView: View {
     private var copyConfirmationBanner: some View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.brandPrimary)
             Text(NSLocalizedString("note_copied", comment: "Note text copied"))
                 .font(.brand(.subheadline))
                 .fontWeight(.medium)
+                .foregroundStyle(Color.brandForeground)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(
             Capsule()
-                .fill(.ultraThinMaterial)
-                .shadow(radius: 8)
+                .fill(Color.brandCard)
+                .shadow(color: .black.opacity(0.08), radius: 8)
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.brandBorder, lineWidth: 1)
         )
         .padding(.bottom, 16)
         .accessibilityIdentifier("copy-confirmation")
