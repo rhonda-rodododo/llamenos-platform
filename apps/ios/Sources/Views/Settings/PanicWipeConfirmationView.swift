@@ -5,6 +5,8 @@ import SwiftUI
 struct PanicWipeConfirmationView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmationText = ""
+    @State private var showFinalAlert = false
 
     var body: some View {
         ScrollView {
@@ -26,9 +28,22 @@ struct PanicWipeConfirmationView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Type WIPE to confirm")
+                        .font(.brand(.subheadline))
+                        .foregroundStyle(Color.brandMutedForeground)
+
+                    TextField("WIPE", text: $confirmationText)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("panic-wipe-confirmation-input")
+                }
+                .padding(.horizontal, 24)
+
                 VStack(spacing: 12) {
                     Button(role: .destructive) {
-                        performPanicWipe()
+                        showFinalAlert = true
                     } label: {
                         Text(NSLocalizedString("panic_wipe_confirm", comment: "Wipe All Data"))
                             .fontWeight(.semibold)
@@ -36,6 +51,7 @@ struct PanicWipeConfirmationView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
+                    .disabled(confirmationText.uppercased() != "WIPE")
                     .accessibilityIdentifier("confirm-panic-wipe")
 
                     Button(role: .cancel) {
@@ -54,6 +70,18 @@ struct PanicWipeConfirmationView: View {
         }
         .navigationTitle(NSLocalizedString("panic_wipe_title", comment: "Emergency Data Wipe"))
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            Haptics.warning()
+        }
+        .alert("This cannot be undone", isPresented: $showFinalAlert) {
+            Button(NSLocalizedString("cancel", comment: "Cancel"), role: .cancel) {}
+            Button("Yes, Wipe Everything", role: .destructive) {
+                Haptics.error()
+                performPanicWipe()
+            }
+        } message: {
+            Text("Are you absolutely sure you want to wipe all data from this device?")
+        }
     }
 
     private func performPanicWipe() {
