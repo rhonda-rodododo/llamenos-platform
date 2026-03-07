@@ -468,6 +468,7 @@
 "dashboard_blasts" = "Message Blasts";
 "dashboard_blasts_subtitle" = "Send broadcast messages to subscribers";
 "dashboard_breakDescription" = "You won't receive calls while on break";
+"dashboard_calls" = "Calls";
 "dashboard_calls_today" = "Calls Today";
 "dashboard_callsToday" = "Calls Today";
 "dashboard_connection" = "Connection";
@@ -482,6 +483,7 @@
 "dashboard_error_refresh" = "Failed to refresh";
 "dashboard_go_on_break" = "Go On Break";
 "dashboard_goOnBreak" = "Take a Break";
+"dashboard_help" = "Help";
 "dashboard_hub" = "Hub";
 "dashboard_identity" = "Identity";
 "dashboard_no_active_calls" = "No active calls";
@@ -489,6 +491,7 @@
 "dashboard_no_recent_notes" = "No Recent Notes";
 "dashboard_noActiveCalls" = "No active calls";
 "dashboard_noShift" = "No shift scheduled";
+"dashboard_notes" = "Notes";
 "dashboard_noVolunteersOnline" = "No volunteers online";
 "dashboard_off_shift" = "Off Shift";
 "dashboard_offline" = "Offline";
@@ -571,6 +574,7 @@
 "error_biometric_not_available" = "Biometric authentication is not available";
 "error_decryption_failed" = "Decryption failed: %@";
 "error_encryption_failed" = "Encryption failed: %@";
+"error_hub_unreachable" = "Could not connect to the hub. Check the URL and try again.";
 "error_hub_url_empty" = "Please enter the hub URL";
 "error_hub_url_required" = "Hub URL is required";
 "error_identity_exists" = "An identity already exists";
@@ -588,8 +592,6 @@
 "error_pin_not_numeric" = "PIN must contain only digits";
 "error_pin_too_long" = "PIN must be at most 6 digits";
 "error_pin_too_short" = "PIN must be at least 4 digits";
-"error_pin_lockout_duration" = "Too many failed attempts. Locked for %d seconds.";
-"error_pin_wiped" = "Too many failed attempts. All keys have been wiped for security.";
 "error_wake_decrypt_failed" = "Wake decrypt failed: %@";
 "error_wake_key_generation" = "Failed to generate wake key";
 "error_wake_register_failed" = "Device registration failed: %@";
@@ -836,10 +838,12 @@
 "hubs_status_suspended" = "Suspended";
 "hubs_switchHub" = "Switch hub";
 "hubs_title" = "Hub Management";
+"identity_label" = "Identity";
 "import_key" = "Import Key";
 "import_nav_title" = "Import Key";
 "import_nsec_label" = "Secret Key (nsec)";
 "import_nsec_placeholder" = "nsec1...";
+"import_security_note" = "Your key is encrypted with your PIN and stored securely on this device. It never leaves this device.";
 "import_submit" = "Import Key";
 "import_subtitle" = "Paste your nsec key to restore your identity";
 "import_title" = "Import Your Key";
@@ -875,6 +879,7 @@
 "lock_keyWiped" = "Key has been wiped due to too many failed attempts";
 "lock_wrongPin" = "Wrong PIN";
 "login_create_identity" = "Create New Identity";
+"login_encrypted_tagline" = "End-to-end encrypted";
 "login_hub_url_label" = "Hub URL";
 "login_hub_url_placeholder" = "https://hub.example.org";
 "login_import_key" = "Import Existing Key";
@@ -1252,6 +1257,7 @@
 "session_reconnect" = "Reconnect";
 "session_stayLoggedIn" = "Stay logged in";
 "settings_about_header" = "About";
+"settings_account_title" = "Account";
 "settings_actions_header" = "Actions";
 "settings_admin" = "Admin Panel";
 "settings_admin_desc" = "Admin settings";
@@ -1340,6 +1346,7 @@
 "settings_phone" = "Phone Number";
 "settings_playRingtone" = "Play ringtone for incoming calls";
 "settings_playRingtoneDescription" = "Plays an audio tone when a call is ringing";
+"settings_preferences_title" = "Preferences";
 "settings_profile" = "Profile";
 "settings_pubkey" = "Hex Pubkey";
 "settings_queue" = "Queue";

@@ -38,7 +38,7 @@ enum APIError: LocalizedError {
 /// generate Schnorr auth tokens for each request. The auth token is sent as a Bearer
 /// header containing a JSON object with pubkey, timestamp, and BIP-340 signature.
 final class APIService: @unchecked Sendable {
-    private var baseURL: URL?
+    private(set) var baseURL: URL?
     private let cryptoService: CryptoService
     private let session: URLSession
     private let encoder: JSONEncoder
@@ -70,12 +70,15 @@ final class APIService: @unchecked Sendable {
 
     /// Set the base URL from a string, validating it first.
     /// H6: Rejects http:// URLs — only HTTPS is allowed for hub connections.
+    /// Exception: localhost/127.0.0.1 are allowed over HTTP for local development.
     /// Auto-prepends https:// if no scheme is specified.
     func configure(hubURLString: String) throws {
         var urlString = hubURLString.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // H6: Reject insecure HTTP connections
-        if urlString.lowercased().hasPrefix("http://") {
+        let isLocalhost = urlString.contains("localhost") || urlString.contains("127.0.0.1")
+
+        // H6: Reject insecure HTTP connections (except localhost)
+        if urlString.lowercased().hasPrefix("http://"), !isLocalhost {
             throw APIError.insecureConnection(
                 NSLocalizedString(
                     "error_http_not_allowed",
@@ -84,9 +87,9 @@ final class APIService: @unchecked Sendable {
             )
         }
 
-        // Auto-prepend https:// if no scheme
-        if !urlString.hasPrefix("https://") {
-            urlString = "https://\(urlString)"
+        // Auto-prepend scheme if none specified
+        if !urlString.hasPrefix("http://"), !urlString.hasPrefix("https://") {
+            urlString = isLocalhost ? "http://\(urlString)" : "https://\(urlString)"
         }
 
         // Strip trailing slash
@@ -97,6 +100,23 @@ final class APIService: @unchecked Sendable {
             throw APIError.invalidURL(hubURLString)
         }
         self.baseURL = url
+    }
+
+    /// Test whether the hub URL is reachable. Returns true if the server responds.
+    func validateConnection() async -> Bool {
+        guard let baseURL else { return false }
+        let healthURL = baseURL.appendingPathComponent("/api/health")
+        var request = URLRequest(url: healthURL, timeoutInterval: 5)
+        request.httpMethod = "GET"
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                return (200...499).contains(httpResponse.statusCode)
+            }
+            return false
+        } catch {
+            return false
+        }
     }
 
     /// Perform an authenticated API request.

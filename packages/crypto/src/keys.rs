@@ -84,6 +84,37 @@ pub fn keypair_from_nsec(nsec: &str) -> Result<KeyPair, CryptoError> {
     })
 }
 
+/// Derive a keypair from a 64-char hex secret key.
+#[cfg_attr(feature = "mobile", uniffi::export)]
+pub fn keypair_from_secret_key_hex(secret_key_hex: &str) -> Result<KeyPair, CryptoError> {
+    let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
+    if sk_bytes.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+
+    let sk = SecretKey::from_slice(&sk_bytes).map_err(|_| CryptoError::InvalidSecretKey)?;
+    let pk = sk.public_key();
+
+    let pk_point = pk.to_encoded_point(true);
+    let pk_compressed = pk_point.as_bytes();
+    let pk_xonly = &pk_compressed[1..];
+
+    let secret_key_hex = hex::encode(&sk_bytes);
+    let public_key = hex::encode(pk_xonly);
+
+    let nsec = bech32::encode::<Bech32>(Hrp::parse("nsec").unwrap(), &sk_bytes)
+        .expect("bech32 encode nsec");
+    let npub = bech32::encode::<Bech32>(Hrp::parse("npub").unwrap(), pk_xonly)
+        .expect("bech32 encode npub");
+
+    Ok(KeyPair {
+        secret_key_hex,
+        public_key,
+        nsec,
+        npub,
+    })
+}
+
 /// Get the x-only public key (hex) from a secret key (hex).
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn get_public_key(secret_key_hex: &str) -> Result<String, CryptoError> {
@@ -137,6 +168,15 @@ mod tests {
         let kp = generate_keypair();
         let pk = get_public_key(&kp.secret_key_hex).unwrap();
         assert_eq!(pk, kp.public_key);
+    }
+
+    #[test]
+    fn roundtrip_hex() {
+        let kp = generate_keypair();
+        let restored = keypair_from_secret_key_hex(&kp.secret_key_hex).unwrap();
+        assert_eq!(kp.public_key, restored.public_key);
+        assert_eq!(kp.nsec, restored.nsec);
+        assert_eq!(kp.npub, restored.npub);
     }
 
     #[test]

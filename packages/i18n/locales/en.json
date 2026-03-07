@@ -559,7 +559,10 @@
     "title": "Dashboard",
     "view_all_notes": "View All Notes",
     "view_calls": "View Calls",
-    "volunteerStatus": "Volunteer Status"
+    "volunteerStatus": "Volunteer Status",
+    "calls": "Calls",
+    "notes": "Notes",
+    "help": "Help"
   },
   "decrypting_keys": "Decrypting keys...",
   "delete": "Delete",
@@ -654,7 +657,8 @@
     "pin_too_short": "PIN must be at least 4 digits",
     "wake_decrypt_failed": "Wake decrypt failed: %@",
     "wake_key_generation": "Failed to generate wake key",
-    "wake_register_failed": "Device registration failed: %@"
+    "wake_register_failed": "Device registration failed: %@",
+    "hub_unreachable": "Could not connect to the hub. Check the URL and try again."
   },
   "event_type": {
     "call": "Call",
@@ -921,7 +925,8 @@
     "nsec_placeholder": "nsec1...",
     "submit": "Import Key",
     "subtitle": "Paste your nsec key to restore your identity",
-    "title": "Import Your Key"
+    "title": "Import Your Key",
+    "security_note": "Your key is encrypted with your PIN and stored securely on this device. It never leaves this device."
   },
   "import_key": "Import Key",
   "incoming_call": "Incoming Call",
@@ -968,7 +973,8 @@
     "hub_url_label": "Hub URL",
     "hub_url_placeholder": "https://hub.example.org",
     "import_key": "Import Existing Key",
-    "subtitle": "Secure crisis response hotline"
+    "subtitle": "Secure crisis response hotline",
+    "encrypted_tagline": "End-to-end encrypted"
   },
   "login_or": "or",
   "logout": {
@@ -1513,7 +1519,9 @@
     "notConfigured": "Not configured",
     "queue": "Queue",
     "rateLimit": "Rate limit",
-    "voicemail": "Voicemail"
+    "voicemail": "Voicemail",
+    "account_title": "Account",
+    "preferences_title": "Preferences"
   },
   "setup": {
     "autoResponse": "Auto-Response Template",
@@ -1947,5 +1955,6 @@
   "yes": "Yes",
   "your_identity": "Your Identity",
   "your_private_key": "Your Private Key",
-  "your_public_key": "Your Public Key"
+  "your_public_key": "Your Public Key",
+  "identity_label": "Identity"
 }

@@ -588,8 +588,6 @@
 "error_pin_not_numeric" = "PIN must contain only digits";
 "error_pin_too_long" = "PIN must be at most 6 digits";
 "error_pin_too_short" = "PIN must be at least 4 digits";
-"error_pin_lockout_duration" = "Too many failed attempts. Locked for %d seconds.";
-"error_pin_wiped" = "Too many failed attempts. All keys have been wiped for security.";
 "error_wake_decrypt_failed" = "Wake decrypt failed: %@";
 "error_wake_key_generation" = "Failed to generate wake key";
 "error_wake_register_failed" = "Device registration failed: %@";

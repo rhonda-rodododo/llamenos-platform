@@ -73,8 +73,8 @@ build_android() {
   echo "=============================="
   echo ""
 
-  # Verify cargo-ndk is installed
-  if ! command -v cargo-ndk &>/dev/null; then
+  # Verify cargo-ndk is installed (cargo subcommand check works with asdf/rustup shims)
+  if ! cargo ndk --version &>/dev/null; then
     echo "ERROR: cargo-ndk not found. Install it with: cargo install cargo-ndk"
     exit 1
   fi

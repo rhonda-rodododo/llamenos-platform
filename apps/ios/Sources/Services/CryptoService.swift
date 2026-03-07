@@ -12,6 +12,10 @@ private func ffiKeypairFromNsec(_ nsec: String) throws -> KeyPair {
     try keypairFromNsec(nsec: nsec)
 }
 
+private func ffiKeypairFromSecretKeyHex(_ hex: String) throws -> KeyPair {
+    try keypairFromSecretKeyHex(secretKeyHex: hex)
+}
+
 private func ffiIsValidPin(_ pin: String) -> Bool {
     isValidPin(pin: pin)
 }
@@ -121,9 +125,16 @@ final class CryptoService: @unchecked Sendable {
 
     // MARK: - Key Import
 
-    /// Import an existing nsec (bech32-encoded secret key).
-    func importNsec(_ nsec: String) throws {
-        let kp = try ffiKeypairFromNsec(nsec)
+    /// Import an existing nsec (bech32 `nsec1...` or 64-char hex).
+    func importNsec(_ input: String) throws {
+        let kp: KeyPair
+        if input.hasPrefix("nsec1") {
+            kp = try ffiKeypairFromNsec(input)
+        } else if input.count == 64, input.allSatisfy(\.isHexDigit) {
+            kp = try ffiKeypairFromSecretKeyHex(input)
+        } else {
+            throw CryptoError.InvalidNsec(message: "Enter a bech32 key (nsec1...) or 64-character hex key")
+        }
         self.nsecHex = kp.secretKeyHex
         self.nsecBech32 = kp.nsec
         self.pubkey = kp.publicKey

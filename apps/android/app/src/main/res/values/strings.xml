@@ -471,6 +471,7 @@
     <string name="dashboard_blasts">Message Blasts</string>
     <string name="dashboard_blasts_subtitle">Send broadcast messages to subscribers</string>
     <string name="dashboard_breakDescription">You won\'t receive calls while on break</string>
+    <string name="dashboard_calls">Calls</string>
     <string name="dashboard_calls_today">Calls Today</string>
     <string name="dashboard_callsToday">Calls Today</string>
     <string name="dashboard_connection">Connection</string>
@@ -485,6 +486,7 @@
     <string name="dashboard_error_refresh">Failed to refresh</string>
     <string name="dashboard_go_on_break">Go On Break</string>
     <string name="dashboard_goOnBreak">Take a Break</string>
+    <string name="dashboard_help">Help</string>
     <string name="dashboard_hub">Hub</string>
     <string name="dashboard_identity">Identity</string>
     <string name="dashboard_no_active_calls">No active calls</string>
@@ -492,6 +494,7 @@
     <string name="dashboard_no_recent_notes">No Recent Notes</string>
     <string name="dashboard_noActiveCalls">No active calls</string>
     <string name="dashboard_noShift">No shift scheduled</string>
+    <string name="dashboard_notes">Notes</string>
     <string name="dashboard_noVolunteersOnline">No volunteers online</string>
     <string name="dashboard_off_shift">Off Shift</string>
     <string name="dashboard_offline">Offline</string>
@@ -574,6 +577,7 @@
     <string name="error_biometric_not_available">Biometric authentication is not available</string>
     <string name="error_decryption_failed">Decryption failed: %@</string>
     <string name="error_encryption_failed">Encryption failed: %@</string>
+    <string name="error_hub_unreachable">Could not connect to the hub. Check the URL and try again.</string>
     <string name="error_hub_url_empty">Please enter the hub URL</string>
     <string name="error_hub_url_required">Hub URL is required</string>
     <string name="error_identity_exists">An identity already exists</string>
@@ -837,10 +841,12 @@
     <string name="hubs_status_suspended">Suspended</string>
     <string name="hubs_switchHub">Switch hub</string>
     <string name="hubs_title">Hub Management</string>
+    <string name="identity_label">Identity</string>
     <string name="import_key">Import Key</string>
     <string name="import_nav_title">Import Key</string>
     <string name="import_nsec_label">Secret Key (nsec)</string>
     <string name="import_nsec_placeholder">nsec1...</string>
+    <string name="import_security_note">Your key is encrypted with your PIN and stored securely on this device. It never leaves this device.</string>
     <string name="import_submit">Import Key</string>
     <string name="import_subtitle">Paste your nsec key to restore your identity</string>
     <string name="import_title">Import Your Key</string>
@@ -876,6 +882,7 @@
     <string name="lock_keyWiped">Key has been wiped due to too many failed attempts</string>
     <string name="lock_wrongPin">Wrong PIN</string>
     <string name="login_create_identity">Create New Identity</string>
+    <string name="login_encrypted_tagline">End-to-end encrypted</string>
     <string name="login_hub_url_label">Hub URL</string>
     <string name="login_hub_url_placeholder">https://hub.example.org</string>
     <string name="login_import_key">Import Existing Key</string>
@@ -1253,6 +1260,7 @@
     <string name="session_reconnect">Reconnect</string>
     <string name="session_stayLoggedIn">Stay logged in</string>
     <string name="settings_about_header">About</string>
+    <string name="settings_account_title">Account</string>
     <string name="settings_actions_header">Actions</string>
     <string name="settings_admin">Admin Panel</string>
     <string name="settings_admin_desc">Admin settings</string>
@@ -1341,6 +1349,7 @@
     <string name="settings_phone">Phone Number</string>
     <string name="settings_playRingtone">Play ringtone for incoming calls</string>
     <string name="settings_playRingtoneDescription">Plays an audio tone when a call is ringing</string>
+    <string name="settings_preferences_title">Preferences</string>
     <string name="settings_profile">Profile</string>
     <string name="settings_pubkey">Hex Pubkey</string>
     <string name="settings_queue">Queue</string>

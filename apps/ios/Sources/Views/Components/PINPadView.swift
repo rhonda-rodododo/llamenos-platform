@@ -38,8 +38,12 @@ struct PINPadView: View {
         ["", "0", "backspace"],
     ]
 
+    private let buttonSize: CGFloat = 64
+    private let buttonSpacing: CGFloat = 16
+    private let rowSpacing: CGFloat = 12
+
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 16) {
             // PIN dots indicator
             HStack(spacing: 12) {
                 ForEach(0..<maxLength, id: \.self) { index in
@@ -50,40 +54,40 @@ struct PINPadView: View {
                             Circle()
                                 .stroke(isFilled ? Color.brandPrimary : Color.brandBorder, lineWidth: 1.5)
                         )
-                        .frame(width: 16, height: 16)
+                        .frame(width: 14, height: 14)
                         .scaleEffect(index < dotScales.count ? dotScales[index] : 1.0)
                         .animation(.easeInOut(duration: 0.15), value: pin.count)
                 }
             }
             .offset(x: shakeOffset)
             .accessibilityIdentifier("pin-dots")
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
 
             // Number grid
-            VStack(spacing: 16) {
+            VStack(spacing: rowSpacing) {
                 ForEach(buttons, id: \.self) { row in
-                    HStack(spacing: 24) {
+                    HStack(spacing: buttonSpacing) {
                         ForEach(row, id: \.self) { label in
                             if label.isEmpty {
                                 // Empty spacer cell
                                 Color.clear
-                                    .frame(width: 72, height: 72)
+                                    .frame(width: buttonSize, height: buttonSize)
                             } else if label == "backspace" {
                                 // Backspace button
                                 Button {
                                     handleBackspace()
                                 } label: {
                                     Image(systemName: "delete.left")
-                                        .font(.title2)
+                                        .font(.title3)
                                         .foregroundStyle(.primary)
-                                        .frame(width: 72, height: 72)
+                                        .frame(width: buttonSize, height: buttonSize)
                                 }
                                 .accessibilityIdentifier("pin-backspace")
                                 .accessibilityLabel(NSLocalizedString("pin_backspace", comment: "Delete last digit"))
                                 .disabled(pin.isEmpty)
                             } else {
                                 // Digit button
-                                PINDigitButton(digit: label) {
+                                PINDigitButton(digit: label, size: buttonSize) {
                                     handleDigit(label)
                                 }
                             }
@@ -149,15 +153,16 @@ struct PINPadView: View {
 /// Individual digit button in the PIN pad with a circular background.
 private struct PINDigitButton: View {
     let digit: String
+    let size: CGFloat
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(digit)
-                .font(.brand(.title))
+                .font(.brand(.title2))
                 .fontWeight(.medium)
                 .foregroundStyle(Color.brandForeground)
-                .frame(width: 72, height: 72)
+                .frame(width: size, height: size)
                 .background(
                     Circle()
                         .fill(Color.brandCard)

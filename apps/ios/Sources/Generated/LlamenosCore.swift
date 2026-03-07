@@ -1681,6 +1681,16 @@ public func keypairFromNsec(nsec: String)throws  -> KeyPair {
 })
 }
 /**
+ * Derive a keypair from a 64-char hex secret key.
+ */
+public func keypairFromSecretKeyHex(secretKeyHex: String)throws  -> KeyPair {
+    return try  FfiConverterTypeKeyPair.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_llamenos_core_fn_func_keypair_from_secret_key_hex(
+        FfiConverterString.lower(secretKeyHex),$0
+    )
+})
+}
+/**
  * Generate 32 random bytes, returned as a hex string.
  */
 public func randomBytesHex() -> String {
@@ -1817,6 +1827,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_keypair_from_nsec() != 313) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_keypair_from_secret_key_hex() != 13284) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_random_bytes_hex() != 19039) {

@@ -27,9 +27,10 @@ struct LoginView: View {
                 VStack(spacing: 32) {
                     // Logo and title
                     VStack(spacing: 12) {
-                        Image(systemName: "phone.badge.checkmark")
-                            .font(.system(size: 36))
-                            .foregroundStyle(Color.brandPrimary)
+                        Image("Logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 80, height: 80)
                             .accessibilityHidden(true)
 
                         Text(NSLocalizedString("app_name", comment: "Llamenos"))
@@ -80,9 +81,11 @@ struct LoginView: View {
                     // Action buttons
                     VStack(spacing: 16) {
                         Button {
-                            vm.createNewIdentity()
-                            if case .showingNsec(let nsec, let npub) = vm.currentStep {
-                                router.showOnboarding(nsec: nsec, npub: npub)
+                            Task {
+                                await vm.createNewIdentity()
+                                if case .showingNsec(let nsec, let npub) = vm.currentStep {
+                                    router.showOnboarding(nsec: nsec, npub: npub)
+                                }
                             }
                         } label: {
                             Text(NSLocalizedString("login_create_identity", comment: "Create New Identity"))
@@ -94,11 +97,15 @@ struct LoginView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         .buttonStyle(.plain)
+                        .disabled(vm.isLoading)
                         .accessibilityIdentifier("create-identity")
 
                         Button {
-                            vm.startImport()
-                            router.showImportKey()
+                            Task {
+                                if await vm.startImport() {
+                                    router.showImportKey()
+                                }
+                            }
                         } label: {
                             Text(NSLocalizedString("login_import_key", comment: "Import Existing Key"))
                                 .fontWeight(.medium)
@@ -108,6 +115,7 @@ struct LoginView: View {
                                 .foregroundStyle(Color.brandPrimary)
                         }
                         .buttonStyle(.plain)
+                        .disabled(vm.isLoading)
                         .accessibilityIdentifier("import-key")
                     }
 
@@ -173,7 +181,7 @@ struct ImportKeyView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                .padding(.top, 20)
+                .padding(.top, 40)
 
                 // Nsec input
                 VStack(alignment: .leading, spacing: 8) {
@@ -257,15 +265,6 @@ struct ImportKeyView: View {
         }
         .navigationTitle(NSLocalizedString("import_nav_title", comment: "Import Key"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button(NSLocalizedString("cancel", comment: "Cancel")) {
-                    vm.cancelImport()
-                    router.goBack()
-                }
-                .accessibilityIdentifier("cancel-import")
-            }
-        }
     }
 
     // MARK: - ViewModel Resolution

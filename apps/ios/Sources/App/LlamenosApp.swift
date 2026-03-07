@@ -12,8 +12,14 @@ struct LlamenosApp: App {
         let inlineTitleAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont(name: "DMSans-SemiBold", size: 17) ?? UIFont.systemFont(ofSize: 17, weight: .semibold)
         ]
-        UINavigationBar.appearance().largeTitleTextAttributes = largeTitleAttrs
-        UINavigationBar.appearance().titleTextAttributes = inlineTitleAttrs
+        let navBarAppearance = UINavigationBarAppearance()
+        navBarAppearance.configureWithDefaultBackground()
+        navBarAppearance.largeTitleTextAttributes = largeTitleAttrs
+        navBarAppearance.titleTextAttributes = inlineTitleAttrs
+
+        UINavigationBar.appearance().standardAppearance = navBarAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
+        UINavigationBar.appearance().compactAppearance = navBarAppearance
     }
 
     @Environment(\.scenePhase) private var scenePhase

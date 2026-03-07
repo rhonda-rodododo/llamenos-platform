@@ -49,21 +49,28 @@ struct DashboardView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
             }
-            .navigationTitle(NSLocalizedString("dashboard_title", comment: "Dashboard"))
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarHidden(true)
             .accessibilityIdentifier("dashboard-title")
             .refreshable {
                 await vm.refresh()
             }
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
+            .safeAreaInset(edge: .top) {
+                HStack {
+                    Text(NSLocalizedString("dashboard_title", comment: "Dashboard"))
+                        .font(.brand(.headline))
+                        .fontWeight(.bold)
+                    Spacer()
                     Button {
                         appState.lockApp()
                     } label: {
                         Image(systemName: "lock.fill")
+                            .foregroundStyle(Color.brandPrimary)
                     }
                     .accessibilityIdentifier("lock-app")
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.bar)
             }
             .navigationDestination(item: $quickActionDestination) { destination in
                 switch destination {
