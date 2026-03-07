@@ -99,7 +99,7 @@ fun ReportsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.report_create),
+                    contentDescription = stringResource(R.string.reports_create),
                 )
             }
         },
@@ -130,7 +130,7 @@ fun ReportsScreen(
                                     when (filter) {
                                         ReportStatusFilter.ALL -> stringResource(R.string.filter_all)
                                         ReportStatusFilter.ACTIVE -> stringResource(R.string.filter_active)
-                                        ReportStatusFilter.WAITING -> stringResource(R.string.report_filter_waiting)
+                                        ReportStatusFilter.WAITING -> stringResource(R.string.reports_filter_waiting)
                                         ReportStatusFilter.CLOSED -> stringResource(R.string.filter_closed)
                                     },
                                 )

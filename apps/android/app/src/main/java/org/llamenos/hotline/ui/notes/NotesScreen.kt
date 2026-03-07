@@ -96,7 +96,7 @@ fun NotesScreen(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.note_create),
+                    contentDescription = stringResource(R.string.notes_create),
                 )
             }
         },

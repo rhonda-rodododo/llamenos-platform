@@ -115,7 +115,7 @@ fun ConversationDetailScreen(
             onDismissRequest = { viewModel.dismissAssignDialog() },
             title = {
                 Text(
-                    stringResource(R.string.conversation_assign_title),
+                    stringResource(R.string.conversations_assign_title),
                     modifier = Modifier.testTag("assign-dialog-title"),
                 )
             },
@@ -124,7 +124,7 @@ fun ConversationDetailScreen(
                     modifier = Modifier.testTag("assign-dialog-content"),
                 ) {
                     Text(
-                        text = stringResource(R.string.conversation_assign_desc),
+                        text = stringResource(R.string.conversations_assign_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -139,7 +139,7 @@ fun ConversationDetailScreen(
                         }
                     } else if (uiState.assignableVolunteers.isEmpty()) {
                         Text(
-                            text = stringResource(R.string.conversation_no_volunteers),
+                            text = stringResource(R.string.conversations_no_volunteers),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -245,7 +245,7 @@ fun ConversationDetailScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.NoteAdd,
-                                contentDescription = stringResource(R.string.conversation_add_note),
+                                contentDescription = stringResource(R.string.conversations_add_note),
                             )
                         }
 
@@ -256,7 +256,7 @@ fun ConversationDetailScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.PersonAdd,
-                                contentDescription = stringResource(R.string.conversation_assign),
+                                contentDescription = stringResource(R.string.conversations_assign),
                             )
                         }
 
@@ -268,7 +268,7 @@ fun ConversationDetailScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Refresh,
-                                    contentDescription = stringResource(R.string.conversation_reopen),
+                                    contentDescription = stringResource(R.string.conversations_reopen),
                                 )
                             }
                         } else {
@@ -278,7 +278,7 @@ fun ConversationDetailScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Close,
-                                    contentDescription = stringResource(R.string.conversation_close),
+                                    contentDescription = stringResource(R.string.conversations_close),
                                     tint = MaterialTheme.colorScheme.error,
                                 )
                             }
@@ -316,7 +316,7 @@ fun ConversationDetailScreen(
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = stringResource(R.string.conversation_e2ee),
+                    text = stringResource(R.string.conversations_e2ee),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -342,7 +342,7 @@ fun ConversationDetailScreen(
                                 CircularProgressIndicator()
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = stringResource(R.string.conversation_decrypting),
+                                    text = stringResource(R.string.conversations_decrypting),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -423,7 +423,7 @@ fun ConversationDetailScreen(
                     value = replyText,
                     onValueChange = { replyText = it },
                     placeholder = {
-                        Text(stringResource(R.string.conversation_reply_hint))
+                        Text(stringResource(R.string.conversations_reply_hint))
                     },
                     modifier = Modifier
                         .weight(1f)

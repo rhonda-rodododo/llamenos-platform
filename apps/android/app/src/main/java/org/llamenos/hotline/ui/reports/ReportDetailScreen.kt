@@ -97,7 +97,7 @@ fun ReportDetailScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = stringResource(R.string.report_not_found),
+                    text = stringResource(R.string.reports_not_found),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("report-not-found"),
@@ -274,7 +274,7 @@ fun ReportDetailScreen(
                     ) {
                         // Created date
                         MetadataRow(
-                            label = stringResource(R.string.report_created),
+                            label = stringResource(R.string.reports_created),
                             value = DateFormatUtils.formatDateVerbose(report.createdAt),
                             testTag = "report-detail-created",
                         )
@@ -282,7 +282,7 @@ fun ReportDetailScreen(
                         // Updated date
                         if (report.updatedAt != null) {
                             MetadataRow(
-                                label = stringResource(R.string.report_updated),
+                                label = stringResource(R.string.reports_updated),
                                 value = DateFormatUtils.formatDateVerbose(report.updatedAt),
                                 testTag = "report-detail-updated",
                             )
@@ -290,7 +290,7 @@ fun ReportDetailScreen(
 
                         // Message count
                         MetadataRow(
-                            label = stringResource(R.string.report_messages),
+                            label = stringResource(R.string.reports_messages),
                             value = report.messageCount.toString(),
                             testTag = "report-detail-messages",
                         )
@@ -298,7 +298,7 @@ fun ReportDetailScreen(
                         // Assigned volunteer
                         if (report.assignedTo != null) {
                             MetadataRow(
-                                label = stringResource(R.string.report_assigned),
+                                label = stringResource(R.string.reports_assigned),
                                 value = report.assignedTo.take(8) + "..." + report.assignedTo.takeLast(8),
                                 testTag = "report-detail-assigned",
                             )
@@ -312,7 +312,7 @@ fun ReportDetailScreen(
                                 label = {
                                     Text(
                                         stringResource(
-                                            R.string.report_linked_call,
+                                            R.string.reports_linked_call,
                                             report.metadata.linkedCallId.take(8),
                                         ),
                                     )

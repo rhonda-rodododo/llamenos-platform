@@ -146,8 +146,8 @@ fun CallHistoryScreen(
                                 Text(
                                     when (filter) {
                                         CallStatusFilter.ALL -> stringResource(R.string.filter_all)
-                                        CallStatusFilter.COMPLETED -> stringResource(R.string.call_filter_completed)
-                                        CallStatusFilter.UNANSWERED -> stringResource(R.string.call_filter_unanswered)
+                                        CallStatusFilter.COMPLETED -> stringResource(R.string.call_history_filter_completed)
+                                        CallStatusFilter.UNANSWERED -> stringResource(R.string.call_history_filter_unanswered)
                                     },
                                 )
                             },
@@ -314,7 +314,7 @@ private fun CallRecordCard(
                         text = if (call.callerLast4 != null) {
                             "***${call.callerLast4}"
                         } else {
-                            stringResource(R.string.call_unknown_caller)
+                            stringResource(R.string.calls_unknown_caller)
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
@@ -323,7 +323,7 @@ private fun CallRecordCard(
 
                     if (isUnanswered) {
                         Text(
-                            text = stringResource(R.string.call_filter_unanswered),
+                            text = stringResource(R.string.call_history_filter_unanswered),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -364,21 +364,21 @@ private fun CallRecordCard(
                         if (call.hasVoicemail) {
                             MetadataBadge(
                                 icon = Icons.Filled.Voicemail,
-                                label = stringResource(R.string.call_voicemail),
+                                label = stringResource(R.string.calls_voicemail),
                                 testTag = "call-voicemail-badge",
                             )
                         }
                         if (call.hasTranscription) {
                             MetadataBadge(
                                 icon = Icons.Filled.GraphicEq,
-                                label = stringResource(R.string.call_transcription),
+                                label = stringResource(R.string.calls_transcription),
                                 testTag = "call-transcription-badge",
                             )
                         }
                         if (call.hasRecording) {
                             MetadataBadge(
                                 icon = Icons.Filled.GraphicEq,
-                                label = stringResource(R.string.call_recording),
+                                label = stringResource(R.string.calls_recording),
                                 testTag = "call-recording-badge",
                             )
                         }
@@ -393,7 +393,7 @@ private fun CallRecordCard(
             ) {
                 Icon(
                     imageVector = Icons.Filled.NoteAdd,
-                    contentDescription = stringResource(R.string.call_add_note),
+                    contentDescription = stringResource(R.string.calls_add_note),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
@@ -464,7 +464,7 @@ private fun DateRangeFilter(
             onClick = { showFromPicker = true },
             label = {
                 Text(
-                    text = dateFrom ?: stringResource(R.string.call_date_from),
+                    text = dateFrom ?: stringResource(R.string.call_history_date_from),
                     style = MaterialTheme.typography.labelSmall,
                 )
             },
@@ -484,7 +484,7 @@ private fun DateRangeFilter(
             onClick = { showToPicker = true },
             label = {
                 Text(
-                    text = dateTo ?: stringResource(R.string.call_date_to),
+                    text = dateTo ?: stringResource(R.string.call_history_date_to),
                     style = MaterialTheme.typography.labelSmall,
                 )
             },

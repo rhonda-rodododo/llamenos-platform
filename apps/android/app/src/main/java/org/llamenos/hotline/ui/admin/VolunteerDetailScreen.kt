@@ -73,7 +73,7 @@ fun VolunteerDetailScreen(
                 title = {
                     Text(
                         text = uiState.volunteer?.displayName
-                            ?: stringResource(R.string.volunteer_detail_title),
+                            ?: stringResource(R.string.volunteers_detail_title),
                         modifier = Modifier.testTag("volunteer-detail-title"),
                     )
                 },
@@ -118,7 +118,7 @@ fun VolunteerDetailScreen(
                 ) {
                     org.llamenos.hotline.ui.components.EmptyState(
                         icon = Icons.Filled.Person,
-                        title = stringResource(R.string.volunteer_not_found),
+                        title = stringResource(R.string.volunteers_not_found),
                         testTag = "volunteer-not-found",
                     )
                 }
@@ -213,7 +213,7 @@ fun VolunteerDetailScreen(
 
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                text = stringResource(R.string.volunteer_joined, volunteer.createdAt.take(10)),
+                                text = stringResource(R.string.volunteers_joined, volunteer.createdAt.take(10)),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 modifier = Modifier.testTag("volunteer-joined"),
@@ -245,7 +245,7 @@ fun VolunteerDetailScreen(
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = stringResource(R.string.volunteer_assigned_shifts),
+                                        text = stringResource(R.string.volunteers_assigned_shifts),
                                         style = MaterialTheme.typography.titleMedium,
                                     )
                                 }
@@ -297,7 +297,7 @@ fun VolunteerDetailScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource(R.string.volunteer_recent_activity),
+                                    text = stringResource(R.string.volunteers_recent_activity),
                                     style = MaterialTheme.typography.titleMedium,
                                 )
                             }
@@ -317,7 +317,7 @@ fun VolunteerDetailScreen(
                                 }
                             } else if (uiState.auditEntries.isEmpty()) {
                                 Text(
-                                    text = stringResource(R.string.volunteer_no_activity),
+                                    text = stringResource(R.string.volunteers_no_activity),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     modifier = Modifier.testTag("volunteer-no-activity"),

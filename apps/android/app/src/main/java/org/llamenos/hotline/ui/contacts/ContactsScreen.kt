@@ -272,13 +272,13 @@ private fun ContactCard(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.contact_first_seen, DateFormatUtils.formatDate(contact.firstSeen)),
+                    text = stringResource(R.string.contacts_first_seen, DateFormatUtils.formatDate(contact.firstSeen)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.testTag("contact-first-seen"),
                 )
                 Text(
-                    text = stringResource(R.string.contact_last_seen, DateFormatUtils.formatDate(contact.lastSeen)),
+                    text = stringResource(R.string.contacts_last_seen, DateFormatUtils.formatDate(contact.lastSeen)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.testTag("contact-last-seen"),

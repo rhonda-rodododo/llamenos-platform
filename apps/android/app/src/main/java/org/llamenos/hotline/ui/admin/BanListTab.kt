@@ -94,7 +94,7 @@ fun BanListTab(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Upload,
-                        contentDescription = stringResource(R.string.ban_import),
+                        contentDescription = stringResource(R.string.ban_list_import),
                     )
                 }
 
@@ -105,7 +105,7 @@ fun BanListTab(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Add,
-                        contentDescription = stringResource(R.string.ban_add),
+                        contentDescription = stringResource(R.string.ban_list_add),
                     )
                 }
             }
@@ -148,7 +148,7 @@ fun BanListTab(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = stringResource(R.string.bans_empty),
+                                text = stringResource(R.string.ban_list_empty),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -268,7 +268,7 @@ private fun BanCard(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.ban_remove),
+                    contentDescription = stringResource(R.string.ban_list_remove),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
@@ -289,13 +289,13 @@ private fun AddBanDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.ban_add)) },
+        title = { Text(stringResource(R.string.ban_list_add)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = identifier,
                     onValueChange = { identifier = it },
-                    label = { Text(stringResource(R.string.ban_identifier_label)) },
+                    label = { Text(stringResource(R.string.ban_list_identifier_label)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -305,7 +305,7 @@ private fun AddBanDialog(
                 OutlinedTextField(
                     value = reason,
                     onValueChange = { reason = it },
-                    label = { Text(stringResource(R.string.ban_reason)) },
+                    label = { Text(stringResource(R.string.ban_list_reason)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -319,7 +319,7 @@ private fun AddBanDialog(
                 enabled = identifier.isNotBlank(),
                 modifier = Modifier.testTag("confirm-ban-button"),
             ) {
-                Text(stringResource(R.string.ban_add))
+                Text(stringResource(R.string.ban_list_add))
             }
         },
         dismissButton = {
@@ -347,13 +347,13 @@ private fun BulkImportDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.ban_import_title)) },
+        title = { Text(stringResource(R.string.ban_list_import_title)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = phonesText,
                     onValueChange = { phonesText = it },
-                    label = { Text(stringResource(R.string.ban_import_hint)) },
+                    label = { Text(stringResource(R.string.ban_list_import_hint)) },
                     minLines = 4,
                     maxLines = 8,
                     modifier = Modifier
@@ -364,7 +364,7 @@ private fun BulkImportDialog(
                 OutlinedTextField(
                     value = reason,
                     onValueChange = { reason = it },
-                    label = { Text(stringResource(R.string.ban_reason)) },
+                    label = { Text(stringResource(R.string.ban_list_reason)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -384,7 +384,7 @@ private fun BulkImportDialog(
                 enabled = phonesText.isNotBlank(),
                 modifier = Modifier.testTag("confirm-bulk-import"),
             ) {
-                Text(stringResource(R.string.ban_import))
+                Text(stringResource(R.string.ban_list_import))
             }
         },
         dismissButton = {

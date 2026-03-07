@@ -102,7 +102,7 @@ fun NoteCreateScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = stringResource(R.string.note_create),
+                            text = stringResource(R.string.notes_create),
                             modifier = Modifier.testTag("note-create-title"),
                         )
                     },
@@ -129,7 +129,7 @@ fun NoteCreateScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Save,
-                                contentDescription = stringResource(R.string.note_save),
+                                contentDescription = stringResource(R.string.notes_save),
                             )
                         }
                     },
@@ -152,7 +152,7 @@ fun NoteCreateScreen(
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
-                    label = { Text(stringResource(R.string.note_text_hint)) },
+                    label = { Text(stringResource(R.string.notes_text_hint)) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp)
@@ -177,7 +177,7 @@ fun NoteCreateScreen(
         // Loading overlay during save
         LoadingOverlay(
             isLoading = uiState.isSaving,
-            message = stringResource(R.string.note_saving),
+            message = stringResource(R.string.notes_saving),
         )
     }
 }

@@ -67,14 +67,14 @@ fun ShiftsScreen(
     uiState.showDropConfirmation?.let { shiftId ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissDropConfirmation() },
-            title = { Text(stringResource(R.string.shift_drop)) },
-            text = { Text(stringResource(R.string.shift_drop_confirm)) },
+            title = { Text(stringResource(R.string.shifts_drop)) },
+            text = { Text(stringResource(R.string.shifts_drop_confirm)) },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.dropShift(shiftId) },
                     modifier = Modifier.testTag("confirm-drop-button"),
                 ) {
-                    Text(stringResource(R.string.shift_drop))
+                    Text(stringResource(R.string.shifts_drop))
                 }
             },
             dismissButton = {
@@ -238,9 +238,9 @@ private fun ClockInOutCard(
 
             Text(
                 text = if (isOnShift) {
-                    stringResource(R.string.on_shift)
+                    stringResource(R.string.shifts_on_shift)
                 } else {
-                    stringResource(R.string.off_shift)
+                    stringResource(R.string.shifts_off_shift)
                 },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -249,7 +249,7 @@ private fun ClockInOutCard(
 
             if (isOnShift && startedAt != null) {
                 Text(
-                    text = stringResource(R.string.shift_since, DateFormatUtils.formatTimeOnly(startedAt)),
+                    text = stringResource(R.string.shifts_since, DateFormatUtils.formatTimeOnly(startedAt)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("clock-started-at"),
@@ -275,7 +275,7 @@ private fun ClockInOutCard(
                         .fillMaxWidth()
                         .testTag("clock-out-button"),
                 ) {
-                    Text(stringResource(R.string.shift_clock_out))
+                    Text(stringResource(R.string.shifts_clock_out))
                 }
             } else {
                 Button(
@@ -284,7 +284,7 @@ private fun ClockInOutCard(
                         .fillMaxWidth()
                         .testTag("clock-in-button"),
                 ) {
-                    Text(stringResource(R.string.shift_clock_in))
+                    Text(stringResource(R.string.shifts_clock_in))
                 }
             }
         }
@@ -397,8 +397,8 @@ private fun ShiftCard(
                 // Status badge
                 Text(
                     text = when (shift.status) {
-                        "available" -> stringResource(R.string.shift_available)
-                        "assigned" -> stringResource(R.string.shift_assigned)
+                        "available" -> stringResource(R.string.shifts_available)
+                        "assigned" -> stringResource(R.string.shifts_assigned)
                         else -> shift.status.replaceFirstChar { it.uppercase() }
                     },
                     style = MaterialTheme.typography.labelSmall,
@@ -418,7 +418,7 @@ private fun ShiftCard(
                             onClick = onSignUp,
                             modifier = Modifier.testTag("shift-signup-${shift.id}"),
                         ) {
-                            Text(stringResource(R.string.shift_sign_up))
+                            Text(stringResource(R.string.shifts_sign_up))
                         }
                     }
 
@@ -427,7 +427,7 @@ private fun ShiftCard(
                             onClick = onDrop,
                             modifier = Modifier.testTag("shift-drop-${shift.id}"),
                         ) {
-                            Text(stringResource(R.string.shift_drop))
+                            Text(stringResource(R.string.shifts_drop))
                         }
                     }
                 }

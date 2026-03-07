@@ -109,7 +109,7 @@ fun AuditLogTab(
             OutlinedTextField(
                 value = uiState.auditSearchQuery,
                 onValueChange = { viewModel.setAuditSearchQuery(it) },
-                placeholder = { Text(stringResource(R.string.audit_search)) },
+                placeholder = { Text(stringResource(R.string.audit_log_search)) },
                 leadingIcon = {
                     Icon(Icons.Filled.Search, contentDescription = null)
                 },
@@ -127,7 +127,7 @@ fun AuditLogTab(
             ) {
                 OutlinedTextField(
                     value = if (uiState.auditEventFilter == "all") {
-                        stringResource(R.string.audit_all_events)
+                        stringResource(R.string.audit_log_all_events)
                     } else {
                         uiState.auditEventFilter.replaceFirstChar { it.uppercase() }
                     },
@@ -147,7 +147,7 @@ fun AuditLogTab(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    if (eventType == "all") stringResource(R.string.audit_all_events)
+                                    if (eventType == "all") stringResource(R.string.audit_log_all_events)
                                     else eventType.replaceFirstChar { it.uppercase() },
                                 )
                             },
@@ -168,7 +168,7 @@ fun AuditLogTab(
                 ) {
                     Icon(
                         Icons.Filled.Clear,
-                        contentDescription = stringResource(R.string.audit_clear_filters),
+                        contentDescription = stringResource(R.string.audit_log_clear_filters),
                     )
                 }
             }
@@ -205,7 +205,7 @@ fun AuditLogTab(
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = stringResource(R.string.audit_empty),
+                            text = stringResource(R.string.audit_log_empty),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

@@ -74,7 +74,7 @@ fun ReportCreateScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = stringResource(R.string.report_create),
+                        text = stringResource(R.string.reports_create),
                         modifier = Modifier.testTag("report-create-title"),
                     )
                 },

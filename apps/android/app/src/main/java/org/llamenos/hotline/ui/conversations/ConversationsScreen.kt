@@ -314,8 +314,8 @@ private fun channelIcon(channelType: String) = when (channelType) {
  */
 @Composable
 private fun channelLabel(channelType: String) = when (channelType) {
-    "sms" -> stringResource(R.string.conversation_sms)
-    "whatsapp" -> stringResource(R.string.conversation_whatsapp)
-    "signal" -> stringResource(R.string.conversation_signal)
+    "sms" -> stringResource(R.string.conversations_sms)
+    "whatsapp" -> stringResource(R.string.conversations_whatsapp)
+    "signal" -> stringResource(R.string.conversations_signal)
     else -> channelType.replaceFirstChar { it.uppercase() }
 }

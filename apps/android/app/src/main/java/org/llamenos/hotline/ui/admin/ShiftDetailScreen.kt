@@ -80,7 +80,7 @@ fun ShiftDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = uiState.shift?.name ?: stringResource(R.string.shift_detail_title),
+                        text = uiState.shift?.name ?: stringResource(R.string.shifts_detail_title),
                         modifier = Modifier.testTag("shift-detail-title"),
                     )
                 },
@@ -125,7 +125,7 @@ fun ShiftDetailScreen(
                 ) {
                     org.llamenos.hotline.ui.components.EmptyState(
                         icon = Icons.Filled.Schedule,
-                        title = stringResource(R.string.shift_not_found),
+                        title = stringResource(R.string.shifts_not_found),
                         testTag = "shift-not-found",
                     )
                 }
@@ -217,7 +217,7 @@ fun ShiftDetailScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = stringResource(R.string.shift_assign_volunteers),
+                                text = stringResource(R.string.shifts_assign_volunteers),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Spacer(Modifier.weight(1f))
@@ -272,7 +272,7 @@ fun ShiftDetailScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                             }
-                            Text(stringResource(R.string.shift_save_assignments))
+                            Text(stringResource(R.string.shifts_save_assignments))
                         }
                     }
                 }
@@ -325,7 +325,7 @@ private fun VolunteerAssignmentCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = volunteer.displayName ?: stringResource(R.string.volunteer_unnamed),
+                    text = volunteer.displayName ?: stringResource(R.string.volunteers_unnamed),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isAssigned) FontWeight.Medium else FontWeight.Normal,
                     maxLines = 1,

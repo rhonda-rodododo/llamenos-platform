@@ -165,8 +165,8 @@ fun LoginScreen(
                             OutlinedTextField(
                                 value = uiState.hubUrl,
                                 onValueChange = viewModel::updateHubUrl,
-                                label = { Text(stringResource(R.string.hub_url_label)) },
-                                placeholder = { Text(stringResource(R.string.hub_url_placeholder)) },
+                                label = { Text(stringResource(R.string.login_hub_url_label)) },
+                                placeholder = { Text(stringResource(R.string.login_hub_url_placeholder)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Uri,

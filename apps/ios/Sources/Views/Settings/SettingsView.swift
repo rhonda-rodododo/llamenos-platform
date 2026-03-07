@@ -13,10 +13,10 @@ enum AutoLockTimeout: Int, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .oneMinute: return NSLocalizedString("settings_lock_1min", comment: "1 minute")
-        case .fiveMinutes: return NSLocalizedString("settings_lock_5min", comment: "5 minutes")
-        case .fifteenMinutes: return NSLocalizedString("settings_lock_15min", comment: "15 minutes")
-        case .thirtyMinutes: return NSLocalizedString("settings_lock_30min", comment: "30 minutes")
+        case .oneMinute: return NSLocalizedString("settings_lock1min", comment: "1 minute")
+        case .fiveMinutes: return NSLocalizedString("settings_lock5min", comment: "5 minutes")
+        case .fifteenMinutes: return NSLocalizedString("settings_lock15min", comment: "15 minutes")
+        case .thirtyMinutes: return NSLocalizedString("settings_lock30min", comment: "30 minutes")
         }
     }
 }

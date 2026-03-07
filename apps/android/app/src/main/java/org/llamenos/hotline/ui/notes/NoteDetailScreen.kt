@@ -118,9 +118,9 @@ fun NoteDetailScreen(
                 title = {
                     Text(
                         text = if (uiState.isEditing) {
-                            stringResource(R.string.note_editing)
+                            stringResource(R.string.notes_editing)
                         } else {
-                            stringResource(R.string.note_detail)
+                            stringResource(R.string.notes_detail)
                         },
                         modifier = Modifier.testTag("note-detail-title"),
                     )
@@ -163,7 +163,7 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Save,
-                                    contentDescription = stringResource(R.string.note_save),
+                                    contentDescription = stringResource(R.string.notes_save),
                                 )
                             }
                         } else {
@@ -174,7 +174,7 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.Edit,
-                                    contentDescription = stringResource(R.string.note_edit),
+                                    contentDescription = stringResource(R.string.notes_edit),
                                 )
                             }
 
@@ -190,7 +190,7 @@ fun NoteDetailScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.ContentCopy,
-                                    contentDescription = stringResource(R.string.note_copy),
+                                    contentDescription = stringResource(R.string.notes_copy),
                                 )
                             }
                         }
@@ -214,7 +214,7 @@ fun NoteDetailScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = stringResource(R.string.note_not_found),
+                    text = stringResource(R.string.notes_not_found),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("note-not-found"),
@@ -234,7 +234,7 @@ fun NoteDetailScreen(
                     OutlinedTextField(
                         value = editText,
                         onValueChange = { editText = it },
-                        label = { Text(stringResource(R.string.note_text_hint)) },
+                        label = { Text(stringResource(R.string.notes_text_hint)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(200.dp)
@@ -302,7 +302,7 @@ fun NoteDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                text = stringResource(R.string.note_author),
+                                text = stringResource(R.string.notes_author),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -322,7 +322,7 @@ fun NoteDetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                text = stringResource(R.string.note_date),
+                                text = stringResource(R.string.notes_date),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -342,7 +342,7 @@ fun NoteDetailScreen(
                             if (note.callId != null) {
                                 AssistChip(
                                     onClick = {},
-                                    label = { Text(stringResource(R.string.note_call_id_badge, note.callId.take(8))) },
+                                    label = { Text(stringResource(R.string.notes_call_id_badge, note.callId.take(8))) },
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Filled.Phone,
@@ -356,7 +356,7 @@ fun NoteDetailScreen(
                             if (note.conversationId != null) {
                                 AssistChip(
                                     onClick = {},
-                                    label = { Text(stringResource(R.string.note_chat_id_badge, note.conversationId.take(8))) },
+                                    label = { Text(stringResource(R.string.notes_chat_id_badge, note.conversationId.take(8))) },
                                     leadingIcon = {
                                         Icon(
                                             imageVector = Icons.Filled.Sms,
@@ -373,7 +373,7 @@ fun NoteDetailScreen(
                         if (note.updatedAt != null) {
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                text = stringResource(R.string.note_updated, DateFormatUtils.formatDateVerbose(note.updatedAt)),
+                                text = stringResource(R.string.notes_updated, DateFormatUtils.formatDateVerbose(note.updatedAt)),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 modifier = Modifier.testTag("note-detail-updated"),
@@ -398,7 +398,7 @@ fun NoteDetailScreen(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = stringResource(R.string.note_replies),
+                        text = stringResource(R.string.notes_replies),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Spacer(Modifier.weight(1f))
@@ -425,7 +425,7 @@ fun NoteDetailScreen(
                     }
                 } else if (uiState.replies.isEmpty()) {
                     Text(
-                        text = stringResource(R.string.note_no_replies),
+                        text = stringResource(R.string.notes_no_replies),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.testTag("note-no-replies"),
@@ -475,7 +475,7 @@ fun NoteDetailScreen(
                         OutlinedTextField(
                             value = replyText,
                             onValueChange = { replyText = it },
-                            placeholder = { Text(stringResource(R.string.note_reply_hint)) },
+                            placeholder = { Text(stringResource(R.string.notes_reply_hint)) },
                             singleLine = true,
                             modifier = Modifier
                                 .weight(1f)
@@ -500,7 +500,7 @@ fun NoteDetailScreen(
                             } else {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = stringResource(R.string.note_reply_send),
+                                    contentDescription = stringResource(R.string.notes_reply_send),
                                     tint = if (replyText.isNotBlank()) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
@@ -518,7 +518,7 @@ fun NoteDetailScreen(
     // Loading overlay during save
     LoadingOverlay(
         isLoading = uiState.isSaving,
-        message = stringResource(R.string.note_saving),
+        message = stringResource(R.string.notes_saving),
     )
     } // Close Box
 }

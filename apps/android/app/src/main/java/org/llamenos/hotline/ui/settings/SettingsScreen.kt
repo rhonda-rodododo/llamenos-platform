@@ -110,10 +110,10 @@ val SUPPORTED_LANGUAGES = listOf(
  * Auto-lock timeout options (in minutes, 0 = never).
  */
 private enum class AutoLockOption(val minutes: Int, val labelRes: Int) {
-    ONE(1, R.string.settings_auto_lock_1min),
-    FIVE(5, R.string.settings_auto_lock_5min),
-    FIFTEEN(15, R.string.settings_auto_lock_15min),
-    THIRTY(30, R.string.settings_auto_lock_30min),
+    ONE(1, R.string.settings_lock1min),
+    FIVE(5, R.string.settings_lock5min),
+    FIFTEEN(15, R.string.settings_lock15min),
+    THIRTY(30, R.string.settings_lock30min),
     NEVER(0, R.string.settings_auto_lock_never),
 }
 

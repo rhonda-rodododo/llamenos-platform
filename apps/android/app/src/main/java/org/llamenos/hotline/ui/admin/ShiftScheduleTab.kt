@@ -87,7 +87,7 @@ fun ShiftScheduleTab(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.shift_create),
+                    contentDescription = stringResource(R.string.shifts_create),
                 )
             }
         },
@@ -248,7 +248,7 @@ private fun ShiftCard(
                 onClick = onEdit,
                 modifier = Modifier.testTag("edit-shift-${shift.id}"),
             ) {
-                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.shift_edit))
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.shifts_edit))
             }
 
             IconButton(
@@ -257,7 +257,7 @@ private fun ShiftCard(
             ) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.shift_delete),
+                    contentDescription = stringResource(R.string.shifts_delete),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
@@ -286,8 +286,8 @@ private fun ShiftDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                if (existingShift != null) stringResource(R.string.shift_edit)
-                else stringResource(R.string.shift_create),
+                if (existingShift != null) stringResource(R.string.shifts_edit)
+                else stringResource(R.string.shifts_create),
             )
         },
         text = {
@@ -295,7 +295,7 @@ private fun ShiftDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.shift_name)) },
+                    label = { Text(stringResource(R.string.shifts_name)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -307,7 +307,7 @@ private fun ShiftDialog(
                 OutlinedTextField(
                     value = startTime,
                     onValueChange = { startTime = it },
-                    label = { Text(stringResource(R.string.shift_start_time)) },
+                    label = { Text(stringResource(R.string.shifts_start_time)) },
                     placeholder = { Text("09:00") },
                     singleLine = true,
                     modifier = Modifier
@@ -320,7 +320,7 @@ private fun ShiftDialog(
                 OutlinedTextField(
                     value = endTime,
                     onValueChange = { endTime = it },
-                    label = { Text(stringResource(R.string.shift_end_time)) },
+                    label = { Text(stringResource(R.string.shifts_end_time)) },
                     placeholder = { Text("17:00") },
                     singleLine = true,
                     modifier = Modifier

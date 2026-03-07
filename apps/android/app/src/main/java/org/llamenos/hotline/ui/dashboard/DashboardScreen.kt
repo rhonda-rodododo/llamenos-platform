@@ -283,15 +283,15 @@ fun DashboardScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = stringResource(R.string.shift_status),
+                                    text = stringResource(R.string.shifts_status),
                                     style = MaterialTheme.typography.titleMedium,
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     text = if (uiState.isOnShift) {
-                                        stringResource(R.string.on_shift)
+                                        stringResource(R.string.shifts_on_shift)
                                     } else {
-                                        stringResource(R.string.off_shift)
+                                        stringResource(R.string.shifts_off_shift)
                                     },
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium,
@@ -331,9 +331,9 @@ fun DashboardScreen(
                                 Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = if (uiState.isOnShift) {
-                                        stringResource(R.string.shift_clock_out)
+                                        stringResource(R.string.shifts_clock_out)
                                     } else {
-                                        stringResource(R.string.shift_clock_in)
+                                        stringResource(R.string.shifts_clock_in)
                                     },
                                 )
                             }

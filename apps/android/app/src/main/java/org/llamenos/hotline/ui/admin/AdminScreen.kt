@@ -96,7 +96,7 @@ fun AdminScreen(
                                     AdminTab.AUDIT -> stringResource(R.string.admin_audit)
                                     AdminTab.INVITES -> stringResource(R.string.admin_invites)
                                     AdminTab.FIELDS -> stringResource(R.string.admin_fields)
-                                    AdminTab.SHIFTS -> stringResource(R.string.shift_schedule)
+                                    AdminTab.SHIFTS -> stringResource(R.string.shifts_schedule)
                                     AdminTab.SETTINGS -> stringResource(R.string.settings_title)
                                 },
                             )

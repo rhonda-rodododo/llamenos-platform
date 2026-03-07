@@ -111,7 +111,7 @@ fun BlastsScreen(
                 onClick = { viewModel.showCreateDialog() },
                 modifier = Modifier.testTag("create-blast-fab"),
             ) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.blast_create))
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.blasts_create))
             }
         },
         modifier = modifier,
@@ -245,9 +245,9 @@ private fun BlastCard(
                         label = {
                             Text(
                                 if (blast.recipientCount == 1) {
-                                    stringResource(R.string.blast_recipient_count_one)
+                                    stringResource(R.string.blasts_recipient_count_one)
                                 } else {
-                                    stringResource(R.string.blast_recipient_count, blast.recipientCount)
+                                    stringResource(R.string.blasts_recipient_count, blast.recipientCount)
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                             )
@@ -291,13 +291,13 @@ private fun CreateBlastDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.blast_create)) },
+        title = { Text(stringResource(R.string.blasts_create)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = message,
                     onValueChange = { message = it },
-                    label = { Text(stringResource(R.string.blast_message_hint)) },
+                    label = { Text(stringResource(R.string.blasts_message_hint)) },
                     maxLines = 4,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -307,7 +307,7 @@ private fun CreateBlastDialog(
                 Spacer(Modifier.height(12.dp))
 
                 Text(
-                    text = stringResource(R.string.blast_recipients),
+                    text = stringResource(R.string.blasts_recipients),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.testTag("blast-recipients-label"),
                 )
@@ -332,7 +332,7 @@ private fun CreateBlastDialog(
                         },
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.blast_select_all))
+                    Text(stringResource(R.string.blasts_select_all))
                 }
 
                 // Individual volunteer checkboxes
@@ -364,7 +364,7 @@ private fun CreateBlastDialog(
                         onCheckedChange = { scheduleForLater = it },
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.blast_schedule_later))
+                    Text(stringResource(R.string.blasts_schedule_later))
                 }
             }
         },
@@ -375,8 +375,8 @@ private fun CreateBlastDialog(
                 modifier = Modifier.testTag("confirm-blast-send"),
             ) {
                 Text(
-                    if (scheduleForLater) stringResource(R.string.blast_schedule)
-                    else stringResource(R.string.blast_send_now),
+                    if (scheduleForLater) stringResource(R.string.blasts_schedule)
+                    else stringResource(R.string.blasts_send_now),
                 )
             }
         },
