@@ -305,11 +305,17 @@ final class CryptoService: @unchecked Sendable {
 
     #if DEBUG
     /// Set a deterministic test identity for XCUITest automation.
-    /// Uses a fixed secret key and derives the real pubkey/npub via the Rust FFI,
-    /// ensuring auth tokens, note envelope matching, and API requests all use
-    /// consistent, cryptographically valid keys.
+    /// Uses the same admin secret key as the desktop Playwright tests,
+    /// matching the ADMIN_PUBKEY configured in Docker Compose. The real
+    /// pubkey/npub are derived via the Rust FFI so auth tokens, note
+    /// envelope matching, and API requests all use consistent keys.
+    ///
+    /// Admin nsec (desktop tests/helpers.ts): nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh
+    /// Secret hex: f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb
+    /// Pubkey:     ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228
     func setMockIdentity() {
-        let secretHex = String(repeating: "ab", count: 32)
+        // Same admin key used in desktop tests — matches ADMIN_PUBKEY in Docker .env
+        let secretHex = "f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb"
         do {
             let kp = try ffiKeypairFromSecretKeyHex(secretHex)
             self.nsecHex = kp.secretKeyHex
@@ -317,9 +323,7 @@ final class CryptoService: @unchecked Sendable {
             self.pubkey = kp.publicKey
             self.npub = kp.npub
         } catch {
-            // Fallback: load just the secret so signing works, derive pubkey
-            // from auth token on first use. This path should never be hit
-            // because "ab"*32 is a valid secp256k1 scalar.
+            // Should never fail — this is a known-valid secp256k1 scalar
             self.nsecHex = secretHex
             self.nsecBech32 = nil
             self.pubkey = nil

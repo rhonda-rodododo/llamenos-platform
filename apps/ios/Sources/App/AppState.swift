@@ -128,10 +128,10 @@ final class AppState {
         }
     }
 
-    /// Synchronously register the test identity as admin via POST /api/auth/bootstrap.
+    /// Register the test identity as admin on the server.
+    /// Step 1: POST /api/auth/bootstrap to create admin volunteer.
+    /// Step 2: POST /api/auth/login to verify the volunteer exists.
     /// Blocks the main thread briefly — acceptable for test setup only.
-    /// If bootstrap succeeds (or admin already exists), also logs in via /api/auth/login
-    /// to ensure the volunteer record exists in the identity DO.
     private func bootstrapTestIdentity() {
         guard let hubURL = authService.hubURL,
               let baseURL = URL(string: hubURL) else {
@@ -139,42 +139,41 @@ final class AppState {
             return
         }
 
-        guard let token = try? cryptoService.createAuthToken(
+        // Step 1: Bootstrap — creates the admin volunteer record
+        guard let bootstrapToken = try? cryptoService.createAuthToken(
             method: "POST", path: "/api/auth/bootstrap"
         ) else {
-            print("⚠️ bootstrapTestIdentity: failed to create auth token")
+            print("⚠️ bootstrapTestIdentity: failed to create bootstrap auth token")
             return
         }
 
-        // Step 1: Bootstrap as admin (creates volunteer + admin role)
         let bootstrapURL = baseURL.appendingPathComponent("api/auth/bootstrap")
         var bootstrapReq = URLRequest(url: bootstrapURL)
         bootstrapReq.httpMethod = "POST"
         bootstrapReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
         bootstrapReq.timeoutInterval = 10
 
-        let body: [String: Any] = [
-            "pubkey": token.pubkey,
-            "timestamp": Int(token.timestamp),
-            "token": token.token,
+        let bootstrapBody: [String: Any] = [
+            "pubkey": bootstrapToken.pubkey,
+            "timestamp": Int(bootstrapToken.timestamp),
+            "token": bootstrapToken.token,
         ]
-        bootstrapReq.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        bootstrapReq.httpBody = try? JSONSerialization.data(withJSONObject: bootstrapBody)
 
         var bootstrapOk = false
         let sem1 = DispatchSemaphore(value: 0)
         URLSession.shared.dataTask(with: bootstrapReq) { data, response, error in
             if let error {
-                print("⚠️ bootstrapTestIdentity: network error: \(error.localizedDescription)")
+                print("⚠️ bootstrapTestIdentity bootstrap: \(error.localizedDescription)")
             } else if let http = response as? HTTPURLResponse {
                 if (200...299).contains(http.statusCode) {
                     bootstrapOk = true
                 } else if http.statusCode == 403 {
-                    // Admin already exists — this is fine, we'll login next
-                    print("ℹ️ bootstrapTestIdentity: admin already exists (403), proceeding to login")
+                    // Admin already exists — proceed to login
                     bootstrapOk = true
                 } else {
                     let bodyStr = data.flatMap { String(data: $0, encoding: .utf8) } ?? "<no body>"
-                    print("⚠️ bootstrapTestIdentity: HTTP \(http.statusCode): \(bodyStr)")
+                    print("⚠️ bootstrapTestIdentity bootstrap: HTTP \(http.statusCode): \(bodyStr)")
                 }
             }
             sem1.signal()
@@ -183,7 +182,7 @@ final class AppState {
 
         guard bootstrapOk else { return }
 
-        // Step 2: Login to ensure volunteer record is accessible
+        // Step 2: Login — verifies volunteer record is accessible
         guard let loginToken = try? cryptoService.createAuthToken(
             method: "POST", path: "/api/auth/login"
         ) else { return }

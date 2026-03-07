@@ -8,6 +8,12 @@ import XCTest
 /// Override with TEST_HUB_URL environment variable if needed.
 final class APIConnectedUITests: BaseUITest {
 
+    /// API tests share server state — run serially to avoid conflicts.
+    override class var defaultTestSuite: XCTestSuite {
+        let suite = XCTestSuite(forTestCaseClass: self)
+        return suite
+    }
+
     override func setUp() {
         super.setUp()
         resetServerState()
@@ -44,10 +50,12 @@ final class APIConnectedUITests: BaseUITest {
             )
 
             // Navigate to settings to verify admin link exists
+            // Role fetch is async — wait extra for it to resolve
+            sleep(3)
             navigateToSettings()
-            let adminLink = find("settings-admin-link")
+            let adminLink = scrollToFind("settings-admin-link", maxSwipes: 3, timeout: 15)
             XCTAssertTrue(
-                adminLink.waitForExistence(timeout: 5),
+                adminLink.exists,
                 "Admin panel link should be visible for admin users"
             )
         }
@@ -226,9 +234,11 @@ final class APIConnectedUITests: BaseUITest {
             _ = dashboard.waitForExistence(timeout: 15)
         }
         when("I navigate to the admin panel") {
+            // Wait for role fetch to complete before navigating
+            sleep(3)
             navigateToSettings()
-            let adminLink = find("settings-admin-link")
-            guard adminLink.waitForExistence(timeout: 5) else {
+            let adminLink = scrollToFind("settings-admin-link", maxSwipes: 3, timeout: 15)
+            guard adminLink.exists else {
                 XCTFail("Admin link should exist for admin users")
                 return
             }

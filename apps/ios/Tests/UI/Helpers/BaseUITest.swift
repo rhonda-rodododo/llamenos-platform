@@ -84,9 +84,10 @@ class BaseUITest: XCTestCase {
 
     /// Reset the test server state by calling POST /api/test-reset.
     /// Call this in setUp() before launching the app for API-connected tests.
-    /// Uses the "no-admin" variant so iOS bootstrap can register its own admin.
+    /// Uses the standard reset which preserves the ADMIN_PUBKEY admin —
+    /// the iOS mock identity uses the matching admin keypair so login works.
     func resetServerState() {
-        guard let url = URL(string: "\(testHubURL)/api/test-reset-no-admin") else {
+        guard let url = URL(string: "\(testHubURL)/api/test-reset") else {
             XCTFail("Invalid test hub URL: \(testHubURL)")
             return
         }
