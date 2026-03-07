@@ -23,6 +23,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEMO_MODE=true
+      - DEV_RESET_SECRET=test-reset-secret
     depends_on:
       postgres:
         condition: service_healthy

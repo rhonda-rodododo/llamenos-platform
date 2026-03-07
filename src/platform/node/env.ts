@@ -78,6 +78,9 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
     // Nostr relay (Epic 76.1)
     SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
     NOSTR_RELAY_URL: nostrRelayUrl || undefined,
+    // Dev/test support
+    DEV_RESET_SECRET: process.env.DEV_RESET_SECRET || undefined,
+    E2E_TEST_SECRET: process.env.E2E_TEST_SECRET || undefined,
   }
 
   // Create DO namespaces that pass env to each instance
