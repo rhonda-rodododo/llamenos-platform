@@ -1,0 +1,134 @@
+@backend @security
+Feature: Security Audit Coverage (Rounds 4-8)
+  As the server
+  I want all security audit fixes to be verified
+  So that regressions are caught immediately
+
+  # ── Round 4 ──────────────────────────────────────────────────
+
+  Scenario: Vonage webhook rejects missing HMAC signature
+    Given a Vonage webhook request without a signature parameter
+    When the webhook validation runs
+    Then the request should be rejected
+
+  Scenario: Vonage webhook rejects expired timestamp
+    Given a Vonage webhook request with a timestamp older than 5 minutes
+    When the webhook validation runs
+    Then the request should be rejected as replay
+
+  Scenario: Volunteer self-update rejects role escalation fields
+    Given a volunteer PATCH request with "roles" set to admin
+    When the update is processed
+    Then the "roles" field should be stripped from the update
+
+  Scenario: Security headers are present on all API responses
+    When a client makes any API request
+    Then the response should include COOP, Referrer-Policy, and X-Content-Type-Options headers
+
+  # ── Round 5 ──────────────────────────────────────────────────
+
+  Scenario: Login endpoint verifies Schnorr signature
+    Given a login request with a valid pubkey but no Schnorr signature
+    When the login is processed
+    Then the server should reject the request
+
+  Scenario: CAPTCHA digits are not exposed in URL parameters
+    Given a CAPTCHA challenge is generated
+    Then the expected digits should not appear in any URL or response body
+    And the digits should be stored server-side only
+
+  Scenario: Invite redemption requires proof of private key
+    Given an invite code exists
+    When someone tries to redeem it without a Schnorr signature
+    Then the redemption should fail with 400
+
+  Scenario: Upload chunk endpoint enforces ownership
+    Given volunteer A uploads a file chunk
+    When volunteer B tries to access volunteer A's upload status
+    Then the request should be rejected with 403
+
+  Scenario: Sessions are revoked on volunteer deactivation
+    Given a volunteer with an active session
+    When the volunteer is deactivated by an admin
+    Then the volunteer's session tokens should be invalidated
+
+  Scenario: Reporter role cannot create call notes
+    Given a user with reporter role
+    When they attempt to create a call note
+    Then the server should reject with 403
+
+  # ── Round 6 ──────────────────────────────────────────────────
+
+  Scenario: Dev reset requires DEV_RESET_SECRET when configured
+    Given the DEV_RESET_SECRET environment variable is set
+    When a reset request is made without the X-Test-Secret header
+    Then the reset should be rejected
+
+  Scenario: SSRF blocklist rejects IPv4-mapped IPv6 private addresses
+    Given a provider test URL of "http://[::ffff:127.0.0.1]/api"
+    When the SSRF guard evaluates the URL
+    Then it should be blocked as an internal address
+
+  Scenario: Phone hashing uses HMAC-SHA256, not bare SHA-256
+    Given a phone number "+15551234567"
+    When it is hashed with two different HMAC secrets
+    Then the hashes should be different
+
+  Scenario: Admin pubkey not exposed in public config
+    When the public /api/config endpoint is queried
+    Then the response should not contain adminPubkey
+
+  # ── Round 7 ──────────────────────────────────────────────────
+
+  Scenario: Invite creation blocks privilege escalation
+    Given a volunteer-permissioned user
+    When they try to create an invite with admin role
+    Then the server should reject with 403 citing missing permissions
+
+  Scenario: Nostr relay events are encrypted
+    Given a hub with SERVER_NOSTR_SECRET configured
+    When the server publishes a Nostr event
+    Then the event content should be encrypted with the derived event key
+
+  Scenario: Auth tokens without method+path binding are rejected
+    Given a Schnorr token signed without method and path
+    When it is presented to an API endpoint
+    Then the server should reject with 401
+
+  Scenario: Contact identifiers are encrypted at rest
+    Given a new conversation with phone "+15551234567"
+    When the conversation is stored
+    Then the stored phone value should start with "enc:"
+
+  Scenario: BlastDO subscriber hashing uses HMAC_SECRET
+    Given HMAC_SECRET is set to a unique value
+    When a subscriber phone is hashed for the blast list
+    Then the hash should depend on HMAC_SECRET, not a public constant
+
+  # ── Round 8 ──────────────────────────────────────────────────
+
+  Scenario: serverEventKeyHex is not in public config
+    When the unauthenticated /api/config endpoint is queried
+    Then the response should not contain serverEventKeyHex
+
+  Scenario: serverEventKeyHex is available after authentication
+    Given an authenticated user
+    When they query /api/auth/me
+    Then the response should contain serverEventKeyHex
+
+  Scenario: DEMO_MODE=false prevents DO reset in production
+    Given DEMO_MODE is set to "false"
+    When a reset request is sent to any Durable Object
+    Then the reset should be rejected
+
+  Scenario: Hub slug must match pattern
+    When creating a hub with slug "-invalid-slug-"
+    Then the server should reject with a validation error
+
+  Scenario: Blast mediaUrl must use HTTPS
+    When creating a blast with mediaUrl "http://cdn.example.com/image.jpg"
+    Then the server should reject with a validation error about HTTPS
+
+  Scenario: Upload size is capped at 10MB
+    When uploading a file of 11MB
+    Then the server should reject with 413 Payload Too Large
