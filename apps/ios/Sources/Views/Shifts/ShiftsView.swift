@@ -271,18 +271,11 @@ struct ShiftsView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label(
-                NSLocalizedString("shifts_empty_title", comment: "No Shifts"),
-                systemImage: "calendar"
-            )
-        } description: {
-            Text(NSLocalizedString(
-                "shifts_empty_message",
-                comment: "No shifts have been configured yet. Contact your administrator."
-            ))
-        }
-        .accessibilityElement(children: .contain)
+        BrandEmptyState(
+            icon: "calendar",
+            title: NSLocalizedString("shifts_empty_title", comment: "No Shifts"),
+            message: NSLocalizedString("shifts_empty_message", comment: "No shifts have been configured yet. Contact your administrator.")
+        )
         .accessibilityIdentifier("shifts-empty-state")
     }
 

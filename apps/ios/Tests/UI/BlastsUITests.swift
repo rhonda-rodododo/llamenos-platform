@@ -1,7 +1,7 @@
 import XCTest
 
 /// BDD tests for the Message Blasts feature (Epic 245).
-/// Tests the blasts list, creation flow, and admin-only visibility.
+/// Tests the blasts list, creation flow, scheduling, and admin-only visibility.
 final class BlastsUITests: BaseUITest {
 
     // MARK: - Helper: Navigate to Blasts
@@ -90,7 +90,7 @@ final class BlastsUITests: BaseUITest {
         }
     }
 
-    // MARK: - Scenario: Create blast sheet opens
+    // MARK: - Scenario: Create blast sheet opens with all elements
 
     func testCreateBlastSheetOpens() {
         given("I am authenticated as admin") {
@@ -111,7 +111,7 @@ final class BlastsUITests: BaseUITest {
                 }
             }
         }
-        then("I should see the blast creation form") {
+        then("I should see the blast creation form with all channels") {
             let nameInput = find("blast-name-input")
             XCTAssertTrue(
                 nameInput.waitForExistence(timeout: 5),
@@ -124,11 +124,58 @@ final class BlastsUITests: BaseUITest {
             let smsToggle = find("blast-channel-sms")
             XCTAssertTrue(smsToggle.exists, "SMS channel toggle should exist")
 
-            let submitButton = find("blast-submit-button")
-            XCTAssertTrue(submitButton.exists, "Submit button should exist")
+            let whatsappToggle = find("blast-channel-whatsapp")
+            XCTAssertTrue(whatsappToggle.exists, "WhatsApp channel toggle should exist")
+
+            let signalToggle = find("blast-channel-signal")
+            XCTAssertTrue(signalToggle.exists, "Signal channel toggle should exist")
+
+            let sendButton = find("blast-send-button")
+            XCTAssertTrue(sendButton.exists, "Send Now button should exist")
+
+            let scheduleButton = find("blast-schedule-button")
+            XCTAssertTrue(scheduleButton.exists, "Schedule button should exist")
 
             let cancelButton = find("cancel-blast-create")
             XCTAssertTrue(cancelButton.exists, "Cancel button should exist")
+        }
+    }
+
+    // MARK: - Scenario: Schedule button toggles date picker
+
+    func testScheduleButtonTogglesDatePicker() {
+        given("I am authenticated as admin") {
+            launchAsAdmin()
+        }
+        when("I open the create blast sheet and tap schedule") {
+            scrollAndTap("dashboard-blasts-action")
+            _ = anyElementExists(["blasts-list", "blasts-empty-state", "blasts-loading"])
+
+            let createButton = find("create-blast-button")
+            if createButton.waitForExistence(timeout: 3) {
+                createButton.tap()
+            } else {
+                let createFirst = find("create-first-blast")
+                if createFirst.waitForExistence(timeout: 3) {
+                    createFirst.tap()
+                }
+            }
+
+            let nameInput = find("blast-name-input")
+            _ = nameInput.waitForExistence(timeout: 5)
+
+            let scheduleButton = find("blast-schedule-button")
+            scheduleButton.tap()
+        }
+        then("I should see the date picker") {
+            let schedulePicker = find("blast-schedule-picker")
+            XCTAssertTrue(
+                schedulePicker.waitForExistence(timeout: 5),
+                "Schedule date picker should appear when schedule button is tapped"
+            )
+
+            let confirmSchedule = find("blast-confirm-schedule")
+            XCTAssertTrue(confirmSchedule.exists, "Confirm schedule button should appear")
         }
     }
 

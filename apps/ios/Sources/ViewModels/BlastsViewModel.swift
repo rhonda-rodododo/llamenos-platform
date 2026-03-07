@@ -97,6 +97,25 @@ final class BlastsViewModel {
         }
     }
 
+    // MARK: - Schedule Blast
+
+    func scheduleBlast(id: String, at date: Date) async {
+        isSending = true
+        defer { isSending = false }
+
+        do {
+            let body = ScheduleBlastRequest(scheduledAt: ISO8601DateFormatter().string(from: date))
+            let _: EmptyResponse = try await apiService.request(
+                method: "POST",
+                path: "/api/blasts/\(id)/schedule",
+                body: body
+            )
+            await loadBlasts()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - Refresh
 
     func refresh() async {

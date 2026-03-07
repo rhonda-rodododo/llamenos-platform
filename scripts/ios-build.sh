@@ -194,8 +194,40 @@ cmd_uitest() {
   sim_device=$(find_simulator)
   log "Using simulator: $sim_device"
 
+  local docker_dir="$PROJECT_ROOT/deploy/docker"
+  local started_docker=false
+
+  # Start Docker Compose test backend if not already running
+  if [ -f "$docker_dir/docker-compose.test.yml" ]; then
+    if ! curl -sf "http://localhost:3000/api/health" &>/dev/null; then
+      log "Starting Docker Compose test backend..."
+      cd "$docker_dir"
+      docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build app 2>&1 || {
+        warn "Docker Compose start failed — running UI tests without API backend"
+      }
+      started_docker=true
+
+      # Wait for backend to be ready (up to 30s)
+      local attempts=0
+      while ! curl -sf "http://localhost:3000/api/health" &>/dev/null; do
+        attempts=$((attempts + 1))
+        if [ $attempts -ge 30 ]; then
+          warn "Backend did not become ready in 30s — continuing anyway"
+          break
+        fi
+        sleep 1
+      done
+      if [ $attempts -lt 30 ]; then
+        log "Docker Compose backend ready."
+      fi
+    else
+      info "Docker Compose backend already running on localhost:3000"
+    fi
+  fi
+
   cd "$IOS_DIR"
   set +e
+  TEST_HUB_URL="${TEST_HUB_URL:-http://localhost:3000}" \
   xcodebuild test \
     -project Llamenos.xcodeproj \
     -scheme "$XCODE_SCHEME" \
@@ -205,6 +237,13 @@ cmd_uitest() {
     2>&1 | filter_xcodebuild
   local exit_code=$?
   set -e
+
+  # Stop Docker Compose if we started it
+  if [ "$started_docker" = true ]; then
+    log "Stopping Docker Compose test backend..."
+    cd "$docker_dir"
+    docker compose -f docker-compose.yml -f docker-compose.test.yml down 2>&1 || true
+  fi
 
   # Show test summary
   echo ""

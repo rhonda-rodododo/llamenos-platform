@@ -72,27 +72,16 @@ struct CustomFieldsView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label(
-                NSLocalizedString("fields_empty_title", comment: "No Custom Fields"),
-                systemImage: "list.bullet.rectangle"
-            )
-        } description: {
-            Text(NSLocalizedString(
-                "fields_empty_message",
-                comment: "Custom fields will appear on note and report forms."
-            ))
-        } actions: {
-            Button {
+        BrandEmptyState(
+            icon: "list.bullet.rectangle",
+            title: NSLocalizedString("fields_empty_title", comment: "No Custom Fields"),
+            message: NSLocalizedString("fields_empty_message", comment: "Custom fields will appear on note and report forms."),
+            action: {
                 viewModel.editingField = nil
                 viewModel.showFieldEditor = true
-            } label: {
-                Text(NSLocalizedString("fields_add_first", comment: "Add First Field"))
-            }
-            .buttonStyle(.bordered)
-            .accessibilityIdentifier("add-first-field")
-        }
-        .accessibilityElement(children: .contain)
+            },
+            actionLabel: NSLocalizedString("fields_add_first", comment: "Add First Field")
+        )
         .accessibilityIdentifier("custom-fields-empty-state")
     }
 

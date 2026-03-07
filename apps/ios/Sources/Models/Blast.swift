@@ -78,6 +78,12 @@ struct CreateBlastRequest: Codable, Sendable {
     let targetLanguages: [String]
 }
 
+// MARK: - Schedule Blast Request
+
+struct ScheduleBlastRequest: Codable, Sendable {
+    let scheduledAt: String
+}
+
 // MARK: - Subscriber Stats
 
 struct BlastSubscriberStats: Codable, Sendable {

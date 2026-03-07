@@ -1823,7 +1823,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_is_valid_nsec() != 41860) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_is_valid_pin() != 65518) {
+    if (uniffi_llamenos_core_checksum_func_is_valid_pin() != 55911) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_keypair_from_nsec() != 313) {
