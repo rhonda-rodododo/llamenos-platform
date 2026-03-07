@@ -78,14 +78,9 @@ Then('the admin card should be tappable', async ({ page }) => {
 })
 
 Then('I should see the version text', async ({ page }) => {
-  // Version text may not be displayed on the settings page yet.
-  // Check for version pattern first, fall back to verifying the settings page is loaded.
+  // Version text should be visible somewhere on the settings page
   const version = page.getByText(/v?\d+\.\d+\.\d+/).first()
-  const versionVisible = await version.isVisible({ timeout: 3000 }).catch(() => false)
-  if (versionVisible) return
-
-  // Fallback: verify the settings page is loaded (page title visible)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(version).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Lock & Logout steps ---
@@ -120,14 +115,9 @@ Then('I should see step labels \\(Scan, Verify, Import)', async ({ page }) => {
 
 Then('the current step should be {string}', async ({ page }, step: string) => {
   const section = page.getByTestId('linked-devices')
-  const isSection = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isSection) {
-    const stepText = section.getByText(step)
-    const isStep = await stepText.isVisible({ timeout: 2000 }).catch(() => false)
-    if (isStep) return
-  }
-  // Fallback: section visible at all
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const stepText = section.getByText(step)
+  await expect(stepText).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see either the camera preview or the camera permission prompt', async ({ page }) => {
@@ -145,10 +135,7 @@ Then('I should see the error state', async ({ page }) => {
   const isError = await errorMessage.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isError) return
   const errorText = page.getByText(/error|invalid|failed/i).first()
-  const isText = await errorText.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isText) return
-  // Fallback: page rendered
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(errorText).toBeVisible({ timeout: 3000 })
 })
 
 Then('the error message should mention {string}', async ({ page }, text: string) => {
@@ -156,26 +143,19 @@ Then('the error message should mention {string}', async ({ page }, text: string)
   const textEl = page.getByText(new RegExp(text, 'i')).first()
   const isText = await textEl.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isText) return
-  // Fallback: check for any error indicator
+  // Check for error toast with matching text
   const errorToast = page.locator('[data-sonner-toast][data-type="error"]').first()
   const isToast = await errorToast.isVisible({ timeout: 2000 }).catch(() => false)
   if (isToast) return
+  // Check for alert role with matching text
   const alertEl = page.locator('[role="alert"]').first()
-  const isAlert = await alertEl.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isAlert) return
-  // Error may not have been triggered — verify page rendered
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(alertEl).toBeVisible({ timeout: 3000 })
 })
 
 Then('the device link card should still be visible', async ({ page }) => {
   const linkedDevices = page.getByTestId('linked-devices')
-  const isVis = await linkedDevices.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVis) {
-    await linkedDevices.scrollIntoViewIfNeeded().catch(() => {})
-    return
-  }
-  // Fallback: settings page loaded
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await linkedDevices.scrollIntoViewIfNeeded()
+  await expect(linkedDevices).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the settings identity card should be visible', async ({ page }) => {

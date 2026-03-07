@@ -3,7 +3,7 @@
  * Matches steps from: packages/test-specs/features/admin/audit-log.feature
  *
  * Behavioral depth: Audit entries verified for real content (dates, actor links).
- * No empty assertion bodies.
+ * Filtering verified via API cross-check. No empty assertion bodies.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
@@ -11,13 +11,20 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listAuditLogViaApi } from '../../api-helpers'
 
-Then('audit entries should be visible with date information', async ({ page }) => {
+Then('audit entries should be visible with date information', async ({ page, request }) => {
   const auditEntry = page.getByTestId(TestIds.AUDIT_ENTRY)
   await expect(auditEntry.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Verify date-like content within entries
   const entryText = await auditEntry.first().textContent()
   expect(entryText).toBeTruthy()
   expect(entryText!.length).toBeGreaterThan(0)
+
+  // Cross-check with API: audit log should have entries
+  const result = await listAuditLogViaApi(request)
+  expect(result.entries.length).toBeGreaterThan(0)
+  // Verify API entries have timestamps
+  const firstEntry = result.entries[0]
+  expect(firstEntry.timestamp || firstEntry.created_at || firstEntry.createdAt).toBeTruthy()
 })
 
 Then('audit entries should show actor links pointing to volunteer profiles', async ({ page }) => {
@@ -48,12 +55,29 @@ When('I filter by {string} event type', async ({ page }, eventType: string) => {
   await trigger.click()
   const option = page.getByRole('option', { name: new RegExp(eventType, 'i') })
   await option.first().click()
+  await page.waitForTimeout(Timeouts.UI_SETTLE)
+})
+
+Then('only {string} events should be visible', async ({ page, request }, eventType: string) => {
+  // Verify UI shows filtered results
+  const auditEntries = page.getByTestId(TestIds.AUDIT_ENTRY)
+  await expect(auditEntries.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // Cross-check with API: filter by event type
+  const result = await listAuditLogViaApi(request, { eventType })
+  expect(result.entries.length).toBeGreaterThan(0)
+  // All returned entries should match the filter
+  for (const entry of result.entries) {
+    const entryType = entry.event_type || entry.eventType || entry.type
+    expect(String(entryType).toLowerCase()).toContain(eventType.toLowerCase())
+  }
 })
 
 When('I search for {string}', async ({ page }, query: string) => {
   const searchInput = page.getByTestId(TestIds.AUDIT_SEARCH)
   await searchInput.fill(query)
   await searchInput.press('Enter')
+  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I type {string} in the search input', async ({ page }, text: string) => {
@@ -64,6 +88,16 @@ Then('the search input should be empty', async ({ page }) => {
   await expect(page.getByTestId(TestIds.AUDIT_SEARCH)).toHaveValue('')
 })
 
+Then('the audit results should update', async ({ page }) => {
+  // After search/filter, the audit list should still be visible
+  const auditEntries = page.getByTestId(TestIds.AUDIT_ENTRY)
+  const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
+  // Either entries or empty state should be visible
+  const hasEntries = await auditEntries.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasEntries) return
+  await expect(emptyState).toBeVisible({ timeout: 3000 })
+})
+
 Then('the {string} badge should have the purple color class', async ({ page }, text: string) => {
   const auditEntry = page.getByTestId(TestIds.AUDIT_ENTRY).filter({ hasText: text })
   await expect(auditEntry.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -71,4 +105,9 @@ Then('the {string} badge should have the purple color class', async ({ page }, t
   const badge = auditEntry.first().locator('[class*="purple"], [class*="badge"]')
   const badgeCount = await badge.count()
   expect(badgeCount).toBeGreaterThanOrEqual(1)
+})
+
+Then('the audit log should have at least {int} entries', async ({ request }, count: number) => {
+  const result = await listAuditLogViaApi(request)
+  expect(result.entries.length).toBeGreaterThanOrEqual(count)
 })

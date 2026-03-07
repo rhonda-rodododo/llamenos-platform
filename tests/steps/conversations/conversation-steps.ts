@@ -5,7 +5,8 @@
  *   - packages/test-specs/features/conversations/conversation-filters.feature
  *
  * Behavioral depth: Hard assertions on conversation-specific elements.
- * No .or(PAGE_TITLE) fallbacks masking missing elements.
+ * No .or(PAGE_TITLE) fallbacks masking missing elements. Sequential checks
+ * used where multiple valid UI states exist.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
@@ -19,52 +20,50 @@ Given('I navigate to the conversations tab', async ({ page }) => {
 
 Given('I open a conversation', async ({ page }) => {
   const conversationItem = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasConversation = await conversationItem.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasConversation) {
-    await conversationItem.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
-  }
-  // If no conversations exist, subsequent steps will need to handle the empty state
+  await expect(conversationItem).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await conversationItem.click()
+  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the filter chips should be visible', async ({ page }) => {
   // Desktop conversations use section headers (Waiting / Active) as visual grouping.
-  // If no conversations exist, the conversation-list container is still present.
+  // Check section header first, then conversation list container.
   const sectionHeader = page.getByTestId(TestIds.CONV_SECTION_HEADER)
-  const conversationList = page.getByTestId(TestIds.CONVERSATION_LIST)
-  await expect(sectionHeader.first().or(conversationList)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasSectionHeader = await sectionHeader.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasSectionHeader) return
+  await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).toBeVisible({ timeout: 3000 })
 })
 
 Then('I should see the {string} filter chip', async ({ page }, filterName: string) => {
   const sectionHeader = page.getByTestId(TestIds.CONV_SECTION_HEADER).filter({ hasText: new RegExp(filterName, 'i') })
-  const conversationList = page.getByTestId(TestIds.CONVERSATION_LIST)
-  await expect(sectionHeader.first().or(conversationList)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasSectionHeader = await sectionHeader.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasSectionHeader) return
+  // Conversation list visible means the page rendered — filter may not exist as a separate chip
+  await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).toBeVisible({ timeout: 3000 })
 })
 
 Then('the {string} filter should be selected', async ({ page }, filterName: string) => {
   const sectionHeader = page.getByTestId(TestIds.CONV_SECTION_HEADER).filter({ hasText: new RegExp(filterName, 'i') })
-  const conversationList = page.getByTestId(TestIds.CONVERSATION_LIST)
-  await expect(sectionHeader.first().or(conversationList)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasSectionHeader = await sectionHeader.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasSectionHeader) return
+  await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).toBeVisible({ timeout: 3000 })
 })
 
 When('I tap the {string} filter chip', async ({ page }, filterName: string) => {
   const sectionHeader = page.getByTestId(TestIds.CONV_SECTION_HEADER).filter({ hasText: new RegExp(filterName, 'i') })
-  if (await sectionHeader.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await sectionHeader.first().click()
-  }
+  await expect(sectionHeader.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await sectionHeader.first().click()
 })
 
 Then('the conversation list should update', async ({ page }) => {
   // Verify the conversation list is still rendered after filter change
-  const conversationList = page.getByTestId(TestIds.CONVERSATION_LIST)
-  await expect(conversationList).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('I have selected the {string} filter', async ({ page }, filterName: string) => {
   const sectionHeader = page.getByTestId(TestIds.CONV_SECTION_HEADER).filter({ hasText: new RegExp(filterName, 'i') })
-  if (await sectionHeader.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await sectionHeader.first().click()
-  }
+  await expect(sectionHeader.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await sectionHeader.first().click()
   await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
@@ -80,11 +79,11 @@ Then(
 
 Then('I should see the conversation filters', async ({ page }) => {
   // Desktop conversations use section headers as visual grouping.
-  // If no conversations exist, check for the conversation list container or page title instead.
+  // Check section header first, then conversation list.
   const sectionHeader = page.getByTestId(TestIds.CONV_SECTION_HEADER)
-  const conversationList = page.getByTestId(TestIds.CONVERSATION_LIST)
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  await expect(sectionHeader.first().or(conversationList).or(pageTitle)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasSectionHeader = await sectionHeader.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasSectionHeader) return
+  await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).toBeVisible({ timeout: 3000 })
 })
 
 Then('I should see the create note FAB', async ({ page }) => {
@@ -106,15 +105,22 @@ Then('I should see the assign dialog', async ({ page }) => {
 })
 
 Then('I should see the add note button', async ({ page }) => {
-  const noteBtn = page.getByTestId(TestIds.CONV_ADD_NOTE_BTN)
-    .or(page.getByTestId(TestIds.NOTE_NEW_BTN))
-  await expect(noteBtn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Check conversation-specific add note button first, then generic note button
+  const convNoteBtn = page.getByTestId(TestIds.CONV_ADD_NOTE_BTN)
+  const isConvBtn = await convNoteBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isConvBtn) return
+  await expect(page.getByTestId(TestIds.NOTE_NEW_BTN)).toBeVisible({ timeout: 3000 })
 })
 
 When('I tap the add note button', async ({ page }) => {
-  const noteBtn = page.getByTestId(TestIds.CONV_ADD_NOTE_BTN)
-    .or(page.getByTestId(TestIds.NOTE_NEW_BTN))
-  await noteBtn.first().click()
+  // Try conversation-specific button first, then generic
+  const convNoteBtn = page.getByTestId(TestIds.CONV_ADD_NOTE_BTN)
+  const isConvBtn = await convNoteBtn.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isConvBtn) {
+    await convNoteBtn.click()
+    return
+  }
+  await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
 })
 
 Then('I should see the E2EE encryption indicator', async ({ page }) => {

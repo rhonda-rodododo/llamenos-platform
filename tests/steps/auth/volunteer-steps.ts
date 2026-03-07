@@ -101,14 +101,15 @@ When('I create an invite for a new volunteer', async ({ page }) => {
 })
 
 Then('an invite link should be generated', async ({ page }) => {
-  // After creating a volunteer, either invite card, nsec card, or success state should appear
+  // After creating a volunteer, either invite card, nsec card, or nsec code should appear
   const inviteCard = page.getByTestId(TestIds.VOLUNTEER_INVITE_CARD)
-  if (await inviteCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
+  const isInvite = await inviteCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isInvite) return
   const nsecCard = page.getByTestId(TestIds.VOLUNTEER_NSEC_CARD)
-  if (await nsecCard.isVisible({ timeout: 2000 }).catch(() => false)) return
-  const nsecCode = page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)
-  if (await nsecCode.isVisible({ timeout: 2000 }).catch(() => false)) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const isNsecCard = await nsecCard.isVisible({ timeout: 2000 }).catch(() => false)
+  if (isNsecCard) return
+  // At minimum, the nsec code must be visible
+  await expect(page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)).toBeVisible({ timeout: 3000 })
 })
 
 When('the volunteer opens the invite link', async ({ page }) => {
@@ -123,10 +124,9 @@ When('the volunteer opens the invite link', async ({ page }) => {
 
 Then('they should see a welcome screen with their name', async ({ page }) => {
   const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
-  if (volName) {
-    // Content assertion — verifying displayed volunteer name
-    await expect(page.getByText(new RegExp(volName, 'i')).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  expect(volName).toBeTruthy()
+  // Content assertion — verifying displayed volunteer name
+  await expect(page.getByText(new RegExp(volName, 'i')).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('the volunteer completes the onboarding flow', async ({ page }) => {
@@ -141,10 +141,9 @@ When('the volunteer completes the onboarding flow', async ({ page }) => {
 
 Then('the volunteer name should appear in the pending invites list', async ({ page }) => {
   const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
-  if (volName) {
-    // Content assertion — verifying volunteer name is displayed
-    await expect(page.getByText(volName, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  expect(volName).toBeTruthy()
+  // Content assertion — verifying volunteer name is displayed
+  await expect(page.getByText(volName, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I revoke the invite', async ({ page }) => {
@@ -158,10 +157,9 @@ When('I revoke the invite', async ({ page }) => {
 
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {
   const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
-  if (volName) {
-    // Content assertion — verifying volunteer name is not displayed
-    await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  expect(volName).toBeTruthy()
+  // Content assertion — verifying volunteer name is not displayed
+  await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Form validation ---
@@ -249,57 +247,49 @@ Given('a reporter has been invited and onboarded', async ({ page }) => {
 
 Given('a reporter is logged in', async ({ page }) => {
   const nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string
-  if (nsec) {
-    await loginAsVolunteer(page, nsec)
-  }
+  expect(nsec).toBeTruthy()
+  await loginAsVolunteer(page, nsec)
 })
 
 When('the reporter logs in', async ({ page }) => {
   const nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string
-  if (nsec) {
-    await loginAsVolunteer(page, nsec)
-  }
+  expect(nsec).toBeTruthy()
+  await loginAsVolunteer(page, nsec)
 })
 
 When('they create a new report', async ({ page }) => {
   const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
-  const isVisible = await newBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    await newBtn.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
-    // Reports use a chat-style interface — find textarea and submit button
-    const textarea = page.locator('textarea').first()
-    if (await textarea.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-      await textarea.fill('Test report content')
-      // Submit via the send button (aria-label) or form-save-btn or Ctrl+Enter
-      const sendAriaBtn = page.locator('button[aria-label*="submit" i], button[aria-label*="send" i]').first()
-      if (await sendAriaBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await sendAriaBtn.click()
-      } else {
-        const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
-        if (await saveBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await saveBtn.click()
-        } else {
-          const submitBtn = page.getByTestId(TestIds.FORM_SUBMIT_BTN)
-          if (await submitBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await submitBtn.click()
-          }
-        }
-      }
-    }
+  await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await newBtn.click()
+  await page.waitForTimeout(Timeouts.UI_SETTLE)
+  // Reports use a chat-style interface — find textarea and submit button
+  const textarea = page.locator('textarea').first()
+  await expect(textarea).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await textarea.fill('Test report content')
+  // Submit via send button, save button, or submit button (sequential check)
+  const sendAriaBtn = page.locator('button[aria-label*="submit" i], button[aria-label*="send" i]').first()
+  const isSend = await sendAriaBtn.isVisible({ timeout: 2000 }).catch(() => false)
+  if (isSend) {
+    await sendAriaBtn.click()
+    return
   }
+  const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
+  const isSave = await saveBtn.isVisible({ timeout: 2000 }).catch(() => false)
+  if (isSave) {
+    await saveBtn.click()
+    return
+  }
+  await page.getByTestId(TestIds.FORM_SUBMIT_BTN).click()
 })
 
 Then('the report should be saved successfully', async ({ page }) => {
-  // Check for success toast or success text
+  // Check for success toast, success text, or return to report list
   const successToast = page.getByTestId(TestIds.SUCCESS_TOAST)
   const isToast = await successToast.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isToast) return
   const successText = page.getByText(/success|saved|created/i).first()
   const isText = await successText.isVisible({ timeout: 3000 }).catch(() => false)
   if (isText) return
-  // Fallback: success toast may have already dismissed — check we're back on the list page
-  const reportList = page.getByTestId(TestIds.REPORT_LIST)
-  if (await reportList.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: 2000 })
+  // Success toast may have already dismissed — check we're back on the list page
+  await expect(page.getByTestId(TestIds.REPORT_LIST)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

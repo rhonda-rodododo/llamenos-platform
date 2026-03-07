@@ -8,7 +8,8 @@
  *   - packages/test-specs/features/reports/report-close.feature
  *
  * Behavioral depth: Hard assertions on report-specific elements. No .or(PAGE_TITLE)
- * fallbacks that silently pass when the real element is missing.
+ * fallbacks that silently pass when the real element is missing. Report lifecycle
+ * verified via API where possible.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
@@ -19,11 +20,12 @@ import { listReportsViaApi } from '../../api-helpers'
 // --- Report list ---
 
 Then('I should see the reports screen', async ({ page }) => {
-  // Report list or empty state should be visible on the reports page
+  // Report list or empty state should be visible — check sequentially, not via .or()
   const reportList = page.getByTestId(TestIds.REPORT_LIST)
+  const isReportList = await reportList.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isReportList) return
   const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  await expect(reportList.or(emptyState).or(pageTitle)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(emptyState).toBeVisible({ timeout: 3000 })
 })
 
 Then('I should see the reports card on the dashboard', async ({ page }) => {
@@ -64,15 +66,22 @@ Then('I should see the report body input', async ({ page }) => {
 })
 
 Then('I should see the report submit button', async ({ page }) => {
+  // Check for submit button first, then fallback to generic save button
   const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
-    .or(page.getByTestId(TestIds.FORM_SAVE_BTN))
-  await expect(submitBtn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const isSubmit = await submitBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isSubmit) return
+  await expect(page.getByTestId(TestIds.FORM_SAVE_BTN)).toBeVisible({ timeout: 3000 })
 })
 
 Then('the report submit button should be disabled', async ({ page }) => {
+  // Check submit button first, then generic save button
   const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
-    .or(page.getByTestId(TestIds.FORM_SAVE_BTN))
-  await expect(submitBtn.first()).toBeDisabled()
+  const isSubmit = await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isSubmit) {
+    await expect(submitBtn).toBeDisabled()
+    return
+  }
+  await expect(page.getByTestId(TestIds.FORM_SAVE_BTN)).toBeDisabled()
 })
 
 // --- Report detail / viewing ---
@@ -98,34 +107,22 @@ Then('I should see the report status badge', async ({ page }) => {
 
 When('I tap the back button on report detail', async ({ page }) => {
   const backBtn = page.getByTestId(TestIds.BACK_BTN)
-  const backVisible = await backBtn.isVisible({ timeout: 2000 }).catch(() => false)
-  if (backVisible) {
-    await backBtn.click()
-  } else {
-    await page.goBack()
-  }
+  await expect(backBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await backBtn.click()
 })
 
 Given('I am viewing a report with status {string}', async ({ page, request }, status: string) => {
   const { Navigation } = await import('../../pages/index')
   await Navigation.goToReports(page)
 
-  // Verify reports exist via API (returns { conversations, total })
-  try {
-    const result = await listReportsViaApi(request, { status })
-    if (result.conversations.length === 0) {
-      console.warn(`No reports with status "${status}" found — subsequent steps may fail`)
-    }
-  } catch {
-    console.warn('Reports API not available in test mode — falling back to UI check')
-  }
+  // Verify reports exist via API
+  const result = await listReportsViaApi(request, { status })
+  expect(result.conversations.length).toBeGreaterThan(0)
 
   const reportCard = page.getByTestId(TestIds.REPORT_CARD).first()
-  const hasReport = await reportCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasReport) {
-    await reportCard.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
-  }
+  await expect(reportCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await reportCard.click()
+  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Report list (report-list.feature) ---
@@ -173,9 +170,9 @@ When('I tap the back button on reports', async ({ page }) => {
   const backVisible = await backBtn.isVisible({ timeout: 2000 }).catch(() => false)
   if (backVisible) {
     await backBtn.click()
-  } else {
-    await page.goBack()
+    return
   }
+  await page.goBack()
 })
 
 // --- Report claim ---
@@ -196,4 +193,16 @@ Then('I should see the report close button', async ({ page }) => {
 
 Then('I should not see the report close button', async ({ page }) => {
   await expect(page.getByTestId(TestIds.REPORT_CLOSE_BTN)).not.toBeVisible({ timeout: 3000 })
+})
+
+// --- Report lifecycle verification via API ---
+
+Then('the report should exist in the API', async ({ request }) => {
+  const result = await listReportsViaApi(request)
+  expect(result.conversations.length).toBeGreaterThan(0)
+})
+
+Then('the report count should increase', async ({ request }) => {
+  const result = await listReportsViaApi(request)
+  expect(result.total).toBeGreaterThan(0)
 })

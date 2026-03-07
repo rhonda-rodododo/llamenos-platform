@@ -112,8 +112,7 @@ Then('I should see a confirmation dialog', async ({ page }) => {
   if (isRole) return
   const isAlert = await alertDialog.isVisible({ timeout: 2000 }).catch(() => false)
   if (isAlert) return
-  // If no dialog appeared, the action may have completed without confirmation
-  // (e.g., direct logout without confirmation dialog)
+  throw new Error('Expected a confirmation dialog but none appeared (checked data-testid, role=dialog, role=alertdialog)')
 })
 
 Then('the dialog should be dismissed', async ({ page }) => {
@@ -179,6 +178,6 @@ Then('no stored keys should remain', async ({ page }) => {
   // If key still exists, the reset step may not have executed — cascading failure
   if (hasKey) {
     // At minimum verify the page rendered
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT }).catch(() => {})
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 })

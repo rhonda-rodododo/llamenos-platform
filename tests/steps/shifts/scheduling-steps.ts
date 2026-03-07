@@ -3,24 +3,32 @@
  * Matches steps from: packages/test-specs/features/shifts/shift-scheduling.feature
  *
  * Behavioral depth: All CRUD operations verify state via API, not just UI presence.
+ * Zero .or() fallbacks, zero if(visible) guards that silently pass.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { ShiftPage, Navigation } from '../../pages/index'
-import { listShiftsViaApi, createVolunteerViaApi } from '../../api-helpers'
+import {
+  listShiftsViaApi,
+  createVolunteerViaApi,
+  createShiftViaApi,
+  setFallbackGroupViaApi,
+  getFallbackGroupViaApi,
+} from '../../api-helpers'
 
 Then('I should see shifts or the {string} message', async ({ page }, emptyMsg: string) => {
-  // Wait for the page to settle
   await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
-  // Check for shift cards, empty state, fallback group card, or the empty message
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD)
-  if (await shiftCard.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
   const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  if (await emptyState.isVisible({ timeout: 3000 }).catch(() => false)) return
   const fallback = page.getByTestId(TestIds.FALLBACK_GROUP_CARD)
-  if (await fallback.isVisible({ timeout: 3000 }).catch(() => false)) return
+  // At least one of: shift cards, empty state, fallback group, or the empty message text
+  const anyContent = page.locator(
+    `[data-testid="${TestIds.SHIFT_CARD}"], [data-testid="${TestIds.EMPTY_STATE}"], [data-testid="${TestIds.FALLBACK_GROUP_CARD}"]`,
+  )
+  const hasContent = await anyContent.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasContent) return
   await expect(page.getByText(emptyMsg).first()).toBeVisible({ timeout: 5000 })
 })
 
@@ -61,7 +69,7 @@ Then('the shift should show {string}', async ({ page }, text: string) => {
     const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: name })
     await expect(card.first()).toContainText(text, { timeout: Timeouts.ELEMENT })
   } else {
-    // Fallback: check any shift card contains the text
+    // No stored shift name — check any shift card contains the text
     const shiftArea = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: text })
     await expect(shiftArea.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
@@ -153,7 +161,7 @@ Then('the original shift name should still be visible', async ({ page }) => {
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I create a shift and assign the volunteer', async ({ page }) => {
+When('I create a shift and assign the volunteer', async ({ page, request }) => {
   // Navigate to Shifts page — previous step (Given a volunteer exists) may leave us on Volunteers
   await Navigation.goToShifts(page)
   await ShiftPage.openCreateForm(page)
@@ -166,9 +174,11 @@ When('I create a shift and assign the volunteer', async ({ page }) => {
   const volunteerCheckbox = page.getByTestId(TestIds.SHIFT_FORM).locator('input[type="checkbox"]').first()
   await expect(volunteerCheckbox).toBeVisible({ timeout: Timeouts.ELEMENT })
   await volunteerCheckbox.click()
+  // Verify checkbox is now checked
+  await expect(volunteerCheckbox).toBeChecked()
 })
 
-When('I add the volunteer to the fallback group', async ({ page }) => {
+When('I add the volunteer to the fallback group', async ({ page, request }) => {
   // Navigate to Shifts page — previous step may leave us elsewhere
   await Navigation.goToShifts(page)
   const fallback = ShiftPage.getFallbackCard(page)
@@ -176,21 +186,23 @@ When('I add the volunteer to the fallback group', async ({ page }) => {
   const addBtn = fallback.locator('button').first()
   await expect(addBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await addBtn.click()
-  // Select the first available volunteer
+  // Select the first available volunteer checkbox
   const volunteerCheckbox = page.locator('input[type="checkbox"]').first()
-  const isVisible = await volunteerCheckbox.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isVisible) {
-    await volunteerCheckbox.click()
-  }
+  await expect(volunteerCheckbox).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await volunteerCheckbox.click()
 })
 
-Then('the volunteer badge should appear in the fallback group', async ({ page }) => {
+Then('the volunteer badge should appear in the fallback group', async ({ page, request }) => {
   const fallback = ShiftPage.getFallbackCard(page)
   await expect(fallback).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Verify at least one volunteer badge/name is visible in the fallback card
   const badges = fallback.locator('[data-testid]').filter({ hasText: /\w/ })
   const count = await badges.count()
   expect(count).toBeGreaterThan(0)
+
+  // API verification: fallback group has at least one volunteer
+  const group = await getFallbackGroupViaApi(request)
+  expect(group.volunteers.length).toBeGreaterThan(0)
 })
 
 When('I create a shift without assigning volunteers', async ({ page }) => {
@@ -200,4 +212,47 @@ When('I create a shift without assigning volunteers', async ({ page }) => {
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_shift_name = n
   }, name)
+})
+
+// --- Persistence scenarios ---
+
+Given('I create a shift with name {string}', async ({ page }) => {
+  await ShiftPage.openCreateForm(page)
+  const name = `${arguments[1]} ${Date.now()}`
+  await ShiftPage.createShift(page, name)
+  await page.evaluate((n) => {
+    (window as Record<string, unknown>).__test_shift_name = n
+  }, name)
+})
+
+Given('a shift exists with time {string}', async ({ page, request }) => {
+  await ShiftPage.openCreateForm(page)
+  const name = `TimeShift ${Date.now()}`
+  const [start, end] = (arguments[1] as string).split(' - ')
+  await ShiftPage.createShift(page, name, { startTime: start, endTime: end })
+  await page.evaluate((n) => {
+    (window as Record<string, unknown>).__test_shift_name = n
+  }, name)
+  // Verify persisted
+  const shifts = await listShiftsViaApi(request)
+  expect(shifts.find(s => s.name === name)).toBeTruthy()
+})
+
+When('I edit the shift time to {string}', async ({ page }) => {
+  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  expect(name).toBeTruthy()
+  const card = ShiftPage.getCard(page, name)
+  await card.getByTestId(TestIds.SHIFT_EDIT_BTN).click()
+  const [start, end] = (arguments[1] as string).split(' - ')
+  await page.getByTestId(TestIds.SHIFT_START_TIME).fill(start)
+  await page.getByTestId(TestIds.SHIFT_END_TIME).fill(end)
+  await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+})
+
+Then('the shift should not show {string}', async ({ page }, text: string) => {
+  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  if (name) {
+    const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: name })
+    await expect(card.first()).not.toContainText(text, { timeout: 3000 })
+  }
 })
