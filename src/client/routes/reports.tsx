@@ -174,8 +174,8 @@ function ReportsPage() {
         setReports(conversations)
         setSelectedId(reportId)
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => toast(t('common.error'), 'error'))
+  }, [t, toast])
 
   const showEmptyState = !loading && reports.length === 0
 

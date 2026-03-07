@@ -55,7 +55,7 @@ function DashboardPage() {
   // Fetch calls today count
   useEffect(() => {
     if (!isAuthenticated) return
-    getCallsTodayCount().then(r => setCallsToday(r.count)).catch(() => {})
+    getCallsTodayCount().then(r => setCallsToday(r.count)).catch(() => toast(t('common.error'), 'error'))
   }, [isAuthenticated, activeCalls.length])
 
   // Fetch volunteer presence (admin only) with periodic refresh

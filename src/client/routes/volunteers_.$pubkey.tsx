@@ -68,18 +68,18 @@ function VolunteerProfilePage() {
       const vol = volRes.volunteers.find(v => v.pubkey === pubkey) || null
       setVolunteer(vol)
       setShifts(shiftRes.shifts)
-    }).catch(() => {})
+    }).catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
-  }, [pubkey])
+  }, [pubkey, t, toast])
 
   // Load audit entries for this volunteer
   useEffect(() => {
     setAuditLoading(true)
     listAuditLog({ page: auditPage, limit: auditLimit, actorPubkey: pubkey })
       .then(r => { setAuditEntries(r.entries); setAuditTotal(r.total) })
-      .catch(() => {})
+      .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setAuditLoading(false))
-  }, [pubkey, auditPage])
+  }, [pubkey, auditPage, t, toast])
 
   const assignedShifts = useMemo(
     () => shifts.filter(s => s.volunteerPubkeys.includes(pubkey)),

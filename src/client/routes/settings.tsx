@@ -81,19 +81,18 @@ function SettingsPage() {
     const promises: Promise<void>[] = [
       getTranscriptionSettings().then(r => {
         setCanOptOut(r.allowVolunteerOptOut)
-      }).catch(() => {}),
+      }).catch(() => toast(t('common.error'), 'error')),
       getWebRtcStatus().then(r => {
         setWebrtcAvailable(r.available)
-      }).catch(() => {}),
+      }).catch(() => toast(t('common.error'), 'error')),
     ]
     // Load WebAuthn credentials for all users
     if (webauthnAvailable) {
-      promises.push(listCredentials().then(setWebauthnCreds).catch(() => {}))
+      promises.push(listCredentials().then(setWebauthnCreds).catch(() => toast(t('common.error'), 'error')))
     }
     Promise.all(promises)
-      .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [t, toast, webauthnAvailable])
 
   // Scroll to deep-linked section after loading
   useEffect(() => {

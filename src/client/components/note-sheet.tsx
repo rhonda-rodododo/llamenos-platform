@@ -62,9 +62,9 @@ export function NoteSheet() {
   // Load custom fields and recent calls
   useEffect(() => {
     if (!isOpen) return
-    getCustomFields().then(r => setCustomFields(r.fields)).catch(() => {})
+    getCustomFields().then(r => setCustomFields(r.fields)).catch(() => toast(t('common.error'), 'error'))
     if (isAdmin && !isConversationNote) {
-      getCallHistory({ limit: 20 }).then(r => setRecentCalls(r.calls)).catch(() => {})
+      getCallHistory({ limit: 20 }).then(r => setRecentCalls(r.calls)).catch(() => toast(t('common.error'), 'error'))
     }
   }, [isAdmin, isOpen, isConversationNote])
 
