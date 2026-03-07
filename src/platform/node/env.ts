@@ -72,12 +72,14 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
     TWILIO_AUTH_TOKEN: twilioAuthToken,
     TWILIO_PHONE_NUMBER: twilioPhoneNumber,
     DEMO_MODE: process.env.DEMO_MODE || undefined,
+    DEMO_RESET_CRON: process.env.DEMO_RESET_CRON || undefined,
     ASSETS: null, // Static files served by Hono serveStatic
     AI: createTranscriptionService(),
     R2_BUCKET: createBlobStorage(),
     // Nostr relay (Epic 76.1)
     SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
     NOSTR_RELAY_URL: nostrRelayUrl || undefined,
+    NOSTR_RELAY_PUBLIC_URL: process.env.NOSTR_RELAY_PUBLIC_URL || undefined,
     // Dev/test support
     DEV_RESET_SECRET: process.env.DEV_RESET_SECRET || undefined,
     E2E_TEST_SECRET: process.env.E2E_TEST_SECRET || undefined,
