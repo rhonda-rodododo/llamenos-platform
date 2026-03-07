@@ -128,87 +128,36 @@ final class AppState {
         }
     }
 
-    /// Register the test identity as admin on the server.
-    /// Step 1: POST /api/auth/bootstrap to create admin volunteer.
-    /// Step 2: POST /api/auth/login to verify the volunteer exists.
-    /// Blocks the main thread briefly — acceptable for test setup only.
+    /// Register the test identity as admin on the server via POST /api/auth/bootstrap.
+    /// Blocks the main thread briefly (max 5s) — acceptable for test setup only.
+    /// The bootstrap endpoint creates the admin volunteer with role-super-admin.
+    /// If admin already exists (403), this is a no-op.
     private func bootstrapTestIdentity() {
         guard let hubURL = authService.hubURL,
-              let baseURL = URL(string: hubURL) else {
-            print("⚠️ bootstrapTestIdentity: no hub URL configured")
-            return
-        }
+              let baseURL = URL(string: hubURL) else { return }
 
-        // Step 1: Bootstrap — creates the admin volunteer record
-        guard let bootstrapToken = try? cryptoService.createAuthToken(
+        guard let token = try? cryptoService.createAuthToken(
             method: "POST", path: "/api/auth/bootstrap"
-        ) else {
-            print("⚠️ bootstrapTestIdentity: failed to create bootstrap auth token")
-            return
-        }
-
-        let bootstrapURL = baseURL.appendingPathComponent("api/auth/bootstrap")
-        var bootstrapReq = URLRequest(url: bootstrapURL)
-        bootstrapReq.httpMethod = "POST"
-        bootstrapReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        bootstrapReq.timeoutInterval = 10
-
-        let bootstrapBody: [String: Any] = [
-            "pubkey": bootstrapToken.pubkey,
-            "timestamp": Int(bootstrapToken.timestamp),
-            "token": bootstrapToken.token,
-        ]
-        bootstrapReq.httpBody = try? JSONSerialization.data(withJSONObject: bootstrapBody)
-
-        var bootstrapOk = false
-        let sem1 = DispatchSemaphore(value: 0)
-        URLSession.shared.dataTask(with: bootstrapReq) { data, response, error in
-            if let error {
-                print("⚠️ bootstrapTestIdentity bootstrap: \(error.localizedDescription)")
-            } else if let http = response as? HTTPURLResponse {
-                if (200...299).contains(http.statusCode) {
-                    bootstrapOk = true
-                } else if http.statusCode == 403 {
-                    // Admin already exists — proceed to login
-                    bootstrapOk = true
-                } else {
-                    let bodyStr = data.flatMap { String(data: $0, encoding: .utf8) } ?? "<no body>"
-                    print("⚠️ bootstrapTestIdentity bootstrap: HTTP \(http.statusCode): \(bodyStr)")
-                }
-            }
-            sem1.signal()
-        }.resume()
-        _ = sem1.wait(timeout: .now() + 10)
-
-        guard bootstrapOk else { return }
-
-        // Step 2: Login — verifies volunteer record is accessible
-        guard let loginToken = try? cryptoService.createAuthToken(
-            method: "POST", path: "/api/auth/login"
         ) else { return }
 
-        let loginURL = baseURL.appendingPathComponent("api/auth/login")
-        var loginReq = URLRequest(url: loginURL)
-        loginReq.httpMethod = "POST"
-        loginReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        loginReq.timeoutInterval = 10
+        let url = baseURL.appendingPathComponent("api/auth/bootstrap")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 5
 
-        let loginBody: [String: Any] = [
-            "pubkey": loginToken.pubkey,
-            "timestamp": Int(loginToken.timestamp),
-            "token": loginToken.token,
+        let body: [String: Any] = [
+            "pubkey": token.pubkey,
+            "timestamp": Int(token.timestamp),
+            "token": token.token,
         ]
-        loginReq.httpBody = try? JSONSerialization.data(withJSONObject: loginBody)
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let sem2 = DispatchSemaphore(value: 0)
-        URLSession.shared.dataTask(with: loginReq) { data, response, _ in
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                let bodyStr = data.flatMap { String(data: $0, encoding: .utf8) } ?? "<no body>"
-                print("⚠️ bootstrapTestIdentity login: HTTP \(http.statusCode): \(bodyStr)")
-            }
-            sem2.signal()
+        let sem = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { _, _, _ in
+            sem.signal()
         }.resume()
-        _ = sem2.wait(timeout: .now() + 10)
+        _ = sem.wait(timeout: .now() + 5)
     }
     #endif
 
@@ -282,15 +231,9 @@ final class AppState {
                 await MainActor.run {
                     // Check if any role contains "admin" (e.g. "role-super-admin", "role-admin")
                     let isAdmin = response.roles.contains { $0.contains("admin") }
-                    #if DEBUG
-                    print("ℹ️ fetchUserRole: roles=\(response.roles), isAdmin=\(isAdmin)")
-                    #endif
                     self.userRole = isAdmin ? .admin : .volunteer
                 }
             } catch {
-                #if DEBUG
-                print("⚠️ fetchUserRole failed: \(error)")
-                #endif
                 // Default to volunteer if role fetch fails
                 await MainActor.run {
                     self.userRole = .volunteer

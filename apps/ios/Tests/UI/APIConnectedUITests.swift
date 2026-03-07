@@ -49,11 +49,10 @@ final class APIConnectedUITests: BaseUITest {
                 "Dashboard should appear after admin API bootstrap"
             )
 
-            // Navigate to settings to verify admin link exists
-            // Role fetch is async — wait extra for it to resolve
-            sleep(3)
+            // launchAsAdminWithAPI() sets --test-admin which sets role locally.
+            // The admin link in settings should be visible immediately.
             navigateToSettings()
-            let adminLink = scrollToFind("settings-admin-link", maxSwipes: 3, timeout: 15)
+            let adminLink = scrollToFind("settings-admin-link", maxSwipes: 3, timeout: 10)
             XCTAssertTrue(
                 adminLink.exists,
                 "Admin panel link should be visible for admin users"
@@ -95,7 +94,7 @@ final class APIConnectedUITests: BaseUITest {
             let addNote = anyElement(["create-note-button", "add-note-button", "new-note-fab"])
             guard addNote.waitForExistence(timeout: 10) else {
                 // May be empty state with create action
-                let emptyAction = find("notes-empty-create")
+                let emptyAction = find("create-first-note")
                 if emptyAction.waitForExistence(timeout: 5) {
                     emptyAction.tap()
                     return
@@ -107,7 +106,7 @@ final class APIConnectedUITests: BaseUITest {
         }
         then("I should see the note creation form") {
             let noteForm = anyElementExists([
-                "note-text-field", "note-form", "new-note-title",
+                "note-text-editor", "save-note", "cancel-note-create",
             ])
             XCTAssertTrue(noteForm, "Note creation form should appear")
         }
@@ -231,25 +230,18 @@ final class APIConnectedUITests: BaseUITest {
         given("I am connected as an admin") {
             launchAsAdminWithAPI()
             let dashboard = find("dashboard-title")
-            _ = dashboard.waitForExistence(timeout: 15)
+            XCTAssertTrue(dashboard.waitForExistence(timeout: 15), "Dashboard should load")
         }
         when("I navigate to the admin panel") {
-            // Wait for role fetch to complete before navigating
-            sleep(3)
-            navigateToSettings()
-            let adminLink = scrollToFind("settings-admin-link", maxSwipes: 3, timeout: 15)
-            guard adminLink.exists else {
-                XCTFail("Admin link should exist for admin users")
-                return
-            }
-            adminLink.tap()
+            // Wait for async role fetch to complete before checking admin link
+            navigateToAdminPanel()
         }
-        then("I should see admin tabs") {
+        then("I should see the admin panel") {
             let found = anyElementExists([
-                "admin-tab-volunteers", "admin-tab-shifts",
-                "admin-tab-settings", "admin-tab-custom-fields",
+                "admin-tab-view", "admin-volunteers",
+                "admin-bans", "admin-custom-fields",
             ])
-            XCTAssertTrue(found, "Admin panel tabs should load")
+            XCTAssertTrue(found, "Admin panel should load")
         }
     }
 
