@@ -87,8 +87,8 @@ function CallHistoryPage() {
   }, [calls, hasNsec, publicKey])
 
   useEffect(() => {
-    listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => {})
-  }, [])
+    listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => toast(t('common.error'), 'error'))
+  }, [t, toast])
 
   const nameMap = useMemo(() => {
     const map = new Map<string, string>()

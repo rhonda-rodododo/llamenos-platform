@@ -81,7 +81,21 @@ export function NostrProvider({
       // Reconnection is handled internally by RelayManager
     })
 
+    // When the tab regains focus, check if the WebSocket is still alive.
+    // Browsers may kill background WebSocket connections; reconnect immediately
+    // rather than waiting for the exponential backoff timer.
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible' && relayRef.current) {
+        const currentState = relayRef.current.getState()
+        if (currentState === 'disconnected') {
+          relayRef.current.connect().catch(() => {})
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       manager.close()
       relayRef.current = null
       setState('disconnected')

@@ -1,5 +1,30 @@
 # Completed Backlog
 
+## 2026-03-07: UX Bug Fixes — Pagination, Error Handling, Relay Reconnection
+
+### Contacts Pagination Fix (CRITICAL)
+- `contacts.tsx:286-294` — pagination buttons rendered but had NO onClick handlers; users could not navigate pages
+- Added `useNavigate` and wired `onClick` to update `?page=` search param via TanStack Router
+
+### Silent Error Handling
+- Replaced `.catch(() => {})` with `.catch(() => toast(t('common.error'), 'error'))` in:
+  - `notes.tsx` — custom fields, call history, volunteers loading
+  - `calls.tsx` — volunteer list loading
+  - `audit.tsx` — volunteer list loading, audit log fetching
+  - `admin/settings.tsx` — WebAuthn, custom fields, telephony, messaging config loading
+
+### Nostr Relay Tab Visibility Reconnection
+- Added `visibilitychange` listener to `NostrProvider` — when tab regains focus, proactively reconnects if WebSocket was killed by the browser during background
+- Previously relied only on exponential backoff which could delay reconnection by up to 30s after tab refocus
+
+## 2026-03-07: Test Suite Fix — PIN Entry for 8-Field PinInput
+
+### enterPin Helper Fix
+- PinInput was updated to 8 fields (minLength 6) but `enterPin()` test helper only typed 6 digits without pressing Enter
+- Auto-complete only fires when all 8 digits are entered; 6-digit TEST_PIN never triggered `onComplete`
+- Fix: added `page.keyboard.press('Enter')` after typing digits (Enter triggers onComplete when >= minLength)
+- **Result: 380/380 Playwright tests pass (was 0/558 — every test failed at login)**
+
 ## 2026-03-07: API Resilience & Accessibility Hardening
 
 ### API Resilience (Desktop Client)

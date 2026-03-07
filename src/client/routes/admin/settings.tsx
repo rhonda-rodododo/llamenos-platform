@@ -82,12 +82,12 @@ function AdminSettingsPage() {
       }),
       getIvrLanguages().then(r => setIvrEnabled(r.enabledLanguages)),
       listIvrAudio().then(r => setIvrAudio(r.recordings)),
-      getWebAuthnSettings().then(setWebauthnSettings).catch(() => {}),
-      getCustomFields().then(r => setCustomFieldDefs(r.fields)).catch(() => {}),
+      getWebAuthnSettings().then(setWebauthnSettings).catch(() => toast(t('common.error'), 'error')),
+      getCustomFields().then(r => setCustomFieldDefs(r.fields)).catch(() => toast(t('common.error'), 'error')),
       getTelephonyProvider().then(config => {
         if (config) { setProviderConfig(config); setProviderDraft(config) }
-      }).catch(() => {}),
-      getMessagingConfig().then(setMessagingConfig).catch(() => {}),
+      }).catch(() => toast(t('common.error'), 'error')),
+      getMessagingConfig().then(setMessagingConfig).catch(() => toast(t('common.error'), 'error')),
     ])
       .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))

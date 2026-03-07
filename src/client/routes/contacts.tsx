@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useCallback } from 'react'
@@ -24,6 +24,7 @@ export const Route = createFileRoute('/contacts')({
 
 function ContactsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate({ from: '/contacts' })
   const { hasNsec, publicKey, isAdmin } = useAuth()
   const { toast } = useToast()
   const { page } = Route.useSearch()
@@ -283,12 +284,12 @@ function ContactsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page === 1}>
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => navigate({ search: { page: page - 1 } })}>
             <ChevronLeft className="h-4 w-4" />
             {t('common.back')}
           </Button>
           <span className="text-sm text-muted-foreground">{page} / {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page === totalPages}>
+          <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => navigate({ search: { page: page + 1 } })}>
             {t('common.next')}
             <ChevronRight className="h-4 w-4" />
           </Button>

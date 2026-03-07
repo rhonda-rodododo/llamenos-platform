@@ -62,12 +62,12 @@ function NotesPage() {
   const limit = 50
 
   useEffect(() => {
-    getCustomFields().then(r => setCustomFields(r.fields)).catch(() => {})
+    getCustomFields().then(r => setCustomFields(r.fields)).catch(() => toast(t('common.error'), 'error'))
     if (isAdmin) {
-      getCallHistory({ limit: 100 }).then(r => setRecentCalls(r.calls)).catch(() => {})
-      listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => {})
+      getCallHistory({ limit: 100 }).then(r => setRecentCalls(r.calls)).catch(() => toast(t('common.error'), 'error'))
+      listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => toast(t('common.error'), 'error'))
     }
-  }, [isAdmin])
+  }, [isAdmin, t, toast])
 
   // Decrypt encrypted call records client-side (Epic 77)
   useEffect(() => {

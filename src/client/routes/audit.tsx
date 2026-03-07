@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { listAuditLog, listVolunteers, type AuditLogEntry, type Volunteer } from '@/lib/api'
+import { useToast } from '@/lib/toast'
 import { ScrollText, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -53,9 +54,11 @@ function AuditPage() {
   const [dateTo, setDateTo] = useState('')
   const limit = 50
 
+  const { toast } = useToast()
+
   useEffect(() => {
-    listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => {})
-  }, [])
+    listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => toast(t('common.error'), 'error'))
+  }, [t, toast])
 
   const fetchEntries = useCallback(() => {
     setLoading(true)
@@ -68,8 +71,9 @@ function AuditPage() {
       search: searchText || undefined,
     })
       .then(r => { setEntries(r.entries); setTotal(r.total) })
+      .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
-  }, [page, eventType, dateFrom, dateTo, searchText])
+  }, [page, eventType, dateFrom, dateTo, searchText, t, toast])
 
   useEffect(() => {
     fetchEntries()
