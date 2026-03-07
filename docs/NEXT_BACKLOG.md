@@ -461,6 +461,30 @@ i18n alignment, codegen validation, BDD test orchestration, and Android tooling 
 ### Android Tooling
 - [x] **[Epic 268: Android Tooling Upgrade](epics/epic-268-android-tooling-upgrade.md)** — AGP 9.1, Gradle 9.4, Kotlin 2.3, Compose BOM 2026.02, kapt→KSP, compileSdk 36
 
+## iOS UX Overhaul — "Quiet Authority" Design System (Epics 269-273) — COMPLETE
+
+Full visual and UX overhaul of the native iOS app. 5 epics covering design system foundation, auth flow, dashboard, feature screens, settings, and test updates.
+
+**Dependency order:** 269 (foundation) → (270 | 271 | 272 | 273) in parallel
+
+### Design System Foundation
+- [x] **Epic 269: Design System Foundation** — BrandColors.swift (15 semantic colors + Asset Catalog), DM Sans typography, shared components (BrandCard, StatusDot, BadgeView, CopyableField, Banner, EmptyState, Avatar, StepIndicator), UINavigationBar + LoadingOverlay brand tinting
+
+### Auth Flow
+- [x] **Epic 270: Auth Flow Redesign** — LoginView with custom logo + encrypted tagline, async hub URL validation with connectivity check, PINPadView haptic refinement, ImportKeyView security note
+
+### Dashboard & Tabs
+- [x] **Epic 271: Dashboard & Tab Bar Overhaul** — Quick action cards (Calls, Notes, Help), shift status card, branded tab bar
+
+### Feature Screens
+- [x] **Epic 272: Feature Screens Polish** — Reports, Blasts, Contacts views with BrandCard styling, dashboard quick action accessibility identifiers
+
+### Settings & Admin
+- [x] **Epic 273: Settings, Admin & Shared Polish** — SettingsView split into navigation hub + AccountSettingsView + PreferencesSettingsView, PanicWipe multi-step friction gate (type "WIPE" + alert), admin cards, help accordions, device link brand styling
+
+### Test Updates
+- [x] **XCUITest Updates** — All 118 XCUITests updated for restructured navigation (settings sub-pages, hub URL validation bypass, PanicWipe friction gate), 98 unit tests passing
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)

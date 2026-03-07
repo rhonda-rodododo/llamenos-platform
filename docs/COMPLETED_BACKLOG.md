@@ -1,5 +1,57 @@
 # Completed Backlog
 
+## 2026-03-06: iOS UX Overhaul — "Quiet Authority" Design System (Epics 269-273)
+
+### Epic 269: Design System Foundation
+- **BrandColors.swift**: 15 semantic colors (primary, accent, surface, text, status indicators) with light/dark mode support
+- **Asset Catalog**: Color sets for all brand colors, Logo.imageset with SVG
+- **DM Sans typography**: System-wide font migration via UINavigationBar appearance + LoadingOverlay brand tinting
+- **Shared components**: BrandCard, StatusDot, BadgeView, CopyableField, Banner, EmptyState, AvatarView, StepIndicator
+- **Utility extensions**: View+Brand, Color+Brand, String truncation helpers
+
+### Epic 270: Auth Flow Redesign
+- **LoginView**: Custom logo, "End-to-end encrypted" tagline, async hub URL validation with real connectivity check
+- **AuthViewModel**: `validateAndStoreHubURL()` with `apiService.validateConnection()`, `--test-skip-hub-validation` flag for XCUITests
+- **PINPadView**: Haptic feedback on digit tap, refined spacing and brand colors
+- **ImportKeyView**: Security note about on-device encryption, improved layout
+
+### Epic 271: Dashboard & Tab Bar Overhaul
+- **DashboardView**: Quick action cards (Calls, Notes, Help) with accessibility identifiers
+- **Shift status card**: Branded styling with StatusDot indicators
+- **Tab bar**: Brand-tinted selection
+
+### Epic 272: Feature Screens Polish
+- **Reports, Blasts, Contacts**: BrandCard-based layouts
+- **Dashboard quick actions**: Proper accessibility identifiers for XCUITest targeting
+
+### Epic 273: Settings, Admin & Shared Polish
+- **SettingsView restructure**: Navigation hub → AccountSettingsView (identity, hub URL, device link) + PreferencesSettingsView (notifications, language, security)
+- **PanicWipeConfirmationView**: Multi-step friction gate — type "WIPE" in TextField + final alert with "Yes, Wipe Everything" destructive button
+- **Admin cards**: Brand-styled NavigationLinks
+- **Help screen**: Accordion-style DisclosureGroup sections
+- **Device link**: Brand-colored status indicators
+
+### XCUITest Updates (118/118 pass, 98 unit tests pass)
+- Added `navigateToAccountSettings()` / `navigateToPreferencesSettings()` helpers to BaseUITest
+- Updated `settings-admin-panel` → `settings-admin-link` across all admin test suites
+- Device link + pubkey tests routed through account settings sub-page
+- Auto-lock picker test routed through preferences settings sub-page
+- PanicWipe test handles friction gate (type "WIPE" + alert confirmation)
+- `--test-skip-hub-validation` flag bypasses hub connectivity check for fake URLs
+- AuthFlowUITests enter hub URL before import/create flows
+- SecurityHardeningTests: async `startImport()` → direct state assignment
+
+### i18n Additions
+- `dashboard.calls`, `dashboard.notes`, `dashboard.help` — quick action labels
+- `error.hub_unreachable` — hub connectivity error
+- `import.security_note` — on-device encryption explanation
+- `login.encrypted_tagline` — "End-to-end encrypted"
+- `settings.account_title`, `settings.preferences_title` — sub-page titles
+- All 13 locales updated, Android codegen output synced
+
+### Rust Crypto
+- `keypair_from_secret_key_hex()` added to `packages/crypto/src/keys.rs` with roundtrip test
+
 ## 2026-03-05: Android Tooling Upgrade — Epic 268
 
 ### Epic 268: Android Tooling Upgrade
