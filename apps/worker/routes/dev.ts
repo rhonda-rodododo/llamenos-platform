@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
+import type { MessagingChannelType } from '@shared/types'
 import { getDOs } from '../lib/do-access'
+import { hashPhone } from '../lib/crypto'
 
 const dev = new Hono<AppEnv>()
 
@@ -76,6 +78,262 @@ dev.post('/test-reset-records', async (c) => {
   await dos.shifts.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.calls.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.conversations.fetch(new Request('http://do/reset', { method: 'POST' }))
+  return c.json({ ok: true })
+})
+
+// ─── Simulation Endpoints (E2E test helpers) ───────────────────────────────
+// These bypass TelephonyAdapter entirely — they proxy directly to DO internal routes.
+// Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
+
+/** Request/response types for simulation endpoints */
+interface SimulateIncomingCallBody {
+  callerNumber: string
+  language?: string
+  hubId?: string
+}
+
+interface SimulateAnswerCallBody {
+  callId: string
+  pubkey: string
+}
+
+interface SimulateEndCallBody {
+  callId: string
+}
+
+interface SimulateVoicemailBody {
+  callId: string
+}
+
+interface SimulateIncomingMessageBody {
+  senderNumber: string
+  body: string
+  channel?: MessagingChannelType
+}
+
+interface SimulateDeliveryStatusBody {
+  conversationId: string
+  messageId: string
+  status: 'delivered' | 'read' | 'failed'
+}
+
+/**
+ * Guard: require ENVIRONMENT=development + valid test secret.
+ * Returns an error Response if denied, or null if allowed.
+ */
+function simulationGuard(c: {
+  env: { ENVIRONMENT: string; DEV_RESET_SECRET?: string; E2E_TEST_SECRET?: string }
+  req: { header(name: string): string | undefined }
+}): Response | null {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return Response.json({ error: 'Not Found' }, { status: 404 })
+  }
+  if (!checkResetSecret(c)) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  return null
+}
+
+// 1. Simulate incoming call
+dev.post('/test-simulate/incoming-call', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json() as SimulateIncomingCallBody
+  if (!body.callerNumber) {
+    return c.json({ error: 'callerNumber is required' }, 400)
+  }
+
+  const callId = crypto.randomUUID()
+  const dos = getDOs(c.env)
+
+  // Get on-shift volunteer pubkeys for the call record
+  let volunteerPubkeys: string[] = []
+  try {
+    const shiftRes = await dos.shifts.fetch(new Request('http://do/current-volunteers'))
+    if (shiftRes.ok) {
+      const data = await shiftRes.json() as { volunteers?: string[] }
+      volunteerPubkeys = Array.isArray(data.volunteers) ? data.volunteers : []
+    }
+  } catch {
+    // Shifts not configured — proceed with empty list
+  }
+
+  const res = await dos.calls.fetch(new Request('http://do/calls/incoming', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      callSid: callId,
+      callerNumber: body.callerNumber,
+      volunteerPubkeys,
+    }),
+  }))
+
+  if (!res.ok) {
+    const text = await res.text()
+    return c.json({ error: 'CallRouterDO rejected incoming call', detail: text }, 500)
+  }
+
+  return c.json({ ok: true, callId, status: 'ringing' })
+})
+
+// 2. Simulate answering a call
+dev.post('/test-simulate/answer-call', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json() as SimulateAnswerCallBody
+  if (!body.callId || !body.pubkey) {
+    return c.json({ error: 'callId and pubkey are required' }, 400)
+  }
+
+  const dos = getDOs(c.env)
+  const res = await dos.calls.fetch(new Request(`http://do/calls/${body.callId}/answer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pubkey: body.pubkey }),
+  }))
+
+  if (!res.ok) {
+    const text = await res.text()
+    return c.json({ error: 'CallRouterDO rejected answer', detail: text }, res.status as 400 | 404 | 500)
+  }
+
+  return c.json({ ok: true, callId: body.callId, status: 'in-progress' })
+})
+
+// 3. Simulate ending a call
+dev.post('/test-simulate/end-call', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json() as SimulateEndCallBody
+  if (!body.callId) {
+    return c.json({ error: 'callId is required' }, 400)
+  }
+
+  const dos = getDOs(c.env)
+  const res = await dos.calls.fetch(new Request(`http://do/calls/${body.callId}/end`, {
+    method: 'POST',
+  }))
+
+  if (!res.ok) {
+    const text = await res.text()
+    return c.json({ error: 'CallRouterDO rejected end', detail: text }, res.status as 400 | 404 | 500)
+  }
+
+  return c.json({ ok: true, callId: body.callId, status: 'completed' })
+})
+
+// 4. Simulate voicemail
+dev.post('/test-simulate/voicemail', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json() as SimulateVoicemailBody
+  if (!body.callId) {
+    return c.json({ error: 'callId is required' }, 400)
+  }
+
+  const dos = getDOs(c.env)
+  const res = await dos.calls.fetch(new Request(`http://do/calls/${body.callId}/voicemail`, {
+    method: 'POST',
+  }))
+
+  if (!res.ok) {
+    const text = await res.text()
+    return c.json({ error: 'CallRouterDO rejected voicemail', detail: text }, res.status as 400 | 404 | 500)
+  }
+
+  return c.json({ ok: true, callId: body.callId, status: 'unanswered' })
+})
+
+// 5. Simulate incoming message
+dev.post('/test-simulate/incoming-message', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json() as SimulateIncomingMessageBody
+  if (!body.senderNumber || !body.body) {
+    return c.json({ error: 'senderNumber and body are required' }, 400)
+  }
+
+  const channel: MessagingChannelType = body.channel || 'sms'
+  const senderHash = hashPhone(body.senderNumber, c.env.HMAC_SECRET)
+
+  const dos = getDOs(c.env)
+  const res = await dos.conversations.fetch(new Request('http://do/conversations/incoming', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      channelType: channel,
+      externalId: crypto.randomUUID(),
+      senderIdentifier: body.senderNumber,
+      senderIdentifierHash: senderHash,
+      body: body.body,
+      timestamp: new Date().toISOString(),
+    }),
+  }))
+
+  if (!res.ok) {
+    const text = await res.text()
+    return c.json({ error: 'ConversationDO rejected incoming message', detail: text }, 500)
+  }
+
+  const result = await res.json() as { conversationId: string; messageId: string }
+  return c.json({ ok: true, conversationId: result.conversationId, messageId: result.messageId })
+})
+
+// 6. Simulate delivery status update
+dev.post('/test-simulate/delivery-status', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json() as SimulateDeliveryStatusBody
+  if (!body.conversationId || !body.messageId || !body.status) {
+    return c.json({ error: 'conversationId, messageId, and status are required' }, 400)
+  }
+
+  const dos = getDOs(c.env)
+
+  // Delivery status updates use the external ID mapping in ConversationDO.
+  // For simulation, we fetch the message to find its externalId, then call the status endpoint.
+  const messagesRes = await dos.conversations.fetch(
+    new Request(`http://do/conversations/${body.conversationId}/messages?limit=200`)
+  )
+
+  if (!messagesRes.ok) {
+    return c.json({ error: 'Failed to fetch conversation messages' }, 500)
+  }
+
+  const { messages } = await messagesRes.json() as {
+    messages: Array<{ id: string; externalId?: string }>
+  }
+  const message = messages.find(m => m.id === body.messageId)
+  if (!message) {
+    return c.json({ error: 'Message not found in conversation' }, 404)
+  }
+
+  if (!message.externalId) {
+    return c.json({ error: 'Message has no externalId — only outbound messages with provider IDs support delivery status' }, 400)
+  }
+
+  const statusRes = await dos.conversations.fetch(new Request('http://do/messages/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      externalId: message.externalId,
+      status: body.status,
+      timestamp: new Date().toISOString(),
+      failureReason: body.status === 'failed' ? 'Simulated failure' : undefined,
+    }),
+  }))
+
+  if (!statusRes.ok) {
+    const text = await statusRes.text()
+    return c.json({ error: 'ConversationDO rejected status update', detail: text }, 500)
+  }
+
   return c.json({ ok: true })
 })
 
