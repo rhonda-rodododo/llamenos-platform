@@ -12,7 +12,9 @@
     "switchToLanguage": "{{language}}(으)로 전환",
     "themeDark": "어두운 테마",
     "themeLight": "밝은 테마",
-    "themeSystem": "시스템 테마"
+    "themeSystem": "시스템 테마",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

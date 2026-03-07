@@ -12,7 +12,9 @@
     "switchToLanguage": "Chuyển sang {{language}}",
     "themeDark": "Giao diện tối",
     "themeLight": "Giao diện sáng",
-    "themeSystem": "Giao diện hệ thống"
+    "themeSystem": "Giao diện hệ thống",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

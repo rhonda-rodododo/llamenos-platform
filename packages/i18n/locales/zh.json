@@ -12,7 +12,9 @@
     "switchToLanguage": "切换到{{language}}",
     "themeDark": "深色主题",
     "themeLight": "浅色主题",
-    "themeSystem": "系统主题"
+    "themeSystem": "系统主题",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

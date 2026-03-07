@@ -5,6 +5,8 @@
     <string name="a11y_copy_to_clipboard">Копировать в буфер обмена</string>
     <string name="a11y_delete_item">Удалить</string>
     <string name="a11y_edit_item">Редактировать</string>
+    <string name="a11y_move_down">Move down</string>
+    <string name="a11y_move_up">Move up</string>
     <string name="a11y_open_menu">Открыть меню</string>
     <string name="a11y_remove_item">Убрать</string>
     <string name="a11y_search_button">Поиск</string>

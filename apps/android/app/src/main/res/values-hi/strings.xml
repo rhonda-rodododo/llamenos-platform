@@ -5,6 +5,8 @@
     <string name="a11y_copy_to_clipboard">क्लिपबोर्ड पर कॉपी करें</string>
     <string name="a11y_delete_item">हटाएं</string>
     <string name="a11y_edit_item">संपादित करें</string>
+    <string name="a11y_move_down">Move down</string>
+    <string name="a11y_move_up">Move up</string>
     <string name="a11y_open_menu">मेनू खोलें</string>
     <string name="a11y_remove_item">निकालें</string>
     <string name="a11y_search_button">खोजें</string>

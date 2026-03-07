@@ -12,7 +12,9 @@
     "switchToLanguage": "Lumipat sa {{language}}",
     "themeDark": "Madilim na tema",
     "themeLight": "Maliwanag na tema",
-    "themeSystem": "Tema ng system"
+    "themeSystem": "Tema ng system",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

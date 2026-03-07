@@ -231,7 +231,7 @@ function LoginPage() {
             <PinUnlockInline onUnlock={handlePinUnlock} onWipe={handlePinWipe} />
 
             {(validationError || error) && (
-              <p className="flex items-center gap-1.5 text-sm text-destructive">
+              <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
                 {validationError || error}
               </p>
             )}
@@ -357,7 +357,7 @@ function LoginPage() {
           </div>
 
           {(validationError || error) && (
-            <p className="flex items-center gap-1.5 text-sm text-destructive">
+            <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
               {validationError || error}
             </p>
           )}
@@ -445,7 +445,7 @@ function LoginPage() {
                     error={!!pinError}
                     autoFocus
                   />
-                  {pinError && <p className="text-center text-sm text-destructive">{pinError}</p>}
+                  {pinError && <p role="alert" className="text-center text-sm text-destructive">{pinError}</p>}
                 </div>
               )}
             </div>
@@ -585,7 +585,7 @@ function PinUnlockInline({ onUnlock, onWipe }: { onUnlock: (pin: string) => Prom
         autoFocus
       />
       {error && (
-        <p className="text-center text-sm text-destructive">{t('lock.wrongPin', { defaultValue: 'Wrong PIN' })}</p>
+        <p role="alert" className="text-center text-sm text-destructive">{t('lock.wrongPin', { defaultValue: 'Wrong PIN' })}</p>
       )}
     </div>
   )

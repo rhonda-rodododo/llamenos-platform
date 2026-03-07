@@ -3,6 +3,8 @@
 "a11y_copy_to_clipboard" = "क्लिपबोर्ड पर कॉपी करें";
 "a11y_delete_item" = "हटाएं";
 "a11y_edit_item" = "संपादित करें";
+"a11y_move_down" = "Move down";
+"a11y_move_up" = "Move up";
 "a11y_open_menu" = "मेनू खोलें";
 "a11y_remove_item" = "निकालें";
 "a11y_search_button" = "खोजें";

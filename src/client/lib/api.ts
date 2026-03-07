@@ -29,27 +29,71 @@ async function getAuthHeaders(method: string, apiPath: string): Promise<Record<s
 let onApiActivity: (() => void) | null = null
 export function setOnApiActivity(cb: (() => void) | null) { onApiActivity = cb }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+const REQUEST_TIMEOUT_MS = 15_000
+const MAX_RETRIES = 3
+const BASE_RETRY_DELAY = 500
+
+function isRetryable(status: number): boolean {
+  return status === 502 || status === 503 || status === 504 || status === 429
+}
+
+async function request<T>(path: string, options: RequestInit & { retries?: number } = {}): Promise<T> {
   const method = ((options.method as string) || 'GET').toUpperCase()
+  const isIdempotent = method === 'GET' || method === 'HEAD'
+  const maxRetries = options.retries ?? (isIdempotent ? MAX_RETRIES : 0)
+
   // Strip query params from path for auth token signing (server uses url.pathname)
   const pathOnly = path.split('?')[0]
-  const headers = {
-    'Content-Type': 'application/json',
-    ...await getAuthHeaders(method, pathOnly),
-    ...options.headers,
-  }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
-  if (!res.ok) {
-    if (res.status === 401 && !path.startsWith('/auth/')) {
-      // Session expired — notify auth provider (don't clear nsec for reconnect)
-      onAuthExpired?.()
+
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delay = BASE_RETRY_DELAY * Math.pow(2, attempt - 1) + Math.random() * 200
+      await new Promise(r => setTimeout(r, delay))
     }
-    const body = await res.text()
-    throw new ApiError(res.status, body)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...await getAuthHeaders(method, pathOnly),
+        ...options.headers,
+      }
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        if (res.status === 401 && !path.startsWith('/auth/')) {
+          onAuthExpired?.()
+        }
+        const body = await res.text()
+        const err = new ApiError(res.status, body)
+        if (isRetryable(res.status) && attempt < maxRetries) {
+          lastError = err
+          continue
+        }
+        throw err
+      }
+
+      onApiActivity?.()
+      return res.json()
+    } catch (err) {
+      if (err instanceof ApiError) throw err
+      // Network error or timeout — retry if idempotent
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (attempt < maxRetries) continue
+      throw new NetworkError(lastError.message, lastError)
+    } finally {
+      clearTimeout(timeout)
+    }
   }
-  // Track successful API activity for session expiry warning
-  onApiActivity?.()
-  return res.json()
+
+  throw lastError ?? new Error('Request failed')
 }
 
 export class ApiError extends Error {
@@ -57,6 +101,18 @@ export class ApiError extends Error {
     super(`API error ${status}: ${body}`)
     this.name = 'ApiError'
   }
+}
+
+export class NetworkError extends Error {
+  constructor(message: string, public cause?: Error) {
+    super(message)
+    this.name = 'NetworkError'
+  }
+}
+
+/** Returns true if the error is a network/connectivity issue (not a server-side error). */
+export function isNetworkError(err: unknown): err is NetworkError {
+  return err instanceof NetworkError
 }
 
 // --- Hub context for hub-scoped API calls ---
@@ -73,21 +129,29 @@ function hp(path: string): string {
 // --- Public config (no auth) ---
 
 export async function getConfig() {
-  const res = await fetch(`${API_BASE}/config`)
-  if (!res.ok) return { hotlineName: 'Hotline', hotlineNumber: '', channels: undefined, setupCompleted: undefined }
-  return res.json() as Promise<{
-    hotlineName: string
-    hotlineNumber: string
-    channels?: import('@shared/types').EnabledChannels
-    setupCompleted?: boolean
-    demoMode?: boolean
-    demoResetSchedule?: string | null
-    needsBootstrap?: boolean
-    hubs?: import('@shared/types').Hub[]
-    defaultHubId?: string
-    serverNostrPubkey?: string
-    nostrRelayUrl?: string
-  }>
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API_BASE}/config`, { signal: controller.signal })
+    if (!res.ok) return { hotlineName: 'Hotline', hotlineNumber: '', channels: undefined, setupCompleted: undefined }
+    return res.json() as Promise<{
+      hotlineName: string
+      hotlineNumber: string
+      channels?: import('@shared/types').EnabledChannels
+      setupCompleted?: boolean
+      demoMode?: boolean
+      demoResetSchedule?: string | null
+      needsBootstrap?: boolean
+      hubs?: import('@shared/types').Hub[]
+      defaultHubId?: string
+      serverNostrPubkey?: string
+      nostrRelayUrl?: string
+    }>
+  } catch {
+    return { hotlineName: 'Hotline', hotlineNumber: '', channels: undefined, setupCompleted: undefined }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 // --- Auth ---
@@ -100,16 +164,27 @@ export async function login(pubkey: string, timestamp: number, token: string) {
 }
 
 export async function bootstrapAdmin(pubkey: string, timestamp: number, token: string) {
-  const res = await fetch(`${API_BASE}/auth/bootstrap`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pubkey, timestamp, token }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new ApiError(res.status, body)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API_BASE}/auth/bootstrap`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pubkey, timestamp, token }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new ApiError(res.status, body)
+    }
+    return res.json() as Promise<{ ok: true; roles: string[] }>
+  } catch (err) {
+    if (err instanceof ApiError) throw err
+    const e = err instanceof Error ? err : new Error(String(err))
+    throw new NetworkError(e.message, e)
+  } finally {
+    clearTimeout(timeout)
   }
-  return res.json() as Promise<{ ok: true; roles: string[] }>
 }
 
 export async function logout() {
@@ -344,17 +419,33 @@ export async function getCallsTodayCount() {
 
 export async function getCallRecording(callId: string): Promise<ArrayBuffer> {
   const pathOnly = hp(`/calls/${callId}/recording`).split('?')[0]
-  const method = 'GET'
-  const headers = {
-    ...await getAuthHeaders(method, pathOnly),
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, BASE_RETRY_DELAY * Math.pow(2, attempt - 1)))
+    }
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+    try {
+      const headers = await getAuthHeaders('GET', pathOnly)
+      const res = await fetch(`${API_BASE}${hp(`/calls/${callId}/recording`)}`, { headers, signal: controller.signal })
+      if (!res.ok) {
+        if (res.status === 401) onAuthExpired?.()
+        const err = new ApiError(res.status, await res.text())
+        if (isRetryable(res.status) && attempt < MAX_RETRIES) continue
+        throw err
+      }
+      onApiActivity?.()
+      return res.arrayBuffer()
+    } catch (err) {
+      if (err instanceof ApiError) throw err
+      if (attempt < MAX_RETRIES) continue
+      const e = err instanceof Error ? err : new Error(String(err))
+      throw new NetworkError(e.message, e)
+    } finally {
+      clearTimeout(timeout)
+    }
   }
-  const res = await fetch(`${API_BASE}${hp(`/calls/${callId}/recording`)}`, { headers })
-  if (!res.ok) {
-    if (res.status === 401) onAuthExpired?.()
-    throw new ApiError(res.status, await res.text())
-  }
-  onApiActivity?.()
-  return res.arrayBuffer()
+  throw new Error('Recording download failed')
 }
 
 // --- Volunteer Presence (admin only) ---
@@ -481,8 +572,14 @@ export async function revokeInvite(code: string) {
 }
 
 export async function validateInvite(code: string) {
-  const res = await fetch(`${API_BASE}/invites/validate/${code}`)
-  return res.json() as Promise<{ valid: boolean; name?: string; roleIds?: string[]; error?: string }>
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API_BASE}/invites/validate/${code}`, { signal: controller.signal })
+    return res.json() as Promise<{ valid: boolean; name?: string; roleIds?: string[]; error?: string }>
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export async function redeemInvite(code: string, pubkey: string, secretKeyHex?: string) {
@@ -495,16 +592,27 @@ export async function redeemInvite(code: string, pubkey: string, secretKeyHex?: 
     const parsed = JSON.parse(tokenJson)
     authFields = { timestamp: parsed.timestamp, token: parsed.token }
   }
-  const res = await fetch(`${API_BASE}/invites/redeem`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, pubkey, ...authFields }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new ApiError(res.status, body)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API_BASE}/invites/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, pubkey, ...authFields }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new ApiError(res.status, body)
+    }
+    return res.json() as Promise<{ volunteer: Volunteer }>
+  } catch (err) {
+    if (err instanceof ApiError) throw err
+    const e = err instanceof Error ? err : new Error(String(err))
+    throw new NetworkError(e.message, e)
+  } finally {
+    clearTimeout(timeout)
   }
-  return res.json() as Promise<{ volunteer: Volunteer }>
 }
 
 // --- IVR Audio ---
@@ -521,22 +629,31 @@ export async function listIvrAudio() {
 }
 
 export async function uploadIvrAudio(promptType: string, language: string, audioBlob: Blob) {
-  const res = await fetch(`${API_BASE}/settings/ivr-audio/${promptType}/${language}`, {
-    method: 'PUT',
-    headers: {
-      ...await getAuthHeaders('PUT', `/settings/ivr-audio/${promptType}/${language}`),
-      'Content-Type': audioBlob.type || 'audio/webm',
-    },
-    body: audioBlob,
-  })
-  if (!res.ok) {
-    if (res.status === 401) {
-      onAuthExpired?.()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30_000)
+  try {
+    const res = await fetch(`${API_BASE}/settings/ivr-audio/${promptType}/${language}`, {
+      method: 'PUT',
+      headers: {
+        ...await getAuthHeaders('PUT', `/settings/ivr-audio/${promptType}/${language}`),
+        'Content-Type': audioBlob.type || 'audio/webm',
+      },
+      body: audioBlob,
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      if (res.status === 401) onAuthExpired?.()
+      throw new ApiError(res.status, await res.text())
     }
-    const body = await res.text()
-    throw new ApiError(res.status, body)
+    onApiActivity?.()
+    return res.json() as Promise<{ ok: true }>
+  } catch (err) {
+    if (err instanceof ApiError) throw err
+    const e = err instanceof Error ? err : new Error(String(err))
+    throw new NetworkError(e.message, e)
+  } finally {
+    clearTimeout(timeout)
   }
-  return res.json() as Promise<{ ok: true }>
 }
 
 export async function deleteIvrAudio(promptType: string, language: string) {
@@ -1027,21 +1144,44 @@ export async function initUpload(data: import('@shared/types').UploadInit) {
 }
 
 export async function uploadChunk(uploadId: string, chunkIndex: number, data: ArrayBuffer) {
-  const headers = {
-    ...await getAuthHeaders('PUT', `/uploads/${uploadId}/chunks/${chunkIndex}`),
-    'Content-Type': 'application/octet-stream',
+  const maxRetries = 2
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, BASE_RETRY_DELAY * Math.pow(2, attempt - 1)))
+    }
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+    try {
+      const headers = {
+        ...await getAuthHeaders('PUT', `/uploads/${uploadId}/chunks/${chunkIndex}`),
+        'Content-Type': 'application/octet-stream',
+      }
+      const res = await fetch(`${API_BASE}/uploads/${uploadId}/chunks/${chunkIndex}`, {
+        method: 'PUT',
+        headers,
+        body: data,
+        signal: controller.signal,
+      })
+      if (!res.ok) {
+        if (res.status === 401) onAuthExpired?.()
+        const err = new ApiError(res.status, await res.text())
+        if (isRetryable(res.status) && attempt < maxRetries) { lastError = err; continue }
+        throw err
+      }
+      onApiActivity?.()
+      return res.json() as Promise<{ chunkIndex: number; completedChunks: number; totalChunks: number }>
+    } catch (err) {
+      if (err instanceof ApiError) throw err
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (attempt < maxRetries) continue
+      throw new NetworkError(lastError.message, lastError)
+    } finally {
+      clearTimeout(timeout)
+    }
   }
-  const res = await fetch(`${API_BASE}/uploads/${uploadId}/chunks/${chunkIndex}`, {
-    method: 'PUT',
-    headers,
-    body: data,
-  })
-  if (!res.ok) {
-    if (res.status === 401) onAuthExpired?.()
-    throw new ApiError(res.status, await res.text())
-  }
-  onApiActivity?.()
-  return res.json() as Promise<{ chunkIndex: number; completedChunks: number; totalChunks: number }>
+  throw lastError ?? new Error('Upload chunk failed')
 }
 
 export async function completeUpload(uploadId: string) {
@@ -1053,14 +1193,33 @@ export async function getUploadStatus(uploadId: string) {
 }
 
 export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
-  const headers = await getAuthHeaders('GET', `/files/${fileId}/content`)
-  const res = await fetch(`${API_BASE}/files/${fileId}/content`, { headers })
-  if (!res.ok) {
-    if (res.status === 401) onAuthExpired?.()
-    throw new ApiError(res.status, await res.text())
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, BASE_RETRY_DELAY * Math.pow(2, attempt - 1)))
+    }
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+    try {
+      const headers = await getAuthHeaders('GET', `/files/${fileId}/content`)
+      const res = await fetch(`${API_BASE}/files/${fileId}/content`, { headers, signal: controller.signal })
+      if (!res.ok) {
+        if (res.status === 401) onAuthExpired?.()
+        const err = new ApiError(res.status, await res.text())
+        if (isRetryable(res.status) && attempt < MAX_RETRIES) continue
+        throw err
+      }
+      onApiActivity?.()
+      return res.arrayBuffer()
+    } catch (err) {
+      if (err instanceof ApiError) throw err
+      if (attempt < MAX_RETRIES) continue
+      const e = err instanceof Error ? err : new Error(String(err))
+      throw new NetworkError(e.message, e)
+    } finally {
+      clearTimeout(timeout)
+    }
   }
-  onApiActivity?.()
-  return res.arrayBuffer()
+  throw new Error('Download failed')
 }
 
 export async function getFileEnvelopes(fileId: string) {

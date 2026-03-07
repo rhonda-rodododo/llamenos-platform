@@ -12,7 +12,9 @@
     "switchToLanguage": "Переключить на {{language}}",
     "themeDark": "Тёмная тема",
     "themeLight": "Светлая тема",
-    "themeSystem": "Системная тема"
+    "themeSystem": "Системная тема",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

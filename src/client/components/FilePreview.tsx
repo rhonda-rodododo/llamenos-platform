@@ -107,7 +107,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+      <div role="alert" className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
         <AlertCircle className="h-4 w-4 text-destructive" />
         <span className="text-xs text-destructive">{error}</span>
       </div>

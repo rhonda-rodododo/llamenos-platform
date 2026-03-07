@@ -57,7 +57,7 @@ function PreferencesPage() {
   }
 
   if (loading) return <div className="flex h-screen items-center justify-center text-muted-foreground">{t('common.loading')}</div>
-  if (error) return <div className="flex h-screen items-center justify-center text-destructive">{error}</div>
+  if (error) return <div role="alert" className="flex h-screen items-center justify-center text-destructive">{error}</div>
   if (!subscriber) return null
 
   return (

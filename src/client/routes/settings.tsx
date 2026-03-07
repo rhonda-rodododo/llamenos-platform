@@ -183,7 +183,7 @@ function SettingsPage() {
         )}
 
         {profileError && (
-          <p className="text-sm text-destructive">{profileError}</p>
+          <p role="alert" className="text-sm text-destructive">{profileError}</p>
         )}
 
         {/* Spoken languages */}
@@ -622,7 +622,7 @@ function LinkDeviceSection() {
             </div>
           </div>
           {status === 'error' && (
-            <p className="text-sm text-destructive">{statusMessage}</p>
+            <p role="alert" className="text-sm text-destructive">{statusMessage}</p>
           )}
         </div>
       ) : status === 'linking' ? (
@@ -676,7 +676,7 @@ function ClientTranscriptionSettings() {
       </div>
 
       {!isSupported ? (
-        <p className="text-sm text-destructive">{t('transcription.notSupported')}</p>
+        <p role="alert" className="text-sm text-destructive">{t('transcription.notSupported')}</p>
       ) : (
         <>
           <div className="flex items-center justify-between">

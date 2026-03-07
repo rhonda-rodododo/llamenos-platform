@@ -3,6 +3,8 @@
 "a11y_copy_to_clipboard" = "Sao chép vào clipboard";
 "a11y_delete_item" = "Xóa";
 "a11y_edit_item" = "Chỉnh sửa";
+"a11y_move_down" = "Move down";
+"a11y_move_up" = "Move up";
 "a11y_open_menu" = "Mở menu";
 "a11y_remove_item" = "Xóa bỏ";
 "a11y_search_button" = "Tìm kiếm";

@@ -5,6 +5,8 @@
     <string name="a11y_copy_to_clipboard">نسخ إلى الحافظة</string>
     <string name="a11y_delete_item">حذف</string>
     <string name="a11y_edit_item">تعديل</string>
+    <string name="a11y_move_down">Move down</string>
+    <string name="a11y_move_up">Move up</string>
     <string name="a11y_open_menu">فتح القائمة</string>
     <string name="a11y_remove_item">إزالة</string>
     <string name="a11y_search_button">بحث</string>

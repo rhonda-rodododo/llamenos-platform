@@ -122,7 +122,7 @@ export function GettingStartedChecklist() {
             </span>
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-xs" onClick={() => setCollapsed(prev => !prev)}>
+            <Button variant="ghost" size="icon-xs" onClick={() => setCollapsed(prev => !prev)} aria-label={collapsed ? t('settings.expand', { defaultValue: 'Expand' }) : t('settings.collapse', { defaultValue: 'Collapse' })}>
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
             </Button>
             <Button variant="ghost" size="icon-xs" onClick={handleDismiss} aria-label={t('common.close')}>

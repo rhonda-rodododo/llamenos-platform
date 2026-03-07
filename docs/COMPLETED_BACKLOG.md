@@ -1,5 +1,25 @@
 # Completed Backlog
 
+## 2026-03-07: API Resilience & Accessibility Hardening
+
+### API Resilience (Desktop Client)
+- Added request timeouts (15s default, 30s for uploads/downloads) via AbortController to ALL fetch calls
+- Added retry with exponential backoff + jitter for GET requests (3 retries, 502/503/504/429)
+- Added retry for upload chunks (2 retries) and file downloads (3 retries)
+- New `NetworkError` class distinguishes network failures from server errors (ApiError)
+- Added `isNetworkError()` helper for UI-level error classification
+- Timeout + error handling added to every raw fetch caller: getConfig, bootstrapAdmin, validateInvite, redeemInvite, uploadIvrAudio, uploadChunk, downloadFile, getCallRecording
+- Previously: zero timeouts, zero retries, network errors thrown as unclassified TypeError
+
+### Accessibility (WCAG role="alert")
+- Added `role="alert"` to 14 error message elements across login, PIN input, settings, file preview, recording player, phone validation, custom fields, link-device, preferences
+- Screen readers now announce error messages immediately when they appear
+- Files: login.tsx (4), link-device.tsx (2), settings.tsx (3), pin-challenge-dialog.tsx, phone-input.tsx, custom-field-inputs.tsx, FilePreview.tsx, recording-player.tsx, preferences.tsx
+
+### Accessibility (ARIA Labels)
+- Added aria-labels to icon-only buttons: custom field reorder (moveUp/moveDown), getting-started collapse toggle
+- Added `a11y.moveUp` and `a11y.moveDown` keys to all 13 locales + codegen output
+
 ## 2026-03-07: Security & Reliability Improvements
 
 ### Node.js Platform Env Fix
@@ -24,6 +44,26 @@
 - Root-level boundary catches top-level crashes
 - Page-level boundary wraps Outlet (sidebar survives page crashes)
 - Error message + "Try again" button vs. blank white screen
+
+### Sliding Session Expiry
+- Server now extends session by 8 hours on each validated request (after first hour of use)
+- Active volunteers never hit session expiry during their 4-8 hour shifts
+- Client idle warning threshold raised from 4 minutes to 30 minutes
+- 70/70 auth/session BDD tests pass
+
+### Offline Connectivity Banner
+- Red alert banner appears when browser loses network connectivity
+- Uses browser online/offline events — zero overhead when online
+- Critical for crisis workers who need instant awareness of connection loss
+
+### Additional Node.js Platform Fixes
+- Added `DEMO_RESET_CRON` and `NOSTR_RELAY_PUBLIC_URL` to `createNodeEnv()`
+- Systematic audit of all `c.env` vars used in Worker routes vs. what Node.js env passes through
+
+### Final Test Results
+- **382/382 Playwright E2E tests pass** against Docker (0 failures)
+- All Rust crypto tests pass (45/45)
+- i18n validation passes across all platforms
 
 ## 2026-03-06: i18n System Overhaul (Epics 274-275)
 

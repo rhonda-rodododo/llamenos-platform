@@ -3,6 +3,8 @@
 "a11y_copy_to_clipboard" = "Copy to clipboard";
 "a11y_delete_item" = "Delete";
 "a11y_edit_item" = "Edit";
+"a11y_move_down" = "Move down";
+"a11y_move_up" = "Move up";
 "a11y_open_menu" = "Open menu";
 "a11y_remove_item" = "Remove";
 "a11y_search_button" = "Search";

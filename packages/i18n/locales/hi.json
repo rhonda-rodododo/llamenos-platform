@@ -12,7 +12,9 @@
     "switchToLanguage": "{{language}} में बदलें",
     "themeDark": "डार्क थीम",
     "themeLight": "लाइट थीम",
-    "themeSystem": "सिस्टम थीम"
+    "themeSystem": "सिस्टम थीम",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

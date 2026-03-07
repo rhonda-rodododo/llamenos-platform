@@ -102,10 +102,10 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
           {fields.map((field, index) => (
             <div key={field.id} data-testid="custom-field-row" className="flex items-center gap-2 rounded-lg border border-border px-4 py-3">
               <div className="flex flex-col gap-0.5">
-                <Button variant="ghost" size="icon-xs" disabled={index === 0} onClick={() => handleReorder(index, -1)}>
+                <Button variant="ghost" size="icon-xs" disabled={index === 0} onClick={() => handleReorder(index, -1)} aria-label={t('a11y.moveUp', { defaultValue: 'Move up' })}>
                   <ChevronUp className="h-3 w-3" />
                 </Button>
-                <Button variant="ghost" size="icon-xs" disabled={index === fields.length - 1} onClick={() => handleReorder(index, 1)}>
+                <Button variant="ghost" size="icon-xs" disabled={index === fields.length - 1} onClick={() => handleReorder(index, 1)} aria-label={t('a11y.moveDown', { defaultValue: 'Move down' })}>
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </div>

@@ -270,7 +270,7 @@ function LinkDevicePage() {
                 onComplete={handlePinConfirm}
                 autoFocus
               />
-              {pinError && <p className="text-sm text-destructive text-center">{pinError}</p>}
+              {pinError && <p role="alert" className="text-sm text-destructive text-center">{pinError}</p>}
             </CardContent>
           </>
         )}
@@ -301,7 +301,7 @@ function LinkDevicePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-destructive">{error}</p>
+              <p role="alert" className="text-sm text-destructive">{error}</p>
               <Button onClick={() => { setStep('init'); setError('') }} className="w-full">
                 {t('common.retry')}
               </Button>

@@ -44,7 +44,7 @@ export function CustomFieldInputs({ fields, values, onChange, errors, disabled, 
               {field.required && <span className="text-destructive">*</span>}
             </Label>
             {renderFieldInput(field, id, value, v => update(field.id, v), disabled, t)}
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
           </div>
         )
       })}

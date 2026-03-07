@@ -7,6 +7,8 @@ object I18n {
     const val A11Y_COPY_TO_CLIPBOARD = "a11y_copy_to_clipboard"  // "Copy to clipboard"
     const val A11Y_DELETE_ITEM = "a11y_delete_item"  // "Delete"
     const val A11Y_EDIT_ITEM = "a11y_edit_item"  // "Edit"
+    const val A11Y_MOVE_DOWN = "a11y_move_down"  // "Move down"
+    const val A11Y_MOVE_UP = "a11y_move_up"  // "Move up"
     const val A11Y_OPEN_MENU = "a11y_open_menu"  // "Open menu"
     const val A11Y_REMOVE_ITEM = "a11y_remove_item"  // "Remove"
     const val A11Y_SEARCH_BUTTON = "a11y_search_button"  // "Search"

@@ -177,7 +177,7 @@ export function PhoneInput({
         <p className="text-xs text-green-600 dark:text-green-400">{t('phone.valid')}</p>
       )}
       {showInvalid && (
-        <p className="text-xs text-destructive">{t('phone.invalid')}</p>
+        <p role="alert" className="text-xs text-destructive">{t('phone.invalid')}</p>
       )}
       {!touched && !value && (
         <p className="text-xs text-muted-foreground">{t('phone.hint')}</p>

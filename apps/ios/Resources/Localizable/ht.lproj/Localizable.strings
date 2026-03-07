@@ -3,6 +3,8 @@
 "a11y_copy_to_clipboard" = "Kopye nan clipboard";
 "a11y_delete_item" = "Efase";
 "a11y_edit_item" = "Modifye";
+"a11y_move_down" = "Move down";
+"a11y_move_up" = "Move up";
 "a11y_open_menu" = "Louvri meni";
 "a11y_remove_item" = "Retire";
 "a11y_search_button" = "Chèche";

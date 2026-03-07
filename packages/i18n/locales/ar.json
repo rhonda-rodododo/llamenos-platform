@@ -12,7 +12,9 @@
     "switchToLanguage": "التبديل إلى {{language}}",
     "themeDark": "سمة داكنة",
     "themeLight": "سمة فاتحة",
-    "themeSystem": "سمة النظام"
+    "themeSystem": "سمة النظام",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

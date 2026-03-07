@@ -12,7 +12,9 @@
     "switchToLanguage": "Cambiar a {{language}}",
     "themeDark": "Tema oscuro",
     "themeLight": "Tema claro",
-    "themeSystem": "Tema del sistema"
+    "themeSystem": "Tema del sistema",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",

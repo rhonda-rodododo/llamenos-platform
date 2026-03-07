@@ -5,6 +5,8 @@
     "copyToClipboard": "Copy to clipboard",
     "deleteItem": "Delete",
     "editItem": "Edit",
+    "moveDown": "Move down",
+    "moveUp": "Move up",
     "openMenu": "Open menu",
     "removeItem": "Remove",
     "searchButton": "Search",

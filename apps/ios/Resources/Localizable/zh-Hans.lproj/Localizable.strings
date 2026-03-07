@@ -3,6 +3,8 @@
 "a11y_copy_to_clipboard" = "复制到剪贴板";
 "a11y_delete_item" = "删除";
 "a11y_edit_item" = "编辑";
+"a11y_move_down" = "Move down";
+"a11y_move_up" = "Move up";
 "a11y_open_menu" = "打开菜单";
 "a11y_remove_item" = "移除";
 "a11y_search_button" = "搜索";

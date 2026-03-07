@@ -73,7 +73,7 @@ export function PinChallengeDialog({
           />
 
           {error && (
-            <p className="mt-3 text-center text-sm text-destructive" data-testid="pin-challenge-error">
+            <p role="alert" className="mt-3 text-center text-sm text-destructive" data-testid="pin-challenge-error">
               {t('pinChallenge.wrongPin', { remaining: remainingAttempts })}
             </p>
           )}
