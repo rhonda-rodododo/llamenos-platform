@@ -192,7 +192,14 @@
     "statusCancelled": "Cancelled",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
-    "statusSent": "Sent"
+    "statusSent": "Sent",
+    "channelSignal": "Signal",
+    "scheduleSection": "Schedule",
+    "scheduleDate": "Send at",
+    "schedule": "Schedule for Later",
+    "hideSchedule": "Hide Schedule",
+    "confirmSchedule": "Confirm Schedule",
+    "sendNow": "Send Now"
   },
   "blasts": {
     "activeSubscribers": "Active",
@@ -688,7 +695,8 @@
   "fields": {
     "addFirst": "Add First Field",
     "emptyTitle": "No Custom Fields",
-    "loading": "Loading custom fields..."
+    "loading": "Loading custom fields...",
+    "emptyMessage": "Custom fields will appear on note and report forms."
   },
   "filter": {
     "active": "Active",
