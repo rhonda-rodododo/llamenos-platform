@@ -60,6 +60,9 @@ struct LlamenosApp: App {
                 router.resetForAuthStatus(appState.authStatus)
                 // Check API version compatibility on launch
                 appState.checkVersionCompatibility()
+                // Install crash reporting handlers and upload pending reports
+                appState.crashReportingService.install()
+                appState.crashReportingService.uploadPendingInBackground()
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 handleScenePhaseChange(from: oldPhase, to: newPhase)

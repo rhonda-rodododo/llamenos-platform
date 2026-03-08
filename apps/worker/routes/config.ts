@@ -89,6 +89,8 @@ config.get('/', async (c) => {
     nostrRelayUrl,
     apiVersion: CURRENT_API_VERSION,
     minApiVersion: MIN_API_VERSION,
+    // GlitchTip/Sentry DSN for client-side crash reporting (opt-in, privacy-first)
+    ...(c.env.GLITCHTIP_DSN ? { sentryDsn: c.env.GLITCHTIP_DSN } : {}),
   })
 })
 

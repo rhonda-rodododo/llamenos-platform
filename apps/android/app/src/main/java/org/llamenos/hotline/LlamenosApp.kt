@@ -17,6 +17,9 @@ class LlamenosApp : Application() {
 
         crashReporter.install()
         networkMonitor.start()
+
+        // Upload pending crash logs if user has consented (fire-and-forget)
+        crashReporter.uploadPendingInBackground()
     }
 
     companion object {

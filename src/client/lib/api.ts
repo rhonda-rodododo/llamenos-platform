@@ -230,6 +230,7 @@ export async function getConfig() {
       nostrRelayUrl?: string
       apiVersion?: number
       minApiVersion?: number
+      sentryDsn?: string
     }>
   } catch {
     return { hotlineName: 'Hotline', hotlineNumber: '', channels: undefined, setupCompleted: undefined }

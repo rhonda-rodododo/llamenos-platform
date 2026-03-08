@@ -80,6 +80,8 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
     SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
     NOSTR_RELAY_URL: nostrRelayUrl || undefined,
     NOSTR_RELAY_PUBLIC_URL: process.env.NOSTR_RELAY_PUBLIC_URL || undefined,
+    // GlitchTip/Sentry DSN for client-side crash reporting (Epic 293)
+    GLITCHTIP_DSN: process.env.GLITCHTIP_DSN || undefined,
     // Dev/test support
     DEV_RESET_SECRET: process.env.DEV_RESET_SECRET || undefined,
     E2E_TEST_SECRET: process.env.E2E_TEST_SECRET || undefined,

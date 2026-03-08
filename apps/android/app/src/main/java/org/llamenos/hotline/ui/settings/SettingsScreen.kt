@@ -156,6 +156,11 @@ fun SettingsScreen(
     onClearCache: () -> Unit,
     onNavigateToAdmin: () -> Unit,
     onNavigateToDeviceLink: () -> Unit,
+    crashReportingEnabled: Boolean = false,
+    onCrashReportingChange: (Boolean) -> Unit = {},
+    pendingCrashReports: Int = 0,
+    onSendCrashReports: () -> Unit = {},
+    onClearCrashReports: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -966,6 +971,76 @@ fun SettingsScreen(
                     text = stringResource(R.string.settings_clear_cache_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                HorizontalDivider()
+
+                Spacer(Modifier.height(12.dp))
+
+                // Crash reporting opt-in toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("crash-reporting-toggle"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.crashReporting_consent),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = stringResource(R.string.crashReporting_consentDescription),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = crashReportingEnabled,
+                        onCheckedChange = onCrashReportingChange,
+                    )
+                }
+
+                // Pending crash reports actions
+                if (pendingCrashReports > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.crashReporting_pendingReportsDescription)
+                            .replace("%@", pendingCrashReports.toString()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (crashReportingEnabled) {
+                            FilledTonalButton(
+                                onClick = onSendCrashReports,
+                                modifier = Modifier.testTag("send-crash-reports"),
+                            ) {
+                                Text(stringResource(R.string.crashReporting_sendNow))
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = onClearCrashReports,
+                            modifier = Modifier.testTag("clear-crash-reports"),
+                        ) {
+                            Text(stringResource(R.string.crashReporting_clearReports))
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    text = stringResource(R.string.crashReporting_privacyNote),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
             }
 

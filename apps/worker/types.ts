@@ -67,6 +67,9 @@ export interface Env {
   // Falls back to /nostr (reverse-proxied via Caddy) if not set but relay is configured
   NOSTR_RELAY_PUBLIC_URL?: string
 
+  // GlitchTip/Sentry DSN for client-side crash reporting (Epic 293)
+  GLITCHTIP_DSN?: string
+
   // Push notifications (Epic 86) — APNs (iOS)
   APNS_KEY_P8?: string       // Apple Push Notification auth key (PEM format)
   APNS_KEY_ID?: string       // Key ID from Apple Developer Portal

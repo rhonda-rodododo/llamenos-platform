@@ -116,6 +116,8 @@ struct SettingsView: View {
                     PreferencesSettingsView()
                 case "transcription":
                     TranscriptionSettingsView(transcriptionService: appState.transcriptionService)
+                case "diagnostics":
+                    DiagnosticsSettingsView()
                 case "admin":
                     AdminTabView()
                 case "help":
@@ -236,6 +238,17 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-admin-link")
             }
+
+            NavigationLink(value: "diagnostics") {
+                Label {
+                    Text(NSLocalizedString("crashReporting_settingsTitle", comment: "Diagnostics"))
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "ant.fill")
+                        .foregroundStyle(Color.brandPrimary)
+                }
+            }
+            .accessibilityIdentifier("settings-diagnostics-link")
 
             NavigationLink(value: "help") {
                 Label {

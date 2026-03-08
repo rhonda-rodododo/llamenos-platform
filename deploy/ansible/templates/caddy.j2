@@ -29,6 +29,15 @@
 		reverse_proxy strfry:7777
 	}
 
+{% if 'monitoring' in compose_profiles | default([]) %}
+	# ── GlitchTip Error Tracking ───────────────────────────
+	# Sentry-compatible DSN endpoint for client crash reports.
+	handle /glitchtip/* {
+		uri strip_prefix /glitchtip
+		reverse_proxy glitchtip:8000
+	}
+{% endif %}
+
 {% if observability_enabled | default(false) and not (healthcheck_only | default(false)) %}
 	# ── Observability ──────────────────────────────────────
 	# Grafana has its own authentication. Prometheus and Alertmanager

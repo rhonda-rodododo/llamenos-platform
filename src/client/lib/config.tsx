@@ -88,6 +88,12 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         }
         if (config.serverNostrPubkey) setServerNostrPubkey(config.serverNostrPubkey)
         if (config.nostrRelayUrl) setNostrRelayUrl(config.nostrRelayUrl)
+        // Wire Sentry/GlitchTip DSN for crash reporting (if configured server-side)
+        if (config.sentryDsn) {
+          import('@/lib/crash-reporting').then(({ setSentryDsn }) => {
+            setSentryDsn(config.sentryDsn ?? null)
+          })
+        }
         setIsLoading(false)
       })
       .catch(() => setIsLoading(false))

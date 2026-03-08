@@ -1980,5 +1980,22 @@
     "operationQueued": "تم الحفظ بدون اتصال — ستتم المزامنة عند الاتصال",
     "relayReconnecting": "جارٍ إعادة الاتصال بالخادم...",
     "relayReconnected": "تمت إعادة الاتصال — جارٍ استرداد الأحداث الفائتة"
+  },
+  "crashReporting": {
+    "title": "Crash Reporting",
+    "description": "Help improve Llamenos by sharing anonymous crash reports when errors occur.",
+    "consent": "Send anonymous crash reports",
+    "consentDescription": "When enabled, crash details (error type, stack trace, app version, OS) are sent to help fix bugs. No personal data, notes, keys, or call content is ever included.",
+    "pendingReports": "Pending crash reports",
+    "pendingReportsDescription": "%@ crash report(s) from previous sessions are ready to send.",
+    "sendNow": "Send Reports",
+    "clearReports": "Discard Reports",
+    "reportSent": "Crash report sent",
+    "reportsSent": "Crash reports sent successfully",
+    "reportsCleared": "Pending crash reports discarded",
+    "sendFailed": "Failed to send crash report",
+    "privacyNote": "Crash reports contain only technical information: error message, stack trace, app version, operating system, and device type. No personally identifiable information is collected.",
+    "settingsTitle": "Diagnostics",
+    "settingsDescription": "Anonymous crash reporting and diagnostics"
   }
 }

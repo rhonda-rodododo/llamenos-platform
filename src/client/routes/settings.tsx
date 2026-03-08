@@ -11,7 +11,7 @@ import {
 import * as keyManager from '@/lib/key-manager'
 import { nip19 } from 'nostr-tools'
 import { useToast } from '@/lib/toast'
-import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2 } from 'lucide-react'
+import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send } from 'lucide-react'
 import { isWebAuthnAvailable, registerCredential, listCredentials, deleteCredential, type WebAuthnCredentialInfo } from '@/lib/webauthn'
 import { PhoneInput } from '@/components/phone-input'
 import {
@@ -35,6 +35,13 @@ import {
   setClientTranscriptionSettings,
   type TranscriptionModel,
 } from '@/lib/transcription'
+import {
+  isCrashReportingEnabled,
+  setCrashReportingEnabled,
+  getPendingReportCount,
+  uploadPendingReports,
+  clearPendingReports,
+} from '@/lib/crash-reporting'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -464,6 +471,18 @@ function SettingsPage() {
         </div>
         <NotificationPermissionStatus />
       </SettingsSection>
+
+      {/* Crash Reporting / Diagnostics */}
+      <SettingsSection
+        id="diagnostics"
+        title={t('crashReporting.settingsTitle')}
+        description={t('crashReporting.settingsDescription')}
+        icon={<Bug className="h-5 w-5 text-muted-foreground" />}
+        expanded={expanded.has('diagnostics')}
+        onToggle={(open) => toggleSection('diagnostics', open)}
+      >
+        <CrashReportingSettings />
+      </SettingsSection>
     </div>
   )
 }
@@ -725,6 +744,98 @@ function ClientTranscriptionSettings() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function CrashReportingSettings() {
+  const { t } = useTranslation()
+  const { toast } = useToast()
+  const [enabled, setEnabled] = useState(isCrashReportingEnabled)
+  const [pendingCount, setPendingCount] = useState(getPendingReportCount)
+  const [uploading, setUploading] = useState(false)
+
+  function handleToggle(checked: boolean) {
+    setCrashReportingEnabled(checked)
+    setEnabled(checked)
+  }
+
+  async function handleSendReports() {
+    setUploading(true)
+    try {
+      const count = await uploadPendingReports()
+      setPendingCount(getPendingReportCount())
+      if (count > 0) {
+        toast(t('crashReporting.reportsSent'), 'success')
+      }
+    } catch {
+      toast(t('crashReporting.sendFailed'), 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function handleClearReports() {
+    clearPendingReports()
+    setPendingCount(0)
+    toast(t('crashReporting.reportsCleared'), 'success')
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Consent toggle */}
+      <div className="flex items-center justify-between rounded-lg border border-border p-4">
+        <div className="space-y-0.5 pr-4">
+          <Label>{t('crashReporting.consent')}</Label>
+          <p className="text-xs text-muted-foreground">{t('crashReporting.consentDescription')}</p>
+        </div>
+        <Switch
+          data-testid="crash-reporting-toggle"
+          checked={enabled}
+          onCheckedChange={handleToggle}
+        />
+      </div>
+
+      {/* Pending reports */}
+      {pendingCount > 0 && (
+        <div className="rounded-lg border border-border p-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {t('crashReporting.pendingReportsDescription', { defaultValue: '%@ crash report(s) from previous sessions are ready to send.' }).replace('%@', String(pendingCount))}
+          </p>
+          <div className="flex gap-2">
+            {enabled && (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="send-crash-reports"
+                onClick={handleSendReports}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-3.5 w-3.5" />
+                )}
+                {t('crashReporting.sendNow')}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="clear-crash-reports"
+              onClick={handleClearReports}
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              {t('crashReporting.clearReports')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Privacy note */}
+      <p className="text-xs text-muted-foreground">
+        {t('crashReporting.privacyNote')}
+      </p>
     </div>
   )
 }

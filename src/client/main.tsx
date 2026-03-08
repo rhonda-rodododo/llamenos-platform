@@ -7,8 +7,19 @@ import { ConfigProvider } from '@/lib/config'
 import { ThemeProvider } from '@/lib/theme'
 import { ToastProvider } from '@/lib/toast'
 import { NoteSheetProvider } from '@/lib/note-sheet-context'
+import { installGlobalErrorHandlers, uploadPendingReports, isCrashReportingEnabled } from '@/lib/crash-reporting'
 import '@/lib/i18n'
 import '@/app.css'
+
+// Install global error handlers for crash reporting (respects consent)
+installGlobalErrorHandlers()
+
+// Upload any pending crash reports from previous sessions
+if (isCrashReportingEnabled()) {
+  uploadPendingReports().catch(() => {
+    // Silently fail — will retry on next page load
+  })
+}
 
 const router = createRouter({ routeTree })
 
