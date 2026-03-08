@@ -144,7 +144,7 @@ class OfflineQueue {
    * Uses exponential backoff on failures.
    * Provides a callback for auth headers (since those depend on current session).
    */
-  async replay(getHeaders: (method: string, path: string) => Record<string, string>): Promise<{
+  async replay(getHeaders: (method: string, path: string) => Record<string, string> | Promise<Record<string, string>>): Promise<{
     succeeded: number
     failed: number
     remaining: number
@@ -164,7 +164,7 @@ class OfflineQueue {
       try {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
-          ...getHeaders(op.method, op.path),
+          ...await getHeaders(op.method, op.path),
         }
 
         const init: RequestInit = {

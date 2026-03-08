@@ -79,7 +79,6 @@ export const migrations: Migration[] = [
       // backward compatibility with any code that still reads it.
     },
   },
-]
 
   // Epic 281: DO Storage Pagination & Scalability
   {
