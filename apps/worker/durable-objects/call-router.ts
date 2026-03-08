@@ -9,6 +9,7 @@ import { getNostrPublisher } from '../lib/do-access'
 import { deriveServerEventKey, encryptHubEvent } from '../lib/hub-event-crypto'
 import { createPushDispatcher } from '../lib/push-dispatch'
 import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
+import { fetchPage } from '../lib/pagination'
 
 /**
  * CallRouterDO — manages real-time call state.
@@ -17,10 +18,11 @@ import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UP
  * Call actions (answer, hangup, spam) are REST endpoints.
  * Presence is derived from shift state + active calls.
  *
- * Storage strategy (Epic 77):
+ * Storage strategy (Epic 281 — cursor-based pagination):
  * - Active calls: array in 'activeCalls' key (transient, needed for routing)
- * - Call history: per-record keys `callrecord:${callId}` (encrypted, scalable)
+ * - Call history: per-record keys `callrecord:{callId}` (encrypted, scalable)
  *   Sensitive metadata (answeredBy, callerNumber) is envelope-encrypted for admins.
+ * - History supports cursor-based pagination via storage.list({ prefix, startAfter })
  */
 export class CallRouterDO extends DurableObject<Env> {
   private migrated = false
@@ -35,12 +37,13 @@ export class CallRouterDO extends DurableObject<Env> {
     this.router.get('/calls/today-count', () => this.getCallsTodayCount())
     this.router.get('/calls/history', async (req) => {
       const url = new URL(req.url)
+      const cursor = url.searchParams.get('cursor') || undefined
       const page = parseInt(url.searchParams.get('page') || '1')
       const limit = parseInt(url.searchParams.get('limit') || '50')
       const search = url.searchParams.get('search') || undefined
       const dateFrom = url.searchParams.get('dateFrom') || undefined
       const dateTo = url.searchParams.get('dateTo') || undefined
-      return this.getCallHistory(page, limit, { search, dateFrom, dateTo })
+      return this.getCallHistory(page, limit, { search, dateFrom, dateTo, cursor })
     })
     this.router.get('/calls/:callId', async (_req, { callId }) => this.getCallById(callId))
     this.router.post('/calls/incoming', async (req) => this.handleIncomingCall(await req.json()))
@@ -184,7 +187,6 @@ export class CallRouterDO extends DurableObject<Env> {
     callerNumber: string
     volunteerPubkeys: string[]
   }): Promise<Response> {
-    // Store last 4 digits for admin display, hash the rest
     const digits = data.callerNumber.replace(/\D/g, '')
     const last4 = digits.length >= 4 ? digits.slice(-4) : digits
 
@@ -199,12 +201,10 @@ export class CallRouterDO extends DurableObject<Env> {
       hasVoicemail: false,
     }
 
-    // Store active call
     const activeCalls = await this.ctx.storage.get<CallRecord[]>('activeCalls') || []
     activeCalls.push(call)
     await this.ctx.storage.put('activeCalls', activeCalls)
 
-    // Publish to Nostr relay (redacted — no PII in relay events)
     this.publishNostrEvent(KIND_CALL_RING, {
       type: 'call:ring',
       callId: call.id,
@@ -224,7 +224,6 @@ export class CallRouterDO extends DurableObject<Env> {
     call.status = 'in-progress'
     await this.ctx.storage.put('activeCalls', activeCalls)
 
-    // Publish call update to Nostr relay
     this.publishNostrEvent(KIND_CALL_UPDATE, {
       type: 'call:update',
       callId: call.id,
@@ -232,7 +231,6 @@ export class CallRouterDO extends DurableObject<Env> {
       answeredBy: call.answeredBy,
     })
 
-    // Publish presence update
     this.publishPresenceUpdate()
 
     return Response.json({ call })
@@ -250,26 +248,22 @@ export class CallRouterDO extends DurableObject<Env> {
       (new Date(call.endedAt).getTime() - new Date(call.startedAt).getTime()) / 1000
     )
 
-    // Remove from active, encrypt and store per-record
     activeCalls.splice(callIdx, 1)
     await this.ctx.storage.put('activeCalls', activeCalls)
     const encrypted = await this.storeEncryptedCallRecord(call)
 
-    // Publish call ended to Nostr relay
     this.publishNostrEvent(KIND_CALL_UPDATE, {
       type: 'call:update',
       callId: call.id,
       status: 'completed',
     })
 
-    // Publish presence update
     this.publishPresenceUpdate()
 
     return Response.json({ call: encrypted })
   }
 
   private async handleVoicemailLeft(callId: string): Promise<Response> {
-    // Move from active calls to history as 'unanswered' with voicemail
     const activeCalls = await this.ctx.storage.get<CallRecord[]>('activeCalls') || []
     const callIdx = activeCalls.findIndex(c => c.id === callId)
 
@@ -285,7 +279,6 @@ export class CallRouterDO extends DurableObject<Env> {
       activeCalls.splice(callIdx, 1)
       await this.ctx.storage.put('activeCalls', activeCalls)
     } else {
-      // Call wasn't tracked (edge case) — create a record
       call = {
         id: callId,
         callerNumber: '[unknown]',
@@ -299,10 +292,8 @@ export class CallRouterDO extends DurableObject<Env> {
       }
     }
 
-    // Encrypt and store per-record
     const encrypted = await this.storeEncryptedCallRecord(call)
 
-    // Publish voicemail event to Nostr relay
     this.publishNostrEvent(KIND_CALL_VOICEMAIL, {
       type: 'voicemail:new',
       callId: call.id,
@@ -324,7 +315,6 @@ export class CallRouterDO extends DurableObject<Env> {
   }
 
   private async handleUpdateMetadata(callId: string, data: Record<string, unknown>): Promise<Response> {
-    // Search active calls first
     const activeCalls = await this.ctx.storage.get<CallRecord[]>('activeCalls') || []
     const activeCall = activeCalls.find(c => c.id === callId)
 
@@ -337,10 +327,8 @@ export class CallRouterDO extends DurableObject<Env> {
       return Response.json({ call: activeCall })
     }
 
-    // Search per-record history
     const encrypted = await this.ctx.storage.get<EncryptedCallRecord>(`callrecord:${callId}`)
     if (encrypted) {
-      // Update plaintext metadata fields (not inside encrypted content)
       if (data.hasTranscription !== undefined) encrypted.hasTranscription = Boolean(data.hasTranscription)
       if (data.hasVoicemail !== undefined) encrypted.hasVoicemail = Boolean(data.hasVoicemail)
       if (data.recordingSid !== undefined) encrypted.recordingSid = String(data.recordingSid)
@@ -355,7 +343,6 @@ export class CallRouterDO extends DurableObject<Env> {
   private async handleReportSpam(callId: string, data: { pubkey: string }): Promise<Response> {
     const activeCalls = await this.ctx.storage.get<CallRecord[]>('activeCalls') || []
     const call = activeCalls.find(c => c.id === callId)
-    // Return the caller number so the API can add it to the ban list
     return Response.json({
       callId,
       callerNumber: call?.callerNumber || null,
@@ -389,7 +376,6 @@ export class CallRouterDO extends DurableObject<Env> {
       }
     }
 
-    // Move stale calls to encrypted per-record history
     if (stale.length > 0) {
       for (const call of stale) {
         call.status = call.status === 'ringing' ? 'unanswered' : 'completed'
@@ -405,19 +391,46 @@ export class CallRouterDO extends DurableObject<Env> {
     return active
   }
 
+  /**
+   * Call history with cursor-based OR offset-based pagination.
+   *
+   * Cursor-based: pass `cursor` param for efficient forward iteration.
+   * Offset-based: pass `page` param for backwards-compatible page/offset.
+   *
+   * When filters are applied, falls back to loading + filtering in memory
+   * (necessary because DO storage doesn't support secondary indexes).
+   */
   private async getCallHistory(
     page: number,
     limit: number,
-    filters?: { search?: string; dateFrom?: string; dateTo?: string },
+    filters?: { search?: string; dateFrom?: string; dateTo?: string; cursor?: string },
   ): Promise<Response> {
-    // Fetch all per-record history entries
+    const hasFilters = filters?.search || filters?.dateFrom || filters?.dateTo
+
+    // Cursor-based path (no filters): efficient prefix scan
+    if (filters?.cursor && !hasFilters) {
+      const result = await fetchPage<EncryptedCallRecord>(
+        this.ctx.storage,
+        'callrecord:',
+        limit,
+        filters.cursor,
+        { reverse: true },
+      )
+      return Response.json({
+        calls: result.items,
+        cursor: result.cursor,
+        hasMore: result.hasMore,
+      })
+    }
+
+    // Offset-based path (or with filters): load all then filter/paginate
     const records = await this.ctx.storage.list<EncryptedCallRecord>({ prefix: 'callrecord:' })
     let history = Array.from(records.values())
 
     // Sort newest first
     history.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
 
-    // Filter by callerLast4 (only plaintext-searchable field)
+    // Filter
     if (filters?.search) {
       const q = filters.search.toLowerCase()
       history = history.filter(c =>
@@ -430,14 +443,22 @@ export class CallRouterDO extends DurableObject<Env> {
       history = history.filter(c => new Date(c.startedAt).getTime() >= from)
     }
     if (filters?.dateTo) {
-      const to = new Date(filters.dateTo).getTime() + 86_400_000 // end of day
+      const to = new Date(filters.dateTo).getTime() + 86_400_000
       history = history.filter(c => new Date(c.startedAt).getTime() <= to)
     }
 
     const start = (page - 1) * limit
+    const items = history.slice(start, start + limit)
+    const hasMore = start + limit < history.length
+
     return Response.json({
-      calls: history.slice(start, start + limit),
+      calls: items,
       total: history.length,
+      // Include cursor for clients that want to switch to cursor-based pagination
+      cursor: hasMore && items.length > 0
+        ? btoa(`callrecord:${items[items.length - 1].id}`).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+        : null,
+      hasMore,
     })
   }
 
@@ -475,7 +496,6 @@ export class CallRouterDO extends DurableObject<Env> {
     todayStart.setUTCHours(0, 0, 0, 0)
     const todayMs = todayStart.getTime()
 
-    // Count active calls from today
     const activeToday = activeCalls.filter(c => new Date(c.startedAt).getTime() >= todayMs).length
 
     // Count history records from today (per-record storage)
@@ -498,7 +518,6 @@ export class CallRouterDO extends DurableObject<Env> {
       const publisher = getNostrPublisher(this.env)
       const hubTag = 'global'
 
-      // Encrypt event content if server secret is available
       let eventContent: string
       if (this.env.SERVER_NOSTR_SECRET) {
         if (!this.eventKey) {

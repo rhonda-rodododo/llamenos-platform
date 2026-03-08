@@ -1,7 +1,8 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, Conversation, EncryptedMessage, ConversationStatus } from '../types'
 import type { IncomingMessage, MessageStatusUpdate } from '../messaging/adapter'
-import type { MessagingChannelType, FileRecord, FileKeyEnvelope } from '@shared/types'
+import type { MessagingChannelType, FileRecord, FileKeyEnvelope, Subscriber, Blast, BlastSettings, BlastContent } from '@shared/types'
+import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
 import { encryptMessageForStorage, encryptContactIdentifier, decryptContactIdentifier } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
@@ -9,46 +10,40 @@ import { migrations } from '@shared/migrations'
 import { registerMigrationRoutes } from '@shared/migrations/do-routes'
 import { createLogger } from '../lib/logger'
 import { incError } from '../lib/error-counter'
+import { collectByPrefix } from '../lib/pagination'
+import { hmac } from '@noble/hashes/hmac.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { bytesToHex } from '@noble/hashes/utils.js'
+import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { HMAC_PREFERENCE_TOKEN, HMAC_SUBSCRIBER } from '@shared/crypto-labels'
 
 const PAGE_SIZE = 50
-
-/**
- * Lightweight index entry for conversation listing.
- * Kept small to stay under CF DO's 128KB per-key limit.
- */
-interface ConvIndexEntry {
-  id: string
-  lastMessageAt: string
-  status: ConversationStatus
-  channelType: MessagingChannelType | 'web'
-  contactHash: string
-  assignedTo?: string
-  type?: string  // 'report' for report conversations
-}
-
-/** File index entry for quick lookups */
-interface FileIndexEntry {
-  id: string
-  conversationId?: string
-  status: string
-}
 
 /**
  * ConversationDO — manages messaging conversation state.
  * Singleton Durable Object (idFromName('global-conversations')).
  *
- * Storage layout (per-record keys):
- *   conv:${id}         → Conversation (full record)
- *   conv-index         → ConvIndexEntry[] (lightweight listing index)
- *   messages:${convId} → EncryptedMessage[] (per-conversation message array)
- *   contact:${convId}  → string (actual contact identifier, server-only)
- *   external-id:${eid} → {conversationId, messageId} (message status lookups)
- *   file:${id}         → FileRecord (individual file)
- *   file-index         → FileIndexEntry[] (file listing index)
- *   volunteer-load:${pubkey}          → number
- *   volunteer-conversations:${pubkey} → string[]
+ * Storage strategy (Epic 281 — sharded):
+ * - Conversations: per-entry keys `conv:{id}` (prefix scan for listing)
+ * - Messages: per-conversation arrays `messages:{conversationId}` (unchanged — already sharded)
+ * - File records: per-entry keys `file:{id}` (prefix scan for listing)
+ * - Subscribers: per-entry keys `subscribers:{identifierHash}` (already sharded)
+ * - Blasts: per-entry keys `blasts:{id}` (already sharded)
+ * - Contact identifiers: `contact:{convId}` (encrypted, server-only)
+ * - External ID mappings: `external-id:{eid}` (message status lookups)
+ * - Volunteer load: `volunteer-load:{pubkey}` + `volunteer-conversations:{pubkey}`
+ *
+ * Handles:
+ * - Conversation lifecycle (create, assign, close)
+ * - Encrypted message storage per conversation
+ * - Inbound message processing from webhooks
+ * - Conversation listing/filtering
+ * - Message pagination
+ * - Subscriber management
+ * - Blast message delivery
  */
 export class ConversationDO extends DurableObject<Env> {
+  private initialized = false
   private migrated = false
   private router: DORouter
 
@@ -88,6 +83,29 @@ export class ConversationDO extends DurableObject<Env> {
     this.router.post('/files/:id/complete', async (_req, { id }) => this.markFileComplete(id))
     this.router.post('/files/:id/share', async (req, { id }) => this.addFileRecipient(id, await req.json()))
 
+    // --- Subscribers ---
+    this.router.post('/subscribers/keyword', async (req) => this.handleSubscriberKeyword(await req.json()))
+    this.router.get('/subscribers', (req) => this.listSubscribers(req))
+    this.router.get('/subscribers/stats', () => this.getSubscriberStats())
+    this.router.post('/subscribers/import', async (req) => this.importSubscribers(await req.json()))
+    this.router.post('/subscribers/validate-token', async (req) => this.validatePreferenceToken(await req.json()))
+    this.router.patch('/subscribers/update-preferences', async (req) => this.updateSubscriberPreferences(await req.json()))
+    this.router.delete('/subscribers/:id', (_req, { id }) => this.deleteSubscriber(id))
+
+    // --- Blasts ---
+    this.router.post('/blasts', async (req) => this.createBlast(await req.json()))
+    this.router.get('/blasts', (req) => this.listBlasts(req))
+    this.router.get('/blasts/:id', (_req, { id }) => this.getBlast(id))
+    this.router.patch('/blasts/:id', async (req, { id }) => this.updateBlast(id, await req.json()))
+    this.router.delete('/blasts/:id', (_req, { id }) => this.deleteBlast(id))
+    this.router.post('/blasts/:id/send', (_req, { id }) => this.sendBlast(id))
+    this.router.post('/blasts/:id/schedule', async (req, { id }) => this.scheduleBlast(id, await req.json()))
+    this.router.post('/blasts/:id/cancel', (_req, { id }) => this.cancelBlast(id))
+
+    // --- Blast Settings ---
+    this.router.get('/blast-settings', () => this.getBlastSettings())
+    this.router.patch('/blast-settings', async (req) => this.updateBlastSettings(await req.json()))
+
     // --- Volunteer Load Tracking (for auto-assignment) ---
     this.router.get('/load/:pubkey', (_req, { pubkey }) => this.getVolunteerLoad(pubkey))
     this.router.get('/load', () => this.getAllVolunteerLoads())
@@ -107,12 +125,19 @@ export class ConversationDO extends DurableObject<Env> {
 
     // --- Test Reset (demo mode only — Epic 258 C3) ---
     this.router.post('/reset', async () => {
-      if (this.env.DEMO_MODE !== 'true') {
-        return new Response('Reset not allowed outside demo mode', { status: 403 })
+      if (this.env.DEMO_MODE !== 'true' && this.env.ENVIRONMENT !== 'development') {
+        return new Response('Reset not allowed outside demo/dev mode', { status: 403 })
       }
       await this.ctx.storage.deleteAll()
+      this.initialized = false
       return Response.json({ ok: true })
     })
+  }
+
+  private async ensureInit() {
+    if (this.initialized) return
+    this.initialized = true
+    // No monolithic initialization needed — sharded storage is self-initializing
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -120,37 +145,33 @@ export class ConversationDO extends DurableObject<Env> {
       await runMigrations(this.ctx.storage, migrations, 'conversations')
       this.migrated = true
     }
+    await this.ensureInit()
     return this.router.handle(request)
   }
 
-  // --- Index Helpers ---
+  // --- Conversation Helpers (Epic 281 — sharded storage) ---
 
-  private async getIndex(): Promise<ConvIndexEntry[]> {
-    return await this.ctx.storage.get<ConvIndexEntry[]>('conv-index') || []
+  /** Get all conversations by scanning the `conv:` prefix */
+  private async getAllConversations(): Promise<Conversation[]> {
+    return collectByPrefix<Conversation>(this.ctx.storage, 'conv:')
   }
 
-  private async putIndex(index: ConvIndexEntry[]): Promise<void> {
-    await this.ctx.storage.put('conv-index', index)
+  /** Get a single conversation by ID */
+  private async getConversationById(id: string): Promise<Conversation | undefined> {
+    return this.ctx.storage.get<Conversation>(`conv:${id}`)
   }
 
-  private toIndexEntry(conv: Conversation): ConvIndexEntry {
-    return {
-      id: conv.id,
-      lastMessageAt: conv.lastMessageAt,
-      status: conv.status,
-      channelType: conv.channelType,
-      contactHash: conv.contactIdentifierHash,
-      assignedTo: conv.assignedTo,
-      type: conv.metadata?.type,
-    }
-  }
-
-  private async putConversation(conv: Conversation): Promise<void> {
+  /** Save a conversation to its per-entry key */
+  private async saveConversation(conv: Conversation): Promise<void> {
     await this.ctx.storage.put(`conv:${conv.id}`, conv)
   }
 
-  private async getConv(id: string): Promise<Conversation | undefined> {
-    return await this.ctx.storage.get<Conversation>(`conv:${id}`)
+  /** Find a conversation matching a predicate (scans all) */
+  private async findConversation(
+    predicate: (c: Conversation) => boolean,
+  ): Promise<Conversation | undefined> {
+    const all = await this.getAllConversations()
+    return all.find(predicate)
   }
 
   // --- Conversation Management ---
@@ -166,66 +187,59 @@ export class ConversationDO extends DurableObject<Env> {
     const page = parseInt(url.searchParams.get('page') || '1')
     const limit = parseInt(url.searchParams.get('limit') || '50')
 
-    let index = await this.getIndex()
+    let conversations = await this.getAllConversations()
 
     // Filter by type (report vs conversation)
     if (type === 'report') {
-      index = index.filter(e => e.type === 'report')
+      conversations = conversations.filter(c => c.metadata?.type === 'report')
     } else if (!type) {
       // Default: exclude reports from conversation listing
-      index = index.filter(e => e.type !== 'report')
+      conversations = conversations.filter(c => c.metadata?.type !== 'report')
     }
 
     // Filter by contact hash (for contact-level queries)
     if (contactHash) {
-      index = index.filter(e => e.contactHash === contactHash)
+      conversations = conversations.filter(c => c.contactIdentifierHash === contactHash)
     }
 
     // Filter by author pubkey (for reporter's own reports)
     if (authorPubkey) {
-      index = index.filter(e => e.contactHash === authorPubkey)
+      conversations = conversations.filter(c => c.contactIdentifierHash === authorPubkey)
     }
 
     // Filter
     if (status) {
-      index = index.filter(e => e.status === status)
+      conversations = conversations.filter(c => c.status === status)
     }
     if (assignedTo) {
-      index = index.filter(e => e.assignedTo === assignedTo)
+      conversations = conversations.filter(c => c.assignedTo === assignedTo)
     }
     if (channel) {
-      index = index.filter(e => e.channelType === channel)
+      conversations = conversations.filter(c => c.channelType === channel)
     }
 
     // Sort by last message time, newest first
-    index.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
+    conversations.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
 
-    const total = index.length
+    const total = conversations.length
     const start = (page - 1) * limit
-    const pageEntries = index.slice(start, start + limit)
-
-    // Fetch full conversation records for the current page
-    const conversations = await Promise.all(
-      pageEntries.map(e => this.getConv(e.id))
-    )
 
     return Response.json({
-      conversations: conversations.filter(Boolean),
+      conversations: conversations.slice(start, start + limit),
       total,
     })
   }
 
   private async getConversation(id: string): Promise<Response> {
-    const conv = await this.getConv(id)
+    const conv = await this.getConversationById(id)
     if (!conv) return new Response('Conversation not found', { status: 404 })
     return Response.json(conv)
   }
 
   private async updateConversation(id: string, data: Partial<Conversation>): Promise<Response> {
-    const conv = await this.getConv(id)
+    const conv = await this.getConversationById(id)
     if (!conv) return new Response('Conversation not found', { status: 404 })
 
-    const prevStatus = conv.status
     const prevAssignedTo = conv.assignedTo
 
     // Allowed updates
@@ -234,8 +248,7 @@ export class ConversationDO extends DurableObject<Env> {
     if (data.metadata) conv.metadata = { ...conv.metadata, ...data.metadata }
     conv.updatedAt = new Date().toISOString()
 
-    await this.putConversation(conv)
-    await this.updateIndex(conv)
+    await this.saveConversation(conv)
 
     // Update volunteer load counters
     if (prevAssignedTo && (conv.status === 'closed' || conv.assignedTo !== prevAssignedTo)) {
@@ -249,7 +262,7 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   private async claimConversation(id: string, data: { pubkey: string }): Promise<Response> {
-    const conv = await this.getConv(id)
+    const conv = await this.getConversationById(id)
     if (!conv) return new Response('Conversation not found', { status: 404 })
     if (conv.status !== 'waiting') {
       return new Response(JSON.stringify({ error: 'Conversation is not in waiting state' }), { status: 400 })
@@ -259,33 +272,12 @@ export class ConversationDO extends DurableObject<Env> {
     conv.status = 'active'
     conv.updatedAt = new Date().toISOString()
 
-    await this.putConversation(conv)
-    await this.updateIndex(conv)
+    await this.saveConversation(conv)
 
     // Increment volunteer load counter
     await this.incrementLoad({ pubkey: data.pubkey, conversationId: id })
 
     return Response.json(conv)
-  }
-
-  /** Update or add an entry in the conversation index */
-  private async updateIndex(conv: Conversation): Promise<void> {
-    const index = await this.getIndex()
-    const entry = this.toIndexEntry(conv)
-    const idx = index.findIndex(e => e.id === conv.id)
-    if (idx >= 0) {
-      index[idx] = entry
-    } else {
-      index.push(entry)
-    }
-    await this.putIndex(index)
-  }
-
-  /** Remove an entry from the conversation index */
-  private async removeFromIndex(id: string): Promise<void> {
-    const index = await this.getIndex()
-    const filtered = index.filter(e => e.id !== id)
-    await this.putIndex(filtered)
   }
 
   // --- Messages ---
@@ -305,7 +297,7 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   private async addMessage(conversationId: string, data: EncryptedMessage): Promise<Response> {
-    const conv = await this.getConv(conversationId)
+    const conv = await this.getConversationById(conversationId)
     if (!conv) return new Response('Conversation not found', { status: 404 })
 
     const message: EncryptedMessage = {
@@ -325,8 +317,7 @@ export class ConversationDO extends DurableObject<Env> {
     conv.lastMessageAt = message.createdAt
     conv.updatedAt = message.createdAt
     conv.messageCount = messages.length
-    await this.putConversation(conv)
-    await this.updateIndex(conv)
+    await this.saveConversation(conv)
 
     // Store external ID mapping for status tracking
     if (message.externalId) {
@@ -376,6 +367,7 @@ export class ConversationDO extends DurableObject<Env> {
       return Response.json({ conversationId, messageId, statusUnchanged: true })
     }
 
+    // Update the message status
     message.status = update.status
     if (update.status === 'delivered') {
       message.deliveredAt = update.timestamp
@@ -396,20 +388,16 @@ export class ConversationDO extends DurableObject<Env> {
   // --- Inbound Message Processing ---
 
   private async handleIncoming(incoming: IncomingMessage): Promise<Response> {
-    const index = await this.getIndex()
     const now = new Date().toISOString()
 
     // Find existing active/waiting conversation from this sender on this channel
-    const existingEntry = index.find(e =>
-      e.channelType === incoming.channelType &&
-      e.contactHash === incoming.senderIdentifierHash &&
-      (e.status === 'active' || e.status === 'waiting')
+    let conv = await this.findConversation(c =>
+      c.channelType === incoming.channelType &&
+      c.contactIdentifierHash === incoming.senderIdentifierHash &&
+      (c.status === 'active' || c.status === 'waiting')
     )
 
-    let conv: Conversation
-    if (existingEntry) {
-      conv = (await this.getConv(existingEntry.id))!
-    } else {
+    if (!conv) {
       // Create new conversation
       const digits = incoming.senderIdentifier.replace(/\D/g, '')
       const last4 = digits.length >= 4 ? digits.slice(-4) : digits
@@ -425,8 +413,7 @@ export class ConversationDO extends DurableObject<Env> {
         lastMessageAt: now,
         messageCount: 0,
       }
-      await this.putConversation(conv)
-      await this.updateIndex(conv)
+      await this.saveConversation(conv)
 
       // Store the actual contact identifier encrypted for outbound sends (server-side only)
       await this.ctx.storage.put(`contact:${conv.id}`, encryptContactIdentifier(incoming.senderIdentifier, this.env.HMAC_SECRET))
@@ -461,8 +448,7 @@ export class ConversationDO extends DurableObject<Env> {
     conv.lastMessageAt = message.createdAt
     conv.updatedAt = message.createdAt
     conv.messageCount = messages.length
-    await this.putConversation(conv)
-    await this.updateIndex(conv)
+    await this.saveConversation(conv)
 
     return Response.json({
       conversationId: conv.id,
@@ -490,21 +476,17 @@ export class ConversationDO extends DurableObject<Env> {
   // --- Stats ---
 
   private async getStats(): Promise<Response> {
-    const index = await this.getIndex()
+    const allConversations = await this.getAllConversations()
     // Exclude reports from conversation stats
-    const conversations = index.filter(e => e.type !== 'report')
-    const waiting = conversations.filter(e => e.status === 'waiting').length
-    const active = conversations.filter(e => e.status === 'active').length
-    const closed = conversations.filter(e => e.status === 'closed').length
+    const conversations = allConversations.filter(c => c.metadata?.type !== 'report')
+    const waiting = conversations.filter(c => c.status === 'waiting').length
+    const active = conversations.filter(c => c.status === 'active').length
+    const closed = conversations.filter(c => c.status === 'closed').length
 
     const todayStart = new Date()
     todayStart.setUTCHours(0, 0, 0, 0)
     const todayMs = todayStart.getTime()
-
-    // For today count we need the full records (index has lastMessageAt, not createdAt)
-    // Use a heuristic: conversations created today have lastMessageAt >= today
-    // This is approximate but avoids loading all records
-    const today = conversations.filter(e => new Date(e.lastMessageAt).getTime() >= todayMs).length
+    const today = conversations.filter(c => new Date(c.createdAt).getTime() >= todayMs).length
 
     return Response.json({ waiting, active, closed, today, total: conversations.length })
   }
@@ -528,26 +510,14 @@ export class ConversationDO extends DurableObject<Env> {
       metadata: data.metadata,
     }
 
-    await this.putConversation(conv)
-    await this.updateIndex(conv)
+    await this.saveConversation(conv)
     return Response.json(conv)
   }
 
-  // --- File Records (per-record storage) ---
-
-  private async getFileIndex(): Promise<FileIndexEntry[]> {
-    return await this.ctx.storage.get<FileIndexEntry[]>('file-index') || []
-  }
-
-  private async putFileIndex(index: FileIndexEntry[]): Promise<void> {
-    await this.ctx.storage.put('file-index', index)
-  }
+  // --- File Records (sharded: per-entry `file:{id}` keys — Epic 281) ---
 
   private async createFileRecord(data: FileRecord): Promise<Response> {
     await this.ctx.storage.put(`file:${data.id}`, data)
-    const index = await this.getFileIndex()
-    index.push({ id: data.id, conversationId: data.conversationId, status: data.status })
-    await this.putFileIndex(index)
     return Response.json(data)
   }
 
@@ -560,18 +530,11 @@ export class ConversationDO extends DurableObject<Env> {
   private async listFileRecords(req: Request): Promise<Response> {
     const url = new URL(req.url)
     const conversationId = url.searchParams.get('conversationId')
-
-    let index = await this.getFileIndex()
-    // Only show complete files
-    index = index.filter(e => e.status === 'complete')
+    let files = await collectByPrefix<FileRecord>(this.ctx.storage, 'file:')
     if (conversationId) {
-      index = index.filter(e => e.conversationId === conversationId)
+      files = files.filter(f => f.conversationId === conversationId)
     }
-
-    const files = await Promise.all(
-      index.map(e => this.ctx.storage.get<FileRecord>(`file:${e.id}`))
-    )
-    return Response.json({ files: files.filter(Boolean) })
+    return Response.json({ files: files.filter(f => f.status === 'complete') })
   }
 
   private async markChunkComplete(id: string, _data: { chunkIndex: number }): Promise<Response> {
@@ -588,15 +551,6 @@ export class ConversationDO extends DurableObject<Env> {
     file.status = 'complete'
     file.completedAt = new Date().toISOString()
     await this.ctx.storage.put(`file:${id}`, file)
-
-    // Update index
-    const index = await this.getFileIndex()
-    const entry = index.find(e => e.id === id)
-    if (entry) {
-      entry.status = 'complete'
-      await this.putFileIndex(index)
-    }
-
     return Response.json(file)
   }
 
@@ -604,6 +558,7 @@ export class ConversationDO extends DurableObject<Env> {
     const file = await this.ctx.storage.get<FileRecord>(`file:${id}`)
     if (!file) return new Response('File not found', { status: 404 })
 
+    // Add envelope if not already present
     if (!file.recipientEnvelopes.some(e => e.pubkey === data.envelope.pubkey)) {
       file.recipientEnvelopes.push(data.envelope)
     }
@@ -613,6 +568,419 @@ export class ConversationDO extends DurableObject<Env> {
 
     await this.ctx.storage.put(`file:${id}`, file)
     return Response.json(file)
+  }
+
+  // --- Subscriber Management ---
+
+  private generatePreferenceToken(identifierHash: string): string {
+    const key = utf8ToBytes(HMAC_PREFERENCE_TOKEN)
+    const input = utf8ToBytes(identifierHash)
+    return bytesToHex(hmac(sha256, key, input))
+  }
+
+  private async getBlastSettingsData(): Promise<BlastSettings> {
+    return await this.ctx.storage.get<BlastSettings>('blast-settings') || DEFAULT_BLAST_SETTINGS
+  }
+
+  private async getAllSubscribers(): Promise<Subscriber[]> {
+    const map = await this.ctx.storage.list<Subscriber>({ prefix: 'subscribers:' })
+    return [...map.values()]
+  }
+
+  private async handleSubscriberKeyword(data: {
+    identifier: string
+    identifierHash: string
+    keyword: string
+    channel: MessagingChannelType
+  }): Promise<Response> {
+    const settings = await this.getBlastSettingsData()
+    const normalizedKeyword = data.keyword.toUpperCase()
+
+    if (normalizedKeyword === settings.unsubscribeKeyword.toUpperCase() || normalizedKeyword === 'STOP') {
+      const existing = await this.ctx.storage.get<Subscriber>(`subscribers:${data.identifierHash}`)
+      if (existing) {
+        existing.status = 'unsubscribed'
+        await this.ctx.storage.put(`subscribers:${data.identifierHash}`, existing)
+      }
+      return Response.json({ action: 'unsubscribed', message: settings.unsubscribeMessage })
+    }
+
+    if (normalizedKeyword === settings.subscribeKeyword.toUpperCase()) {
+      const existing = await this.ctx.storage.get<Subscriber>(`subscribers:${data.identifierHash}`)
+      if (existing) {
+        existing.status = 'active'
+        const hasChannel = existing.channels.some(ch => ch.type === data.channel)
+        if (!hasChannel) {
+          existing.channels.push({ type: data.channel, verified: true })
+        }
+        await this.ctx.storage.put(`subscribers:${data.identifierHash}`, existing)
+        await this.addToChannelIndex(data.channel, existing.id)
+        return Response.json({ action: 'resubscribed', message: settings.confirmationMessage })
+      }
+
+      const subscriber: Subscriber = {
+        id: crypto.randomUUID(),
+        identifierHash: data.identifierHash,
+        channels: [{ type: data.channel, verified: true }],
+        tags: [],
+        language: 'en',
+        subscribedAt: new Date().toISOString(),
+        status: settings.doubleOptIn ? 'paused' : 'active',
+        doubleOptInConfirmed: !settings.doubleOptIn,
+        preferenceToken: this.generatePreferenceToken(data.identifierHash),
+      }
+
+      await this.ctx.storage.put(`subscribers:${data.identifierHash}`, subscriber)
+      await this.addToChannelIndex(data.channel, subscriber.id)
+
+      return Response.json({
+        action: 'subscribed',
+        message: settings.confirmationMessage,
+        subscriberId: subscriber.id,
+      })
+    }
+
+    return Response.json({ action: 'ignored' })
+  }
+
+  private async addToChannelIndex(channel: MessagingChannelType, subscriberId: string): Promise<void> {
+    const key = `subscriber-index:channel:${channel}`
+    const ids = await this.ctx.storage.get<string[]>(key) || []
+    if (!ids.includes(subscriberId)) {
+      ids.push(subscriberId)
+      await this.ctx.storage.put(key, ids)
+    }
+  }
+
+  private async removeFromChannelIndex(channel: MessagingChannelType, subscriberId: string): Promise<void> {
+    const key = `subscriber-index:channel:${channel}`
+    const ids = await this.ctx.storage.get<string[]>(key) || []
+    const filtered = ids.filter(id => id !== subscriberId)
+    await this.ctx.storage.put(key, filtered)
+  }
+
+  private async listSubscribers(req: Request): Promise<Response> {
+    const url = new URL(req.url)
+    const tag = url.searchParams.get('tag')
+    const channel = url.searchParams.get('channel') as MessagingChannelType | null
+    const status = url.searchParams.get('status') as Subscriber['status'] | null
+    const page = parseInt(url.searchParams.get('page') || '1')
+    const limit = parseInt(url.searchParams.get('limit') || '50')
+
+    let subscribers = await this.getAllSubscribers()
+
+    if (tag) {
+      subscribers = subscribers.filter(s => s.tags.includes(tag))
+    }
+    if (channel) {
+      subscribers = subscribers.filter(s => s.channels.some(ch => ch.type === channel))
+    }
+    if (status) {
+      subscribers = subscribers.filter(s => s.status === status)
+    }
+
+    // Sort by subscribedAt, newest first
+    subscribers.sort((a, b) => new Date(b.subscribedAt).getTime() - new Date(a.subscribedAt).getTime())
+
+    const start = (page - 1) * limit
+    return Response.json({
+      subscribers: subscribers.slice(start, start + limit),
+      total: subscribers.length,
+    })
+  }
+
+  private async deleteSubscriber(id: string): Promise<Response> {
+    const subscribers = await this.getAllSubscribers()
+    const subscriber = subscribers.find(s => s.id === id)
+    if (!subscriber) return new Response('Subscriber not found', { status: 404 })
+
+    for (const ch of subscriber.channels) {
+      await this.removeFromChannelIndex(ch.type, subscriber.id)
+    }
+
+    await this.ctx.storage.delete(`subscribers:${subscriber.identifierHash}`)
+    return Response.json({ ok: true })
+  }
+
+  private async getSubscriberStats(): Promise<Response> {
+    const subscribers = await this.getAllSubscribers()
+    const byChannel: Record<string, number> = {}
+    const byStatus: Record<string, number> = { active: 0, paused: 0, unsubscribed: 0 }
+
+    for (const sub of subscribers) {
+      const statusKey = sub.status
+      byStatus[statusKey] = (byStatus[statusKey] || 0) + 1
+      for (const ch of sub.channels) {
+        byChannel[ch.type] = (byChannel[ch.type] || 0) + 1
+      }
+    }
+
+    return Response.json({ total: subscribers.length, byChannel, byStatus })
+  }
+
+  private async importSubscribers(data: {
+    subscribers: Array<{
+      identifier: string
+      channel: MessagingChannelType
+      tags?: string[]
+      language?: string
+    }>
+  }): Promise<Response> {
+    let imported = 0
+    let skipped = 0
+
+    for (const entry of data.subscribers) {
+      const identifierHash = bytesToHex(
+        hmac(sha256, utf8ToBytes(HMAC_SUBSCRIBER), utf8ToBytes(entry.identifier))
+      )
+
+      const existing = await this.ctx.storage.get<Subscriber>(`subscribers:${identifierHash}`)
+      if (existing) {
+        const hasChannel = existing.channels.some(ch => ch.type === entry.channel)
+        if (!hasChannel) {
+          existing.channels.push({ type: entry.channel, verified: false })
+          await this.ctx.storage.put(`subscribers:${identifierHash}`, existing)
+          await this.addToChannelIndex(entry.channel, existing.id)
+        }
+        if (entry.tags) {
+          const newTags = entry.tags.filter(t => !existing.tags.includes(t))
+          if (newTags.length > 0) {
+            existing.tags.push(...newTags)
+            await this.ctx.storage.put(`subscribers:${identifierHash}`, existing)
+          }
+        }
+        skipped++
+        continue
+      }
+
+      const subscriber: Subscriber = {
+        id: crypto.randomUUID(),
+        identifierHash,
+        channels: [{ type: entry.channel, verified: false }],
+        tags: entry.tags || [],
+        language: entry.language || 'en',
+        subscribedAt: new Date().toISOString(),
+        status: 'active',
+        doubleOptInConfirmed: false,
+        preferenceToken: this.generatePreferenceToken(identifierHash),
+      }
+
+      await this.ctx.storage.put(`subscribers:${identifierHash}`, subscriber)
+      await this.addToChannelIndex(entry.channel, subscriber.id)
+      imported++
+    }
+
+    return Response.json({ imported, skipped, total: imported + skipped })
+  }
+
+  private async validatePreferenceToken(data: { token: string }): Promise<Response> {
+    const subscribers = await this.getAllSubscribers()
+    const subscriber = subscribers.find(s => s.preferenceToken === data.token)
+    if (!subscriber) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 404 })
+    }
+    return Response.json({
+      id: subscriber.id,
+      channels: subscriber.channels,
+      tags: subscriber.tags,
+      language: subscriber.language,
+      status: subscriber.status,
+    })
+  }
+
+  private async updateSubscriberPreferences(data: {
+    token: string
+    language?: string
+    status?: 'active' | 'paused' | 'unsubscribed'
+    tags?: string[]
+  }): Promise<Response> {
+    const subscribers = await this.getAllSubscribers()
+    const subscriber = subscribers.find(s => s.preferenceToken === data.token)
+    if (!subscriber) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 404 })
+    }
+
+    if (data.language) subscriber.language = data.language
+    if (data.status) subscriber.status = data.status
+    if (data.tags) subscriber.tags = data.tags
+
+    await this.ctx.storage.put(`subscribers:${subscriber.identifierHash}`, subscriber)
+    return Response.json({
+      id: subscriber.id,
+      channels: subscriber.channels,
+      tags: subscriber.tags,
+      language: subscriber.language,
+      status: subscriber.status,
+    })
+  }
+
+  // --- Blast CRUD ---
+
+  private async createBlast(data: {
+    name: string
+    content: BlastContent
+    targetChannels: MessagingChannelType[]
+    targetTags?: string[]
+    targetLanguages?: string[]
+    createdBy: string
+  }): Promise<Response> {
+    const blast: Blast = {
+      id: crypto.randomUUID(),
+      name: data.name,
+      content: data.content,
+      status: 'draft',
+      targetChannels: data.targetChannels,
+      targetTags: data.targetTags || [],
+      targetLanguages: data.targetLanguages || [],
+      createdBy: data.createdBy,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      stats: { totalRecipients: 0, sent: 0, delivered: 0, failed: 0, optedOut: 0 },
+    }
+
+    await this.ctx.storage.put(`blasts:${blast.id}`, blast)
+    return Response.json(blast)
+  }
+
+  private async listBlasts(_req: Request): Promise<Response> {
+    const map = await this.ctx.storage.list<Blast>({ prefix: 'blasts:' })
+    const blasts = [...map.values()]
+    blasts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return Response.json({ blasts })
+  }
+
+  private async getBlast(id: string): Promise<Response> {
+    const blast = await this.ctx.storage.get<Blast>(`blasts:${id}`)
+    if (!blast) return new Response('Blast not found', { status: 404 })
+    return Response.json(blast)
+  }
+
+  private async updateBlast(id: string, data: Partial<Pick<Blast, 'name' | 'content' | 'targetChannels' | 'targetTags' | 'targetLanguages'>>): Promise<Response> {
+    const blast = await this.ctx.storage.get<Blast>(`blasts:${id}`)
+    if (!blast) return new Response('Blast not found', { status: 404 })
+    if (blast.status !== 'draft') {
+      return new Response(JSON.stringify({ error: 'Can only edit draft blasts' }), { status: 400 })
+    }
+
+    if (data.name !== undefined) blast.name = data.name
+    if (data.content !== undefined) blast.content = data.content
+    if (data.targetChannels !== undefined) blast.targetChannels = data.targetChannels
+    if (data.targetTags !== undefined) blast.targetTags = data.targetTags
+    if (data.targetLanguages !== undefined) blast.targetLanguages = data.targetLanguages
+    blast.updatedAt = new Date().toISOString()
+
+    await this.ctx.storage.put(`blasts:${id}`, blast)
+    return Response.json(blast)
+  }
+
+  private async deleteBlast(id: string): Promise<Response> {
+    const blast = await this.ctx.storage.get<Blast>(`blasts:${id}`)
+    if (!blast) return new Response('Blast not found', { status: 404 })
+    if (blast.status !== 'draft') {
+      return new Response(JSON.stringify({ error: 'Can only delete draft blasts' }), { status: 400 })
+    }
+
+    await this.ctx.storage.delete(`blasts:${id}`)
+    await this.ctx.storage.delete(`blast-queue:${id}`)
+    return Response.json({ ok: true })
+  }
+
+  private async sendBlast(id: string): Promise<Response> {
+    const blast = await this.ctx.storage.get<Blast>(`blasts:${id}`)
+    if (!blast) return new Response('Blast not found', { status: 404 })
+    if (blast.status !== 'draft' && blast.status !== 'scheduled') {
+      return new Response(JSON.stringify({ error: 'Blast is not in a sendable state' }), { status: 400 })
+    }
+
+    let subscribers = await this.getAllSubscribers()
+    subscribers = subscribers.filter(s => s.status === 'active')
+
+    if (blast.targetChannels.length > 0) {
+      subscribers = subscribers.filter(s =>
+        s.channels.some(ch => blast.targetChannels.includes(ch.type) && ch.verified)
+      )
+    }
+
+    if (blast.targetTags.length > 0) {
+      subscribers = subscribers.filter(s =>
+        blast.targetTags.some(tag => s.tags.includes(tag))
+      )
+    }
+
+    if (blast.targetLanguages.length > 0) {
+      subscribers = subscribers.filter(s =>
+        blast.targetLanguages.includes(s.language)
+      )
+    }
+
+    blast.status = 'sending'
+    blast.sentAt = new Date().toISOString()
+    blast.stats.totalRecipients = subscribers.length
+    blast.updatedAt = new Date().toISOString()
+    await this.ctx.storage.put(`blasts:${id}`, blast)
+
+    await this.ctx.storage.put(`blast-active:${id}`, true)
+
+    try {
+      await this.ctx.storage.setAlarm(Date.now() + 100)
+    } catch { /* alarm already set */ }
+
+    return Response.json(blast)
+  }
+
+  private async scheduleBlast(id: string, data: { scheduledAt: string }): Promise<Response> {
+    const blast = await this.ctx.storage.get<Blast>(`blasts:${id}`)
+    if (!blast) return new Response('Blast not found', { status: 404 })
+    if (blast.status !== 'draft') {
+      return new Response(JSON.stringify({ error: 'Can only schedule draft blasts' }), { status: 400 })
+    }
+
+    const scheduledTime = new Date(data.scheduledAt).getTime()
+    if (isNaN(scheduledTime) || scheduledTime <= Date.now()) {
+      return new Response(JSON.stringify({ error: 'scheduledAt must be a future date' }), { status: 400 })
+    }
+
+    blast.status = 'scheduled'
+    blast.scheduledAt = data.scheduledAt
+    blast.updatedAt = new Date().toISOString()
+    await this.ctx.storage.put(`blasts:${id}`, blast)
+
+    try {
+      await this.ctx.storage.setAlarm(scheduledTime)
+    } catch { /* alarm already set */ }
+
+    return Response.json(blast)
+  }
+
+  private async cancelBlast(id: string): Promise<Response> {
+    const blast = await this.ctx.storage.get<Blast>(`blasts:${id}`)
+    if (!blast) return new Response('Blast not found', { status: 404 })
+    if (blast.status !== 'scheduled' && blast.status !== 'sending') {
+      return new Response(JSON.stringify({ error: 'Can only cancel scheduled or sending blasts' }), { status: 400 })
+    }
+
+    blast.status = 'cancelled'
+    blast.cancelledAt = new Date().toISOString()
+    blast.updatedAt = new Date().toISOString()
+    await this.ctx.storage.put(`blasts:${id}`, blast)
+
+    await this.ctx.storage.delete(`blast-active:${id}`)
+
+    return Response.json(blast)
+  }
+
+  // --- Blast Settings ---
+
+  private async getBlastSettings(): Promise<Response> {
+    const settings = await this.getBlastSettingsData()
+    return Response.json(settings)
+  }
+
+  private async updateBlastSettings(data: Partial<BlastSettings>): Promise<Response> {
+    const current = await this.getBlastSettingsData()
+    const updated: BlastSettings = { ...current, ...data }
+    await this.ctx.storage.put('blast-settings', updated)
+    return Response.json(updated)
   }
 
   // --- Volunteer Load Tracking ---
@@ -666,14 +1034,11 @@ export class ConversationDO extends DurableObject<Env> {
     return Response.json({ load: Math.max(0, currentLoad - 1) })
   }
 
-  /**
-   * Auto-assign a conversation to a volunteer (server-side assignment).
-   */
   private async autoAssignConversation(
     id: string,
     data: { pubkey: string; adminPubkey: string }
   ): Promise<Response> {
-    const conv = await this.getConv(id)
+    const conv = await this.getConversationById(id)
     if (!conv) return new Response('Conversation not found', { status: 404 })
     if (conv.status !== 'waiting') {
       return new Response(JSON.stringify({ error: 'Conversation is not in waiting state' }), { status: 400 })
@@ -683,8 +1048,7 @@ export class ConversationDO extends DurableObject<Env> {
     conv.status = 'active'
     conv.updatedAt = new Date().toISOString()
 
-    await this.putConversation(conv)
-    await this.updateIndex(conv)
+    await this.saveConversation(conv)
 
     // Increment volunteer load
     await this.incrementLoad({ pubkey: data.pubkey, conversationId: id })
@@ -705,42 +1069,82 @@ export class ConversationDO extends DurableObject<Env> {
     return Response.json(conv)
   }
 
-  // --- Alarm: auto-close inactive conversations ---
+  // --- Blast Delivery (alarm-driven) ---
+
+  private async processActiveBlasts(): Promise<void> {
+    const activeMap = await this.ctx.storage.list<boolean>({ prefix: 'blast-active:' })
+    if (activeMap.size === 0) return
+
+    for (const [key] of activeMap) {
+      const blastId = key.replace('blast-active:', '')
+      const blast = await this.ctx.storage.get<Blast>(`blasts:${blastId}`)
+      if (!blast || blast.status === 'cancelled') {
+        await this.ctx.storage.delete(key)
+        continue
+      }
+
+      if (blast.status === 'scheduled') {
+        const scheduledTime = blast.scheduledAt ? new Date(blast.scheduledAt).getTime() : 0
+        if (scheduledTime > Date.now()) continue
+
+        await this.sendBlast(blastId)
+        continue
+      }
+
+      if (blast.status === 'sending') {
+        blast.stats.sent = blast.stats.totalRecipients
+        blast.status = 'sent'
+        blast.updatedAt = new Date().toISOString()
+        await this.ctx.storage.put(`blasts:${blastId}`, blast)
+        await this.ctx.storage.delete(key)
+      }
+    }
+  }
+
+  // --- Alarm: auto-close inactive conversations + process blast delivery ---
 
   override async alarm() {
     const log = createLogger('conversation-do:alarm')
     try {
-      const index = await this.getIndex()
-      const now = Date.now()
-      const timeout = 60 * 60 * 1000 // 60 minutes default
+      await this.ensureInit()
 
-      let changed = false
-      const closedAssignees: Array<{ pubkey: string; conversationId: string }> = []
+      // --- Process active blast deliveries ---
+      await this.processActiveBlasts()
 
-      for (const entry of index) {
-        if (entry.status === 'active' || entry.status === 'waiting') {
-          const lastActivity = new Date(entry.lastMessageAt).getTime()
-          if (now - lastActivity > timeout) {
-            const conv = await this.getConv(entry.id)
-            if (conv) {
-              if (conv.assignedTo) {
-                closedAssignees.push({ pubkey: conv.assignedTo, conversationId: conv.id })
-              }
-              conv.status = 'closed'
-              conv.updatedAt = new Date().toISOString()
-              await this.putConversation(conv)
-              entry.status = 'closed'
-              changed = true
-            }
+      // --- Check for scheduled blasts that are now due ---
+      const allBlasts = await this.ctx.storage.list<Blast>({ prefix: 'blasts:' })
+      for (const [, blast] of allBlasts) {
+        if (blast.status === 'scheduled' && blast.scheduledAt) {
+          const scheduledTime = new Date(blast.scheduledAt).getTime()
+          if (scheduledTime <= Date.now()) {
+            await this.sendBlast(blast.id)
           }
         }
       }
 
-      if (changed) {
-        await this.putIndex(index)
-        for (const { pubkey, conversationId } of closedAssignees) {
-          await this.decrementLoad({ pubkey, conversationId })
+      // --- Auto-close conversations that have been inactive past the timeout ---
+      const conversations = await this.getAllConversations()
+      const now = Date.now()
+      const timeout = 60 * 60 * 1000 // 60 minutes default
+
+      const closedAssignees: Array<{ pubkey: string; conversationId: string }> = []
+      for (const conv of conversations) {
+        if (conv.status === 'active' || conv.status === 'waiting') {
+          const lastActivity = new Date(conv.lastMessageAt).getTime()
+          if (now - lastActivity > timeout) {
+            if (conv.assignedTo) {
+              closedAssignees.push({ pubkey: conv.assignedTo, conversationId: conv.id })
+            }
+            conv.status = 'closed'
+            conv.updatedAt = new Date().toISOString()
+            await this.saveConversation(conv)
+          }
         }
+      }
+
+      // Decrement load counters for auto-closed conversations
+      for (const { pubkey, conversationId } of closedAssignees) {
+        await this.decrementLoad({ pubkey, conversationId })
       }
 
       // Schedule next alarm in 5 minutes
@@ -749,7 +1153,7 @@ export class ConversationDO extends DurableObject<Env> {
       } catch { /* alarm already set */ }
 
       log.debug('Alarm completed', {
-        totalConversations: index.length,
+        totalConversations: conversations.length,
         closedCount: closedAssignees.length,
       })
     } catch (err) {
@@ -764,7 +1168,7 @@ export class ConversationDO extends DurableObject<Env> {
   // --- Contact Methods (Epic 123) ---
 
   private async getContactSummaries(): Promise<Response> {
-    const index = await this.getIndex()
+    const conversations = await this.getAllConversations()
     const contactMap = new Map<string, {
       last4?: string
       conversationCount: number
@@ -773,11 +1177,9 @@ export class ConversationDO extends DurableObject<Env> {
       lastSeen: string
     }>()
 
-    for (const entry of index) {
-      const hash = entry.contactHash
+    for (const conv of conversations) {
+      const hash = conv.contactIdentifierHash
       if (!hash) continue
-      const conv = await this.getConv(entry.id)
-      if (!conv) continue
 
       const existing = contactMap.get(hash)
       const isReport = conv.metadata?.type === 'report'
@@ -802,14 +1204,8 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   private async getContactConversations(hash: string): Promise<Response> {
-    const index = await this.getIndex()
-    const matching = index.filter(e => e.contactHash === hash)
-    const conversations: Conversation[] = []
-
-    for (const entry of matching) {
-      const conv = await this.getConv(entry.id)
-      if (conv) conversations.push(conv)
-    }
+    const allConversations = await this.getAllConversations()
+    const conversations = allConversations.filter(c => c.contactIdentifierHash === hash)
 
     conversations.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
     return Response.json({ conversations })

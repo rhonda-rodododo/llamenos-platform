@@ -38,6 +38,8 @@ calls.get('/history', requirePermission('calls:read-history'), validateQuery(cal
   const params = new URLSearchParams()
   params.set('page', String(query.page))
   params.set('limit', String(query.limit))
+  // Cursor-based pagination (Epic 281)
+  if (query.cursor) params.set('cursor', query.cursor)
   if (query.search) params.set('search', query.search)
   if (query.dateFrom) params.set('dateFrom', query.dateFrom)
   if (query.dateTo) params.set('dateTo', query.dateTo)

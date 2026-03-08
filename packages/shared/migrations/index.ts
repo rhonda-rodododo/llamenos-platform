@@ -81,5 +81,80 @@ export const migrations: Migration[] = [
   },
 ]
 
+  // Epic 281: DO Storage Pagination & Scalability
+  {
+    version: 3,
+    name: 'shard-identity-volunteers',
+    async run(storage) {
+      // Migrate monolithic 'volunteers' record → per-entry 'vol:{pubkey}' keys
+      const volunteers = await storage.get<Record<string, unknown>>('volunteers')
+      if (!volunteers || typeof volunteers !== 'object') return
+
+      for (const [pubkey, vol] of Object.entries(volunteers)) {
+        if (vol && typeof vol === 'object') {
+          await storage.put(`vol:${pubkey}`, vol)
+        }
+      }
+
+      // Delete the monolithic key
+      await storage.delete('volunteers')
+    },
+  },
+  {
+    version: 4,
+    name: 'shard-identity-invites',
+    async run(storage) {
+      // Migrate monolithic 'invites' array → per-entry 'invite:{code}' keys
+      const invites = await storage.get<Array<{ code: string; [key: string]: unknown }>>('invites')
+      if (!invites || !Array.isArray(invites)) return
+
+      for (const invite of invites) {
+        if (invite && invite.code) {
+          await storage.put(`invite:${invite.code}`, invite)
+        }
+      }
+
+      // Delete the monolithic key
+      await storage.delete('invites')
+    },
+  },
+  {
+    version: 5,
+    name: 'shard-conversation-index',
+    async run(storage) {
+      // Migrate monolithic 'conversations' array → per-entry 'conv:{id}' keys
+      const conversations = await storage.get<Array<{ id: string; [key: string]: unknown }>>('conversations')
+      if (!conversations || !Array.isArray(conversations)) return
+
+      for (const conv of conversations) {
+        if (conv && conv.id) {
+          await storage.put(`conv:${conv.id}`, conv)
+        }
+      }
+
+      // Delete the monolithic key
+      await storage.delete('conversations')
+    },
+  },
+  {
+    version: 6,
+    name: 'shard-conversation-file-records',
+    async run(storage) {
+      // Migrate monolithic 'fileRecords' array → per-entry 'file:{id}' keys
+      const fileRecords = await storage.get<Array<{ id: string; [key: string]: unknown }>>('fileRecords')
+      if (!fileRecords || !Array.isArray(fileRecords)) return
+
+      for (const file of fileRecords) {
+        if (file && file.id) {
+          await storage.put(`file:${file.id}`, file)
+        }
+      }
+
+      // Delete the monolithic key
+      await storage.delete('fileRecords')
+    },
+  },
+]
+
 // Re-export for convenience
 export { MIGRATION_VERSION_KEY }
