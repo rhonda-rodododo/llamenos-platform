@@ -1206,12 +1206,62 @@ export class ConversationDO extends DurableObject<Env> {
 
     // Schedule next alarm in 5 minutes (keeps existing cadence for blasts/auto-close)
     try {
-      await this.ctx.storage.setAlarm(now + 5 * 60 * 1000)
+      await this.ctx.storage.setAlarm(Date.now() + 5 * 60 * 1000)
     } catch { /* alarm already set */ }
   }
 
   private async getCleanupMetrics(): Promise<Response> {
     const metrics = await this.ctx.storage.get<CleanupMetrics>('cleanupMetrics') || emptyCleanupMetrics()
     return Response.json(metrics)
+  }
+
+  // --- Contacts (Epic 123) ---
+
+  private async getContactSummaries(): Promise<Response> {
+    const conversations = await this.getAllConversations()
+    const contactMap = new Map<string, {
+      last4?: string
+      conversationCount: number
+      reportCount: number
+      firstSeen: string
+      lastSeen: string
+    }>()
+
+    for (const conv of conversations) {
+      const hash = conv.contactIdentifierHash
+      if (!hash) continue
+
+      const isReport = conv.metadata?.type === 'report'
+      const existing = contactMap.get(hash)
+      if (existing) {
+        if (isReport) existing.reportCount++
+        else existing.conversationCount++
+        if (conv.createdAt < existing.firstSeen) existing.firstSeen = conv.createdAt
+        if (conv.lastMessageAt > existing.lastSeen) existing.lastSeen = conv.lastMessageAt
+        if (!existing.last4 && conv.contactLast4) existing.last4 = conv.contactLast4
+      } else {
+        contactMap.set(hash, {
+          last4: conv.contactLast4,
+          conversationCount: isReport ? 0 : 1,
+          reportCount: isReport ? 1 : 0,
+          firstSeen: conv.createdAt,
+          lastSeen: conv.lastMessageAt,
+        })
+      }
+    }
+
+    const contacts = Array.from(contactMap.entries()).map(([hash, data]) => ({
+      contactHash: hash,
+      ...data,
+    }))
+    contacts.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime())
+    return Response.json({ contacts })
+  }
+
+  private async getContactConversations(hash: string): Promise<Response> {
+    const all = await this.getAllConversations()
+    const matching = all.filter(c => c.contactIdentifierHash === hash)
+    matching.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
+    return Response.json({ conversations: matching })
   }
 }
