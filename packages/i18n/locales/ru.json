@@ -1822,7 +1822,8 @@
     "restart": "Restart Now",
     "skipVersion": "Skip This Version",
     "updateNow": "Update Now",
-    "versionChange": "{{current}} → {{new}}"
+    "versionChange": "{{current}} → {{new}}",
+    "contact_admin": "If you need help, contact your administrator:"
   },
   "useBiometric": "Use Biometric",
   "volunteerProfile": {

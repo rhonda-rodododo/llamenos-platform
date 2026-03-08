@@ -32,12 +32,38 @@ enum APIError: LocalizedError {
     }
 }
 
+// MARK: - Version Status
+
+/// Result of comparing the client's API version against the server's config.
+enum VersionStatus: Equatable {
+    /// Client is up-to-date with the server.
+    case upToDate
+    /// A newer version is available but not required.
+    case updateAvailable(latestVersion: Int)
+    /// Client is too old and must update before continuing.
+    case forceUpdate(minVersion: Int)
+    /// Version check could not be performed (network error, etc.).
+    case unknown
+}
+
+// MARK: - App Config Response
+
+/// Response from `GET /api/config` — only the fields needed for version checking.
+struct AppConfig: Decodable {
+    let hotlineName: String
+    let apiVersion: Int
+    let minApiVersion: Int
+}
+
 // MARK: - APIService
 
 /// URLSession-based REST client for the Llamenos hub API. Injects CryptoService to
 /// generate Schnorr auth tokens for each request. The auth token is sent as a Bearer
 /// header containing a JSON object with pubkey, timestamp, and BIP-340 signature.
 final class APIService: @unchecked Sendable {
+    /// The API version this client is compiled against.
+    /// Must match the server's `CURRENT_API_VERSION` in `apps/worker/lib/api-versions.ts`.
+    static let apiVersion: Int = 1
     private(set) var baseURL: URL?
     private let cryptoService: CryptoService
     private let session: URLSession
@@ -197,6 +223,42 @@ final class APIService: @unchecked Sendable {
         body: (any Encodable)? = nil
     ) async throws {
         let _: EmptyResponse = try await request(method: method, path: path, body: body)
+    }
+
+    // MARK: - Version Check
+
+    /// Compare this client's API version against the server's config.
+    /// Returns `.unknown` on network failure — the app should not be blocked if offline.
+    /// Uses a plain JSONDecoder because the server sends camelCase keys natively.
+    func checkVersionCompatibility() async -> VersionStatus {
+        guard let baseURL else { return .unknown }
+
+        let configURL = baseURL.appendingPathComponent("/api/config")
+        var request = URLRequest(url: configURL, timeoutInterval: 10)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                return .unknown
+            }
+            // Use a plain decoder — the /api/config endpoint returns camelCase keys
+            // (apiVersion, minApiVersion), not snake_case.
+            let plainDecoder = JSONDecoder()
+            let config = try plainDecoder.decode(AppConfig.self, from: data)
+
+            if Self.apiVersion < config.minApiVersion {
+                return .forceUpdate(minVersion: config.minApiVersion)
+            }
+            if Self.apiVersion < config.apiVersion {
+                return .updateAvailable(latestVersion: config.apiVersion)
+            }
+            return .upToDate
+        } catch {
+            return .unknown
+        }
     }
 }
 

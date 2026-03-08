@@ -1,8 +1,8 @@
 # CI workflow for mobile (iOS + Android) release builds.
-# Builds signed mobile apps and uploads to TestFlight / Play Store.
+# Builds signed mobile apps and uploads to TestFlight / Play Store / GitHub Releases.
 #
 # Trigger: push to tags matching v* or manual dispatch.
-# Epic 210: Mobile Release Prep.
+# Epic 210: Mobile Release Prep, Epic 290: Mobile App Distribution & Update Management.
 
 name: Mobile Release
 
@@ -18,6 +18,10 @@ on:
 
 permissions:
   contents: write
+
+env:
+  # Safely capture workflow_dispatch input at top level
+  INPUT_VERSION: ${{ github.event.inputs.version }}
 
 jobs:
   # ─── Android Release ─────────────────────────────────────────
@@ -44,17 +48,19 @@ jobs:
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
 
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
       - name: Rust cache
         uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
         with:
           workspaces: packages/crypto
 
-      # Build llamenos-core for Android (when build-mobile.sh is ready)
-      # - name: Build crypto for Android
-      #   run: |
-      #     cd packages/crypto
-      #     ./scripts/build-mobile.sh android
-      #     cp -r dist/android/jniLibs/* ../../apps/android/app/src/main/jniLibs/
+      - name: Build crypto for Android
+        run: |
+          cd packages/crypto
+          ./scripts/build-mobile.sh android
+          cp -r dist/android/jniLibs/* ../../apps/android/app/src/main/jniLibs/
 
       - name: Decode keystore
         if: env.KEYSTORE_BASE64 != ''
@@ -64,21 +70,25 @@ jobs:
 
       - name: Sync version from tag
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_VERSION"
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           echo "Building version: ${VERSION}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
           # Update versionName in build.gradle.kts
           sed -i "s/versionName = \"[^\"]*\"/versionName = \"${VERSION}\"/" apps/android/app/build.gradle.kts
 
           # Increment versionCode based on run number (always increasing)
-          sed -i "s/versionCode = [0-9]*/versionCode = ${{ github.run_number }}/" apps/android/app/build.gradle.kts
+          sed -i "s/versionCode = [0-9]*/versionCode = ${RUN_NUMBER}/" apps/android/app/build.gradle.kts
 
-      - name: Build release AAB
+      - name: Build release AAB (Play Store)
         working-directory: apps/android
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/apps/android/release.keystore
@@ -87,7 +97,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew bundleRelease
 
-      - name: Build release APK
+      - name: Build release APK (direct download)
         working-directory: apps/android
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/apps/android/release.keystore
@@ -96,6 +106,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
+      - name: Generate APK checksum
+        run: |
+          APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          if [ -n "$APK" ]; then
+            sha256sum "$APK" > "${APK}.sha256"
+            echo "APK checksum:"
+            cat "${APK}.sha256"
+          fi
+
       - name: Upload AAB artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -103,6 +122,7 @@ jobs:
           path: |
             apps/android/app/build/outputs/bundle/release/*.aab
             apps/android/app/build/outputs/apk/release/*.apk
+            apps/android/app/build/outputs/apk/release/*.sha256
             apps/android/app/build/outputs/mapping/release/mapping.txt
           retention-days: 30
 
@@ -114,23 +134,31 @@ jobs:
           packageName: org.llamenos.hotline
           releaseFiles: apps/android/app/build/outputs/bundle/release/*.aab
           track: internal
+          status: completed
           mappingFile: apps/android/app/build/outputs/mapping/release/mapping.txt
 
       - name: Upload Android artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TAG="v${{ github.event.inputs.version }}"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG="v${INPUT_VERSION}"
           else
             TAG="${GITHUB_REF_NAME}"
           fi
 
-          # Find the APK
+          # Find the APK and checksum
           APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          CHECKSUM=$(find apps/android/app/build/outputs/apk/release -name "*.sha256" | head -1)
           if [ -n "$APK" ]; then
-            if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
-              gh release upload "${TAG}" "$APK" --clobber
+            # Create release if it doesn't exist
+            if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
+              gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --title "${TAG}" --generate-notes --draft
+            fi
+            gh release upload "${TAG}" "$APK" --clobber
+            if [ -n "$CHECKSUM" ]; then
+              gh release upload "${TAG}" "$CHECKSUM" --clobber
             fi
           fi
 
@@ -157,27 +185,38 @@ jobs:
         with:
           workspaces: packages/crypto
 
-      # Build llamenos-core for iOS (when build-mobile.sh is ready)
-      # - name: Build crypto for iOS
-      #   run: |
-      #     cd packages/crypto
-      #     ./scripts/build-mobile.sh ios
+      - name: Build crypto XCFramework
+        run: |
+          cd packages/crypto
+          ./scripts/build-mobile.sh ios
+          cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate
 
       - name: Sync version from tag
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$INPUT_VERSION"
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           echo "Building version: ${VERSION}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
           # Update CFBundleShortVersionString in Info.plist
           sed -i '' "s|<key>CFBundleShortVersionString</key>[[:space:]]*<string>[^<]*</string>|<key>CFBundleShortVersionString</key>\n\t<string>${VERSION}</string>|" apps/ios/Sources/App/Info.plist
 
           # Use run number as build number
-          sed -i '' "s|<key>CFBundleVersion</key>[[:space:]]*<string>[^<]*</string>|<key>CFBundleVersion</key>\n\t<string>${{ github.run_number }}</string>|" apps/ios/Sources/App/Info.plist
+          sed -i '' "s|<key>CFBundleVersion</key>[[:space:]]*<string>[^<]*</string>|<key>CFBundleVersion</key>\n\t<string>${RUN_NUMBER}</string>|" apps/ios/Sources/App/Info.plist
 
       - name: Setup Apple signing
         if: env.APPLE_CERTIFICATE != ''
@@ -209,14 +248,19 @@ jobs:
 
       - name: Build archive
         working-directory: apps/ios
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           xcodebuild archive \
+            -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -sdk iphoneos \
             -configuration Release \
             -archivePath build/Llamenos.xcarchive \
+            -destination generic/platform=iOS \
             -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             INFOPLIST_FILE=Sources/App/Info.plist \
             | xcpretty || true
 
@@ -224,24 +268,9 @@ jobs:
         if: success()
         working-directory: apps/ios
         run: |
-          cat > build/ExportOptions.plist << 'EXPORTEOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>uploadSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          EXPORTEOF
-
           xcodebuild -exportArchive \
             -archivePath build/Llamenos.xcarchive \
-            -exportOptionsPlist build/ExportOptions.plist \
+            -exportOptionsPlist ExportOptions.plist \
             -exportPath build/export \
             -allowProvisioningUpdates \
             | xcpretty || true
@@ -264,8 +293,8 @@ jobs:
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
           # Decode API key
-          mkdir -p ~/private_keys
-          echo "$APPLE_API_KEY" | base64 --decode > ~/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$APPLE_API_KEY" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
 
           # Upload via altool
           IPA=$(find apps/ios/build/export -name "*.ipa" | head -1)

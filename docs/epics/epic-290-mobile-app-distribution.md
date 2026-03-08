@@ -1,6 +1,6 @@
 # Epic 290: Mobile App Distribution & Update Management
 
-**Status**: PENDING
+**Status**: DONE
 **Priority**: High
 **Depends on**: Epic 288
 **Blocks**: None

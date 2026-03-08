@@ -1,0 +1,28 @@
+Categories:
+  - Phone & SMS
+  - Security
+License: AGPL-3.0-or-later
+AuthorName: Llamenos Project
+WebSite: https://llamenos.org
+SourceCode: https://github.com/rhonda-rodododo/llamenos
+IssueTracker: https://github.com/rhonda-rodododo/llamenos/issues
+
+RepoType: git
+Repo: https://github.com/rhonda-rodododo/llamenos.git
+
+Builds:
+  - versionName: 0.18.0
+    versionCode: 18
+    commit: v0.18.0
+    subdir: apps/android
+    gradle:
+      - yes
+    ndk: 28.0.13004108
+    prebuild:
+      - cd ../../packages/crypto
+      - cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o ../../apps/android/app/src/main/jniLibs build --release
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.18.0
+CurrentVersionCode: 18

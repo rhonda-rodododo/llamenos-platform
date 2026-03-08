@@ -1956,5 +1956,13 @@
     "updateError": "Failed to update report type",
     "cannotArchiveLast": "Cannot archive the last active report type",
     "maxTypes": "Maximum number of report types reached"
+  },
+  "updates": {
+    "update_required_title": "Update Required",
+    "update_required_message": "Your app is out of date and can no longer connect to the server. Please update to continue.",
+    "update_required_button": "Update Now",
+    "update_available_message": "A new version is available. Update for the latest features and security fixes.",
+    "update_available_dismiss": "Later",
+    "contact_admin": "If you need help, contact your administrator:"
   }
 }

@@ -1,11 +1,18 @@
 package org.llamenos.hotline.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import org.llamenos.hotline.api.VersionChecker
+import org.llamenos.hotline.ui.components.UpdateBanner
+import org.llamenos.hotline.ui.components.UpdateRequiredScreen
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -199,11 +206,33 @@ fun LlamenosNavigation(
     webSocketService: WebSocketService,
     keystoreService: KeystoreService,
     networkMonitor: NetworkMonitor,
+    versionChecker: VersionChecker,
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
     val uiState by authViewModel.uiState.collectAsState()
+
+    // Version check state
+    var versionStatus by remember { mutableStateOf<VersionChecker.VersionStatus>(VersionChecker.VersionStatus.Unknown) }
+    var showUpdateBanner by remember { mutableStateOf(false) }
+
+    // Check API version compatibility on first composition
+    LaunchedEffect(Unit) {
+        val status = versionChecker.check()
+        versionStatus = status
+        when (status) {
+            is VersionChecker.VersionStatus.UpdateAvailable -> showUpdateBanner = true
+            else -> { /* no banner */ }
+        }
+    }
+
+    // Force-update screen blocks the entire app
+    if (versionStatus is VersionChecker.VersionStatus.ForceUpdate) {
+        val hubUrl = keystoreService.retrieve(KeystoreService.KEY_HUB_URL) ?: ""
+        UpdateRequiredScreen(hubUrl = hubUrl)
+        return
+    }
 
     // Determine start destination based on stored key presence
     val startDestination = if (uiState.hasStoredKeys) {
@@ -212,10 +241,15 @@ fun LlamenosNavigation(
         LlamenosRoute.Login.route
     }
 
+    Column(modifier = modifier) {
+        // Soft-update banner (dismissible)
+        if (showUpdateBanner) {
+            UpdateBanner(onDismiss = { showUpdateBanner = false })
+        }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier,
     ) {
         composable(LlamenosRoute.Login.route) {
             LoginScreen(
@@ -486,4 +520,5 @@ fun LlamenosNavigation(
             )
         }
     }
+    } // Column
 }

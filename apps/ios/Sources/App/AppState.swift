@@ -46,6 +46,15 @@ final class AppState {
     /// Total unread conversation count for the tab badge.
     var unreadConversationCount: Int = 0
 
+    /// Result of the on-launch version compatibility check against the server.
+    var versionStatus: VersionStatus = .unknown
+
+    /// Whether to show the force-update blocking screen.
+    var showForceUpdate: Bool = false
+
+    /// Whether to show the soft-update banner (dismissible).
+    var showUpdateBanner: Bool = false
+
     // MARK: - WebSocket Event Listener
 
     /// Background task that listens for WebSocket events.
@@ -219,6 +228,28 @@ final class AppState {
     }
 
     // MARK: - WebSocket Connection
+
+    /// Check API version compatibility with the server on app launch.
+    /// Fetches `/api/config` and compares `minApiVersion` / `apiVersion` against the client.
+    func checkVersionCompatibility() {
+        Task {
+            let status = await apiService.checkVersionCompatibility()
+            await MainActor.run {
+                self.versionStatus = status
+                switch status {
+                case .forceUpdate:
+                    self.showForceUpdate = true
+                    self.showUpdateBanner = false
+                case .updateAvailable:
+                    self.showForceUpdate = false
+                    self.showUpdateBanner = true
+                case .upToDate, .unknown:
+                    self.showForceUpdate = false
+                    self.showUpdateBanner = false
+                }
+            }
+        }
+    }
 
     /// Fetch the current user's role from the API after authentication.
     func fetchUserRole() {

@@ -514,7 +514,7 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 ### Track 4: Client Resilience & Lifecycle
 - [ ] **[Epic 288: API Version Negotiation & Backwards Compatibility](epics/epic-288-api-version-negotiation.md)** — X-API-Version headers, forced update flow, graceful degradation
 - [ ] **[Epic 289: Desktop Auto-Update (Tauri Updater)](epics/epic-289-desktop-auto-update.md)** — GitHub Releases + self-hosted manifest, Ed25519 signing, background checks
-- [ ] **[Epic 290: Mobile App Distribution & Update Management](epics/epic-290-mobile-app-distribution.md)** — TestFlight + Play Store + F-Droid + direct APK, version check on launch
+- [x] **[Epic 290: Mobile App Distribution & Update Management](epics/epic-290-mobile-app-distribution.md)** — TestFlight + Play Store + F-Droid + direct APK, version check on launch
 - [ ] **[Epic 291: Client-Side Transcription on Mobile](epics/epic-291-mobile-transcription.md)** — iOS Speech framework, Android SpeechRecognizer, on-device only
 - [ ] **[Epic 292: Offline Resilience & Sync](epics/epic-292-offline-resilience.md)** — Offline operation queue, replay on reconnect, Nostr event replay
 - [ ] **[Epic 293: Client Crash Reporting & Diagnostics](epics/epic-293-crash-reporting.md)** — GlitchTip (self-hosted Sentry), all 3 platforms, PII stripping, source maps

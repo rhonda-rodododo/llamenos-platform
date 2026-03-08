@@ -37,20 +37,37 @@ struct LlamenosApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView()
-                    .environment(appState)
-                    .environment(router)
-                    .onAppear {
-                        // Sync router to initial auth state (onChange only fires on subsequent changes)
-                        router.resetForAuthStatus(appState.authStatus)
-                    }
-                    .onChange(of: scenePhase) { oldPhase, newPhase in
-                        handleScenePhaseChange(from: oldPhase, to: newPhase)
-                    }
-                    .onChange(of: appState.authStatus) { _, newStatus in
-                        router.resetForAuthStatus(newStatus)
-                    }
+                // Force-update screen blocks the entire app
+                if appState.showForceUpdate {
+                    UpdateRequiredView(hubURL: appState.authService.hubURL)
+                } else {
+                    VStack(spacing: 0) {
+                        // Soft-update banner (dismissible)
+                        if appState.showUpdateBanner {
+                            UpdateBanner(onDismiss: {
+                                appState.showUpdateBanner = false
+                            })
+                        }
 
+                        ContentView()
+                            .environment(appState)
+                            .environment(router)
+                    }
+                }
+            }
+            .onAppear {
+                // Sync router to initial auth state (onChange only fires on subsequent changes)
+                router.resetForAuthStatus(appState.authStatus)
+                // Check API version compatibility on launch
+                appState.checkVersionCompatibility()
+            }
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                handleScenePhaseChange(from: oldPhase, to: newPhase)
+            }
+            .onChange(of: appState.authStatus) { _, newStatus in
+                router.resetForAuthStatus(newStatus)
+            }
+            .overlay {
                 // M28: Privacy overlay — hides sensitive content in app switcher
                 if showPrivacyOverlay {
                     PrivacyOverlayView()

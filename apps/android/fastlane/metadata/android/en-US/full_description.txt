@@ -1,0 +1,17 @@
+Llamenos is a secure crisis response hotline application designed for organizations that need to protect the identity of both callers and volunteers.
+
+Key features:
+- End-to-end encrypted call notes and messages
+- Volunteer shift management with parallel ringing
+- Real-time call routing to on-shift volunteers
+- Admin dashboard with audit logging
+- Multi-language support (13 languages)
+- GDPR-compliant data handling
+
+Built with security-first architecture:
+- Nostr keypair authentication (no passwords)
+- PIN-protected encrypted key storage
+- Certificate pinning for API connections
+- Zero-knowledge server design — the server cannot read your notes
+
+Llamenos is free, open-source software (AGPL-3.0) built by and for crisis response communities.

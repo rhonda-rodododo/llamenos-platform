@@ -1,5 +1,42 @@
 # Completed Backlog
 
+## 2026-03-08: Epic 290 — Mobile App Distribution & Update Management
+
+### iOS Distribution Pipeline
+- Enhanced `.github/workflows/mobile-release.yml` with crypto XCFramework build, xcodegen, manual code signing
+- Committed `apps/ios/ExportOptions.plist` for App Store Connect archive export
+- Created `apps/ios/fastlane/Fastfile` with beta (TestFlight) and release (App Store) lanes
+- Version check: `APIService.checkVersionCompatibility()` fetches `/api/config` and compares `apiVersion`/`minApiVersion`
+- `UpdateRequiredView` blocks the app when `minApiVersion` exceeds client version, with App Store link + admin contact fallback
+- `UpdateBanner` shows dismissible soft-update notification with App Store link
+
+### Android Distribution Pipeline
+- Enhanced workflow with `cargo-ndk` crypto build, Play Store AAB upload via `r0adkll/upload-google-play`
+- APK SHA-256 checksum generation and upload to GitHub Releases alongside APK
+- Created `apps/android/fastlane/metadata/android/en-US/` (full/short description, title, changelogs)
+- Created `apps/android/metadata/org.llamenos.hotline.yml` F-Droid build metadata with cargo-ndk prebuild
+- `VersionChecker` singleton: fetches `/api/config`, compares `API_VERSION` constant against server
+- `UpdateRequiredScreen` composable: blocks app with Play Store link + hub URL fallback
+- `UpdateBanner` composable: dismissible Material 3 banner with Play Store link
+
+### Client-Side Version Check (Both Platforms)
+- iOS: wired into `LlamenosApp.onAppear` via `AppState.checkVersionCompatibility()`
+- Android: wired into `LlamenosNavigation` via `LaunchedEffect(Unit)` + `VersionChecker.check()`
+- Force-update blocks entire app; soft-update is dismissible banner above content
+- Network failures return `.unknown` — app is never blocked when offline
+
+### i18n
+- Added `updates.*` section (6 keys) to all 13 locales
+- Ran `bun run i18n:codegen` to generate iOS `.strings` + Android `strings.xml` + Kotlin `I18n.kt`
+
+### Tests
+- `VersionCheckerTest.kt`: 5 unit tests with OkHttp MockWebServer (UpToDate, ForceUpdate, UpdateAvailable, network error, server error)
+- `VersionCheckTests.swift`: 7 unit tests for VersionStatus equality, API version constant, AppConfig decoding, unknown key handling
+
+### Security
+- Workflow uses env vars for user inputs (no direct `${{ }}` in run blocks)
+- Version check uses separate plain JSONDecoder (server sends camelCase, not snake_case)
+
 ## 2026-03-07: Cross-Platform E2E Simulation & iOS API Tests
 
 ### E1: Fix iOS API Bootstrap (401 Auth)
