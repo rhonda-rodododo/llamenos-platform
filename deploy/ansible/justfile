@@ -78,9 +78,29 @@ migrate *ARGS:
 
 # ── Backup ──────────────────────────────────────────────────────
 
-# Run encrypted backup
+# Run all backups (postgres, strfry, minio, config) with monitoring
 backup *ARGS:
     ansible-playbook playbooks/backup.yml --ask-vault-pass {{ARGS}}
+
+# Run backup for a specific service only (postgres, strfry, minio, config)
+backup-service SERVICE *ARGS:
+    ansible-playbook playbooks/backup.yml --ask-vault-pass --tags {{SERVICE}} {{ARGS}}
+
+# Check backup health status
+backup-status *ARGS:
+    ansible-playbook playbooks/backup-status.yml --ask-vault-pass {{ARGS}}
+
+# Restore from backup (interactive — shows what will happen first)
+restore *ARGS:
+    ansible-playbook playbooks/restore.yml --ask-vault-pass {{ARGS}}
+
+# Restore dry-run (shows what would be restored without making changes)
+restore-dry-run *ARGS:
+    ansible-playbook playbooks/restore.yml --ask-vault-pass -e restore_dry_run=true {{ARGS}}
+
+# Test backup restoration in isolated container (non-destructive)
+test-restore *ARGS:
+    ansible-playbook playbooks/test-restore.yml --ask-vault-pass {{ARGS}}
 
 # ── Verification ────────────────────────────────────────────────
 

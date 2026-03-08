@@ -1,17 +1,224 @@
 ---
-# Backup Playbook
+# Backup Orchestration Playbook
 #
-# Runs an encrypted backup of the PostgreSQL database and uploads
-# it to an off-site storage destination via rclone.
+# Runs all backup roles in dependency order, generates a unified manifest
+# with checksums, and optionally runs health monitoring.
 #
 # Usage:
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags postgres
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags strfry
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags minio
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags config
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags monitor
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass -e backup_type=manual
 
-- name: Run backup
+- name: Run all service backups
   hosts: all
   become: true
   vars_files:
     - ../vars.yml
+
+  pre_tasks:
+    - name: Ensure backup base directory exists
+      ansible.builtin.file:
+        path: "{{ app_dir }}/backups"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0700"
+      tags: always
+
+    - name: Ensure scripts directory exists
+      ansible.builtin.file:
+        path: "{{ app_dir }}/scripts"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0750"
+      tags: always
+
+    - name: Record backup run start time
+      ansible.builtin.set_fact:
+        backup_start_time: "{{ ansible_date_time.iso8601 }}"
+      tags: always
+
+    - name: Install rclone (if remote storage configured)
+      ansible.builtin.shell: |
+        if command -v rclone &>/dev/null; then
+          echo "already installed"
+        else
+          curl -fsSL https://rclone.org/install.sh | bash
+          echo "installed"
+        fi
+      register: rclone_install
+      changed_when: "'installed' in rclone_install.stdout"
+      when: backup_rclone_remote | default('') | length > 0
+      tags: always
+
   roles:
-    - role: backup
-      tags: [backup]
+    # 1. Config first (lightweight, captures current state before any changes)
+    - role: backup-config
+      tags: [backup, config]
+
+    # 2. PostgreSQL (primary data store — most critical)
+    - role: backup-postgres
+      tags: [backup, postgres]
+
+    # 3. strfry (Nostr relay events)
+    - role: backup-strfry
+      tags: [backup, strfry]
+
+    # 4. MinIO (file attachments — can be large, runs last)
+    - role: backup-minio
+      tags: [backup, minio]
+
+    # 5. Health monitoring (runs after all backups complete)
+    - role: backup-monitor
+      tags: [backup, monitor]
+
+  post_tasks:
+    - name: Template orchestration backup script
+      ansible.builtin.copy:
+        dest: "{{ app_dir }}/scripts/backup-all.sh"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0750"
+        content: |
+          #!/usr/bin/env bash
+          #
+          # Llamenos Full Backup Orchestrator — managed by Ansible
+          #
+          # Runs all backup scripts in dependency order, generates a
+          # unified manifest with checksums.
+          #
+          # Usage:
+          #   ./backup-all.sh              # Run all backups
+          #   ./backup-all.sh --manual     # Tag as manual backup
+
+          set -euo pipefail
+
+          SCRIPTS_DIR="{{ app_dir }}/scripts"
+          BACKUP_DIR="{{ app_dir }}/backups"
+          TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+          ARGS="${*:-}"
+          FAILED=0
+          MANIFEST_FILE="${BACKUP_DIR}/manifest-${TIMESTAMP}.txt"
+
+          log() {
+            echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [orchestrator] $*"
+          }
+
+          run_backup() {
+            local name="$1"
+            local script="$2"
+            log "Starting ${name} backup..."
+            local start=$(date +%s)
+            if "${script}" ${ARGS} --manifest >> "${MANIFEST_FILE}" 2>&1; then
+              local elapsed=$(( $(date +%s) - start ))
+              log "${name} backup completed in ${elapsed}s"
+            else
+              local elapsed=$(( $(date +%s) - start ))
+              log "ERROR: ${name} backup FAILED after ${elapsed}s"
+              FAILED=$((FAILED + 1))
+            fi
+          }
+
+          log "=== Starting full backup run ==="
+
+          # Initialize manifest
+          echo "# Llamenos Backup Manifest" > "${MANIFEST_FILE}"
+          echo "# Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${MANIFEST_FILE}"
+          echo "# Host: $(hostname)" >> "${MANIFEST_FILE}"
+          echo "# Format: service|timestamp|filename|size|sha256|type[|extra]" >> "${MANIFEST_FILE}"
+          echo "" >> "${MANIFEST_FILE}"
+
+          # Run in dependency order
+          run_backup "config" "${SCRIPTS_DIR}/backup-config.sh"
+          run_backup "postgres" "${SCRIPTS_DIR}/backup-postgres.sh"
+          run_backup "strfry" "${SCRIPTS_DIR}/backup-strfry.sh"
+          run_backup "minio" "${SCRIPTS_DIR}/backup-minio.sh"
+
+          # Generate manifest checksum
+          MANIFEST_SHA256="$(sha256sum "${MANIFEST_FILE}" | cut -d' ' -f1)"
+          echo "" >> "${MANIFEST_FILE}"
+          echo "# Manifest SHA-256: ${MANIFEST_SHA256}" >> "${MANIFEST_FILE}"
+
+          # Keep only the 30 most recent manifests
+          find "${BACKUP_DIR}" -maxdepth 1 -name 'manifest-*.txt' -printf '%T@ %p\n' \
+            | sort -rn \
+            | tail -n +31 \
+            | cut -d' ' -f2- \
+            | xargs rm -f 2>/dev/null || true
+
+          if [ ${FAILED} -gt 0 ]; then
+            log "=== Backup run COMPLETED WITH ${FAILED} FAILURE(S) ==="
+            exit 1
+          else
+            log "=== Backup run COMPLETED SUCCESSFULLY ==="
+          fi
+
+          # Run health check
+          log "Running health check..."
+          "${SCRIPTS_DIR}/backup-monitor.sh" || true
+      tags: always
+
+    - name: Configure daily backup cron job
+      ansible.builtin.cron:
+        name: "Llamenos daily full backup"
+        user: "{{ deploy_user }}"
+        hour: "{{ backup_cron_hour | default('3') }}"
+        minute: "{{ backup_cron_minute | default('0') }}"
+        job: "{{ app_dir }}/scripts/backup-all.sh >> {{ app_dir }}/backups/backup.log 2>&1"
+        state: "{{ 'present' if backup_enabled | default(true) else 'absent' }}"
+      tags: always
+
+    - name: Remove legacy single-backup cron job
+      ansible.builtin.cron:
+        name: "Llamenos daily backup"
+        user: "{{ deploy_user }}"
+        state: absent
+      tags: always
+
+    - name: Configure backup log rotation
+      ansible.builtin.copy:
+        dest: /etc/logrotate.d/llamenos-backup
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          {{ app_dir }}/backups/backup.log {
+              weekly
+              rotate 8
+              compress
+              delaycompress
+              missingok
+              notifempty
+              create 0640 {{ deploy_user }} {{ deploy_group }}
+          }
+      tags: always
+
+    - name: Display backup summary
+      ansible.builtin.debug:
+        msg: |
+          Backup orchestration deployed successfully.
+
+          Scripts installed:
+            {{ app_dir }}/scripts/backup-all.sh      (orchestrator)
+            {{ app_dir }}/scripts/backup-postgres.sh  (PostgreSQL)
+            {{ app_dir }}/scripts/backup-strfry.sh    (Nostr relay)
+            {{ app_dir }}/scripts/backup-minio.sh     (MinIO objects)
+            {{ app_dir }}/scripts/backup-config.sh    (configuration)
+            {{ app_dir }}/scripts/backup-monitor.sh   (health check)
+
+          Backup directories:
+            {{ app_dir }}/backups/postgres/{daily,weekly,monthly}
+            {{ app_dir }}/backups/strfry/{daily,weekly,monthly}
+            {{ app_dir }}/backups/minio/{daily,weekly,monthly}
+            {{ app_dir }}/backups/config/{daily,weekly,monthly}
+
+          Cron: Daily at {{ backup_cron_hour | default('3') }}:{{ backup_cron_minute | default('0') }} UTC
+          Encryption: {{ 'ENABLED (age)' if backup_age_public_key | default('') | length > 0 else 'DISABLED — set backup_age_public_key' }}
+          Remote: {{ backup_rclone_remote | default('DISABLED — set backup_rclone_remote') }}
+          Webhook: {{ backup_monitor_webhook_url | default('DISABLED — set backup_monitor_webhook_url') }}
+      tags: always

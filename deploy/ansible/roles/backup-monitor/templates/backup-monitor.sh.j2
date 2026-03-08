@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+#
+# Llamenos Backup Health Monitor — managed by Ansible
+#
+# Checks backup freshness, size trends, and integrity.
+# Sends webhook alerts on failure or staleness.
+#
+# Usage:
+#   ./backup-monitor.sh              # Run all checks
+#   ./backup-monitor.sh --quiet      # Exit code only (0=ok, 1=warning, 2=critical)
+#   ./backup-monitor.sh --json       # Output JSON status
+
+set -euo pipefail
+
+MAX_AGE_HOURS={{ backup_monitor_max_age_hours }}
+MIN_SIZE_BYTES={{ backup_monitor_min_size_bytes }}
+WEBHOOK_URL="{{ backup_monitor_webhook_url }}"
+WEBHOOK_TYPE="{{ backup_monitor_webhook_type }}"
+QUIET=false
+JSON_OUTPUT=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --quiet) QUIET=true ;;
+    --json) JSON_OUTPUT=true ;;
+  esac
+done
+
+MAX_AGE_SECONDS=$((MAX_AGE_HOURS * 3600))
+NOW="$(date +%s)"
+EXIT_CODE=0
+ALERTS=()
+STATUS_LINES=()
+
+check_dir() {
+  local name="$1"
+  local dir="$2"
+  local pattern="$3"
+  local status="ok"
+  local message=""
+  local latest_file=""
+  local latest_age=0
+  local latest_size=0
+
+  if [ ! -d "${dir}" ]; then
+    status="critical"
+    message="Backup directory does not exist: ${dir}"
+    ALERTS+=("${message}")
+    STATUS_LINES+=("${name}|${status}|${message}|0|0")
+    return
+  fi
+
+  # Find the most recent matching file
+  latest_file="$(find "${dir}" -maxdepth 1 -type f -name "${pattern}" -printf '%T@ %p\n' 2>/dev/null \
+    | sort -rn \
+    | head -1 \
+    | cut -d' ' -f2-)"
+
+  if [ -z "${latest_file}" ]; then
+    status="critical"
+    message="No backups found matching '${pattern}' in ${dir}"
+    ALERTS+=("${message}")
+    STATUS_LINES+=("${name}|${status}|${message}|0|0")
+    return
+  fi
+
+  # Check age
+  local file_mtime
+  file_mtime="$(stat -c%Y "${latest_file}")"
+  latest_age=$(( NOW - file_mtime ))
+  local age_hours=$(( latest_age / 3600 ))
+
+  if [ "${latest_age}" -gt "${MAX_AGE_SECONDS}" ]; then
+    status="critical"
+    message="Backup is ${age_hours}h old (max: ${MAX_AGE_HOURS}h): $(basename "${latest_file}")"
+    ALERTS+=("${message}")
+  fi
+
+  # Check size
+  latest_size="$(stat -c%s "${latest_file}")"
+
+  if [ "${latest_size}" -lt "${MIN_SIZE_BYTES}" ]; then
+    status="critical"
+    message="Backup too small (${latest_size} bytes, min: ${MIN_SIZE_BYTES}): $(basename "${latest_file}")"
+    ALERTS+=("${message}")
+  fi
+
+  # Check for size anomalies (compare to previous backup)
+  local prev_file
+  prev_file="$(find "${dir}" -maxdepth 1 -type f -name "${pattern}" -printf '%T@ %p\n' 2>/dev/null \
+    | sort -rn \
+    | sed -n '2p' \
+    | cut -d' ' -f2-)"
+
+  if [ -n "${prev_file}" ]; then
+    local prev_size
+    prev_size="$(stat -c%s "${prev_file}")"
+    if [ "${prev_size}" -gt 0 ]; then
+      # Alert if size dropped by more than 90%
+      local threshold=$(( prev_size / 10 ))
+      if [ "${latest_size}" -lt "${threshold}" ]; then
+        local drop_pct=$(( 100 - (latest_size * 100 / prev_size) ))
+        if [ "${status}" != "critical" ]; then
+          status="warning"
+        fi
+        local size_msg="Backup size dropped ${drop_pct}% (${prev_size} -> ${latest_size}): $(basename "${latest_file}")"
+        ALERTS+=("${size_msg}")
+      fi
+    fi
+  fi
+
+  if [ -z "${message}" ]; then
+    message="OK (${age_hours}h old, ${latest_size} bytes): $(basename "${latest_file}")"
+  fi
+
+  STATUS_LINES+=("${name}|${status}|${message}|${latest_size}|${age_hours}")
+}
+
+# Check each backup directory
+{% for dir_entry in backup_monitor_dirs %}
+check_dir "{{ dir_entry.name }}" "{{ dir_entry.path }}" "{{ dir_entry.pattern }}"
+{% endfor %}
+
+# Verify manifest integrity
+MANIFEST="{{ backup_base_dir }}/manifest.log"
+if [ -f "${MANIFEST}" ]; then
+  MANIFEST_LINES="$(wc -l < "${MANIFEST}")"
+  STATUS_LINES+=("manifest|ok|${MANIFEST_LINES} entries|0|0")
+else
+  STATUS_LINES+=("manifest|warning|No manifest file found|0|0")
+fi
+
+# Determine overall exit code
+for line in "${STATUS_LINES[@]}"; do
+  local_status="$(echo "${line}" | cut -d'|' -f2)"
+  case "${local_status}" in
+    critical) EXIT_CODE=2 ;;
+    warning) [ "${EXIT_CODE}" -lt 1 ] && EXIT_CODE=1 ;;
+  esac
+done
+
+# Output
+if [ "${JSON_OUTPUT}" = true ]; then
+  echo "{"
+  echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+  echo "  \"status\": \"$([ ${EXIT_CODE} -eq 0 ] && echo ok || ([ ${EXIT_CODE} -eq 1 ] && echo warning || echo critical))\","
+  echo "  \"checks\": ["
+  first=true
+  for line in "${STATUS_LINES[@]}"; do
+    name="$(echo "${line}" | cut -d'|' -f1)"
+    status="$(echo "${line}" | cut -d'|' -f2)"
+    message="$(echo "${line}" | cut -d'|' -f3)"
+    size="$(echo "${line}" | cut -d'|' -f4)"
+    age="$(echo "${line}" | cut -d'|' -f5)"
+    [ "${first}" = true ] || echo ","
+    echo "    {\"name\": \"${name}\", \"status\": \"${status}\", \"message\": \"${message}\", \"size_bytes\": ${size}, \"age_hours\": ${age}}"
+    first=false
+  done
+  echo ""
+  echo "  ]"
+  echo "}"
+elif [ "${QUIET}" = false ]; then
+  echo "=== Llamenos Backup Health Check ==="
+  echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo ""
+  for line in "${STATUS_LINES[@]}"; do
+    name="$(echo "${line}" | cut -d'|' -f1)"
+    status="$(echo "${line}" | cut -d'|' -f2)"
+    message="$(echo "${line}" | cut -d'|' -f3)"
+    icon="[OK]"
+    [ "${status}" = "warning" ] && icon="[WARN]"
+    [ "${status}" = "critical" ] && icon="[CRIT]"
+    printf "  %-10s %s %s\n" "${name}" "${icon}" "${message}"
+  done
+  echo ""
+  if [ ${EXIT_CODE} -eq 0 ]; then
+    echo "Overall: ALL BACKUPS HEALTHY"
+  else
+    echo "Overall: ISSUES DETECTED (exit code: ${EXIT_CODE})"
+  fi
+fi
+
+# Send webhook alert if there are problems
+if [ ${EXIT_CODE} -gt 0 ] && [ -n "${WEBHOOK_URL}" ]; then
+  ALERT_TEXT="Llamenos Backup Alert ($(hostname))\n"
+  for alert in "${ALERTS[@]}"; do
+    ALERT_TEXT="${ALERT_TEXT}\n- ${alert}"
+  done
+
+  case "${WEBHOOK_TYPE}" in
+    slack)
+      curl -sf -X POST "${WEBHOOK_URL}" \
+        -H 'Content-Type: application/json' \
+        -d "{\"text\": \"$(echo -e "${ALERT_TEXT}")\"}" \
+        2>/dev/null || true
+      ;;
+    discord)
+      curl -sf -X POST "${WEBHOOK_URL}" \
+        -H 'Content-Type: application/json' \
+        -d "{\"content\": \"$(echo -e "${ALERT_TEXT}")\"}" \
+        2>/dev/null || true
+      ;;
+    *)
+      # Generic webhook: POST JSON with alert details
+      curl -sf -X POST "${WEBHOOK_URL}" \
+        -H 'Content-Type: application/json' \
+        -d "{\"hostname\": \"$(hostname)\", \"status\": \"$([ ${EXIT_CODE} -eq 1 ] && echo warning || echo critical)\", \"alerts\": [$(printf '\"%s\",' "${ALERTS[@]}" | sed 's/,$//')]}" \
+        2>/dev/null || true
+      ;;
+  esac
+fi
+
+exit ${EXIT_CODE}

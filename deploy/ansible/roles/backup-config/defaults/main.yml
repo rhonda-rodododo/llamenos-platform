@@ -1,0 +1,28 @@
+---
+# Configuration backup defaults
+
+backup_base_dir: "{{ app_dir }}/backups"
+backup_config_dir: "{{ backup_base_dir }}/config"
+
+# Paths to back up
+backup_config_paths:
+  - "{{ app_dir }}/docker-compose.yml"
+  - "{{ app_dir }}/.env"
+  - "{{ app_dir }}/Caddyfile"
+
+# Optional extra paths (TLS certs, ansible inventory, etc.)
+backup_config_extra_paths: []
+
+# Ansible inventory/vars on the control node (backed up locally, not on remote)
+backup_config_ansible_dir: ""           # e.g., "/path/to/deploy/ansible"
+
+# Retention policy
+backup_config_retain_daily: 14
+backup_config_retain_weekly: 8
+backup_config_retain_monthly: 6
+
+# Encryption
+backup_age_public_key: ""
+
+# Remote storage via rclone
+backup_rclone_remote: ""

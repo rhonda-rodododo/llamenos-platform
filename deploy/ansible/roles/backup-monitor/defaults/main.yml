@@ -1,0 +1,33 @@
+---
+# Backup monitoring defaults
+
+backup_base_dir: "{{ app_dir }}/backups"
+
+# Maximum age (in hours) before a backup is considered stale
+backup_monitor_max_age_hours: 26        # slightly more than 24h to allow for drift
+
+# Minimum expected backup size in bytes (alerts if smaller)
+backup_monitor_min_size_bytes: 1024     # 1 KB — catches empty/corrupt backups
+
+# Webhook alerting
+backup_monitor_webhook_url: ""          # Slack/Discord/generic webhook URL
+backup_monitor_webhook_type: generic    # slack, discord, or generic
+
+# Backup directories to monitor
+backup_monitor_dirs:
+  - name: postgres
+    path: "{{ backup_base_dir }}/postgres/daily"
+    pattern: "llamenos-postgres-*.dump*"
+  - name: strfry
+    path: "{{ backup_base_dir }}/strfry/daily"
+    pattern: "llamenos-strfry-*.jsonl*"
+  - name: minio
+    path: "{{ backup_base_dir }}/minio/daily"
+    pattern: "llamenos-minio-*.tar*"
+  - name: config
+    path: "{{ backup_base_dir }}/config/daily"
+    pattern: "llamenos-config-*.tar*"
+
+# Cron schedule for monitoring checks
+backup_monitor_cron_hour: "7"
+backup_monitor_cron_minute: "0"

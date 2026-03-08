@@ -1,0 +1,77 @@
+---
+# Backup Status Playbook
+#
+# Quick health check of all backup services. Does NOT run any backups,
+# just checks freshness, size, and integrity of existing backups.
+#
+# Usage:
+#   ansible-playbook playbooks/backup-status.yml --ask-vault-pass
+#   ansible-playbook playbooks/backup-status.yml --ask-vault-pass -e output_json=true
+
+- name: Check backup status
+  hosts: all
+  become: true
+  become_user: "{{ deploy_user }}"
+  vars_files:
+    - ../vars.yml
+
+  vars:
+    output_json: false
+
+  tasks:
+    - name: Check if monitor script exists
+      ansible.builtin.stat:
+        path: "{{ app_dir }}/scripts/backup-monitor.sh"
+      register: monitor_script
+
+    - name: Run backup health check (human-readable)
+      ansible.builtin.command: "{{ app_dir }}/scripts/backup-monitor.sh"
+      register: health_check
+      changed_when: false
+      failed_when: false
+      when: monitor_script.stat.exists and not output_json
+
+    - name: Run backup health check (JSON)
+      ansible.builtin.command: "{{ app_dir }}/scripts/backup-monitor.sh --json"
+      register: health_check_json
+      changed_when: false
+      failed_when: false
+      when: monitor_script.stat.exists and output_json
+
+    - name: Display health check
+      ansible.builtin.debug:
+        msg: "{{ (health_check_json if output_json else health_check).stdout_lines | default(['Monitor script not found — run backup.yml first']) }}"
+      when: monitor_script.stat.exists
+
+    - name: List recent manifests
+      ansible.builtin.find:
+        paths: "{{ app_dir }}/backups"
+        patterns: "manifest-*.txt"
+        file_type: file
+      register: manifests
+
+    - name: Display latest manifest
+      ansible.builtin.command: "cat {{ (manifests.files | sort(attribute='mtime') | last).path }}"
+      register: latest_manifest
+      changed_when: false
+      when: manifests.matched > 0
+
+    - name: Show latest manifest
+      ansible.builtin.debug:
+        msg: "{{ latest_manifest.stdout_lines }}"
+      when: latest_manifest is defined and latest_manifest.stdout is defined
+
+    - name: Show disk usage for backups
+      ansible.builtin.command: "du -sh {{ app_dir }}/backups/*"
+      register: disk_usage
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display disk usage
+      ansible.builtin.debug:
+        msg: "{{ disk_usage.stdout_lines | default(['No backup directories found']) }}"
+
+    - name: Monitor script not found
+      ansible.builtin.debug:
+        msg: "Backup monitor not deployed yet. Run: just backup"
+      when: not monitor_script.stat.exists

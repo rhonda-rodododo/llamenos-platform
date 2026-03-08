@@ -1,228 +1,42 @@
 ---
-# Backup role
+# Legacy backup role — DEPRECATED
 #
-# Sets up automated encrypted backups:
-# - Installs age (modern encryption) and rclone (cloud sync)
-# - Creates a backup script that:
-#   1. Dumps PostgreSQL database
-#   2. Compresses with gzip
-#   3. Encrypts with age using the operator's public key
-#   4. Uploads to remote storage via rclone (if configured)
-#   5. Enforces retention policy (7 daily, 4 weekly, 3 monthly)
-# - Configures a daily cron job
+# This role has been superseded by per-service backup roles:
+#   - backup-postgres  (PostgreSQL pg_dump)
+#   - backup-strfry    (Nostr relay event export)
+#   - backup-minio     (MinIO object mirror)
+#   - backup-config    (deployment configuration)
+#   - backup-monitor   (health checks + alerting)
+#
+# Use the backup orchestration playbook instead:
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass
+#
+# This role now delegates to the new per-service roles for backward
+# compatibility. It will be removed in a future release.
 
-- name: Install age encryption tool
-  ansible.builtin.apt:
-    name: age
-    state: present
+- name: "[DEPRECATED] Legacy backup role — delegating to per-service roles"
+  ansible.builtin.debug:
+    msg: >
+      The 'backup' role is deprecated. Use playbooks/backup.yml with
+      per-service roles (backup-postgres, backup-strfry, backup-minio,
+      backup-config, backup-monitor) instead.
 
-- name: Install MinIO client (mc)
-  ansible.builtin.shell: |
-    if command -v mc &>/dev/null; then
-      echo "already installed"
-    else
-      curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
-      chmod +x /usr/local/bin/mc
-      echo "installed"
-    fi
-  register: mc_install
-  changed_when: "'installed' in mc_install.stdout"
+- name: Include PostgreSQL backup role
+  ansible.builtin.include_role:
+    name: backup-postgres
 
-- name: Install rclone
-  ansible.builtin.shell: |
-    if command -v rclone &>/dev/null; then
-      echo "already installed"
-    else
-      curl -fsSL https://rclone.org/install.sh | bash
-      echo "installed"
-    fi
-  register: rclone_install
-  changed_when: "'installed' in rclone_install.stdout"
+- name: Include strfry backup role
+  ansible.builtin.include_role:
+    name: backup-strfry
 
-- name: Create backup directories
-  ansible.builtin.file:
-    path: "{{ app_dir }}/backups/{{ item }}"
-    state: directory
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_group }}"
-    mode: "0700"
-  loop:
-    - daily
-    - weekly
-    - monthly
+- name: Include MinIO backup role
+  ansible.builtin.include_role:
+    name: backup-minio
 
-- name: Create backup script
-  ansible.builtin.copy:
-    dest: "{{ app_dir }}/scripts/backup.sh"
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_group }}"
-    mode: "0750"
-    content: |
-      #!/usr/bin/env bash
-      #
-      # Llamenos Backup Script — managed by Ansible
-      #
-      # Performs an encrypted backup of the PostgreSQL database.
-      # Enforces retention: {{ backup_retain_daily }} daily, {{ backup_retain_weekly }} weekly, {{ backup_retain_monthly }} monthly.
-      #
-      # Usage:
-      #   ./backup.sh              # Run a daily backup
-      #   ./backup.sh --manual     # Run and tag as manual backup
+- name: Include config backup role
+  ansible.builtin.include_role:
+    name: backup-config
 
-      set -euo pipefail
-
-      BACKUP_DIR="{{ app_dir }}/backups"
-      COMPOSE_FILE="{{ app_dir }}/docker-compose.yml"
-      AGE_RECIPIENT="{{ backup_age_public_key }}"
-      RCLONE_REMOTE="{{ backup_rclone_remote }}"
-      TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
-      DAY_OF_WEEK="$(date -u +%u)"
-      DAY_OF_MONTH="$(date -u +%d)"
-
-      # Determine backup type
-      BACKUP_TYPE="daily"
-      if [ "${1:-}" = "--manual" ]; then
-        BACKUP_TYPE="manual"
-      fi
-
-      FILENAME="llamenos-${TIMESTAMP}.sql.gz.age"
-
-      log() {
-        echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
-      }
-
-      log "Starting ${BACKUP_TYPE} backup..."
-
-      # Create temp directory for intermediate files
-      TMPDIR="$(mktemp -d)"
-      trap 'rm -rf "${TMPDIR}"' EXIT
-
-      # Step 1: Dump PostgreSQL
-      log "Dumping PostgreSQL database..."
-      docker compose -f "${COMPOSE_FILE}" exec -T postgres \
-        pg_dump -U llamenos -d llamenos --no-owner --no-privileges \
-        | gzip -9 \
-        > "${TMPDIR}/dump.sql.gz"
-
-      DUMP_SIZE="$(stat -c%s "${TMPDIR}/dump.sql.gz")"
-      log "Database dump: ${DUMP_SIZE} bytes (compressed)"
-
-      # Step 1b: Mirror MinIO bucket
-      if command -v mc &>/dev/null; then
-        log "Backing up MinIO bucket..."
-        mc alias set llamenos "http://localhost:9000" "${MINIO_ROOT_USER:-}" "${MINIO_ROOT_PASSWORD:-}" --api S3v4 2>/dev/null || true
-        if mc ls llamenos/{{ minio_bucket | default('llamenos-files') }} &>/dev/null; then
-          mc mirror --overwrite llamenos/{{ minio_bucket | default('llamenos-files') }} "${TMPDIR}/minio-files/" 2>/dev/null
-          tar -czf "${TMPDIR}/minio-files.tar.gz" -C "${TMPDIR}" minio-files/
-          MINIO_SIZE="$(stat -c%s "${TMPDIR}/minio-files.tar.gz")"
-          log "MinIO backup: ${MINIO_SIZE} bytes (compressed)"
-        else
-          log "MinIO bucket not found or empty, skipping"
-        fi
-      else
-        log "mc (MinIO client) not installed, skipping MinIO backup"
-      fi
-
-      # Step 2: Encrypt with age
-      if [ -n "${AGE_RECIPIENT}" ]; then
-        log "Encrypting backup with age..."
-        age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}" "${TMPDIR}/dump.sql.gz"
-      else
-        log "WARNING: No age public key configured. Backup is NOT encrypted."
-        FILENAME="llamenos-${TIMESTAMP}.sql.gz"
-        mv "${TMPDIR}/dump.sql.gz" "${TMPDIR}/${FILENAME}"
-      fi
-
-      # Step 3: Store in daily directory
-      cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/daily/${FILENAME}"
-      log "Saved to ${BACKUP_DIR}/daily/${FILENAME}"
-
-      # Step 4: Copy to weekly (on Sundays) and monthly (on 1st)
-      if [ "${DAY_OF_WEEK}" = "7" ]; then
-        cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/weekly/${FILENAME}"
-        log "Weekly backup saved"
-      fi
-
-      if [ "${DAY_OF_MONTH}" = "01" ]; then
-        cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/monthly/${FILENAME}"
-        log "Monthly backup saved"
-      fi
-
-      # Step 5: Upload to remote storage via rclone
-      if [ -n "${RCLONE_REMOTE}" ]; then
-        log "Uploading to remote storage: ${RCLONE_REMOTE}"
-        rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/daily/" --progress
-        if [ "${DAY_OF_WEEK}" = "7" ]; then
-          rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/weekly/" --progress
-        fi
-        if [ "${DAY_OF_MONTH}" = "01" ]; then
-          rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/monthly/" --progress
-        fi
-        log "Remote upload complete"
-      fi
-
-      # Step 6: Enforce retention policy
-      log "Enforcing retention policy..."
-
-      # Keep N most recent files in a directory
-      enforce_retention() {
-        local dir="$1"
-        local keep="$2"
-        local count
-        count="$(find "${dir}" -maxdepth 1 -type f -name 'llamenos-*' | wc -l)"
-        if [ "${count}" -gt "${keep}" ]; then
-          local to_delete=$(( count - keep ))
-          find "${dir}" -maxdepth 1 -type f -name 'llamenos-*' -printf '%T@ %p\n' \
-            | sort -n \
-            | head -n "${to_delete}" \
-            | cut -d' ' -f2- \
-            | xargs rm -f
-          log "Removed ${to_delete} old backups from ${dir}"
-        fi
-      }
-
-      enforce_retention "${BACKUP_DIR}/daily" {{ backup_retain_daily }}
-      enforce_retention "${BACKUP_DIR}/weekly" {{ backup_retain_weekly }}
-      enforce_retention "${BACKUP_DIR}/monthly" {{ backup_retain_monthly }}
-
-      # Also enforce retention on remote
-      if [ -n "${RCLONE_REMOTE}" ]; then
-        rclone delete "${RCLONE_REMOTE}/daily/" --min-age "{{ backup_retain_daily }}d" 2>/dev/null || true
-        rclone delete "${RCLONE_REMOTE}/weekly/" --min-age "{{ backup_retain_weekly * 7 }}d" 2>/dev/null || true
-        rclone delete "${RCLONE_REMOTE}/monthly/" --min-age "{{ backup_retain_monthly * 30 }}d" 2>/dev/null || true
-      fi
-
-      log "Backup complete: ${FILENAME}"
-
-- name: Run initial backup
-  ansible.builtin.command: "{{ app_dir }}/scripts/backup.sh"
-  become_user: "{{ deploy_user }}"
-  register: initial_backup
-  changed_when: "'Backup complete' in initial_backup.stdout"
-  ignore_errors: true
-
-- name: Configure daily backup cron job
-  ansible.builtin.cron:
-    name: "Llamenos daily backup"
-    user: "{{ deploy_user }}"
-    hour: "{{ backup_cron_hour }}"
-    minute: "{{ backup_cron_minute }}"
-    job: "{{ app_dir }}/scripts/backup.sh >> {{ app_dir }}/backups/backup.log 2>&1"
-    state: "{{ 'present' if backup_enabled else 'absent' }}"
-
-- name: Configure backup log rotation
-  ansible.builtin.copy:
-    dest: /etc/logrotate.d/llamenos-backup
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      {{ app_dir }}/backups/backup.log {
-          weekly
-          rotate 4
-          compress
-          delaycompress
-          missingok
-          notifempty
-          create 0640 {{ deploy_user }} {{ deploy_group }}
-      }
+- name: Include backup monitor role
+  ansible.builtin.include_role:
+    name: backup-monitor

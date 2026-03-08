@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+#
+# Llamenos Configuration Backup Script — managed by Ansible
+#
+# Archives deployment configuration files (docker-compose.yml, .env,
+# Caddyfile, TLS certs, etc.) into a compressed, optionally encrypted tarball.
+#
+# Usage:
+#   ./backup-config.sh              # Run a daily backup
+#   ./backup-config.sh --manual     # Run and tag as manual backup
+#   ./backup-config.sh --manifest   # Output manifest entry to stdout
+
+set -euo pipefail
+
+BACKUP_DIR="{{ backup_config_dir }}"
+AGE_RECIPIENT="{{ backup_age_public_key }}"
+RCLONE_REMOTE="{{ backup_rclone_remote }}"
+TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+DAY_OF_WEEK="$(date -u +%u)"
+DAY_OF_MONTH="$(date -u +%d)"
+MANIFEST_MODE=false
+
+BACKUP_TYPE="daily"
+for arg in "$@"; do
+  case "$arg" in
+    --manual) BACKUP_TYPE="manual" ;;
+    --manifest) MANIFEST_MODE=true ;;
+  esac
+done
+
+log() {
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [config] $*"
+}
+
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR}"' EXIT
+
+STAGING="${TMPDIR}/config"
+mkdir -p "${STAGING}"
+
+log "Starting ${BACKUP_TYPE} config backup..."
+
+# Step 1: Collect configuration files
+CONFIG_PATHS=(
+{% for path in backup_config_paths %}
+  "{{ path }}"
+{% endfor %}
+{% for path in backup_config_extra_paths %}
+  "{{ path }}"
+{% endfor %}
+)
+
+FILE_COUNT=0
+for src in "${CONFIG_PATHS[@]}"; do
+  if [ -e "${src}" ]; then
+    # Preserve directory structure relative to /
+    dest_dir="${STAGING}$(dirname "${src}")"
+    mkdir -p "${dest_dir}"
+    cp -a "${src}" "${dest_dir}/"
+    FILE_COUNT=$((FILE_COUNT + 1))
+    log "  Collected: ${src}"
+  else
+    log "  SKIP (not found): ${src}"
+  fi
+done
+
+log "Collected ${FILE_COUNT} files"
+
+# Step 2: Include installed package list and Docker image versions
+docker images --format '{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }} {{ '{{' }}.ID{{ '}}' }}' > "${STAGING}/docker-images.txt" 2>/dev/null || true
+dpkg --get-selections > "${STAGING}/dpkg-selections.txt" 2>/dev/null || true
+systemctl list-unit-files --state=enabled > "${STAGING}/systemd-enabled.txt" 2>/dev/null || true
+
+# Step 3: Tar and compress
+TAR_FILE="${TMPDIR}/llamenos-config-${TIMESTAMP}.tar.gz"
+tar -czf "${TAR_FILE}" -C "${STAGING}" .
+
+DUMP_SIZE="$(stat -c%s "${TAR_FILE}")"
+log "Config archive: ${DUMP_SIZE} bytes"
+
+# Step 4: Compute checksum
+DUMP_SHA256="$(sha256sum "${TAR_FILE}" | cut -d' ' -f1)"
+
+# Step 5: Encrypt with age (if configured)
+if [ -n "${AGE_RECIPIENT}" ]; then
+  FILENAME="llamenos-config-${TIMESTAMP}.tar.gz.age"
+  log "Encrypting backup with age..."
+  age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}" "${TAR_FILE}"
+  rm -f "${TAR_FILE}"
+else
+  FILENAME="llamenos-config-${TIMESTAMP}.tar.gz"
+  mv "${TAR_FILE}" "${TMPDIR}/${FILENAME}"
+  log "WARNING: No age public key configured. Backup is NOT encrypted."
+fi
+
+FINAL_SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}")"
+
+# Step 6: Store in daily directory
+cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/daily/${FILENAME}"
+log "Saved to ${BACKUP_DIR}/daily/${FILENAME}"
+
+# Step 7: Copy to weekly (Sundays) and monthly (1st)
+if [ "${DAY_OF_WEEK}" = "7" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/weekly/${FILENAME}"
+  log "Weekly backup saved"
+fi
+
+if [ "${DAY_OF_MONTH}" = "01" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/monthly/${FILENAME}"
+  log "Monthly backup saved"
+fi
+
+# Step 8: Upload to remote storage via rclone
+if [ -n "${RCLONE_REMOTE}" ]; then
+  log "Uploading to remote storage: ${RCLONE_REMOTE}"
+  rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/daily/" --no-traverse
+  if [ "${DAY_OF_WEEK}" = "7" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/weekly/" --no-traverse
+  fi
+  if [ "${DAY_OF_MONTH}" = "01" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/monthly/" --no-traverse
+  fi
+  log "Remote upload complete"
+fi
+
+# Step 9: Enforce retention
+enforce_retention() {
+  local dir="$1"
+  local keep="$2"
+  local pattern="$3"
+  local count
+  count="$(find "${dir}" -maxdepth 1 -type f -name "${pattern}" | wc -l)"
+  if [ "${count}" -gt "${keep}" ]; then
+    local to_delete=$(( count - keep ))
+    find "${dir}" -maxdepth 1 -type f -name "${pattern}" -printf '%T@ %p\n' \
+      | sort -n \
+      | head -n "${to_delete}" \
+      | cut -d' ' -f2- \
+      | xargs rm -f
+    log "Removed ${to_delete} old backups from ${dir}"
+  fi
+}
+
+enforce_retention "${BACKUP_DIR}/daily" {{ backup_config_retain_daily }} 'llamenos-config-*'
+enforce_retention "${BACKUP_DIR}/weekly" {{ backup_config_retain_weekly }} 'llamenos-config-*'
+enforce_retention "${BACKUP_DIR}/monthly" {{ backup_config_retain_monthly }} 'llamenos-config-*'
+
+# Step 10: Manifest entry
+MANIFEST_ENTRY="config|${TIMESTAMP}|${FILENAME}|${FINAL_SIZE}|${DUMP_SHA256}|${BACKUP_TYPE}|files=${FILE_COUNT}"
+echo "${MANIFEST_ENTRY}" >> "${BACKUP_DIR}/../manifest.log"
+
+if [ "${MANIFEST_MODE}" = true ]; then
+  echo "${MANIFEST_ENTRY}"
+fi
+
+log "Config backup complete: ${FILENAME} (${FINAL_SIZE} bytes, ${FILE_COUNT} files)"

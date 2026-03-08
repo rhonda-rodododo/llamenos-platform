@@ -142,10 +142,8 @@ backup_enabled: true
 # Store the private key somewhere safe (NOT on the server)
 backup_age_public_key: ""
 
-# Backup retention policy
-backup_retain_daily: 7
-backup_retain_weekly: 4
-backup_retain_monthly: 3
+# Path to age private key (for restore operations only — NOT stored on server)
+# backup_age_private_key_path: "/path/to/backup-key.txt"
 
 # Backup schedule (cron format) — default: 3:00 AM UTC daily
 backup_cron_hour: "3"
@@ -155,6 +153,41 @@ backup_cron_minute: "0"
 # Configure rclone on the server first: rclone config
 # Examples: "s3:llamenos-backups", "b2:llamenos-backups"
 backup_rclone_remote: ""
+
+# ─── Per-Service Backup Retention ──────────────────────────────
+# Override per-service if needed; defaults are sensible for most deployments
+
+# PostgreSQL (pg_dump custom format, compressed)
+backup_postgres_retain_daily: 7
+backup_postgres_retain_weekly: 4
+backup_postgres_retain_monthly: 3
+# backup_postgres_exclude_tables: []    # Tables to skip (e.g., sessions)
+# backup_postgres_wal_enabled: false    # Enable WAL archiving for PITR
+
+# strfry (Nostr relay event export as JSONL)
+backup_strfry_retain_daily: 7
+backup_strfry_retain_weekly: 4
+backup_strfry_retain_monthly: 3
+
+# MinIO (object store mirror)
+backup_minio_retain_daily: 7
+backup_minio_retain_weekly: 4
+backup_minio_retain_monthly: 3
+
+# Config (docker-compose.yml, .env, Caddyfile, etc.)
+backup_config_retain_daily: 14
+backup_config_retain_weekly: 8
+backup_config_retain_monthly: 6
+# Additional paths to back up (e.g., TLS certs, custom scripts)
+backup_config_extra_paths: []
+
+# ─── Backup Monitoring ────────────────────────────────────────
+# Maximum hours before a backup is considered stale
+backup_monitor_max_age_hours: 26
+
+# Webhook for alert notifications (leave empty to disable)
+# backup_monitor_webhook_url: "https://hooks.slack.com/services/..."
+# backup_monitor_webhook_type: slack   # slack, discord, or generic
 
 # ─── Docker Hardening ───────────────────────────────────────────
 # Enable user namespace remapping for Docker container isolation

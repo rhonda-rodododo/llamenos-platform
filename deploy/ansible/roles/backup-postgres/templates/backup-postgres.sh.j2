@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+#
+# Llamenos PostgreSQL Backup Script — managed by Ansible
+#
+# Performs a compressed, optionally encrypted backup of the PostgreSQL database.
+# Supports pg_dump custom format with parallel jobs, retention policies,
+# and optional off-site upload via rclone.
+#
+# Usage:
+#   ./backup-postgres.sh              # Run a daily backup
+#   ./backup-postgres.sh --manual     # Run and tag as manual backup
+#   ./backup-postgres.sh --manifest   # Output manifest entry to stdout
+
+set -euo pipefail
+
+BACKUP_DIR="{{ backup_postgres_dir }}"
+COMPOSE_FILE="{{ backup_compose_file }}"
+AGE_RECIPIENT="{{ backup_age_public_key }}"
+RCLONE_REMOTE="{{ backup_rclone_remote }}"
+TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+DAY_OF_WEEK="$(date -u +%u)"
+DAY_OF_MONTH="$(date -u +%d)"
+MANIFEST_MODE=false
+
+# Parse arguments
+BACKUP_TYPE="daily"
+for arg in "$@"; do
+  case "$arg" in
+    --manual) BACKUP_TYPE="manual" ;;
+    --manifest) MANIFEST_MODE=true ;;
+  esac
+done
+
+log() {
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [postgres] $*"
+}
+
+# Create temp directory for intermediate files
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR}"' EXIT
+
+log "Starting ${BACKUP_TYPE} PostgreSQL backup..."
+
+# Step 1: Dump PostgreSQL using custom format (compressed, restorable)
+DUMP_FILE="${TMPDIR}/llamenos-postgres-${TIMESTAMP}.dump"
+
+docker compose -f "${COMPOSE_FILE}" exec -T postgres \
+  pg_dump \
+    -U {{ backup_postgres_user }} \
+    -d {{ backup_postgres_db }} \
+    --no-owner \
+    --no-privileges \
+    --format={{ backup_postgres_format }} \
+{% if backup_postgres_format == 'custom' %}
+    --compress={{ backup_postgres_compress }} \
+{% endif %}
+{% for table in backup_postgres_exclude_tables %}
+    --exclude-table='{{ table }}' \
+{% endfor %}
+  > "${DUMP_FILE}"
+
+DUMP_SIZE="$(stat -c%s "${DUMP_FILE}")"
+log "Database dump: ${DUMP_SIZE} bytes"
+
+# Step 2: Compute checksum before encryption
+DUMP_SHA256="$(sha256sum "${DUMP_FILE}" | cut -d' ' -f1)"
+log "Dump SHA-256: ${DUMP_SHA256}"
+
+# Step 3: Encrypt with age (if configured)
+if [ -n "${AGE_RECIPIENT}" ]; then
+  FILENAME="llamenos-postgres-${TIMESTAMP}.dump.age"
+  log "Encrypting backup with age..."
+  age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}" "${DUMP_FILE}"
+  rm -f "${DUMP_FILE}"
+else
+  FILENAME="llamenos-postgres-${TIMESTAMP}.dump"
+  log "WARNING: No age public key configured. Backup is NOT encrypted."
+fi
+
+FINAL_SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}")"
+
+# Step 4: Store in daily directory
+cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/daily/${FILENAME}"
+log "Saved to ${BACKUP_DIR}/daily/${FILENAME}"
+
+# Step 5: Copy to weekly (Sundays) and monthly (1st)
+if [ "${DAY_OF_WEEK}" = "7" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/weekly/${FILENAME}"
+  log "Weekly backup saved"
+fi
+
+if [ "${DAY_OF_MONTH}" = "01" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/monthly/${FILENAME}"
+  log "Monthly backup saved"
+fi
+
+# Step 6: Upload to remote storage via rclone
+if [ -n "${RCLONE_REMOTE}" ]; then
+  log "Uploading to remote storage: ${RCLONE_REMOTE}"
+  rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/daily/" --no-traverse
+  if [ "${DAY_OF_WEEK}" = "7" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/weekly/" --no-traverse
+  fi
+  if [ "${DAY_OF_MONTH}" = "01" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/monthly/" --no-traverse
+  fi
+  log "Remote upload complete"
+fi
+
+# Step 7: Enforce retention policy
+enforce_retention() {
+  local dir="$1"
+  local keep="$2"
+  local pattern="$3"
+  local count
+  count="$(find "${dir}" -maxdepth 1 -type f -name "${pattern}" | wc -l)"
+  if [ "${count}" -gt "${keep}" ]; then
+    local to_delete=$(( count - keep ))
+    find "${dir}" -maxdepth 1 -type f -name "${pattern}" -printf '%T@ %p\n' \
+      | sort -n \
+      | head -n "${to_delete}" \
+      | cut -d' ' -f2- \
+      | xargs rm -f
+    log "Removed ${to_delete} old backups from ${dir}"
+  fi
+}
+
+enforce_retention "${BACKUP_DIR}/daily" {{ backup_postgres_retain_daily }} 'llamenos-postgres-*'
+enforce_retention "${BACKUP_DIR}/weekly" {{ backup_postgres_retain_weekly }} 'llamenos-postgres-*'
+enforce_retention "${BACKUP_DIR}/monthly" {{ backup_postgres_retain_monthly }} 'llamenos-postgres-*'
+
+# Step 8: Output manifest entry
+MANIFEST_ENTRY="postgres|${TIMESTAMP}|${FILENAME}|${FINAL_SIZE}|${DUMP_SHA256}|${BACKUP_TYPE}"
+echo "${MANIFEST_ENTRY}" >> "${BACKUP_DIR}/../manifest.log"
+
+if [ "${MANIFEST_MODE}" = true ]; then
+  echo "${MANIFEST_ENTRY}"
+fi
+
+log "PostgreSQL backup complete: ${FILENAME} (${FINAL_SIZE} bytes)"

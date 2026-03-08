@@ -1,0 +1,57 @@
+---
+# Backup monitoring role
+#
+# Installs a health check script that monitors:
+# - Backup freshness (age threshold)
+# - Backup size (minimum threshold + anomaly detection)
+# - Manifest integrity
+# - Sends webhook alerts on failure/staleness
+#
+# Also sets up a daily cron job for automated monitoring.
+
+- name: Template backup monitor script
+  ansible.builtin.template:
+    src: backup-monitor.sh.j2
+    dest: "{{ app_dir }}/scripts/backup-monitor.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Run initial health check
+  ansible.builtin.command: "{{ app_dir }}/scripts/backup-monitor.sh"
+  become_user: "{{ deploy_user }}"
+  register: initial_health_check
+  changed_when: false
+  failed_when: initial_health_check.rc > 1
+  ignore_errors: true
+
+- name: Display health check result
+  ansible.builtin.debug:
+    msg: "{{ initial_health_check.stdout_lines | default(['No output']) }}"
+  when: initial_health_check is defined
+
+- name: Configure daily backup health check cron
+  ansible.builtin.cron:
+    name: "Llamenos backup health check"
+    user: "{{ deploy_user }}"
+    hour: "{{ backup_monitor_cron_hour }}"
+    minute: "{{ backup_monitor_cron_minute }}"
+    job: "{{ app_dir }}/scripts/backup-monitor.sh >> {{ backup_base_dir }}/monitor.log 2>&1"
+    state: present
+
+- name: Configure monitor log rotation
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/llamenos-backup-monitor
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {{ backup_base_dir }}/monitor.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ deploy_user }} {{ deploy_group }}
+      }

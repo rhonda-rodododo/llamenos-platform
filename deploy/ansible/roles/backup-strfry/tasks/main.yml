@@ -1,0 +1,46 @@
+---
+# strfry (Nostr relay) backup role
+#
+# Exports Nostr events from strfry as JSONL (one event per line):
+# - Compressed with gzip
+# - Optional age encryption
+# - Retention policy (daily/weekly/monthly)
+# - Optional rclone upload
+# - Manifest logging with SHA-256 checksums and event counts
+
+- name: Install age encryption tool
+  ansible.builtin.apt:
+    name: age
+    state: present
+
+- name: Create strfry backup directories
+  ansible.builtin.file:
+    path: "{{ backup_strfry_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0700"
+  loop:
+    - daily
+    - weekly
+    - monthly
+
+- name: Template strfry backup script
+  ansible.builtin.template:
+    src: backup-strfry.sh.j2
+    dest: "{{ app_dir }}/scripts/backup-strfry.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Run initial strfry backup
+  ansible.builtin.command: "{{ app_dir }}/scripts/backup-strfry.sh --manifest"
+  become_user: "{{ deploy_user }}"
+  register: initial_strfry_backup
+  changed_when: "'Backup complete' in initial_strfry_backup.stdout"
+  ignore_errors: true
+
+- name: Display initial backup result
+  ansible.builtin.debug:
+    msg: "{{ initial_strfry_backup.stdout_lines | default(['No output']) }}"
+  when: initial_strfry_backup is defined

@@ -1,0 +1,23 @@
+---
+# strfry (Nostr relay) backup defaults
+
+backup_base_dir: "{{ app_dir }}/backups"
+backup_strfry_dir: "{{ backup_base_dir }}/strfry"
+
+# strfry exports events as JSONL (one event per line)
+# This is the canonical backup format for Nostr relays
+backup_strfry_container: llamenos-strfry-1
+
+# Retention policy
+backup_strfry_retain_daily: 7
+backup_strfry_retain_weekly: 4
+backup_strfry_retain_monthly: 3
+
+# Encryption
+backup_age_public_key: ""
+
+# Remote storage via rclone
+backup_rclone_remote: ""
+
+# Docker compose file path
+backup_compose_file: "{{ app_dir }}/docker-compose.yml"

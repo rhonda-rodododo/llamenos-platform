@@ -1,0 +1,2 @@
+---
+# No handlers needed — PostgreSQL backup is script-based, no services to restart.

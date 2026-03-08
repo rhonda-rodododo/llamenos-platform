@@ -1,0 +1,55 @@
+---
+# PostgreSQL backup role
+#
+# Installs a pg_dump backup script with:
+# - Custom format (compressed, parallel-restorable)
+# - Optional age encryption
+# - Retention policy (daily/weekly/monthly)
+# - Optional rclone upload to off-site storage
+# - Manifest logging with SHA-256 checksums
+
+- name: Install age encryption tool
+  ansible.builtin.apt:
+    name: age
+    state: present
+
+- name: Create PostgreSQL backup directories
+  ansible.builtin.file:
+    path: "{{ backup_postgres_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0700"
+  loop:
+    - daily
+    - weekly
+    - monthly
+
+- name: Create WAL archive directory
+  ansible.builtin.file:
+    path: "{{ backup_postgres_wal_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0700"
+  when: backup_postgres_wal_enabled
+
+- name: Template PostgreSQL backup script
+  ansible.builtin.template:
+    src: backup-postgres.sh.j2
+    dest: "{{ app_dir }}/scripts/backup-postgres.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Run initial PostgreSQL backup
+  ansible.builtin.command: "{{ app_dir }}/scripts/backup-postgres.sh --manifest"
+  become_user: "{{ deploy_user }}"
+  register: initial_pg_backup
+  changed_when: "'Backup complete' in initial_pg_backup.stdout"
+  ignore_errors: true
+
+- name: Display initial backup result
+  ansible.builtin.debug:
+    msg: "{{ initial_pg_backup.stdout_lines | default(['No output']) }}"
+  when: initial_pg_backup is defined

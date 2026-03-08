@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+#
+# Llamenos strfry (Nostr Relay) Backup Script — managed by Ansible
+#
+# Exports all Nostr events from strfry as JSONL, compresses, and optionally
+# encrypts. strfry's export produces one JSON event per line — the canonical
+# backup format for Nostr relays, allowing event-level restore.
+#
+# Usage:
+#   ./backup-strfry.sh              # Run a daily backup
+#   ./backup-strfry.sh --manual     # Run and tag as manual backup
+#   ./backup-strfry.sh --manifest   # Output manifest entry to stdout
+
+set -euo pipefail
+
+BACKUP_DIR="{{ backup_strfry_dir }}"
+COMPOSE_FILE="{{ backup_compose_file }}"
+AGE_RECIPIENT="{{ backup_age_public_key }}"
+RCLONE_REMOTE="{{ backup_rclone_remote }}"
+TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+DAY_OF_WEEK="$(date -u +%u)"
+DAY_OF_MONTH="$(date -u +%d)"
+MANIFEST_MODE=false
+
+BACKUP_TYPE="daily"
+for arg in "$@"; do
+  case "$arg" in
+    --manual) BACKUP_TYPE="manual" ;;
+    --manifest) MANIFEST_MODE=true ;;
+  esac
+done
+
+log() {
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [strfry] $*"
+}
+
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR}"' EXIT
+
+log "Starting ${BACKUP_TYPE} strfry backup..."
+
+# Step 1: Export all events as JSONL via strfry export
+# strfry export outputs one Nostr event per line to stdout
+EXPORT_FILE="${TMPDIR}/llamenos-strfry-${TIMESTAMP}.jsonl"
+
+docker compose -f "${COMPOSE_FILE}" exec -T strfry \
+  strfry export > "${EXPORT_FILE}" 2>/dev/null || true
+
+EVENT_COUNT="$(wc -l < "${EXPORT_FILE}")"
+log "Exported ${EVENT_COUNT} events"
+
+# Step 2: Compress
+gzip -9 "${EXPORT_FILE}"
+COMPRESSED="${EXPORT_FILE}.gz"
+DUMP_SIZE="$(stat -c%s "${COMPRESSED}")"
+log "Compressed size: ${DUMP_SIZE} bytes"
+
+# Step 3: Compute checksum
+DUMP_SHA256="$(sha256sum "${COMPRESSED}" | cut -d' ' -f1)"
+
+# Step 4: Encrypt with age (if configured)
+if [ -n "${AGE_RECIPIENT}" ]; then
+  FILENAME="llamenos-strfry-${TIMESTAMP}.jsonl.gz.age"
+  log "Encrypting backup with age..."
+  age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}" "${COMPRESSED}"
+  rm -f "${COMPRESSED}"
+else
+  FILENAME="llamenos-strfry-${TIMESTAMP}.jsonl.gz"
+  mv "${COMPRESSED}" "${TMPDIR}/${FILENAME}"
+  log "WARNING: No age public key configured. Backup is NOT encrypted."
+fi
+
+FINAL_SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}")"
+
+# Step 5: Store in daily directory
+cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/daily/${FILENAME}"
+log "Saved to ${BACKUP_DIR}/daily/${FILENAME}"
+
+# Step 6: Copy to weekly (Sundays) and monthly (1st)
+if [ "${DAY_OF_WEEK}" = "7" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/weekly/${FILENAME}"
+  log "Weekly backup saved"
+fi
+
+if [ "${DAY_OF_MONTH}" = "01" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/monthly/${FILENAME}"
+  log "Monthly backup saved"
+fi
+
+# Step 7: Upload to remote storage via rclone
+if [ -n "${RCLONE_REMOTE}" ]; then
+  log "Uploading to remote storage: ${RCLONE_REMOTE}"
+  rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/daily/" --no-traverse
+  if [ "${DAY_OF_WEEK}" = "7" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/weekly/" --no-traverse
+  fi
+  if [ "${DAY_OF_MONTH}" = "01" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/monthly/" --no-traverse
+  fi
+  log "Remote upload complete"
+fi
+
+# Step 8: Enforce retention
+enforce_retention() {
+  local dir="$1"
+  local keep="$2"
+  local pattern="$3"
+  local count
+  count="$(find "${dir}" -maxdepth 1 -type f -name "${pattern}" | wc -l)"
+  if [ "${count}" -gt "${keep}" ]; then
+    local to_delete=$(( count - keep ))
+    find "${dir}" -maxdepth 1 -type f -name "${pattern}" -printf '%T@ %p\n' \
+      | sort -n \
+      | head -n "${to_delete}" \
+      | cut -d' ' -f2- \
+      | xargs rm -f
+    log "Removed ${to_delete} old backups from ${dir}"
+  fi
+}
+
+enforce_retention "${BACKUP_DIR}/daily" {{ backup_strfry_retain_daily }} 'llamenos-strfry-*'
+enforce_retention "${BACKUP_DIR}/weekly" {{ backup_strfry_retain_weekly }} 'llamenos-strfry-*'
+enforce_retention "${BACKUP_DIR}/monthly" {{ backup_strfry_retain_monthly }} 'llamenos-strfry-*'
+
+# Step 9: Manifest entry
+MANIFEST_ENTRY="strfry|${TIMESTAMP}|${FILENAME}|${FINAL_SIZE}|${DUMP_SHA256}|${BACKUP_TYPE}|events=${EVENT_COUNT}"
+echo "${MANIFEST_ENTRY}" >> "${BACKUP_DIR}/../manifest.log"
+
+if [ "${MANIFEST_MODE}" = true ]; then
+  echo "${MANIFEST_ENTRY}"
+fi
+
+log "strfry backup complete: ${FILENAME} (${FINAL_SIZE} bytes, ${EVENT_COUNT} events)"
