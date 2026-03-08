@@ -30,6 +30,7 @@
   loop:
     - backups
     - scripts
+    - logs
 
 - name: Template docker-compose.yml
   ansible.builtin.template:

@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Container Watchdog — managed by Ansible
+#
+# Checks Docker container health status. If a container has been
+# unhealthy for more than THRESHOLD consecutive checks, it gets restarted.
+# Sends an alert on restart and on persistent failure.
+set -euo pipefail
+
+APP_DIR="{{ app_dir }}"
+STATE_DIR="{{ app_dir }}/logs/watchdog-state"
+ALERT_WEBHOOK="{{ llamenos_alert_webhook | default('') }}"
+HOST="{{ inventory_hostname }}"
+MAX_FAILURES={{ llamenos_watchdog_max_failures | default(3) }}
+MAX_RESTARTS={{ llamenos_watchdog_max_restarts | default(5) }}
+LOG_FILE="{{ app_dir }}/logs/watchdog.log"
+
+mkdir -p "${STATE_DIR}"
+
+log() {
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >> "${LOG_FILE}"
+}
+
+send_alert() {
+  local title="$1" message="$2" priority="${3:-default}"
+  if [ -n "${ALERT_WEBHOOK}" ]; then
+    curl -sf -d "${message}" \
+      -H "Title: ${title}" \
+      -H "Priority: ${priority}" \
+      -H "Tags: rotating_light" \
+      "${ALERT_WEBHOOK}" 2>/dev/null || true
+  fi
+}
+
+# Get all containers with health checks in the llamenos project
+CONTAINERS=$(docker ps --filter "label=com.docker.compose.project=llamenos" \
+  --format '{{ '{{' }}.Names{{ '}}' }}:{{ '{{' }}.Status{{ '}}' }}' 2>/dev/null || echo "")
+
+if [ -z "${CONTAINERS}" ]; then
+  log "No llamenos containers found"
+  exit 0
+fi
+
+while IFS=: read -r name status_line; do
+  [ -z "${name}" ] && continue
+
+  # Check if container has a health check configured
+  HEALTH=$(docker inspect --format '{{ '{{' }}if .State.Health{{ '}}' }}{{ '{{' }}.State.Health.Status{{ '}}' }}{{ '{{' }}else{{ '}}' }}none{{ '{{' }}end{{ '}}' }}' "${name}" 2>/dev/null || echo "unknown")
+
+  FAILURE_FILE="${STATE_DIR}/${name}.failures"
+  RESTART_FILE="${STATE_DIR}/${name}.restarts"
+
+  case "${HEALTH}" in
+    healthy|none)
+      # Reset failure counter on healthy or no-healthcheck containers
+      if [ -f "${FAILURE_FILE}" ]; then
+        prev=$(cat "${FAILURE_FILE}")
+        if [ "${prev}" -ge "${MAX_FAILURES}" ]; then
+          log "${name}: recovered (was unhealthy for ${prev} checks)"
+          send_alert "Recovered: ${name} on ${HOST}" "${name} is healthy again after auto-restart"
+        fi
+        rm -f "${FAILURE_FILE}"
+      fi
+      ;;
+    unhealthy)
+      # Increment failure counter
+      failures=1
+      [ -f "${FAILURE_FILE}" ] && failures=$(( $(cat "${FAILURE_FILE}") + 1 ))
+      echo "${failures}" > "${FAILURE_FILE}"
+
+      log "${name}: unhealthy (consecutive: ${failures}/${MAX_FAILURES})"
+
+      if [ "${failures}" -ge "${MAX_FAILURES}" ]; then
+        # Check restart budget
+        restarts=0
+        [ -f "${RESTART_FILE}" ] && restarts=$(cat "${RESTART_FILE}")
+
+        if [ "${restarts}" -ge "${MAX_RESTARTS}" ]; then
+          log "${name}: exceeded restart budget (${restarts}/${MAX_RESTARTS}). Manual intervention required."
+          send_alert "CRITICAL: ${name} on ${HOST}" \
+            "${name} has been restarted ${restarts} times and is still failing. Manual intervention required." \
+            "urgent"
+          continue
+        fi
+
+        log "${name}: restarting (attempt $((restarts + 1))/${MAX_RESTARTS})"
+        send_alert "Restarting: ${name} on ${HOST}" \
+          "${name} unhealthy for ${failures} consecutive checks. Auto-restarting (attempt $((restarts + 1))/${MAX_RESTARTS})." \
+          "high"
+
+        # Find the compose project directory for this container
+        PROJECT_DIR=$(docker inspect --format '{{ '{{' }}index .Config.Labels "com.docker.compose.project.working_dir"{{ '}}' }}' "${name}" 2>/dev/null)
+        SERVICE=$(docker inspect --format '{{ '{{' }}index .Config.Labels "com.docker.compose.service"{{ '}}' }}' "${name}" 2>/dev/null)
+
+        if [ -n "${PROJECT_DIR}" ] && [ -n "${SERVICE}" ]; then
+          docker compose -f "${PROJECT_DIR}/docker-compose.yml" restart "${SERVICE}" 2>&1 | tee -a "${LOG_FILE}"
+          echo "$((restarts + 1))" > "${RESTART_FILE}"
+          rm -f "${FAILURE_FILE}"
+        else
+          log "${name}: could not determine compose project directory"
+        fi
+      fi
+      ;;
+    *)
+      log "${name}: unknown health status: ${HEALTH}"
+      ;;
+  esac
+done <<< "${CONTAINERS}"
+
+# Reset daily restart budget at midnight
+HOUR=$(date -u +%H)
+if [ "${HOUR}" = "00" ]; then
+  find "${STATE_DIR}" -name '*.restarts' -delete
+  log "Daily restart budget reset"
+fi

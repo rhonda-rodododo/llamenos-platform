@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# PostgreSQL VACUUM ANALYZE — managed by Ansible
+# Weekly full vacuum to reclaim space after bulk deletes.
+set -euo pipefail
+
+APP_DIR="{{ app_dir }}"
+
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [vacuum] $*"; }
+
+# Check if postgres container is running
+if ! docker compose -f "${APP_DIR}/docker-compose.yml" ps --status running postgres 2>/dev/null | grep -q postgres; then
+  log "PostgreSQL container not running, skipping vacuum"
+  exit 0
+fi
+
+log "Starting VACUUM ANALYZE..."
+
+# Run VACUUM ANALYZE (not VACUUM FULL — that locks tables)
+docker compose -f "${APP_DIR}/docker-compose.yml" exec -T postgres \
+  psql -U llamenos -d llamenos -c "VACUUM ANALYZE;" 2>&1 | \
+  while read -r line; do log "${line}"; done
+
+# Report table sizes
+log "Table sizes after vacuum:"
+docker compose -f "${APP_DIR}/docker-compose.yml" exec -T postgres \
+  psql -U llamenos -d llamenos -t -c "
+    SELECT schemaname || '.' || tablename AS table,
+           pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) AS size
+    FROM pg_tables
+    WHERE schemaname = 'public'
+    ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC
+    LIMIT 10;
+  " 2>&1 | while read -r line; do log "  ${line}"; done
+
+# Report dead tuple stats
+log "Dead tuple stats:"
+docker compose -f "${APP_DIR}/docker-compose.yml" exec -T postgres \
+  psql -U llamenos -d llamenos -t -c "
+    SELECT relname, n_dead_tup, last_autovacuum
+    FROM pg_stat_user_tables
+    WHERE n_dead_tup > 100
+    ORDER BY n_dead_tup DESC
+    LIMIT 10;
+  " 2>&1 | while read -r line; do log "  ${line}"; done
+
+log "VACUUM ANALYZE complete"

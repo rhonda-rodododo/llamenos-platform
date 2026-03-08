@@ -282,6 +282,29 @@ healthcheck_endpoints:
 healthcheck_ntfy_url: "https://ntfy.sh"
 healthcheck_ntfy_topic: "llamenos-health"
 
+# ─── Auto-Healing & Monitoring ──────────────────────────────────
+# Webhook URL for alerts (ntfy, gotify, or any HTTP endpoint)
+# Example: https://ntfy.sh/llamenos-alerts
+llamenos_alert_webhook: ""
+
+# Container watchdog: consecutive failures before restart
+llamenos_watchdog_max_failures: 3
+
+# Container watchdog: max restarts per day before escalating to critical
+llamenos_watchdog_max_restarts: 5
+
+# Certificate expiry: alert when fewer than this many days remain
+llamenos_alert_cert_expiry_days: 7
+
+# Disk space: warning threshold percentage
+llamenos_alert_disk_percent: 85
+
+# Enable/disable PostgreSQL maintenance (vacuum, cleanup)
+llamenos_postgres_enabled: true
+
+# Enable/disable Caddy certificate monitoring
+llamenos_caddy_enabled: true
+
 # ─── System ─────────────────────────────────────────────────────
 # Timezone for the server
 timezone: UTC

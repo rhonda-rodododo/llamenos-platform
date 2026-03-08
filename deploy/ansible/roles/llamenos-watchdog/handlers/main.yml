@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable watchdog timer
+  ansible.builtin.systemd:
+    name: llamenos-watchdog.timer
+    state: started
+    enabled: true

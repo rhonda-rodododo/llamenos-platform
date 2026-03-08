@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# NTP Drift Monitor — managed by Ansible
+# Schnorr signature validation fails with >5min clock skew.
+# This script detects drift >50ms and forces chrony re-sync.
+set -euo pipefail
+
+ALERT_WEBHOOK="{{ llamenos_alert_webhook | default('') }}"
+HOST="{{ inventory_hostname }}"
+MAX_DRIFT_MS=50
+STATE_FILE="{{ app_dir }}/logs/ntp-drift.state"
+
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [ntp] $*"; }
+
+# Get current offset from chrony
+if ! command -v chronyc &>/dev/null; then
+  log "chronyc not found, cannot check NTP drift"
+  exit 1
+fi
+
+TRACKING=$(chronyc tracking 2>/dev/null)
+OFFSET_S=$(echo "${TRACKING}" | grep 'System time' | awk '{print $4}')
+OFFSET_SIGN=$(echo "${TRACKING}" | grep 'System time' | awk '{print $5}')
+
+if [ -z "${OFFSET_S}" ]; then
+  log "Could not determine NTP offset"
+  exit 1
+fi
+
+# Convert to milliseconds (remove sign, multiply by 1000)
+OFFSET_MS=$(echo "${OFFSET_S}" | awk '{printf "%.0f", $1 * 1000}')
+
+log "NTP offset: ${OFFSET_S}s ${OFFSET_SIGN} (${OFFSET_MS}ms)"
+
+if [ "${OFFSET_MS}" -gt "${MAX_DRIFT_MS}" ]; then
+  log "DRIFT DETECTED: ${OFFSET_MS}ms exceeds ${MAX_DRIFT_MS}ms threshold"
+
+  # Attempt automatic correction
+  log "Forcing chrony re-sync..."
+  chronyc makestep 2>&1 | while read -r line; do log "chronyc: ${line}"; done
+
+  # Wait and re-check
+  sleep 5
+  NEW_OFFSET=$(chronyc tracking 2>/dev/null | grep 'System time' | awk '{print $4}')
+  NEW_MS=$(echo "${NEW_OFFSET}" | awk '{printf "%.0f", $1 * 1000}')
+
+  if [ "${NEW_MS}" -gt "${MAX_DRIFT_MS}" ]; then
+    log "CRITICAL: Drift persists after correction (${NEW_MS}ms)"
+    if [ -n "${ALERT_WEBHOOK}" ]; then
+      curl -sf -d "NTP drift on ${HOST}: ${NEW_MS}ms after correction attempt. Schnorr signatures may fail." \
+        -H "Title: CRITICAL: NTP Drift on ${HOST}" \
+        -H "Priority: urgent" \
+        -H "Tags: warning" \
+        "${ALERT_WEBHOOK}" 2>/dev/null || true
+    fi
+  else
+    log "Drift corrected: ${NEW_MS}ms (was ${OFFSET_MS}ms)"
+    if [ -n "${ALERT_WEBHOOK}" ]; then
+      curl -sf -d "NTP drift on ${HOST} corrected: ${OFFSET_MS}ms -> ${NEW_MS}ms" \
+        -H "Title: NTP Drift Corrected on ${HOST}" \
+        -H "Priority: default" \
+        "${ALERT_WEBHOOK}" 2>/dev/null || true
+    fi
+  fi
+fi

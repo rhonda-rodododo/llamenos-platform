@@ -1,0 +1,103 @@
+---
+# Scheduled maintenance tasks — cleanup, vacuum, cert monitoring,
+# disk space monitoring, and log rotation.
+
+- name: Create logs directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/logs"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Create maintenance cleanup script
+  ansible.builtin.template:
+    src: maintenance/cleanup.sh.j2
+    dest: "{{ app_dir }}/scripts/maintenance-cleanup.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Configure daily maintenance cron
+  ansible.builtin.cron:
+    name: "Llamenos daily maintenance"
+    user: "{{ deploy_user }}"
+    hour: "4"
+    minute: "30"
+    job: "{{ app_dir }}/scripts/maintenance-cleanup.sh >> {{ app_dir }}/logs/maintenance.log 2>&1"
+    state: present
+
+- name: Create PostgreSQL vacuum script
+  ansible.builtin.template:
+    src: maintenance/vacuum.sh.j2
+    dest: "{{ app_dir }}/scripts/maintenance-vacuum.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+  when: llamenos_postgres_enabled | default(true)
+
+- name: Configure weekly vacuum cron
+  ansible.builtin.cron:
+    name: "Llamenos PostgreSQL vacuum"
+    user: "{{ deploy_user }}"
+    weekday: "0"
+    hour: "5"
+    minute: "0"
+    job: "{{ app_dir }}/scripts/maintenance-vacuum.sh >> {{ app_dir }}/logs/vacuum.log 2>&1"
+    state: "{{ 'present' if llamenos_postgres_enabled | default(true) else 'absent' }}"
+
+- name: Create certificate monitoring script
+  ansible.builtin.template:
+    src: maintenance/cert-monitor.sh.j2
+    dest: "{{ app_dir }}/scripts/cert-monitor.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+  when: llamenos_caddy_enabled | default(true)
+
+- name: Configure daily certificate check
+  ansible.builtin.cron:
+    name: "Llamenos certificate expiry check"
+    user: "{{ deploy_user }}"
+    hour: "6"
+    minute: "0"
+    job: "{{ app_dir }}/scripts/cert-monitor.sh >> {{ app_dir }}/logs/cert-monitor.log 2>&1"
+    state: "{{ 'present' if llamenos_caddy_enabled | default(true) else 'absent' }}"
+
+- name: Create disk space monitoring script
+  ansible.builtin.template:
+    src: maintenance/disk-monitor.sh.j2
+    dest: "{{ app_dir }}/scripts/disk-monitor.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Configure disk monitoring cron (every 30 minutes)
+  ansible.builtin.cron:
+    name: "Llamenos disk space monitor"
+    user: "{{ deploy_user }}"
+    minute: "*/30"
+    job: "{{ app_dir }}/scripts/disk-monitor.sh >> {{ app_dir }}/logs/disk-monitor.log 2>&1"
+    state: present
+
+- name: Configure log rotation for all maintenance logs
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/llamenos-maintenance
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {{ app_dir }}/logs/*.log {
+          weekly
+          rotate 4
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 {{ deploy_user }} {{ deploy_group }}
+          sharedscripts
+          postrotate
+              # Signal Docker containers to reopen log files if needed
+              true
+          endscript
+      }

@@ -1,0 +1,49 @@
+---
+# Watchdog — health-check-driven auto-restart for containers
+#
+# Monitors Docker container health status via a systemd timer.
+# Restarts persistently unhealthy containers with a daily budget
+# to prevent restart loops. Sends alerts via configurable webhook.
+
+- name: Create watchdog logs directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/logs/watchdog-state"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Create watchdog script
+  ansible.builtin.template:
+    src: watchdog/container-watchdog.sh.j2
+    dest: "{{ app_dir }}/scripts/container-watchdog.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Install watchdog systemd service
+  ansible.builtin.template:
+    src: watchdog/llamenos-watchdog.service.j2
+    dest: /etc/systemd/system/llamenos-watchdog.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install watchdog systemd timer
+  ansible.builtin.template:
+    src: watchdog/llamenos-watchdog.timer.j2
+    dest: /etc/systemd/system/llamenos-watchdog.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Enable watchdog timer
+
+- name: Enable and start watchdog timer
+  ansible.builtin.systemd:
+    name: llamenos-watchdog.timer
+    state: started
+    enabled: true
+    daemon_reload: true

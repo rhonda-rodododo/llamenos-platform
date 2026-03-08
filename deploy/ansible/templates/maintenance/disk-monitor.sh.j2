@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Disk Space Monitor — managed by Ansible
+# Alerts on high usage and takes automatic action at critical levels.
+set -euo pipefail
+
+ALERT_WEBHOOK="{{ llamenos_alert_webhook | default('') }}"
+HOST="{{ inventory_hostname }}"
+APP_DIR="{{ app_dir }}"
+WARN_PERCENT={{ llamenos_alert_disk_percent | default(85) }}
+CRIT_PERCENT=95
+
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [disk] $*"; }
+
+USAGE=$(df "${APP_DIR}" --output=pcent 2>/dev/null | tail -1 | tr -d ' %')
+
+log "Disk usage: ${USAGE}%"
+
+if [ "${USAGE}" -ge "${CRIT_PERCENT}" ]; then
+  log "CRITICAL: Disk at ${USAGE}%, taking emergency action"
+
+  # Emergency cleanup
+  docker image prune -af --filter "until=24h" 2>&1 | while read -r line; do log "prune: ${line}"; done
+  docker builder prune -af 2>&1 | while read -r line; do log "builder: ${line}"; done
+
+  # Remove old backups beyond minimum retention
+  find "${APP_DIR}/backups/daily" -name 'llamenos-*' -mtime +3 -delete 2>/dev/null || true
+
+  NEW_USAGE=$(df "${APP_DIR}" --output=pcent 2>/dev/null | tail -1 | tr -d ' %')
+  log "After cleanup: ${NEW_USAGE}%"
+
+  if [ -n "${ALERT_WEBHOOK}" ]; then
+    curl -sf -d "CRITICAL: Disk on ${HOST} at ${USAGE}% (now ${NEW_USAGE}% after cleanup). Immediate attention needed." \
+      -H "Title: CRITICAL: Disk Full on ${HOST}" \
+      -H "Priority: urgent" \
+      -H "Tags: rotating_light" \
+      "${ALERT_WEBHOOK}" 2>/dev/null || true
+  fi
+elif [ "${USAGE}" -ge "${WARN_PERCENT}" ]; then
+  log "WARNING: Disk at ${USAGE}%"
+
+  # Light cleanup
+  docker image prune -f --filter "until=168h" 2>&1 | while read -r line; do log "prune: ${line}"; done
+
+  STATE_FILE="${APP_DIR}/logs/disk-warn.state"
+  TODAY=$(date +%Y-%m-%d)
+  LAST_WARN=$(cat "${STATE_FILE}" 2>/dev/null || echo "")
+  if [ "${LAST_WARN}" != "${TODAY}" ]; then
+    if [ -n "${ALERT_WEBHOOK}" ]; then
+      curl -sf -d "Disk on ${HOST} at ${USAGE}%. Consider adding storage or reviewing backup retention." \
+        -H "Title: Disk Warning on ${HOST}" \
+        -H "Priority: high" \
+        -H "Tags: warning" \
+        "${ALERT_WEBHOOK}" 2>/dev/null || true
+    fi
+    echo "${TODAY}" > "${STATE_FILE}"
+  fi
+fi

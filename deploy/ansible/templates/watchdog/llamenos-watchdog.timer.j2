@@ -1,0 +1,10 @@
+[Unit]
+Description=Llamenos Container Watchdog Timer
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=60
+AccuracySec=10
+
+[Install]
+WantedBy=timers.target

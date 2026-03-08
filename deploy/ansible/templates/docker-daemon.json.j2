@@ -1,0 +1,23 @@
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3",
+    "compress": "true"
+  },
+  "live-restore": true,
+  "storage-driver": "overlay2",
+  "default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Hard": 65536,
+      "Soft": 32768
+    }
+  },
+  "no-new-privileges": true,
+  "userland-proxy": false,
+  "iptables": true,
+  "ip6tables": true{% if docker_userns_remap | default(true) %},
+  "userns-remap": "default"
+{% endif %}
+}

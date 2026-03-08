@@ -81,3 +81,16 @@
     - role: llamenos-signal
       tags: [signal, deploy]
       when: llamenos_signal_enabled | default(false)
+
+- name: Deploy auto-healing and maintenance
+  hosts: llamenos_servers
+  become: true
+  vars_files:
+    - ../vars.yml
+  roles:
+    - role: llamenos-watchdog
+      tags: [watchdog, deploy, auto-healing]
+    - role: llamenos-ntp-monitor
+      tags: [ntp, deploy, auto-healing]
+    - role: llamenos-maintenance
+      tags: [maintenance, deploy, auto-healing]

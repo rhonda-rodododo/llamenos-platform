@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# TLS Certificate Monitor — managed by Ansible
+# Caddy auto-renews, but this catches renewal failures.
+set -euo pipefail
+
+DOMAIN="{{ domain }}"
+ALERT_WEBHOOK="{{ llamenos_alert_webhook | default('') }}"
+HOST="{{ inventory_hostname }}"
+MIN_DAYS={{ llamenos_alert_cert_expiry_days | default(7) }}
+STATE_FILE="{{ app_dir }}/logs/cert-monitor.state"
+
+log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [cert] $*"; }
+
+# Check certificate expiry
+CERT_INFO=$(echo | timeout 10 openssl s_client -servername "${DOMAIN}" -connect "${DOMAIN}:443" 2>/dev/null)
+if [ -z "${CERT_INFO}" ]; then
+  log "Could not connect to ${DOMAIN}:443"
+  exit 0
+fi
+
+EXPIRY_DATE=$(echo "${CERT_INFO}" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)
+if [ -z "${EXPIRY_DATE}" ]; then
+  log "Could not parse certificate expiry"
+  exit 0
+fi
+
+EXPIRY_EPOCH=$(date -d "${EXPIRY_DATE}" +%s 2>/dev/null || date -j -f '%b %d %H:%M:%S %Y %Z' "${EXPIRY_DATE}" +%s 2>/dev/null)
+NOW_EPOCH=$(date +%s)
+DAYS_LEFT=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+
+log "Certificate for ${DOMAIN} expires in ${DAYS_LEFT} days (${EXPIRY_DATE})"
+
+if [ "${DAYS_LEFT}" -lt "${MIN_DAYS}" ]; then
+  # Only alert once per day
+  TODAY=$(date +%Y-%m-%d)
+  LAST_ALERT=$(cat "${STATE_FILE}" 2>/dev/null || echo "")
+  if [ "${LAST_ALERT}" != "${TODAY}" ]; then
+    if [ -n "${ALERT_WEBHOOK}" ]; then
+      curl -sf -d "TLS certificate for ${DOMAIN} expires in ${DAYS_LEFT} days. Caddy auto-renewal may have failed. Check: docker compose logs caddy" \
+        -H "Title: Certificate Expiring: ${DOMAIN}" \
+        -H "Priority: high" \
+        -H "Tags: lock" \
+        "${ALERT_WEBHOOK}" 2>/dev/null || true
+    fi
+    echo "${TODAY}" > "${STATE_FILE}"
+    log "ALERT: Certificate expires in ${DAYS_LEFT} days"
+  fi
+fi

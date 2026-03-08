@@ -61,33 +61,27 @@
     group: root
     mode: "0755"
 
-- name: Configure Docker daemon
-  ansible.builtin.copy:
+- name: Configure Docker daemon for production
+  ansible.builtin.template:
+    src: docker-daemon.json.j2
     dest: /etc/docker/daemon.json
     owner: root
     group: root
     mode: "0644"
-    content: |
-      {
-        "log-driver": "json-file",
-        "log-opts": {
-          "max-size": "10m",
-          "max-file": "3"
-        },
-        "default-ulimits": {
-          "nofile": {
-            "Name": "nofile",
-            "Hard": 65536,
-            "Soft": 32768
-          }
-        },
-        "no-new-privileges": true,
-        "live-restore": true,
-        "userland-proxy": false,
-        "iptables": true,
-        "ip6tables": true{{ ',\n    "userns-remap": "default"' if docker_userns_remap else '' }}
-      }
   notify: Restart docker
+
+- name: Verify Docker restart policies on all containers
+  ansible.builtin.shell: |
+    docker ps -a --format '{{ '{{' }}.Names{{ '}}' }}:{{ '{{' }}.Status{{ '}}' }}' | \
+      while IFS=: read name status; do
+        policy=$(docker inspect --format '{{ '{{' }}.HostConfig.RestartPolicy.Name{{ '}}' }}' "$name" 2>/dev/null)
+        if [ "$policy" != "unless-stopped" ] && [ "$policy" != "always" ]; then
+          echo "WARNING: $name has restart policy: $policy"
+        fi
+      done
+  register: restart_policy_check
+  changed_when: false
+  failed_when: false
 
 - name: Create userns-remap subordinate UID mapping
   ansible.builtin.copy:

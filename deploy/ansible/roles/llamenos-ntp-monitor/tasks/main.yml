@@ -1,0 +1,25 @@
+---
+# NTP drift monitoring — critical for Schnorr signature validation
+# Detects drift >50ms and attempts automatic correction via chronyc.
+
+- name: Ensure chrony is installed and running
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: Create NTP monitoring script
+  ansible.builtin.template:
+    src: maintenance/ntp-monitor.sh.j2
+    dest: "{{ app_dir }}/scripts/ntp-monitor.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Configure NTP monitoring cron (every 15 minutes)
+  ansible.builtin.cron:
+    name: "Llamenos NTP drift monitor"
+    user: root
+    minute: "*/15"
+    job: "{{ app_dir }}/scripts/ntp-monitor.sh >> {{ app_dir }}/logs/ntp-monitor.log 2>&1"
+    state: present
