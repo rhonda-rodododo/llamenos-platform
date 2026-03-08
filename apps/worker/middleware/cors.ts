@@ -28,7 +28,7 @@ export const cors = createMiddleware<AppEnv>(async (c, next) => {
       headers: {
         ...(allowedOrigin ? { 'Access-Control-Allow-Origin': allowedOrigin } : {}),
         'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Version',
         'Vary': 'Origin',
       },
     })
@@ -38,6 +38,8 @@ export const cors = createMiddleware<AppEnv>(async (c, next) => {
 
   if (allowedOrigin) {
     c.header('Access-Control-Allow-Origin', allowedOrigin)
+    // Expose version negotiation headers to client JS (Epic 288)
+    c.header('Access-Control-Expose-Headers', 'X-Min-Version, X-Current-Version')
   }
   c.header('Vary', 'Origin')
 })

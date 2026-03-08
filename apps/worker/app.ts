@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from './types'
 import { cors } from './middleware/cors'
+import { apiVersion } from './middleware/api-version'
 import { securityHeaders } from './middleware/security-headers'
 import { auth } from './middleware/auth'
 import configRoutes from './routes/config'
@@ -43,6 +44,7 @@ api.route('/health', healthRoutes)
 api.route('/metrics', metricsRoutes)
 
 api.use('*', cors)
+api.use('*', apiVersion)
 
 // Public routes (no auth)
 api.route('/config', configRoutes)

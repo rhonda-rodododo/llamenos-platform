@@ -1,5 +1,6 @@
 import * as keyManager from './key-manager'
 import { createAuthToken } from './platform'
+import { APP_API_VERSION, emitUpdateRequired } from './version'
 
 const API_BASE = '/api'
 
@@ -37,6 +38,18 @@ function isRetryable(status: number): boolean {
   return status === 502 || status === 503 || status === 504 || status === 429
 }
 
+/** Check response headers for version mismatch and emit update-required if needed. */
+function checkVersionHeaders(res: Response): void {
+  const minVersion = res.headers.get('X-Min-Version')
+  const currentVersion = res.headers.get('X-Current-Version')
+  if (minVersion && parseInt(minVersion, 10) > APP_API_VERSION) {
+    emitUpdateRequired({
+      minVersion: parseInt(minVersion, 10),
+      currentVersion: currentVersion ? parseInt(currentVersion, 10) : parseInt(minVersion, 10),
+    })
+  }
+}
+
 async function request<T>(path: string, options: RequestInit & { retries?: number } = {}): Promise<T> {
   const method = ((options.method as string) || 'GET').toUpperCase()
   const isIdempotent = method === 'GET' || method === 'HEAD'
@@ -58,6 +71,7 @@ async function request<T>(path: string, options: RequestInit & { retries?: numbe
     try {
       const headers = {
         'Content-Type': 'application/json',
+        'X-API-Version': String(APP_API_VERSION),
         ...await getAuthHeaders(method, pathOnly),
         ...options.headers,
       }
@@ -67,7 +81,15 @@ async function request<T>(path: string, options: RequestInit & { retries?: numbe
         signal: controller.signal,
       })
 
+      // Check version headers on every response (even errors)
+      checkVersionHeaders(res)
+
       if (!res.ok) {
+        if (res.status === 426) {
+          // Server requires a newer client — update-required already emitted via checkVersionHeaders
+          const body = await res.text()
+          throw new ApiError(res.status, body)
+        }
         if (res.status === 401 && !path.startsWith('/auth/')) {
           onAuthExpired?.()
         }
@@ -132,13 +154,18 @@ export async function getConfig() {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetch(`${API_BASE}/config`, { signal: controller.signal })
+    const res = await fetch(`${API_BASE}/config`, {
+      headers: { 'X-API-Version': String(APP_API_VERSION) },
+      signal: controller.signal,
+    })
     if (!res.ok) return { hotlineName: 'Hotline', hotlineNumber: '', channels: undefined, setupCompleted: undefined }
+    checkVersionHeaders(res)
     return res.json() as Promise<{
       hotlineName: string
       hotlineNumber: string
       channels?: import('@shared/types').EnabledChannels
       setupCompleted?: boolean
+      adminPubkey?: string
       demoMode?: boolean
       demoResetSchedule?: string | null
       needsBootstrap?: boolean
@@ -146,6 +173,8 @@ export async function getConfig() {
       defaultHubId?: string
       serverNostrPubkey?: string
       nostrRelayUrl?: string
+      apiVersion?: number
+      minApiVersion?: number
     }>
   } catch {
     return { hotlineName: 'Hotline', hotlineNumber: '', channels: undefined, setupCompleted: undefined }

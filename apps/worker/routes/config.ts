@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
 import { deriveServerKeypair } from '../lib/nostr-publisher'
+import { CURRENT_API_VERSION, MIN_API_VERSION } from '../lib/api-versions'
 import type { EnabledChannels, Hub, SetupState } from '@shared/types'
 
 const config = new Hono<AppEnv>()
@@ -86,6 +87,8 @@ config.get('/', async (c) => {
     defaultHubId,
     serverNostrPubkey,
     nostrRelayUrl,
+    apiVersion: CURRENT_API_VERSION,
+    minApiVersion: MIN_API_VERSION,
   })
 })
 
