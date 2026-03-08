@@ -387,6 +387,52 @@ export interface EnabledChannels {
   reports: boolean
 }
 
+// --- Report Types ---
+
+export interface ReportType {
+  id: string               // UUID
+  name: string             // Display name (e.g., "Incident Report")
+  description: string      // Brief description of when to use this type
+  icon?: string            // Optional lucide icon name (e.g., "alert-triangle")
+  fields: CustomFieldDefinition[]  // Fields specific to this report type
+  isDefault?: boolean      // Whether this is the pre-selected type
+  isArchived?: boolean     // Soft-deleted (hidden from selectors, existing reports keep reference)
+  createdAt: string
+  updatedAt: string
+}
+
+export const MAX_REPORT_TYPES = 50
+export const MAX_REPORT_TYPE_NAME_LENGTH = 100
+export const MAX_REPORT_TYPE_DESCRIPTION_LENGTH = 500
+
+export const DEFAULT_REPORT_TYPES: Omit<ReportType, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  {
+    name: 'Incident Report',
+    description: 'Document a specific incident or event that occurred.',
+    icon: 'alert-triangle',
+    fields: [],
+    isDefault: true,
+  },
+  {
+    name: 'Field Observation',
+    description: 'Record observations from the field or community.',
+    icon: 'eye',
+    fields: [],
+  },
+  {
+    name: 'Evidence',
+    description: 'Submit evidence documentation (photos, files, recordings).',
+    icon: 'camera',
+    fields: [],
+  },
+  {
+    name: 'Other',
+    description: 'General report that does not fit other categories.',
+    icon: 'file-text',
+    fields: [],
+  },
+]
+
 // --- Hub Types ---
 
 export interface Hub {

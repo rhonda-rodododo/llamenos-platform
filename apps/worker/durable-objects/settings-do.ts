@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, SpamSettings, CallSettings } from '../types'
-import type { CustomFieldDefinition, TelephonyProviderConfig, MessagingConfig, SetupState, EnabledChannels, Hub } from '@shared/types'
-import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS, DEFAULT_MESSAGING_CONFIG, DEFAULT_SETUP_STATE } from '@shared/types'
+import type { CustomFieldDefinition, TelephonyProviderConfig, MessagingConfig, SetupState, EnabledChannels, Hub, ReportType } from '@shared/types'
+import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS, DEFAULT_MESSAGING_CONFIG, DEFAULT_SETUP_STATE, MAX_REPORT_TYPES, MAX_REPORT_TYPE_NAME_LENGTH, MAX_REPORT_TYPE_DESCRIPTION_LENGTH, DEFAULT_REPORT_TYPES } from '@shared/types'
 import { IVR_LANGUAGES } from '@shared/languages'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
@@ -74,9 +74,15 @@ export class SettingsDO extends DurableObject<Env> {
     // --- Enabled Channels (computed) ---
     this.router.get('/settings/enabled-channels', () => this.getEnabledChannels())
 
-    // --- Report Categories ---
+    // --- Report Categories (deprecated — use report-types) ---
     this.router.get('/settings/report-categories', () => this.getReportCategories())
     this.router.put('/settings/report-categories', async (req) => this.updateReportCategories(await req.json()))
+
+    // --- Report Types ---
+    this.router.get('/settings/report-types', () => this.getReportTypes())
+    this.router.post('/settings/report-types', async (req) => this.createReportType(await req.json()))
+    this.router.patch('/settings/report-types/:id', async (req, { id }) => this.updateReportType(id, await req.json()))
+    this.router.delete('/settings/report-types/:id', (_req, { id }) => this.archiveReportType(id))
 
     // --- Fallback Group ---
     this.router.get('/fallback', () => this.getFallbackGroup())
@@ -475,6 +481,162 @@ export class SettingsDO extends DurableObject<Env> {
     const categories = data.categories.slice(0, 50) // max 50 categories
     await this.ctx.storage.put('reportCategories', categories)
     return Response.json({ categories })
+  }
+
+  // --- Report Types CRUD ---
+
+  private async getReportTypes(): Promise<Response> {
+    let reportTypes = await this.ctx.storage.get<ReportType[]>('reportTypes')
+    if (!reportTypes || reportTypes.length === 0) {
+      // Seed defaults if migration hasn't run yet
+      const now = new Date().toISOString()
+      reportTypes = DEFAULT_REPORT_TYPES.map(d => ({
+        ...d,
+        id: crypto.randomUUID(),
+        fields: [],
+        isArchived: false,
+        createdAt: now,
+        updatedAt: now,
+      }))
+      await this.ctx.storage.put('reportTypes', reportTypes)
+    }
+    return Response.json({ reportTypes })
+  }
+
+  private async createReportType(data: unknown): Promise<Response> {
+    if (!data || typeof data !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 })
+    }
+
+    const { name, description, icon, fields, isDefault } = data as Partial<ReportType>
+
+    if (!name || !name.trim()) {
+      return new Response(JSON.stringify({ error: 'Name is required' }), { status: 400 })
+    }
+    if (name.length > MAX_REPORT_TYPE_NAME_LENGTH) {
+      return new Response(JSON.stringify({ error: `Name too long (max ${MAX_REPORT_TYPE_NAME_LENGTH} chars)` }), { status: 400 })
+    }
+    if (description && description.length > MAX_REPORT_TYPE_DESCRIPTION_LENGTH) {
+      return new Response(JSON.stringify({ error: `Description too long (max ${MAX_REPORT_TYPE_DESCRIPTION_LENGTH} chars)` }), { status: 400 })
+    }
+
+    const reportTypes = await this.ctx.storage.get<ReportType[]>('reportTypes') || []
+
+    if (reportTypes.filter(rt => !rt.isArchived).length >= MAX_REPORT_TYPES) {
+      return new Response(JSON.stringify({ error: `Maximum ${MAX_REPORT_TYPES} active report types` }), { status: 400 })
+    }
+
+    // Validate fields if provided
+    if (fields && fields.length > MAX_CUSTOM_FIELDS) {
+      return new Response(JSON.stringify({ error: `Maximum ${MAX_CUSTOM_FIELDS} fields per report type` }), { status: 400 })
+    }
+
+    const now = new Date().toISOString()
+
+    // If this is default, clear other defaults
+    if (isDefault) {
+      for (const rt of reportTypes) {
+        rt.isDefault = false
+      }
+    }
+
+    const reportType: ReportType = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      description: (description || '').trim(),
+      icon: icon || undefined,
+      fields: fields || [],
+      isDefault: isDefault || false,
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    reportTypes.push(reportType)
+    await this.ctx.storage.put('reportTypes', reportTypes)
+    return Response.json(reportType, { status: 201 })
+  }
+
+  private async updateReportType(id: string, data: unknown): Promise<Response> {
+    if (!data || typeof data !== 'object') {
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 })
+    }
+
+    const reportTypes = await this.ctx.storage.get<ReportType[]>('reportTypes') || []
+    const idx = reportTypes.findIndex(rt => rt.id === id)
+    if (idx === -1) {
+      return new Response(JSON.stringify({ error: 'Report type not found' }), { status: 404 })
+    }
+
+    const updates = data as Partial<ReportType>
+    const rt = reportTypes[idx]
+
+    if (updates.name !== undefined) {
+      if (!updates.name.trim()) {
+        return new Response(JSON.stringify({ error: 'Name cannot be empty' }), { status: 400 })
+      }
+      if (updates.name.length > MAX_REPORT_TYPE_NAME_LENGTH) {
+        return new Response(JSON.stringify({ error: `Name too long (max ${MAX_REPORT_TYPE_NAME_LENGTH} chars)` }), { status: 400 })
+      }
+      rt.name = updates.name.trim()
+    }
+
+    if (updates.description !== undefined) {
+      if (updates.description.length > MAX_REPORT_TYPE_DESCRIPTION_LENGTH) {
+        return new Response(JSON.stringify({ error: `Description too long (max ${MAX_REPORT_TYPE_DESCRIPTION_LENGTH} chars)` }), { status: 400 })
+      }
+      rt.description = updates.description.trim()
+    }
+
+    if (updates.icon !== undefined) rt.icon = updates.icon || undefined
+    if (updates.fields !== undefined) {
+      if (updates.fields.length > MAX_CUSTOM_FIELDS) {
+        return new Response(JSON.stringify({ error: `Maximum ${MAX_CUSTOM_FIELDS} fields per report type` }), { status: 400 })
+      }
+      rt.fields = updates.fields
+    }
+
+    if (updates.isDefault !== undefined) {
+      if (updates.isDefault) {
+        // Clear other defaults
+        for (const other of reportTypes) {
+          other.isDefault = false
+        }
+      }
+      rt.isDefault = updates.isDefault
+    }
+
+    rt.updatedAt = new Date().toISOString()
+    reportTypes[idx] = rt
+    await this.ctx.storage.put('reportTypes', reportTypes)
+    return Response.json(rt)
+  }
+
+  private async archiveReportType(id: string): Promise<Response> {
+    const reportTypes = await this.ctx.storage.get<ReportType[]>('reportTypes') || []
+    const idx = reportTypes.findIndex(rt => rt.id === id)
+    if (idx === -1) {
+      return new Response(JSON.stringify({ error: 'Report type not found' }), { status: 404 })
+    }
+
+    // Don't allow archiving the last non-archived type
+    const activeCount = reportTypes.filter(rt => !rt.isArchived).length
+    if (activeCount <= 1 && !reportTypes[idx].isArchived) {
+      return new Response(JSON.stringify({ error: 'Cannot archive the last active report type' }), { status: 400 })
+    }
+
+    reportTypes[idx].isArchived = true
+    reportTypes[idx].isDefault = false
+    reportTypes[idx].updatedAt = new Date().toISOString()
+
+    // If we archived the default, set a new default
+    if (!reportTypes.some(rt => rt.isDefault && !rt.isArchived)) {
+      const firstActive = reportTypes.find(rt => !rt.isArchived)
+      if (firstActive) firstActive.isDefault = true
+    }
+
+    await this.ctx.storage.put('reportTypes', reportTypes)
+    return Response.json({ ok: true })
   }
 
   // --- Telephony Provider ---

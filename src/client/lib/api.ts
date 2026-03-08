@@ -959,6 +959,7 @@ export interface Conversation {
     type?: 'report'
     reportTitle?: string
     reportCategory?: string
+    reportTypeId?: string
   }
 }
 
@@ -1113,6 +1114,7 @@ export interface Report extends Conversation {
     type: 'report'
     reportTitle?: string
     reportCategory?: string
+    reportTypeId?: string
     customFieldValues?: string
     linkedCallId?: string
     reportId?: string
@@ -1131,6 +1133,7 @@ export async function listReports(params?: { status?: string; category?: string;
 export async function createReport(data: {
   title: string
   category?: string
+  reportTypeId?: string
   encryptedContent: string
   readerEnvelopes: import('@shared/types').RecipientEnvelope[]
 }) {
@@ -1178,6 +1181,42 @@ export async function updateReport(id: string, data: { status?: string }) {
 
 export async function getReportCategories() {
   return request<{ categories: string[] }>(hp('/reports/categories'))
+}
+
+// --- Report Types ---
+
+export async function getReportTypes() {
+  return request<{ reportTypes: import('@shared/types').ReportType[] }>(hp('/reports/types'))
+}
+
+export async function getReportTypesAdmin() {
+  return request<{ reportTypes: import('@shared/types').ReportType[] }>(hp('/settings/report-types'))
+}
+
+export async function createReportType(data: {
+  name: string
+  description?: string
+  icon?: string
+  fields?: import('@shared/types').CustomFieldDefinition[]
+  isDefault?: boolean
+}) {
+  return request<import('@shared/types').ReportType>(hp('/settings/report-types'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateReportType(id: string, data: Partial<import('@shared/types').ReportType>) {
+  return request<import('@shared/types').ReportType>(hp(`/settings/report-types/${id}`), {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function archiveReportType(id: string) {
+  return request<{ ok: boolean }>(hp(`/settings/report-types/${id}`), {
+    method: 'DELETE',
+  })
 }
 
 export async function getReportFiles(id: string) {

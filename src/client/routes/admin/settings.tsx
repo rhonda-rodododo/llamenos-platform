@@ -38,6 +38,7 @@ import { RolesSection } from '@/components/admin-settings/roles-section'
 import { RCSChannelSection } from '@/components/admin-settings/rcs-channel-section'
 import { SignalChannelSection } from '@/components/admin-settings/signal-channel-section'
 import { MigrationStatusSection } from '@/components/admin-settings/migration-status-section'
+import { ReportTypesSection } from '@/components/admin-settings/report-types-section'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
@@ -252,6 +253,12 @@ function AdminSettingsPage() {
         expanded={expanded.has('custom-fields')}
         onToggle={(open) => toggleSection('custom-fields', open)}
         statusSummary={customFieldsStatus}
+      />
+
+      <ReportTypesSection
+        expanded={expanded.has('report-types')}
+        onToggle={(open) => toggleSection('report-types', open)}
+        statusSummary={t('reportTypes.title', { defaultValue: 'Report Types' })}
       />
 
       {spam && (

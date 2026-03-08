@@ -9,9 +9,11 @@ import {
   sendReportMessage,
   assignReport,
   updateReport,
+  getReportTypes,
   type Report,
   type ConversationMessage,
 } from '@/lib/api'
+import type { ReportType } from '@shared/types'
 import { encryptMessage } from '@/lib/platform'
 import { formatRelativeTime } from '@/lib/format'
 import { ReportForm } from '@/components/ReportForm'
@@ -46,8 +48,16 @@ function ReportsPage() {
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
   const [showFileUpload, setShowFileUpload] = useState(false)
+  const [reportTypes, setReportTypes] = useState<ReportType[]>([])
 
   const selectedReport = reports.find(r => r.id === selectedId)
+
+  // Load report types
+  useEffect(() => {
+    getReportTypes()
+      .then(({ reportTypes: types }) => setReportTypes(types.filter(rt => !rt.isArchived)))
+      .catch(() => {})
+  }, [])
 
   // Fetch reports
   useEffect(() => {
@@ -237,6 +247,9 @@ function ReportsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t('reports.allCategories', { defaultValue: 'All categories' })}</SelectItem>
+                      {reportTypes.map(rt => (
+                        <SelectItem key={rt.id} value={rt.name}>{rt.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -255,6 +268,7 @@ function ReportsPage() {
                     report={report}
                     isSelected={selectedId === report.id}
                     onSelect={setSelectedId}
+                    reportTypes={reportTypes}
                   />
                 ))}
               </div>
@@ -299,10 +313,11 @@ function ReportsPage() {
   )
 }
 
-function ReportCard({ report, isSelected, onSelect }: {
+function ReportCard({ report, isSelected, onSelect, reportTypes }: {
   report: Report
   isSelected: boolean
   onSelect: (id: string) => void
+  reportTypes: ReportType[]
 }) {
   const { t } = useTranslation()
 
@@ -313,6 +328,11 @@ function ReportCard({ report, isSelected, onSelect }: {
       : <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" />
 
   const relativeTime = formatRelativeTime(report.lastMessageAt, t)
+
+  // Resolve report type name: prefer the typed system, fall back to category string
+  const reportTypeName = report.metadata?.reportTypeId
+    ? reportTypes.find(rt => rt.id === report.metadata?.reportTypeId)?.name || report.metadata?.reportCategory
+    : report.metadata?.reportCategory
 
   return (
     <button
@@ -336,9 +356,9 @@ function ReportCard({ report, isSelected, onSelect }: {
         </span>
       </div>
       <div className="mt-1.5 flex items-center gap-2">
-        {report.metadata?.reportCategory && (
+        {reportTypeName && (
           <Badge variant="secondary" className="text-[10px]">
-            {report.metadata.reportCategory}
+            {reportTypeName}
           </Badge>
         )}
         <span className="text-xs text-muted-foreground">
@@ -382,11 +402,11 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Lock className="h-3 w-3" />
             {t('reports.e2ee', { defaultValue: 'End-to-end encrypted' })}
-            {report.metadata?.reportCategory && (
+            {(report.metadata?.reportCategory || report.metadata?.reportTypeId) && (
               <>
                 <span className="mx-1">·</span>
                 <Badge variant="secondary" className="text-[10px]">
-                  {report.metadata.reportCategory}
+                  {report.metadata.reportCategory || report.metadata.reportTypeId}
                 </Badge>
               </>
             )}

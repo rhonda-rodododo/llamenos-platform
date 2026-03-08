@@ -1314,7 +1314,10 @@
     "uploadComplete": "Complete",
     "uploadError": "Failed to upload {{name}}",
     "uploadFailed": "Failed",
-    "videoNotSupported": "Your browser does not support video playback."
+    "videoNotSupported": "Your browser does not support video playback.",
+    "typeLabel": "Report Type",
+    "selectType": "Select a report type",
+    "noTypes": "No report types available"
   },
   "resetIdentity": "Reset Identity",
   "retry": "Retry",
@@ -1624,7 +1627,6 @@
     "emptyScheduled": "No scheduled shifts",
     "emptyTitle": "No Shifts",
     "emptySubtitle": "Shifts will appear here when created",
-    "emptyTitle": "No Shifts",
     "endTime": "End Time",
     "fallbackDescription": "These volunteers receive calls when no shift is scheduled",
     "fallbackGroup": "Fallback Group",
@@ -1928,5 +1930,31 @@
   "yes": "Yes",
   "yourIdentity": "Your Identity",
   "yourPrivateKey": "Your Private Key",
-  "yourPublicKey": "Your Public Key"
+  "yourPublicKey": "Your Public Key",
+  "reportTypes": {
+    "title": "Report Types",
+    "description": "Define structured report types with custom fields. Each type determines which fields appear when creating a report.",
+    "addType": "Add Report Type",
+    "editType": "Edit Report Type",
+    "name": "Name",
+    "namePlaceholder": "e.g., Incident Report",
+    "typeDescription": "Description",
+    "descriptionPlaceholder": "When should this report type be used?",
+    "icon": "Icon",
+    "iconPlaceholder": "e.g., alert-triangle",
+    "default": "Default",
+    "defaultHelp": "This type will be pre-selected when creating new reports.",
+    "archived": "Archived",
+    "fields": "Custom Fields",
+    "noFields": "No custom fields configured for this report type.",
+    "created": "Report type created",
+    "updated": "Report type updated",
+    "archiveConfirm": "Archive this report type? Existing reports will keep their type reference, but it won't be available for new reports.",
+    "archiveSuccess": "Report type archived",
+    "archiveError": "Failed to archive report type",
+    "createError": "Failed to create report type",
+    "updateError": "Failed to update report type",
+    "cannotArchiveLast": "Cannot archive the last active report type",
+    "maxTypes": "Maximum number of report types reached"
+  }
 }

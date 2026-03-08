@@ -9,6 +9,7 @@ export const listReportsQuerySchema = paginationSchema.extend({
 export const createReportBodySchema = z.object({
   title: z.string().min(1).max(500),
   category: z.string().optional(),
+  reportTypeId: z.string().optional(),
   encryptedContent: z.string().min(1, 'Report content is required'),
   readerEnvelopes: z.array(recipientEnvelopeSchema).min(1, 'At least one reader envelope required'),
 }).passthrough()

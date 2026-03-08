@@ -273,6 +273,46 @@ settings.delete('/ivr-audio/:promptType/:language', requirePermission('settings:
   return res
 })
 
+// --- Report Types ---
+settings.get('/report-types', async (c) => {
+  const dos = getDOs(c.env)
+  return dos.settings.fetch(new Request('http://do/settings/report-types'))
+})
+
+settings.post('/report-types', requirePermission('settings:manage-fields'), async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const body = await c.req.json()
+  const res = await dos.settings.fetch(new Request('http://do/settings/report-types', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }))
+  if (res.ok) await audit(dos.records, 'reportTypeCreated', pubkey, { name: (body as { name?: string }).name })
+  return res
+})
+
+settings.patch('/report-types/:id', requirePermission('settings:manage-fields'), async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const res = await dos.settings.fetch(new Request(`http://do/settings/report-types/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }))
+  if (res.ok) await audit(dos.records, 'reportTypeUpdated', pubkey, { reportTypeId: id })
+  return res
+})
+
+settings.delete('/report-types/:id', requirePermission('settings:manage-fields'), async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const id = c.req.param('id')
+  const res = await dos.settings.fetch(new Request(`http://do/settings/report-types/${id}`, { method: 'DELETE' }))
+  if (res.ok) await audit(dos.records, 'reportTypeArchived', pubkey, { reportTypeId: id })
+  return res
+})
+
 // --- Roles (PBAC) ---
 settings.get('/roles', async (c) => {
   const dos = getDOs(c.env)
