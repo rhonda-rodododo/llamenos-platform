@@ -1,0 +1,40 @@
+---
+# Alertmanager role
+#
+# Deploys Prometheus Alertmanager with configurable notification backends:
+# email (SMTP), ntfy (push notifications), or generic webhook.
+# Receives alerts from Prometheus and routes them to the configured receiver.
+
+- name: Create Alertmanager directories
+  ansible.builtin.file:
+    path: "{{ app_dir }}/observability/alertmanager/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+  loop:
+    - ""
+    - data
+
+- name: Template Alertmanager config
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ app_dir }}/observability/alertmanager/alertmanager.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  notify: Restart alertmanager
+
+- name: Template Alertmanager docker-compose.yml
+  ansible.builtin.template:
+    src: ../../../templates/compose/alertmanager.j2
+    dest: "{{ app_dir }}/observability/alertmanager/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart alertmanager
+
+- name: Start Alertmanager
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/alertmanager"
+    state: present

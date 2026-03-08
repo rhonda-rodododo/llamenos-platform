@@ -29,6 +29,18 @@
 		reverse_proxy strfry:7777
 	}
 
+{% if observability_enabled | default(false) and not (healthcheck_only | default(false)) %}
+	# ── Observability ──────────────────────────────────────
+	# Grafana has its own authentication. Prometheus and Alertmanager
+	# are only accessible via the internal Docker network (monitoring).
+	# They are NOT exposed through Caddy for security.
+{% if grafana_enabled | default(true) %}
+	handle /grafana/* {
+		reverse_proxy grafana:3000
+	}
+{% endif %}
+{% endif %}
+
 	# Everything else (SPA static files)
 	handle {
 		reverse_proxy app:3000

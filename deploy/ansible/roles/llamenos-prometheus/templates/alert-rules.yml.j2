@@ -1,0 +1,114 @@
+# Prometheus Alert Rules — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+groups:
+  - name: llamenos-availability
+    rules:
+      - alert: AppDown
+        expr: up{job="llamenos-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Llamenos app is down"
+          description: "The Llamenos application has been unreachable for more than 1 minute."
+
+      - alert: AppHealthCheckFailing
+        expr: probe_success{job="llamenos-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "App health check failing"
+          description: "The /api/health endpoint has been failing for 2 minutes."
+
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL exporter has been unreachable for more than 1 minute."
+
+      - alert: CaddyDown
+        expr: up{job="caddy"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Caddy reverse proxy is down"
+          description: "Caddy has been unreachable for more than 1 minute."
+
+{% if node_exporter_enabled | default(true) %}
+  - name: llamenos-host
+    rules:
+      - alert: HighCpuUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage (> 85%)"
+          description: "CPU usage has been above 85% for 5 minutes. Current: {{ "{{ $value | printf \"%.1f\" }}" }}%"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage (> 90%)"
+          description: "Memory usage has been above 90% for 5 minutes. Current: {{ "{{ $value | printf \"%.1f\" }}" }}%"
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space low (> 85% used)"
+          description: "Root filesystem is above 85% full. Current: {{ "{{ $value | printf \"%.1f\" }}" }}%"
+
+      - alert: DiskSpaceCritical
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk space critical (> 95% used)"
+          description: "Root filesystem is above 95% full. Current: {{ "{{ $value | printf \"%.1f\" }}" }}%"
+{% endif %}
+
+  - name: llamenos-containers
+    rules:
+      - alert: ContainerRestarting
+        expr: increase(container_restart_count[15m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restarting frequently"
+          description: "Container {{ "{{ $labels.name }}" }} has restarted more than 3 times in 15 minutes."
+
+      - alert: ContainerOomKilled
+        expr: container_oom_events_total > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container OOM killed"
+          description: "Container {{ "{{ $labels.name }}" }} was OOM killed."
+
+{% if loki_enabled | default(true) %}
+  - name: llamenos-logs
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate({job="llamenos"} |= "error" [5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate in logs"
+          description: "More than 1 error per second sustained for 5 minutes."
+{% endif %}

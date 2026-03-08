@@ -206,6 +206,82 @@ ntp_servers:
   - "2.pool.ntp.org"
   - "3.pool.ntp.org"
 
+# ─── Observability ──────────────────────────────────────────────
+# Master toggle — set to true to deploy monitoring stack
+observability_enabled: false
+
+# Individual service toggles (all require observability_enabled: true)
+prometheus_enabled: true
+grafana_enabled: true
+loki_enabled: true
+promtail_enabled: true
+alertmanager_enabled: true
+node_exporter_enabled: true
+
+# Lightweight alternative — if true, disables Prometheus/Grafana/Loki/Promtail
+# and uses a simple HTTP health poller with ntfy notifications instead
+healthcheck_only: false
+
+# Prometheus settings
+prometheus_image: prom/prometheus:v3.2.1
+prometheus_retention: 15d
+prometheus_retention_size: 5GB
+prometheus_scrape_interval: 15s
+
+# Grafana settings
+grafana_image: grafana/grafana-oss:11.5.2
+grafana_admin_password: ""  # Generate with: openssl rand -base64 24
+grafana_domain: ""          # Leave empty to use {{ domain }} with /grafana path
+grafana_allow_signup: false
+
+# Loki settings
+loki_image: grafana/loki:3.4.2
+loki_retention_period: 168h  # 7 days
+
+# Promtail settings
+promtail_image: grafana/promtail:3.4.2
+
+# Alertmanager settings
+alertmanager_image: prom/alertmanager:v0.28.1
+
+# Alert notification — choose one:
+#   "email"   → SMTP (set alert_smtp_* below)
+#   "ntfy"    → ntfy.sh push notifications (set alert_ntfy_* below)
+#   "webhook" → generic webhook (set alert_webhook_url below)
+alert_notification_method: ntfy
+
+# SMTP settings (for alert_notification_method: email)
+alert_smtp_host: ""
+alert_smtp_port: 587
+alert_smtp_username: ""
+alert_smtp_password: ""
+alert_smtp_from: "alerts@yourdomain.org"
+alert_smtp_to: "oncall@yourdomain.org"
+
+# ntfy settings (for alert_notification_method: ntfy)
+alert_ntfy_url: "https://ntfy.sh"
+alert_ntfy_topic: "llamenos-alerts"
+alert_ntfy_token: ""  # Optional auth token
+
+# Webhook settings (for alert_notification_method: webhook)
+alert_webhook_url: ""
+
+# Node exporter settings
+node_exporter_image: prom/node-exporter:v1.9.0
+
+# Healthcheck-only mode settings (used when healthcheck_only: true)
+healthcheck_image: curlimages/curl:8.12.1
+healthcheck_interval: 30     # seconds between checks
+healthcheck_endpoints:
+  - name: app
+    url: "http://app:3000/api/health"
+  - name: postgres
+    url: "tcp://postgres:5432"
+  - name: strfry
+    url: "http://strfry:7777"
+healthcheck_ntfy_url: "https://ntfy.sh"
+healthcheck_ntfy_topic: "llamenos-health"
+
 # ─── System ─────────────────────────────────────────────────────
 # Timezone for the server
 timezone: UTC

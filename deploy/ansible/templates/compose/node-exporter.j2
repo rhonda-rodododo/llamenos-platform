@@ -1,0 +1,32 @@
+# Node Exporter Docker Compose — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+name: llamenos
+
+services:
+  node-exporter:
+    image: {{ node_exporter_image }}
+    restart: unless-stopped
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - monitoring
+    pid: host
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+networks:
+  monitoring:
+    name: llamenos_monitoring
+    external: true

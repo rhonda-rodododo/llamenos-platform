@@ -1,0 +1,28 @@
+# Promtail Docker Compose — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+name: llamenos
+
+services:
+  promtail:
+    image: {{ promtail_image }}
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/promtail/promtail-config.yml"
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log:ro
+    networks:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+networks:
+  monitoring:
+    name: llamenos_monitoring
+    external: true

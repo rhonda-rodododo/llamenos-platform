@@ -1,0 +1,29 @@
+---
+# Node Exporter role
+#
+# Deploys Prometheus node_exporter as a Docker container via a standalone
+# Compose file. Exposes host metrics (CPU, memory, disk, network) on port 9100
+# for Prometheus scraping. Runs with read-only root filesystem and host
+# namespace access for accurate metrics.
+
+- name: Create node-exporter directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/observability/node-exporter"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template node-exporter docker-compose.yml
+  ansible.builtin.template:
+    src: ../../../templates/compose/node-exporter.j2
+    dest: "{{ app_dir }}/observability/node-exporter/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart node-exporter
+
+- name: Start node-exporter
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/node-exporter"
+    state: present

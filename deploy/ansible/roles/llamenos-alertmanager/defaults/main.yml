@@ -1,0 +1,13 @@
+---
+alertmanager_image: prom/alertmanager:v0.28.1
+alert_notification_method: ntfy
+alert_smtp_host: ""
+alert_smtp_port: 587
+alert_smtp_username: ""
+alert_smtp_password: ""
+alert_smtp_from: "alerts@yourdomain.org"
+alert_smtp_to: "oncall@yourdomain.org"
+alert_ntfy_url: "https://ntfy.sh"
+alert_ntfy_topic: "llamenos-alerts"
+alert_ntfy_token: ""
+alert_webhook_url: ""

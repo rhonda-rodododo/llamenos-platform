@@ -102,6 +102,28 @@ restore-dry-run *ARGS:
 test-restore *ARGS:
     ansible-playbook playbooks/test-restore.yml --ask-vault-pass {{ARGS}}
 
+# ── Observability ─────────────────────────────────────────────────
+
+# Deploy or update the observability stack (Prometheus, Grafana, Loki, etc.)
+observability *ARGS:
+    ansible-playbook playbooks/observability.yml --ask-vault-pass {{ARGS}}
+
+# Deploy only Prometheus
+prometheus *ARGS:
+    ansible-playbook playbooks/observability.yml --ask-vault-pass --tags prometheus {{ARGS}}
+
+# Deploy only Grafana
+grafana *ARGS:
+    ansible-playbook playbooks/observability.yml --ask-vault-pass --tags grafana {{ARGS}}
+
+# Deploy only Loki + Promtail (log aggregation)
+logs *ARGS:
+    ansible-playbook playbooks/observability.yml --ask-vault-pass --tags loki,promtail {{ARGS}}
+
+# Deploy only Alertmanager
+alertmanager *ARGS:
+    ansible-playbook playbooks/observability.yml --ask-vault-pass --tags alertmanager {{ARGS}}
+
 # ── Verification ────────────────────────────────────────────────
 
 # Check configuration without making changes
@@ -145,6 +167,7 @@ generate-secrets:
     echo "server_nostr_secret: $(openssl rand -hex 32)"
     echo "ari_password: $(openssl rand -base64 24)"
     echo "bridge_secret: $(openssl rand -base64 24)"
+    echo "grafana_admin_password: $(openssl rand -base64 24)"
     echo ""
     echo "Copy these into your vars.yml before encrypting."
     echo "Run: just encrypt-vars"

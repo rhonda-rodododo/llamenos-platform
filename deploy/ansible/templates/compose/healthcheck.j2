@@ -1,0 +1,27 @@
+# Healthcheck Docker Compose — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+#
+# Lightweight health polling container — alternative to full observability stack.
+
+name: llamenos
+
+services:
+  healthcheck:
+    image: {{ healthcheck_image }}
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/opt/healthcheck/healthcheck.sh"]
+    volumes:
+      - ./healthcheck.sh:/opt/healthcheck/healthcheck.sh:ro
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+networks:
+  internal:
+    name: llamenos_internal
+    external: true

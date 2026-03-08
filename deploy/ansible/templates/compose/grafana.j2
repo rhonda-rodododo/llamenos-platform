@@ -1,0 +1,49 @@
+# Grafana Docker Compose — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+name: llamenos
+
+services:
+  grafana:
+    image: {{ grafana_image }}
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password }}
+      - GF_USERS_ALLOW_SIGN_UP={{ grafana_allow_signup | lower }}
+      - GF_SERVER_ROOT_URL=https://{{ grafana_domain | default(domain) }}/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=true
+      - GF_SECURITY_CONTENT_SECURITY_POLICY=true
+    volumes:
+      - ./data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - monitoring
+      - web
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/grafana/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+networks:
+  monitoring:
+    name: llamenos_monitoring
+    external: true
+  web:
+    name: llamenos_web
+    external: true

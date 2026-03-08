@@ -1,0 +1,121 @@
+---
+# Observability Stack Playbook
+#
+# Deploys the monitoring and logging stack based on configuration:
+# - Full stack: Prometheus, Grafana, Loki, Promtail, Alertmanager, Node Exporter
+# - Lightweight: Healthcheck-only mode with ntfy notifications
+#
+# Requires observability_enabled: true in vars.yml.
+# Individual services can be toggled independently.
+#
+# Usage:
+#   ansible-playbook playbooks/observability.yml --ask-vault-pass
+#   ansible-playbook playbooks/observability.yml --ask-vault-pass --tags prometheus
+
+- name: Deploy Observability Stack
+  hosts: all
+  become: true
+  vars_files:
+    - ../vars.yml
+  pre_tasks:
+    - name: Validate observability is enabled
+      ansible.builtin.assert:
+        that:
+          - observability_enabled | default(false) | bool
+        fail_msg: "Observability is disabled. Set observability_enabled: true in vars.yml."
+        quiet: true
+
+    - name: Create observability base directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}/observability"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0750"
+
+    - name: Create monitoring Docker network
+      community.docker.docker_network:
+        name: llamenos_monitoring
+        driver: bridge
+        state: present
+
+    - name: Ensure internal Docker network exists
+      community.docker.docker_network:
+        name: llamenos_internal
+        driver: bridge
+        internal: true
+        state: present
+
+    - name: Ensure web Docker network exists
+      community.docker.docker_network:
+        name: llamenos_web
+        driver: bridge
+        state: present
+
+  roles:
+    # ── Healthcheck-only mode ─────────────────────────────
+    - role: llamenos-healthcheck
+      when: healthcheck_only | default(false) | bool
+      tags: [healthcheck, observability]
+
+    # ── Full observability stack ──────────────────────────
+    - role: llamenos-node-exporter
+      when:
+        - not (healthcheck_only | default(false) | bool)
+        - node_exporter_enabled | default(true) | bool
+      tags: [node-exporter, observability]
+
+    - role: llamenos-loki
+      when:
+        - not (healthcheck_only | default(false) | bool)
+        - loki_enabled | default(true) | bool
+      tags: [loki, observability]
+
+    - role: llamenos-promtail
+      when:
+        - not (healthcheck_only | default(false) | bool)
+        - promtail_enabled | default(true) | bool
+        - loki_enabled | default(true) | bool
+      tags: [promtail, observability]
+
+    - role: llamenos-prometheus
+      when:
+        - not (healthcheck_only | default(false) | bool)
+        - prometheus_enabled | default(true) | bool
+      tags: [prometheus, observability]
+
+    - role: llamenos-alertmanager
+      when:
+        - not (healthcheck_only | default(false) | bool)
+        - alertmanager_enabled | default(true) | bool
+      tags: [alertmanager, observability]
+
+    - role: llamenos-grafana
+      when:
+        - not (healthcheck_only | default(false) | bool)
+        - grafana_enabled | default(true) | bool
+        - prometheus_enabled | default(true) | bool
+      tags: [grafana, observability]
+
+  post_tasks:
+    - name: Display observability status
+      ansible.builtin.debug:
+        msg: |
+          Observability stack deployed successfully.
+
+          {% if healthcheck_only | default(false) | bool %}
+          Mode: Healthcheck-only (lightweight)
+          Notifications: {{ healthcheck_ntfy_url }}/{{ healthcheck_ntfy_topic }}
+          {% else %}
+          Mode: Full observability stack
+          {% if grafana_enabled | default(true) | bool %}
+          Grafana: https://{{ domain }}/grafana/ (admin / {{ '***' if grafana_admin_password else 'NOT SET' }})
+          {% endif %}
+          {% if prometheus_enabled | default(true) | bool %}
+          Prometheus: https://{{ domain }}/prometheus/
+          {% endif %}
+          {% if alertmanager_enabled | default(true) | bool %}
+          Alertmanager: https://{{ domain }}/alertmanager/
+          Notifications: {{ alert_notification_method }}
+          {% endif %}
+          {% endif %}

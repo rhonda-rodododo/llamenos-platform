@@ -1,0 +1,39 @@
+---
+# Loki role
+#
+# Deploys Grafana Loki for centralized log aggregation. Stores logs on local
+# filesystem with configurable retention. Promtail ships logs to Loki.
+
+- name: Create Loki directories
+  ansible.builtin.file:
+    path: "{{ app_dir }}/observability/loki/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+  loop:
+    - ""
+    - data
+
+- name: Template Loki config
+  ansible.builtin.template:
+    src: loki-config.yml.j2
+    dest: "{{ app_dir }}/observability/loki/loki-config.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart loki
+
+- name: Template Loki docker-compose.yml
+  ansible.builtin.template:
+    src: ../../../templates/compose/loki.j2
+    dest: "{{ app_dir }}/observability/loki/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart loki
+
+- name: Start Loki
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/loki"
+    state: present

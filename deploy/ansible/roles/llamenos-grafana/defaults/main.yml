@@ -1,0 +1,5 @@
+---
+grafana_image: grafana/grafana-oss:11.5.2
+grafana_admin_password: ""
+grafana_domain: ""
+grafana_allow_signup: false

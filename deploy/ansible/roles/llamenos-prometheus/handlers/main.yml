@@ -1,0 +1,6 @@
+---
+- name: Restart prometheus
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/prometheus"
+    state: restarted
+    recreate: always

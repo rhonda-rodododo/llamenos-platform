@@ -1,0 +1,45 @@
+# Prometheus Docker Compose — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+name: llamenos
+
+services:
+  prometheus:
+    image: {{ prometheus_image }}
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time={{ prometheus_retention }}"
+      - "--storage.tsdb.retention.size={{ prometheus_retention_size }}"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.external-url=/prometheus/"
+      - "--web.route-prefix=/prometheus/"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./rules:/etc/prometheus/rules:ro
+      - ./data:/prometheus
+    networks:
+      - monitoring
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/prometheus/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+networks:
+  monitoring:
+    name: llamenos_monitoring
+    external: true
+  internal:
+    name: llamenos_internal
+    external: true

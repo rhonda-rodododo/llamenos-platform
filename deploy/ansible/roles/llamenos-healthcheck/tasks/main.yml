@@ -1,0 +1,38 @@
+---
+# Healthcheck role
+#
+# Lightweight alternative to the full Prometheus/Grafana/Loki stack.
+# Deploys a small container that polls configured endpoints at a fixed interval
+# and sends failure notifications via ntfy push notifications.
+# Suitable for low-resource VPS deployments that still need basic alerting.
+
+- name: Create healthcheck directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/observability/healthcheck"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template healthcheck script
+  ansible.builtin.template:
+    src: healthcheck.sh.j2
+    dest: "{{ app_dir }}/observability/healthcheck/healthcheck.sh"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+  notify: Restart healthcheck
+
+- name: Template healthcheck docker-compose.yml
+  ansible.builtin.template:
+    src: ../../../templates/compose/healthcheck.j2
+    dest: "{{ app_dir }}/observability/healthcheck/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart healthcheck
+
+- name: Start healthcheck
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/healthcheck"
+    state: present

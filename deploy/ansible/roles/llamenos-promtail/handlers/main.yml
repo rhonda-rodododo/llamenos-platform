@@ -1,0 +1,6 @@
+---
+- name: Restart promtail
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/promtail"
+    state: restarted
+    recreate: always

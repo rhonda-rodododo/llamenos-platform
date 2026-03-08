@@ -1,0 +1,3 @@
+---
+loki_image: grafana/loki:3.4.2
+loki_retention_period: 168h

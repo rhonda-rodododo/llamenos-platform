@@ -1,0 +1,36 @@
+# Alertmanager Docker Compose — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+name: llamenos
+
+services:
+  alertmanager:
+    image: {{ alertmanager_image }}
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=/alertmanager/"
+      - "--web.route-prefix=/alertmanager/"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./data:/alertmanager
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/alertmanager/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+networks:
+  monitoring:
+    name: llamenos_monitoring
+    external: true

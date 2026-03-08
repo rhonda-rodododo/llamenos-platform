@@ -1,0 +1,63 @@
+# Promtail Configuration — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # ── Docker container logs ─────────────────────────────
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["com.docker.compose.project=llamenos"]
+    relabel_configs:
+      # Use container name as the label
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/?(.*)"
+        target_label: container
+      # Use compose service name
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: service
+      # Use compose project name
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_project"]
+        target_label: project
+    pipeline_stages:
+      # Try to parse JSON logs (app, caddy)
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            ts: ts
+      - labels:
+          level:
+      # Drop empty lines
+      - match:
+          selector: '{service=~".+"}'
+          stages:
+            - drop:
+                expression: "^\\s*$"
+
+  # ── System logs ───────────────────────────────────────
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/syslog
+    pipeline_stages:
+      - regex:
+          expression: "^(?P<timestamp>\\w+\\s+\\d+\\s+\\d+:\\d+:\\d+)\\s+(?P<hostname>\\S+)\\s+(?P<process>\\S+?)(?:\\[\\d+\\])?:\\s+(?P<message>.*)$"
+      - labels:
+          hostname:
+          process:

@@ -1,0 +1,6 @@
+---
+- name: Restart healthcheck
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/healthcheck"
+    state: restarted
+    recreate: always

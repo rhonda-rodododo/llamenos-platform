@@ -1,0 +1,66 @@
+# Prometheus Configuration — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_scrape_interval }}
+  external_labels:
+    cluster: llamenos
+    environment: {{ environment }}
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+{% if alertmanager_enabled | default(true) %}
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+{% endif %}
+
+scrape_configs:
+  # ── Prometheus self-monitoring ────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── Llamenos application ──────────────────────────────
+  - job_name: llamenos-app
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["app:3000"]
+        labels:
+          service: app
+
+  # ── Node exporter (host metrics) ─────────────────────
+{% if node_exporter_enabled | default(true) %}
+  - job_name: node-exporter
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          service: node
+{% endif %}
+
+  # ── Caddy reverse proxy ──────────────────────────────
+  - job_name: caddy
+    static_configs:
+      - targets: ["caddy:2019"]
+        labels:
+          service: caddy
+
+  # ── PostgreSQL ───────────────────────────────────────
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: postgres
+
+{% if loki_enabled | default(true) %}
+  # ── Loki ─────────────────────────────────────────────
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+        labels:
+          service: loki
+{% endif %}

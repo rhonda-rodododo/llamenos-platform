@@ -1,0 +1,94 @@
+#!/bin/sh
+# Llamenos Health Check Script — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+#
+# Polls configured endpoints and sends ntfy alerts on failure.
+# Runs in a loop inside a lightweight curl container.
+
+set -eu
+
+NTFY_URL="{{ healthcheck_ntfy_url }}/{{ healthcheck_ntfy_topic }}"
+INTERVAL={{ healthcheck_interval }}
+HOSTNAME="$(hostname)"
+
+# Track failure state to avoid alert spam
+{% for endpoint in healthcheck_endpoints %}
+FAILED_{{ endpoint.name | upper }}=0
+{% endfor %}
+
+send_alert() {
+  local name="$1"
+  local url="$2"
+  local status="$3"
+
+  curl -sf \
+    -H "Title: [DOWN] ${name} on ${HOSTNAME}" \
+    -H "Priority: urgent" \
+    -H "Tags: rotating_light" \
+    -d "Health check failed for ${name} (${url}). Status: ${status}" \
+    "${NTFY_URL}" >/dev/null 2>&1 || true
+}
+
+send_recovery() {
+  local name="$1"
+  local url="$2"
+
+  curl -sf \
+    -H "Title: [RECOVERED] ${name} on ${HOSTNAME}" \
+    -H "Priority: default" \
+    -H "Tags: white_check_mark" \
+    -d "Health check recovered for ${name} (${url})." \
+    "${NTFY_URL}" >/dev/null 2>&1 || true
+}
+
+check_http() {
+  local url="$1"
+  curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "${url}" 2>/dev/null
+}
+
+check_tcp() {
+  local host_port="$1"
+  local host="${host_port%%:*}"
+  local port="${host_port##*:}"
+  # Use curl to test TCP connectivity
+  curl -sf -o /dev/null --max-time 5 "http://${host}:${port}" 2>/dev/null
+  # Any response (even connection refused at HTTP level) means TCP is reachable
+  # Only timeout means unreachable
+}
+
+echo "Starting health check loop (interval: ${INTERVAL}s)"
+
+while true; do
+{% for endpoint in healthcheck_endpoints %}
+  # Check {{ endpoint.name }}
+{% if endpoint.url.startswith('tcp://') %}
+  HOST_PORT="{{ endpoint.url | replace('tcp://', '') }}"
+  if check_tcp "${HOST_PORT}"; then
+    if [ "${FAILED_{{ endpoint.name | upper }}}" = "1" ]; then
+      send_recovery "{{ endpoint.name }}" "{{ endpoint.url }}"
+      FAILED_{{ endpoint.name | upper }}=0
+    fi
+  else
+    if [ "${FAILED_{{ endpoint.name | upper }}}" = "0" ]; then
+      send_alert "{{ endpoint.name }}" "{{ endpoint.url }}" "timeout"
+      FAILED_{{ endpoint.name | upper }}=1
+    fi
+  fi
+{% else %}
+  STATUS=$(check_http "{{ endpoint.url }}" || echo "000")
+  if [ "${STATUS}" = "200" ]; then
+    if [ "${FAILED_{{ endpoint.name | upper }}}" = "1" ]; then
+      send_recovery "{{ endpoint.name }}" "{{ endpoint.url }}"
+      FAILED_{{ endpoint.name | upper }}=0
+    fi
+  else
+    if [ "${FAILED_{{ endpoint.name | upper }}}" = "0" ]; then
+      send_alert "{{ endpoint.name }}" "{{ endpoint.url }}" "${STATUS}"
+      FAILED_{{ endpoint.name | upper }}=1
+    fi
+  fi
+{% endif %}
+
+{% endfor %}
+  sleep "${INTERVAL}"
+done

@@ -28,3 +28,10 @@
   ansible.builtin.import_playbook: playbooks/deploy.yml
   tags:
     - deploy
+
+- name: Deploy Observability Stack
+  ansible.builtin.import_playbook: playbooks/observability.yml
+  when: observability_enabled | default(false) | bool
+  tags:
+    - observability
+    - deploy

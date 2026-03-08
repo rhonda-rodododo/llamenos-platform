@@ -1,0 +1,12 @@
+---
+healthcheck_image: curlimages/curl:8.12.1
+healthcheck_interval: 30
+healthcheck_endpoints:
+  - name: app
+    url: "http://app:3000/api/health"
+  - name: postgres
+    url: "tcp://postgres:5432"
+  - name: strfry
+    url: "http://strfry:7777"
+healthcheck_ntfy_url: "https://ntfy.sh"
+healthcheck_ntfy_topic: "llamenos-health"

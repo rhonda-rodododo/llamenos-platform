@@ -1,0 +1,2 @@
+---
+promtail_image: grafana/promtail:3.4.2

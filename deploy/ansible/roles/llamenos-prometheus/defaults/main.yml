@@ -1,0 +1,5 @@
+---
+prometheus_image: prom/prometheus:v3.2.1
+prometheus_retention: 15d
+prometheus_retention_size: 5GB
+prometheus_scrape_interval: 15s

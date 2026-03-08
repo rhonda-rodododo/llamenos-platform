@@ -1,0 +1,66 @@
+---
+# Grafana role
+#
+# Deploys Grafana with pre-provisioned datasources (Prometheus, Loki) and
+# pre-built dashboards for the Llamenos stack. Accessible via /grafana path
+# on the main domain through Caddy reverse proxy.
+
+- name: Create Grafana directories
+  ansible.builtin.file:
+    path: "{{ app_dir }}/observability/grafana/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+  loop:
+    - ""
+    - data
+    - provisioning/datasources
+    - provisioning/dashboards
+    - dashboards
+
+- name: Template Grafana datasource provisioning
+  ansible.builtin.template:
+    src: datasources.yml.j2
+    dest: "{{ app_dir }}/observability/grafana/provisioning/datasources/llamenos.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart grafana
+
+- name: Template Grafana dashboard provisioning
+  ansible.builtin.template:
+    src: dashboard-provider.yml.j2
+    dest: "{{ app_dir }}/observability/grafana/provisioning/dashboards/llamenos.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart grafana
+
+- name: Copy pre-built dashboards
+  ansible.builtin.template:
+    src: "../../../templates/grafana/{{ item }}"
+    dest: "{{ app_dir }}/observability/grafana/dashboards/{{ item | replace('.j2', '') }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  loop:
+    - overview.json
+    - host-metrics.json
+    - container-metrics.json
+    - logs.json
+  notify: Restart grafana
+
+- name: Template Grafana docker-compose.yml
+  ansible.builtin.template:
+    src: ../../../templates/compose/grafana.j2
+    dest: "{{ app_dir }}/observability/grafana/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart grafana
+
+- name: Start Grafana
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/grafana"
+    state: present

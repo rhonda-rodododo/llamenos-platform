@@ -1,0 +1,6 @@
+---
+- name: Restart loki
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/observability/loki"
+    state: restarted
+    recreate: always
