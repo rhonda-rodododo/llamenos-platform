@@ -37,6 +37,7 @@ import { SpamSection } from '@/components/admin-settings/spam-section'
 import { RolesSection } from '@/components/admin-settings/roles-section'
 import { RCSChannelSection } from '@/components/admin-settings/rcs-channel-section'
 import { SignalChannelSection } from '@/components/admin-settings/signal-channel-section'
+import { MigrationStatusSection } from '@/components/admin-settings/migration-status-section'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
@@ -283,6 +284,12 @@ function AdminSettingsPage() {
           statusSummary={messagingConfig.signal ? t('common.configured', { defaultValue: 'Configured' }) : t('settings.notConfigured', { defaultValue: 'Not configured' })}
         />
       )}
+
+      <MigrationStatusSection
+        expanded={expanded.has('migrations')}
+        onToggle={(open) => toggleSection('migrations', open)}
+        statusSummary={t('migrations.title', { defaultValue: 'Data Migrations' })}
+      />
 
       <ConfirmDialog
         open={!!confirmToggle}

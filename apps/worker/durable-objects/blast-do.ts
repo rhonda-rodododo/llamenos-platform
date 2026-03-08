@@ -3,6 +3,9 @@ import type { Env } from '../types'
 import type { MessagingChannelType, Subscriber, Blast, BlastSettings, BlastContent } from '@shared/types'
 import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
 import { DORouter } from '../lib/do-router'
+import { runMigrations } from '../../shared/migrations/runner'
+import { migrations } from '../../shared/migrations'
+import { registerMigrationRoutes } from '../../shared/migrations/do-routes'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
@@ -20,6 +23,7 @@ import { HMAC_PREFERENCE_TOKEN, HMAC_SUBSCRIBER } from '@shared/crypto-labels'
  * - Alarm-driven batch delivery
  */
 export class BlastDO extends DurableObject<Env> {
+  private migrated = false
   private router: DORouter
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -49,6 +53,9 @@ export class BlastDO extends DurableObject<Env> {
     this.router.get('/blast-settings', () => this.getBlastSettings())
     this.router.patch('/blast-settings', async (req) => this.updateBlastSettings(await req.json()))
 
+    // --- Migration Management (Epic 286) ---
+    registerMigrationRoutes(this.router, () => this.ctx.storage, 'blasts')
+
     // --- Test Reset (demo mode only — Epic 258 C3) ---
     this.router.post('/reset', async () => {
       if (this.env.DEMO_MODE !== 'true') {
@@ -60,6 +67,10 @@ export class BlastDO extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (!this.migrated) {
+      await runMigrations(this.ctx.storage, migrations, 'blasts')
+      this.migrated = true
+    }
     return this.router.handle(request)
   }
 

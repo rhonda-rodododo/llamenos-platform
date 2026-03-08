@@ -3,6 +3,7 @@ import type { Env, Volunteer, InviteCode, WebAuthnCredential, WebAuthnSettings, 
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
 import { migrations } from '@shared/migrations'
+import { registerMigrationRoutes } from '@shared/migrations/do-routes'
 import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 
 /**
@@ -99,6 +100,15 @@ export class IdentityDO extends DurableObject<Env> {
     this.router.post('/devices/:pubkey/cleanup', async (req, { pubkey }) =>
       this.cleanupDevices(pubkey, await req.json()))
     this.router.delete('/devices/:pubkey', (_req, { pubkey }) => this.deleteAllDevices(pubkey))
+
+    // --- Migration Management (Epic 286) ---
+    registerMigrationRoutes(this.router, () => this.ctx.storage, 'identity')
+
+    // --- Test: skip admin seed on next ensureInit (for bootstrap tests) ---
+    this.router.post('/test-skip-admin-seed', async () => {
+      await this.ctx.storage.put('_skipAdminSeed', true)
+      return Response.json({ ok: true })
+    })
 
     // --- Test Reset (demo mode only — Epic 258 C3) ---
     this.router.post('/reset', async () => {

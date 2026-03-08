@@ -4,6 +4,7 @@ import { hashAuditEntry } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
 import { migrations } from '@shared/migrations'
+import { registerMigrationRoutes } from '@shared/migrations/do-routes'
 
 /**
  * RecordsDO — manages operational data:
@@ -71,6 +72,9 @@ export class RecordsDO extends DurableObject<Env> {
       return this.getAuditLog(page, limit, actorPubkey, eventType, dateFrom, dateTo, search)
     })
     this.router.post('/audit', async (req) => this.addAuditEntry(await req.json()))
+
+    // --- Migration Management (Epic 286) ---
+    registerMigrationRoutes(this.router, () => this.ctx.storage, 'records')
 
     // --- Test Reset (demo mode only — Epic 258 C3) ---
     this.router.post('/reset', async () => {

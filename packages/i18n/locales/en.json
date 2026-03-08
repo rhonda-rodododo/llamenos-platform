@@ -1902,6 +1902,15 @@
     "disconnected": "Disconnected",
     "reconnecting": "Reconnecting (%d)..."
   },
+  "migrations": {
+    "title": "Data Migrations",
+    "description": "Schema version and migration status across all data stores",
+    "pending": "pending",
+    "applied": "Applied",
+    "upToDate": "Up to date",
+    "lastRun": "Last run",
+    "pendingWarning": "{{count}} pending migration(s) — migrations run automatically on next access"
+  },
   "yes": "Yes",
   "yourIdentity": "Your Identity",
   "yourPrivateKey": "Your Private Key",

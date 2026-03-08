@@ -322,4 +322,37 @@ settings.get('/permissions', requirePermission('system:manage-roles'), async (c)
   })
 })
 
+// --- Migration Status (Epic 286) ---
+// Returns migration status for all 7 DOs in a single response
+settings.get('/migrations', requirePermission('system:manage-roles'), async (c) => {
+  const dos = getDOs(c.env)
+
+  const doNames: Array<{ label: string; stub: typeof dos.settings }> = [
+    { label: 'settings', stub: dos.settings },
+    { label: 'identity', stub: dos.identity },
+    { label: 'records', stub: dos.records },
+    { label: 'shifts', stub: dos.shifts },
+    { label: 'calls', stub: dos.calls },
+    { label: 'conversations', stub: dos.conversations },
+    { label: 'blasts', stub: dos.blasts },
+  ]
+
+  const results = await Promise.all(
+    doNames.map(async ({ label, stub }) => {
+      try {
+        const res = await stub.fetch(new Request('http://do/migrations/status'))
+        if (res.ok) {
+          const data = await res.json()
+          return { namespace: label, ...data as Record<string, unknown> }
+        }
+        return { namespace: label, error: `HTTP ${res.status}` }
+      } catch (err) {
+        return { namespace: label, error: err instanceof Error ? err.message : 'Unknown error' }
+      }
+    }),
+  )
+
+  return c.json({ namespaces: results })
+})
+
 export default settings

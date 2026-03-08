@@ -3,6 +3,7 @@ import type { Env, Shift } from '../types'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
 import { migrations } from '@shared/migrations'
+import { registerMigrationRoutes } from '@shared/migrations/do-routes'
 import { createPushDispatcher } from '../lib/push-dispatch'
 
 /** Validate HH:MM format (00:00–23:59) */
@@ -31,6 +32,9 @@ export class ShiftManagerDO extends DurableObject<Env> {
       const pubkey = new URL(req.url).searchParams.get('pubkey') || ''
       return this.getMyStatus(pubkey)
     })
+    // --- Migration Management (Epic 286) ---
+    registerMigrationRoutes(this.router, () => this.ctx.storage, 'shifts')
+
     // Demo mode only — Epic 258 C3
     this.router.post('/reset', async () => {
       if (this.env.DEMO_MODE !== 'true') {

@@ -6,6 +6,7 @@ import { encryptMessageForStorage, encryptContactIdentifier, decryptContactIdent
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
 import { migrations } from '@shared/migrations'
+import { registerMigrationRoutes } from '@shared/migrations/do-routes'
 
 const PAGE_SIZE = 50
 
@@ -98,6 +99,9 @@ export class ConversationDO extends DurableObject<Env> {
     // --- Contacts (Epic 123) ---
     this.router.get('/contacts', () => this.getContactSummaries())
     this.router.get('/contacts/:hash', (_req, { hash }) => this.getContactConversations(hash))
+
+    // --- Migration Management (Epic 286) ---
+    registerMigrationRoutes(this.router, () => this.ctx.storage, 'conversations')
 
     // --- Test Reset (demo mode only — Epic 258 C3) ---
     this.router.post('/reset', async () => {

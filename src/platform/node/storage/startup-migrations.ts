@@ -1,6 +1,10 @@
 /**
  * Run migrations for all existing namespaces at Node.js server startup.
  * Uses advisory locks to prevent concurrent migration across replicas.
+ *
+ * Production safety: Requires RUN_MIGRATIONS=true in production environments.
+ * This prevents accidental migration runs during deploys — migrations must be
+ * explicitly opt-in via environment variable or CLI tooling.
  */
 import { getPool } from './postgres-pool'
 import { PostgresStorage } from './postgres-storage'
@@ -10,6 +14,14 @@ import { migrations } from '../../../../packages/shared/migrations'
 export async function runStartupMigrations(): Promise<void> {
   if (migrations.length === 0) {
     console.log('[migrations] No migrations registered — skipping')
+    return
+  }
+
+  // Production safety guard: require explicit opt-in
+  const env = process.env.ENVIRONMENT || 'production'
+  const runMigrationsEnv = process.env.RUN_MIGRATIONS
+  if (env === 'production' && runMigrationsEnv !== 'true') {
+    console.log('[migrations] Production mode — set RUN_MIGRATIONS=true to run migrations at startup')
     return
   }
 

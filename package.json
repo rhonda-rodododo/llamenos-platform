@@ -78,7 +78,10 @@
     "test:integration:node": "bunx vitest run --config vitest.integration.node.config.ts",
     "dev:node": "bash scripts/dev-node.sh",
     "dev:node:stop": "bash scripts/dev-node.sh stop",
-    "dev:node:logs": "bash scripts/dev-node.sh logs"
+    "dev:node:logs": "bash scripts/dev-node.sh logs",
+    "migrate:status": "bun run scripts/migrate.ts status",
+    "migrate:up": "bun run scripts/migrate.ts up",
+    "migrate:rollback": "bun run scripts/migrate.ts rollback"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1000.0",

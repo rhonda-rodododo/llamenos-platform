@@ -4,6 +4,7 @@ import { hashPhone, encryptCallRecordForStorage } from '../lib/crypto'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
 import { migrations } from '@shared/migrations'
+import { registerMigrationRoutes } from '@shared/migrations/do-routes'
 import { getNostrPublisher } from '../lib/do-access'
 import { deriveServerEventKey, encryptHubEvent } from '../lib/hub-event-crypto'
 import { createPushDispatcher } from '../lib/push-dispatch'
@@ -87,6 +88,9 @@ export class CallRouterDO extends DurableObject<Env> {
       this.publishNostrEvent(KIND_CALL_UPDATE, message)
       return Response.json({ ok: true })
     })
+
+    // --- Migration Management (Epic 286) ---
+    registerMigrationRoutes(this.router, () => this.ctx.storage, 'calls')
 
     // Demo mode only — Epic 258 C3
     this.router.post('/reset', async () => {

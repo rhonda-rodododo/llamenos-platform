@@ -6,6 +6,7 @@ import { IVR_LANGUAGES } from '@shared/languages'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
 import { migrations } from '@shared/migrations'
+import { registerMigrationRoutes } from '@shared/migrations/do-routes'
 import type { Role } from '@shared/permissions'
 import { DEFAULT_ROLES } from '@shared/permissions'
 
@@ -107,6 +108,9 @@ export class SettingsDO extends DurableObject<Env> {
     // --- Hub Key Management ---
     this.router.get('/settings/hub/:id/key', (_req, { id }) => this.getHubKeyEnvelopes(id))
     this.router.put('/settings/hub/:id/key', async (req, { id }) => this.setHubKeyEnvelopes(id, await req.json()))
+
+    // --- Migration Management (Epic 286) ---
+    registerMigrationRoutes(this.router, () => this.ctx.storage, 'settings')
 
     // --- Test Reset (demo mode only — Epic 258 C3) ---
     this.router.post('/reset', async () => {
