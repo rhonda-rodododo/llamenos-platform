@@ -254,6 +254,20 @@ alert-log *ARGS:
 alert-state *ARGS:
     ssh {{ ansible_host }} "cat {{ app_dir | default('/opt/llamenos') }}/alerting/state.json | jq ."
 
+# Run full disaster recovery test
+dr-test *ARGS:
+    ansible-playbook playbooks/dr-test.yml --ask-vault-pass {{ARGS}}
+
+# View DR drill history and next scheduled drill
+dr-status:
+    @cat {{ app_dir }}/dr-results/*.json 2>/dev/null | jq -s 'sort_by(.date) | .[-5:]' || echo "No DR test results found"
+    @echo ""
+    @echo "DR Scenarios: docs/DR_SCENARIOS.md"
+
+# Restore from latest backup (production — use with caution)
+restore *ARGS:
+    ansible-playbook playbooks/test-restore.yml --ask-vault-pass {{ARGS}}
+
 # Generate secrets for a new deployment
 generate-secrets:
     #!/usr/bin/env bash

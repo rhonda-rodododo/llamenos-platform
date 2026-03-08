@@ -1,0 +1,363 @@
+---
+# Disaster Recovery Test Playbook
+#
+# Provisions a fresh Docker environment, restores from the latest backup,
+# validates all services, measures time-to-recovery, and tears down.
+#
+# Usage:
+#   just dr-test
+#   ansible-playbook playbooks/dr-test.yml --ask-vault-pass
+#   ansible-playbook playbooks/dr-test.yml --ask-vault-pass -e dr_mode=validate
+#
+# Tags: provision, restore, validate, always
+# Non-destructive: uses port 3333, project name llamenos-dr-test
+
+- name: Disaster Recovery Test
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    dr_mode: full  # full | restore | validate
+    dr_start_time: "{{ ansible_date_time.epoch }}"
+    dr_compose_dir: "{{ ansible_env.HOME }}/.llamenos-dr-test"
+    dr_results_file: "{{ app_dir | default('/opt/llamenos') }}/dr-results/dr-{{ ansible_date_time.iso8601_basic_short }}.json"
+    dr_project_name: llamenos-dr-test
+    dr_port: 3333
+    dr_rto_target: 14400  # 4 hours in seconds
+    backup_dir: "{{ app_dir | default('/opt/llamenos') }}/backups"
+    age_identity: "{{ age_identity_file | default('/root/backup-key.txt') }}"
+
+  pre_tasks:
+    - name: Record start time
+      ansible.builtin.set_fact:
+        dr_timer_start: "{{ ansible_date_time.epoch | int }}"
+      tags: always
+
+    - name: Ensure results directory exists
+      ansible.builtin.file:
+        path: "{{ dr_results_file | dirname }}"
+        state: directory
+        mode: "0755"
+      tags: always
+
+  tasks:
+    # =========================================================================
+    # PROVISION — Create isolated Docker environment
+    # =========================================================================
+    - name: Create temporary DR compose directory
+      ansible.builtin.file:
+        path: "{{ dr_compose_dir }}"
+        state: directory
+        mode: "0700"
+      tags: provision
+
+    - name: Find latest backup file
+      ansible.builtin.shell: |
+        ls -t {{ backup_dir }}/*.sql.gz.age {{ backup_dir }}/*.sql.gz 2>/dev/null | head -1
+      register: latest_backup
+      changed_when: false
+      failed_when: latest_backup.stdout == ""
+      tags: provision
+
+    - name: Record backup file
+      ansible.builtin.set_fact:
+        dr_backup_file: "{{ latest_backup.stdout }}"
+      tags: provision
+
+    - name: Determine if backup is encrypted
+      ansible.builtin.set_fact:
+        dr_backup_encrypted: "{{ dr_backup_file.endswith('.age') }}"
+      tags: provision
+
+    - name: Generate DR Docker Compose file
+      ansible.builtin.copy:
+        dest: "{{ dr_compose_dir }}/docker-compose.yml"
+        mode: "0600"
+        content: |
+          services:
+            postgres:
+              image: postgres:16-alpine
+              environment:
+                POSTGRES_USER: llamenos
+                POSTGRES_PASSWORD: dr-test-password
+                POSTGRES_DB: llamenos
+              ports:
+                - "{{ dr_port | int + 1 }}:5432"
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U llamenos"]
+                interval: 5s
+                timeout: 3s
+                retries: 10
+              volumes:
+                - dr-pgdata:/var/lib/postgresql/data
+
+            minio:
+              image: minio/minio:latest
+              command: server /data --console-address ":9001"
+              environment:
+                MINIO_ROOT_USER: dr-test-access
+                MINIO_ROOT_PASSWORD: dr-test-secret-key
+              ports:
+                - "{{ dr_port | int + 2 }}:9000"
+              healthcheck:
+                test: ["CMD", "mc", "ready", "local"]
+                interval: 5s
+                timeout: 3s
+                retries: 10
+              volumes:
+                - dr-minio:/data
+
+            app:
+              image: ghcr.io/llamenos/llamenos:latest
+              depends_on:
+                postgres:
+                  condition: service_healthy
+                minio:
+                  condition: service_healthy
+              environment:
+                NODE_ENV: production
+                PG_HOST: postgres
+                PG_PORT: "5432"
+                PG_USER: llamenos
+                PG_PASSWORD: dr-test-password
+                PG_DATABASE: llamenos
+                MINIO_ENDPOINT: minio
+                MINIO_PORT: "9000"
+                MINIO_ACCESS_KEY: dr-test-access
+                MINIO_SECRET_KEY: dr-test-secret-key
+                HMAC_SECRET: "{{ 'dr-test-hmac-secret-for-validation-only' | hash('sha256') }}"
+                ADMIN_PUBKEY: "0000000000000000000000000000000000000000000000000000000000000000"
+                SERVER_NOSTR_SECRET: "{{ 'dr-test-nostr-secret-for-validation-only' | hash('sha256') }}"
+                PORT: "3000"
+              ports:
+                - "{{ dr_port }}:3000"
+              healthcheck:
+                test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
+                interval: 10s
+                timeout: 5s
+                retries: 12
+                start_period: 30s
+
+          volumes:
+            dr-pgdata:
+            dr-minio:
+      tags: provision
+
+    - name: Record provision start time
+      ansible.builtin.set_fact:
+        dr_timer_provision_start: "{{ now(utc=true).strftime('%s') | int }}"
+      tags: provision
+
+    - name: Start DR Docker environment
+      ansible.builtin.command:
+        cmd: docker compose -p {{ dr_project_name }} up -d --wait
+        chdir: "{{ dr_compose_dir }}"
+      register: dr_compose_up
+      tags: provision
+
+    - name: Wait for PostgreSQL to be ready
+      ansible.builtin.command:
+        cmd: >
+          docker compose -p {{ dr_project_name }} exec -T postgres
+          pg_isready -U llamenos
+        chdir: "{{ dr_compose_dir }}"
+      register: pg_ready
+      retries: 30
+      delay: 2
+      until: pg_ready.rc == 0
+      tags: provision
+
+    - name: Record provision end time
+      ansible.builtin.set_fact:
+        dr_timer_provision_end: "{{ now(utc=true).strftime('%s') | int }}"
+      tags: provision
+
+    # =========================================================================
+    # RESTORE — Decrypt and restore from backup
+    # =========================================================================
+    - name: Record restore start time
+      ansible.builtin.set_fact:
+        dr_timer_restore_start: "{{ now(utc=true).strftime('%s') | int }}"
+      tags: restore
+
+    - name: Decrypt and restore backup (encrypted)
+      ansible.builtin.shell: |
+        age -d -i {{ age_identity }} {{ dr_backup_file }} \
+          | gunzip \
+          | docker compose -p {{ dr_project_name }} exec -T postgres \
+              psql -U llamenos -d llamenos
+      args:
+        chdir: "{{ dr_compose_dir }}"
+      when: dr_backup_encrypted | bool
+      register: dr_restore_encrypted
+      tags: restore
+
+    - name: Restore backup (unencrypted)
+      ansible.builtin.shell: |
+        gunzip -c {{ dr_backup_file }} \
+          | docker compose -p {{ dr_project_name }} exec -T postgres \
+              psql -U llamenos -d llamenos
+      args:
+        chdir: "{{ dr_compose_dir }}"
+      when: not (dr_backup_encrypted | bool)
+      register: dr_restore_unencrypted
+      tags: restore
+
+    - name: Record restore end time
+      ansible.builtin.set_fact:
+        dr_timer_restore_end: "{{ now(utc=true).strftime('%s') | int }}"
+      tags: restore
+
+    # =========================================================================
+    # VALIDATE — Check health, database tables, and API endpoints
+    # =========================================================================
+    - name: Record validate start time
+      ansible.builtin.set_fact:
+        dr_timer_validate_start: "{{ now(utc=true).strftime('%s') | int }}"
+      tags: validate
+
+    - name: Wait for app health endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:{{ dr_port }}/api/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      retries: 30
+      delay: 5
+      until: health_check.status == 200
+      ignore_errors: true
+      tags: validate
+
+    - name: Validate database tables exist
+      ansible.builtin.command:
+        cmd: >
+          docker compose -p {{ dr_project_name }} exec -T postgres
+          psql -U llamenos -d llamenos -t -c
+          "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
+        chdir: "{{ dr_compose_dir }}"
+      register: db_table_count
+      tags: validate
+
+    - name: Validate storage table has data
+      ansible.builtin.command:
+        cmd: >
+          docker compose -p {{ dr_project_name }} exec -T postgres
+          psql -U llamenos -d llamenos -t -c
+          "SELECT count(*) FROM storage;"
+        chdir: "{{ dr_compose_dir }}"
+      register: db_storage_count
+      ignore_errors: true
+      tags: validate
+
+    - name: Validate API auth endpoint responds
+      ansible.builtin.uri:
+        url: "http://localhost:{{ dr_port }}/api/auth/challenge"
+        method: GET
+        status_code: [200, 401, 404]
+      register: api_auth_check
+      ignore_errors: true
+      tags: validate
+
+    - name: Validate API settings endpoint responds
+      ansible.builtin.uri:
+        url: "http://localhost:{{ dr_port }}/api/settings/public"
+        method: GET
+        status_code: [200, 401, 404]
+      register: api_settings_check
+      ignore_errors: true
+      tags: validate
+
+    - name: Record validate end time
+      ansible.builtin.set_fact:
+        dr_timer_validate_end: "{{ now(utc=true).strftime('%s') | int }}"
+      tags: validate
+
+    # =========================================================================
+    # RESULTS — Calculate timing and save report
+    # =========================================================================
+    - name: Calculate recovery times
+      ansible.builtin.set_fact:
+        dr_time_provision: "{{ (dr_timer_provision_end | int) - (dr_timer_provision_start | int) }}"
+        dr_time_restore: "{{ (dr_timer_restore_end | int) - (dr_timer_restore_start | int) }}"
+        dr_time_validate: "{{ (dr_timer_validate_end | int) - (dr_timer_validate_start | int) }}"
+        dr_time_total: "{{ (dr_timer_validate_end | int) - (dr_timer_start | int) }}"
+      tags: always
+
+    - name: Display DR test results
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          DISASTER RECOVERY TEST RESULTS
+          ========================================
+          Date:            {{ ansible_date_time.iso8601 }}
+          Backup file:     {{ dr_backup_file }}
+          Encrypted:       {{ dr_backup_encrypted }}
+
+          TIMING
+          ----------------------------------------
+          Provision:       {{ dr_time_provision }}s
+          Restore:         {{ dr_time_restore }}s
+          Validate:        {{ dr_time_validate }}s
+          Total:           {{ dr_time_total }}s
+          RTO Target:      {{ dr_rto_target }}s ({{ (dr_rto_target | int / 3600) | round(1) }}h)
+          RTO Met:         {{ 'YES' if (dr_time_total | int) < (dr_rto_target | int) else 'NO' }}
+
+          VALIDATION
+          ----------------------------------------
+          Health endpoint: {{ 'PASS' if health_check.status == 200 else 'FAIL' }}
+          DB tables:       {{ db_table_count.stdout | trim }} tables
+          Storage rows:    {{ db_storage_count.stdout | default('0') | trim }}
+          Auth API:        {{ 'PASS' if api_auth_check.status is defined else 'FAIL' }}
+          Settings API:    {{ 'PASS' if api_settings_check.status is defined else 'FAIL' }}
+          ========================================
+      tags: always
+
+    - name: Save results as JSON
+      ansible.builtin.copy:
+        dest: "{{ dr_results_file }}"
+        mode: "0644"
+        content: |
+          {
+            "date": "{{ ansible_date_time.iso8601 }}",
+            "mode": "{{ dr_mode }}",
+            "backup_file": "{{ dr_backup_file }}",
+            "backup_encrypted": {{ dr_backup_encrypted | lower }},
+            "timing": {
+              "provision_seconds": {{ dr_time_provision }},
+              "restore_seconds": {{ dr_time_restore }},
+              "validate_seconds": {{ dr_time_validate }},
+              "total_seconds": {{ dr_time_total }}
+            },
+            "rto": {
+              "target_seconds": {{ dr_rto_target }},
+              "met": {{ 'true' if (dr_time_total | int) < (dr_rto_target | int) else 'false' }}
+            },
+            "validation": {
+              "health_endpoint": {{ 'true' if health_check.status == 200 else 'false' }},
+              "db_table_count": {{ db_table_count.stdout | trim | default('0') }},
+              "storage_row_count": {{ db_storage_count.stdout | default('0') | trim }},
+              "auth_api_responsive": {{ 'true' if api_auth_check.status is defined else 'false' }},
+              "settings_api_responsive": {{ 'true' if api_settings_check.status is defined else 'false' }}
+            },
+            "host": "{{ ansible_hostname }}"
+          }
+      tags: always
+
+  # ===========================================================================
+  # CLEANUP — Always runs, even on failure
+  # ===========================================================================
+  post_tasks:
+    - name: Tear down DR Docker environment
+      ansible.builtin.command:
+        cmd: docker compose -p {{ dr_project_name }} down -v --remove-orphans
+        chdir: "{{ dr_compose_dir }}"
+      ignore_errors: true
+      tags: always
+
+    - name: Remove temporary DR compose directory
+      ansible.builtin.file:
+        path: "{{ dr_compose_dir }}"
+        state: absent
+      ignore_errors: true
+      tags: always

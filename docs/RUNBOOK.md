@@ -21,6 +21,7 @@ This runbook provides procedures for common operational tasks, incident response
 7. [Common Issues and Solutions](#7-common-issues-and-solutions)
 8. [Scaling Considerations](#8-scaling-considerations)
 9. [Emergency Procedures](#9-emergency-procedures)
+10. [Disaster Recovery Drills](#10-disaster-recovery-drills)
 
 > **Key Revocation and Rotation**: For cryptographic key compromise, volunteer departure key revocation, device seizure response, and hub key rotation procedures, see the dedicated [Key Revocation Runbook](security/KEY_REVOCATION_RUNBOOK.md).
 
@@ -990,6 +991,50 @@ If your telephony provider is down (Twilio outage, etc.):
 
 ---
 
+## 10. Disaster Recovery Drills
+
+Regular DR drills verify that backups are restorable and that the team can execute recovery procedures under time pressure.
+
+**Full DR scenario documentation**: See [DR_SCENARIOS.md](DR_SCENARIOS.md) for five detailed scenarios covering server total loss, database corruption, ransomware, key compromise, and hosting provider shutdown.
+
+### 10.1 Run an Automated DR Drill
+
+The DR test playbook provisions a fresh, isolated Docker environment (port 3333, project name `llamenos-dr-test`), restores from the latest backup, validates all services, measures time-to-recovery, and tears down. It never touches production data.
+
+```bash
+cd deploy/ansible
+just dr-test
+```
+
+The playbook supports both encrypted (`.age`) and unencrypted (`.sql.gz`) backups. Results are saved as JSON in the `dr-results/` directory for historical tracking.
+
+### 10.2 Review DR History
+
+```bash
+cd deploy/ansible
+just dr-status
+```
+
+Displays the last 5 DR test results and RTO compliance.
+
+### 10.3 Drill Schedule
+
+Run automated DR drills **quarterly**. Alternate between full restore tests and tabletop exercises (walking through a scenario without executing). See [DR_SCENARIOS.md](DR_SCENARIOS.md) for the recommended quarterly rotation.
+
+### 10.4 RTO Targets
+
+| Scenario | Target RTO |
+|----------|-----------|
+| Server total loss | < 4 hours |
+| Database corruption | < 1 hour |
+| Ransomware | < 4 hours |
+| Key compromise | < 2 hours |
+| Hosting provider shutdown | < 8 hours |
+
+If a DR drill exceeds the target RTO, investigate the bottleneck (provisioning speed, backup download time, DNS propagation) and address it before the next drill.
+
+---
+
 ## Appendix: Maintenance Schedule
 
 | Task | Frequency | Procedure |
@@ -1004,5 +1049,5 @@ If your telephony provider is down (Twilio outage, etc.):
 | Database vacuum | Monthly | [Section 3.4](#34-vacuum-and-analyze) |
 | Dependency audit | Monthly | `bun audit` against latest source |
 | Backup retention cleanup | Automatic | Cron script (30-day default) |
-| Full restore test | Quarterly | Restore backup to staging environment |
+| DR drill (automated) | Quarterly | `just dr-test` — [Section 10](#10-disaster-recovery-drills) |
 | Penetration test | Annually | Engage external security firm |

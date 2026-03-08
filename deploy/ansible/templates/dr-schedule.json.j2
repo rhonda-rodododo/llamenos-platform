@@ -1,0 +1,18 @@
+{
+  "schedule": {
+    "frequency": "quarterly",
+    "next_drill": "{{ '%Y-%m-%d' | strftime(ansible_date_time.epoch | int + 7776000) }}",
+    "last_updated": "{{ ansible_date_time.iso8601 }}"
+  },
+  "contact": {
+    "email": "{{ dr_contact_email | default('ops@yourorg.org') }}"
+  },
+  "rto_targets": {
+    "server_total_loss": 14400,
+    "database_corruption": 3600,
+    "ransomware": 14400,
+    "key_compromise": 7200,
+    "provider_shutdown": 28800
+  },
+  "history": []
+}
