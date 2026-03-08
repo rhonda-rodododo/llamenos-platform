@@ -8,6 +8,8 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 import { createLogger } from '../lib/logger'
 import { incError } from '../lib/error-counter'
 import { collectByPrefix } from '../lib/pagination'
+import { resolveTTL, CLEANUP_ALARM_INTERVAL_MS, type TTLOverrides, type CleanupMetrics, emptyCleanupMetrics } from '../lib/ttl'
+import { incCounter } from '../routes/metrics'
 
 /**
  * IdentityDO — manages people and auth:
@@ -87,6 +89,9 @@ export class IdentityDO extends DurableObject<Env> {
     })
     this.router.post('/provision/rooms/:id/payload', async (req, { id }) =>
       this.setProvisionPayload(id, await req.json()))
+
+    // --- Cleanup Metrics ---
+    this.router.get('/identity/cleanup-metrics', () => this.getCleanupMetrics())
 
     // --- Admin Bootstrap ---
     this.router.get('/has-admin', () => this.hasAdmin())
@@ -241,40 +246,76 @@ export class IdentityDO extends DurableObject<Env> {
 
   override async alarm() {
     const log = createLogger('identity-do:alarm')
-    try {
-      const now = Date.now()
+    const now = Date.now()
+    const overrides = await this.ctx.storage.get<TTLOverrides>('ttlOverrides')
+    const metrics = await this.ctx.storage.get<CleanupMetrics>('cleanupMetrics') || emptyCleanupMetrics()
 
-      // Clean up expired WebAuthn challenges
+    try {
+      // --- Clean up expired WebAuthn challenges ---
+      const challengeTTL = resolveTTL('webauthnChallenge', overrides ?? undefined)
       const challengeKeys = await this.ctx.storage.list({ prefix: 'webauthn:challenge:' })
       for (const [key, value] of challengeKeys) {
         const data = value as { challenge: string; createdAt: number }
-        if (now - data.createdAt > 5 * 60 * 1000) {
+        if (now - data.createdAt > challengeTTL) {
           await this.ctx.storage.delete(key)
+          metrics.webauthnChallengesDeleted++
+          incCounter('llamenos_cleanup_items_deleted', { type: 'webauthn_challenge', do: 'identity' })
         }
       }
 
-      // Clean up expired sessions
+      // --- Clean up expired sessions ---
       const sessionKeys = await this.ctx.storage.list({ prefix: 'session:' })
       for (const [key, value] of sessionKeys) {
         const session = value as ServerSession
-        if (new Date(session.expiresAt) < new Date()) {
+        if (new Date(session.expiresAt).getTime() <= now) {
           await this.ctx.storage.delete(key)
+          metrics.expiredSessionsDeleted++
+          incCounter('llamenos_cleanup_items_deleted', { type: 'expired_session', do: 'identity' })
         }
       }
 
-      // Clean up expired provisioning rooms (5-minute TTL)
+      // --- Clean up expired provisioning rooms ---
+      const provisionTTL = resolveTTL('provisionRoom', overrides ?? undefined)
       const provisionKeys = await this.ctx.storage.list({ prefix: 'provision:' })
       for (const [key, value] of provisionKeys) {
         const room = value as ProvisionRoom
-        if (now - room.createdAt > 5 * 60 * 1000) {
+        if (now - room.createdAt > provisionTTL) {
           await this.ctx.storage.delete(key)
+          metrics.provisionRoomsDeleted++
+          incCounter('llamenos_cleanup_items_deleted', { type: 'provision_room', do: 'identity' })
         }
       }
+
+      // --- Clean up redeemed and expired invites (sharded storage) ---
+      const redeemedTTL = resolveTTL('redeemedInvite', overrides ?? undefined)
+      const expiredInviteTTL = resolveTTL('expiredInvite', overrides ?? undefined)
+      const invites = await this.getAllInvites()
+      let invitesCleaned = 0
+      for (const invite of invites) {
+        let shouldDelete = false
+        if (invite.usedAt) {
+          // Redeemed invite: delete after redeemedTTL
+          shouldDelete = now - new Date(invite.usedAt).getTime() >= redeemedTTL
+        } else if (new Date(invite.expiresAt).getTime() <= now) {
+          // Expired but never redeemed: delete after expiredInviteTTL
+          shouldDelete = now - new Date(invite.expiresAt).getTime() >= expiredInviteTTL
+        }
+        if (shouldDelete) {
+          await this.ctx.storage.delete(`invite:${invite.code}`)
+          invitesCleaned++
+          incCounter('llamenos_cleanup_items_deleted', { type: 'expired_invite', do: 'identity' })
+        }
+      }
+      metrics.expiredInvitesCleaned += invitesCleaned
+
+      metrics.lastCleanupAt = new Date().toISOString()
+      await this.ctx.storage.put('cleanupMetrics', metrics)
 
       log.debug('Alarm completed', {
         challengesCleaned: challengeKeys.size,
         sessionsCleaned: sessionKeys.size,
         provisionsCleaned: provisionKeys.size,
+        invitesCleaned,
       })
     } catch (err) {
       incError('alarm')
@@ -284,15 +325,15 @@ export class IdentityDO extends DurableObject<Env> {
       })
     }
 
-    // Clean up expired/redeemed invites (Epic 281)
-    const invites = await this.getAllInvites()
-    for (const invite of invites) {
-      const expired = new Date(invite.expiresAt) < new Date()
-      const redeemed = !!invite.usedAt
-      if (expired || redeemed) {
-        await this.ctx.storage.delete(`invite:${invite.code}`)
-      }
-    }
+    // Schedule next cleanup alarm
+    try {
+      await this.ctx.storage.setAlarm(now + CLEANUP_ALARM_INTERVAL_MS)
+    } catch { /* alarm already set */ }
+  }
+
+  private async getCleanupMetrics(): Promise<Response> {
+    const metrics = await this.ctx.storage.get<CleanupMetrics>('cleanupMetrics') || emptyCleanupMetrics()
+    return Response.json(metrics)
   }
 
   // --- Admin Bootstrap Methods ---

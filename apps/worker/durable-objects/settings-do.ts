@@ -11,6 +11,8 @@ import type { Role } from '@shared/permissions'
 import { DEFAULT_ROLES } from '@shared/permissions'
 import { createLogger } from '../lib/logger'
 import { incError } from '../lib/error-counter'
+import { resolveTTL, validateTTLOverrides, CLEANUP_ALARM_INTERVAL_MS, type TTLOverrides, type CleanupMetrics, emptyCleanupMetrics } from '../lib/ttl'
+import { incCounter } from '../routes/metrics'
 
 /**
  * SettingsDO — manages system configuration:
@@ -96,6 +98,13 @@ export class SettingsDO extends DurableObject<Env> {
 
     // --- Rate Limiting ---
     this.router.post('/rate-limit/check', async (req) => this.checkRateLimit(await req.json()))
+
+    // --- TTL Overrides ---
+    this.router.get('/settings/ttl', () => this.getTTLOverrides())
+    this.router.patch('/settings/ttl', async (req) => this.updateTTLOverrides(await req.json()))
+
+    // --- Cleanup Metrics ---
+    this.router.get('/settings/cleanup-metrics', () => this.getCleanupMetrics())
 
     // --- CAPTCHA state (server-side storage of expected digits) ---
     this.router.post('/captcha/store', async (req) => this.storeCaptcha(await req.json()))
@@ -202,22 +211,45 @@ export class SettingsDO extends DurableObject<Env> {
 
   override async alarm() {
     const log = createLogger('settings-do:alarm')
-    try {
-      const now = Date.now()
+    const now = Date.now()
+    const overrides = await this.ctx.storage.get<TTLOverrides>('ttlOverrides')
+    const metrics = await this.ctx.storage.get<CleanupMetrics>('cleanupMetrics') || emptyCleanupMetrics()
 
-      // Clean up expired rate limit entries
+    try {
+      // --- Clean up expired rate limit entries ---
+      const rateLimitTTL = resolveTTL('rateLimit', overrides ?? undefined)
       const rlKeys = await this.ctx.storage.list({ prefix: 'ratelimit:' })
       for (const [key, value] of rlKeys) {
         const timestamps = value as number[]
-        const recent = timestamps.filter(t => now - t < 60_000)
+        const recent = timestamps.filter(t => now - t < rateLimitTTL)
         if (recent.length === 0) {
           await this.ctx.storage.delete(key)
+          metrics.rateLimitEntriesDeleted++
+          incCounter('llamenos_cleanup_items_deleted', { type: 'rate_limit', do: 'settings' })
         } else {
           await this.ctx.storage.put(key, recent)
         }
       }
 
-      log.debug('Alarm completed', { rateLimitKeysCleaned: rlKeys.size })
+      // --- Clean up expired CAPTCHA challenges ---
+      const captchaTTL = resolveTTL('captchaChallenge', overrides ?? undefined)
+      const captchaKeys = await this.ctx.storage.list({ prefix: 'captcha:' })
+      for (const [key, value] of captchaKeys) {
+        const data = value as { expected: string; createdAt: number }
+        if (now - data.createdAt > captchaTTL) {
+          await this.ctx.storage.delete(key)
+          metrics.captchaChallengesDeleted++
+          incCounter('llamenos_cleanup_items_deleted', { type: 'captcha', do: 'settings' })
+        }
+      }
+
+      metrics.lastCleanupAt = new Date().toISOString()
+      await this.ctx.storage.put('cleanupMetrics', metrics)
+
+      log.debug('Alarm completed', {
+        rateLimitKeysCleaned: rlKeys.size,
+        captchaKeysCleaned: captchaKeys.size,
+      })
     } catch (err) {
       incError('alarm')
       log.error('Alarm failed', {
@@ -225,6 +257,11 @@ export class SettingsDO extends DurableObject<Env> {
         stack: err instanceof Error ? err.stack : undefined,
       })
     }
+
+    // Schedule next cleanup alarm
+    try {
+      await this.ctx.storage.setAlarm(now + CLEANUP_ALARM_INTERVAL_MS)
+    } catch { /* alarm already set */ }
   }
 
   // --- Spam Settings ---
@@ -834,6 +871,31 @@ export class SettingsDO extends DurableObject<Env> {
       match &= expected.charCodeAt(i) === digits.charCodeAt(i) ? 1 : 0
     }
     return Response.json({ match: match === 1, expected })
+  }
+
+  // --- TTL Overrides ---
+
+  private async getTTLOverrides(): Promise<Response> {
+    const overrides = await this.ctx.storage.get<TTLOverrides>('ttlOverrides') || {}
+    return Response.json({ overrides })
+  }
+
+  private async updateTTLOverrides(data: Record<string, unknown>): Promise<Response> {
+    const error = validateTTLOverrides(data)
+    if (error) {
+      return new Response(JSON.stringify({ error }), { status: 400 })
+    }
+    const current = await this.ctx.storage.get<TTLOverrides>('ttlOverrides') || {}
+    const updated = { ...current, ...data }
+    await this.ctx.storage.put('ttlOverrides', updated)
+    return Response.json({ overrides: updated })
+  }
+
+  // --- Cleanup Metrics ---
+
+  private async getCleanupMetrics(): Promise<Response> {
+    const metrics = await this.ctx.storage.get<CleanupMetrics>('cleanupMetrics') || emptyCleanupMetrics()
+    return Response.json(metrics)
   }
 
   // --- Hub Registry Methods ---

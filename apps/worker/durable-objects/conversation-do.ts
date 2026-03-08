@@ -16,6 +16,8 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { HMAC_PREFERENCE_TOKEN, HMAC_SUBSCRIBER } from '@shared/crypto-labels'
+import { resolveTTL, CLEANUP_ALARM_INTERVAL_MS, type TTLOverrides, type CleanupMetrics, emptyCleanupMetrics } from '../lib/ttl'
+import { incCounter } from '../routes/metrics'
 
 const PAGE_SIZE = 50
 
@@ -105,6 +107,9 @@ export class ConversationDO extends DurableObject<Env> {
     // --- Blast Settings ---
     this.router.get('/blast-settings', () => this.getBlastSettings())
     this.router.patch('/blast-settings', async (req) => this.updateBlastSettings(await req.json()))
+
+    // --- Cleanup Metrics ---
+    this.router.get('/conversations/cleanup-metrics', () => this.getCleanupMetrics())
 
     // --- Volunteer Load Tracking (for auto-assignment) ---
     this.router.get('/load/:pubkey', (_req, { pubkey }) => this.getVolunteerLoad(pubkey))
@@ -1107,6 +1112,9 @@ export class ConversationDO extends DurableObject<Env> {
     const log = createLogger('conversation-do:alarm')
     try {
       await this.ensureInit()
+      const now = Date.now()
+      const overrides = await this.ctx.storage.get<TTLOverrides>('ttlOverrides')
+      const metrics = await this.ctx.storage.get<CleanupMetrics>('cleanupMetrics') || emptyCleanupMetrics()
 
       // --- Process active blast deliveries ---
       await this.processActiveBlasts()
@@ -1116,7 +1124,7 @@ export class ConversationDO extends DurableObject<Env> {
       for (const [, blast] of allBlasts) {
         if (blast.status === 'scheduled' && blast.scheduledAt) {
           const scheduledTime = new Date(blast.scheduledAt).getTime()
-          if (scheduledTime <= Date.now()) {
+          if (scheduledTime <= now) {
             await this.sendBlast(blast.id)
           }
         }
@@ -1124,7 +1132,6 @@ export class ConversationDO extends DurableObject<Env> {
 
       // --- Auto-close conversations that have been inactive past the timeout ---
       const conversations = await this.getAllConversations()
-      const now = Date.now()
       const timeout = 60 * 60 * 1000 // 60 minutes default
 
       const closedAssignees: Array<{ pubkey: string; conversationId: string }> = []
@@ -1147,14 +1154,47 @@ export class ConversationDO extends DurableObject<Env> {
         await this.decrementLoad({ pubkey, conversationId })
       }
 
-      // Schedule next alarm in 5 minutes
-      try {
-        await this.ctx.storage.setAlarm(now + 5 * 60 * 1000)
-      } catch { /* alarm already set */ }
+      // --- Clean up stale file uploads (stuck in 'uploading' status) ---
+      const staleFileTTL = resolveTTL('staleFileUpload', overrides ?? undefined)
+      const allFiles = await collectByPrefix<FileRecord>(this.ctx.storage, 'file:')
+      let staleFilesDeleted = 0
+      for (const f of allFiles) {
+        if (f.status === 'uploading' && now - new Date(f.createdAt).getTime() >= staleFileTTL) {
+          await this.ctx.storage.delete(`file:${f.id}`)
+          staleFilesDeleted++
+          incCounter('llamenos_cleanup_items_deleted', { type: 'stale_file_upload', do: 'conversation' })
+        }
+      }
+      metrics.staleFileUploadsDeleted += staleFilesDeleted
+
+      // --- Clean up completed blast delivery queues ---
+      const blastQueueTTL = resolveTTL('completedBlastQueue', overrides ?? undefined)
+      const blastQueueKeys = await this.ctx.storage.list<import('../types').BlastDeliveryQueue>({ prefix: 'blast-queue:' })
+      for (const [key, queue] of blastQueueKeys) {
+        // A queue is "completed" when processedCount >= totalCount
+        if (queue.processedCount >= queue.totalCount && queue.totalCount > 0) {
+          // Check the corresponding blast for completion time
+          const blastId = key.replace('blast-queue:', '')
+          const blast = await this.ctx.storage.get<Blast>(`blasts:${blastId}`)
+          if (blast && blast.status === 'sent') {
+            const completedAt = new Date(blast.updatedAt).getTime()
+            if (now - completedAt > blastQueueTTL) {
+              await this.ctx.storage.delete(key)
+              metrics.completedBlastQueuesDeleted++
+              incCounter('llamenos_cleanup_items_deleted', { type: 'completed_blast_queue', do: 'conversation' })
+            }
+          }
+        }
+      }
+
+      metrics.lastCleanupAt = new Date().toISOString()
+      await this.ctx.storage.put('cleanupMetrics', metrics)
 
       log.debug('Alarm completed', {
         totalConversations: conversations.length,
         closedCount: closedAssignees.length,
+        staleFilesDeleted,
+        blastQueuesDeleted: metrics.completedBlastQueuesDeleted,
       })
     } catch (err) {
       incError('alarm')
@@ -1163,51 +1203,15 @@ export class ConversationDO extends DurableObject<Env> {
         stack: err instanceof Error ? err.stack : undefined,
       })
     }
+
+    // Schedule next alarm in 5 minutes (keeps existing cadence for blasts/auto-close)
+    try {
+      await this.ctx.storage.setAlarm(now + 5 * 60 * 1000)
+    } catch { /* alarm already set */ }
   }
 
-  // --- Contact Methods (Epic 123) ---
-
-  private async getContactSummaries(): Promise<Response> {
-    const conversations = await this.getAllConversations()
-    const contactMap = new Map<string, {
-      last4?: string
-      conversationCount: number
-      reportCount: number
-      firstSeen: string
-      lastSeen: string
-    }>()
-
-    for (const conv of conversations) {
-      const hash = conv.contactIdentifierHash
-      if (!hash) continue
-
-      const existing = contactMap.get(hash)
-      const isReport = conv.metadata?.type === 'report'
-      if (existing) {
-        if (isReport) existing.reportCount++
-        else existing.conversationCount++
-        if (conv.createdAt < existing.firstSeen) existing.firstSeen = conv.createdAt
-        if (conv.lastMessageAt > existing.lastSeen) existing.lastSeen = conv.lastMessageAt
-        if (conv.contactLast4) existing.last4 = conv.contactLast4
-      } else {
-        contactMap.set(hash, {
-          last4: conv.contactLast4,
-          conversationCount: isReport ? 0 : 1,
-          reportCount: isReport ? 1 : 0,
-          firstSeen: conv.createdAt,
-          lastSeen: conv.lastMessageAt,
-        })
-      }
-    }
-
-    return Response.json({ contacts: Object.fromEntries(contactMap) })
-  }
-
-  private async getContactConversations(hash: string): Promise<Response> {
-    const allConversations = await this.getAllConversations()
-    const conversations = allConversations.filter(c => c.contactIdentifierHash === hash)
-
-    conversations.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
-    return Response.json({ conversations })
+  private async getCleanupMetrics(): Promise<Response> {
+    const metrics = await this.ctx.storage.get<CleanupMetrics>('cleanupMetrics') || emptyCleanupMetrics()
+    return Response.json(metrics)
   }
 }

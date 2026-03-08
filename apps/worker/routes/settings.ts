@@ -395,4 +395,40 @@ settings.get('/migrations', requirePermission('system:manage-roles'), async (c) 
   return c.json({ namespaces: results })
 })
 
+// --- TTL Overrides (admin-configurable cleanup intervals) ---
+settings.get('/ttl', requirePermission('settings:manage'), async (c) => {
+  const dos = getDOs(c.env)
+  return dos.settings.fetch(new Request('http://do/settings/ttl'))
+})
+
+settings.patch('/ttl', requirePermission('settings:manage'), async (c) => {
+  const dos = getDOs(c.env)
+  const pubkey = c.get('pubkey')
+  const body = await c.req.json()
+  const res = await dos.settings.fetch(new Request('http://do/settings/ttl', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  }))
+  if (res.ok) await audit(dos.records, 'ttlOverridesUpdated', pubkey, body as Record<string, unknown>)
+  return res
+})
+
+// --- Aggregated cleanup metrics from all DOs ---
+settings.get('/cleanup-metrics', requirePermission('settings:manage'), async (c) => {
+  const dos = getDOs(c.env)
+  const [settingsRes, identityRes, conversationRes] = await Promise.all([
+    dos.settings.fetch(new Request('http://do/settings/cleanup-metrics')),
+    dos.identity.fetch(new Request('http://do/identity/cleanup-metrics')),
+    dos.conversations.fetch(new Request('http://do/conversations/cleanup-metrics')),
+  ])
+  const settingsMetrics = settingsRes.ok ? await settingsRes.json() : {}
+  const identityMetrics = identityRes.ok ? await identityRes.json() : {}
+  const conversationMetrics = conversationRes.ok ? await conversationRes.json() : {}
+  return c.json({
+    settings: settingsMetrics,
+    identity: identityMetrics,
+    conversation: conversationMetrics,
+  })
+})
+
 export default settings
