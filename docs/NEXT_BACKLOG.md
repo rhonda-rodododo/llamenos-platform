@@ -489,6 +489,52 @@ Full visual and UX overhaul of the native iOS app. 5 epics covering design syste
 ### Test Updates
 - [x] **XCUITest Updates** — All 118 XCUITests updated for restructured navigation (settings sub-pages, hub URL validation bypass, PanicWipe friction gate), 98 unit tests passing
 
+## Production Readiness & Long-Term Lifecycle (Epics 276-300)
+
+Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-03-08-production-readiness-design.md)
+
+### Track 1: Ansible Fleet Deployment
+- [ ] **[Epic 276: Multi-Host Ansible Inventory & Service Discovery](epics/epic-276-multi-host-inventory.md)** — matrix-docker-ansible-deploy style, per-service toggles, multi-host service discovery
+- [ ] **[Epic 277: Backup Orchestration for Distributed Deployments](epics/epic-277-backup-orchestration.md)** — Per-service backup roles, cross-host aggregation, strfry/MinIO/config backup, restore playbook
+- [ ] **[Epic 278: Observability Stack via Ansible](epics/epic-278-observability-stack.md)** — Prometheus + Grafana + Loki (full) or health-poll + ntfy (lightweight), pre-built dashboards
+- [ ] **[Epic 279: Auto-Healing & Zero-Touch Operations](epics/epic-279-auto-healing.md)** — Container watchdog, stale data cleanup, NTP drift detection, disk management
+- [ ] **[Epic 280: Rolling Updates with Rollback](epics/epic-280-rolling-updates.md)** — Health-gated updates, dependency-ordered multi-host, version history, automatic rollback
+
+### Track 2: Backend Resilience & Scale
+- [ ] **[Epic 281: DO Storage Pagination & Scalability](epics/epic-281-do-storage-pagination.md)** — Shard large storage keys, cursor-based pagination, bounds checking
+- [ ] **[Epic 282: Retry Logic & Circuit Breakers](epics/epic-282-retry-circuit-breakers.md)** — Exponential backoff, circuit breaker per service, graceful degradation
+- [ ] **[Epic 283: Input Validation with Zod](epics/epic-283-input-validation-zod.md)** — Schema validation on all REST endpoints, Hono middleware
+- [ ] **[Epic 284: Structured Error Handling & Observability](epics/epic-284-structured-error-handling.md)** — Correlation IDs, DO alarm error handling, error counters, auth failure logging
+- [ ] **[Epic 285: Storage Cleanup & TTL](epics/epic-285-storage-cleanup-ttl.md)** — TTL for ephemeral data, periodic cleanup alarms, conversation archival
+
+### Track 3: Data Migrations & Schema Evolution
+- [ ] **[Epic 286: Online Data Migration Framework](epics/epic-286-online-data-migration-framework.md)** — Progress tracking, rollback support, admin visibility, CLI tooling, production guards
+- [ ] **[Epic 287: Multi-Report-Type System](epics/epic-287-multi-report-type-system.md)** — Per-report-type custom fields, admin CRUD, schema migration, cross-platform
+
+### Track 4: Client Resilience & Lifecycle
+- [ ] **[Epic 288: API Version Negotiation & Backwards Compatibility](epics/epic-288-api-version-negotiation.md)** — X-API-Version headers, forced update flow, graceful degradation
+- [ ] **[Epic 289: Desktop Auto-Update (Tauri Updater)](epics/epic-289-desktop-auto-update.md)** — GitHub Releases + self-hosted manifest, Ed25519 signing, background checks
+- [ ] **[Epic 290: Mobile App Distribution & Update Management](epics/epic-290-mobile-app-distribution.md)** — TestFlight + Play Store + F-Droid + direct APK, version check on launch
+- [ ] **[Epic 291: Client-Side Transcription on Mobile](epics/epic-291-mobile-transcription.md)** — iOS Speech framework, Android SpeechRecognizer, on-device only
+- [ ] **[Epic 292: Offline Resilience & Sync](epics/epic-292-offline-resilience.md)** — Offline operation queue, replay on reconnect, Nostr event replay
+- [ ] **[Epic 293: Client Crash Reporting & Diagnostics](epics/epic-293-crash-reporting.md)** — GlitchTip (self-hosted Sentry), all 3 platforms, PII stripping, source maps
+
+### Track 5: Operational Sustainability
+- [ ] **[Epic 294: Operator Alerting & Notification](epics/epic-294-operator-alerting-notification.md)** — ntfy/Gotify/email/webhook, state-based deduplication, 7 health checks
+- [ ] **[Epic 295: Admin System Health Dashboard](epics/epic-295-admin-system-health-dashboard.md)** — In-app system tab, real-time health, call metrics, storage, backup status
+- [ ] **[Epic 296: Load Testing & Capacity Planning](epics/epic-296-load-testing-capacity-planning.md)** — k6 scripts, 4 scenarios, capacity planning doc
+- [ ] **[Epic 297: Security Update Automation](epics/epic-297-security-update-automation.md)** — Renovate, weekly Docker rebuilds, OS CVE scanning
+- [ ] **[Epic 298: Disaster Recovery Runbook & Drills](epics/epic-298-disaster-recovery-drills.md)** — Automated DR test playbook, 5 scenarios, quarterly drills
+- [ ] **[Epic 299: Operator Handbook & Onboarding](epics/epic-299-operator-handbook-onboarding.md)** — Consolidated handbook, troubleshooting trees, quick reference card
+- [ ] **[Epic 300: Mobile Admin Feature Parity](epics/epic-300-mobile-admin-feature-parity.md)** — 4-phase mobile admin features (custom fields, report categories, recording playback, settings)
+
+**Dependency order:**
+- Track 1: 276 → 277 → 278 → 279 → 280
+- Track 2: 283 → 284 → 281 → 282 → 285
+- Track 3: 286 → 287
+- Track 4: 288 → (289 | 290) → 291 → 292 → 293
+- Track 5: 278 → 294 → 295 → 296 → 297 → 298 → 299 → 300
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
