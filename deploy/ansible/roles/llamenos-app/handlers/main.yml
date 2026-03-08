@@ -1,0 +1,6 @@
+---
+- name: Restart app service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/app"
+    state: restarted
+    recreate: always

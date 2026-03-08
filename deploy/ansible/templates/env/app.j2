@@ -1,0 +1,40 @@
+# Llamenos App Environment — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+# ─── Application ─────────────────────────────────────────────
+PLATFORM=node
+PORT=3000
+ADMIN_PUBKEY={{ admin_pubkey }}
+HOTLINE_NAME={{ hotline_name }}
+ENVIRONMENT={{ environment }}
+HMAC_SECRET={{ hmac_secret }}
+
+# ─── Database ────────────────────────────────────────────────
+DATABASE_URL={{ llamenos_database_url }}
+PG_POOL_SIZE={{ pg_pool_size }}
+
+# ─── Object Storage ─────────────────────────────────────────
+MINIO_ENDPOINT={{ llamenos_minio_endpoint }}
+MINIO_ACCESS_KEY={{ minio_access_key }}
+MINIO_SECRET_KEY={{ minio_secret_key }}
+MINIO_BUCKET={{ minio_bucket }}
+
+# ─── Telephony ───────────────────────────────────────────────
+TWILIO_ACCOUNT_SID={{ twilio_account_sid }}
+TWILIO_AUTH_TOKEN={{ twilio_auth_token }}
+TWILIO_PHONE_NUMBER={{ twilio_phone_number }}
+
+# ─── Transcription ───────────────────────────────────────────
+WHISPER_URL={{ llamenos_whisper_url }}
+
+# ─── Nostr Relay ─────────────────────────────────────────────
+SERVER_NOSTR_SECRET={{ server_nostr_secret }}
+NOSTR_RELAY_URL={{ llamenos_relay_url }}
+
+{% if llamenos_asterisk_enabled | default(false) %}
+# ─── Asterisk ────────────────────────────────────────────────
+ARI_USERNAME={{ ari_username }}
+ARI_PASSWORD={{ ari_password }}
+BRIDGE_SECRET={{ bridge_secret }}
+{% endif %}

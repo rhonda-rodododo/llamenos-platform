@@ -1,0 +1,55 @@
+---
+# Asterisk PBX role — deploys the SIP trunk telephony service
+#
+# Skips if:
+#   - llamenos_asterisk_enabled is false
+#   - This host is not in the llamenos_asterisk group (when the group has members)
+
+- name: Skip if asterisk not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_asterisk_enabled | default(false))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_asterisk', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_asterisk', [])
+
+- name: Create asterisk service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/asterisk"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template asterisk compose file
+  ansible.builtin.template:
+    src: compose/asterisk.j2
+    dest: "{{ app_dir }}/services/asterisk/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart asterisk service
+
+- name: Template asterisk environment
+  ansible.builtin.template:
+    src: env/asterisk.j2
+    dest: "{{ app_dir }}/services/asterisk/.env.asterisk"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  notify: Restart asterisk service
+
+- name: Pull asterisk images
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/asterisk"
+    pull: always
+    state: present
+    recreate: never
+
+- name: Start asterisk service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/asterisk"
+    state: present
+  register: asterisk_compose

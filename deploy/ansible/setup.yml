@@ -11,7 +11,7 @@
 #   ansible-playbook setup.yml --ask-vault-pass    # If vars.yml is encrypted
 
 - name: Load configuration variables
-  hosts: all
+  hosts: llamenos_servers
   gather_facts: false
   tasks:
     - name: Include vars file

@@ -1,0 +1,55 @@
+---
+# MinIO object storage role — deploys the S3-compatible blob store
+#
+# Skips if:
+#   - llamenos_minio_enabled is false
+#   - This host is not in the llamenos_storage group (when the group has members)
+
+- name: Skip if minio not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_minio_enabled | default(true))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_storage', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_storage', [])
+
+- name: Create minio service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/minio"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template minio compose file
+  ansible.builtin.template:
+    src: compose/minio.j2
+    dest: "{{ app_dir }}/services/minio/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart minio service
+
+- name: Template minio environment
+  ansible.builtin.template:
+    src: env/minio.j2
+    dest: "{{ app_dir }}/services/minio/.env.minio"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  notify: Restart minio service
+
+- name: Pull minio image
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/minio"
+    pull: always
+    state: present
+    recreate: never
+
+- name: Start minio service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/minio"
+    state: present
+  register: minio_compose

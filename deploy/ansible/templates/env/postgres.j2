@@ -1,0 +1,7 @@
+# PostgreSQL Environment — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+POSTGRES_DB=llamenos
+POSTGRES_USER=llamenos
+POSTGRES_PASSWORD={{ pg_password }}

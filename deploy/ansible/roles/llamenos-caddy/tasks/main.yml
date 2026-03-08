@@ -1,0 +1,55 @@
+---
+# Caddy reverse proxy role — deploys the TLS-terminating proxy
+#
+# Skips if:
+#   - llamenos_caddy_enabled is false
+#   - This host is not in the llamenos_proxy group (when the group has members)
+
+- name: Skip if caddy not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_caddy_enabled | default(true))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_proxy', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_proxy', [])
+
+- name: Create caddy service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/caddy"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template caddy compose file
+  ansible.builtin.template:
+    src: compose/caddy.j2
+    dest: "{{ app_dir }}/services/caddy/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart caddy service
+
+- name: Template Caddyfile
+  ansible.builtin.template:
+    src: caddy.j2
+    dest: "{{ app_dir }}/services/caddy/Caddyfile"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart caddy service
+
+- name: Pull caddy image
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/caddy"
+    pull: always
+    state: present
+    recreate: never
+
+- name: Start caddy service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/caddy"
+    state: present
+  register: caddy_compose

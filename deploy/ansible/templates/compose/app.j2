@@ -1,0 +1,41 @@
+# Llamenos App Service — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+name: llamenos-app
+
+services:
+  app:
+    image: {{ llamenos_app_image }}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    env_file:
+      - .env.app
+    networks:
+      - web
+{% if llamenos_postgres_enabled and inventory_hostname in groups.get('llamenos_db', groups['llamenos_servers']) %}
+      - internal
+{% endif %}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+networks:
+  web:
+    driver: bridge
+{% if llamenos_postgres_enabled and inventory_hostname in groups.get('llamenos_db', groups['llamenos_servers']) %}
+  internal:
+    driver: bridge
+    internal: true
+{% endif %}

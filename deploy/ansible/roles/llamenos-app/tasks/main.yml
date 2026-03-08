@@ -1,0 +1,67 @@
+---
+# App service role — deploys the Node.js application container
+#
+# Skips if:
+#   - llamenos_app_enabled is false
+#   - This host is not in the llamenos_app group (when the group has members)
+
+- name: Skip if app not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_app_enabled | default(true))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_app', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_app', [])
+
+- name: Create app service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/app"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template app compose file
+  ansible.builtin.template:
+    src: compose/app.j2
+    dest: "{{ app_dir }}/services/app/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart app service
+
+- name: Template app environment
+  ansible.builtin.template:
+    src: env/app.j2
+    dest: "{{ app_dir }}/services/app/.env.app"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  notify: Restart app service
+
+- name: Pull app image
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/app"
+    pull: always
+    state: present
+    recreate: never
+  register: app_pull
+
+- name: Start app service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/app"
+    state: present
+  register: app_compose
+
+- name: Wait for app health check
+  ansible.builtin.uri:
+    url: "http://localhost:3000/api/health"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: app_health
+  retries: 20
+  delay: 5
+  until: app_health.status == 200

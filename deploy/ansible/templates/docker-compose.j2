@@ -1,3 +1,10 @@
+# DEPRECATED: This monolithic compose template is kept for backward compatibility.
+# New deployments should use per-service templates in templates/compose/*.j2
+# with the multi-host inventory and per-service roles.
+#
+# To migrate an existing deployment:
+#   ansible-playbook playbooks/migrate-to-multi-host.yml --ask-vault-pass
+#
 # Llamenos Docker Compose — managed by Ansible
 # Do not edit manually; changes will be overwritten on next deploy.
 #

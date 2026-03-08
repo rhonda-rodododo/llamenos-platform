@@ -1,4 +1,4 @@
-# Llamenos Ansible Inventory
+# Llamenos Multi-Host Ansible Inventory
 #
 # Copy this file to inventory.yml and fill in your server details.
 #
@@ -7,23 +7,105 @@
 #   $EDITOR inventory.yml
 #   just setup-all
 #
-# For multiple servers (e.g., staging + production), create separate
-# inventory files and pass them with -i:
+# ── Single-Host (default) ──────────────────────────────────────
+# Put your server in [llamenos_servers] and all services deploy there.
+# No other groups needed — everything runs on one machine.
+#
+# ── Multi-Host (split services across machines) ────────────────
+# Add hosts to specific service groups to control placement.
+# A host can be in multiple groups. Services deploy only to hosts
+# in their group. If a service group is empty, that service deploys
+# to all llamenos_servers hosts (backward compatible).
+#
+# For multiple deployments (e.g., staging + production), create
+# separate inventory files and pass them with -i:
 #   ansible-playbook -i inventory-staging.yml setup.yml
 
 all:
-  hosts:
-    llamenos:
-      # Your VPS IP address or hostname
-      ansible_host: 203.0.113.10
+  vars:
+    # Global variables shared across all hosts
+    ansible_python_interpreter: /usr/bin/python3
 
-      # SSH user created during initial VPS setup
-      # This user must have sudo access
-      ansible_user: deploy
+  children:
+    # Every Llamenos host must be in this group
+    llamenos_servers:
+      hosts:
+        hub1:
+          # Your VPS IP address or hostname
+          ansible_host: 203.0.113.10
 
-      # Path to your SSH private key
-      ansible_ssh_private_key_file: ~/.ssh/llamenos_deploy
+          # SSH user created during initial VPS setup
+          # This user must have sudo access
+          ansible_user: deploy
 
-      # SSH port (will be changed to ssh_port after hardening)
-      # Set this to 22 for the first run, then change to match ssh_port
-      ansible_port: 22
+          # Path to your SSH private key
+          ansible_ssh_private_key_file: ~/.ssh/llamenos_deploy
+
+          # SSH port (will be changed to ssh_port after hardening)
+          # Set this to 22 for the first run, then change to match ssh_port
+          ansible_port: 22
+
+    # ── Service Groups ──────────────────────────────────────────
+    # Assign hosts to control where each service runs.
+    # If a group is empty or undefined, that service runs on all
+    # llamenos_servers hosts (single-host default behavior).
+
+    # Core services
+    llamenos_app:
+      hosts:
+        hub1: {}
+    llamenos_db:
+      hosts:
+        hub1: {}
+    llamenos_proxy:
+      hosts:
+        hub1: {}
+    llamenos_storage:
+      hosts:
+        hub1: {}
+    llamenos_relay:
+      hosts:
+        hub1: {}
+
+    # Optional service groups — only deployed if the service is enabled
+    # in vars.yml (llamenos_*_enabled: true)
+    llamenos_transcription:
+      hosts: {}
+    llamenos_asterisk:
+      hosts: {}
+    llamenos_signal:
+      hosts: {}
+
+# ── Multi-Host Example ──────────────────────────────────────────
+#
+# To split services across two machines, add a second host:
+#
+# all:
+#   children:
+#     llamenos_servers:
+#       hosts:
+#         app-server:
+#           ansible_host: 203.0.113.10
+#           ansible_user: deploy
+#           ansible_ssh_private_key_file: ~/.ssh/llamenos_deploy
+#           ansible_port: 22
+#         db-server:
+#           ansible_host: 203.0.113.11
+#           ansible_user: deploy
+#           ansible_ssh_private_key_file: ~/.ssh/llamenos_deploy
+#           ansible_port: 22
+#     llamenos_app:
+#       hosts:
+#         app-server: {}
+#     llamenos_db:
+#       hosts:
+#         db-server: {}
+#     llamenos_proxy:
+#       hosts:
+#         app-server: {}
+#     llamenos_storage:
+#       hosts:
+#         db-server: {}
+#     llamenos_relay:
+#       hosts:
+#         app-server: {}

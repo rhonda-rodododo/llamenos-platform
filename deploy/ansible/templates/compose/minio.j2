@@ -1,0 +1,50 @@
+# MinIO Object Storage — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+name: llamenos-minio
+
+services:
+  minio:
+    image: {{ llamenos_minio_image }}
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    volumes:
+      - minio-data:/data
+    env_file:
+      - .env.minio
+{% if llamenos_internal_tls_enabled %}
+    ports:
+      - "{{ llamenos_minio_port | default('9000') }}:9000"
+      - "9001:9001"
+{% elif groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_storage', [])) | length == 0 %}
+    # App is on a different host — expose port for cross-host access
+    ports:
+      - "{{ llamenos_minio_port | default('9000') }}:9000"
+      - "9001:9001"
+{% else %}
+    networks:
+      - internal
+{% endif %}
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  minio-data:
+
+{% if not llamenos_internal_tls_enabled and not (groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_storage', [])) | length == 0) %}
+networks:
+  internal:
+    driver: bridge
+    internal: true
+{% endif %}

@@ -1,0 +1,40 @@
+# Caddy Reverse Proxy — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+name: llamenos-caddy
+
+services:
+  caddy:
+    image: {{ llamenos_caddy_image }}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - web
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  web:
+    driver: bridge

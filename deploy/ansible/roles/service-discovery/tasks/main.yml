@@ -1,0 +1,83 @@
+---
+# Service Discovery Role
+#
+# Computes cross-host connection variables based on inventory groups.
+# When a service (e.g., postgres) runs on a different host than the consumer
+# (e.g., app), the consumer gets the remote host's IP as the connection target.
+#
+# Single-host: all services use Docker network names (e.g., "postgres:5432").
+# Multi-host: remote services use ansible_host IPs.
+
+- name: Determine PostgreSQL connection target
+  ansible.builtin.set_fact:
+    llamenos_pg_host: >-
+      {%- if groups.get('llamenos_db', []) | length > 0 and
+             inventory_hostname not in groups.get('llamenos_db', []) -%}
+        {{ hostvars[groups['llamenos_db'][0]]['ansible_host'] }}
+      {%- else -%}
+        postgres
+      {%- endif -%}
+    llamenos_pg_port: >-
+      {%- if groups.get('llamenos_db', []) | length > 0 and
+             inventory_hostname not in groups.get('llamenos_db', []) -%}
+        {{ llamenos_postgres_port | default('5432') }}
+      {%- else -%}
+        5432
+      {%- endif -%}
+
+- name: Determine MinIO connection target
+  ansible.builtin.set_fact:
+    llamenos_minio_endpoint: >-
+      {%- if groups.get('llamenos_storage', []) | length > 0 and
+             inventory_hostname not in groups.get('llamenos_storage', []) -%}
+        http://{{ hostvars[groups['llamenos_storage'][0]]['ansible_host'] }}:{{ llamenos_minio_port | default('9000') }}
+      {%- else -%}
+        http://minio:9000
+      {%- endif -%}
+
+- name: Determine strfry relay connection target
+  ansible.builtin.set_fact:
+    llamenos_relay_url: >-
+      {%- if groups.get('llamenos_relay', []) | length > 0 and
+             inventory_hostname not in groups.get('llamenos_relay', []) -%}
+        ws://{{ hostvars[groups['llamenos_relay'][0]]['ansible_host'] }}:{{ llamenos_strfry_port | default('7777') }}
+      {%- else -%}
+        ws://strfry:7777
+      {%- endif -%}
+
+- name: Determine Whisper transcription URL
+  ansible.builtin.set_fact:
+    llamenos_whisper_url: >-
+      {%- if not (llamenos_transcription_enabled | default(false)) -%}
+        {{ '' }}
+      {%- elif groups.get('llamenos_transcription', []) | length > 0 and
+              inventory_hostname not in groups.get('llamenos_transcription', []) -%}
+        http://{{ hostvars[groups['llamenos_transcription'][0]]['ansible_host'] }}:8080/v1/audio/transcriptions
+      {%- else -%}
+        http://whisper:8080/v1/audio/transcriptions
+      {%- endif -%}
+
+- name: Determine app host for cross-service references
+  ansible.builtin.set_fact:
+    llamenos_app_host: >-
+      {%- if groups.get('llamenos_app', []) | length > 0 and
+             inventory_hostname not in groups.get('llamenos_app', []) -%}
+        {{ hostvars[groups['llamenos_app'][0]]['ansible_host'] }}
+      {%- else -%}
+        app
+      {%- endif -%}
+
+- name: Compute DATABASE_URL for app service
+  ansible.builtin.set_fact:
+    llamenos_database_url: "postgresql://llamenos:{{ pg_password }}@{{ llamenos_pg_host | trim }}:{{ llamenos_pg_port | trim }}/llamenos"
+
+- name: Display service topology
+  ansible.builtin.debug:
+    msg: |
+      Service topology for {{ inventory_hostname }}:
+        PostgreSQL:    {{ llamenos_pg_host | trim }}:{{ llamenos_pg_port | trim }}
+        MinIO:         {{ llamenos_minio_endpoint | trim }}
+        Relay:         {{ llamenos_relay_url | trim }}
+        Whisper:       {{ llamenos_whisper_url | trim | default('disabled', true) }}
+        App:           {{ llamenos_app_host | trim }}
+        DATABASE_URL:  postgresql://llamenos:***@{{ llamenos_pg_host | trim }}:{{ llamenos_pg_port | trim }}/llamenos

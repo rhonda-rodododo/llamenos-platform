@@ -1,0 +1,33 @@
+# Signal Messaging Bridge — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+name: llamenos-signal
+
+services:
+  signal-cli:
+    image: {{ llamenos_signal_image }}
+    restart: unless-stopped
+    environment:
+      - MODE=json-rpc
+      - AUTO_RECEIVE_SCHEDULE=0 * * * *
+    volumes:
+      - signal-data:/home/.local/share/signal-cli
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/about"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  signal-data:
+
+networks:
+  internal:
+    driver: bridge
+    internal: true

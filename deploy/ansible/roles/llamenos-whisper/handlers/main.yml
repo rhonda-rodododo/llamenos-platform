@@ -1,0 +1,6 @@
+---
+- name: Restart whisper service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/whisper"
+    state: restarted
+    recreate: always

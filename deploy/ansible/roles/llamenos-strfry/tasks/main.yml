@@ -1,0 +1,46 @@
+---
+# strfry Nostr relay role — deploys the real-time event relay
+#
+# Skips if:
+#   - llamenos_strfry_enabled is false
+#   - This host is not in the llamenos_relay group (when the group has members)
+
+- name: Skip if strfry not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_strfry_enabled | default(true))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_relay', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_relay', [])
+
+- name: Create strfry service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/strfry"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template strfry compose file
+  ansible.builtin.template:
+    src: compose/strfry.j2
+    dest: "{{ app_dir }}/services/strfry/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart strfry service
+
+- name: Pull strfry image
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/strfry"
+    pull: always
+    state: present
+    recreate: never
+
+- name: Start strfry service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/strfry"
+    state: present
+  register: strfry_compose

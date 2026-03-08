@@ -1,0 +1,35 @@
+# Whisper Transcription Service — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+name: llamenos-whisper
+
+services:
+  whisper:
+    image: {{ llamenos_whisper_image }}
+    restart: unless-stopped
+    env_file:
+      - .env.whisper
+{% if groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_transcription', [])) | length == 0 %}
+    # App is on a different host — expose port for cross-host access
+    ports:
+      - "8080:8080"
+{% else %}
+    networks:
+      - internal
+{% endif %}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+{% if not (groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_transcription', [])) | length == 0) %}
+networks:
+  internal:
+    driver: bridge
+    internal: true
+{% endif %}

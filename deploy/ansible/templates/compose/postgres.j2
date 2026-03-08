@@ -1,0 +1,48 @@
+# PostgreSQL Service — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+name: llamenos-postgres
+
+services:
+  postgres:
+    image: {{ llamenos_postgres_image }}
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    env_file:
+      - .env.postgres
+{% if llamenos_internal_tls_enabled %}
+    # Expose on host network for cross-host access with TLS
+    ports:
+      - "{{ llamenos_postgres_port | default('5432') }}:5432"
+{% elif groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_db', [])) | length == 0 %}
+    # App is on a different host — expose port for cross-host access
+    ports:
+      - "{{ llamenos_postgres_port | default('5432') }}:5432"
+{% else %}
+    networks:
+      - internal
+{% endif %}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llamenos -d llamenos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  postgres-data:
+
+{% if not llamenos_internal_tls_enabled and not (groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_db', [])) | length == 0) %}
+networks:
+  internal:
+    driver: bridge
+    internal: true
+{% endif %}

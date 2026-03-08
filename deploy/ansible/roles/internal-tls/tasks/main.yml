@@ -1,0 +1,114 @@
+---
+# Internal TLS role
+#
+# Generates a deployment-local CA and per-host certificates for
+# cross-host service communication (PostgreSQL, MinIO, strfry).
+# Only runs when llamenos_internal_tls_enabled is true.
+
+- name: Skip if internal TLS not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_internal_tls_enabled | default(false))
+
+- name: Create TLS directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/tls"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0700"
+
+- name: Generate CA private key (on first host only)
+  community.crypto.openssl_privatekey:
+    path: "{{ app_dir }}/tls/ca.key"
+    size: 4096
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  when: inventory_hostname == groups['llamenos_servers'][0]
+  run_once: true
+
+- name: Generate self-signed CA certificate
+  community.crypto.x509_certificate:
+    path: "{{ app_dir }}/tls/ca.crt"
+    privatekey_path: "{{ app_dir }}/tls/ca.key"
+    provider: selfsigned
+    selfsigned_not_after: "+3650d"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0644"
+  when: inventory_hostname == groups['llamenos_servers'][0]
+  run_once: true
+
+- name: Fetch CA certificate from first host
+  ansible.builtin.fetch:
+    src: "{{ app_dir }}/tls/ca.crt"
+    dest: "/tmp/llamenos-ca.crt"
+    flat: true
+  when: inventory_hostname == groups['llamenos_servers'][0]
+  run_once: true
+
+- name: Fetch CA key from first host
+  ansible.builtin.fetch:
+    src: "{{ app_dir }}/tls/ca.key"
+    dest: "/tmp/llamenos-ca.key"
+    flat: true
+  when: inventory_hostname == groups['llamenos_servers'][0]
+  run_once: true
+
+- name: Distribute CA certificate to all hosts
+  ansible.builtin.copy:
+    src: /tmp/llamenos-ca.crt
+    dest: "{{ app_dir }}/tls/ca.crt"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0644"
+
+- name: Distribute CA key to all hosts (for signing)
+  ansible.builtin.copy:
+    src: /tmp/llamenos-ca.key
+    dest: "{{ app_dir }}/tls/ca.key"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+
+- name: Generate per-host private key
+  community.crypto.openssl_privatekey:
+    path: "{{ app_dir }}/tls/{{ inventory_hostname }}.key"
+    size: 2048
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+
+- name: Generate per-host CSR
+  community.crypto.openssl_csr:
+    path: "{{ app_dir }}/tls/{{ inventory_hostname }}.csr"
+    privatekey_path: "{{ app_dir }}/tls/{{ inventory_hostname }}.key"
+    subject_alt_name:
+      - "DNS:{{ inventory_hostname }}"
+      - "IP:{{ ansible_host }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+
+- name: Sign per-host certificate with CA
+  community.crypto.x509_certificate:
+    path: "{{ app_dir }}/tls/{{ inventory_hostname }}.crt"
+    csr_path: "{{ app_dir }}/tls/{{ inventory_hostname }}.csr"
+    ownca_path: "{{ app_dir }}/tls/ca.crt"
+    ownca_privatekey_path: "{{ app_dir }}/tls/ca.key"
+    provider: ownca
+    ownca_not_after: "+365d"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0644"
+
+- name: Clean up temporary CA files on controller
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  delegate_to: localhost
+  become: false
+  run_once: true
+  loop:
+    - /tmp/llamenos-ca.crt
+    - /tmp/llamenos-ca.key

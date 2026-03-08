@@ -16,6 +16,8 @@
 default:
     @just --list
 
+# ── Full Setup ──────────────────────────────────────────────────
+
 # Full server setup: harden + deploy
 setup-all *ARGS:
     ansible-playbook setup.yml --ask-vault-pass {{ARGS}}
@@ -24,7 +26,9 @@ setup-all *ARGS:
 harden *ARGS:
     ansible-playbook playbooks/harden.yml --ask-vault-pass {{ARGS}}
 
-# Deploy or update the application
+# ── Deployment ──────────────────────────────────────────────────
+
+# Deploy or update all services (multi-host orchestration)
 deploy *ARGS:
     ansible-playbook playbooks/deploy.yml --ask-vault-pass {{ARGS}}
 
@@ -32,13 +36,67 @@ deploy *ARGS:
 update *ARGS:
     ansible-playbook playbooks/update.yml --ask-vault-pass {{ARGS}}
 
+# ── Per-Service Deployment ──────────────────────────────────────
+
+# Deploy only the app service
+deploy-app *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags app {{ARGS}}
+
+# Deploy only PostgreSQL
+deploy-postgres *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags postgres {{ARGS}}
+
+# Deploy only Caddy reverse proxy
+deploy-caddy *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags caddy {{ARGS}}
+
+# Deploy only MinIO object storage
+deploy-minio *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags minio {{ARGS}}
+
+# Deploy only strfry Nostr relay
+deploy-strfry *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags strfry {{ARGS}}
+
+# Deploy only Whisper transcription
+deploy-whisper *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags whisper {{ARGS}}
+
+# Deploy only Asterisk PBX
+deploy-asterisk *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags asterisk {{ARGS}}
+
+# Deploy only Signal bridge
+deploy-signal *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags signal {{ARGS}}
+
+# ── Migration ───────────────────────────────────────────────────
+
+# Migrate from monolithic to per-service layout
+migrate *ARGS:
+    ansible-playbook playbooks/migrate-to-multi-host.yml --ask-vault-pass {{ARGS}}
+
+# ── Backup ──────────────────────────────────────────────────────
+
 # Run encrypted backup
 backup *ARGS:
     ansible-playbook playbooks/backup.yml --ask-vault-pass {{ARGS}}
 
+# ── Verification ────────────────────────────────────────────────
+
 # Check configuration without making changes
 check *ARGS:
     ansible-playbook setup.yml --check --diff --ask-vault-pass {{ARGS}}
+
+# Test SSH connectivity to all hosts
+ping:
+    ansible all -m ping
+
+# Show gathered facts for debugging
+facts:
+    ansible all -m setup --ask-vault-pass
+
+# ── Vault Management ───────────────────────────────────────────
 
 # Encrypt the vars file with Ansible Vault
 encrypt-vars:
@@ -52,13 +110,7 @@ edit-vars:
 view-vars:
     ansible-vault view vars.yml
 
-# Test SSH connectivity to all hosts
-ping:
-    ansible all -m ping
-
-# Show gathered facts for debugging
-facts:
-    ansible all -m setup --ask-vault-pass
+# ── Utilities ──────────────────────────────────────────────────
 
 # Generate secrets for a new deployment
 generate-secrets:
@@ -70,6 +122,7 @@ generate-secrets:
     echo "hmac_secret: $(openssl rand -hex 32)"
     echo "minio_access_key: $(openssl rand -base64 24)"
     echo "minio_secret_key: $(openssl rand -base64 24)"
+    echo "server_nostr_secret: $(openssl rand -hex 32)"
     echo "ari_password: $(openssl rand -base64 24)"
     echo "bridge_secret: $(openssl rand -base64 24)"
     echo ""

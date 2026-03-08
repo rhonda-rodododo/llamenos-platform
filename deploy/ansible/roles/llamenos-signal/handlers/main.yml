@@ -1,0 +1,6 @@
+---
+- name: Restart signal service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/signal"
+    state: restarted
+    recreate: always

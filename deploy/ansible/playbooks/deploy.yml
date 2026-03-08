@@ -1,22 +1,83 @@
 ---
-# Application Deployment Playbook
+# Llamenos Deployment — Multi-Host Orchestration
 #
-# Deploys the Llamenos stack via Docker Compose:
-# - Ensures Docker is installed
-# - Templates docker-compose.yml, .env, and Caddyfile
-# - Pulls images and starts services
-# - Waits for health check to pass
+# Deploys services in dependency order across all hosts.
+# Each service role is self-selecting: it skips hosts not in its group.
 #
 # Usage:
 #   ansible-playbook playbooks/deploy.yml --ask-vault-pass
+#   ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags postgres
+#   ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags app
+#
+# Tags: docker, service-discovery, internal-tls, postgres, minio, strfry,
+#       app, caddy, whisper, asterisk, signal, deploy
 
-- name: Deploy Llamenos
-  hosts: all
+- name: Gather facts and run service discovery
+  hosts: llamenos_servers
+  become: true
+  vars_files:
+    - ../vars.yml
+  pre_tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+      tags: [always]
+  roles:
+    - role: service-discovery
+      tags: [always, service-discovery]
+
+- name: Provision internal TLS (if enabled)
+  hosts: llamenos_servers
+  become: true
+  vars_files:
+    - ../vars.yml
+  roles:
+    - role: internal-tls
+      tags: [internal-tls, deploy]
+      when: llamenos_internal_tls_enabled | default(false)
+
+- name: Deploy infrastructure services (database, storage, relay)
+  hosts: llamenos_servers
   become: true
   vars_files:
     - ../vars.yml
   roles:
     - role: docker
       tags: [docker, deploy]
-    - role: llamenos
-      tags: [llamenos, deploy]
+    - role: llamenos-postgres
+      tags: [postgres, deploy]
+      when: llamenos_postgres_enabled | default(true)
+    - role: llamenos-minio
+      tags: [minio, deploy]
+      when: llamenos_minio_enabled | default(true)
+    - role: llamenos-strfry
+      tags: [strfry, deploy]
+      when: llamenos_strfry_enabled | default(true)
+
+- name: Deploy application services
+  hosts: llamenos_servers
+  become: true
+  vars_files:
+    - ../vars.yml
+  roles:
+    - role: llamenos-app
+      tags: [app, deploy]
+      when: llamenos_app_enabled | default(true)
+
+- name: Deploy proxy and optional services
+  hosts: llamenos_servers
+  become: true
+  vars_files:
+    - ../vars.yml
+  roles:
+    - role: llamenos-caddy
+      tags: [caddy, deploy]
+      when: llamenos_caddy_enabled | default(true)
+    - role: llamenos-whisper
+      tags: [whisper, deploy]
+      when: llamenos_transcription_enabled | default(false)
+    - role: llamenos-asterisk
+      tags: [asterisk, deploy]
+      when: llamenos_asterisk_enabled | default(false)
+    - role: llamenos-signal
+      tags: [signal, deploy]
+      when: llamenos_signal_enabled | default(false)

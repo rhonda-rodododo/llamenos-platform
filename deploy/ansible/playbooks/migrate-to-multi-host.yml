@@ -1,0 +1,112 @@
+---
+# Migration: single-host monolithic → multi-host per-service layout
+#
+# Safe to run multiple times (idempotent).
+# Stops the old monolithic stack, archives the compose file,
+# and creates the per-service directory structure.
+# Data volumes are preserved — Docker named volumes persist across
+# compose project renames.
+#
+# Usage:
+#   ansible-playbook playbooks/migrate-to-multi-host.yml --ask-vault-pass
+#
+# After migration, run:
+#   just deploy
+
+- name: Migrate to multi-host layout
+  hosts: llamenos_servers
+  become: true
+  vars_files:
+    - ../vars.yml
+  tasks:
+    - name: Check for old monolithic docker-compose.yml
+      ansible.builtin.stat:
+        path: "{{ app_dir }}/docker-compose.yml"
+      register: old_compose
+
+    - name: Check for old monolithic .env
+      ansible.builtin.stat:
+        path: "{{ app_dir }}/.env"
+      register: old_env
+
+    - name: Stop old monolithic stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: stopped
+      when: old_compose.stat.exists
+      ignore_errors: true
+
+    - name: Create per-service directory structure
+      ansible.builtin.file:
+        path: "{{ app_dir }}/services/{{ item }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0750"
+      loop:
+        - app
+        - postgres
+        - caddy
+        - minio
+        - strfry
+
+    - name: Create optional service directories (if enabled)
+      ansible.builtin.file:
+        path: "{{ app_dir }}/services/{{ item.name }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0750"
+      loop:
+        - { name: whisper, enabled: "{{ llamenos_transcription_enabled | default(false) }}" }
+        - { name: asterisk, enabled: "{{ llamenos_asterisk_enabled | default(false) }}" }
+        - { name: signal, enabled: "{{ llamenos_signal_enabled | default(false) }}" }
+      when: item.enabled | bool
+
+    - name: Archive old compose file
+      ansible.builtin.copy:
+        src: "{{ app_dir }}/docker-compose.yml"
+        dest: "{{ app_dir }}/docker-compose.yml.pre-migration"
+        remote_src: true
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0640"
+      when: old_compose.stat.exists
+
+    - name: Archive old .env file
+      ansible.builtin.copy:
+        src: "{{ app_dir }}/.env"
+        dest: "{{ app_dir }}/.env.pre-migration"
+        remote_src: true
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0600"
+      when: old_env.stat.exists
+
+    - name: Remove old compose file
+      ansible.builtin.file:
+        path: "{{ app_dir }}/docker-compose.yml"
+        state: absent
+      when: old_compose.stat.exists
+
+    - name: Remove old .env file
+      ansible.builtin.file:
+        path: "{{ app_dir }}/.env"
+        state: absent
+      when: old_env.stat.exists
+
+    - name: Display migration status
+      ansible.builtin.debug:
+        msg: |
+          Migration complete for {{ inventory_hostname }}.
+
+          Archived files (if they existed):
+            {{ app_dir }}/docker-compose.yml.pre-migration
+            {{ app_dir }}/.env.pre-migration
+
+          Per-service directories created under {{ app_dir }}/services/
+
+          Data volumes are preserved — Docker named volumes persist
+          across compose project renames.
+
+          Next step: run 'just deploy' to start per-service stacks.

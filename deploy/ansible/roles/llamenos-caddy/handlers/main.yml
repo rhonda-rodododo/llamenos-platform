@@ -1,0 +1,6 @@
+---
+- name: Restart caddy service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/caddy"
+    state: restarted
+    recreate: always

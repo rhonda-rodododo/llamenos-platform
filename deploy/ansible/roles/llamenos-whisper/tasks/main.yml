@@ -1,0 +1,55 @@
+---
+# Whisper transcription role — deploys the speech-to-text service
+#
+# Skips if:
+#   - llamenos_transcription_enabled is false
+#   - This host is not in the llamenos_transcription group (when the group has members)
+
+- name: Skip if whisper not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_transcription_enabled | default(false))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_transcription', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_transcription', [])
+
+- name: Create whisper service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/whisper"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template whisper compose file
+  ansible.builtin.template:
+    src: compose/whisper.j2
+    dest: "{{ app_dir }}/services/whisper/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart whisper service
+
+- name: Template whisper environment
+  ansible.builtin.template:
+    src: env/whisper.j2
+    dest: "{{ app_dir }}/services/whisper/.env.whisper"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  notify: Restart whisper service
+
+- name: Pull whisper image
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/whisper"
+    pull: always
+    state: present
+    recreate: never
+
+- name: Start whisper service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/whisper"
+    state: present
+  register: whisper_compose

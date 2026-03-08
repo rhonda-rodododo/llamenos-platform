@@ -1,0 +1,55 @@
+---
+# Signal messaging bridge role — deploys the Signal CLI REST API
+#
+# Skips if:
+#   - llamenos_signal_enabled is false
+#   - This host is not in the llamenos_signal group (when the group has members)
+
+- name: Skip if signal not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_signal_enabled | default(false))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_signal', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_signal', [])
+
+- name: Create signal service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/signal"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template signal compose file
+  ansible.builtin.template:
+    src: compose/signal.j2
+    dest: "{{ app_dir }}/services/signal/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart signal service
+
+- name: Template signal environment
+  ansible.builtin.template:
+    src: env/signal.j2
+    dest: "{{ app_dir }}/services/signal/.env.signal"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  notify: Restart signal service
+
+- name: Pull signal image
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/signal"
+    pull: always
+    state: present
+    recreate: never
+
+- name: Start signal service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/signal"
+    state: present
+  register: signal_compose

@@ -33,20 +33,32 @@ ssh_allowed_cidrs:
 deploy_user: deploy
 deploy_group: deploy
 
+# ─── Service Toggles ────────────────────────────────────────────
+# Each service can be independently enabled/disabled.
+# Services only deploy to hosts in their inventory group.
+# Core services default to enabled; optional services default to disabled.
+llamenos_app_enabled: true
+llamenos_postgres_enabled: true
+llamenos_caddy_enabled: true
+llamenos_minio_enabled: true
+llamenos_strfry_enabled: true
+llamenos_transcription_enabled: false
+llamenos_asterisk_enabled: false
+llamenos_signal_enabled: false
+
+# ─── Service Images ─────────────────────────────────────────────
+# Pin to specific tags for reproducible deployments.
+# Use "latest" only for development.
+llamenos_app_image: ghcr.io/llamenos/llamenos:latest
+llamenos_postgres_image: postgres:17-alpine
+llamenos_caddy_image: caddy:2.9-alpine
+llamenos_minio_image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+llamenos_strfry_image: dockurr/strfry:latest
+llamenos_whisper_image: fedirz/faster-whisper-server:0.4.1
+llamenos_asterisk_image: andrius/asterisk:20
+llamenos_signal_image: bbernhard/signal-cli-rest-api:0.92
+
 # ─── Application ─────────────────────────────────────────────────
-# Docker image for the Llamenos app
-# Use a specific tag in production (e.g., ghcr.io/llamenos/llamenos:0.14.0)
-llamenos_image: ghcr.io/llamenos/llamenos:latest
-
-# Docker image for Caddy reverse proxy
-caddy_image: caddy:2.9-alpine
-
-# Docker image for PostgreSQL
-postgres_image: postgres:17-alpine
-
-# Docker image for MinIO
-minio_image: minio/minio:RELEASE.2025-01-20T14-49-07Z
-
 # Directory on the host where app files are stored
 app_dir: /opt/llamenos
 
@@ -71,11 +83,17 @@ pg_password: ""
 # Connection pool size
 pg_pool_size: 10
 
+# Port to expose when PostgreSQL is on a separate host (multi-host only)
+llamenos_postgres_port: 5432
+
 # ─── MinIO (Blob Storage) ───────────────────────────────────────
 # Access credentials (generate with: openssl rand -base64 24)
 minio_access_key: ""
 minio_secret_key: ""
 minio_bucket: llamenos-files
+
+# Port to expose when MinIO is on a separate host (multi-host only)
+llamenos_minio_port: 9000
 
 # ─── Telephony (Twilio) ─────────────────────────────────────────
 # Leave empty if configuring via the admin UI or using Asterisk
@@ -91,24 +109,29 @@ server_nostr_secret: ""
 # Relay URL (default: ws://strfry:7777 for the bundled strfry)
 # nostr_relay_url: "ws://strfry:7777"
 
-# ─── Optional Profiles ──────────────────────────────────────────
-# Enable optional Docker Compose profiles
-# Options: transcription, asterisk, signal
+# Port to expose when strfry is on a separate host (multi-host only)
+llamenos_strfry_port: 7777
+
+# ─── Optional Profiles (DEPRECATED) ─────────────────────────────
+# These are kept for backward compatibility with the monolithic compose template.
+# For new deployments, use llamenos_*_enabled toggles above instead.
 compose_profiles: []
 
-# Whisper transcription settings (only used if 'transcription' profile enabled)
-whisper_image: fedirz/faster-whisper-server:0.4.1
+# Whisper transcription settings (only used if transcription is enabled)
 whisper_model: Systran/faster-whisper-base
 whisper_device: cpu
 
-# Asterisk PBX settings (only used if 'asterisk' profile enabled)
-asterisk_image: andrius/asterisk:20
+# Asterisk PBX settings (only used if asterisk is enabled)
 ari_username: llamenos
 ari_password: ""
 bridge_secret: ""
 
-# Signal bridge settings (only used if 'signal' profile enabled)
-signal_image: bbernhard/signal-cli-rest-api:0.92
+# Signal bridge settings (only used if signal is enabled)
+# No additional config needed beyond enabling
+
+# ─── Cross-Host Networking ──────────────────────────────────────
+# Enable TLS between services on different hosts (recommended for multi-host)
+llamenos_internal_tls_enabled: false
 
 # ─── Backup ─────────────────────────────────────────────────────
 # Enable automated backups

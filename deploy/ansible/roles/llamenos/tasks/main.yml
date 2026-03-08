@@ -1,6 +1,11 @@
 ---
-# Llamenos application deployment role
+# DEPRECATED: This monolithic deployment role is kept for backward compatibility.
+# New deployments should use per-service roles (llamenos-app, llamenos-postgres, etc.)
+# with the multi-host inventory and orchestration playbook.
 #
+# To migrate: ansible-playbook playbooks/migrate-to-multi-host.yml --ask-vault-pass
+#
+# Original description:
 # - Creates app directory structure
 # - Templates docker-compose.yml, .env, and Caddyfile
 # - Pulls Docker images

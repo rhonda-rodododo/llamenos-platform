@@ -1,0 +1,6 @@
+# MinIO Environment — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+MINIO_ROOT_USER={{ minio_access_key }}
+MINIO_ROOT_PASSWORD={{ minio_secret_key }}
