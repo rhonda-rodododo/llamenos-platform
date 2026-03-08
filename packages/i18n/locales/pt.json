@@ -1948,5 +1948,19 @@
     "updateError": "Failed to update report type",
     "cannotArchiveLast": "Cannot archive the last active report type",
     "maxTypes": "Maximum number of report types reached"
+  },
+  "offline": {
+    "banner": "Você está offline. Chamadas e mensagens não funcionarão até que a conectividade seja restaurada.",
+    "pendingCount": "{{count}} pendentes",
+    "pendingCount_one": "{{count}} pendente",
+    "pendingSyncMessage": "{{count}} operações aguardando sincronização",
+    "pendingSyncMessage_one": "{{count}} operação aguardando sincronização",
+    "syncNow": "Sincronizar agora",
+    "syncing": "Sincronizando...",
+    "syncComplete": "Todas as operações foram sincronizadas com sucesso",
+    "syncFailed": "Algumas operações falharam ao sincronizar",
+    "operationQueued": "Salvo offline — será sincronizado ao conectar",
+    "relayReconnecting": "Reconectando ao servidor em tempo real...",
+    "relayReconnected": "Reconectado — recuperando eventos perdidos"
   }
 }

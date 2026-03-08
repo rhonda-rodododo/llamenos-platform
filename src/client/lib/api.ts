@@ -1,6 +1,7 @@
 import * as keyManager from './key-manager'
 import { createAuthToken } from './platform'
 import { APP_API_VERSION, emitUpdateRequired } from './version'
+import { offlineQueue, isQueueableMethod, isNetworkError as isOfflineNetworkError } from './offline-queue'
 
 const API_BASE = '/api'
 
@@ -26,9 +27,38 @@ async function getAuthHeaders(method: string, apiPath: string): Promise<Record<s
   return {}
 }
 
+/**
+ * Get auth headers for offline queue replay.
+ * Exported so the replay mechanism can authenticate requests.
+ */
+export function getAuthHeadersForReplay(method: string, path: string): Promise<Record<string, string>> {
+  return getAuthHeaders(method, path)
+}
+
 // Activity tracking callback — set by AuthProvider
 let onApiActivity: (() => void) | null = null
 export function setOnApiActivity(cb: (() => void) | null) { onApiActivity = cb }
+
+/**
+ * Paths that should NEVER be queued for offline replay.
+ * Auth endpoints, reads, and real-time operations are excluded.
+ */
+const NON_QUEUEABLE_PATHS = [
+  '/auth/',
+  '/config',
+  '/setup/',
+  '/calls/active',
+  '/calls/today-count',
+  '/calls/presence',
+  '/calls/', // Call answer/hangup must be real-time — stale actions are harmful
+  '/telephony/',
+  '/uploads/', // Chunked uploads have their own retry logic
+  '/files/',
+]
+
+function isQueueablePath(path: string): boolean {
+  return !NON_QUEUEABLE_PATHS.some(prefix => path.startsWith(prefix))
+}
 
 const REQUEST_TIMEOUT_MS = 15_000
 const MAX_RETRIES = 3
@@ -103,12 +133,26 @@ async function request<T>(path: string, options: RequestInit & { retries?: numbe
       }
 
       onApiActivity?.()
+
+      // On successful request, attempt to replay any queued offline operations
+      if (offlineQueue.pendingCount > 0 && navigator.onLine) {
+        // Fire-and-forget replay — don't block the current request
+        offlineQueue.replay(getAuthHeadersForReplay).catch(() => {})
+      }
+
       return res.json()
     } catch (err) {
       if (err instanceof ApiError) throw err
+      if (err instanceof OfflineQueuedError) throw err
       // Network error or timeout — retry if idempotent
       lastError = err instanceof Error ? err : new Error(String(err))
       if (attempt < maxRetries) continue
+      // If this is a network error and the operation is queueable, add to offline queue
+      if (isOfflineNetworkError(lastError) && isQueueableMethod(method) && isQueueablePath(path)) {
+        const body = options.body ? (typeof options.body === 'string' ? options.body : null) : null
+        offlineQueue.enqueue(path, method, body)
+        throw new OfflineQueuedError(path, method)
+      }
       throw new NetworkError(lastError.message, lastError)
     } finally {
       clearTimeout(timeout)
@@ -135,6 +179,17 @@ export class NetworkError extends Error {
 /** Returns true if the error is a network/connectivity issue (not a server-side error). */
 export function isNetworkError(err: unknown): err is NetworkError {
   return err instanceof NetworkError
+}
+
+/**
+ * Thrown when a write operation is queued for offline replay instead of failing.
+ * Callers can check for this to show "saved for later" UI instead of an error.
+ */
+export class OfflineQueuedError extends Error {
+  constructor(public path: string, public method: string) {
+    super(`Operation queued for offline replay: ${method} ${path}`)
+    this.name = 'OfflineQueuedError'
+  }
 }
 
 // --- Hub context for hub-scoped API calls ---

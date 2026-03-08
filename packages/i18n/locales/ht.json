@@ -1948,5 +1948,19 @@
     "updateError": "Failed to update report type",
     "cannotArchiveLast": "Cannot archive the last active report type",
     "maxTypes": "Maximum number of report types reached"
+  },
+  "offline": {
+    "banner": "Ou pa konekte. Apèl ak mesaj pa pral fonksyone jiskaske koneksyon retabli.",
+    "pendingCount": "{{count}} an atant",
+    "pendingCount_one": "{{count}} an atant",
+    "pendingSyncMessage": "{{count}} operasyon ap tann senkronizasyon",
+    "pendingSyncMessage_one": "{{count}} operasyon ap tann senkronizasyon",
+    "syncNow": "Senkronize kounye a",
+    "syncing": "Senkronizasyon...",
+    "syncComplete": "Tout operasyon senkronize avèk siksè",
+    "syncFailed": "Kèk operasyon pa t kapab senkronize",
+    "operationQueued": "Sove san koneksyon — pral senkronize lè konekte",
+    "relayReconnecting": "Rekoneksyon ak sèvè an tan reyèl...",
+    "relayReconnected": "Rekonekte — ap rattrape evènman ki te manke"
   }
 }

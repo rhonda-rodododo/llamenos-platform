@@ -1809,20 +1809,12 @@
     "title": "Update Required"
   },
   "updates": {
-    "available": "Version {{version}} is available",
-    "details": "Details",
-    "dialogTitle": "Software Update",
-    "download": "Download",
-    "downloading": "Downloading update...",
-    "later": "Later",
-    "publishedOn": "Published on {{date}}",
-    "ready": "Update ready. Restart to apply.",
-    "readyDescription": "The update has been downloaded and is ready to install. Restart the application to apply it.",
-    "releaseNotes": "Release Notes",
-    "restart": "Restart Now",
-    "skipVersion": "Skip This Version",
-    "updateNow": "Update Now",
-    "versionChange": "{{current}} → {{new}}"
+    "update_required_title": "Update Required",
+    "update_required_message": "Your app is out of date and can no longer connect to the server. Please update to continue.",
+    "update_required_button": "Update Now",
+    "update_available_message": "A new version is available. Update for the latest features and security fixes.",
+    "update_available_dismiss": "Later",
+    "contact_admin": "If you need help, contact your administrator:"
   },
   "useBiometric": "Use Biometric",
   "volunteerProfile": {
@@ -1957,12 +1949,18 @@
     "cannotArchiveLast": "Cannot archive the last active report type",
     "maxTypes": "Maximum number of report types reached"
   },
-  "updates": {
-    "update_required_title": "Update Required",
-    "update_required_message": "Your app is out of date and can no longer connect to the server. Please update to continue.",
-    "update_required_button": "Update Now",
-    "update_available_message": "A new version is available. Update for the latest features and security fixes.",
-    "update_available_dismiss": "Later",
-    "contact_admin": "If you need help, contact your administrator:"
+  "offline": {
+    "banner": "You are offline. Calls and messages will not work until connectivity is restored.",
+    "pendingCount": "{{count}} pending",
+    "pendingCount_one": "{{count}} pending",
+    "pendingSyncMessage": "{{count}} operations waiting to sync",
+    "pendingSyncMessage_one": "{{count}} operation waiting to sync",
+    "syncNow": "Sync now",
+    "syncing": "Syncing...",
+    "syncComplete": "All operations synced successfully",
+    "syncFailed": "Some operations failed to sync",
+    "operationQueued": "Saved offline — will sync when connected",
+    "relayReconnecting": "Reconnecting to real-time server...",
+    "relayReconnected": "Reconnected — catching up on missed events"
   }
 }

@@ -48,6 +48,10 @@ export class RelayManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private destroyed = false
   private authenticated = false
+  /** Tracks the timestamp of the last received event per hub for replay on reconnect */
+  private lastEventTimestamp = new Map<string, number>()
+  /** Timestamp when the connection was lost — used to request missed events */
+  private disconnectedAt: number | null = null
 
   constructor(options: RelayManagerOptions) {
     this.relayUrl = options.relayUrl
@@ -87,6 +91,9 @@ export class RelayManager {
           this.ws = ws
           this.reconnectAttempts = 0
           this.setupListeners(ws)
+          // Clear disconnectedAt after subscriptions are flushed (they use it for since filter)
+          // The flushPendingSubscriptions() call happens after auth, so disconnectedAt is still
+          // available when building the since filter
           resolve()
         })
 
@@ -215,6 +222,7 @@ export class RelayManager {
     ws.addEventListener('close', () => {
       this.ws = null
       this.authenticated = false
+      this.disconnectedAt = Date.now()
       this.setState('disconnected')
       if (!this.destroyed) {
         this.scheduleReconnect()
@@ -284,6 +292,12 @@ export class RelayManager {
     const hubId = event.tags.find(t => t[0] === 'd')?.[1]
     if (!hubId) return
 
+    // Track the latest event timestamp per hub for replay on reconnect
+    const prevTs = this.lastEventTimestamp.get(hubId) ?? 0
+    if (event.created_at > prevTs) {
+      this.lastEventTimestamp.set(hubId, event.created_at)
+    }
+
     for (const sub of this.subscriptions.values()) {
       if (sub.hubId === hubId && sub.kinds.includes(event.kind)) {
         try {
@@ -298,11 +312,25 @@ export class RelayManager {
   private sendSubscription(sub: Subscription): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
 
-    this.ws.send(JSON.stringify(['REQ', sub.id, {
+    // Build the filter with optional `since` for replay of missed events
+    const filter: Record<string, unknown> = {
       kinds: sub.kinds,
       '#d': [sub.hubId],
       '#t': ['llamenos:event'],
-    }]))
+    }
+
+    // On reconnect, request events since the last received timestamp for this hub
+    // to catch up on events missed during disconnection
+    const lastTs = this.lastEventTimestamp.get(sub.hubId)
+    if (lastTs) {
+      // Subtract 1 second to ensure we don't miss events at the boundary
+      filter.since = lastTs - 1
+    } else if (this.disconnectedAt) {
+      // If we have no events yet but know when we disconnected, use that
+      filter.since = Math.floor(this.disconnectedAt / 1000) - 1
+    }
+
+    this.ws.send(JSON.stringify(['REQ', sub.id, filter]))
   }
 
   private flushPendingSubscriptions(): void {
@@ -317,6 +345,8 @@ export class RelayManager {
         this.sendSubscription(sub)
       }
     }
+    // Clear disconnectedAt after all subscriptions have been sent with the since filter
+    this.disconnectedAt = null
   }
 
   private scheduleReconnect(): void {
