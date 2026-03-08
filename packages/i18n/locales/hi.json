@@ -14,7 +14,8 @@
     "themeLight": "लाइट थीम",
     "themeSystem": "सिस्टम थीम",
     "moveUp": "Move up",
-    "moveDown": "Move down"
+    "moveDown": "Move down",
+    "copyField": "Copy %@"
   },
   "actionCopy": "Copy",
   "actionDone": "Done",
@@ -1106,6 +1107,12 @@
   },
   "panicWipe": {
     "confirm": "Wipe All Data",
+    "confirmFinalAction": "Yes, Wipe Everything",
+    "confirmFinalMessage": "Are you absolutely sure you want to wipe all data from this device?",
+    "confirmFinalTitle": "This cannot be undone",
+    "confirmInputHint": "Type WIPE to confirm",
+    "confirmInputPlaceholder": "WIPE",
+    "description": "This will permanently delete ALL data including your identity keys. This cannot be undone. Make sure you have backed up your secret key.",
     "message": "All data has been wiped",
     "title": "Emergency Data Wipe",
     "wiping": "Emergency wipe in progress..."
@@ -1617,7 +1624,6 @@
     "emptyScheduled": "No scheduled shifts",
     "emptyTitle": "No Shifts",
     "emptySubtitle": "Shifts will appear here when created",
-    "emptyTitle": "No Shifts",
     "endTime": "समाप्ति का समय",
     "fallbackDescription": "जब कोई शिफ्ट निर्धारित नहीं होती तो ये स्वयंसेवक कॉल प्राप्त करते हैं",
     "fallbackGroup": "बैकअप ग्रुप",

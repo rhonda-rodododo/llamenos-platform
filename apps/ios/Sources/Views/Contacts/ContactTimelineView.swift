@@ -97,6 +97,7 @@ struct ContactTimelineView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("timeline-loading")
     }
 
     // MARK: - Error State
@@ -118,6 +119,7 @@ struct ContactTimelineView: View {
             }
             .buttonStyle(.bordered)
         }
+        .accessibilityIdentifier("timeline-error")
     }
 
     // MARK: - ViewModel Resolution

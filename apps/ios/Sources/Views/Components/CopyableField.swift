@@ -35,6 +35,9 @@ struct CopyableField: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("copy-field-button")
+            .accessibilityLabel("Copy \(label)")
         }
+        .accessibilityElement(children: .contain)
     }
 }

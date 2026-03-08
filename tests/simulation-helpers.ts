@@ -12,7 +12,12 @@
 import type { APIRequestContext } from '@playwright/test'
 
 const TEST_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
-const HUB_BASE_URL = process.env.TEST_HUB_URL || process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8788'
+/**
+ * Backend base URL for simulation endpoints.
+ * These must hit the backend directly (not the Vite frontend).
+ * Defaults to http://localhost:3000 (Docker Compose backend).
+ */
+const HUB_BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
 function simulationHeaders(): Record<string, string> {
   return {
@@ -97,7 +102,10 @@ async function postSimulation<T>(
   endpoint: string,
   body: Record<string, unknown>,
 ): Promise<T> {
-  const url = `/api/test-simulate/${endpoint}`
+  // Use absolute URL to hit the backend directly, not the Vite frontend.
+  // Playwright's request.post() with a relative URL would resolve against
+  // the baseURL (Vite at :8788), but simulation endpoints live on the backend.
+  const url = `${HUB_BASE_URL}/api/test-simulate/${endpoint}`
   const res = await request.post(url, {
     headers: simulationHeaders(),
     data: body,

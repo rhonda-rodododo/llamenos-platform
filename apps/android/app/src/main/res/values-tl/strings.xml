@@ -2,6 +2,7 @@
 <resources>
     <string name="a11y_clear_filters">I-clear ang mga filter</string>
     <string name="a11y_close_sidebar">Isara ang sidebar</string>
+    <string name="a11y_copy_field">Copy %@</string>
     <string name="a11y_copy_to_clipboard">Kopyahin sa clipboard</string>
     <string name="a11y_delete_item">Tanggalin</string>
     <string name="a11y_edit_item">I-edit</string>
@@ -997,6 +998,12 @@
     <string name="onboarding_welcome_description">Inimbitahan kang sumali bilang boluntaryo, %s</string>
     <string name="onboarding_welcome_title">Maligayang pagdating sa %s</string>
     <string name="panic_wipe_confirm">Wipe All Data</string>
+    <string name="panic_wipe_confirm_final_action">Yes, Wipe Everything</string>
+    <string name="panic_wipe_confirm_final_message">Are you absolutely sure you want to wipe all data from this device?</string>
+    <string name="panic_wipe_confirm_final_title">This cannot be undone</string>
+    <string name="panic_wipe_confirm_input_hint">Type WIPE to confirm</string>
+    <string name="panic_wipe_confirm_input_placeholder">WIPE</string>
+    <string name="panic_wipe_description">This will permanently delete ALL data including your identity keys. This cannot be undone. Make sure you have backed up your secret key.</string>
     <string name="panic_wipe_message">All data has been wiped</string>
     <string name="panic_wipe_title">Emergency Data Wipe</string>
     <string name="panic_wipe_wiping">Emergency wipe in progress...</string>

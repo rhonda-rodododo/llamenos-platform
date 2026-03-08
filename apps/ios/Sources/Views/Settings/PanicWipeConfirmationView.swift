@@ -20,7 +20,7 @@ struct PanicWipeConfirmationView: View {
                     .font(.brand(.title2))
 
                 Text(NSLocalizedString(
-                    "panic_wipe_message",
+                    "panic_wipe_description",
                     comment: "This will permanently delete ALL data including your identity keys. This cannot be undone. Make sure you have backed up your secret key."
                 ))
                 .font(.brand(.body))
@@ -29,11 +29,11 @@ struct PanicWipeConfirmationView: View {
                 .padding(.horizontal, 24)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Type WIPE to confirm")
+                    Text(NSLocalizedString("panic_wipe_confirm_input_hint", comment: "Type WIPE to confirm"))
                         .font(.brand(.subheadline))
                         .foregroundStyle(Color.brandMutedForeground)
 
-                    TextField("WIPE", text: $confirmationText)
+                    TextField(NSLocalizedString("panic_wipe_confirm_input_placeholder", comment: "WIPE"), text: $confirmationText)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .textFieldStyle(.roundedBorder)
@@ -73,14 +73,14 @@ struct PanicWipeConfirmationView: View {
         .onAppear {
             Haptics.warning()
         }
-        .alert("This cannot be undone", isPresented: $showFinalAlert) {
+        .alert(NSLocalizedString("panic_wipe_confirm_final_title", comment: "This cannot be undone"), isPresented: $showFinalAlert) {
             Button(NSLocalizedString("cancel", comment: "Cancel"), role: .cancel) {}
-            Button("Yes, Wipe Everything", role: .destructive) {
+            Button(NSLocalizedString("panic_wipe_confirm_final_action", comment: "Yes, Wipe Everything"), role: .destructive) {
                 Haptics.error()
                 performPanicWipe()
             }
         } message: {
-            Text("Are you absolutely sure you want to wipe all data from this device?")
+            Text(NSLocalizedString("panic_wipe_confirm_final_message", comment: "Are you absolutely sure you want to wipe all data from this device?"))
         }
     }
 

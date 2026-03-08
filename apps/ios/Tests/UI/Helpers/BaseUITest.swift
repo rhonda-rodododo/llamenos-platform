@@ -109,6 +109,126 @@ class BaseUITest: XCTestCase {
         wait(for: [expectation], timeout: 20)
     }
 
+    // MARK: - Simulation Helpers
+
+    /// Simulate an incoming call via the test simulation API.
+    /// Returns (callId, status) on success, or nil values on failure.
+    @discardableResult
+    func simulateIncomingCall(callerNumber: String = "+15551234567") -> (callId: String, status: String) {
+        return simulationRequest(
+            endpoint: "incoming-call",
+            body: ["callerNumber": callerNumber],
+            extractKeys: ("callId", "status")
+        )
+    }
+
+    /// Simulate answering a call via the test simulation API.
+    /// Returns the call status string.
+    @discardableResult
+    func simulateAnswerCall(callId: String, pubkey: String) -> String {
+        let result = simulationRequest(
+            endpoint: "answer-call",
+            body: ["callId": callId, "pubkey": pubkey],
+            extractKeys: ("status", "status")
+        )
+        return result.0
+    }
+
+    /// Simulate ending a call via the test simulation API.
+    /// Returns the call status string.
+    @discardableResult
+    func simulateEndCall(callId: String) -> String {
+        let result = simulationRequest(
+            endpoint: "end-call",
+            body: ["callId": callId],
+            extractKeys: ("status", "status")
+        )
+        return result.0
+    }
+
+    /// Simulate a voicemail (unanswered call) via the test simulation API.
+    /// Returns the call status string.
+    @discardableResult
+    func simulateVoicemail(callId: String) -> String {
+        let result = simulationRequest(
+            endpoint: "voicemail",
+            body: ["callId": callId],
+            extractKeys: ("status", "status")
+        )
+        return result.0
+    }
+
+    /// Simulate an incoming message via the test simulation API.
+    /// Returns (conversationId, messageId) on success.
+    @discardableResult
+    func simulateIncomingMessage(
+        senderNumber: String = "+15559876543",
+        body: String = "Test message",
+        channel: String = "sms"
+    ) -> (conversationId: String, messageId: String) {
+        return simulationRequest(
+            endpoint: "incoming-message",
+            body: ["senderNumber": senderNumber, "body": body, "channel": channel],
+            extractKeys: ("conversationId", "messageId")
+        )
+    }
+
+    /// Generic simulation request helper using synchronous URLSession + DispatchSemaphore.
+    private func simulationRequest(
+        endpoint: String,
+        body: [String: String],
+        extractKeys: (String, String)
+    ) -> (String, String) {
+        guard let url = URL(string: "\(testHubURL)/api/test-simulate/\(endpoint)") else {
+            XCTFail("Invalid simulation URL for endpoint: \(endpoint)")
+            return ("", "")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(testResetSecret, forHTTPHeaderField: "X-Test-Secret")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 15
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            XCTFail("Failed to serialize simulation request body: \(error)")
+            return ("", "")
+        }
+
+        var resultFirst = ""
+        var resultSecond = ""
+        let semaphore = DispatchSemaphore(value: 0)
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { semaphore.signal() }
+
+            if let error {
+                print("Warning: Simulation request '\(endpoint)' failed: \(error.localizedDescription)")
+                return
+            }
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                print("Warning: Simulation request '\(endpoint)' returned \(code)")
+                return
+            }
+            guard let data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                print("Warning: Simulation request '\(endpoint)' returned invalid JSON")
+                return
+            }
+
+            resultFirst = json[extractKeys.0] as? String ?? ""
+            resultSecond = json[extractKeys.1] as? String ?? ""
+        }.resume()
+
+        let timeout = semaphore.wait(timeout: .now() + 20)
+        if timeout == .timedOut {
+            print("Warning: Simulation request '\(endpoint)' timed out")
+        }
+        return (resultFirst, resultSecond)
+    }
+
     // MARK: - BDD Step Helpers
 
     /// Wraps an action in an XCTContext activity for structured Given/When/Then reporting.

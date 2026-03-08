@@ -1,5 +1,6 @@
 "a11y_clear_filters" = "Limpar filtros";
 "a11y_close_sidebar" = "Fechar barra lateral";
+"a11y_copy_field" = "Copy %@";
 "a11y_copy_to_clipboard" = "Copiar para a área de transferência";
 "a11y_delete_item" = "Excluir";
 "a11y_edit_item" = "Editar";
@@ -994,6 +995,12 @@
 "onboarding_welcome_description" = "Você foi convidado para participar como voluntário, %@";
 "onboarding_welcome_title" = "Bem-vindo ao %@";
 "panic_wipe_confirm" = "Wipe All Data";
+"panic_wipe_confirm_final_action" = "Yes, Wipe Everything";
+"panic_wipe_confirm_final_message" = "Are you absolutely sure you want to wipe all data from this device?";
+"panic_wipe_confirm_final_title" = "This cannot be undone";
+"panic_wipe_confirm_input_hint" = "Type WIPE to confirm";
+"panic_wipe_confirm_input_placeholder" = "WIPE";
+"panic_wipe_description" = "This will permanently delete ALL data including your identity keys. This cannot be undone. Make sure you have backed up your secret key.";
 "panic_wipe_message" = "All data has been wiped";
 "panic_wipe_title" = "Emergency Data Wipe";
 "panic_wipe_wiping" = "Emergency wipe in progress...";

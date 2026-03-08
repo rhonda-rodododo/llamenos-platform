@@ -33,5 +33,7 @@ struct BrandEmptyState: View {
             }
         }
         .padding(32)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("brand-empty-state")
     }
 }

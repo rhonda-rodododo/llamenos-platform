@@ -30,17 +30,17 @@ struct SupportedLanguage: Identifiable, Hashable {
 
     static let all: [SupportedLanguage] = [
         SupportedLanguage(id: "en", name: "English"),
-        SupportedLanguage(id: "es", name: "Espanol"),
-        SupportedLanguage(id: "zh", name: "Chinese"),
+        SupportedLanguage(id: "es", name: "Espa\u{00F1}ol"),
+        SupportedLanguage(id: "zh", name: "\u{4E2D}\u{6587}"),
         SupportedLanguage(id: "tl", name: "Tagalog"),
-        SupportedLanguage(id: "vi", name: "Tieng Viet"),
-        SupportedLanguage(id: "ar", name: "Arabic"),
-        SupportedLanguage(id: "fr", name: "Francais"),
-        SupportedLanguage(id: "ht", name: "Kreyol Ayisyen"),
-        SupportedLanguage(id: "ko", name: "Korean"),
-        SupportedLanguage(id: "ru", name: "Russian"),
-        SupportedLanguage(id: "hi", name: "Hindi"),
-        SupportedLanguage(id: "pt", name: "Portugues"),
+        SupportedLanguage(id: "vi", name: "Ti\u{1EBF}ng Vi\u{1EC7}t"),
+        SupportedLanguage(id: "ar", name: "\u{0627}\u{0644}\u{0639}\u{0631}\u{0628}\u{064A}\u{0629}"),
+        SupportedLanguage(id: "fr", name: "Fran\u{00E7}ais"),
+        SupportedLanguage(id: "ht", name: "Krey\u{00F2}l Ayisyen"),
+        SupportedLanguage(id: "ko", name: "\u{D55C}\u{AD6D}\u{C5B4}"),
+        SupportedLanguage(id: "ru", name: "\u{0420}\u{0443}\u{0441}\u{0441}\u{043A}\u{0438}\u{0439}"),
+        SupportedLanguage(id: "hi", name: "\u{0939}\u{093F}\u{0928}\u{094D}\u{0926}\u{0940}"),
+        SupportedLanguage(id: "pt", name: "Portugu\u{00EA}s"),
         SupportedLanguage(id: "de", name: "Deutsch"),
     ]
 }
