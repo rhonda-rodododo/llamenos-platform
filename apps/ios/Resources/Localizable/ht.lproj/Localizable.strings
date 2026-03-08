@@ -1758,3 +1758,23 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+// MARK: - Transcription
+"transcription_attach_to_note" = "Atache transkripsyon nan not la";
+"transcription_enable_on_device" = "Aktive transkripsyon sou aparey la";
+"transcription_language_auto" = "Deteksyon otomatik";
+"transcription_language_selection" = "Lang transkripsyon";
+"transcription_live_transcript" = "Transkripsyon an dirèk";
+"transcription_mic_permission_denied" = "Pemisyon mikwofon refize. Aktive li nan Paramèt.";
+"transcription_mic_permission_required" = "Akse mikwofon obligatwa pou transkripsyon";
+"transcription_no_speech_detected" = "Pa gen pawòl detekte";
+"transcription_on_device" = "Transkripsyon sou aparey la";
+"transcription_on_device_description" = "Transkri apel lokal sou aparey ou ak rekonesans vwa. Odyo a pa janm kite aparey ou.";
+"transcription_speech_recognition_unavailable" = "Rekonesans vwa pa disponib sou aparey sa a";
+"transcription_starting_transcription" = "Kòmanse transkripsyon...";
+"transcription_stopping_transcription" = "Kanpe transkripsyon...";
+"transcription_transcript_attached" = "Transkripsyon atache";
+"transcription_transcript_label" = "Transkripsyon apel";
+"transcription_transcription_active" = "Transkripsyon aktif";
+"transcription_transcription_error" = "Erè transkripsyon";
+"transcription_transcription_stopped" = "Transkripsyon kanpe";

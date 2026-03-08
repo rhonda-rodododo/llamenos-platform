@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">노트에 녹취록 첨부</string>
+    <string name="transcription_enable_on_device">기기 내 녹취 활성화</string>
+    <string name="transcription_language_auto">자동 감지</string>
+    <string name="transcription_language_selection">녹취 언어</string>
+    <string name="transcription_live_transcript">실시간 녹취</string>
+    <string name="transcription_mic_permission_denied">마이크 권한이 거부되었습니다. 설정에서 활성화하세요.</string>
+    <string name="transcription_mic_permission_required">녹취에 마이크 접근이 필요합니다</string>
+    <string name="transcription_no_speech_detected">음성이 감지되지 않음</string>
+    <string name="transcription_on_device">기기 내 녹취</string>
+    <string name="transcription_on_device_description">음성 인식을 사용하여 기기에서 로컬로 통화를 녹취합니다. 오디오는 기기를 떠나지 않습니다.</string>
+    <string name="transcription_speech_recognition_unavailable">이 기기에서 음성 인식을 사용할 수 없습니다</string>
+    <string name="transcription_starting_transcription">녹취 시작 중...</string>
+    <string name="transcription_stopping_transcription">녹취 중지 중...</string>
+    <string name="transcription_transcript_attached">녹취록 첨부됨</string>
+    <string name="transcription_transcript_label">통화 녹취록</string>
+    <string name="transcription_transcription_active">녹취 활성화됨</string>
+    <string name="transcription_transcription_error">녹취 오류</string>
+    <string name="transcription_transcription_stopped">녹취 중지됨</string>
 </resources>

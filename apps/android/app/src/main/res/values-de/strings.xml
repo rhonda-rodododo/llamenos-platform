@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">Transkript an Notiz anhangen</string>
+    <string name="transcription_enable_on_device">Transkription auf dem Gerat aktivieren</string>
+    <string name="transcription_language_auto">Automatische Erkennung</string>
+    <string name="transcription_language_selection">Transkriptionssprache</string>
+    <string name="transcription_live_transcript">Live-Transkript</string>
+    <string name="transcription_mic_permission_denied">Mikrofonberechtigung verweigert. Aktivieren Sie sie in den Einstellungen.</string>
+    <string name="transcription_mic_permission_required">Mikrofonzugriff ist fur die Transkription erforderlich</string>
+    <string name="transcription_no_speech_detected">Keine Sprache erkannt</string>
+    <string name="transcription_on_device">Transkription auf dem Gerat</string>
+    <string name="transcription_on_device_description">Transkribieren Sie Anrufe lokal auf Ihrem Gerat mittels Spracherkennung. Audio verlasst nie Ihr Gerat.</string>
+    <string name="transcription_speech_recognition_unavailable">Spracherkennung ist auf diesem Gerat nicht verfugbar</string>
+    <string name="transcription_starting_transcription">Transkription wird gestartet...</string>
+    <string name="transcription_stopping_transcription">Transkription wird gestoppt...</string>
+    <string name="transcription_transcript_attached">Transkript angehangt</string>
+    <string name="transcription_transcript_label">Anruftranskript</string>
+    <string name="transcription_transcription_active">Transkription aktiv</string>
+    <string name="transcription_transcription_error">Transkriptionsfehler</string>
+    <string name="transcription_transcription_stopped">Transkription gestoppt</string>
 </resources>

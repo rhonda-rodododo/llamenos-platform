@@ -1756,3 +1756,28 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+// MARK: - Transcription
+"transcription_attach_to_note" = "Attach transcript to note";
+"transcription_enable_on_device" = "Enable on-device transcription";
+"transcription_language_auto" = "Auto-detect";
+"transcription_language_selection" = "Transcription Language";
+"transcription_live_transcript" = "Live Transcript";
+"transcription_mic_permission_denied" = "Microphone permission denied. Enable it in Settings.";
+"transcription_mic_permission_required" = "Microphone access is required for transcription";
+"transcription_no_speech_detected" = "No speech detected";
+"transcription_on_device" = "On-Device Transcription";
+"transcription_on_device_description" = "Transcribe calls locally on your device using speech recognition. Audio never leaves your device.";
+"transcription_speech_recognition_unavailable" = "Speech recognition is not available on this device";
+"transcription_starting_transcription" = "Starting transcription...";
+"transcription_stopping_transcription" = "Stopping transcription...";
+"transcription_transcript_attached" = "Transcript attached";
+"transcription_transcript_label" = "Call Transcript";
+"transcription_transcription_active" = "Transcription active";
+"transcription_transcription_error" = "Transcription error";
+"transcription_transcription_stopped" = "Transcription stopped";
+"updates_available" = "Update available";
+"updates_download" = "Download";
+"updates_downloading" = "Downloading update...";
+"updates_ready" = "Update ready to install";
+"updates_restart" = "Restart to update";

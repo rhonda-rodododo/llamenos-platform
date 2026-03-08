@@ -8,11 +8,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,8 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -48,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.CustomFieldDefinition
+import org.llamenos.hotline.service.TranscriptionService
 import org.llamenos.hotline.ui.components.LoadingOverlay
 
 /**
@@ -70,6 +77,7 @@ fun NoteCreateScreen(
     onNavigateBack: () -> Unit,
     conversationId: String? = null,
     callId: String? = null,
+    transcriptionService: TranscriptionService? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -77,6 +85,7 @@ fun NoteCreateScreen(
     val fieldValues = remember { mutableStateMapOf<String, String>() }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var attachedTranscript by remember { mutableStateOf<String?>(null) }
 
     // Navigate back on successful save
     LaunchedEffect(uiState.saveSuccess) {
@@ -121,7 +130,7 @@ fun NoteCreateScreen(
                         IconButton(
                             onClick = {
                                 if (noteText.isNotBlank()) {
-                                    viewModel.createNote(noteText.trim(), fieldValues.toMap(), conversationId, callId)
+                                    viewModel.createNote(noteText.trim(), fieldValues.toMap(), conversationId, callId, attachedTranscript)
                                 }
                             },
                             enabled = noteText.isNotBlank() && !uiState.isSaving,
@@ -160,6 +169,86 @@ fun NoteCreateScreen(
                     maxLines = 10,
                     singleLine = false,
                 )
+
+                // Transcript attachment section
+                if (transcriptionService != null) {
+                    val finalTranscript by transcriptionService.finalTranscript.collectAsState()
+                    val liveTranscript by transcriptionService.liveTranscript.collectAsState()
+                    val availableTranscript = finalTranscript.ifEmpty { liveTranscript }
+
+                    if (availableTranscript.isNotEmpty()) {
+                        if (attachedTranscript != null) {
+                            // Show attached transcript
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                tonalElevation = 1.dp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("attached-transcript"),
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.GraphicEq,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.transcription_transcript_label),
+                                                style = MaterialTheme.typography.titleSmall,
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { attachedTranscript = null },
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .testTag("remove-transcript"),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Close,
+                                                contentDescription = stringResource(R.string.a11y_remove_item),
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = attachedTranscript ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 5,
+                                        modifier = Modifier.padding(top = 4.dp),
+                                    )
+                                }
+                            }
+                        } else {
+                            // Attach transcript button
+                            OutlinedButton(
+                                onClick = { attachedTranscript = availableTranscript },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("attach-transcript"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.GraphicEq,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .padding(end = 4.dp),
+                                )
+                                Text(stringResource(R.string.transcription_attach_to_note))
+                            }
+                        }
+                    }
+                }
 
                 // Dynamic custom fields
                 uiState.customFields.forEach { field ->

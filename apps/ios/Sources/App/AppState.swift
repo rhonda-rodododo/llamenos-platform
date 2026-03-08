@@ -26,6 +26,7 @@ final class AppState {
     let authService: AuthService
     let webSocketService: WebSocketService
     let wakeKeyService: WakeKeyService
+    let transcriptionService: TranscriptionService
 
     // MARK: - Auth State
 
@@ -69,6 +70,7 @@ final class AppState {
         let auth = AuthService(cryptoService: crypto, keychainService: keychain)
         let ws = WebSocketService()
         let wake = WakeKeyService(keychainService: keychain, cryptoService: crypto, apiService: api)
+        let transcription = TranscriptionService()
 
         self.cryptoService = crypto
         self.keychainService = keychain
@@ -76,6 +78,7 @@ final class AppState {
         self.authService = auth
         self.webSocketService = ws
         self.wakeKeyService = wake
+        self.transcriptionService = transcription
 
         #if DEBUG
         // Handle launch arguments BEFORE reading persisted state

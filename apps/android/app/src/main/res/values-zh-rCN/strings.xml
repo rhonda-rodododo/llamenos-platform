@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">将转录附加到笔记</string>
+    <string name="transcription_enable_on_device">启用设备端转录</string>
+    <string name="transcription_language_auto">自动检测</string>
+    <string name="transcription_language_selection">转录语言</string>
+    <string name="transcription_live_transcript">实时转录</string>
+    <string name="transcription_mic_permission_denied">麦克风权限被拒绝。请在设置中启用。</string>
+    <string name="transcription_mic_permission_required">转录需要麦克风访问权限</string>
+    <string name="transcription_no_speech_detected">未检测到语音</string>
+    <string name="transcription_on_device">设备端转录</string>
+    <string name="transcription_on_device_description">使用语音识别在设备本地转录通话。音频永远不会离开您的设备。</string>
+    <string name="transcription_speech_recognition_unavailable">此设备不支持语音识别</string>
+    <string name="transcription_starting_transcription">正在开始转录...</string>
+    <string name="transcription_stopping_transcription">正在停止转录...</string>
+    <string name="transcription_transcript_attached">转录已附加</string>
+    <string name="transcription_transcript_label">通话转录</string>
+    <string name="transcription_transcription_active">转录进行中</string>
+    <string name="transcription_transcription_error">转录错误</string>
+    <string name="transcription_transcription_stopped">转录已停止</string>
 </resources>

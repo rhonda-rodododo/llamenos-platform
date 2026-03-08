@@ -1758,3 +1758,23 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+// MARK: - Transcription
+"transcription_attach_to_note" = "ارفاق النسخ بالملاحظة";
+"transcription_enable_on_device" = "تفعيل النسخ على الجهاز";
+"transcription_language_auto" = "كشف تلقائي";
+"transcription_language_selection" = "لغة النسخ";
+"transcription_live_transcript" = "نسخ مباشر";
+"transcription_mic_permission_denied" = "تم رفض اذن الميكروفون. قم بتفعيله في الاعدادات.";
+"transcription_mic_permission_required" = "مطلوب الوصول الى الميكروفون للنسخ";
+"transcription_no_speech_detected" = "لم يتم اكتشاف كلام";
+"transcription_on_device" = "النسخ على الجهاز";
+"transcription_on_device_description" = "نسخ المكالمات محليا على جهازك باستخدام التعرف على الكلام. لا يغادر الصوت جهازك ابدا.";
+"transcription_speech_recognition_unavailable" = "التعرف على الكلام غير متاح على هذا الجهاز";
+"transcription_starting_transcription" = "بدء النسخ...";
+"transcription_stopping_transcription" = "ايقاف النسخ...";
+"transcription_transcript_attached" = "تم ارفاق النسخ";
+"transcription_transcript_label" = "نسخ المكالمة";
+"transcription_transcription_active" = "النسخ نشط";
+"transcription_transcription_error" = "خطأ في النسخ";
+"transcription_transcription_stopped" = "تم ايقاف النسخ";

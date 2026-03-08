@@ -1758,3 +1758,23 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+// MARK: - Transcription
+"transcription_attach_to_note" = "Transkript an Notiz anhangen";
+"transcription_enable_on_device" = "Transkription auf dem Gerat aktivieren";
+"transcription_language_auto" = "Automatische Erkennung";
+"transcription_language_selection" = "Transkriptionssprache";
+"transcription_live_transcript" = "Live-Transkript";
+"transcription_mic_permission_denied" = "Mikrofonberechtigung verweigert. Aktivieren Sie sie in den Einstellungen.";
+"transcription_mic_permission_required" = "Mikrofonzugriff ist fur die Transkription erforderlich";
+"transcription_no_speech_detected" = "Keine Sprache erkannt";
+"transcription_on_device" = "Transkription auf dem Gerat";
+"transcription_on_device_description" = "Transkribieren Sie Anrufe lokal auf Ihrem Gerat mittels Spracherkennung. Audio verlasst nie Ihr Gerat.";
+"transcription_speech_recognition_unavailable" = "Spracherkennung ist auf diesem Gerat nicht verfugbar";
+"transcription_starting_transcription" = "Transkription wird gestartet...";
+"transcription_stopping_transcription" = "Transkription wird gestoppt...";
+"transcription_transcript_attached" = "Transkript angehangt";
+"transcription_transcript_label" = "Anruftranskript";
+"transcription_transcription_active" = "Transkription aktiv";
+"transcription_transcription_error" = "Transkriptionsfehler";
+"transcription_transcription_stopped" = "Transkription gestoppt";

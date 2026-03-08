@@ -7,6 +7,7 @@ import SwiftUI
 struct NoteCreateView: View {
     let customFields: [CustomFieldDefinition]
     let onSave: (String, [String: AnyCodableValue]?, String?, String?) async throws -> Void
+    var transcriptionService: TranscriptionService?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -15,6 +16,7 @@ struct NoteCreateView: View {
     @State private var callId: String = ""
     @State private var isSaving: Bool = false
     @State private var errorMessage: String?
+    @State private var attachedTranscript: String?
 
     /// Editable custom fields (filtered + sorted).
     private var editableFields: [CustomFieldDefinition] {
@@ -60,6 +62,58 @@ struct NoteCreateView: View {
                         }
                     } header: {
                         Text(NSLocalizedString("note_create_fields_label", comment: "Details"))
+                            .font(.brand(.headline))
+                            .foregroundStyle(Color.brandForeground)
+                    }
+                }
+
+                // Transcript attachment section
+                if let service = transcriptionService,
+                   !service.finalTranscript.isEmpty || !service.liveTranscript.isEmpty {
+                    Section {
+                        if let transcript = attachedTranscript {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Image(systemName: "waveform")
+                                        .foregroundStyle(Color.brandPrimary)
+                                    Text(NSLocalizedString("transcription_transcript_label", comment: "Call Transcript"))
+                                        .font(.brand(.subheadline))
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    Button {
+                                        attachedTranscript = nil
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(Color.brandMutedForeground)
+                                    }
+                                    .accessibilityIdentifier("remove-transcript")
+                                }
+                                Text(transcript)
+                                    .font(.brand(.caption))
+                                    .foregroundStyle(Color.brandMutedForeground)
+                                    .lineLimit(5)
+                            }
+                            .accessibilityIdentifier("attached-transcript")
+                        } else {
+                            Button {
+                                let text = service.finalTranscript.isEmpty
+                                    ? service.liveTranscript
+                                    : service.finalTranscript
+                                if !text.isEmpty {
+                                    attachedTranscript = text
+                                }
+                            } label: {
+                                Label {
+                                    Text(NSLocalizedString("transcription_attach_to_note", comment: "Attach transcript to note"))
+                                } icon: {
+                                    Image(systemName: "waveform.badge.plus")
+                                        .foregroundStyle(Color.brandPrimary)
+                                }
+                            }
+                            .accessibilityIdentifier("attach-transcript")
+                        }
+                    } header: {
+                        Text(NSLocalizedString("transcription_title", comment: "Transcription"))
                             .font(.brand(.headline))
                             .foregroundStyle(Color.brandForeground)
                     }
@@ -297,7 +351,7 @@ struct NoteCreateView: View {
                 trimmedText,
                 fields,
                 trimmedCallId.isEmpty ? nil : trimmedCallId,
-                nil
+                attachedTranscript
             )
         } catch {
             errorMessage = error.localizedDescription

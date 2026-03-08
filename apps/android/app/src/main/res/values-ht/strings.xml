@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">Atache transkripsyon nan not la</string>
+    <string name="transcription_enable_on_device">Aktive transkripsyon sou aparey la</string>
+    <string name="transcription_language_auto">Deteksyon otomatik</string>
+    <string name="transcription_language_selection">Lang transkripsyon</string>
+    <string name="transcription_live_transcript">Transkripsyon an dirèk</string>
+    <string name="transcription_mic_permission_denied">Pemisyon mikwofon refize. Aktive li nan Paramèt.</string>
+    <string name="transcription_mic_permission_required">Akse mikwofon obligatwa pou transkripsyon</string>
+    <string name="transcription_no_speech_detected">Pa gen pawòl detekte</string>
+    <string name="transcription_on_device">Transkripsyon sou aparey la</string>
+    <string name="transcription_on_device_description">Transkri apel lokal sou aparey ou ak rekonesans vwa. Odyo a pa janm kite aparey ou.</string>
+    <string name="transcription_speech_recognition_unavailable">Rekonesans vwa pa disponib sou aparey sa a</string>
+    <string name="transcription_starting_transcription">Kòmanse transkripsyon...</string>
+    <string name="transcription_stopping_transcription">Kanpe transkripsyon...</string>
+    <string name="transcription_transcript_attached">Transkripsyon atache</string>
+    <string name="transcription_transcript_label">Transkripsyon apel</string>
+    <string name="transcription_transcription_active">Transkripsyon aktif</string>
+    <string name="transcription_transcription_error">Erè transkripsyon</string>
+    <string name="transcription_transcription_stopped">Transkripsyon kanpe</string>
 </resources>

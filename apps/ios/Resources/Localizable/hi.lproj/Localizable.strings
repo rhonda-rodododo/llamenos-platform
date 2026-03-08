@@ -1758,3 +1758,23 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+// MARK: - Transcription
+"transcription_attach_to_note" = "नोट में ट्रांसक्रिप्ट संलग्न करें";
+"transcription_enable_on_device" = "डिवाइस पर ट्रांसक्रिप्शन सक्षम करें";
+"transcription_language_auto" = "स्वतः पता लगाएं";
+"transcription_language_selection" = "ट्रांसक्रिप्शन भाषा";
+"transcription_live_transcript" = "लाइव ट्रांसक्रिप्ट";
+"transcription_mic_permission_denied" = "माइक्रोफ़ोन अनुमति अस्वीकृत। सेटिंग्स में सक्षम करें।";
+"transcription_mic_permission_required" = "ट्रांसक्रिप्शन के लिए माइक्रोफ़ोन एक्सेस आवश्यक है";
+"transcription_no_speech_detected" = "कोई भाषण नहीं पहचाना गया";
+"transcription_on_device" = "डिवाइस पर ट्रांसक्रिप्शन";
+"transcription_on_device_description" = "स्पीच रिकग्निशन का उपयोग करके अपने डिवाइस पर स्थानीय रूप से कॉल ट्रांसक्राइब करें। ऑडियो कभी भी आपका डिवाइस नहीं छोड़ता।";
+"transcription_speech_recognition_unavailable" = "इस डिवाइस पर स्पीच रिकग्निशन उपलब्ध नहीं है";
+"transcription_starting_transcription" = "ट्रांसक्रिप्शन शुरू हो रहा है...";
+"transcription_stopping_transcription" = "ट्रांसक्रिप्शन रुक रहा है...";
+"transcription_transcript_attached" = "ट्रांसक्रिप्ट संलग्न";
+"transcription_transcript_label" = "कॉल ट्रांसक्रिप्ट";
+"transcription_transcription_active" = "ट्रांसक्रिप्शन सक्रिय";
+"transcription_transcription_error" = "ट्रांसक्रिप्शन त्रुटि";
+"transcription_transcription_stopped" = "ट्रांसक्रिप्शन रुका";

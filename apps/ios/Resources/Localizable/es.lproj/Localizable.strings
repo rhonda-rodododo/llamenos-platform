@@ -1758,3 +1758,23 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+// MARK: - Transcription
+"transcription_attach_to_note" = "Adjuntar transcripcion a la nota";
+"transcription_enable_on_device" = "Activar transcripcion en el dispositivo";
+"transcription_language_auto" = "Deteccion automatica";
+"transcription_language_selection" = "Idioma de transcripcion";
+"transcription_live_transcript" = "Transcripcion en vivo";
+"transcription_mic_permission_denied" = "Permiso de microfono denegado. Activalo en Configuracion.";
+"transcription_mic_permission_required" = "Se requiere acceso al microfono para la transcripcion";
+"transcription_no_speech_detected" = "No se detecto voz";
+"transcription_on_device" = "Transcripcion en el dispositivo";
+"transcription_on_device_description" = "Transcribe llamadas localmente en tu dispositivo usando reconocimiento de voz. El audio nunca sale de tu dispositivo.";
+"transcription_speech_recognition_unavailable" = "El reconocimiento de voz no esta disponible en este dispositivo";
+"transcription_starting_transcription" = "Iniciando transcripcion...";
+"transcription_stopping_transcription" = "Deteniendo transcripcion...";
+"transcription_transcript_attached" = "Transcripcion adjuntada";
+"transcription_transcript_label" = "Transcripcion de llamada";
+"transcription_transcription_active" = "Transcripcion activa";
+"transcription_transcription_error" = "Error de transcripcion";
+"transcription_transcription_stopped" = "Transcripcion detenida";

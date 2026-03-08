@@ -213,7 +213,7 @@ class NotesViewModel @Inject constructor(
      * @param text The note body text
      * @param fieldValues Map of custom field name -> value
      */
-    fun createNote(text: String, fieldValues: Map<String, String>, conversationId: String? = null, callId: String? = null) {
+    fun createNote(text: String, fieldValues: Map<String, String>, conversationId: String? = null, callId: String? = null, transcript: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, saveError = null, saveSuccess = false) }
 
@@ -235,7 +235,13 @@ class NotesViewModel @Inject constructor(
                     null
                 }
 
-                val payload = NotePayload(text = text, fields = fields)
+                // Include transcript in note text if provided
+                val noteText = if (transcript != null) {
+                    "$text\n\n--- Transcript ---\n$transcript"
+                } else {
+                    text
+                }
+                val payload = NotePayload(text = noteText, fields = fields)
                 val payloadJson = json.encodeToString(NotePayload.serializer(), payload)
 
                 // Encrypt the note — in production, CryptoService will fetch admin pubkeys

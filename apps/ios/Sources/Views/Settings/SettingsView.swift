@@ -114,6 +114,8 @@ struct SettingsView: View {
                     AccountSettingsView()
                 case "preferences":
                     PreferencesSettingsView()
+                case "transcription":
+                    TranscriptionSettingsView(transcriptionService: appState.transcriptionService)
                 case "admin":
                     AdminTabView()
                 case "help":
@@ -210,6 +212,17 @@ struct SettingsView: View {
                 }
             }
             .accessibilityIdentifier("settings-preferences-link")
+
+            NavigationLink(value: "transcription") {
+                Label {
+                    Text(NSLocalizedString("transcription_title", comment: "Transcription"))
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "waveform")
+                        .foregroundStyle(Color.brandPrimary)
+                }
+            }
+            .accessibilityIdentifier("settings-transcription-link")
 
             if appState.isAdmin {
                 NavigationLink(value: "admin") {

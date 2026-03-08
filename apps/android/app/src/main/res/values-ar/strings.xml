@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">ارفاق النسخ بالملاحظة</string>
+    <string name="transcription_enable_on_device">تفعيل النسخ على الجهاز</string>
+    <string name="transcription_language_auto">كشف تلقائي</string>
+    <string name="transcription_language_selection">لغة النسخ</string>
+    <string name="transcription_live_transcript">نسخ مباشر</string>
+    <string name="transcription_mic_permission_denied">تم رفض اذن الميكروفون. قم بتفعيله في الاعدادات.</string>
+    <string name="transcription_mic_permission_required">مطلوب الوصول الى الميكروفون للنسخ</string>
+    <string name="transcription_no_speech_detected">لم يتم اكتشاف كلام</string>
+    <string name="transcription_on_device">النسخ على الجهاز</string>
+    <string name="transcription_on_device_description">نسخ المكالمات محليا على جهازك باستخدام التعرف على الكلام. لا يغادر الصوت جهازك ابدا.</string>
+    <string name="transcription_speech_recognition_unavailable">التعرف على الكلام غير متاح على هذا الجهاز</string>
+    <string name="transcription_starting_transcription">بدء النسخ...</string>
+    <string name="transcription_stopping_transcription">ايقاف النسخ...</string>
+    <string name="transcription_transcript_attached">تم ارفاق النسخ</string>
+    <string name="transcription_transcript_label">نسخ المكالمة</string>
+    <string name="transcription_transcription_active">النسخ نشط</string>
+    <string name="transcription_transcription_error">خطأ في النسخ</string>
+    <string name="transcription_transcription_stopped">تم ايقاف النسخ</string>
 </resources>

@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">Joindre la transcription a la note</string>
+    <string name="transcription_enable_on_device">Activer la transcription sur l\'appareil</string>
+    <string name="transcription_language_auto">Detection automatique</string>
+    <string name="transcription_language_selection">Langue de transcription</string>
+    <string name="transcription_live_transcript">Transcription en direct</string>
+    <string name="transcription_mic_permission_denied">Permission du microphone refusee. Activez-la dans les Parametres.</string>
+    <string name="transcription_mic_permission_required">L\'acces au microphone est requis pour la transcription</string>
+    <string name="transcription_no_speech_detected">Aucune parole detectee</string>
+    <string name="transcription_on_device">Transcription sur l\'appareil</string>
+    <string name="transcription_on_device_description">Transcrire les appels localement sur votre appareil. L\'audio ne quitte jamais votre appareil.</string>
+    <string name="transcription_speech_recognition_unavailable">La reconnaissance vocale n\'est pas disponible sur cet appareil</string>
+    <string name="transcription_starting_transcription">Demarrage de la transcription...</string>
+    <string name="transcription_stopping_transcription">Arret de la transcription...</string>
+    <string name="transcription_transcript_attached">Transcription jointe</string>
+    <string name="transcription_transcript_label">Transcription d\'appel</string>
+    <string name="transcription_transcription_active">Transcription active</string>
+    <string name="transcription_transcription_error">Erreur de transcription</string>
+    <string name="transcription_transcription_stopped">Transcription arretee</string>
 </resources>

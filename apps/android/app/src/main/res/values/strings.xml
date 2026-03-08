@@ -1759,4 +1759,29 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">Attach transcript to note</string>
+    <string name="transcription_enable_on_device">Enable on-device transcription</string>
+    <string name="transcription_language_auto">Auto-detect</string>
+    <string name="transcription_language_selection">Transcription Language</string>
+    <string name="transcription_live_transcript">Live Transcript</string>
+    <string name="transcription_mic_permission_denied">Microphone permission denied. Enable it in Settings.</string>
+    <string name="transcription_mic_permission_required">Microphone access is required for transcription</string>
+    <string name="transcription_no_speech_detected">No speech detected</string>
+    <string name="transcription_on_device">On-Device Transcription</string>
+    <string name="transcription_on_device_description">Transcribe calls locally on your device using speech recognition. Audio never leaves your device.</string>
+    <string name="transcription_speech_recognition_unavailable">Speech recognition is not available on this device</string>
+    <string name="transcription_starting_transcription">Starting transcription...</string>
+    <string name="transcription_stopping_transcription">Stopping transcription...</string>
+    <string name="transcription_transcript_attached">Transcript attached</string>
+    <string name="transcription_transcript_label">Call Transcript</string>
+    <string name="transcription_transcription_active">Transcription active</string>
+    <string name="transcription_transcription_error">Transcription error</string>
+    <string name="transcription_transcription_stopped">Transcription stopped</string>
+    <string name="updates_available">Update available</string>
+    <string name="updates_download">Download</string>
+    <string name="updates_downloading">Downloading update...</string>
+    <string name="updates_ready">Update ready to install</string>
+    <string name="updates_restart">Restart to update</string>
 </resources>

@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">I-attach ang transcript sa note</string>
+    <string name="transcription_enable_on_device">I-enable ang transkripsyon sa device</string>
+    <string name="transcription_language_auto">Auto-detect</string>
+    <string name="transcription_language_selection">Wika ng Transkripsyon</string>
+    <string name="transcription_live_transcript">Live na Transcript</string>
+    <string name="transcription_mic_permission_denied">Tinanggihan ang permiso sa mikropono. I-enable ito sa Settings.</string>
+    <string name="transcription_mic_permission_required">Kailangan ng access sa mikropono para sa transkripsyon</string>
+    <string name="transcription_no_speech_detected">Walang nadetect na pagsasalita</string>
+    <string name="transcription_on_device">Transkripsyon sa Device</string>
+    <string name="transcription_on_device_description">I-transcribe ang mga tawag nang lokal sa iyong device gamit ang speech recognition. Hindi umaalis ang audio sa iyong device.</string>
+    <string name="transcription_speech_recognition_unavailable">Hindi available ang speech recognition sa device na ito</string>
+    <string name="transcription_starting_transcription">Sinisimulan ang transkripsyon...</string>
+    <string name="transcription_stopping_transcription">Itinitgil ang transkripsyon...</string>
+    <string name="transcription_transcript_attached">Na-attach ang transcript</string>
+    <string name="transcription_transcript_label">Transcript ng Tawag</string>
+    <string name="transcription_transcription_active">Aktibo ang transkripsyon</string>
+    <string name="transcription_transcription_error">Error sa transkripsyon</string>
+    <string name="transcription_transcription_stopped">Itinigil ang transkripsyon</string>
 </resources>

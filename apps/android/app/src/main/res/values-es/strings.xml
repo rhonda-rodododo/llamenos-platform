@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">Adjuntar transcripcion a la nota</string>
+    <string name="transcription_enable_on_device">Activar transcripcion en el dispositivo</string>
+    <string name="transcription_language_auto">Deteccion automatica</string>
+    <string name="transcription_language_selection">Idioma de transcripcion</string>
+    <string name="transcription_live_transcript">Transcripcion en vivo</string>
+    <string name="transcription_mic_permission_denied">Permiso de microfono denegado. Activalo en Configuracion.</string>
+    <string name="transcription_mic_permission_required">Se requiere acceso al microfono para la transcripcion</string>
+    <string name="transcription_no_speech_detected">No se detecto voz</string>
+    <string name="transcription_on_device">Transcripcion en el dispositivo</string>
+    <string name="transcription_on_device_description">Transcribe llamadas localmente en tu dispositivo usando reconocimiento de voz. El audio nunca sale de tu dispositivo.</string>
+    <string name="transcription_speech_recognition_unavailable">El reconocimiento de voz no esta disponible en este dispositivo</string>
+    <string name="transcription_starting_transcription">Iniciando transcripcion...</string>
+    <string name="transcription_stopping_transcription">Deteniendo transcripcion...</string>
+    <string name="transcription_transcript_attached">Transcripcion adjuntada</string>
+    <string name="transcription_transcript_label">Transcripcion de llamada</string>
+    <string name="transcription_transcription_active">Transcripcion activa</string>
+    <string name="transcription_transcription_error">Error de transcripcion</string>
+    <string name="transcription_transcription_stopped">Transcripcion detenida</string>
 </resources>

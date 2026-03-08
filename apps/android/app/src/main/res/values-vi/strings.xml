@@ -1761,4 +1761,24 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Transcription -->
+    <string name="transcription_attach_to_note">Dinh kem ban phien am vao ghi chu</string>
+    <string name="transcription_enable_on_device">Bat phien am tren thiet bi</string>
+    <string name="transcription_language_auto">Tu dong nhan dien</string>
+    <string name="transcription_language_selection">Ngon ngu phien am</string>
+    <string name="transcription_live_transcript">Phien am truc tiep</string>
+    <string name="transcription_mic_permission_denied">Quyen micro bi tu choi. Bat trong Cai dat.</string>
+    <string name="transcription_mic_permission_required">Can quyen truy cap micro de phien am</string>
+    <string name="transcription_no_speech_detected">Khong phat hien giong noi</string>
+    <string name="transcription_on_device">Phien am tren thiet bi</string>
+    <string name="transcription_on_device_description">Phien am cuoc goi tren thiet bi cua ban bang nhan dang giong noi. Am thanh khong bao gio roi khoi thiet bi.</string>
+    <string name="transcription_speech_recognition_unavailable">Nhan dang giong noi khong kha dung tren thiet bi nay</string>
+    <string name="transcription_starting_transcription">Dang bat dau phien am...</string>
+    <string name="transcription_stopping_transcription">Dang dung phien am...</string>
+    <string name="transcription_transcript_attached">Da dinh kem ban phien am</string>
+    <string name="transcription_transcript_label">Ban phien am cuoc goi</string>
+    <string name="transcription_transcription_active">Dang phien am</string>
+    <string name="transcription_transcription_error">Loi phien am</string>
+    <string name="transcription_transcription_stopped">Da dung phien am</string>
 </resources>

@@ -1758,3 +1758,23 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+// MARK: - Transcription
+"transcription_attach_to_note" = "I-attach ang transcript sa note";
+"transcription_enable_on_device" = "I-enable ang transkripsyon sa device";
+"transcription_language_auto" = "Auto-detect";
+"transcription_language_selection" = "Wika ng Transkripsyon";
+"transcription_live_transcript" = "Live na Transcript";
+"transcription_mic_permission_denied" = "Tinanggihan ang permiso sa mikropono. I-enable ito sa Settings.";
+"transcription_mic_permission_required" = "Kailangan ng access sa mikropono para sa transkripsyon";
+"transcription_no_speech_detected" = "Walang nadetect na pagsasalita";
+"transcription_on_device" = "Transkripsyon sa Device";
+"transcription_on_device_description" = "I-transcribe ang mga tawag nang lokal sa iyong device gamit ang speech recognition. Hindi umaalis ang audio sa iyong device.";
+"transcription_speech_recognition_unavailable" = "Hindi available ang speech recognition sa device na ito";
+"transcription_starting_transcription" = "Sinisimulan ang transkripsyon...";
+"transcription_stopping_transcription" = "Itinitgil ang transkripsyon...";
+"transcription_transcript_attached" = "Na-attach ang transcript";
+"transcription_transcript_label" = "Transcript ng Tawag";
+"transcription_transcription_active" = "Aktibo ang transkripsyon";
+"transcription_transcription_error" = "Error sa transkripsyon";
+"transcription_transcription_stopped" = "Itinigil ang transkripsyon";
