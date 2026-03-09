@@ -55,7 +55,9 @@ function createSchnorrAuthToken(
 }
 
 function authHeaders(nsec: string, method: string, path: string): Record<string, string> {
-  const token = createSchnorrAuthToken(nsec, method, path)
+  // Strip query params — server verifies against url.pathname (no query string)
+  const pathWithoutQuery = path.split('?')[0]
+  const token = createSchnorrAuthToken(nsec, method, pathWithoutQuery)
   return {
     'Authorization': `Bearer ${JSON.stringify(token)}`,
     'Content-Type': 'application/json',
@@ -440,6 +442,8 @@ export interface AuditEntry {
   actorPubkey: string
   details: Record<string, unknown>
   createdAt: string
+  entryHash?: string
+  previousEntryHash?: string
 }
 
 export async function listAuditLogViaApi(

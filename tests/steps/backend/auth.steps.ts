@@ -62,18 +62,12 @@ Given('a user with a valid keypair', async ({}) => {
 })
 
 When('the user creates a signed auth token', async ({ request }) => {
-  expect(authState.keypair).toBeDefined()
-  const { pubkey, skHex, nsec } = authState.keypair!
-
-  // Register the user first so the server knows them
-  try {
-    await createVolunteerViaApi(request, { name: `Auth Test ${Date.now()}` })
-  } catch {
-    // May already exist
-  }
+  // Register a volunteer and use its keypair for auth testing
+  const vol = await createVolunteerViaApi(request, { name: `Auth Test ${Date.now()}` })
+  authState.keypair = { nsec: vol.nsec, pubkey: vol.pubkey, skHex: '' }
 
   // Test with /api/auth/me — the simplest authenticated endpoint
-  const result = await getMeViaApi(request, nsec)
+  const result = await getMeViaApi(request, vol.nsec)
   authState.authResult = result
 })
 
@@ -131,13 +125,17 @@ When('the token is presented to the server', async ({ request }) => {
 
 Given('a token signed by an unregistered pubkey', async ({}) => {
   // Generate a fresh keypair that is NOT registered as a volunteer
-  authState.keypair = generateTestKeypair()
+  const keypair = generateTestKeypair()
+  authState.keypair = keypair
+  // Create a valid token for this unregistered keypair so the When step can present it
+  const token = createRawAuthToken(keypair.skHex, keypair.pubkey, 'GET', '/api/auth/me')
+  authState.tamperedToken = JSON.stringify(token)
 })
 
-Given('a user with a registered WebAuthn credential', async ({}) => {
-  // WebAuthn session testing requires browser context — mark as pending for backend BDD
-  // This step sets up the expectation for session-based auth
-  authState.keypair = generateTestKeypair()
+Given('a user with a registered WebAuthn credential', async ({ request }) => {
+  // Register a volunteer so the auth token will be accepted
+  const vol = await createVolunteerViaApi(request, { name: `WebAuthn Test ${Date.now()}` })
+  authState.keypair = { nsec: vol.nsec, pubkey: vol.pubkey, skHex: '' }
 })
 
 When('the user presents a valid session token', async ({ request }) => {

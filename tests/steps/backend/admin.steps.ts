@@ -53,9 +53,10 @@ Given('an empty audit log', async ({ request }) => {
   // Reset server to get a clean audit log
   const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
   const TEST_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
-  await request.post(`${BASE_URL}/api/test-reset`, {
+  const res = await request.post(`${BASE_URL}/api/test-reset`, {
     headers: { 'Content-Type': 'application/json', 'X-Test-Secret': TEST_SECRET },
   })
+  expect(res.ok()).toBeTruthy()
   adminState.auditEntries = []
 })
 
@@ -68,18 +69,15 @@ When('the first entry is added', async ({ request }) => {
 
 Then('the entry hash should be computed', async ({}) => {
   expect(adminState.auditEntries.length).toBeGreaterThan(0)
-  const entry = adminState.auditEntries[0] as AuditEntry & { entryHash?: string }
-  // The entry should have a hash (may be in entryHash or a computed field)
-  expect(entry.id).toBeTruthy()
+  const entry = adminState.auditEntries[0]
+  expect(entry.entryHash).toBeTruthy()
 })
 
 Then('the previous entry hash should be null', async ({}) => {
   expect(adminState.auditEntries.length).toBeGreaterThan(0)
-  const entry = adminState.auditEntries[0] as AuditEntry & { previousEntryHash?: string | null }
-  // First entry in a clean log should have no previous hash
-  if ('previousEntryHash' in entry) {
-    expect(entry.previousEntryHash).toBeNull()
-  }
+  const entry = adminState.auditEntries[0]
+  // First entry in a clean log should have no previous hash (empty string from server)
+  expect(entry.previousEntryHash).toBeFalsy()
 })
 
 Given('an audit log with {int} entry/entries', async ({ request }, count: number) => {
@@ -97,19 +95,6 @@ Given('an audit log with {int} entry/entries', async ({ request }, count: number
   adminState.auditEntries = entries
 })
 
-Given('an audit log with {int} entries', async ({ request }, count: number) => {
-  const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
-  const TEST_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
-  await request.post(`${BASE_URL}/api/test-reset`, {
-    headers: { 'Content-Type': 'application/json', 'X-Test-Secret': TEST_SECRET },
-  })
-
-  for (let i = 0; i < count; i++) {
-    await createVolunteerViaApi(request, { name: `Audit Chain ${Date.now()}-${i}` })
-  }
-  const { entries } = await listAuditLogViaApi(request, { limit: count + 5 })
-  adminState.auditEntries = entries
-})
 
 When('a new entry is added', async ({ request }) => {
   await createVolunteerViaApi(request, { name: `Audit New ${Date.now()}` })
@@ -119,10 +104,8 @@ When('a new entry is added', async ({ request }) => {
 
 Then('the new entry should reference the previous entry hash', async ({}) => {
   expect(adminState.auditEntries.length).toBeGreaterThan(1)
-  const latest = adminState.auditEntries[0] as AuditEntry & { previousEntryHash?: string }
-  if ('previousEntryHash' in latest) {
-    expect(latest.previousEntryHash).toBeTruthy()
-  }
+  const latest = adminState.auditEntries[0]
+  expect(latest.previousEntryHash).toBeTruthy()
 })
 
 When('the event field of entry {int} is modified', async ({}, index: number) => {
@@ -157,25 +140,23 @@ Then('chain verification should fail at entry {int}', async ({}, index: number) 
   // Verify that recomputing the hash chain detects the tamper
   expect(adminState.tamperedIndex).toBe(index)
   // The tampered entry's recomputed hash won't match its stored hash
-  // This is a client-side verification step
-  const entry = adminState.auditEntries[index - 1] as AuditEntry & { entryHash?: string }
+  const entry = adminState.auditEntries[index - 1]
   if (entry.entryHash) {
-    // Recompute hash from fields
-    const payload = `${entry.event}:${entry.actorPubkey}:${entry.createdAt}`
-    const recomputed = bytesToHex(sha256(utf8ToBytes(payload)))
+    // Recompute hash matching server's hashAuditEntry()
+    const content = `${entry.id}:${entry.event}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:${entry.previousEntryHash || ''}`
+    const recomputed = bytesToHex(sha256(utf8ToBytes(content)))
     expect(recomputed).not.toBe(entry.entryHash)
   }
 })
 
 When('the chain is verified', async ({}) => {
   // Verify the chain integrity by checking each entry's hash
+  // Entries are returned newest-first, so reverse for chronological order
+  const entries = [...adminState.auditEntries].reverse()
   adminState.chainValid = true
-  for (let i = 1; i < adminState.auditEntries.length; i++) {
-    const current = adminState.auditEntries[i] as AuditEntry & {
-      entryHash?: string
-      previousEntryHash?: string
-    }
-    const previous = adminState.auditEntries[i - 1] as AuditEntry & { entryHash?: string }
+  for (let i = 1; i < entries.length; i++) {
+    const current = entries[i]
+    const previous = entries[i - 1]
     if (current.previousEntryHash && previous.entryHash) {
       if (current.previousEntryHash !== previous.entryHash) {
         adminState.chainValid = false

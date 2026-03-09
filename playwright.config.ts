@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { defineBddConfig } from "playwright-bdd";
+import { defineBddProject } from "playwright-bdd";
 
 // Desktop BDD: exclude tests/steps/backend/ to avoid loading backend-only step defs
 // that use a different createBdd() instance.
@@ -8,24 +8,6 @@ const desktopStepDirs = [
   "crypto", "dashboard", "help", "messaging", "notes", "reports",
   "security", "settings", "shifts",
 ];
-const bddTestDir = defineBddConfig({
-  features: "packages/test-specs/features/**/*.feature",
-  steps: [
-    "tests/steps/*.ts",
-    ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
-  ],
-  outputDir: ".features-gen",
-  featuresRoot: "packages/test-specs/features",
-  tags: "@desktop and not @backend",
-});
-
-const backendBddTestDir = defineBddConfig({
-  features: "packages/test-specs/features/**/*.feature",
-  steps: "tests/steps/backend/**/*.ts",
-  outputDir: ".features-gen-backend",
-  featuresRoot: "packages/test-specs/features",
-  tags: "@backend",
-});
 
 export default defineConfig({
   testDir: "./tests",
@@ -47,6 +29,7 @@ export default defineConfig({
   projects: [
     {
       name: "setup",
+      testDir: "./tests",
       testMatch: /global-setup\.ts/,
     },
     {
@@ -69,17 +52,36 @@ export default defineConfig({
       dependencies: ["setup"],
     },
     {
-      name: "bdd",
-      testDir: bddTestDir,
+      ...defineBddProject({
+        name: "bdd",
+        features: "packages/test-specs/features/**/*.feature",
+        steps: [
+          "tests/steps/*.ts",
+          ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
+        ],
+        featuresRoot: "packages/test-specs/features",
+        tags: "@desktop and not @backend",
+        // Backend-only scenarios have steps not defined in desktop — skip them
+        missingSteps: "skip-scenario",
+      }),
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
     },
     {
-      name: "backend-bdd",
-      testDir: backendBddTestDir,
+      ...defineBddProject({
+        name: "backend-bdd",
+        features: "packages/test-specs/features/**/*.feature",
+        steps: "tests/steps/backend/**/*.ts",
+        featuresRoot: "packages/test-specs/features",
+        tags: "@backend",
+        // Desktop/mobile-only scenarios have steps not defined in backend — skip them
+        missingSteps: "skip-scenario",
+      }),
       use: {
         baseURL: process.env.TEST_HUB_URL || "http://localhost:3000",
       },
+      // Backend tests share server state (test-reset between scenarios) — must run serially
+      fullyParallel: false,
     },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL

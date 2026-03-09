@@ -202,6 +202,7 @@ Feature: Call Routing & History
   @backend
   Scenario: Call history filters by date range
     Given the server is reset
+    And 1 volunteers are on shift
     And 3 calls were completed today
     When the call history is filtered to today's date
     Then the call history contains 3 entries

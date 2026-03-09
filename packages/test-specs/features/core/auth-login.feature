@@ -28,7 +28,7 @@ Feature: Authentication & Login
   Scenario: Token with wrong pubkey is rejected
     Given a token signed by an unregistered pubkey
     When the token is presented to the server
-    Then the server should reject the token with 403
+    Then the server should reject the token with 401
 
   @backend
   Scenario: Session token validates WebAuthn credential

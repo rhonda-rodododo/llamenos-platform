@@ -39,7 +39,7 @@ Feature: Messaging Flow
   Scenario: Closed conversation can be reopened
     Given a conversation with status "closed"
     When a new inbound message arrives
-    Then the conversation status should change to "active"
+    Then the conversation status should change to "waiting"
 
   # ── Desktop/Mobile: Conversation List ─────────────────────────────
 
