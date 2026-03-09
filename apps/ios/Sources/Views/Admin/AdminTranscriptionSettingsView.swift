@@ -1,10 +1,10 @@
 import SwiftUI
 
-// MARK: - TranscriptionSettingsView
+// MARK: - AdminTranscriptionSettingsView
 
 /// Admin view for configuring transcription settings. Controls global
 /// transcription enable/disable and volunteer opt-out permissions.
-struct TranscriptionSettingsView: View {
+struct AdminTranscriptionSettingsView: View {
     @Bindable var viewModel: AdminViewModel
 
     var body: some View {

@@ -555,7 +555,7 @@ final class AdminViewModel {
         errorMessage = nil
 
         do {
-            let response: ReportCategoriesResponse = try await apiService.request(
+            let response: ReportTypesResponse = try await apiService.request(
                 method: "GET",
                 path: "/api/settings/report-types"
             )

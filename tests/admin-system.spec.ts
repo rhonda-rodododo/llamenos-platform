@@ -1,8 +1,31 @@
 import { test, expect } from '@playwright/test'
 import { loginAsAdmin, navigateAfterLogin, Timeouts } from './helpers'
 
+const mockSystemHealth = {
+  server: { status: 'ok', uptime: 3600, version: '1.0.0-test' },
+  services: [
+    { name: 'Blob Storage', status: 'ok' },
+    { name: 'Nostr Relay', status: 'ok' },
+    { name: 'Telephony', status: 'degraded', details: 'High latency' },
+  ],
+  calls: { today: 42, active: 3, avgResponseSeconds: 12, missed: 2 },
+  storage: { dbSize: '128 MB', blobStorage: 'Connected' },
+  backup: { lastBackup: '2026-03-08T00:00:00Z', backupSize: '64 MB', lastVerify: null },
+  volunteers: { totalActive: 15, onlineNow: 5, onShift: 3, shiftCoverage: 20 },
+  timestamp: new Date().toISOString(),
+}
+
 test.describe('Admin System Health Dashboard', () => {
   test.beforeEach(async ({ page }) => {
+    // Mock the system health API endpoint
+    await page.route('**/api/system/health', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockSystemHealth),
+      })
+    })
+
     await loginAsAdmin(page)
     await navigateAfterLogin(page, '/admin/system')
   })

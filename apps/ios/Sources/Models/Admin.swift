@@ -270,7 +270,7 @@ struct ReportCategory: Codable, Identifiable, Sendable {
 }
 
 /// API response from `GET /api/settings/report-types`.
-struct ReportCategoriesResponse: Codable, Sendable {
+struct ReportTypesResponse: Codable, Sendable {
     let reportTypes: [ReportCategory]
 }
 

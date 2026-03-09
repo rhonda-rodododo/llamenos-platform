@@ -107,7 +107,7 @@ struct AdminTabView: View {
                 .accessibilityIdentifier("admin-ivr-settings")
 
                 NavigationLink {
-                    TranscriptionSettingsView(viewModel: vm)
+                    AdminTranscriptionSettingsView(viewModel: vm)
                 } label: {
                     Label(
                         NSLocalizedString("admin_transcription_settings", comment: "Transcription"),
