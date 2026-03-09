@@ -1,9 +1,19 @@
 import { defineConfig, devices } from "@playwright/test";
 import { defineBddConfig } from "playwright-bdd";
 
+// Desktop BDD: exclude tests/steps/backend/ to avoid loading backend-only step defs
+// that use a different createBdd() instance.
+const desktopStepDirs = [
+  "admin", "auth", "calls", "common", "contacts", "conversations",
+  "crypto", "dashboard", "help", "messaging", "notes", "reports",
+  "security", "settings", "shifts",
+];
 const bddTestDir = defineBddConfig({
   features: "packages/test-specs/features/**/*.feature",
-  steps: "tests/steps/**/*.ts",
+  steps: [
+    "tests/steps/*.ts",
+    ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
+  ],
   outputDir: ".features-gen",
   featuresRoot: "packages/test-specs/features",
   tags: "@desktop and not @backend",
