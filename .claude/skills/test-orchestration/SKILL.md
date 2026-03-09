@@ -10,8 +10,9 @@ description: >
   when the user needs to run verification after making changes across multiple platforms, when
   configuring new test environments, debugging why tests pass locally but fail in CI, or when
   test infrastructure itself is broken (stuck simulators, port conflicts, stale codegen).
-  Distinct from multi-platform-test-recovery which diagnoses test logic failures — this skill
-  handles the infrastructure and orchestration layer.
+  Distinct from bdd-feature-development which diagnoses test logic failures — this skill
+  handles the infrastructure and orchestration layer. Also covers backend BDD test
+  orchestration against Docker Compose.
 ---
 
 # Test Orchestration for Llamenos
@@ -30,6 +31,7 @@ bun run test:ios       # XCUITest + unit tests
 bun run test:android   # Gradle unit + lint + androidTest compilation
 bun run test:worker    # Worker integration tests
 bun run test:crypto    # cargo test + clippy
+bun run test:backend:bdd  # Backend BDD against Docker Compose (API-level)
 bun run test:feature <name>  # Tests matching feature name across platforms
 ```
 
@@ -42,18 +44,18 @@ All scripts support: `--verbose`, `--no-codegen`, `--json`, `--timeout <seconds>
                     │   bun run test:all   │
                     └──────────┬──────────┘
                                │
-          ┌────────────────────┼────────────────────┐
-          │                    │                     │
-     ┌────▼────┐         ┌────▼────┐          ┌─────▼─────┐
-     │ Codegen │         │ Codegen │          │  Codegen   │
-     │  Guard  │         │  Guard  │          │   Guard    │
-     └────┬────┘         └────┬────┘          └─────┬─────┘
-          │                    │                     │
-    ┌─────▼──────┐     ┌──────▼───────┐     ┌──────▼───────┐
-    │  Desktop   │     │     iOS      │     │   Android    │
-    │ Playwright │     │  XCUITest    │     │   Gradle     │
-    │ + Docker   │     │ + Simulator  │     │ + Emulator*  │
-    └────────────┘     └──────────────┘     └──────────────┘
+     ┌──────────┬──────────────┼────────────────────┐
+     │          │              │                     │
+┌────▼────┐ ┌──▼──────┐ ┌────▼────┐          ┌─────▼─────┐
+│ Codegen │ │ Codegen │ │ Codegen │          │  Codegen   │
+│  Guard  │ │  Guard  │ │  Guard  │          │   Guard    │
+└────┬────┘ └────┬────┘ └────┬────┘          └─────┬─────┘
+     │           │           │                     │
+┌────▼─────┐┌───▼──────┐┌───▼────────┐     ┌──────▼───────┐
+│ Backend  ││ Desktop  ││    iOS     │     │   Android    │
+│   BDD    ││Playwright││  XCUITest  │     │   Gradle     │
+│ + Docker ││ + Docker ││ +Simulator │     │ + Emulator*  │
+└──────────┘└──────────┘└────────────┘     └──────────────┘
                                                   │
                                             * Emulator broken
                                               on macOS 26
@@ -99,6 +101,54 @@ bun run test:build && bunx playwright test --config playwright.docker.config.ts
 - **UI mode**: `bun run test:ui` — step through tests visually
 - **Screenshots**: Automatically captured on failure in `test-results/`
 - **Global setup**: `tests/global-setup.ts` — runs once before all tests (state reset)
+
+## Platform: Backend BDD
+
+Backend BDD runs shared Gherkin specs tagged `@backend` against the Docker Compose
+backend. No browser needed -- tests hit the API directly via Playwright's APIRequestContext.
+
+### Prerequisites
+- Docker Compose backend running: `bun run test:docker:up`
+- Health check: `curl http://localhost:3000/api/health`
+
+### Running
+
+```bash
+# Full backend BDD suite
+bun run test:backend:bdd
+
+# Specific feature
+PLAYWRIGHT_TEST=true bunx playwright test --project=backend-bdd --grep "call routing"
+```
+
+### What It Tests
+- API correctness (CRUD operations, permission enforcement, auth validation)
+- Call/message simulation (routing, parallel ring, voicemail, conversation threading)
+- Encryption roundtrips (note encryption, multi-admin envelopes)
+- Audit log integrity (hash chain, filtering)
+- Error paths (expired tokens, banned callers, permission denial)
+
+### Step Definitions
+- Location: `tests/steps/backend/`
+- Pattern: Given (setup state via API) -> When (trigger action) -> Then (verify via API)
+- Uses: `tests/simulation-helpers.ts` and `tests/api-helpers.ts`
+
+## Shared BDD Spec Structure
+
+Shared Gherkin feature files live in `packages/test-specs/features/` organized by tier:
+
+```
+packages/test-specs/features/
+  core/           # Core behavioral specs (call routing, messaging, notes, auth)
+  admin/          # Admin operations (volunteers, shifts, bans, settings)
+  security/       # Security specs (crypto, E2EE, permissions, audit)
+  platform/       # Platform-specific specs
+    desktop/      # Desktop-only features
+    ios/          # iOS-only features
+    android/      # Android-only features
+```
+
+**Tagging:** `@backend` for API-level, `@desktop`/`@ios`/`@android` for client platforms, `@smoke` for fast CI subset.
 
 ## Platform: iOS (XCUITest)
 

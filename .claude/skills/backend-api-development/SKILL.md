@@ -372,3 +372,46 @@ Every route and DO must work on both Cloudflare Workers and Node.js (self-hosted
 | `apps/worker/types.ts` | `Env`, `AppEnv`, `Volunteer`, `DOStub` types |
 | `packages/shared/nostr-events.ts` | `KIND_*` constants |
 | `packages/shared/permissions.ts` | Role/permission definitions, `resolvePermissions()` |
+
+## Backend BDD Testing
+
+Every new API endpoint or DO method MUST have corresponding BDD coverage:
+
+1. **Write Gherkin scenario** in `packages/test-specs/features/` with `@backend` tag
+2. **Write step definition** in `tests/steps/backend/` using simulation helpers + API helpers
+3. **Run**: `bun run test:backend:bdd`
+
+### Example: Adding a new endpoint
+
+```gherkin
+# packages/test-specs/features/core/volunteer-lifecycle.feature
+@backend
+Scenario: Deactivating a volunteer revokes all sessions
+  Given a volunteer "alice" exists with an active session
+  When an admin deactivates volunteer "alice"
+  Then alice's session is revoked
+  And alice cannot access protected endpoints
+```
+
+```typescript
+// tests/steps/backend/admin.steps.ts
+When('an admin deactivates volunteer {string}', async ({ request }, name) => {
+  const vol = scenarioState.volunteers.find(v => v.name === name)
+  await apiPatch(request, `/api/volunteers/${vol.pubkey}`, { active: false })
+})
+```
+
+### Simulation Framework Reference
+
+| Endpoint | Use For |
+|----------|---------|
+| `POST /api/test-simulate/incoming-call` | Test call routing without Twilio |
+| `POST /api/test-simulate/answer-call` | Test call answering and state transitions |
+| `POST /api/test-simulate/end-call` | Test call termination and cleanup |
+| `POST /api/test-simulate/voicemail` | Test voicemail recording flow |
+| `POST /api/test-simulate/incoming-message` | Test conversation creation without SMS |
+| `POST /api/test-simulate/delivery-status` | Test message delivery tracking |
+| `POST /api/test-reset` | Clean state between scenarios |
+
+Step definitions should use the typed helpers from `tests/simulation-helpers.ts`
+and `tests/api-helpers.ts`, not raw HTTP calls.

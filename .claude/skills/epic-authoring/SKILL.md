@@ -85,12 +85,22 @@ that demonstrate the problem.}
 {What tests must be written or updated. Be specific — name the test files,
 describe the scenarios, specify which platforms need coverage.}
 
-## Acceptance Criteria
+## Acceptance Criteria & Test Scenarios
 
-- [ ] {Checkbox format — scannable, trackable}
-- [ ] {Each criterion is independently verifiable}
-- [ ] All affected platform tests pass (`bun run test:changed`)
-- [ ] Backlog files updated (NEXT_BACKLOG.md / COMPLETED_BACKLOG.md)
+- [ ] {Criterion description}
+  → `{feature-file-path}: "{Scenario title}"`
+- [ ] {Criterion description}
+  → `{feature-file-path}: "{Scenario title}"`
+- [ ] All platform BDD suites pass (`bun run test:all`)
+- [ ] Backlog files updated
+
+## Feature Files
+
+| File | Status | Description |
+|------|--------|-------------|
+| `packages/test-specs/features/core/X.feature` | New/Modified | Scenarios for {feature} |
+| `tests/steps/backend/X.steps.ts` | New | Backend step definitions |
+| `tests/steps/X.steps.ts` | Phase 2 | Desktop step definitions |
 
 ## Risk Assessment
 
@@ -167,21 +177,47 @@ Structure by platform layer:
 4. **iOS** (SwiftUI views, services)
 5. **Android** (Compose screens, repositories)
 
+### BDD-First Feature Epics (DEFAULT for all new features)
+
+Structure epics to produce BDD specs as the first deliverable:
+
+#### Phase 1: API + Specs (single agent)
+- Backend routes/DO methods
+- i18n strings (all locales)
+- Shared .feature file(s) in `packages/test-specs/features/`
+- Backend step definitions in `tests/steps/backend/`
+- **Gate**: `bun run test:backend:bdd` passes
+
+#### Phase 2: Client Implementation (parallel agents)
+- Desktop: UI + step definitions in `tests/steps/`
+- iOS: Views + XCUITest step implementations
+- Android: Screens + Cucumber step definitions
+- **Gate**: `bun run test:changed` passes per platform
+
+#### Phase 3: Integration
+- **Gate**: `bun run test:all` passes
+
 ## Sequencing: Phase vs Task
 
 - Use **"Phase N"** when steps have strict ordering (Phase 1 must complete before Phase 2)
 - Use **"Task N"** or **numbered sections** when work is parallelizable
 - State this explicitly: `**Execution**: Phases are sequential` or `**Execution**: Tasks 2-5 can run in parallel after Task 1`
 
-## Batch Workflow: Write ALL Epics Before Implementing
+## Batch Workflow: Phased Implementation
 
-When the user proposes multiple features or a batch of work:
+When the user proposes multiple features:
 
-1. **Phase 1: Research & Write ALL Epics** — write them one at a time sequentially, researching
-   each thoroughly before writing. Do NOT start implementing during this phase.
-2. **Phase 2: Deep Self-Review of ALL Epics** — after ALL epics are written, review the entire
-   batch together (see Deep Self-Review below).
-3. **Phase 3: Implement** — execute epics in dependency order.
+1. **Write ALL epics** — sequential, one at a time, with BDD scenarios in each
+2. **Deep self-review ALL epics** — including items 9-12 (test coverage verification)
+3. **Phase 1 for ALL features**: API + locales + shared BDD specs (sequential commits)
+   - One commit per feature's backend + specs
+   - Gate: `bun run test:backend:bdd` passes after each commit
+4. **Phase 2 for ALL features**: Client implementation (parallel per-client)
+   - Agent 1: Desktop (`src/client/`, `tests/steps/`)
+   - Agent 2: iOS (`apps/ios/`)
+   - Agent 3: Android (`apps/android/`)
+   - Gate: `bun run test:changed` per platform
+5. **Phase 3**: Integration gate (`bun run test:all`)
 
 ## After Writing Each Epic
 
@@ -258,7 +294,39 @@ For epics touching encrypted data or wire formats:
 ### 8. Review Checklist Summary
 
 After the deep review, fix all issues found by editing the epic files directly. Then summarize
-what was changed:
+what was changed.
+
+### 9. Verify Test Scenario Coverage
+
+For every acceptance criterion:
+- Does it map to at least one Gherkin scenario?
+- Does the scenario test BEHAVIOR (state change, data persistence, API response)?
+- NOT: "I should see the X element" (that's a UI existence check, not behavior)
+
+### 10. Verify Scenario Quality
+
+Each scenario must:
+- Have a `@backend` tag if it can be verified without UI
+- Have platform tags (`@desktop` `@ios` `@android`) for UI verification scenarios
+- Include at least one edge case or error path per feature file
+- Use Scenario Outline for parametrized cases (don't copy-paste scenarios)
+
+### 11. Verify Phase Separation
+
+- Phase 1 files (`apps/worker/`, `packages/i18n/`, `packages/test-specs/`, `tests/steps/backend/`)
+  do NOT overlap with Phase 2 files (`src/client/`, `apps/ios/`, `apps/android/`)
+- If they overlap, restructure the epic to separate concerns
+
+### 12. Verify Backend BDD Feasibility
+
+For each `@backend` scenario:
+- Can it be verified using the simulation framework + API helpers?
+- Does the needed API endpoint exist, or does the epic create it?
+- Is the test data setup realistic (not dependent on UI flow)?
+
+### Review Summary
+
+After the deep review, fix all issues and summarize:
 
 ```markdown
 ## Self-Review Fixes

@@ -217,6 +217,7 @@ bun run test:ios                         # iOS: codegen → xcodebuild → unit 
 bun run test:android                     # Android: codegen → gradle unit + lint + androidTest
 bun run test:worker                      # Worker: codegen → typecheck → integration tests
 bun run test:crypto                      # Crypto: cargo test + clippy
+bun run test:backend:bdd                 # Backend BDD against Docker Compose (API-level)
 
 # Deploy (runs on Linux machine)
 bun run deploy                           # Deploy EVERYTHING (Worker + marketing site)
@@ -240,20 +241,47 @@ bun run bootstrap-admin                  # Generate admin keypair
 
 ## Claude Code Working Style
 
-- **Pre-commit: `bun run test:all` or `bun run test:changed`** — runs codegen guard + typecheck + build + test for all (or affected) platforms. Never push code that doesn't build.
-- **For quick iteration**: `bun run test:changed` detects affected platforms from git diff and only tests those.
-- **Full E2E verification** means `bun run test:all` — runs desktop Playwright, Android unit+lint+androidTest, iOS unit+UI, worker integration, and crypto tests with unified output.
-- **i18n changes**: Always run `bun run i18n:validate:all` after modifying locale files or string references.
-- Implement features completely — no stubs, no shortcuts, no TODOs left behind.
-- **Every feature or fix must include tests.** Desktop: Playwright E2E tests in `tests/`. Android: unit tests (`src/test/`) and UI tests (`src/androidTest/`). iOS: XCTest unit + UI tests in `Tests/`. A feature is not complete until its tests are written and passing.
-- Edit files in place; never create copies. Git history is the backup. Commit regularly when work is complete, don't worry about accidentally committing unrelated changes.
-- Keep the file tree lean. Use git commits frequently to checkpoint progress.
-- No legacy fallbacks or migration code until this file notes the app is in production.
-- Use `docs/epics/` for planning feature epics. Track backlog in `docs/NEXT_BACKLOG.md` and completed work in `docs/COMPLETED_BACKLOG.md` with every iteration
-- Use context7 plugin to look up current docs for Twilio, Cloudflare Workers, TanStack, shadcn/ui, and other libraries before implementing.
-- Use the feature-dev plugin for guided development of complex features.
-- Use Playwright plugin for E2E test development and debugging.
-- Clean up unused files/configs when pivoting. Keep code modular and DRY — refactor proactively.
-- Update related documentation when requirements, architecture, or design changes occur.
-- NEVER delete or regress functionality to fix type issues or get tests passing. Only remove features if explicitly asked or when replacing as part of new work.
-- Use parallel agent execution where it makes sense to keep things moving.
+### Feature Development: 3-Phase BDD Workflow
+
+**Every feature follows this sequence. No exceptions.**
+
+1. **Epic authoring** — with BDD scenarios mapped 1:1 to acceptance criteria
+2. **Phase 1: API + Locales + Shared BDD Specs** (single agent)
+   - Backend routes/DO methods (`apps/worker/`)
+   - i18n strings (`packages/i18n/locales/`)
+   - Shared `.feature` files (`packages/test-specs/features/`)
+   - Backend step definitions (`tests/steps/backend/`)
+   - **Gate**: `bun run test:backend:bdd` passes
+3. **Phase 2: Client Implementation** (parallel agents, non-overlapping dirs)
+   - Agent 1: Desktop (`src/client/`, `tests/steps/`)
+   - Agent 2: iOS (`apps/ios/`)
+   - Agent 3: Android (`apps/android/`)
+   - Each implements UI + step definitions to pass shared BDD scenarios
+4. **Phase 3: Integration Gate** — `bun run test:all`
+
+### Test Philosophy
+
+- **Tests are the spec.** BDD scenarios define what the feature does. Implementation makes them pass.
+- **Behavior, not UI.** Every scenario tests state changes, API responses, data persistence — never "element exists."
+- **Backend BDD is the minimum bar.** If backend BDD passes, the API is correct. Client tests verify the UI reflects it.
+- If a design change breaks a scenario that's still valid → update the step implementation (selectors, navigation)
+- If a scenario is obsolete → update the scenario AND the AC it maps to
+
+### Pre-Commit Verification
+
+```bash
+bun run test:changed   # Fast: only affected platforms
+bun run test:all       # Thorough: all platforms including backend BDD
+```
+
+### General Rules
+
+- Implement features completely — no stubs, no shortcuts, no TODOs
+- **Every feature includes tests.** Written in Phase 1 (specs) and Phase 2 (step definitions)
+- Edit files in place; never create copies. Git history is the backup
+- Keep the file tree lean. Commit frequently
+- No legacy fallbacks until the app is in production
+- Use `docs/epics/` for planning. Track in `docs/NEXT_BACKLOG.md` / `docs/COMPLETED_BACKLOG.md`
+- Use context7 MCP for library documentation lookups
+- Clean up unused files when pivoting. Refactor proactively
+- NEVER delete or regress functionality to fix type issues or get tests passing

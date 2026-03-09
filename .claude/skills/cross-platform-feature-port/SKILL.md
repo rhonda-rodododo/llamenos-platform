@@ -36,15 +36,18 @@ patterns between platforms so ports are consistent and complete.
 
 ## Porting Workflow
 
-### Step 1: Understand the Source Feature
+### Step 1: Read the BDD Spec (the Behavioral Contract)
 
-Before porting, read the existing implementation:
+When porting a feature, the shared `.feature` file IS the specification:
 
-1. **Desktop routes**: `src/client/routes/` — find the route file for the feature
-2. **Desktop components**: `src/client/components/` — UI components used
-3. **Worker endpoints**: `apps/worker/routes/` or `apps/worker/durable-objects/` — API surface
-4. **Shared types**: `packages/shared/types.ts` or `packages/protocol/generated/` — data models
-5. **Crypto operations**: What encryption/signing does the feature use? (Check platform.ts calls)
+1. **Read the feature file**: `packages/test-specs/features/core/{feature}.feature`
+2. **Understand every scenario**: Each one defines a behavior the target platform must support
+3. **Check tags**: Which scenarios apply to your target platform?
+4. **Read backend steps**: `tests/steps/backend/{feature}.steps.ts` -- how does the API verify it?
+
+You do NOT need to "understand the source platform's implementation." The Gherkin
+scenarios define WHAT the feature does. Your job is to implement step definitions
+that make those scenarios pass on the target platform.
 
 ### Step 2: Protocol & Shared Layer
 
@@ -67,7 +70,17 @@ If the feature needs new API endpoints:
 4. **Nostr broadcast**: If real-time updates needed, add encrypted event publishing
 5. **Tests**: Worker integration tests via `bun run test:worker`
 
-### Step 4: Platform Implementation
+### Step 4: Write Step Definitions First (Red-Green-Refactor)
+
+For each scenario in the feature file:
+
+1. Write the step definition stub (Given/When/Then)
+2. Run it -- verify it fails (Red)
+3. Implement the minimum UI/logic to make it pass (Green)
+4. Refactor if needed
+
+This is Red-Green-Refactor applied to cross-platform porting. The shared `.feature`
+file already defines what the feature does -- your job is making those scenarios pass.
 
 #### Porting to iOS (SwiftUI)
 
