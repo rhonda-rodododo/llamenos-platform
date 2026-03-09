@@ -16,7 +16,7 @@ else
 fi
 
 # Returns: space-separated list of available platforms
-# Possible values: desktop ios android worker crypto
+# Possible values: desktop ios android worker crypto backend-bdd
 detect_platforms() {
   local platforms=()
   local os
@@ -30,6 +30,11 @@ detect_platforms() {
   # Worker tests need bun
   if command -v bun &>/dev/null; then
     platforms+=("worker")
+  fi
+
+  # Backend BDD tests need bun and a running backend
+  if command -v bun &>/dev/null; then
+    platforms+=("backend-bdd")
   fi
 
   case "$os" in
@@ -88,7 +93,7 @@ print_platform_summary() {
   echo "  Available platforms: $available"
   echo ""
 
-  for plat in crypto worker desktop ios android; do
+  for plat in crypto worker backend-bdd desktop ios android; do
     if [[ " $available " == *" $plat "* ]]; then
       echo -e "  ${GREEN}[ok]${RESET} $plat"
     else

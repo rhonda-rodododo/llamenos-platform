@@ -9,6 +9,14 @@ const bddTestDir = defineBddConfig({
   tags: "@desktop and not @backend",
 });
 
+const backendBddTestDir = defineBddConfig({
+  features: "packages/test-specs/features/**/*.feature",
+  steps: "tests/steps/backend/**/*.ts",
+  outputDir: ".features-gen-backend",
+  featuresRoot: "packages/test-specs/features",
+  tags: "@backend",
+});
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
@@ -55,6 +63,13 @@ export default defineConfig({
       testDir: bddTestDir,
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["setup"],
+    },
+    {
+      name: "backend-bdd",
+      testDir: backendBddTestDir,
+      use: {
+        baseURL: process.env.TEST_HUB_URL || "http://localhost:3000",
+      },
     },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL

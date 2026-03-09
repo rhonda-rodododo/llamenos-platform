@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Backend BDD test runner
+# Runs @backend-tagged Gherkin scenarios against a live backend via API only (no browser).
+# Requires a running backend (Docker Compose or wrangler dev).
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/lib/test-reporter.sh"
+
+# Parse arguments
+VERBOSE="${VERBOSE:-false}"
+NO_CODEGEN="${NO_CODEGEN:-false}"
+JSON_OUTPUT="${JSON_OUTPUT:-false}"
+REPORTER_TIMEOUT="${REPORTER_TIMEOUT:-300}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --verbose) VERBOSE=true; shift ;;
+    --no-codegen) NO_CODEGEN=true; shift ;;
+    --json) JSON_OUTPUT=true; shift ;;
+    --timeout) REPORTER_TIMEOUT="$2"; shift 2 ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
+
+export VERBOSE JSON_OUTPUT REPORTER_TIMEOUT
+
+cd "$PROJECT_ROOT"
+
+reporter_init "backend-bdd"
+
+overall_result="pass"
+
+# Step 1: Codegen guard (optional)
+if [[ "$NO_CODEGEN" != "true" ]]; then
+  if ! source "$SCRIPT_DIR/lib/codegen-guard.sh" && run_codegen_guard; then
+    overall_result="fail"
+    reporter_summary "$overall_result"
+    exit 1
+  fi
+fi
+
+# Step 2: Check backend is reachable
+HUB_URL="${TEST_HUB_URL:-http://localhost:3000}"
+if ! reporter_run_step "health-check" curl -sf "${HUB_URL}/api/health" >/dev/null 2>&1; then
+  echo "Backend not reachable at ${HUB_URL}. Start it with: bun run test:docker:up"
+  overall_result="fail"
+  reporter_record_suite "health-check" 0 1 0
+  reporter_summary "$overall_result"
+  exit 1
+fi
+reporter_record_suite "health-check" 1 0 0
+
+# Step 3: Run backend BDD tests via Playwright
+if reporter_run_step "backend-bdd" bunx playwright test --project=backend-bdd; then
+  parse_playwright_results "$REPORTER_LOG_FILE"
+  reporter_record_suite "backend-bdd" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
+else
+  overall_result="fail"
+  parse_playwright_results "$REPORTER_LOG_FILE"
+  reporter_record_suite "backend-bdd" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
+fi
+
+reporter_summary "$overall_result"
+
+if [[ "$overall_result" == "fail" ]]; then
+  exit 1
+fi

@@ -27,6 +27,7 @@
     "test:build": "PLAYWRIGHT_TEST=true bun run build",
     "test:live": "bunx playwright test --config playwright.live.config.ts",
     "test:ui": "PLAYWRIGHT_TEST=true bunx playwright test --ui",
+    "test:backend:bdd": "scripts/test-backend-bdd.sh",
     "test:all": "scripts/test-orchestrator.sh",
     "test:desktop": "scripts/test-desktop.sh",
     "test:desktop:wdio": "bunx wdio tests/desktop/wdio.conf.ts",
