@@ -124,8 +124,13 @@ final class AppState {
         }
 
         if args.contains("--test-authenticated") {
-            // Set deterministic mock identity for UI test automation.
-            cryptoService.setMockIdentity()
+            if args.contains("--test-volunteer-identity") {
+                // Use a separate volunteer keypair (NOT the admin key)
+                cryptoService.setMockVolunteerIdentity()
+            } else {
+                // Default: admin mock identity matching ADMIN_PUBKEY in Docker .env
+                cryptoService.setMockIdentity()
+            }
             isLocked = false
         }
 
@@ -135,8 +140,14 @@ final class AppState {
 
         // Register identity with server (must come after keypair + hub URL)
         if args.contains("--test-register") && cryptoService.isUnlocked {
-            bootstrapTestIdentity()
-            // After successful bootstrap, connect WebSocket and fetch role
+            if args.contains("--test-volunteer-identity") {
+                // Volunteer identity — register via admin API, not bootstrap
+                registerVolunteerIdentity()
+            } else {
+                // Admin identity — use the bootstrap endpoint
+                bootstrapTestIdentity()
+            }
+            // After successful registration, connect WebSocket and fetch role
             // so the dashboard shows "Connected" and the correct user role.
             connectWebSocketIfConfigured()
             fetchUserRole()
@@ -172,6 +183,73 @@ final class AppState {
         URLSession.shared.dataTask(with: request) { _, _, _ in
             sem.signal()
         }.resume()
+        _ = sem.wait(timeout: .now() + 5)
+    }
+
+    /// Register the test volunteer identity on the server.
+    /// First ensures admin is bootstrapped (using the admin key), then creates a volunteer
+    /// using the admin's auth via POST /api/volunteers.
+    private func registerVolunteerIdentity() {
+        guard let hubURL = authService.hubURL,
+              let baseURL = URL(string: hubURL) else { return }
+        guard let volunteerPubkey = cryptoService.pubkey else { return }
+
+        // Step 1: Bootstrap admin (admin key is hardcoded — same as setMockIdentity)
+        let adminSecretHex = "f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb"
+        bootstrapAdmin(baseURL: baseURL, adminSecretHex: adminSecretHex)
+
+        // Step 2: Create volunteer using admin auth
+        createVolunteer(baseURL: baseURL, adminSecretHex: adminSecretHex, volunteerPubkey: volunteerPubkey)
+    }
+
+    private func bootstrapAdmin(baseURL: URL, adminSecretHex: String) {
+        guard let adminToken = try? CryptoService.createAuthTokenStatic(
+            secretHex: adminSecretHex, method: "POST", path: "/api/auth/bootstrap"
+        ) else { return }
+
+        let url = baseURL.appendingPathComponent("api/auth/bootstrap")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 5
+
+        let body: [String: Any] = [
+            "pubkey": adminToken.pubkey,
+            "timestamp": Int(adminToken.timestamp),
+            "token": adminToken.token,
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        let sem = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { _, _, _ in sem.signal() }.resume()
+        _ = sem.wait(timeout: .now() + 5)
+    }
+
+    private func createVolunteer(baseURL: URL, adminSecretHex: String, volunteerPubkey: String) {
+        guard let adminToken = try? CryptoService.createAuthTokenStatic(
+            secretHex: adminSecretHex, method: "POST", path: "/api/volunteers"
+        ) else { return }
+
+        let url = baseURL.appendingPathComponent("api/volunteers")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Server expects: Bearer {"pubkey":"...","timestamp":...,"token":"..."}
+        let authJSON = """
+        {"pubkey":"\(adminToken.pubkey)","timestamp":\(adminToken.timestamp),"token":"\(adminToken.token)"}
+        """
+        request.setValue("Bearer \(authJSON)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 5
+
+        let body: [String: Any] = [
+            "pubkey": volunteerPubkey,
+            "name": "Test Volunteer",
+            "roles": ["role-volunteer"],
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        let sem = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { _, _, _ in sem.signal() }.resume()
         _ = sem.wait(timeout: .now() + 5)
     }
     #endif

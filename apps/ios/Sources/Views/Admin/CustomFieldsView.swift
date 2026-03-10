@@ -80,7 +80,8 @@ struct CustomFieldsView: View {
                 viewModel.editingField = nil
                 viewModel.showFieldEditor = true
             },
-            actionLabel: NSLocalizedString("fields_add_first", comment: "Add First Field")
+            actionLabel: NSLocalizedString("fields_add_first", comment: "Add First Field"),
+            actionAccessibilityID: "add-first-field"
         )
         .accessibilityIdentifier("custom-fields-empty-state")
     }

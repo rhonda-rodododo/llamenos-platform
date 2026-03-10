@@ -6,6 +6,7 @@ struct BrandEmptyState: View {
     let message: String
     var action: (() -> Void)? = nil
     var actionLabel: String? = nil
+    var actionAccessibilityID: String? = nil
 
     var body: some View {
         VStack(spacing: 16) {
@@ -30,10 +31,24 @@ struct BrandEmptyState: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.brandPrimary)
+                .optionalAccessibilityIdentifier(actionAccessibilityID)
             }
         }
         .padding(32)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("brand-empty-state")
+    }
+}
+
+// MARK: - Optional Accessibility ID
+
+private extension View {
+    @ViewBuilder
+    func optionalAccessibilityIdentifier(_ id: String?) -> some View {
+        if let id {
+            self.accessibilityIdentifier(id)
+        } else {
+            self
+        }
     }
 }

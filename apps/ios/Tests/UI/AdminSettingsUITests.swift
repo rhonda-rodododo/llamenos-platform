@@ -261,18 +261,27 @@ final class AdminSettingsUITests: XCTestCase {
     func testSystemHealthShowsCards() {
         navigateToAdminSettingsScreen("admin-system-health")
 
-        let view = find("system-health-view")
-        guard view.waitForExistence(timeout: 10) else {
-            // May show error state if no API — that's acceptable
-            let errorState = find("health-error-state")
-            if errorState.waitForExistence(timeout: 5) {
-                XCTAssertTrue(true, "System health shows error state (no API) — acceptable")
-                return
-            }
+        // The ScrollView always exists; check for actual content inside it
+        let errorState = find("health-error-state")
+        let firstCard = find("health-card-server")
+
+        // Wait for either health cards or error state to appear
+        let loaded = firstCard.waitForExistence(timeout: 10)
+            || errorState.waitForExistence(timeout: 5)
+
+        if errorState.exists {
+            // No API connection — error state is acceptable for mock-only tests
             return
         }
 
-        // If loaded successfully, check for health cards
+        guard loaded else {
+            // Neither cards nor error appeared — check loading state
+            let loading = find("health-loading")
+            XCTAssertTrue(loading.exists, "System health should show loading, cards, or error")
+            return
+        }
+
+        // Health cards loaded — verify all 6 are present
         let cards = [
             "health-card-server",
             "health-card-services",

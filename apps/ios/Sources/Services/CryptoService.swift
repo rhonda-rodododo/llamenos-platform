@@ -164,9 +164,15 @@ final class CryptoService: @unchecked Sendable {
     /// The nsec is used for signing but never leaves this service.
     func createAuthToken(method: String, path: String) throws -> AuthToken {
         guard let nsecHex else { throw CryptoServiceError.noKeyLoaded }
+        return try Self.createAuthTokenStatic(secretHex: nsecHex, method: method, path: path)
+    }
+
+    /// Create an auth token from a known secret key (no instance state needed).
+    /// Used by test infrastructure to create tokens for admin bootstrapping.
+    static func createAuthTokenStatic(secretHex: String, method: String, path: String) throws -> AuthToken {
         let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
         return try ffiCreateAuthToken(
-            secretKeyHex: nsecHex,
+            secretKeyHex: secretHex,
             timestamp: timestamp,
             method: method,
             path: path
@@ -316,6 +322,20 @@ final class CryptoService: @unchecked Sendable {
     func setMockIdentity() {
         // Same admin key used in desktop tests — matches ADMIN_PUBKEY in Docker .env
         let secretHex = "f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb"
+        setIdentity(secretHex: secretHex)
+    }
+
+    /// Set a mock volunteer identity (different keypair from admin).
+    /// Used by API-connected tests that need to test volunteer-specific behavior.
+    ///
+    /// Volunteer nsec hex: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
+    /// Pubkey:             5877220aaae6e54a6f974602d5995c0fe24a3ea7ddabd8644bec795b9da00743
+    func setMockVolunteerIdentity() {
+        let secretHex = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
+        setIdentity(secretHex: secretHex)
+    }
+
+    private func setIdentity(secretHex: String) {
         do {
             let kp = try ffiKeypairFromSecretKeyHex(secretHex)
             self.nsecHex = kp.secretKeyHex

@@ -48,12 +48,27 @@ class BaseUITest: XCTestCase {
         app.launch()
     }
 
-    /// Launch the app connected to the live Docker API as a volunteer.
-    /// The identity is registered with the server via bootstrap.
+    /// Launch the app connected to the live Docker API as admin.
+    /// Uses the admin mock identity (matches ADMIN_PUBKEY in Docker .env)
+    /// and registers via /api/auth/bootstrap.
     func launchWithAPI() {
         app.launchArguments.append(contentsOf: [
             "--reset-keychain",
             "--test-authenticated",
+            "--test-hub-url", testHubURL,
+            "--test-register",
+        ])
+        app.launch()
+    }
+
+    /// Launch the app connected to the live Docker API as a volunteer.
+    /// Uses a separate volunteer keypair. The admin is bootstrapped first,
+    /// then the volunteer is created via POST /api/volunteers.
+    func launchAsVolunteerWithAPI() {
+        app.launchArguments.append(contentsOf: [
+            "--reset-keychain",
+            "--test-authenticated",
+            "--test-volunteer-identity",
             "--test-hub-url", testHubURL,
             "--test-register",
         ])
