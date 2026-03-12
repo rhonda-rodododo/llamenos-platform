@@ -545,7 +545,7 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 - [x] **[Epic 306: Nostr Relay Event Delivery Fixes](epics/epic-306-nostr-relay-event-delivery-fixes.md)** — NodeNostrPublisher rejection handling, mobile kind filters, Android/iOS event type string alignment
 - [x] **[Epic 307: Real-Time Event Delivery BDD Coverage](epics/epic-307-realtime-event-delivery-bdd-coverage.md)** — RelayCapture test helper, 9 BDD scenarios for all event kinds + encryption + tags + signatures
 - [x] **[Epic 308: In-Call Quick Actions — Ban & Notes](epics/epic-308-call-action-buttons-ban-notes.md)** — POST /api/calls/:callId/ban server-side endpoint, client API fix, i18n strings, 5 BDD scenarios
-- [ ] **[Epic 309: Mobile Relay Event Decryption](epics/epic-309-mobile-relay-event-decryption.md)** — Rust FFI hub event decrypt, iOS/Android HubKeyManager, WebSocket decrypt pipeline
+- [x] **[Epic 309: Relay Event Decryption — All Platforms](epics/epic-309-relay-event-decryption.md)** — Wire serverEventKeyHex into desktop/iOS/Android relay decryption, add decrypt_server_event_hex Rust FFI
 - [ ] **[Epic 310: Nostr Publisher Reliability & Cleanup](epics/epic-310-nostr-publisher-reliability-cleanup.md)** — Async publishNostrEvent, messaging router encryption fix, flush OK tracking, reconnect cap, orphaned constants, skill docs, strfry hardening
 
 ## Low Priority (Post-Launch)
