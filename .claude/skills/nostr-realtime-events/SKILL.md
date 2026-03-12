@@ -33,11 +33,12 @@ File: `apps/worker/lib/nostr-events.ts`
 import { publishNostrEvent } from '@worker/lib/nostr-events';
 
 // Inside a DO method, after a successful mutation:
-await publishNostrEvent(env, KIND_NOTE_EVENT, {
-  id: noteId,
-  action: 'created',        // 'created' | 'updated' | 'deleted'
-  callId: note.callId,      // optional context for filtering
-});
+publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+  type: 'message:new',
+  entityId: messageId,
+}).catch((e) => {
+  console.error('[messaging] Failed to publish event:', e)
+})
 ```
 
 The function:
@@ -90,16 +91,17 @@ NEVER use a raw string literal for this label.
 File: `src/client/lib/hooks/useNostrSubscription.ts`
 
 ```typescript
-useNostrSubscription(hubId, [KIND_CALL_EVENT, KIND_NOTE_EVENT], (event) => {
+useNostrSubscription(hubId, [KIND_CALL_RING, KIND_CALL_UPDATE, KIND_MESSAGE_NEW], (event) => {
   // event.content is already decrypted
-  const { id, action } = JSON.parse(event.content);
+  const { type, entityId } = JSON.parse(event.content);
 
   switch (event.kind) {
-    case KIND_CALL_EVENT:
+    case KIND_CALL_RING:
+    case KIND_CALL_UPDATE:
       queryClient.invalidateQueries({ queryKey: ['calls'] });
       break;
-    case KIND_NOTE_EVENT:
-      queryClient.invalidateQueries({ queryKey: ['notes', id] });
+    case KIND_MESSAGE_NEW:
+      queryClient.invalidateQueries({ queryKey: ['messages', entityId] });
       break;
   }
 });
@@ -148,16 +150,17 @@ if (dedup.check(event.id, event.created_at)) {
 
 All constants defined in `packages/shared/nostr-events.ts`:
 
-| Constant | Value | Published By | Trigger |
-|----------|-------|-------------|---------|
-| `KIND_CALL_EVENT` | 20001 | CallRouterDO | Call started, answered, ended |
-| `KIND_NOTE_EVENT` | 20002 | RecordsDO | Note created, updated, deleted |
-| `KIND_SETTINGS_CHANGED` | 20003 | SettingsDO | Any settings mutation |
-| `KIND_SHIFT_EVENT` | 20004 | ShiftManagerDO | Shift schedule changed, volunteer clock in/out |
-| `KIND_CONVERSATION_EVENT` | 20005 | ConversationDO | New inbound message, conversation assigned |
-| `KIND_BLAST_EVENT` | 20006 | BlastDO | Broadcast queued, delivery status update |
+| Constant | Value | Published By | Content Type | Trigger |
+|----------|-------|-------------|--------------|---------|
+| `KIND_CALL_RING` | 1000 | CallRouterDO | `call:ring` | Incoming call |
+| `KIND_CALL_UPDATE` | 1001 | CallRouterDO | `call:update` | Call answered, completed, etc. |
+| `KIND_CALL_VOICEMAIL` | 1002 | CallRouterDO | `voicemail:new` | Voicemail received |
+| `KIND_MESSAGE_NEW` | 1010 | Routes + messaging/router | `message:new` | Inbound message or status update |
+| `KIND_CONVERSATION_ASSIGNED` | 1011 | Routes + messaging/router | `conversation:assigned` / `conversation:closed` | Assignment change |
+| `KIND_PRESENCE_UPDATE` | 20000 | CallRouterDO | `presence:summary` | Volunteer availability changed |
+| `KIND_NIP42_AUTH` | 22242 | NodeNostrPublisher | NIP-42 auth | Relay authentication |
 
-All kinds use the ephemeral range (20000+) so relays do not persist them.
+Kinds 1000-1011 are regular (persisted by relay). Kind 20000 is ephemeral (broadcast only, 5-min TTL).
 
 ## Adding a New Event Type
 
@@ -169,18 +172,27 @@ more platforms.
 File: `packages/shared/nostr-events.ts`
 
 ```typescript
-export const KIND_MY_NEW_EVENT = 20007;
+// Choose the appropriate range:
+// Regular (1000-9999): persisted by relay, returned in queries
+// Ephemeral (20000-29999): broadcast only, not persisted
+export const KIND_MY_NEW_EVENT = 1012;
 ```
 
-### Step 2: Publish from the DO
+### Step 2: Publish from the route or DO
 
-In the relevant DO, after the mutation succeeds:
+In the relevant route handler or DO method, after the mutation succeeds.
+Use `publishNostrEvent()` from `apps/worker/lib/nostr-events.ts`:
 
 ```typescript
-await publishNostrEvent(env, KIND_MY_NEW_EVENT, {
-  id: resource.id,
-  action: 'created',
-});
+import { publishNostrEvent } from '../lib/nostr-events'
+import { KIND_MY_NEW_EVENT } from '@shared/nostr-events'
+
+publishNostrEvent(c.env, KIND_MY_NEW_EVENT, {
+  type: 'my-domain:action',
+  entityId: result.id,
+}).catch((e) => {
+  console.error('[my-domain] Failed to publish event:', e)
+})
 ```
 
 ### Step 3: Add client handler
@@ -229,4 +241,4 @@ const { data } = useQuery({
 | Using raw string for crypto label | Domain separation violation, audit failure | Import from generated constants |
 | Not handling relay reconnection | Permanent disconnect after network blip | RelayManager handles this; verify reconnection in tests |
 | Publishing before mutation commits | Event arrives but API returns stale data | Always publish AFTER the storage write succeeds |
-| Using persistent event kinds (< 20000) | Relay stores events forever, privacy risk | Use ephemeral range (20000+) |
+| Using wrong kind range | Regular events persist forever, ephemeral events are lost on disconnect | Choose range based on whether the event needs relay persistence (see table above) |

@@ -28,19 +28,10 @@ export const KIND_MESSAGE_NEW = 1010
 /** Conversation assignment changed */
 export const KIND_CONVERSATION_ASSIGNED = 1011
 
-/** Shift schedule changed */
-export const KIND_SHIFT_UPDATE = 1020
-
-/** Settings changed (global or hub-scoped) */
-export const KIND_SETTINGS_CHANGED = 1030
-
 // --- Ephemeral Events (not persisted, broadcast only) ---
 
 /** Volunteer presence update — online counts, availability */
 export const KIND_PRESENCE_UPDATE = 20000
-
-/** Call answer/hangup signals — real-time coordination */
-export const KIND_CALL_SIGNAL = 20001
 
 // --- NIP-42 Auth (standard) ---
 

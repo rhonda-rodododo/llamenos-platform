@@ -35,7 +35,7 @@ enum ConnectionState: Equatable, Sendable {
 
 // MARK: - NostrEvent
 
-/// A Nostr event received from the relay. Matches NIP-01 + custom kind 20001.
+/// A Nostr event received from the relay. Matches NIP-01 + custom Llamenos kinds.
 struct NostrEvent: Codable, Sendable, Identifiable {
     let id: String
     let pubkey: String
@@ -177,7 +177,7 @@ final class WebSocketService: @unchecked Sendable {
 
         // Send Nostr REQ subscription
         let reqMessage = """
-        ["REQ","\(subscriptionId)",{"kinds":[1000,1001,1002,1010,1011,20000,20001],"#t":["llamenos:event"]}]
+        ["REQ","\(subscriptionId)",{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["llamenos:event"]}]
         """
         do {
             try await task.send(.string(reqMessage))
