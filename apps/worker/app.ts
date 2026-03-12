@@ -2,7 +2,6 @@ import { Hono } from 'hono'
 import type { AppEnv } from './types'
 import { cors } from './middleware/cors'
 import { apiVersion } from './middleware/api-version'
-import { securityHeaders } from './middleware/security-headers'
 import { auth } from './middleware/auth'
 import configRoutes from './routes/config'
 import devRoutes from './routes/dev'
@@ -147,16 +146,7 @@ api.route('/', authenticated)
 // Mount API under /api
 app.route('/api', api)
 
-// Static assets with security headers
-app.use('*', securityHeaders)
-app.all('*', async (c, next) => {
-  if (!c.env.ASSETS) {
-    // Node.js mode — let the outer app's serveStatic handle static files
-    await next()
-    return
-  }
-  const assetResponse = await c.env.ASSETS.fetch(c.req.raw)
-  return assetResponse
-})
+// Catch-all — no web frontend served here (Tauri desktop embeds its own)
+app.all('*', (c) => c.json({ error: 'Not Found' }, 404))
 
 export default app

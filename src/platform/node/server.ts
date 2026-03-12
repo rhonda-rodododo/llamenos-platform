@@ -1,15 +1,13 @@
 /**
  * Node.js server entry point.
- * Runs the Hono app with @hono/node-server, serving static files.
+ * Runs the Hono worker app with @hono/node-server as a pure API server.
  *
- * Real-time events use the Nostr relay (strfry) — no direct WebSocket
- * handling needed in the app server. Clients connect to the relay via
- * the Caddy reverse proxy at /nostr.
+ * The frontend is served by Tauri's webview — this server handles
+ * only API routes and Durable Object shims. Real-time events use the
+ * Nostr relay (strfry) — clients connect via the Caddy reverse proxy.
  */
 import { serve } from '@hono/node-server'
-import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
-import path from 'node:path'
 import { createNodeEnv } from './env'
 
 async function main() {
@@ -36,17 +34,8 @@ async function main() {
   // Mount the worker app routes
   app.route('/', workerApp as any)
 
-  // Static file serving (replaces CF ASSETS binding)
-  // The worker app's catch-all calls next() when ASSETS is null,
-  // allowing these middleware to serve static files on Node.js.
-  const staticDir = path.resolve(process.cwd(), 'dist', 'client')
-  app.use('*', serveStatic({ root: staticDir }))
-
-  // API 404 — return JSON for unmatched /api/* routes (before SPA fallback)
-  app.all('/api/*', (c) => c.json({ error: 'Not Found' }, 404))
-
-  // SPA fallback — serve index.html for all unmatched non-API routes
-  app.use('*', serveStatic({ root: staticDir, path: '/index.html' }))
+  // JSON 404 for any unmatched route (no SPA fallback — frontend is in Tauri)
+  app.all('*', (c) => c.json({ error: 'Not Found' }, 404))
 
   const port = parseInt(process.env.PORT || '3000')
   const server = serve({

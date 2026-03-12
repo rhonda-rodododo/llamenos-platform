@@ -5,7 +5,6 @@
  * - DO namespaces → PostgreSQL-backed singletons
  * - AI binding → self-hosted Whisper HTTP client
  * - R2_BUCKET → MinIO S3 client
- * - ASSETS → null (handled by Hono serveStatic)
  * - Secrets → process.env or /run/secrets/ files
  */
 import { createDONamespace, storageInstances } from './durable-object'
@@ -73,7 +72,6 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
     TWILIO_PHONE_NUMBER: twilioPhoneNumber,
     DEMO_MODE: process.env.DEMO_MODE || undefined,
     DEMO_RESET_CRON: process.env.DEMO_RESET_CRON || undefined,
-    ASSETS: null, // Static files served by Hono serveStatic
     AI: createTranscriptionService(),
     R2_BUCKET: createBlobStorage(),
     // Nostr relay (Epic 76.1)

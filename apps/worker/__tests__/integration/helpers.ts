@@ -109,7 +109,6 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
     CONVERSATION_DO: createMockDONamespace(),
     BLAST_DO: createMockDONamespace(),
     AI: { run: async () => ({}) } as unknown as Env['AI'],
-    ASSETS: null,
     R2_BUCKET: { put: async () => ({}), get: async () => null, delete: async () => {} } as unknown as Env['R2_BUCKET'],
     TWILIO_ACCOUNT_SID: 'AC-test',
     TWILIO_AUTH_TOKEN: 'test-auth-token',

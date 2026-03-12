@@ -30,7 +30,6 @@ function createMockEnv(): Env {
     CONVERSATION_DO: createMockNamespace('conversations'),
     BLAST_DO: createMockNamespace('blasts'),
     AI: { run: async () => ({}) } as any,
-    ASSETS: null,
     R2_BUCKET: {} as any,
     TWILIO_ACCOUNT_SID: '',
     TWILIO_AUTH_TOKEN: '',

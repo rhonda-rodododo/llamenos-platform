@@ -34,9 +34,6 @@ export interface Env {
   // Transcription (CF: Ai binding, Node: Whisper HTTP client)
   AI: TranscriptionService
 
-  // Static assets (CF: Fetcher, Node: null — served by Hono serveStatic)
-  ASSETS: { fetch(request: Request): Promise<Response> } | null
-
   // Blob storage (CF: R2Bucket, Node: MinIO S3 client)
   R2_BUCKET: BlobStorage
 

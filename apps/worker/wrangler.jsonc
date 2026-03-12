@@ -12,11 +12,6 @@
     { "pattern": "demo.llamenos-hotline.com", "custom_domain": true }
   ],
 
-  // Serve the Vite-built SPA as static assets
-  "assets": {
-    "directory": "../../dist/client",
-    "not_found_handling": "single-page-application"
-  },
 
   // Durable Object bindings
   "durable_objects": {
