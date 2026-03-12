@@ -128,7 +128,7 @@ reports.post('/',
       type: 'report:new',
       conversationId: conversation.id,
       category: body.category,
-    })
+    }).catch((e) => { console.error('[reports] Failed to publish event:', e) })
 
     await audit(dos.records, 'reportCreated', pubkey, {
       conversationId: conversation.id,
@@ -309,7 +309,7 @@ reports.post('/:id/messages',
     publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'message:new',
       conversationId: id,
-    })
+    }).catch((e) => { console.error('[reports] Failed to publish event:', e) })
 
     return c.json(msg)
   },
@@ -350,7 +350,7 @@ reports.post('/:id/assign',
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: body.assignedTo,
-    })
+    }).catch((e) => { console.error('[reports] Failed to publish event:', e) })
 
     return new Response(res.body, res)
   },

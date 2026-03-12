@@ -395,7 +395,7 @@ conversations.post('/:id/messages',
       type: 'message:new',
       conversationId: id,
       channelType: 'outbound',
-    })
+    }).catch((e) => { console.error('[conversations] Failed to publish event:', e) })
 
     c.executionCtx.waitUntil(
       audit(dos.records, 'messageSent', pubkey, {
@@ -458,7 +458,7 @@ conversations.patch('/:id',
       type: convEventType,
       conversationId: id,
       assignedTo: body.assignedTo,
-    })
+    }).catch((e) => { console.error('[conversations] Failed to publish event:', e) })
 
     c.executionCtx.waitUntil(
       audit(dos.records, body.status === 'closed' ? 'conversationClosed' : 'conversationUpdated', pubkey, {
@@ -544,7 +544,7 @@ conversations.post('/:id/claim',
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: pubkey,
-    })
+    }).catch((e) => { console.error('[conversations] Failed to publish event:', e) })
 
     // Push notification to assigned volunteer (Epic 86)
     dispatchPushToVolunteer(c.env, pubkey, {

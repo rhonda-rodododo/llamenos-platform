@@ -6,30 +6,24 @@ import { deriveServerEventKey, encryptHubEvent } from './hub-event-crypto'
 let cachedEventKey: Uint8Array | null = null
 
 /** Publish an event to the Nostr relay for real-time sync. Content is encrypted if SERVER_NOSTR_SECRET is set. */
-export function publishNostrEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>): void {
-  try {
-    const publisher = getNostrPublisher(env)
+export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>): Promise<void> {
+  const publisher = getNostrPublisher(env)
 
-    // Encrypt event content if server secret is available
-    let eventContent: string
-    if (env.SERVER_NOSTR_SECRET) {
-      if (!cachedEventKey) {
-        cachedEventKey = deriveServerEventKey(env.SERVER_NOSTR_SECRET)
-      }
-      eventContent = encryptHubEvent(content, cachedEventKey)
-    } else {
-      eventContent = JSON.stringify(content)
+  // Encrypt event content if server secret is available
+  let eventContent: string
+  if (env.SERVER_NOSTR_SECRET) {
+    if (!cachedEventKey) {
+      cachedEventKey = deriveServerEventKey(env.SERVER_NOSTR_SECRET)
     }
-
-    publisher.publish({
-      kind,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [['d', 'global'], ['t', 'llamenos:event']],
-      content: eventContent,
-    }).catch((e) => {
-      console.error('[nostr-events] Failed to publish event:', e)
-    })
-  } catch {
-    // Nostr not configured
+    eventContent = encryptHubEvent(content, cachedEventKey)
+  } else {
+    eventContent = JSON.stringify(content)
   }
+
+  await publisher.publish({
+    kind,
+    created_at: Math.floor(Date.now() / 1000),
+    tags: [['d', 'global'], ['t', 'llamenos:event']],
+    content: eventContent,
+  })
 }
