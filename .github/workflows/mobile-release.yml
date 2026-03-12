@@ -30,6 +30,10 @@ jobs:
     name: Build (Android)
     timeout-minutes: 30
 
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT != '' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -64,7 +68,7 @@ jobs:
           cp -r dist/android/jniLibs/* ../../apps/android/app/src/main/jniLibs/
 
       - name: Decode keystore
-        if: env.KEYSTORE_BASE64 != ''
+        if: env.HAS_KEYSTORE == 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 --decode > apps/android/release.keystore
@@ -128,7 +132,7 @@ jobs:
           retention-days: 30
 
       - name: Upload to Play Store (internal track)
-        if: env.PLAY_SERVICE_ACCOUNT != ''
+        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
         env:
           PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
         uses: r0adkll/upload-google-play@935ef9c68bb393a8e6116b1575626a7f5be3a7fb # v1
@@ -170,6 +174,10 @@ jobs:
     runs-on: macos-latest
     name: Build (iOS)
     timeout-minutes: 45
+
+    env:
+      HAS_APPLE_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+      HAS_APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_BASE64 != '' }}
 
     steps:
       - name: Checkout
@@ -223,7 +231,7 @@ jobs:
           sed -i '' "s|<key>CFBundleVersion</key>[[:space:]]*<string>[^<]*</string>|<key>CFBundleVersion</key>\n\t<string>${RUN_NUMBER}</string>|" apps/ios/Sources/App/Info.plist
 
       - name: Setup Apple signing
-        if: env.APPLE_CERTIFICATE != ''
+        if: env.HAS_APPLE_CERTIFICATE == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
@@ -290,7 +298,7 @@ jobs:
           retention-days: 30
 
       - name: Upload to TestFlight
-        if: success() && env.APPLE_API_KEY != ''
+        if: success() && env.HAS_APPLE_API_KEY == 'true'
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_BASE64 }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}

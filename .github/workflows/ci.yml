@@ -22,7 +22,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, desktop]
   pull_request:
 
 # Cancel in-progress PR runs when new commits are pushed; never cancel main
@@ -678,10 +678,11 @@ jobs:
   # ─── Version Bump & Changelog ──────────────────────────────
   version:
     needs: [changes, build, audit, worker-tests, worker-tests-integration, crypto-tests, e2e, e2e-node, integration-node, android-build-test, android-e2e, ios-build-test]
-    # Skip version bump for docs-only changes and PRs; require E2E success for app changes
+    # Skip version bump for docs-only changes, PRs, and non-main branches
     if: |
       always() &&
       github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
       needs.changes.outputs.docs_only != 'true' &&
       needs.build.result == 'success' &&
       needs.audit.result == 'success' &&
