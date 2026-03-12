@@ -32,6 +32,8 @@ export const openAPIConfig = {
       { name: 'WebAuthn', description: 'WebAuthn credential management' },
       { name: 'Hubs', description: 'Multi-hub management' },
       { name: 'System', description: 'System health and diagnostics' },
+      { name: 'Health', description: 'Health check and liveness/readiness probes' },
+      { name: 'Metrics', description: 'Prometheus and JSON metrics' },
       { name: 'Setup', description: 'Initial hub setup' },
       { name: 'WebRTC', description: 'VoIP token generation' },
     ],
