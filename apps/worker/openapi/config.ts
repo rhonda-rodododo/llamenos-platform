@@ -1,0 +1,48 @@
+export const openAPIConfig = {
+  documentation: {
+    info: {
+      title: 'Llamenos API',
+      version: '1.0.0',
+      description: 'Crisis response hotline backend API. Callers dial a phone number; calls are routed to on-shift volunteers. Volunteers log encrypted notes. Admins manage shifts, volunteers, and ban lists.',
+    },
+    servers: [
+      { url: '/api', description: 'API base path' },
+    ],
+    tags: [
+      { name: 'Auth', description: 'Authentication and session management' },
+      { name: 'Config', description: 'Public configuration' },
+      { name: 'Volunteers', description: 'Volunteer management (admin)' },
+      { name: 'Shifts', description: 'Shift scheduling' },
+      { name: 'Bans', description: 'Ban list management' },
+      { name: 'Notes', description: 'Encrypted call/conversation notes' },
+      { name: 'Calls', description: 'Call history and routing' },
+      { name: 'Conversations', description: 'Messaging conversations' },
+      { name: 'Blasts', description: 'Bulk message broadcasts' },
+      { name: 'Contacts', description: 'Contact management' },
+      { name: 'Reports', description: 'Reporting and analytics' },
+      { name: 'Settings', description: 'Hub and system settings' },
+      { name: 'Audit', description: 'Audit log (admin)' },
+      { name: 'Uploads', description: 'Encrypted file uploads' },
+      { name: 'Files', description: 'File retrieval and management' },
+      { name: 'Devices', description: 'Multi-device management' },
+      { name: 'Invites', description: 'Invite code management' },
+      { name: 'Provisioning', description: 'Device provisioning rooms' },
+      { name: 'Telephony', description: 'Telephony provider webhooks' },
+      { name: 'Messaging', description: 'Messaging provider webhooks' },
+      { name: 'WebAuthn', description: 'WebAuthn credential management' },
+      { name: 'Hubs', description: 'Multi-hub management' },
+      { name: 'System', description: 'System health and diagnostics' },
+      { name: 'Setup', description: 'Initial hub setup' },
+      { name: 'WebRTC', description: 'VoIP token generation' },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          description: 'Nostr session token (JSON with pubkey, timestamp, token signed via BIP-340 Schnorr)',
+        },
+      },
+    },
+  },
+}
