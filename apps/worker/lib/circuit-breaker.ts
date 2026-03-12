@@ -140,7 +140,7 @@ export class CircuitBreaker {
     this.state = to
     this.lastStateChangeTime = Date.now()
     this.onStateChange(this.name, from, to)
-    console.log(`[circuit-breaker] ${this.name}: ${from} -> ${to}`)
+    console.debug(`[circuit-breaker] ${this.name}: ${from} -> ${to}`)
   }
 
   /** Get the current circuit state */

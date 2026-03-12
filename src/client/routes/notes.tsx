@@ -296,7 +296,7 @@ function NotesPage() {
         </div>
         <div className="flex gap-2">
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={handleExport}>
+            <Button data-testid="note-export-btn" variant="outline" size="sm" onClick={handleExport}>
               <Download className="h-4 w-4" />
               {t('notes.export')}
             </Button>
@@ -326,11 +326,12 @@ function NotesPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button type="submit" size="sm" aria-label={t('a11y.searchButton')}>
+              <Button data-testid="note-search-btn" type="submit" size="sm" aria-label={t('a11y.searchButton')}>
                 <Search className="h-4 w-4" />
               </Button>
               {(search || callId) && (
                 <Button
+                  data-testid="note-clear-filters"
                   type="button" variant="ghost" size="sm"
                   onClick={() => { setSearchInput(''); navigate({ search: { page: 1, callId: '', search: '' } }) }}
                   aria-label={t('a11y.clearFilters')}
@@ -535,12 +536,12 @@ function NotesPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+          <Button data-testid="pagination-prev" variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
             <ChevronLeft className="h-4 w-4" />
             {t('common.back')}
           </Button>
-          <span className="text-sm text-muted-foreground">{page} / {totalPages}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
+          <span data-testid="pagination-info" className="text-sm text-muted-foreground">{page} / {totalPages}</span>
+          <Button data-testid="pagination-next" variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
             {t('common.next')}
             <ChevronRight className="h-4 w-4" />
           </Button>

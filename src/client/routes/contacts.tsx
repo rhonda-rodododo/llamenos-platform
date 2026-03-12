@@ -93,7 +93,7 @@ function ContactsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedHash(null)}>
+          <Button data-testid="contact-back-btn" variant="ghost" size="sm" onClick={() => setSelectedHash(null)}>
             <ArrowLeft className="h-4 w-4" />
             {t('common.back')}
           </Button>
@@ -284,12 +284,12 @@ function ContactsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => navigate({ search: { page: page - 1 } })}>
+          <Button data-testid="pagination-prev" variant="outline" size="sm" disabled={page === 1} onClick={() => navigate({ search: { page: page - 1 } })}>
             <ChevronLeft className="h-4 w-4" />
             {t('common.back')}
           </Button>
-          <span className="text-sm text-muted-foreground">{page} / {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => navigate({ search: { page: page + 1 } })}>
+          <span data-testid="pagination-info" className="text-sm text-muted-foreground">{page} / {totalPages}</span>
+          <Button data-testid="pagination-next" variant="outline" size="sm" disabled={page === totalPages} onClick={() => navigate({ search: { page: page + 1 } })}>
             {t('common.next')}
             <ChevronRight className="h-4 w-4" />
           </Button>
