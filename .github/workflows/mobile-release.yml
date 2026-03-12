@@ -35,13 +35,13 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Java 17
-        uses: actions/setup-java@c5195efecefb84a719a2088d2e2cbb5e11e18908 # v4.7.1
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
           java-version: 17
 
       - name: Setup Gradle cache
-        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d69a9da8bc5f6e75c # v4.4.1
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972fe187c82e2fd2858a # v4.4.1
 
       - name: Install Rust stable (for crypto build)
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
@@ -127,7 +127,9 @@ jobs:
           retention-days: 30
 
       - name: Upload to Play Store (internal track)
-        if: secrets.PLAY_SERVICE_ACCOUNT != ''
+        if: env.PLAY_SERVICE_ACCOUNT != ''
+        env:
+          PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
         uses: r0adkll/upload-google-play@935ef9c68bb393a8e6116b1575626a7f5be3a7fb # v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
@@ -294,7 +296,7 @@ jobs:
         run: |
           # Decode API key
           mkdir -p ~/.appstoreconnect/private_keys
-          echo "$APPLE_API_KEY" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+          echo "$APPLE_API_KEY" | base64 --decode > ~/.appstoreconnect/private_keys/"AuthKey_${APPLE_API_KEY_ID}.p8"
 
           # Upload via altool
           IPA=$(find apps/ios/build/export -name "*.ipa" | head -1)
