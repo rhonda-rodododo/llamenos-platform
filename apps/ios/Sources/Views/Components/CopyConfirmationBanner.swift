@@ -3,7 +3,7 @@ import SwiftUI
 struct CopyConfirmationBanner: View {
     let message: String
 
-    init(_ message: String = "Copied to clipboard") {
+    init(_ message: String = NSLocalizedString("copied_to_clipboard", comment: "Copied to clipboard")) {
         self.message = message
     }
 
