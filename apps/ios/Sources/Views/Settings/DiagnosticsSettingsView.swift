@@ -18,16 +18,16 @@ struct DiagnosticsSettingsView: View {
                     set: { appState.crashReportingService.isEnabled = $0 }
                 )) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(NSLocalizedString("crashReporting_consent", comment: "Send anonymous crash reports"))
+                        Text(NSLocalizedString("crash_reporting_consent", comment: "Send anonymous crash reports"))
                             .font(.brand(.body))
-                        Text(NSLocalizedString("crashReporting_consentDescription", comment: ""))
+                        Text(NSLocalizedString("crash_reporting_consent_description", comment: ""))
                             .font(.brand(.caption))
                             .foregroundStyle(Color.brandMutedForeground)
                     }
                 }
                 .accessibilityIdentifier("crash-reporting-toggle")
             } header: {
-                Text(NSLocalizedString("crashReporting_title", comment: "Crash Reporting"))
+                Text(NSLocalizedString("crash_reporting_title", comment: "Crash Reporting"))
             }
 
             // Pending reports section
@@ -35,7 +35,7 @@ struct DiagnosticsSettingsView: View {
             if pendingCount > 0 {
                 Section {
                     Text(
-                        NSLocalizedString("crashReporting_pendingReportsDescription", comment: "")
+                        NSLocalizedString("crash_reporting_pending_reports_description", comment: "")
                             .replacingOccurrences(of: "%@", with: "\(pendingCount)")
                     )
                     .font(.brand(.callout))
@@ -52,7 +52,7 @@ struct DiagnosticsSettingsView: View {
                                 } else {
                                     Image(systemName: "arrow.up.circle")
                                 }
-                                Text(NSLocalizedString("crashReporting_sendNow", comment: "Send Reports"))
+                                Text(NSLocalizedString("crash_reporting_send_now", comment: "Send Reports"))
                             }
                         }
                         .disabled(isSending)
@@ -65,29 +65,29 @@ struct DiagnosticsSettingsView: View {
                     } label: {
                         HStack {
                             Image(systemName: "trash")
-                            Text(NSLocalizedString("crashReporting_clearReports", comment: "Discard Reports"))
+                            Text(NSLocalizedString("crash_reporting_clear_reports", comment: "Discard Reports"))
                         }
                     }
                     .accessibilityIdentifier("clear-crash-reports")
                 } header: {
-                    Text(NSLocalizedString("crashReporting_pendingReports", comment: "Pending crash reports"))
+                    Text(NSLocalizedString("crash_reporting_pending_reports", comment: "Pending crash reports"))
                 }
             }
 
             // Privacy note
             Section {
-                Text(NSLocalizedString("crashReporting_privacyNote", comment: ""))
+                Text(NSLocalizedString("crash_reporting_privacy_note", comment: ""))
                     .font(.brand(.caption))
                     .foregroundStyle(Color.brandMutedForeground)
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(NSLocalizedString("crashReporting_settingsTitle", comment: "Diagnostics"))
+        .navigationTitle(NSLocalizedString("crash_reporting_settings_title", comment: "Diagnostics"))
         .navigationBarTitleDisplayMode(.large)
-        .alert(NSLocalizedString("crashReporting_reportsSent", comment: ""), isPresented: $showSentConfirmation) {
+        .alert(NSLocalizedString("crash_reporting_reports_sent", comment: ""), isPresented: $showSentConfirmation) {
             Button(NSLocalizedString("ok", comment: "OK")) {}
         }
-        .alert(NSLocalizedString("crashReporting_reportsCleared", comment: ""), isPresented: $showClearedConfirmation) {
+        .alert(NSLocalizedString("crash_reporting_reports_cleared", comment: ""), isPresented: $showClearedConfirmation) {
             Button(NSLocalizedString("ok", comment: "OK")) {}
         }
     }

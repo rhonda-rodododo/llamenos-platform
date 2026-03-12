@@ -989,11 +989,11 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = stringResource(R.string.crashReporting_consent),
+                            text = stringResource(R.string.crash_reporting_consent),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            text = stringResource(R.string.crashReporting_consentDescription),
+                            text = stringResource(R.string.crash_reporting_consent_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1008,7 +1008,7 @@ fun SettingsScreen(
                 if (pendingCrashReports > 0) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = stringResource(R.string.crashReporting_pendingReportsDescription)
+                        text = stringResource(R.string.crash_reporting_pending_reports_description)
                             .replace("%@", pendingCrashReports.toString()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1023,14 +1023,14 @@ fun SettingsScreen(
                                 onClick = onSendCrashReports,
                                 modifier = Modifier.testTag("send-crash-reports"),
                             ) {
-                                Text(stringResource(R.string.crashReporting_sendNow))
+                                Text(stringResource(R.string.crash_reporting_send_now))
                             }
                         }
                         OutlinedButton(
                             onClick = onClearCrashReports,
                             modifier = Modifier.testTag("clear-crash-reports"),
                         ) {
-                            Text(stringResource(R.string.crashReporting_clearReports))
+                            Text(stringResource(R.string.crash_reporting_clear_reports))
                         }
                     }
                 }
@@ -1038,7 +1038,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    text = stringResource(R.string.crashReporting_privacyNote),
+                    text = stringResource(R.string.crash_reporting_privacy_note),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )

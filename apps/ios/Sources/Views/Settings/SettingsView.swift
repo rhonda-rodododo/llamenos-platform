@@ -241,7 +241,7 @@ struct SettingsView: View {
 
             NavigationLink(value: "diagnostics") {
                 Label {
-                    Text(NSLocalizedString("crashReporting_settingsTitle", comment: "Diagnostics"))
+                    Text(NSLocalizedString("crash_reporting_settings_title", comment: "Diagnostics"))
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "ant.fill")

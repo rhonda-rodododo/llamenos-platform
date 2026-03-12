@@ -47,7 +47,7 @@ struct ReportCategoriesView: View {
                 viewModel.newCategoryName = ""
             }
 
-            Button(NSLocalizedString("admin_category_add", comment: "Add")) {
+            Button(NSLocalizedString("admin_add_category", comment: "Add")) {
                 Task { await viewModel.createReportCategory(name: viewModel.newCategoryName) }
             }
             .disabled(viewModel.newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
