@@ -1,0 +1,236 @@
+/**
+ * Step definitions for Nostr relay event delivery BDD scenarios.
+ *
+ * Uses RelayCapture to subscribe to the local strfry instance and assert
+ * that server-published events arrive within the expected timeframe.
+ */
+import { expect } from '@playwright/test'
+import { Given, When, Then, After } from './fixtures'
+import { state } from './common.steps'
+import { RelayCapture, type CapturedEvent } from '../../helpers/relay-capture'
+import {
+  simulateIncomingCall,
+  simulateAnswerCall,
+  simulateEndCall,
+  simulateVoicemail,
+  simulateIncomingMessage,
+  uniqueCallerNumber,
+} from '../../simulation-helpers'
+import { verifyEvent } from 'nostr-tools/pure'
+import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { hexToBytes } from '@noble/hashes/utils.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { LABEL_HUB_EVENT } from '@shared/crypto-labels'
+
+const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:7777'
+const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
+
+let lastCapturedEvent: CapturedEvent | undefined
+let serverPubkey: string | undefined
+
+// --- Relay Setup ---
+
+Given('the test relay is connected and capturing events', async () => {
+  if (state.relayCapture) {
+    state.relayCapture.close()
+  }
+  state.relayCapture = await RelayCapture.connect(RELAY_URL)
+})
+
+After(async () => {
+  if (state.relayCapture) {
+    state.relayCapture.close()
+    state.relayCapture = undefined
+  }
+  lastCapturedEvent = undefined
+})
+
+// --- Call Triggers ---
+
+When('an incoming call arrives from a unique number', async ({ request }) => {
+  const caller = uniqueCallerNumber()
+  const result = await simulateIncomingCall(request, { callerNumber: caller })
+  state.callId = result.callId
+})
+
+Given('an incoming call is ringing', async ({ request }) => {
+  const caller = uniqueCallerNumber()
+  const result = await simulateIncomingCall(request, { callerNumber: caller })
+  state.callId = result.callId
+})
+
+When('the first volunteer answers the call', async ({ request }) => {
+  expect(state.callId).toBeTruthy()
+  expect(state.volunteers.length).toBeGreaterThan(0)
+  await simulateAnswerCall(request, state.callId!, state.volunteers[0].pubkey)
+})
+
+Given('the first volunteer answers the call', async ({ request }) => {
+  expect(state.callId).toBeTruthy()
+  expect(state.volunteers.length).toBeGreaterThan(0)
+  await simulateAnswerCall(request, state.callId!, state.volunteers[0].pubkey)
+})
+
+When('the active call is ended', async ({ request }) => {
+  expect(state.callId).toBeTruthy()
+  await simulateEndCall(request, state.callId!)
+})
+
+When('the call goes to voicemail', async ({ request }) => {
+  expect(state.callId).toBeTruthy()
+  await simulateVoicemail(request, state.callId!)
+})
+
+// --- Messaging Triggers ---
+
+When('an inbound SMS message arrives from a unique number', async ({ request }) => {
+  const sender = uniqueCallerNumber()
+  const result = await simulateIncomingMessage(request, {
+    senderNumber: sender,
+    body: 'BDD test message',
+    channel: 'sms',
+  })
+  state.conversationId = result.conversationId
+  state.messageId = result.messageId
+})
+
+// --- Relay Capture Utilities ---
+
+Given('the relay captured events are cleared', async () => {
+  expect(state.relayCapture).toBeTruthy()
+  state.relayCapture!.clear()
+})
+
+// --- Event Assertions ---
+
+Then(
+  'the relay should receive a kind {int} event within {int} seconds',
+  async ({}, kind: number, seconds: number) => {
+    expect(state.relayCapture).toBeTruthy()
+    const events = await state.relayCapture!.waitForEvents({
+      kind,
+      count: 1,
+      timeoutMs: seconds * 1000,
+    })
+    expect(events.length).toBeGreaterThanOrEqual(1)
+    lastCapturedEvent = events[0]
+  },
+)
+
+Then('the decrypted event content type should be {string}', async ({}, expectedType: string) => {
+  expect(lastCapturedEvent).toBeTruthy()
+  const content = decryptEventContent(lastCapturedEvent!)
+  expect(content).toBeTruthy()
+  expect(content!.type).toBe(expectedType)
+})
+
+Then('the event should contain a {string} field', async ({}, fieldName: string) => {
+  expect(lastCapturedEvent).toBeTruthy()
+  const content = decryptEventContent(lastCapturedEvent!)
+  expect(content).toBeTruthy()
+  expect(content![fieldName]).toBeDefined()
+})
+
+Then(
+  'the event content {string} should be {string}',
+  async ({}, fieldName: string, expectedValue: string) => {
+    expect(lastCapturedEvent).toBeTruthy()
+    const content = decryptEventContent(lastCapturedEvent!)
+    expect(content).toBeTruthy()
+    expect(content![fieldName]).toBe(expectedValue)
+  },
+)
+
+Then('the raw event content should NOT be valid JSON', async () => {
+  expect(lastCapturedEvent).toBeTruthy()
+  let isJson = false
+  try {
+    JSON.parse(lastCapturedEvent!.content)
+    isJson = true
+  } catch {
+    isJson = false
+  }
+  expect(isJson).toBe(false)
+})
+
+Then('the decrypted event content should be valid JSON', async () => {
+  expect(lastCapturedEvent).toBeTruthy()
+  const content = decryptEventContent(lastCapturedEvent!)
+  expect(content).toBeTruthy()
+})
+
+Then(
+  'the event should have tag {string} with value {string}',
+  async ({}, tagName: string, tagValue: string) => {
+    expect(lastCapturedEvent).toBeTruthy()
+    const tag = lastCapturedEvent!.tags.find((t) => t[0] === tagName && t[1] === tagValue)
+    expect(tag).toBeTruthy()
+  },
+)
+
+Then('the event signature should be valid', async () => {
+  expect(lastCapturedEvent).toBeTruthy()
+  // verifyEvent checks id, sig, and pubkey
+  const valid = verifyEvent(lastCapturedEvent as Parameters<typeof verifyEvent>[0])
+  expect(valid).toBe(true)
+})
+
+Then("the event pubkey should match the server's configured pubkey", async ({ request }) => {
+  expect(lastCapturedEvent).toBeTruthy()
+  if (!serverPubkey) {
+    const res = await request.get(`${BASE_URL}/api/config`)
+    const config = (await res.json()) as { serverPubkey?: string }
+    serverPubkey = config.serverPubkey
+  }
+  if (serverPubkey) {
+    expect(lastCapturedEvent!.pubkey).toBe(serverPubkey)
+  }
+})
+
+// --- Helpers ---
+
+/**
+ * Decrypt event content using the server event key derived from SERVER_NOSTR_SECRET.
+ *
+ * Format: hex(nonce_24 || ciphertext)
+ * Algorithm: XChaCha20-Poly1305
+ * Key derivation: HKDF(SHA-256, secret, salt=empty, info="llamenos:hub-event", 32)
+ *
+ * Falls back to direct JSON parse for unencrypted content (shouldn't happen in prod).
+ */
+function decryptEventContent(event: CapturedEvent): Record<string, unknown> | null {
+  // Try direct JSON parse first (unencrypted fallback)
+  try {
+    return JSON.parse(event.content) as Record<string, unknown>
+  } catch {
+    // Content is encrypted — decrypt with server event key
+  }
+
+  const secret = process.env.SERVER_NOSTR_SECRET || process.env.DEV_SERVER_SECRET
+  if (!secret) {
+    console.warn('[relay.steps] No SERVER_NOSTR_SECRET — cannot decrypt event content')
+    return null
+  }
+
+  try {
+    const eventKey = hkdf(
+      sha256,
+      hexToBytes(secret),
+      new Uint8Array(0),
+      utf8ToBytes(LABEL_HUB_EVENT),
+      32,
+    )
+    const packed = hexToBytes(event.content)
+    const nonce = packed.slice(0, 24)
+    const ciphertext = packed.slice(24)
+    const cipher = xchacha20poly1305(eventKey, nonce)
+    const plaintext = cipher.decrypt(ciphertext)
+    const text = new TextDecoder().decode(plaintext)
+    return JSON.parse(text) as Record<string, unknown>
+  } catch (err) {
+    console.warn('[relay.steps] Failed to decrypt event content:', err)
+    return null
+  }
+}

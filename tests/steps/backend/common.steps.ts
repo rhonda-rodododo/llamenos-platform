@@ -9,6 +9,7 @@ import {
   createBanViaApi,
   type CreateVolunteerResult,
 } from '../../api-helpers'
+import type { RelayCapture } from '../../helpers/relay-capture'
 import {
   simulateIncomingCall,
   simulateAnswerCall,
@@ -29,6 +30,7 @@ export interface ScenarioState {
   messageId?: string
   lastApiResponse?: { status: number; data: unknown }
   banPhones: string[]
+  relayCapture?: RelayCapture
 }
 
 export let state: ScenarioState
