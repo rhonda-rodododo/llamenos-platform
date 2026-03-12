@@ -56,6 +56,7 @@ services:
       - "7777:7777"
     volumes:
       - strfrydata:/app/strfry-db
+      - ./strfry-dev.conf:/etc/strfry.conf:ro
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:7777"]
       interval: 15s

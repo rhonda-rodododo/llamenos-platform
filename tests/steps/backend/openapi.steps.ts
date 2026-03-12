@@ -20,8 +20,8 @@ When('I fetch the OpenAPI spec', async ({ request }) => {
 When('I fetch the Scalar docs page', async ({ request }) => {
   const res = await request.get(`${BASE_URL}/api/docs`)
   const headers: Record<string, string> = {}
-  for (const [key, value] of res.headersArray()) {
-    headers[key.toLowerCase()] = value
+  for (const { name, value } of res.headersArray()) {
+    headers[name.toLowerCase()] = value
   }
   docsResponse = { status: res.status(), contentType: headers['content-type'] || '' }
 })

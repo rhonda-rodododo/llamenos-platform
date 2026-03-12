@@ -13,16 +13,21 @@ export interface CapturedEvent {
 /**
  * Subscribes to the Nostr relay and captures events for BDD test assertions.
  *
+ * Uses a `since` filter set to 2 seconds before subscription time to avoid
+ * receiving hundreds of historical events from prior test runs.
+ * Events received before EOSE (end of stored events) are discarded so only
+ * truly new events are captured.
+ *
  * Usage:
  *   const capture = await RelayCapture.connect('ws://localhost:7777')
  *   // ... trigger action that publishes an event ...
  *   const events = await capture.waitForEvents({ kind: 1000, count: 1, timeoutMs: 5000 })
- *   expect(events[0].content).toContain('call:ring')
  *   capture.close()
  */
 export class RelayCapture {
   private ws: WebSocket
   private events: CapturedEvent[] = []
+  private eoseReceived = false
   private waiters: Array<{
     filter: { kind?: number; count: number }
     resolve: (events: CapturedEvent[]) => void
@@ -58,12 +63,16 @@ export class RelayCapture {
   }
 
   private subscribe(): void {
+    // Use `since` to filter out historical events from prior test runs.
+    // Subtract 2 seconds for clock skew tolerance.
+    const since = Math.floor(Date.now() / 1000) - 2
     const req = JSON.stringify([
       'REQ',
       this.subscriptionId,
       {
         kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
         '#t': ['llamenos:event'],
+        since,
       },
     ])
     this.ws.send(req)
@@ -75,7 +84,16 @@ export class RelayCapture {
         const data = JSON.parse(raw.toString())
         if (!Array.isArray(data)) return
 
+        if (data[0] === 'EOSE' && data[1] === this.subscriptionId) {
+          // All stored events have been delivered; start capturing new ones
+          this.eoseReceived = true
+          return
+        }
+
         if (data[0] === 'EVENT' && data[1] === this.subscriptionId) {
+          // Discard historical events delivered before EOSE
+          if (!this.eoseReceived) return
+
           const event = data[2] as CapturedEvent
           this.events.push(event)
           this.checkWaiters()

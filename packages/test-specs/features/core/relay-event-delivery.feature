@@ -6,8 +6,8 @@ Feature: Real-Time Relay Event Delivery
 
   Background:
     Given the server is reset
-    And the test relay is connected and capturing events
     And 1 volunteers are on shift
+    And the test relay is connected and capturing events
 
   # --- Call Events ---
 

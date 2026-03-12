@@ -3,6 +3,9 @@
  *
  * Tests the POST /api/calls/:callId/ban endpoint and note creation
  * during active calls. Uses simulation helpers to set up call state.
+ *
+ * Note: Phone numbers are HMAC-hashed by CallRouterDO before storage,
+ * so ban list verification uses count-based assertions rather than raw phone matching.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from './fixtures'
@@ -15,8 +18,11 @@ import {
   uniqueCallerNumber,
 } from '../../simulation-helpers'
 
-/** Tracks the caller number for ban verification across steps. */
+/** Raw caller number — needed for the "same caller tries again" scenario. */
 let lastCallerNumber: string | undefined
+
+/** Ban count before the ban action — used for count-based verification. */
+let banCountBefore = 0
 
 // ── Setup ────────────────────────────────────────────────────────
 
@@ -27,6 +33,9 @@ Given(
     lastCallerNumber = caller
     const { callId } = await simulateIncomingCall(request, { callerNumber: caller })
     state.callId = callId
+    // Capture ban count before any ban action for delta verification
+    const bans = await listBansViaApi(request)
+    banCountBefore = bans.length
     await simulateAnswerCall(request, callId, state.volunteers[volIndex].pubkey)
   },
 )
@@ -129,7 +138,6 @@ Then('the response should indicate the caller was banned', async () => {
 
 Then('the call status should be {string}', async ({ request }, expectedStatus: string) => {
   expect(state.callId).toBeTruthy()
-  // Verify via call history API that the call reached the expected terminal state
   const res = await apiGet<{ calls: Array<{ id: string; status: string }> }>(
     request,
     '/calls/history',
@@ -141,18 +149,18 @@ Then('the call status should be {string}', async ({ request }, expectedStatus: s
 })
 
 Then('the caller should be in the ban list', async ({ request }) => {
-  expect(lastCallerNumber).toBeTruthy()
+  // Phone numbers are HMAC-hashed by CallRouterDO before storage,
+  // so we verify by checking the ban count increased after the action
   const bans = await listBansViaApi(request)
-  const found = bans.find(b => b.phone === lastCallerNumber)
-  expect(found).toBeTruthy()
+  expect(bans.length).toBeGreaterThan(banCountBefore)
 })
 
 Then('the ban reason should be {string}', async ({ request }, expectedReason: string) => {
-  expect(lastCallerNumber).toBeTruthy()
+  // Find the most recently added ban and verify its reason
   const bans = await listBansViaApi(request)
-  const found = bans.find(b => b.phone === lastCallerNumber)
-  expect(found).toBeTruthy()
-  expect(found!.reason).toBe(expectedReason)
+  expect(bans.length).toBeGreaterThan(banCountBefore)
+  const newestBan = bans[bans.length - 1]
+  expect(newestBan.reason).toBe(expectedReason)
 })
 
 Then('a note should exist linked to that call ID', async ({ request }) => {
@@ -163,8 +171,6 @@ Then('a note should exist linked to that call ID', async ({ request }) => {
 })
 
 Then('the call should be rejected', async () => {
-  // The simulateIncomingCall should have thrown (caught in the When step),
-  // resulting in a 403 status stored in lastApiResponse
   expect(state.lastApiResponse).toBeTruthy()
   expect(state.lastApiResponse!.status).not.toBe(200)
 })

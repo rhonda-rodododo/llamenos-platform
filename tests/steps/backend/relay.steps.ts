@@ -26,6 +26,8 @@ import { LABEL_HUB_EVENT } from '@shared/crypto-labels'
 
 const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:7777'
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
+// Default dev secret from scripts/dev-node.sh — used for event decryption in tests
+const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000001'
 
 let lastCapturedEvent: CapturedEvent | undefined
 let serverPubkey: string | undefined
@@ -91,6 +93,8 @@ When('an inbound SMS message arrives from a unique number', async ({ request }) 
 
 Given('the relay captured events are cleared', async () => {
   expect(state.relayCapture).toBeTruthy()
+  // Wait for in-flight events to settle (publishing is fire-and-forget async)
+  await new Promise(resolve => setTimeout(resolve, 1000))
   state.relayCapture!.clear()
 })
 
@@ -199,7 +203,7 @@ function decryptEventContent(event: CapturedEvent): Record<string, unknown> | nu
     // Content is encrypted — decrypt with server event key
   }
 
-  const secret = process.env.SERVER_NOSTR_SECRET || process.env.DEV_SERVER_SECRET
+  const secret = process.env.SERVER_NOSTR_SECRET || process.env.DEV_SERVER_SECRET || DEV_SERVER_SECRET
   if (!secret) {
     console.warn('[relay.steps] No SERVER_NOSTR_SECRET — cannot decrypt event content')
     return null

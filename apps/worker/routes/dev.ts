@@ -3,6 +3,8 @@ import type { AppEnv } from '../types'
 import type { MessagingChannelType } from '@shared/types'
 import { getDOs } from '../lib/do-access'
 import { hashPhone } from '../lib/crypto'
+import { publishNostrEvent } from '../lib/nostr-events'
+import { KIND_MESSAGE_NEW } from '@shared/nostr-events'
 
 const dev = new Hono<AppEnv>()
 
@@ -147,6 +149,16 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   const callId = crypto.randomUUID()
   const dos = getDOs(c.env)
 
+  // Check if the caller is banned (mirrors real telephony flow)
+  const hashedPhone = hashPhone(body.callerNumber, c.env.HMAC_SECRET)
+  const banCheckRes = await dos.records.fetch(new Request(`http://do/bans/check/${encodeURIComponent(hashedPhone)}`))
+  if (banCheckRes.ok) {
+    const { banned } = await banCheckRes.json() as { banned: boolean }
+    if (banned) {
+      return c.json({ error: 'Caller is banned', banned: true }, 403)
+    }
+  }
+
   // Get on-shift volunteer pubkeys for the call record
   let volunteerPubkeys: string[] = []
   try {
@@ -281,6 +293,15 @@ dev.post('/test-simulate/incoming-message', async (c) => {
   }
 
   const result = await res.json() as { conversationId: string; messageId: string }
+
+  // Publish Nostr event (mirrors real messaging webhook flow)
+  publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+    type: 'message:new',
+    conversationId: result.conversationId,
+    messageId: result.messageId,
+    channelType: channel,
+  }).catch(() => {})
+
   return c.json({ ok: true, conversationId: result.conversationId, messageId: result.messageId })
 })
 

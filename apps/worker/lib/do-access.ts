@@ -1,7 +1,7 @@
 import type { Env, DOStub } from '../types'
 import type { TelephonyAdapter } from '../telephony/adapter'
 import type { MessagingAdapter } from '../messaging/adapter'
-import { type NostrPublisher, createNostrPublisher } from './nostr-publisher'
+import { type NostrPublisher, createNostrPublisher, NodeNostrPublisher } from './nostr-publisher'
 import type { TelephonyProviderConfig, MessagingChannelType, MessagingConfig } from '@shared/types'
 import { TwilioAdapter } from '../telephony/twilio'
 import { SignalWireAdapter } from '../telephony/signalwire'
@@ -175,6 +175,10 @@ let cachedPublisher: NostrPublisher | null = null
 export function getNostrPublisher(env: Env): NostrPublisher {
   if (!cachedPublisher) {
     cachedPublisher = createNostrPublisher(env)
+    // Eagerly connect Node.js publisher so events don't queue behind a 2s auth timeout
+    if (cachedPublisher instanceof NodeNostrPublisher) {
+      cachedPublisher.connect().catch(() => {})
+    }
   }
   return cachedPublisher
 }

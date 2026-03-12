@@ -39,16 +39,18 @@ export const reportTypeResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const customFieldsBodySchema = z.array(z.looseObject({
-  name: z.string().min(1).max(200),
-  label: z.string().min(1).max(200),
-  type: z.enum(['text', 'number', 'select', 'checkbox', 'textarea', 'file']),
-  required: z.boolean().optional(),
-  options: z.array(z.string().max(200)).optional(),
-  order: z.number().int().optional(),
-  context: z.string().optional(),
-  visibleToVolunteers: z.boolean().optional(),
-}))
+export const customFieldsBodySchema = z.looseObject({
+  fields: z.array(z.looseObject({
+    name: z.string().min(1).max(200),
+    label: z.string().min(1).max(200),
+    type: z.enum(['text', 'number', 'select', 'checkbox', 'textarea', 'file']),
+    required: z.boolean().optional(),
+    options: z.array(z.string().max(200)).optional(),
+    order: z.number().int().optional(),
+    context: z.string().optional(),
+    visibleToVolunteers: z.boolean().optional(),
+  })),
+})
 
 export const createReportTypeBodySchema = z.looseObject({
   name: z.string().min(1).max(200),
