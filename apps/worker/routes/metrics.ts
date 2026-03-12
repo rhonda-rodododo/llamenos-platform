@@ -10,11 +10,13 @@
  * since CF provides its own analytics.
  */
 import { Hono } from 'hono'
+import { describeRoute } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getErrorSummary } from '../lib/error-counter'
 import { auth } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission-guard'
 import { getAllCircuitBreakerMetrics } from '../lib/circuit-breaker'
+import { authErrors } from '../openapi/helpers'
 
 const metrics = new Hono<AppEnv>()
 
@@ -114,14 +116,31 @@ function formatPrometheusMetrics(): string {
 }
 
 // Prometheus text format — no auth (for scrapers behind network policy)
-metrics.get('/prometheus', (c) => {
+metrics.get('/prometheus',
+  describeRoute({
+    tags: ['Metrics'],
+    summary: 'Prometheus text exposition metrics',
+    responses: {
+      200: { description: 'Prometheus text format metrics' },
+    },
+  }),
+  (c) => {
   return new Response(formatPrometheusMetrics(), {
     headers: { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' },
   })
 })
 
 // JSON summary — admin-only
-metrics.get('/', auth, requirePermission('audit:read'), (c) => {
+metrics.get('/',
+  describeRoute({
+    tags: ['Metrics'],
+    summary: 'JSON metrics summary for admin dashboards',
+    responses: {
+      200: { description: 'JSON metrics including uptime, request counts, and errors' },
+      ...authErrors,
+    },
+  }),
+  auth, requirePermission('audit:read'), (c) => {
   const summary = getErrorSummary()
   const uptimeSeconds = (Date.now() - startTime) / 1000
 

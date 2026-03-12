@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { describeRoute } from 'hono-openapi'
 import type { AppEnv } from '../types'
 
 declare const __BUILD_VERSION__: string
@@ -51,7 +52,16 @@ async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
 }
 
 // Full health check — dependency status
-health.get('/', async (c) => {
+health.get('/',
+  describeRoute({
+    tags: ['Health'],
+    summary: 'Full health check with dependency status',
+    responses: {
+      200: { description: 'All dependencies healthy' },
+      503: { description: 'One or more dependencies degraded or failing' },
+    },
+  }),
+  async (c) => {
   const { status, checks, details } = await runChecks(c.env as unknown as Record<string, unknown>)
   const hasDetails = Object.keys(details).length > 0
 
@@ -65,10 +75,28 @@ health.get('/', async (c) => {
 })
 
 // Kubernetes liveness probe — process is alive, always returns 200
-health.get('/live', (c) => c.json({ status: 'ok' }))
+health.get('/live',
+  describeRoute({
+    tags: ['Health'],
+    summary: 'Kubernetes liveness probe',
+    responses: {
+      200: { description: 'Process is alive' },
+    },
+  }),
+  (c) => c.json({ status: 'ok' }),
+)
 
 // Kubernetes readiness probe — verifies all dependencies
-health.get('/ready', async (c) => {
+health.get('/ready',
+  describeRoute({
+    tags: ['Health'],
+    summary: 'Kubernetes readiness probe with dependency verification',
+    responses: {
+      200: { description: 'All dependencies ready' },
+      503: { description: 'One or more dependencies not ready' },
+    },
+  }),
+  async (c) => {
   const { status, checks, details } = await runChecks(c.env as unknown as Record<string, unknown>)
   const hasDetails = Object.keys(details).length > 0
 

@@ -293,7 +293,7 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 209: Feature Parity Phase 2](epics/epic-209-feature-parity-p2.md)** — Voice calls, conversations, admin, device linking
 - [x] **[Epic 210: Release Prep](epics/epic-210-release-prep.md)** — Store listings, signing, CI/CD, docs update
 
-## Production Readiness & Quality (Epics 211-214) — IN PROGRESS
+## Production Readiness & Quality (Epics 211-214) — COMPLETE
 
 ### Testing & CI
 - [x] **[Epic 211: Mobile CI Testing Pipeline](epics/epic-211-mobile-ci-testing.md)** — Android + iOS build/test jobs in ci.yml, ci-status gate update
@@ -388,22 +388,22 @@ Architecture audit (2026-03-03) identified that Node.js + PostgreSQL is the real
 
 **Dependency order:** 237 ✓ → 214-iOS ✓ → 227 ✓ → 234 ✓ | 235 ✓ | 236 ✓
 
-## Desktop BDD Behavioral Recovery (Epics 247-251) — IN PROGRESS
+## Desktop BDD Behavioral Recovery (Epics 247-251) — COMPLETE
 
 Recover the ~400 behavioral tests lost in the Epic 232 BDD migration. Original .spec.ts files had 5,833 lines of deep behavioral tests (API verification, CRUD cycles, permission enforcement, serial state chains). Current step definitions are ~80% presence-only checks. Recovery uses BDD approach: expand feature files + rewrite step definitions.
 
 ### Admin & Infrastructure
-- [ ] **[Epic 247: Admin CRUD Behavioral Recovery](epics/epic-247-desktop-bdd-admin-crud.md)** — Volunteer, ban, shift CRUD with API verification. API helpers foundation.
-- [ ] **[Epic 248: Notes & Custom Fields Behavioral Recovery](epics/epic-248-desktop-bdd-notes-custom-fields.md)** — Note create/edit/save/verify, custom field CRUD + badge display, call ID grouping.
+- [x] **[Epic 247: Admin CRUD Behavioral Recovery](epics/epic-247-desktop-bdd-admin-crud.md)** — Volunteer, ban, shift CRUD with API verification. API helpers foundation.
+- [x] **[Epic 248: Notes & Custom Fields Behavioral Recovery](epics/epic-248-desktop-bdd-notes-custom-fields.md)** — Note create/edit/save/verify, custom field CRUD + badge display, call ID grouping.
 
 ### RBAC & Permissions
-- [ ] **[Epic 249: RBAC & Permissions Behavioral Recovery](epics/epic-249-desktop-bdd-rbac-permissions.md)** — Role CRUD via API, cross-role permission enforcement (admin/volunteer/reporter/custom), multi-role union, wildcard permissions.
+- [x] **[Epic 249: RBAC & Permissions Behavioral Recovery](epics/epic-249-desktop-bdd-rbac-permissions.md)** — Role CRUD via API, cross-role permission enforcement (admin/volunteer/reporter/custom), multi-role union, wildcard permissions.
 
 ### Reports, Conversations & Audit
-- [ ] **[Epic 250: Reports, Conversations & Audit Behavioral Recovery](epics/epic-250-desktop-bdd-reports-conversations-audit.md)** — Report lifecycle (create→claim→close→filter), reporter role onboarding, audit log filtering/search, conversation assign/close/reopen.
+- [x] **[Epic 250: Reports, Conversations & Audit Behavioral Recovery](epics/epic-250-desktop-bdd-reports-conversations-audit.md)** — Report lifecycle (create→claim→close→filter), reporter role onboarding, audit log filtering/search, conversation assign/close/reopen.
 
 ### Settings & Auth Guards
-- [ ] **[Epic 251: Settings, Auth Guards & Desktop Flows](epics/epic-251-desktop-bdd-settings-auth-guards.md)** — Settings/theme/language persistence, auth guard enforcement, volunteer navigation restrictions, admin settings sections.
+- [x] **[Epic 251: Settings, Auth Guards & Desktop Flows](epics/epic-251-desktop-bdd-settings-auth-guards.md)** — Settings/theme/language persistence, auth guard enforcement, volunteer navigation restrictions, admin settings sections.
 
 **Dependency order:** 247 (API helpers) → (248 | 249 | 250 | 251) in parallel
 
@@ -454,7 +454,7 @@ Catch iOS up to Android feature set with native SwiftUI design. BDD-first: write
 - [x] **[Epic 260: iOS Security Hardening](epics/epic-260.md)** — Biometric unlock, SAS gate, URL validation, persistent PIN lockout (Keychain), cert pinning, screenshot protection
 - [x] **[Epic 261: Android Security Hardening](epics/epic-261.md)** — Hard-fail crypto, PIN brute-force, deep link validation, StrongBox, cert pinning, ProGuard narrowing
 
-## Tooling & Test Orchestration Overhaul (Epics 265-268) — IN PROGRESS
+## Tooling & Test Orchestration Overhaul (Epics 265-268) — COMPLETE
 
 i18n alignment, codegen validation, BDD test orchestration, and Android tooling upgrade. Mac M4 now fully self-contained for all platforms.
 

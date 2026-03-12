@@ -272,7 +272,7 @@ export class SettingsDO extends DurableObject<Env> {
   }
 
   private async updateSpamSettings(data: Partial<SpamSettings>): Promise<Response> {
-    const settings = await this.ctx.storage.get<SpamSettings>('spamSettings')!
+    const settings = await this.ctx.storage.get<SpamSettings>('spamSettings') || {} as SpamSettings
     const updated = { ...settings, ...data }
     await this.ctx.storage.put('spamSettings', updated)
     return Response.json(updated)

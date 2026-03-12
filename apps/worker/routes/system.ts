@@ -6,9 +6,11 @@
  * failures don't break the entire response.
  */
 import { Hono } from 'hono'
+import { describeRoute } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
+import { authErrors } from '../openapi/helpers'
 
 declare const __BUILD_VERSION__: string
 
@@ -148,7 +150,16 @@ async function fetchVolunteerInfo(dos: ReturnType<typeof getDOs>): Promise<Syste
   }
 }
 
-systemRoutes.get('/health', async (c) => {
+systemRoutes.get('/health',
+  describeRoute({
+    tags: ['System'],
+    summary: 'Aggregated system health dashboard for admins',
+    responses: {
+      200: { description: 'System health including server, services, calls, storage, and volunteers' },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
   const env = c.env as unknown as Record<string, unknown>
   const dos = getDOs(c.env)
 
