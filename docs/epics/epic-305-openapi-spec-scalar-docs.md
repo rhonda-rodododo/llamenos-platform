@@ -1,6 +1,6 @@
 # Epic 305: OpenAPI Spec Generation + Scalar API Documentation
 
-**Status**: PENDING
+**Status**: COMPLETED
 **Priority**: Medium
 **Depends on**: Epic 283 (Zod input validation — completed)
 **Blocks**: None

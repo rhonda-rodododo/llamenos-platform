@@ -90,10 +90,11 @@ packages/
   shared/             # Cross-boundary TypeScript types and config
     types.ts          # Shared types (CustomFieldDefinition, NotePayload, etc.)
     crypto-labels.ts  # Domain separation constants (re-exported from protocol)
-  protocol/           # JSON Schema definitions + multi-platform codegen
-    schemas/          # 8 JSON Schema files (envelope, notes, files, telephony, etc.)
-    tools/codegen.ts  # quicktype-core → TS/Swift/Kotlin type generation
-    generated/        # Auto-generated types (typescript/, swift/, kotlin/)
+  protocol/           # Cross-platform type codegen (Zod → quicktype)
+    tools/codegen.ts  # Zod → toJSONSchema() → quicktype → TS/Swift/Kotlin
+    tools/schema-registry.ts  # Maps Zod schemas to named JSON Schemas
+    openapi-snapshot.json     # OpenAPI spec snapshot (written by dev server on startup)
+    generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
     crypto-labels.json # 28 domain separation constants (source of truth)
   i18n/               # Localization package
     locales/          # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
@@ -131,7 +132,7 @@ docs/
 - **E2EE messaging**: Per-message envelope encryption — random symmetric key, ECIES-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
 - **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. The nsec NEVER enters the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.
 - **packages/crypto**: Shared Rust crypto crate (formerly separate `llamenos-core` repo). All crypto operations (ECIES, Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305) implemented once in Rust, compiled to native (Tauri), WASM (browser), and UniFFI (mobile). Desktop links via `apps/desktop/Cargo.toml` path dep to `../../packages/crypto`.
-- **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates TypeScript interfaces, Swift structs (Codable), and Kotlin data classes (kotlinx.serialization) from JSON Schema definitions. Also generates crypto label constants. Run `bun run codegen` after schema changes. CI validates with `bun run codegen:check`.
+- **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates TypeScript interfaces, Swift Codable structs, and Kotlin @Serializable data classes from Zod schemas (via `toJSONSchema()` + quicktype). Also generates crypto label constants from `crypto-labels.json`. Zod schemas in `apps/worker/schemas/` are the single source of truth. Run `bun run codegen` after schema changes. Generated output is gitignored — codegen runs as a build prerequisite.
 - **Key management**: PIN-encrypted keys stored in Tauri Store (desktop), iOS Keychain, or Android Keystore (EncryptedSharedPreferences). Rust CryptoState holds the nsec; UI only sees pubkey. Device linking via ephemeral ECDH provisioning rooms.
 - **Tauri IPC mock for tests**: Playwright tests run in a regular browser. `PLAYWRIGHT_TEST=true` triggers Vite aliases that route `@tauri-apps/api/core` and `@tauri-apps/plugin-store` to JS mock implementations in `tests/mocks/`. The mock maintains a CryptoState that mirrors the Rust side.
 - **Mobile crypto**: iOS uses UniFFI XCFramework from `packages/crypto/`, Android uses JNI `.so` files. Both wrap CryptoService as a singleton — `nsecHex` is private and never leaves the service layer.
@@ -216,8 +217,7 @@ bun run crypto:clippy                    # cargo clippy on packages/crypto
 bun run crypto:fmt                       # cargo fmt --check on packages/crypto
 
 # Codegen (runs on either machine)
-bun run codegen                          # Generate TS/Swift/Kotlin types from JSON Schemas
-bun run codegen:check                    # Verify generated files are up-to-date (CI)
+bun run codegen                          # Generate TS/Swift/Kotlin types from Zod schemas (via quicktype)
 bun run i18n:codegen                     # Generate iOS .strings + Android strings.xml + Kotlin I18n.kt
 bun run i18n:validate                    # Check locale completeness
 bun run i18n:validate:android            # Validate R.string.* refs match codegen output
