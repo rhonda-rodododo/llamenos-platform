@@ -1,29 +1,12 @@
 // --- ECIES Key Envelopes ---
-// Used across notes, messages, files, and hub key wrapping.
-
-/**
- * Unified ECIES-wrapped symmetric key for one recipient.
- * Used everywhere: notes, messages, call records, hub keys.
- * The same ECIES construction with different domain separation labels.
- */
-export interface RecipientEnvelope {
-  /** Recipient's x-only public key (hex). */
-  pubkey: string
-  /** Nonce (24 bytes) + ciphertext: ECIES-wrapped symmetric key (hex). */
-  wrappedKey: string
-  /** Ephemeral secp256k1 compressed public key used for ECDH (hex). */
-  ephemeralPubkey: string
-}
-
-/** @deprecated Use RecipientEnvelope instead. Kept for gradual migration. */
-export type KeyEnvelope = Omit<RecipientEnvelope, 'pubkey'>
-
-/** @deprecated Use RecipientEnvelope instead. */
-export type RecipientKeyEnvelope = RecipientEnvelope
+// Canonical types are inferred from Zod schemas in @worker/schemas/common.
+export type { RecipientEnvelope, KeyEnvelope, RecipientKeyEnvelope, FileKeyEnvelope } from '@worker/schemas/common'
+import type { FileKeyEnvelope } from '@worker/schemas/common'
 
 // --- Telephony Provider Config ---
-
-export type TelephonyProviderType = 'twilio' | 'signalwire' | 'vonage' | 'plivo' | 'asterisk'
+// TelephonyProviderType canonical definition is in @worker/schemas/settings
+export type { TelephonyProviderType } from '@worker/schemas/settings'
+import type { TelephonyProviderType } from '@worker/schemas/settings'
 
 export const TELEPHONY_PROVIDER_LABELS: Record<TelephonyProviderType, string> = {
   twilio: 'Twilio',
@@ -129,12 +112,7 @@ export interface EncryptedFileMetadata {
   checksum: string   // SHA-256 of plaintext for integrity verification
 }
 
-/** ECIES-wrapped file encryption key for one recipient. */
-export interface FileKeyEnvelope {
-  pubkey: string
-  encryptedFileKey: string
-  ephemeralPubkey: string
-}
+// FileKeyEnvelope is re-exported from @worker/schemas/common above
 
 export interface FileRecord {
   id: string
@@ -193,11 +171,9 @@ export const CUSTOM_FIELD_CONTEXT_LABELS: Record<CustomFieldContext, string> = {
 }
 
 // --- Messaging Channel Types ---
-
-export type MessagingChannelType = 'sms' | 'whatsapp' | 'signal' | 'rcs'
-
-/** All possible channel types including voice and reports */
-export type ChannelType = 'voice' | MessagingChannelType | 'reports'
+// Canonical definitions are in @worker/schemas/settings
+export type { MessagingChannelType, ChannelType } from '@worker/schemas/settings'
+import type { MessagingChannelType, ChannelType } from '@worker/schemas/settings'
 
 /** Transport security level for each channel */
 export type TransportSecurity = 'none' | 'provider-encrypted' | 'e2ee-to-bridge' | 'e2ee'

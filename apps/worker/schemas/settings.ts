@@ -1,5 +1,19 @@
 import { z } from 'zod'
 
+// --- Inferred types ---
+
+/** The five supported telephony provider types */
+export const telephonyProviderTypeSchema = z.enum(['twilio', 'signalwire', 'vonage', 'plivo', 'asterisk'])
+export type TelephonyProviderType = z.infer<typeof telephonyProviderTypeSchema>
+
+/** The four messaging channel types */
+export const messagingChannelTypeSchema = z.enum(['sms', 'whatsapp', 'signal', 'rcs'])
+export type MessagingChannelType = z.infer<typeof messagingChannelTypeSchema>
+
+/** All channel types including voice and reports */
+export const channelTypeSchema = z.enum(['voice', 'sms', 'whatsapp', 'signal', 'rcs', 'reports'])
+export type ChannelType = z.infer<typeof channelTypeSchema>
+
 // --- Response schemas ---
 
 export const roleResponseSchema = z.object({
@@ -86,7 +100,7 @@ export const callSettingsSchema = z.looseObject({
 })
 
 export const messagingConfigSchema = z.looseObject({
-  enabledChannels: z.array(z.enum(['sms', 'whatsapp', 'signal', 'rcs'])).optional(),
+  enabledChannels: z.array(messagingChannelTypeSchema).optional(),
   autoAssignEnabled: z.boolean().optional(),
   maxConcurrentPerVolunteer: z.number().int().min(1).max(20).optional(),
   inactivityTimeout: z.number().int().min(5).max(1440).optional(),
@@ -95,7 +109,7 @@ export const messagingConfigSchema = z.looseObject({
 })
 
 export const telephonyProviderSchema = z.looseObject({
-  type: z.enum(['twilio', 'signalwire', 'vonage', 'plivo', 'asterisk']),
+  type: telephonyProviderTypeSchema,
   accountSid: z.string().optional(),
   authToken: z.string().optional(),
   apiKeySid: z.string().optional(),

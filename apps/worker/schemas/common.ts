@@ -75,3 +75,17 @@ export const encryptedMetadataEntrySchema = z.looseObject({
   encryptedContent: z.string().min(1),
   ephemeralPubkey: pubkeySchema,
 })
+
+// --- Inferred types (canonical source of truth for envelope types) ---
+
+/** Unified ECIES-wrapped symmetric key for one recipient. */
+export type RecipientEnvelope = z.infer<typeof recipientEnvelopeSchema>
+
+/** Key envelope — note author copies (no pubkey). @deprecated Use RecipientEnvelope. */
+export type KeyEnvelope = z.infer<typeof keyEnvelopeSchema>
+
+/** @deprecated Use RecipientEnvelope instead. */
+export type RecipientKeyEnvelope = RecipientEnvelope
+
+/** ECIES-wrapped file encryption key for one recipient. */
+export type FileKeyEnvelope = z.infer<typeof fileKeyEnvelopeSchema>

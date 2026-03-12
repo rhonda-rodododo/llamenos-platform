@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { pubkeySchema } from './common'
+import { messagingChannelTypeSchema } from './settings'
 
 // --- Response schemas ---
 
@@ -43,5 +44,5 @@ export const adminUpdateVolunteerBodySchema = updateVolunteerBodySchema.extend({
   roles: z.array(z.string()).optional(),
   active: z.boolean().optional(),
   messagingEnabled: z.boolean().optional(),
-  supportedMessagingChannels: z.array(z.enum(['sms', 'whatsapp', 'signal', 'rcs'])).optional(),
+  supportedMessagingChannels: z.array(messagingChannelTypeSchema).optional(),
 })
