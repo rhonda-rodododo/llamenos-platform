@@ -92,3 +92,27 @@ export const updateBlastBodySchema = z.looseObject({
 export const scheduleBlastBodySchema = z.looseObject({
   scheduledAt: z.iso.datetime(),
 })
+
+export const importSubscribersBodySchema = z.looseObject({
+  subscribers: z.array(z.looseObject({
+    identifier: z.string().min(1).max(200),
+    channel: z.enum(['sms', 'whatsapp', 'signal']),
+    tags: z.array(z.string().max(100)).optional(),
+    language: z.string().max(10).optional(),
+  })).min(1).max(10000),
+})
+
+export const updateBlastSettingsBodySchema = z.looseObject({
+  subscribeKeyword: z.string().max(50).optional(),
+  unsubscribeKeyword: z.string().max(50).optional(),
+  confirmationMessage: z.string().max(500).optional(),
+  unsubscribeMessage: z.string().max(500).optional(),
+  doubleOptIn: z.boolean().optional(),
+  maxBlastsPerDay: z.number().int().min(1).max(100).optional(),
+})
+
+export const messagingPreferencesBodySchema = z.looseObject({
+  optedOut: z.boolean().optional(),
+  channels: z.array(z.enum(['sms', 'whatsapp', 'signal'])).optional(),
+  language: z.string().max(10).optional(),
+})

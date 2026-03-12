@@ -86,11 +86,16 @@ api.patch('/messaging/preferences', async (c) => {
   const token = c.req.query('token')
   if (!token) return c.json({ error: 'Token required' }, 400)
   const dos = getDOs(c.env)
-  const body = await c.req.text()
+  let body: Record<string, unknown>
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400)
+  }
   const res = await dos.blasts.fetch(new Request('http://do/subscribers/update-preferences', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, ...JSON.parse(body) }),
+    body: JSON.stringify({ token, ...body }),
   }))
   return new Response(res.body, { status: res.status, headers: res.headers })
 })

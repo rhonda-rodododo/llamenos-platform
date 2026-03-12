@@ -3,7 +3,7 @@ import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getScopedDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
-import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema } from '../schemas/blasts'
+import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema } from '../schemas/blasts'
 import { authErrors } from '../openapi/helpers'
 
 const blasts = new Hono<AppEnv>()
@@ -76,13 +76,14 @@ blasts.post('/subscribers/import',
     },
   }),
   requirePermission('blasts:manage'),
+  validator('json', importSubscribersBodySchema),
   async (c) => {
     const dos = getScopedDOs(c.env, c.get('hubId'))
-    const body = await c.req.text()
+    const body = c.req.valid('json')
     const res = await dos.blasts.fetch(new Request('http://do/subscribers/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body,
+      body: JSON.stringify(body),
     }))
     return new Response(res.body, { status: res.status, headers: res.headers })
   },
@@ -283,13 +284,14 @@ blasts.patch('/settings',
     },
   }),
   requirePermission('blasts:manage'),
+  validator('json', updateBlastSettingsBodySchema),
   async (c) => {
     const dos = getScopedDOs(c.env, c.get('hubId'))
-    const body = await c.req.text()
+    const body = c.req.valid('json')
     const res = await dos.blasts.fetch(new Request('http://do/blast-settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body,
+      body: JSON.stringify(body),
     }))
     return new Response(res.body, { status: res.status, headers: res.headers })
   },

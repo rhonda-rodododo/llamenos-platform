@@ -1,22 +1,37 @@
 import { Hono } from 'hono'
+import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getScopedDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
+import { listAuditQuerySchema } from '../schemas/audit'
+import { authErrors } from '../openapi/helpers'
 
 const auditRoutes = new Hono<AppEnv>()
 auditRoutes.use('*', requirePermission('audit:read'))
 
-auditRoutes.get('/', async (c) => {
-  const dos = getScopedDOs(c.env, c.get('hubId'))
-  const params = new URLSearchParams()
-  params.set('page', c.req.query('page') || '1')
-  params.set('limit', c.req.query('limit') || '50')
-  if (c.req.query('actorPubkey')) params.set('actorPubkey', c.req.query('actorPubkey')!)
-  if (c.req.query('eventType')) params.set('eventType', c.req.query('eventType')!)
-  if (c.req.query('dateFrom')) params.set('dateFrom', c.req.query('dateFrom')!)
-  if (c.req.query('dateTo')) params.set('dateTo', c.req.query('dateTo')!)
-  if (c.req.query('search')) params.set('search', c.req.query('search')!)
-  return dos.records.fetch(new Request(`http://do/audit?${params}`))
-})
+auditRoutes.get('/',
+  describeRoute({
+    tags: ['Audit'],
+    summary: 'List audit log entries',
+    responses: {
+      200: { description: 'Paginated audit entries' },
+      ...authErrors,
+    },
+  }),
+  validator('query', listAuditQuerySchema),
+  async (c) => {
+    const dos = getScopedDOs(c.env, c.get('hubId'))
+    const query = c.req.valid('query')
+    const params = new URLSearchParams()
+    params.set('page', String(query.page))
+    params.set('limit', String(query.limit))
+    if (query.actorPubkey) params.set('actorPubkey', query.actorPubkey)
+    if (query.eventType) params.set('eventType', query.eventType)
+    if (query.dateFrom) params.set('dateFrom', query.dateFrom)
+    if (query.dateTo) params.set('dateTo', query.dateTo)
+    if (query.search) params.set('search', query.search)
+    return dos.records.fetch(new Request(`http://do/audit?${params}`))
+  },
+)
 
 export default auditRoutes

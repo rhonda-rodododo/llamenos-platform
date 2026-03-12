@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
+import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getScopedDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
+import { paginationSchema } from '../schemas/common'
 import { authErrors } from '../openapi/helpers'
 
 const contacts = new Hono<AppEnv>()
@@ -18,11 +19,11 @@ contacts.get('/',
       ...authErrors,
     },
   }),
+  validator('query', paginationSchema),
   async (c) => {
     const dos = getScopedDOs(c.env, c.get('hubId'))
-    const page = c.req.query('page') || '1'
-    const limit = c.req.query('limit') || '50'
-    const params = new URLSearchParams({ page, limit })
+    const query = c.req.valid('query')
+    const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit) })
 
     // Get contact data from RecordsDO (notes with contactHash)
     const notesRes = await dos.records.fetch(new Request(`http://do/contacts?${params}`))
