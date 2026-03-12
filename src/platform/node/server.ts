@@ -48,12 +48,10 @@ async function main() {
     if (process.env.ENVIRONMENT === 'development') {
       try {
         const { writeFile } = await import('fs/promises')
-        const { resolve, dirname } = await import('path')
-        const { fileURLToPath } = await import('url')
+        const { resolve } = await import('path')
 
-        const __filename = fileURLToPath(import.meta.url)
-        const __dirname = dirname(__filename)
-        const snapshotPath = resolve(__dirname, '../../../packages/protocol/openapi-snapshot.json')
+        // Always resolve from project root (server runs via `node --watch dist/server/index.js`)
+        const snapshotPath = resolve(process.cwd(), 'packages/protocol/openapi-snapshot.json')
 
         const response = await app.fetch(
           new Request(`http://localhost:${info.port}/api/openapi.json`)
