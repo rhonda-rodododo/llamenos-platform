@@ -287,7 +287,7 @@ conversations.post('/:id/messages',
   validator('json', sendMessageBodySchema),
   async (c) => {
     const dos = getScopedDOs(c.env, c.get('hubId'))
-    const id = c.req.param('id')!
+    const id = c.req.param('id')
     const pubkey = c.get('pubkey')
     const permissions = c.get('permissions')
     const canSendAny = checkPermission(permissions, 'conversations:send-any')
