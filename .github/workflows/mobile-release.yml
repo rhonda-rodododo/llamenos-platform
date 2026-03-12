@@ -41,11 +41,12 @@ jobs:
           java-version: 17
 
       - name: Setup Gradle cache
-        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972fe187c82e2fd2858a # v4.4.1
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
 
       - name: Install Rust stable (for crypto build)
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
         with:
+          toolchain: stable
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
 
       - name: Install cargo-ndk
@@ -180,6 +181,7 @@ jobs:
       - name: Install Rust stable (for crypto build)
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
         with:
+          toolchain: stable
           targets: aarch64-apple-ios,aarch64-apple-ios-sim
 
       - name: Rust cache

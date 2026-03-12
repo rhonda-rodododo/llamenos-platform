@@ -124,20 +124,11 @@ jobs:
       - name: Build Node.js server
         run: bun run build:node
 
-      - name: Capture Worker bundle (Epic 79)
-        run: bunx wrangler deploy --config apps/worker/wrangler.jsonc --dry-run --outdir dist/worker-bundle/
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Compute build checksums (Epic 79)
         run: |
           cd dist
           find client server -type f -exec sha256sum {} \; | sort > ../CHECKSUMS.txt
           cd ..
-          if [ -d dist/worker-bundle ]; then
-            sha256sum dist/worker-bundle/* >> CHECKSUMS.txt
-          fi
           sha256sum bun.lockb >> CHECKSUMS.txt
           echo "$(wc -l < CHECKSUMS.txt) files checksummed"
 
@@ -179,6 +170,8 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        with:
+          toolchain: stable
 
       - name: Rust cache
         uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
@@ -284,7 +277,7 @@ jobs:
           java-version: 17
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972fe187c82e2fd2858a # v4.4.1
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
 
       - name: Run unit tests
         working-directory: apps/android
@@ -327,7 +320,7 @@ jobs:
           java-version: 17
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972fe187c82e2fd2858a # v4.4.1
+        uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
 
       - name: Cache AVD snapshot
         id: avd-cache
@@ -466,7 +459,6 @@ jobs:
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build
 
-  # ─── E2E Tests: Cloudflare Workers (wrangler dev) ──────────
   # ─── E2E Tests: Docker Compose + Vite ──────────────────────
   e2e:
     needs: [changes, build]
@@ -863,85 +855,9 @@ jobs:
           git pull --rebase origin main
           git push origin main --follow-tags
 
-  # ─── Deploy API to Cloudflare Workers ────────────────────────
-  # API-only — desktop clients connect to this Worker. No SPA served.
-  deploy-api:
-    needs: version
-    if: github.event_name == 'push' && needs.version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Inject build-time constants into Worker config (Epic 79)
-        run: |
-          VERSION="${{ needs.version.outputs.new_version }}"
-          BUILD_TIME=$(date -d "@$(git log -1 --format=%ct)" -Iseconds 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%S+00:00)
-          node -e "
-            const fs = require('fs');
-            let cfg = fs.readFileSync('apps/worker/wrangler.jsonc', 'utf-8');
-            cfg = cfg.replace(/\"__BUILD_VERSION__\":\s*\"[^\"]*\"/, '\"__BUILD_VERSION__\": \"' + \"'${VERSION}'\" + '\"');
-            cfg = cfg.replace(/\"__BUILD_COMMIT__\":\s*\"[^\"]*\"/, '\"__BUILD_COMMIT__\": \"' + \"'${GITHUB_SHA}'\" + '\"');
-            cfg = cfg.replace(/\"__BUILD_TIME__\":\s*\"[^\"]*\"/, '\"__BUILD_TIME__\": \"' + \"'${BUILD_TIME}'\" + '\"');
-            fs.writeFileSync('apps/worker/wrangler.jsonc', cfg);
-          "
-
-      - name: Deploy Worker (API-only)
-        run: bunx wrangler deploy --config apps/worker/wrangler.jsonc
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-  # ─── Deploy Site to Cloudflare Pages ────────────────────────
-  # Deploy when: (1) there's a versioned release, OR (2) site files changed
-  deploy-site:
-    needs: [changes, build, version]
-    if: |
-      always() &&
-      github.event_name == 'push' &&
-      needs.build.result == 'success' &&
-      (needs.version.outputs.should_release == 'true' || needs.changes.outputs.site == 'true')
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Download site build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: site-build
-          path: site/dist/
-
-      - name: Deploy to Cloudflare Pages
-        run: bunx wrangler pages deploy site/dist/ --project-name llamenos-site
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
   # ─── Create GitHub Release ──────────────────────────────────
   release:
-    needs: [version, deploy-api]
+    needs: [version]
     if: github.event_name == 'push' && needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
