@@ -368,10 +368,6 @@ export type AppEnv = {
     hubId?: string
     /** Hub-scoped permissions (resolved for the current hub) */
     hubPermissions?: string[]
-    /** Parsed and validated request body (set by validateBody middleware) */
-    validatedBody: unknown
-    /** Parsed and validated query parameters (set by validateQuery middleware) */
-    validatedQuery: unknown
     /** Unique request ID for correlation (set by request-id middleware) */
     requestId: string
   }
