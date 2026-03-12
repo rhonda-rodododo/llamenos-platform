@@ -276,6 +276,15 @@
     "unsubscribeKeyword": "Unsubscribe Keyword",
     "unsubscribeMsg": "Unsubscribe Message"
   },
+  "callActions": {
+    "banAndHangUp": "Ban & Hang Up",
+    "banAndHangUpConfirm": "Ban this caller and end the call?",
+    "banReason": "Reason (optional)",
+    "openNotes": "Notes",
+    "noteForCall": "Note for call {{callId}}",
+    "banSuccess": "Caller banned and call ended",
+    "banFailed": "Failed to ban caller"
+  },
   "callHistory": {
     "answeredBy": "Answered By",
     "back": "Back",
@@ -485,6 +494,23 @@
   },
   "copied": {
     "toClipboard": "Copied to clipboard"
+  },
+  "crashReporting": {
+    "title": "Crash Reporting",
+    "description": "Help improve Llamenos by sharing anonymous crash reports when errors occur.",
+    "consent": "Send anonymous crash reports",
+    "consentDescription": "When enabled, crash details (error type, stack trace, app version, OS) are sent to help fix bugs. No personal data, notes, keys, or call content is ever included.",
+    "pendingReports": "Pending crash reports",
+    "pendingReportsDescription": "%@ crash report(s) from previous sessions are ready to send.",
+    "sendNow": "Send Reports",
+    "clearReports": "Discard Reports",
+    "reportSent": "Crash report sent",
+    "reportsSent": "Crash reports sent successfully",
+    "reportsCleared": "Pending crash reports discarded",
+    "sendFailed": "Failed to send crash report",
+    "privacyNote": "Crash reports contain only technical information: error message, stack trace, app version, operating system, and device type. No personally identifiable information is collected.",
+    "settingsTitle": "Diagnostics",
+    "settingsDescription": "Anonymous crash reporting and diagnostics"
   },
   "createNewIdentity": "Create New Identity",
   "customFields": {
@@ -952,6 +978,15 @@
     "inbound": "Received",
     "outbound": "Sent"
   },
+  "migrations": {
+    "title": "Data Migrations",
+    "description": "Schema version and migration status across all data stores",
+    "pending": "pending",
+    "applied": "Applied",
+    "upToDate": "Up to date",
+    "lastRun": "Last run",
+    "pendingWarning": "{{count}} pending migration(s) — migrations run automatically on next access"
+  },
   "nav": {
     "admin": "Admin",
     "auditLog": "Audit Log",
@@ -1077,6 +1112,20 @@
     "label": "Private Key (nsec)",
     "placeholder": "nsec1...",
     "warning": "Never share your private key with anyone"
+  },
+  "offline": {
+    "banner": "You are offline. Calls and messages will not work until connectivity is restored.",
+    "pendingCount": "{{count}} pending",
+    "pendingCount_one": "{{count}} pending",
+    "pendingSyncMessage": "{{count}} operations waiting to sync",
+    "pendingSyncMessage_one": "{{count}} operation waiting to sync",
+    "syncNow": "Sync now",
+    "syncing": "Syncing...",
+    "syncComplete": "All operations synced successfully",
+    "syncFailed": "Some operations failed to sync",
+    "operationQueued": "Saved offline — will sync when connected",
+    "relayReconnecting": "Reconnecting to real-time server...",
+    "relayReconnected": "Reconnected — catching up on missed events"
   },
   "ok": "OK",
   "onboarding": {
@@ -1257,6 +1306,32 @@
     "titleLabel": "Title",
     "titlePlaceholder": "Report title",
     "untitled": "Untitled Report"
+  },
+  "reportTypes": {
+    "title": "Report Types",
+    "description": "Define structured report types with custom fields. Each type determines which fields appear when creating a report.",
+    "addType": "Add Report Type",
+    "editType": "Edit Report Type",
+    "name": "Name",
+    "namePlaceholder": "e.g., Incident Report",
+    "typeDescription": "Description",
+    "descriptionPlaceholder": "When should this report type be used?",
+    "icon": "Icon",
+    "iconPlaceholder": "e.g., alert-triangle",
+    "default": "Default",
+    "defaultHelp": "This type will be pre-selected when creating new reports.",
+    "archived": "Archived",
+    "fields": "Custom Fields",
+    "noFields": "No custom fields configured for this report type.",
+    "created": "Report type created",
+    "updated": "Report type updated",
+    "archiveConfirm": "Archive this report type? Existing reports will keep their type reference, but it won't be available for new reports.",
+    "archiveSuccess": "Report type archived",
+    "archiveError": "Failed to archive report type",
+    "createError": "Failed to create report type",
+    "updateError": "Failed to update report type",
+    "cannotArchiveLast": "Cannot archive the last active report type",
+    "maxTypes": "Maximum number of report types reached"
   },
   "reports": {
     "allCategories": "All categories",
@@ -1938,74 +2013,8 @@
     "disconnected": "Disconnected",
     "reconnecting": "Reconnecting (%d)..."
   },
-  "migrations": {
-    "title": "Data Migrations",
-    "description": "Schema version and migration status across all data stores",
-    "pending": "pending",
-    "applied": "Applied",
-    "upToDate": "Up to date",
-    "lastRun": "Last run",
-    "pendingWarning": "{{count}} pending migration(s) — migrations run automatically on next access"
-  },
   "yes": "Yes",
   "yourIdentity": "Your Identity",
   "yourPrivateKey": "Your Private Key",
-  "yourPublicKey": "Your Public Key",
-  "reportTypes": {
-    "title": "Report Types",
-    "description": "Define structured report types with custom fields. Each type determines which fields appear when creating a report.",
-    "addType": "Add Report Type",
-    "editType": "Edit Report Type",
-    "name": "Name",
-    "namePlaceholder": "e.g., Incident Report",
-    "typeDescription": "Description",
-    "descriptionPlaceholder": "When should this report type be used?",
-    "icon": "Icon",
-    "iconPlaceholder": "e.g., alert-triangle",
-    "default": "Default",
-    "defaultHelp": "This type will be pre-selected when creating new reports.",
-    "archived": "Archived",
-    "fields": "Custom Fields",
-    "noFields": "No custom fields configured for this report type.",
-    "created": "Report type created",
-    "updated": "Report type updated",
-    "archiveConfirm": "Archive this report type? Existing reports will keep their type reference, but it won't be available for new reports.",
-    "archiveSuccess": "Report type archived",
-    "archiveError": "Failed to archive report type",
-    "createError": "Failed to create report type",
-    "updateError": "Failed to update report type",
-    "cannotArchiveLast": "Cannot archive the last active report type",
-    "maxTypes": "Maximum number of report types reached"
-  },
-  "offline": {
-    "banner": "You are offline. Calls and messages will not work until connectivity is restored.",
-    "pendingCount": "{{count}} pending",
-    "pendingCount_one": "{{count}} pending",
-    "pendingSyncMessage": "{{count}} operations waiting to sync",
-    "pendingSyncMessage_one": "{{count}} operation waiting to sync",
-    "syncNow": "Sync now",
-    "syncing": "Syncing...",
-    "syncComplete": "All operations synced successfully",
-    "syncFailed": "Some operations failed to sync",
-    "operationQueued": "Saved offline — will sync when connected",
-    "relayReconnecting": "Reconnecting to real-time server...",
-    "relayReconnected": "Reconnected — catching up on missed events"
-  },
-  "crashReporting": {
-    "title": "Crash Reporting",
-    "description": "Help improve Llamenos by sharing anonymous crash reports when errors occur.",
-    "consent": "Send anonymous crash reports",
-    "consentDescription": "When enabled, crash details (error type, stack trace, app version, OS) are sent to help fix bugs. No personal data, notes, keys, or call content is ever included.",
-    "pendingReports": "Pending crash reports",
-    "pendingReportsDescription": "%@ crash report(s) from previous sessions are ready to send.",
-    "sendNow": "Send Reports",
-    "clearReports": "Discard Reports",
-    "reportSent": "Crash report sent",
-    "reportsSent": "Crash reports sent successfully",
-    "reportsCleared": "Pending crash reports discarded",
-    "sendFailed": "Failed to send crash report",
-    "privacyNote": "Crash reports contain only technical information: error message, stack trace, app version, operating system, and device type. No personally identifiable information is collected.",
-    "settingsTitle": "Diagnostics",
-    "settingsDescription": "Anonymous crash reporting and diagnostics"
-  }
+  "yourPublicKey": "Your Public Key"
 }

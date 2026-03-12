@@ -276,6 +276,15 @@
     "unsubscribeKeyword": "Unsubscribe Keyword",
     "unsubscribeMsg": "Unsubscribe Message"
   },
+  "callActions": {
+    "banAndHangUp": "Ban & Hang Up",
+    "banAndHangUpConfirm": "Ban this caller and end the call?",
+    "banReason": "Reason (optional)",
+    "openNotes": "Notes",
+    "noteForCall": "Note for call {{callId}}",
+    "banSuccess": "Caller banned and call ended",
+    "banFailed": "Failed to ban caller"
+  },
   "callHistory": {
     "answeredBy": "أجاب عليها",
     "back": "Back",
@@ -485,6 +494,23 @@
   },
   "copied": {
     "toClipboard": "Copied to clipboard"
+  },
+  "crashReporting": {
+    "title": "Crash Reporting",
+    "description": "Help improve Llamenos by sharing anonymous crash reports when errors occur.",
+    "consent": "Send anonymous crash reports",
+    "consentDescription": "When enabled, crash details (error type, stack trace, app version, OS) are sent to help fix bugs. No personal data, notes, keys, or call content is ever included.",
+    "pendingReports": "Pending crash reports",
+    "pendingReportsDescription": "%@ crash report(s) from previous sessions are ready to send.",
+    "sendNow": "Send Reports",
+    "clearReports": "Discard Reports",
+    "reportSent": "Crash report sent",
+    "reportsSent": "Crash reports sent successfully",
+    "reportsCleared": "Pending crash reports discarded",
+    "sendFailed": "Failed to send crash report",
+    "privacyNote": "Crash reports contain only technical information: error message, stack trace, app version, operating system, and device type. No personally identifiable information is collected.",
+    "settingsTitle": "Diagnostics",
+    "settingsDescription": "Anonymous crash reporting and diagnostics"
   },
   "createNewIdentity": "Create New Identity",
   "customFields": {
@@ -1078,6 +1104,20 @@
     "placeholder": "nsec1...",
     "warning": "Never share your private key with anyone"
   },
+  "offline": {
+    "banner": "أنت غير متصل بالإنترنت. لن تعمل المكالمات والرسائل حتى يتم استعادة الاتصال.",
+    "pendingCount": "{{count}} قيد الانتظار",
+    "pendingCount_one": "{{count}} قيد الانتظار",
+    "pendingSyncMessage": "{{count}} عمليات في انتظار المزامنة",
+    "pendingSyncMessage_one": "{{count}} عملية في انتظار المزامنة",
+    "syncNow": "مزامنة الآن",
+    "syncing": "جارٍ المزامنة...",
+    "syncComplete": "تمت مزامنة جميع العمليات بنجاح",
+    "syncFailed": "فشلت بعض العمليات في المزامنة",
+    "operationQueued": "تم الحفظ بدون اتصال — ستتم المزامنة عند الاتصال",
+    "relayReconnecting": "جارٍ إعادة الاتصال بالخادم...",
+    "relayReconnected": "تمت إعادة الاتصال — جارٍ استرداد الأحداث الفائتة"
+  },
   "ok": "OK",
   "onboarding": {
     "alreadyUsed": "تم استخدام هذه الدعوة بالفعل",
@@ -1257,6 +1297,32 @@
     "titleLabel": "Title",
     "titlePlaceholder": "Report title",
     "untitled": "Untitled Report"
+  },
+  "reportTypes": {
+    "title": "Report Types",
+    "description": "Define structured report types with custom fields. Each type determines which fields appear when creating a report.",
+    "addType": "Add Report Type",
+    "editType": "Edit Report Type",
+    "name": "Name",
+    "namePlaceholder": "e.g., Incident Report",
+    "typeDescription": "Description",
+    "descriptionPlaceholder": "When should this report type be used?",
+    "icon": "Icon",
+    "iconPlaceholder": "e.g., alert-triangle",
+    "default": "Default",
+    "defaultHelp": "This type will be pre-selected when creating new reports.",
+    "archived": "Archived",
+    "fields": "Custom Fields",
+    "noFields": "No custom fields configured for this report type.",
+    "created": "Report type created",
+    "updated": "Report type updated",
+    "archiveConfirm": "Archive this report type? Existing reports will keep their type reference, but it won't be available for new reports.",
+    "archiveSuccess": "Report type archived",
+    "archiveError": "Failed to archive report type",
+    "createError": "Failed to create report type",
+    "updateError": "Failed to update report type",
+    "cannotArchiveLast": "Cannot archive the last active report type",
+    "maxTypes": "Maximum number of report types reached"
   },
   "reports": {
     "title": "Reports",
@@ -1947,62 +2013,5 @@
   "yes": "Yes",
   "yourIdentity": "Your Identity",
   "yourPrivateKey": "Your Private Key",
-  "yourPublicKey": "Your Public Key",
-  "reportTypes": {
-    "title": "Report Types",
-    "description": "Define structured report types with custom fields. Each type determines which fields appear when creating a report.",
-    "addType": "Add Report Type",
-    "editType": "Edit Report Type",
-    "name": "Name",
-    "namePlaceholder": "e.g., Incident Report",
-    "typeDescription": "Description",
-    "descriptionPlaceholder": "When should this report type be used?",
-    "icon": "Icon",
-    "iconPlaceholder": "e.g., alert-triangle",
-    "default": "Default",
-    "defaultHelp": "This type will be pre-selected when creating new reports.",
-    "archived": "Archived",
-    "fields": "Custom Fields",
-    "noFields": "No custom fields configured for this report type.",
-    "created": "Report type created",
-    "updated": "Report type updated",
-    "archiveConfirm": "Archive this report type? Existing reports will keep their type reference, but it won't be available for new reports.",
-    "archiveSuccess": "Report type archived",
-    "archiveError": "Failed to archive report type",
-    "createError": "Failed to create report type",
-    "updateError": "Failed to update report type",
-    "cannotArchiveLast": "Cannot archive the last active report type",
-    "maxTypes": "Maximum number of report types reached"
-  },
-  "offline": {
-    "banner": "أنت غير متصل بالإنترنت. لن تعمل المكالمات والرسائل حتى يتم استعادة الاتصال.",
-    "pendingCount": "{{count}} قيد الانتظار",
-    "pendingCount_one": "{{count}} قيد الانتظار",
-    "pendingSyncMessage": "{{count}} عمليات في انتظار المزامنة",
-    "pendingSyncMessage_one": "{{count}} عملية في انتظار المزامنة",
-    "syncNow": "مزامنة الآن",
-    "syncing": "جارٍ المزامنة...",
-    "syncComplete": "تمت مزامنة جميع العمليات بنجاح",
-    "syncFailed": "فشلت بعض العمليات في المزامنة",
-    "operationQueued": "تم الحفظ بدون اتصال — ستتم المزامنة عند الاتصال",
-    "relayReconnecting": "جارٍ إعادة الاتصال بالخادم...",
-    "relayReconnected": "تمت إعادة الاتصال — جارٍ استرداد الأحداث الفائتة"
-  },
-  "crashReporting": {
-    "title": "Crash Reporting",
-    "description": "Help improve Llamenos by sharing anonymous crash reports when errors occur.",
-    "consent": "Send anonymous crash reports",
-    "consentDescription": "When enabled, crash details (error type, stack trace, app version, OS) are sent to help fix bugs. No personal data, notes, keys, or call content is ever included.",
-    "pendingReports": "Pending crash reports",
-    "pendingReportsDescription": "%@ crash report(s) from previous sessions are ready to send.",
-    "sendNow": "Send Reports",
-    "clearReports": "Discard Reports",
-    "reportSent": "Crash report sent",
-    "reportsSent": "Crash reports sent successfully",
-    "reportsCleared": "Pending crash reports discarded",
-    "sendFailed": "Failed to send crash report",
-    "privacyNote": "Crash reports contain only technical information: error message, stack trace, app version, operating system, and device type. No personally identifiable information is collected.",
-    "settingsTitle": "Diagnostics",
-    "settingsDescription": "Anonymous crash reporting and diagnostics"
-  }
+  "yourPublicKey": "Your Public Key"
 }
