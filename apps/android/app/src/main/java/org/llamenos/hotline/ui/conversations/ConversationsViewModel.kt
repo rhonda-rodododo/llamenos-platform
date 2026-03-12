@@ -273,8 +273,7 @@ class ConversationsViewModel @Inject constructor(
 
                 val request = SendMessageRequest(
                     encryptedContent = encrypted.ciphertext,
-                    recipientEnvelopes = envelopes,
-                    channelType = conversation.channelType,
+                    readerEnvelopes = envelopes,
                 )
 
                 apiService.request<ConversationMessage>(

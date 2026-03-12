@@ -88,7 +88,7 @@ class CryptoServiceTest {
 
     @Test(expected = IllegalStateException::class)
     fun `decryptNote throws without native lib`(): Unit = runBlocking {
-        val envelope = org.llamenos.hotline.model.RecipientEnvelope(
+        val envelope = org.llamenos.protocol.RecipientEnvelope(
             pubkey = "test",
             wrappedKey = "test",
             ephemeralPubkey = "test",

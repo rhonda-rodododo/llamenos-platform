@@ -15,6 +15,10 @@ import kotlinx.serialization.Serializable
  * - "file" -> file attachment (not yet implemented on mobile)
  *
  * [context] determines where the field appears (e.g., "note", "call").
+ *
+ * Note: The generated CustomFieldResponse covers the API response shape.
+ * This client type extends it with additional client-specific fields
+ * (id, validation, editableByVolunteers) for local UI usage.
  */
 @Serializable
 data class CustomFieldDefinition(

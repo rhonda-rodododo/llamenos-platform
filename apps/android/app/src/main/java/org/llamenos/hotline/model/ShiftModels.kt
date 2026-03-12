@@ -3,23 +3,19 @@ package org.llamenos.hotline.model
 import kotlinx.serialization.Serializable
 
 /**
- * A scheduled shift as returned by the API.
- *
- * [days] contains day-of-week indices (0 = Sunday, 6 = Saturday).
- * [status] is one of "available", "assigned", or "completed".
+ * Re-export generated ShiftResponse from protocol package.
+ * The generated type includes the full API shape (id, name, startTime, endTime,
+ * days as List<Double>, volunteerPubkeys, createdAt).
  */
-@Serializable
-data class ShiftResponse(
-    val id: String,
-    val startTime: String,
-    val endTime: String,
-    val days: List<Int>,
-    val volunteerId: String? = null,
-    val status: String,
-)
+typealias ShiftResponse = org.llamenos.protocol.ShiftResponse
 
 /**
  * Current shift status for the authenticated volunteer.
+ * Client-specific shape for the /api/shifts/status endpoint.
+ *
+ * Note: The generated MyStatusResponse has a different shape (nested
+ * currentShift/nextShift objects). This client type uses flat fields
+ * matching the app's UI expectations.
  */
 @Serializable
 data class ShiftStatusResponse(
@@ -34,6 +30,7 @@ data class ShiftStatusResponse(
 
 /**
  * Response from clock-in / clock-out endpoints.
+ * Client-only type — not part of the generated API surface.
  */
 @Serializable
 data class ClockResponse(
@@ -43,9 +40,10 @@ data class ClockResponse(
 
 /**
  * Paginated shifts list response from GET /api/shifts.
+ * Client-side wrapper — the API returns shifts array + count.
  */
 @Serializable
 data class ShiftsListResponse(
-    val shifts: List<ShiftResponse>,
+    val shifts: List<org.llamenos.protocol.ShiftResponse>,
     val total: Int,
 )

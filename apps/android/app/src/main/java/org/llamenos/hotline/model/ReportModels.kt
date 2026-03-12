@@ -5,10 +5,9 @@ import kotlinx.serialization.Serializable
 /**
  * A report — a specialized conversation with structured metadata.
  *
- * Reports extend the conversation concept with a title, category, and
- * optional custom field values. They can be linked to a call record.
- * Report content (messages) follows the same E2EE envelope pattern as
- * regular conversation messages.
+ * Client-specific shape for the reports UI. The generated ReportResponse
+ * (org.llamenos.protocol.ReportResponse) has a different shape with
+ * E2EE fields (encryptedContent, readerEnvelopes).
  */
 @Serializable
 data class Report(
@@ -76,11 +75,9 @@ data class ReportEnvelope(
 
 /**
  * Request body for POST /reports/:id/assign.
+ * Maps to the generated AssignReportBody type.
  */
-@Serializable
-data class AssignReportRequest(
-    val assignedTo: String,
-)
+typealias AssignReportRequest = org.llamenos.protocol.AssignReportBody
 
 /**
  * Request body for PATCH /reports/:id (status update).

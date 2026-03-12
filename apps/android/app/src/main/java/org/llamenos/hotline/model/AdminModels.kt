@@ -5,8 +5,9 @@ import kotlinx.serialization.Serializable
 /**
  * A volunteer registered in the system.
  *
- * Only admins can view the full volunteer list. [displayName] is optional
- * and may be null if the volunteer has not set one.
+ * Client-specific type for admin views. The generated VolunteerResponse
+ * (org.llamenos.protocol.VolunteerResponse) has a different shape optimized
+ * for the API response. This type uses UI-friendly field names.
  */
 @Serializable
 data class Volunteer(
@@ -28,8 +29,8 @@ data class VolunteersListResponse(
 )
 
 /**
- * A ban list entry. Phone numbers / identifiers are stored as one-way hashes
- * to prevent the server from having a plaintext blacklist of numbers.
+ * A ban list entry for the client.
+ * Extends the generated BanResponse with client-specific field names.
  */
 @Serializable
 data class BanEntry(
@@ -51,6 +52,8 @@ data class BanListResponse(
 
 /**
  * Request body for adding a ban via POST /api/admin/bans.
+ * Client-specific shape — the generated CreateBanBody uses `phone`
+ * instead of `identifier`.
  */
 @Serializable
 data class AddBanRequest(
@@ -61,9 +64,9 @@ data class AddBanRequest(
 /**
  * A hash-chained audit log entry.
  *
- * Each entry includes [entryHash] (SHA-256 of the entry) and
- * [previousEntryHash] (the prior entry's hash) forming an
- * append-only tamper-evident chain.
+ * Client-specific shape with field names matching the UI. The generated
+ * AuditEntryResponse uses `event` and `createdAt` instead of `action`
+ * and `timestamp`.
  */
 @Serializable
 data class AuditEntry(
@@ -88,9 +91,8 @@ data class AuditLogResponse(
 
 /**
  * An invite code for onboarding new volunteers.
- *
- * Invite codes are single-use and time-limited. Once [claimedBy] is set,
- * the invite cannot be used again.
+ * Client-specific shape — the generated InviteResponse has different
+ * field names (usedBy instead of claimedBy, roleIDS instead of role).
  */
 @Serializable
 data class Invite(
@@ -113,7 +115,7 @@ data class InvitesListResponse(
 )
 
 /**
- * Request body for creating an invite via POST /api/admin/invites.
+ * Request body for creating an invite.
  */
 @Serializable
 data class CreateInviteRequest(
@@ -157,6 +159,9 @@ data class BulkBanRequest(
 
 /**
  * Request body for creating/updating a shift.
+ * Client-specific shape — the generated CreateShiftBody uses different
+ * field names (volunteerPubkeys instead of volunteerIds) and types
+ * (List<Long> instead of List<Int> for days).
  */
 @Serializable
 data class CreateShiftRequest(
@@ -191,6 +196,8 @@ data class AdminShiftsListResponse(
 
 /**
  * Request to set the fallback ring group.
+ * Client-specific shape — the generated FallbackGroup uses
+ * volunteerPubkeys instead of volunteerIds.
  */
 @Serializable
 data class FallbackGroupRequest(
@@ -204,7 +211,7 @@ data class FallbackGroupRequest(
  */
 @Serializable
 data class CustomFieldsResponse(
-    val fields: List<org.llamenos.hotline.model.CustomFieldDefinition>,
+    val fields: List<CustomFieldDefinition>,
 )
 
 /**
@@ -212,7 +219,7 @@ data class CustomFieldsResponse(
  */
 @Serializable
 data class UpdateCustomFieldsRequest(
-    val fields: List<org.llamenos.hotline.model.CustomFieldDefinition>,
+    val fields: List<CustomFieldDefinition>,
 )
 
 // ---- Report Categories (Settings) ----
@@ -333,6 +340,7 @@ data class SpamSettingsResponse(
 
 /**
  * Aggregate system health response from GET /api/system/health.
+ * Client-only composite type — not in the generated API surface.
  */
 @Serializable
 data class SystemHealth(
@@ -345,9 +353,6 @@ data class SystemHealth(
     val timestamp: String,
 )
 
-/**
- * Server-level health information.
- */
 @Serializable
 data class ServerHealth(
     val status: String,
@@ -355,9 +360,6 @@ data class ServerHealth(
     val version: String,
 )
 
-/**
- * Status of an individual service (e.g., database, relay, telephony).
- */
 @Serializable
 data class ServiceStatus(
     val name: String,
@@ -365,9 +367,6 @@ data class ServiceStatus(
     val details: String? = null,
 )
 
-/**
- * Call metrics for the current day.
- */
 @Serializable
 data class CallMetrics(
     val today: Int,
@@ -376,18 +375,12 @@ data class CallMetrics(
     val missed: Int,
 )
 
-/**
- * Storage usage information.
- */
 @Serializable
 data class StorageInfo(
     val dbSize: String,
     val blobStorage: String,
 )
 
-/**
- * Backup status information.
- */
 @Serializable
 data class BackupInfo(
     val lastBackup: String?,
@@ -395,9 +388,6 @@ data class BackupInfo(
     val lastVerify: String?,
 )
 
-/**
- * Volunteer activity summary.
- */
 @Serializable
 data class VolunteerInfo(
     val totalActive: Int,

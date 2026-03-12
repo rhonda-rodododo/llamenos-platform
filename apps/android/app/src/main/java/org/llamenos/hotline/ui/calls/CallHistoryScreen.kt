@@ -63,6 +63,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.CallRecord
+import org.llamenos.hotline.model.durationSeconds
+import org.llamenos.hotline.model.hasRecordingFlag
+import org.llamenos.hotline.model.hasTranscriptionFlag
+import org.llamenos.hotline.model.hasVoicemailFlag
 import org.llamenos.hotline.util.DateFormatUtils
 
 /**
@@ -345,9 +349,9 @@ private fun CallRecordCard(
                     )
 
                     // Duration
-                    if (call.duration != null && call.duration > 0) {
+                    if (call.durationSeconds != null && call.durationSeconds!! > 0) {
                         Text(
-                            text = DateFormatUtils.formatDuration(call.duration),
+                            text = DateFormatUtils.formatDuration(call.durationSeconds!!),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.testTag("call-duration"),
@@ -356,26 +360,26 @@ private fun CallRecordCard(
                 }
 
                 // Metadata badges
-                if (call.hasVoicemail || call.hasTranscription || call.hasRecording) {
+                if (call.hasVoicemailFlag || call.hasTranscriptionFlag || call.hasRecordingFlag) {
                     Spacer(Modifier.height(6.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        if (call.hasVoicemail) {
+                        if (call.hasVoicemailFlag) {
                             MetadataBadge(
                                 icon = Icons.Filled.Voicemail,
                                 label = stringResource(R.string.calls_voicemail),
                                 testTag = "call-voicemail-badge",
                             )
                         }
-                        if (call.hasTranscription) {
+                        if (call.hasTranscriptionFlag) {
                             MetadataBadge(
                                 icon = Icons.Filled.GraphicEq,
                                 label = stringResource(R.string.calls_transcription),
                                 testTag = "call-transcription-badge",
                             )
                         }
-                        if (call.hasRecording) {
+                        if (call.hasRecordingFlag) {
                             MetadataBadge(
                                 icon = Icons.Filled.GraphicEq,
                                 label = stringResource(R.string.calls_recording),

@@ -3,31 +3,13 @@ package org.llamenos.hotline.model
 import kotlinx.serialization.Serializable
 
 /**
- * Encrypted call record as stored server-side and returned by GET /calls/history.
- *
- * Plaintext fields (callerLast4, timestamps, duration, status) are safe for ordering
- * and display. Sensitive metadata (answeredBy, callerNumber) is sealed inside
- * [encryptedContent] as XChaCha20-Poly1305 ciphertext. Each admin receives their
- * own [RecipientEnvelope] wrapping the per-record symmetric key via ECIES.
+ * Re-export generated CallRecordResponse from protocol package.
  */
-@Serializable
-data class CallRecord(
-    val id: String,
-    val callerLast4: String? = null,
-    val startedAt: String,
-    val endedAt: String? = null,
-    val duration: Int? = null,
-    val status: String,
-    val hasTranscription: Boolean = false,
-    val hasVoicemail: Boolean = false,
-    val hasRecording: Boolean = false,
-    val recordingSid: String? = null,
-    val encryptedContent: String? = null,
-    val adminEnvelopes: List<RecipientEnvelope>? = null,
-)
+typealias CallRecord = org.llamenos.protocol.CallRecordResponse
 
 /**
  * Active call — a call currently ringing or in progress.
+ * Client-only type — not part of the generated API surface.
  */
 @Serializable
 data class ActiveCall(
@@ -40,15 +22,17 @@ data class ActiveCall(
 
 /**
  * Paginated call history response from GET /calls/history.
+ * Client-side wrapper.
  */
 @Serializable
 data class CallHistoryResponse(
-    val calls: List<CallRecord>,
+    val calls: List<org.llamenos.protocol.CallRecordResponse>,
     val total: Int,
 )
 
 /**
  * Today's call count response from GET /calls/today-count.
+ * Client-only type.
  */
 @Serializable
 data class CallCountResponse(

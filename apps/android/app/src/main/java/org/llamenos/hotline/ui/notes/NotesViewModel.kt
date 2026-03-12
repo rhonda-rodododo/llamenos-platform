@@ -17,16 +17,18 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.crypto.CryptoService
-import org.llamenos.hotline.model.CreateNoteEnvelope
-import org.llamenos.hotline.model.CreateNoteReplyRequest
-import org.llamenos.hotline.model.CreateNoteRequest
 import org.llamenos.hotline.model.CustomFieldDefinition
 import org.llamenos.hotline.model.NotePayload
 import org.llamenos.hotline.model.NoteRepliesResponse
 import org.llamenos.hotline.model.NoteReply
-import org.llamenos.hotline.model.NoteResponse
 import org.llamenos.hotline.model.NotesListResponse
-import org.llamenos.hotline.model.RecipientEnvelope
+import org.llamenos.protocol.CreateNoteBody
+import org.llamenos.protocol.CreateNoteBodyAdminEnvelope
+import org.llamenos.protocol.CreateNoteBodyAuthorEnvelope
+import org.llamenos.protocol.CreateReplyBody
+import org.llamenos.protocol.CreateReplyBodyReaderEnvelope
+import org.llamenos.protocol.NoteResponse
+import org.llamenos.protocol.RecipientEnvelope
 import javax.inject.Inject
 
 /**
@@ -248,19 +250,26 @@ class NotesViewModel @Inject constructor(
 
                 val encrypted = cryptoService.encryptNote(payloadJson, sessionState.adminPubkeys)
 
-                val envelopes = encrypted.envelopes.map { env ->
-                    CreateNoteEnvelope(
-                        pubkey = env.recipientPubkey,
-                        wrappedKey = env.wrappedKey,
-                        ephemeralPubkey = env.ephemeralPubkey,
-                    )
-                }
+                // Separate author envelope from admin envelopes.
+                // The first envelope is always for the author (our pubkey).
+                val authorEnv = encrypted.envelopes.first()
+                val adminEnvs = encrypted.envelopes.drop(1)
 
-                val request = CreateNoteRequest(
+                val request = CreateNoteBody(
                     encryptedContent = encrypted.ciphertext,
-                    recipientEnvelopes = envelopes,
-                    conversationId = conversationId,
-                    callId = callId,
+                    authorEnvelope = CreateNoteBodyAuthorEnvelope(
+                        ephemeralPubkey = authorEnv.ephemeralPubkey,
+                        wrappedKey = authorEnv.wrappedKey,
+                    ),
+                    adminEnvelopes = adminEnvs.map { env ->
+                        CreateNoteBodyAdminEnvelope(
+                            pubkey = env.recipientPubkey,
+                            wrappedKey = env.wrappedKey,
+                            ephemeralPubkey = env.ephemeralPubkey,
+                        )
+                    },
+                    conversationID = conversationId,
+                    callID = callId,
                 )
 
                 apiService.request<NoteResponse>("POST", "/api/notes", request)
@@ -367,17 +376,22 @@ class NotesViewModel @Inject constructor(
 
                 val encrypted = cryptoService.encryptNote(payloadJson, sessionState.adminPubkeys)
 
-                val envelopes = encrypted.envelopes.map { env ->
-                    CreateNoteEnvelope(
-                        pubkey = env.recipientPubkey,
-                        wrappedKey = env.wrappedKey,
-                        ephemeralPubkey = env.ephemeralPubkey,
-                    )
-                }
+                val authorEnv = encrypted.envelopes.first()
+                val adminEnvs = encrypted.envelopes.drop(1)
 
-                val request = CreateNoteRequest(
+                val request = CreateNoteBody(
                     encryptedContent = encrypted.ciphertext,
-                    recipientEnvelopes = envelopes,
+                    authorEnvelope = CreateNoteBodyAuthorEnvelope(
+                        ephemeralPubkey = authorEnv.ephemeralPubkey,
+                        wrappedKey = authorEnv.wrappedKey,
+                    ),
+                    adminEnvelopes = adminEnvs.map { env ->
+                        CreateNoteBodyAdminEnvelope(
+                            pubkey = env.recipientPubkey,
+                            wrappedKey = env.wrappedKey,
+                            ephemeralPubkey = env.ephemeralPubkey,
+                        )
+                    },
                 )
 
                 apiService.request<NoteResponse>("PUT", "/api/notes/$noteId", request)
@@ -440,17 +454,17 @@ class NotesViewModel @Inject constructor(
             try {
                 val encrypted = cryptoService.encryptNote(text, sessionState.adminPubkeys)
 
-                val envelopes = encrypted.envelopes.map { env ->
-                    CreateNoteEnvelope(
+                val readerEnvelopes = encrypted.envelopes.map { env ->
+                    CreateReplyBodyReaderEnvelope(
                         pubkey = env.recipientPubkey,
                         wrappedKey = env.wrappedKey,
                         ephemeralPubkey = env.ephemeralPubkey,
                     )
                 }
 
-                val request = CreateNoteReplyRequest(
+                val request = CreateReplyBody(
                     encryptedContent = encrypted.ciphertext,
-                    readerEnvelopes = envelopes,
+                    readerEnvelopes = readerEnvelopes,
                 )
 
                 apiService.requestNoContent("POST", "/api/notes/$noteId/replies", request)
@@ -486,7 +500,7 @@ class NotesViewModel @Inject constructor(
      */
     private suspend fun decryptReply(reply: NoteReply): DecryptedReply? {
         val ourPubkey = cryptoService.pubkey ?: return null
-        val envelope = reply.recipientEnvelopes.find { it.pubkey == ourPubkey } ?: return null
+        val envelope = reply.readerEnvelopes.find { it.pubkey == ourPubkey } ?: return null
         return try {
             val payload = cryptoService.decryptNote(reply.encryptedContent, envelope)
             if (payload != null) {
@@ -510,8 +524,23 @@ class NotesViewModel @Inject constructor(
     private suspend fun decryptNote(note: NoteResponse): DecryptedNote? {
         val ourPubkey = cryptoService.pubkey ?: return null
 
-        val envelope = note.recipientEnvelopes.find { it.pubkey == ourPubkey }
-            ?: return null
+        // Find the envelope for our pubkey: check authorEnvelope first (if we're
+        // the author), then adminEnvelopes (if we're an admin reader).
+        val envelope: RecipientEnvelope = if (note.authorPubkey == ourPubkey && note.authorEnvelope != null) {
+            RecipientEnvelope(
+                pubkey = ourPubkey,
+                wrappedKey = note.authorEnvelope!!.wrappedKey,
+                ephemeralPubkey = note.authorEnvelope!!.ephemeralPubkey,
+            )
+        } else {
+            note.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
+                RecipientEnvelope(
+                    pubkey = adminEnv.pubkey,
+                    wrappedKey = adminEnv.wrappedKey,
+                    ephemeralPubkey = adminEnv.ephemeralPubkey,
+                )
+            } ?: return null
+        }
 
         return try {
             val payload = cryptoService.decryptNote(note.encryptedContent, envelope)
@@ -521,9 +550,9 @@ class NotesViewModel @Inject constructor(
                     text = payload.text,
                     fields = payload.fields,
                     authorPubkey = note.authorPubkey,
-                    callId = note.callId,
-                    conversationId = note.conversationId,
-                    replyCount = note.replyCount,
+                    callId = note.callID,
+                    conversationId = note.conversationID,
+                    replyCount = note.replyCount?.toInt() ?: 0,
                     createdAt = note.createdAt,
                     updatedAt = note.updatedAt,
                 )

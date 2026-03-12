@@ -43,8 +43,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.ShiftResponse
+import org.llamenos.hotline.model.dayIndices
+import org.llamenos.hotline.model.displayStatus
 import org.llamenos.hotline.util.DateFormatUtils
+import org.llamenos.protocol.ShiftResponse
 
 /**
  * Shifts screen showing clock in/out toggle and available shifts.
@@ -154,7 +156,7 @@ fun ShiftsScreen(
 
                         // Shifts grouped by day
                         val shiftsByDay = uiState.shifts.groupBy { shift ->
-                            shift.days.firstOrNull() ?: 0
+                            shift.dayIndices.firstOrNull() ?: 0
                         }.toSortedMap()
 
                         if (shiftsByDay.isEmpty() && !uiState.isLoading) {
@@ -382,7 +384,7 @@ private fun ShiftCard(
 
                 // Days
                 Text(
-                    text = shift.days.joinToString(", ") { DateFormatUtils.shortDayName(it) },
+                    text = shift.dayIndices.joinToString(", ") { DateFormatUtils.shortDayName(it) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -396,13 +398,13 @@ private fun ShiftCard(
             ) {
                 // Status badge
                 Text(
-                    text = when (shift.status) {
+                    text = when (shift.displayStatus) {
                         "available" -> stringResource(R.string.shifts_available)
                         "assigned" -> stringResource(R.string.shifts_assigned)
-                        else -> shift.status.replaceFirstChar { it.uppercase() }
+                        else -> shift.displayStatus.replaceFirstChar { it.uppercase() }
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = when (shift.status) {
+                    color = when (shift.displayStatus) {
                         "available" -> MaterialTheme.colorScheme.primary
                         "assigned" -> MaterialTheme.colorScheme.tertiary
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -412,7 +414,7 @@ private fun ShiftCard(
 
                 Spacer(Modifier.height(8.dp))
 
-                when (shift.status) {
+                when (shift.displayStatus) {
                     "available" -> {
                         FilledTonalButton(
                             onClick = onSignUp,

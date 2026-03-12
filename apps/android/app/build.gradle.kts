@@ -68,6 +68,8 @@ android {
     sourceSets {
         getByName("main") {
             jniLibs.directories.add("src/main/jniLibs")
+            // Include generated protocol types from codegen
+            kotlin.srcDir("${rootProject.projectDir}/../../packages/protocol/generated/kotlin")
         }
     }
 

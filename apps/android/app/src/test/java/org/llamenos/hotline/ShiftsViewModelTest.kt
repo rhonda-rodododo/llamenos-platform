@@ -98,11 +98,13 @@ class ShiftsViewModelTest {
         assertNull(cleared.error)
     }
 
-    private fun mockShift(id: String) = org.llamenos.hotline.model.ShiftResponse(
+    private fun mockShift(id: String) = org.llamenos.protocol.ShiftResponse(
         id = id,
+        name = "Test Shift",
         startTime = "09:00",
         endTime = "17:00",
-        days = listOf(1, 2, 3),
-        status = "available",
+        days = listOf(1.0, 2.0, 3.0),
+        volunteerPubkeys = emptyList(),
+        createdAt = "2026-03-01",
     )
 }

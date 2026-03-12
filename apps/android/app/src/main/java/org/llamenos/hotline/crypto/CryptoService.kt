@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.llamenos.hotline.model.NotePayload
-import org.llamenos.hotline.model.RecipientEnvelope
+import org.llamenos.protocol.RecipientEnvelope
 import javax.inject.Inject
 import javax.inject.Singleton
 

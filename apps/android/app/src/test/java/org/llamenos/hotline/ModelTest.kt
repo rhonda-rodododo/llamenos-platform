@@ -10,12 +10,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.llamenos.hotline.model.ClockResponse
 import org.llamenos.hotline.model.NotePayload
-import org.llamenos.hotline.model.ShiftResponse
 import org.llamenos.hotline.model.ShiftStatusResponse
 import org.llamenos.hotline.model.ShiftsListResponse
 import org.llamenos.hotline.ui.notes.DecryptedNote
 import org.llamenos.hotline.ui.notes.NotesUiState
 import org.llamenos.hotline.ui.notes.displayValue
+import org.llamenos.protocol.ShiftResponse
 
 /**
  * Unit tests for model serialization and data class behavior.
@@ -25,28 +25,27 @@ class ModelTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    // ─── ShiftResponse Serialization ───────────────────────────
+    // --- ShiftResponse Serialization (generated type) ---
 
     @Test
     fun `ShiftResponse deserializes from JSON`() {
-        val input = """{"id":"s1","startTime":"09:00","endTime":"17:00","days":[1,3,5],"status":"available"}"""
+        val input = """{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0,3.0,5.0],"volunteerPubkeys":[],"createdAt":"2026-03-01"}"""
         val shift = json.decodeFromString<ShiftResponse>(input)
 
         assertEquals("s1", shift.id)
+        assertEquals("Morning", shift.name)
         assertEquals("09:00", shift.startTime)
         assertEquals("17:00", shift.endTime)
-        assertEquals(listOf(1, 3, 5), shift.days)
-        assertEquals("available", shift.status)
-        assertNull(shift.volunteerId)
+        assertEquals(listOf(1.0, 3.0, 5.0), shift.days)
+        assertTrue(shift.volunteerPubkeys.isEmpty())
     }
 
     @Test
-    fun `ShiftResponse deserializes with optional volunteerId`() {
-        val input = """{"id":"s2","startTime":"18:00","endTime":"02:00","days":[0],"volunteerId":"vol123","status":"assigned"}"""
+    fun `ShiftResponse deserializes with volunteerPubkeys`() {
+        val input = """{"id":"s2","name":"Evening","startTime":"18:00","endTime":"02:00","days":[0.0],"volunteerPubkeys":["pk1","pk2"],"createdAt":"2026-03-01"}"""
         val shift = json.decodeFromString<ShiftResponse>(input)
 
-        assertEquals("vol123", shift.volunteerId)
-        assertEquals("assigned", shift.status)
+        assertEquals(listOf("pk1", "pk2"), shift.volunteerPubkeys)
     }
 
     @Test
@@ -81,14 +80,14 @@ class ModelTest {
 
     @Test
     fun `ShiftsListResponse deserializes with total count`() {
-        val input = """{"shifts":[{"id":"s1","startTime":"09:00","endTime":"17:00","days":[1],"status":"available"}],"total":42}"""
+        val input = """{"shifts":[{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0],"volunteerPubkeys":[],"createdAt":"2026-03-01"}],"total":42}"""
         val response = json.decodeFromString<ShiftsListResponse>(input)
 
         assertEquals(1, response.shifts.size)
         assertEquals(42, response.total)
     }
 
-    // ─── NotePayload Serialization ─────────────────────────────
+    // --- NotePayload Serialization ---
 
     @Test
     fun `NotePayload deserializes text-only note`() {
@@ -118,7 +117,7 @@ class ModelTest {
         assertEquals(original.text, deserialized.text)
     }
 
-    // ─── JsonElement.displayValue() Extension ──────────────────
+    // --- JsonElement.displayValue() Extension ---
 
     @Test
     fun `displayValue formats boolean true as Yes`() {
@@ -144,7 +143,7 @@ class ModelTest {
         assertEquals("42", element.displayValue())
     }
 
-    // ─── NotesUiState ──────────────────────────────────────────
+    // --- NotesUiState ---
 
     @Test
     fun `NotesUiState default has empty notes and no loading`() {

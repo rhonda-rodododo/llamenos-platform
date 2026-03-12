@@ -5,10 +5,10 @@ import kotlinx.serialization.Serializable
 /**
  * A messaging conversation between a contact and the hotline.
  *
- * Each conversation is scoped to a single channel ([channelType]) and contact.
- * The [contactHash] is a one-way hash of the contact's identifier for privacy.
- * Conversations can be assigned to a specific volunteer or remain unassigned
- * in a pool visible to all on-shift volunteers.
+ * Client-specific shape optimized for local UI. The generated
+ * ConversationResponse (org.llamenos.protocol.ConversationResponse) represents
+ * the full API shape with different field names (contactIdentifierHash,
+ * assignedTo, messageCount). This type uses UI-friendly field names.
  */
 @Serializable
 data class Conversation(
@@ -35,7 +35,7 @@ data class ConversationMessage(
     val conversationId: String,
     val direction: String,
     val encryptedContent: String,
-    val recipientEnvelopes: List<RecipientEnvelope>,
+    val recipientEnvelopes: List<org.llamenos.protocol.RecipientEnvelope>,
     val channelType: String,
     val createdAt: String,
     val readAt: String? = null,
@@ -60,24 +60,16 @@ data class MessagesListResponse(
 )
 
 /**
- * Request body for sending an encrypted reply via POST /api/conversations/:id/messages.
+ * Request body for sending an encrypted reply.
+ * Uses the generated SendMessageBody type.
  */
-@Serializable
-data class SendMessageRequest(
-    val encryptedContent: String,
-    val recipientEnvelopes: List<CreateMessageEnvelope>,
-    val channelType: String,
-)
+typealias SendMessageRequest = org.llamenos.protocol.SendMessageBody
 
 /**
  * Envelope structure for the send-message request body.
+ * Uses the generated SendMessageBodyReaderEnvelope type.
  */
-@Serializable
-data class CreateMessageEnvelope(
-    val pubkey: String,
-    val wrappedKey: String,
-    val ephemeralPubkey: String,
-)
+typealias CreateMessageEnvelope = org.llamenos.protocol.SendMessageBodyReaderEnvelope
 
 /**
  * Decrypted message for UI display.
