@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth'
 import { useConfig, useHasMessaging } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
 import { useEffect, useState, useCallback, type ReactNode } from 'react'
+import { hexToBytes } from '@noble/hashes/utils.js'
 import { NostrProvider } from '@/lib/nostr/context'
 import { useCalls, useShiftStatus } from '@/lib/hooks'
 import { CommandPalette, triggerCommandPalette } from '@/components/command-palette'
@@ -156,12 +157,14 @@ const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frid
 function NostrWrappedLayout() {
   const { serverNostrPubkey, nostrRelayUrl } = useConfig()
 
-  // Hub key not yet available at this layer — will be provided by hub-key-manager
-  // when Epic 76.2 hub key distribution is wired in. For now, return null
-  // which means Nostr events won't be decrypted (REST polling still works).
+  const { serverEventKeyHex } = useAuth()
+
+  // Server event key for decrypting relay events (XChaCha20-Poly1305).
+  // The key comes from GET /api/auth/me — same algorithm as decryptFromHub().
   const getHubKey = useCallback((): Uint8Array | null => {
-    return null
-  }, [])
+    if (!serverEventKeyHex) return null
+    return hexToBytes(serverEventKeyHex)
+  }, [serverEventKeyHex])
 
   return (
     <NostrProvider

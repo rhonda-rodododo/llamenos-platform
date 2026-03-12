@@ -263,6 +263,37 @@ pub fn ecies_decrypt_content_hex(
     ecies_decrypt_content(packed_hex, ephemeral_pubkey_hex, secret_key_hex, label)
 }
 
+/// Decrypt a server-encrypted event payload (XChaCha20-Poly1305).
+///
+/// Input: hex(nonce_24 + ciphertext), 32-byte key as hex.
+/// Output: decrypted UTF-8 string (JSON).
+///
+/// Used by mobile platforms to decrypt Nostr relay events encrypted
+/// with the server event key (from GET /api/auth/me serverEventKeyHex).
+#[uniffi::export]
+pub fn decrypt_server_event_hex(encrypted_hex: &str, key_hex: &str) -> Result<String, CryptoError> {
+    use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+
+    let data = hex::decode(encrypted_hex).map_err(CryptoError::HexError)?;
+    let key_bytes = hex::decode(key_hex).map_err(CryptoError::HexError)?;
+    if key_bytes.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+    if data.len() < 40 {
+        return Err(CryptoError::InvalidCiphertext);
+    }
+
+    let nonce = XNonce::from_slice(&data[..24]);
+    let ciphertext = &data[24..];
+    let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let plaintext = cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|_| CryptoError::DecryptionFailed)?;
+
+    String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,5 +502,59 @@ mod tests {
             label,
         ).unwrap();
         assert_eq!(decrypted, content);
+    }
+
+    #[test]
+    fn roundtrip_server_event_decrypt() {
+        use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+
+        let key = random_bytes_32();
+        let key_hex = hex::encode(&key);
+
+        let plaintext = r#"{"type":"call:ring","callId":"abc123"}"#;
+        let mut nonce_bytes = [0u8; 24];
+        getrandom::getrandom(&mut nonce_bytes).unwrap();
+        let nonce = XNonce::from_slice(&nonce_bytes);
+        let cipher = XChaCha20Poly1305::new_from_slice(&key).unwrap();
+        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).unwrap();
+
+        let mut packed = Vec::with_capacity(24 + ciphertext.len());
+        packed.extend_from_slice(&nonce_bytes);
+        packed.extend_from_slice(&ciphertext);
+        let encrypted_hex = hex::encode(&packed);
+
+        let decrypted = decrypt_server_event_hex(&encrypted_hex, &key_hex).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn server_event_decrypt_wrong_key_fails() {
+        use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+
+        let key = random_bytes_32();
+        let wrong_key = random_bytes_32();
+
+        let plaintext = r#"{"type":"call:ring"}"#;
+        let mut nonce_bytes = [0u8; 24];
+        getrandom::getrandom(&mut nonce_bytes).unwrap();
+        let nonce = XNonce::from_slice(&nonce_bytes);
+        let cipher = XChaCha20Poly1305::new_from_slice(&key).unwrap();
+        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).unwrap();
+
+        let mut packed = Vec::with_capacity(24 + ciphertext.len());
+        packed.extend_from_slice(&nonce_bytes);
+        packed.extend_from_slice(&ciphertext);
+        let encrypted_hex = hex::encode(&packed);
+
+        let result = decrypt_server_event_hex(&encrypted_hex, &hex::encode(wrong_key));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn server_event_decrypt_too_short_fails() {
+        let key_hex = hex::encode(random_bytes_32());
+        let short_hex = hex::encode([0u8; 30]);
+        let result = decrypt_server_event_hex(&short_hex, &key_hex);
+        assert!(result.is_err());
     }
 }
