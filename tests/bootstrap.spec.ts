@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { loginAsAdmin, resetTestState } from './helpers'
 
+const TEST_RESET_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
+const resetHeaders = { 'X-Test-Secret': TEST_RESET_SECRET }
+
 // Tests depend on each other's server-side state (bootstrap creates admin for later tests)
 test.describe.configure({ mode: 'serial' })
 
@@ -10,7 +13,7 @@ test.describe('In-Browser Admin Bootstrap', () => {
   // =====================================================================
   test('fresh deploy redirects unauthenticated user to /setup', async ({ page, request }) => {
     // Reset to a fresh state with no admin
-    await request.post('/api/test-reset-no-admin')
+    await request.post('/api/test-reset-no-admin', { headers: resetHeaders })
 
     // Verify server state: config should show needsBootstrap
     const configRes = await request.get('/api/config')
@@ -54,7 +57,7 @@ test.describe('In-Browser Admin Bootstrap', () => {
   // =====================================================================
   test('login page shows "go to setup" when no admin exists', async ({ page, request }) => {
     // Ensure fresh state
-    await request.post('/api/test-reset-no-admin')
+    await request.post('/api/test-reset-no-admin', { headers: resetHeaders })
 
     await page.goto('/login')
     await page.evaluate(() => {
@@ -73,7 +76,7 @@ test.describe('In-Browser Admin Bootstrap', () => {
   // =====================================================================
   test('complete bootstrap flow creates admin and advances to wizard', async ({ page, request }) => {
     // Fresh state
-    await request.post('/api/test-reset-no-admin')
+    await request.post('/api/test-reset-no-admin', { headers: resetHeaders })
 
     await page.goto('/setup')
     await page.evaluate(() => {

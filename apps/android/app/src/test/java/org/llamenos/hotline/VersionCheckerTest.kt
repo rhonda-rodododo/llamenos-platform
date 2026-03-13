@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -26,14 +27,16 @@ import org.llamenos.hotline.crypto.KeystoreService
  *
  * Uses OkHttp [MockWebServer] to simulate `/api/config` responses with
  * different `apiVersion` and `minApiVersion` values.
+ *
+ * The production [OkHttpClient] (with [AuthInterceptor] and certificate pinning)
+ * is replaced with a plain client because JVM unit tests cannot load the native
+ * crypto library required by [AuthInterceptor.intercept].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VersionCheckerTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var mockWebServer: MockWebServer
-    private lateinit var keyValueStore: InMemoryKeyValueStore
-    private lateinit var apiService: ApiService
     private lateinit var versionChecker: VersionChecker
 
     @Before
@@ -42,14 +45,15 @@ class VersionCheckerTest {
         mockWebServer = MockWebServer()
         mockWebServer.start()
 
-        keyValueStore = InMemoryKeyValueStore()
-        // Set hub URL to point to mock server
+        val keyValueStore = InMemoryKeyValueStore()
         keyValueStore.store(KeystoreService.KEY_HUB_URL, mockWebServer.url("/").toString().trimEnd('/'))
 
         val cryptoService = CryptoService()
-        val authInterceptor = AuthInterceptor(cryptoService)
-        val retryInterceptor = RetryInterceptor()
-        apiService = ApiService(authInterceptor, retryInterceptor, keyValueStore)
+        val apiService = ApiService(AuthInterceptor(cryptoService), RetryInterceptor(), keyValueStore)
+        // Replace production OkHttpClient (which has AuthInterceptor + cert pinning)
+        // with a plain client for JVM unit tests
+        apiService.client = OkHttpClient()
+
         versionChecker = VersionChecker(apiService)
     }
 
@@ -104,7 +108,6 @@ class VersionCheckerTest {
 
     @Test
     fun `check returns Unknown on network error`() = runTest {
-        // Shut down the mock server to simulate network failure
         mockWebServer.shutdown()
 
         val status = versionChecker.check()

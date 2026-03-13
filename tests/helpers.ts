@@ -307,8 +307,12 @@ export function uniquePhone(): string {
   return `+1555${suffix}`
 }
 
+const TEST_RESET_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
+
 export async function resetTestState(request: APIRequestContext) {
-  const res = await request.post('/api/test-reset')
+  const res = await request.post('/api/test-reset', {
+    headers: { 'X-Test-Secret': TEST_RESET_SECRET },
+  })
   if (!res.ok()) {
     throw new Error(`test-reset failed with status ${res.status()}: ${await res.text()}`)
   }

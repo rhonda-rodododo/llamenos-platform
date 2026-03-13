@@ -178,8 +178,9 @@ export class SettingsDO extends DurableObject<Env> {
       }))
       await this.ctx.storage.put('roles', roles)
     }
-    // Mark setup as completed in demo mode so users skip the wizard
-    if (this.env.DEMO_MODE === 'true') {
+    // Mark setup as completed in demo/development mode so users skip the wizard
+    if (this.env.DEMO_MODE === 'true' || this.env.ENVIRONMENT === 'development') {
+      const isDemoMode = this.env.DEMO_MODE === 'true'
       const setupState = await this.ctx.storage.get<SetupState>('setupState')
       if (!setupState || !setupState.setupCompleted) {
         await this.ctx.storage.put<SetupState>('setupState', {
@@ -187,7 +188,7 @@ export class SettingsDO extends DurableObject<Env> {
           completedSteps: ['welcome', 'telephony', 'channels'],
           pendingChannels: [],
           selectedChannels: ['voice', 'sms', 'signal', 'reports'],
-          demoMode: true,
+          demoMode: isDemoMode,
         })
       }
       // Enable messaging channels so the Conversations UI is visible

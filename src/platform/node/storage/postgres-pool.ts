@@ -26,24 +26,37 @@ export async function initPostgresPool(): Promise<ReturnType<typeof postgres>> {
     connect_timeout: 10,
   })
 
-  // Auto-create tables
-  await pool`
-    CREATE TABLE IF NOT EXISTS kv_store (
-      namespace TEXT NOT NULL,
-      key       TEXT NOT NULL,
-      value     JSONB NOT NULL,
-      PRIMARY KEY (namespace, key)
-    )
-  `
-  await pool`
-    CREATE TABLE IF NOT EXISTS alarms (
-      namespace    TEXT NOT NULL PRIMARY KEY,
-      scheduled_at BIGINT NOT NULL
-    )
-  `
-  await pool`
-    CREATE INDEX IF NOT EXISTS idx_alarms_scheduled ON alarms (scheduled_at)
-  `
+  // Auto-create tables. Wrapped in try/catch because concurrent
+  // CREATE TABLE IF NOT EXISTS can race on pg_type creation (PostgreSQL
+  // creates a composite type per table, and the IF NOT EXISTS check
+  // doesn't cover the type insertion, leading to duplicate key errors).
+  try {
+    await pool`
+      CREATE TABLE IF NOT EXISTS kv_store (
+        namespace TEXT NOT NULL,
+        key       TEXT NOT NULL,
+        value     JSONB NOT NULL,
+        PRIMARY KEY (namespace, key)
+      )
+    `
+    await pool`
+      CREATE TABLE IF NOT EXISTS alarms (
+        namespace    TEXT NOT NULL PRIMARY KEY,
+        scheduled_at BIGINT NOT NULL
+      )
+    `
+    await pool`
+      CREATE INDEX IF NOT EXISTS idx_alarms_scheduled ON alarms (scheduled_at)
+    `
+  } catch (err: unknown) {
+    // Ignore duplicate type errors from concurrent table creation (code 23505 on pg_type)
+    const pgErr = err as { code?: string; constraint_name?: string }
+    if (pgErr.code === '23505' && pgErr.constraint_name === 'pg_type_typname_nsp_index') {
+      // Tables already exist — safe to continue
+    } else {
+      throw err
+    }
+  }
 
   console.log(`[postgres] Pool initialized (max ${poolSize} connections)`)
   return pool

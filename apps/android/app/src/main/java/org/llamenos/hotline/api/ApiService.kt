@@ -35,7 +35,7 @@ class ApiService @Inject constructor(
 ) {
 
     @PublishedApi
-    internal val client: OkHttpClient = OkHttpClient.Builder()
+    internal var client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(retryInterceptor)
         .addInterceptor(authInterceptor)
         .certificatePinner(certificatePinner)
