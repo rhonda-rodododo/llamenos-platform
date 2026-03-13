@@ -552,6 +552,10 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 - [x] **[Epic 311: Mobile Admin Envelope Encryption & Blasts Authorization](epics/epic-311-mobile-admin-envelope-encryption-blasts-auth.md)** — Wire adminDecryptionPubkey into iOS/Android encryption, add requirePermission to 14 blast endpoints, Zod validation for 10 endpoints
 - [x] **Follow-up fixes**: Add requirePermission to GET /conversations/stats and GET /reports/categories, Zod validator for POST /calls/:callId/ban
 
+## Test Infrastructure (Epics 312-313)
+- [ ] **[Epic 312: Permission Matrix BDD Flakiness](epics/epic-312-permission-matrix-bdd-flakiness.md)** — Intermittent failures under concurrent load, passes in isolation
+- [ ] **[Epic 313: Worker Integration Test Fixtures](epics/epic-313-worker-integration-test-fixtures.md)** — 5 tests use stale placeholder data that fails new validation (56/61 pass)
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
