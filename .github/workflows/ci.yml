@@ -514,15 +514,31 @@ jobs:
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build
 
-      # ── Docker via colima for API-connected UI tests ──
-      - name: Setup Docker (colima)
+      # ── Native backend for API-connected UI tests ──
+      # Docker is unavailable on macOS GHA runners (no nested virtualization).
+      # Run PostgreSQL and MinIO natively instead.
+      - name: Start PostgreSQL
         run: |
-          brew install docker docker-compose colima
-          mkdir -p ~/.docker
-          echo '{"cliPluginsExtraDirs":["/opt/homebrew/lib/docker/cli-plugins"]}' > ~/.docker/config.json
-          colima start
-          docker version
-          docker compose version
+          brew install postgresql@17
+          export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+          echo "/opt/homebrew/opt/postgresql@17/bin" >> "$GITHUB_PATH"
+          initdb -D /tmp/pgdata
+          pg_ctl -D /tmp/pgdata -l /tmp/pgdata/log start
+          createuser -s llamenos 2>/dev/null || true
+          createdb -O llamenos llamenos 2>/dev/null || true
+
+      - name: Start MinIO
+        run: |
+          curl -sSfL https://dl.min.io/server/minio/release/darwin-arm64/minio -o /tmp/minio
+          chmod +x /tmp/minio
+          MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup /tmp/minio server /tmp/minio-data &>/tmp/minio.log &
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:9000/minio/health/live; then
+              echo "MinIO is ready"
+              break
+            fi
+            sleep 1
+          done
 
       - name: Download build artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -530,33 +546,35 @@ jobs:
           name: app-build
           path: dist/
 
-      - name: Create .env for Docker Compose
+      - name: Start Node.js backend
         run: |
-          printf '%s\n' \
-            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
-            "DOMAIN=localhost" \
-            "PG_PASSWORD=ci-test-password" \
-            "HMAC_SECRET=$(openssl rand -hex 32)" \
-            "MINIO_ACCESS_KEY=testaccess" \
-            "MINIO_SECRET_KEY=testsecret123456" \
-            "HOTLINE_NAME=Llámenos" \
-            "BRIDGE_SECRET=ci-test-bridge-secret" \
-            "ARI_PASSWORD=ci-test-ari-password" \
-            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
-            > deploy/docker/.env
+          nohup node dist/server/index.js &>/tmp/backend.log &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/health; then
+              echo "Backend is ready"
+              break
+            fi
+            sleep 2
+          done
+        env:
+          PLATFORM: node
+          PORT: "3000"
+          DATABASE_URL: postgresql://llamenos@localhost:5432/llamenos
+          PG_POOL_SIZE: "5"
+          ADMIN_PUBKEY: ${{ env.TEST_ADMIN_PUBKEY }}
+          HOTLINE_NAME: "Llámenos"
+          ENVIRONMENT: development
+          DEV_RESET_SECRET: test-reset-secret
+          HMAC_SECRET: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+          MINIO_ENDPOINT: http://localhost:9000
+          MINIO_ACCESS_KEY: testaccess
+          MINIO_SECRET_KEY: testsecret123456
+          MINIO_BUCKET: llamenos-files
+          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
 
-      - name: Build and start Docker Compose
-        working-directory: deploy/docker
-        run: |
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
-        timeout-minutes: 10
-
-      - name: Show container status
+      - name: Show backend logs
         if: ${{ !cancelled() }}
-        working-directory: deploy/docker
-        run: |
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml ps || true
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml logs --tail=50 || true
+        run: cat /tmp/backend.log || true
 
       - name: Run UI tests
         working-directory: apps/ios
@@ -568,10 +586,12 @@ jobs:
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build
 
-      - name: Tear down Docker Compose
+      - name: Stop backend services
         if: always()
-        working-directory: deploy/docker
-        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml down -v 2>/dev/null || true
+        run: |
+          pkill -f "node dist/server/index.js" || true
+          pkill -f minio || true
+          pg_ctl -D /tmp/pgdata stop 2>/dev/null || true
 
   # ─── Version Bump & Changelog (main only) ───────────────────
   version:
