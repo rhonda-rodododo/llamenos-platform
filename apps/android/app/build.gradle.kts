@@ -6,6 +6,16 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// ecryptfs (encrypted home dirs) has a 143-byte filename limit. D8 global synthetics
+// for Compose lambdas generate filenames up to ~150 chars, causing build failures.
+// Redirect build output to /tmp on Linux to avoid this. Set ANDROID_BUILD_DIR to override.
+val buildDir = System.getenv("ANDROID_BUILD_DIR")
+if (buildDir != null) {
+    layout.buildDirectory = file(buildDir)
+} else if (System.getProperty("os.name")?.lowercase()?.contains("linux") == true) {
+    layout.buildDirectory = file("/tmp/llamenos-android-build/app")
+}
+
 android {
     namespace = "org.llamenos.hotline"
     compileSdk = 36

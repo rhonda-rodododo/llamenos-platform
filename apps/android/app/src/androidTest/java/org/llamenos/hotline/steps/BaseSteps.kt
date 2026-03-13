@@ -41,7 +41,7 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
     // ---- Shared utility methods ----
 
     /**
-     * Enter a 4-digit PIN by tapping pin-N buttons sequentially.
+     * Enter a PIN by tapping pin-N buttons sequentially.
      */
     protected fun enterPin(pin: String) {
         for (digit in pin.toList()) {
@@ -51,7 +51,7 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
     }
 
     /**
-     * Complete the full auth flow: create identity -> confirm backup -> PIN 1234 -> confirm 1234.
+     * Complete the full auth flow: create identity -> confirm backup -> PIN 123456 -> confirm 123456.
      * After this, the app is on the dashboard.
      *
      * Handles two cases:
@@ -84,11 +84,11 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             waitForNode("confirm-backup")
             onNodeWithTag("confirm-backup").performClick()
             waitForNode("pin-pad")
-            enterPin("1234")
-            enterPin("1234")
+            enterPin("123456")
+            enterPin("123456")
         } else {
             // Returning user — enter PIN to unlock
-            enterPin("1234")
+            enterPin("123456")
         }
         waitForNode("dashboard-title")
         onNodeWithTag("dashboard-title").assertIsDisplayed()

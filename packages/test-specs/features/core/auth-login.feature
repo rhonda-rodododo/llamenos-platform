@@ -149,31 +149,31 @@ Feature: Authentication & Login
 
   @desktop @ios @android @smoke
   Scenario: PIN pad displays correctly
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     Then I should see the PIN pad with digits 0-9
     And I should see the PIN dots indicator
 
   @desktop @ios @android @smoke
   Scenario: Correct PIN unlocks to dashboard
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
-    When I enter PIN "1234"
+    When I enter PIN "123456"
     Then I should arrive at the dashboard
     And the dashboard title should be displayed
     And the bottom navigation should be visible
 
   @desktop @ios @android @smoke
   Scenario: Wrong PIN shows error
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
-    When I enter PIN "9999"
+    When I enter PIN "999999"
     Then I should remain on the unlock screen
     And the PIN dots should be cleared
 
   @desktop @ios @android @regression
   Scenario: Backspace removes entered digit
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     When I press "1", "2"
     And I press backspace
@@ -182,9 +182,9 @@ Feature: Authentication & Login
 
   @desktop @ios @android @regression
   Scenario: PIN is encrypted and stored
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
-    When I enter PIN "1234"
+    When I enter PIN "123456"
     Then the encrypted key data should be stored
     And the pubkey should be stored for locked display
     And the npub should be stored for locked display
@@ -193,7 +193,7 @@ Feature: Authentication & Login
 
   @desktop @ios @android @smoke
   Scenario: Unlock screen displays for returning user
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     When the app launches
     Then I should see the PIN unlock screen
@@ -202,35 +202,35 @@ Feature: Authentication & Login
 
   @desktop @ios @android @smoke
   Scenario: Correct PIN unlocks the app
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
-    When I enter PIN "1234"
+    When I enter PIN "123456"
     Then I should arrive at the dashboard
     And the crypto service should be unlocked
 
   @desktop @ios @android @smoke
   Scenario: Wrong PIN shows error on unlock
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
-    When I enter PIN "9999"
+    When I enter PIN "999999"
     Then I should see a PIN error message
     And I should remain on the unlock screen
     And the PIN dots should be cleared
 
   @desktop @ios @android @regression
   Scenario: Multiple wrong PINs allow retry
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
-    When I enter PIN "0000"
+    When I enter PIN "000000"
     And I see the error
-    And I enter PIN "1111"
+    And I enter PIN "111111"
     And I see the error
-    And I enter PIN "1234"
+    And I enter PIN "123456"
     Then I should arrive at the dashboard
 
   @desktop @ios @android @regression
   Scenario: Recovery options accessible from unlock screen
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     When I tap "Recovery options"
     Then I should see the nsec import input field
@@ -239,71 +239,71 @@ Feature: Authentication & Login
 
   @desktop @ios @android @security
   Scenario: First four wrong PINs allow immediate retry
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
-    When I enter PIN "0000"
+    When I enter PIN "000000"
     Then I should see a PIN error message
     And I should not see a lockout timer
-    When I enter PIN "1111"
+    When I enter PIN "111111"
     Then I should see a PIN error message
     And I should not see a lockout timer
-    When I enter PIN "2222"
+    When I enter PIN "222222"
     Then I should see a PIN error message
     And I should not see a lockout timer
-    When I enter PIN "3333"
+    When I enter PIN "333333"
     Then I should see a PIN error message
     And I should not see a lockout timer
 
   @desktop @ios @android @security
   Scenario: Fifth wrong PIN triggers 30-second lockout
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     And I have 4 failed PIN attempts
-    When I enter PIN "0000"
+    When I enter PIN "000000"
     Then I should see a lockout message
     And the lockout duration should be approximately 30 seconds
     And the PIN pad should be disabled
 
   @desktop @ios @android @security
   Scenario: Seventh wrong PIN triggers 2-minute lockout
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     And I have 6 failed PIN attempts
-    When I enter PIN "0000"
+    When I enter PIN "000000"
     Then I should see a lockout message
     And the lockout duration should be approximately 2 minutes
     And the PIN pad should be disabled
 
   @desktop @ios @android @security
   Scenario: Ninth wrong PIN triggers 10-minute lockout
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     And I have 8 failed PIN attempts
-    When I enter PIN "0000"
+    When I enter PIN "000000"
     Then I should see a lockout message
     And the lockout duration should be approximately 10 minutes
 
   @desktop @ios @android @security @destructive
   Scenario: Tenth wrong PIN wipes all keys
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     And I have 9 failed PIN attempts
-    When I enter PIN "0000"
+    When I enter PIN "000000"
     Then the stored keys should be wiped
     And I should be redirected to the setup or login screen
 
   @desktop @ios @android @security
   Scenario: Correct PIN resets attempt counter
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     And I have 3 failed PIN attempts
-    When I enter PIN "1234"
+    When I enter PIN "123456"
     Then I should arrive at the dashboard
     And the failed attempt counter should be reset
 
   @desktop @ios @android @security
   Scenario: Lockout persists after app restart
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     And I have 5 failed PIN attempts
     And I see the lockout message
@@ -313,11 +313,11 @@ Feature: Authentication & Login
 
   @desktop @ios @android @security
   Scenario: After lockout expires, retry is allowed
-    Given I have a stored identity with PIN "1234"
+    Given I have a stored identity with PIN "123456"
     And the app is restarted
     And I have 5 failed PIN attempts
     And the lockout has expired
-    When I enter PIN "1234"
+    When I enter PIN "123456"
     Then I should arrive at the dashboard
 
   # ── Desktop/Mobile: Key Import ────────────────────────────────────

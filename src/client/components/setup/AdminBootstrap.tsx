@@ -59,8 +59,9 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
   const stepHeadingRef = useRef<HTMLHeadingElement>(null)
   const langGroupRef = useRef<HTMLDivElement>(null)
 
-  // Focus step heading on step change
+  // Focus step heading on step change (skip PIN steps — PinInput has autoFocus)
   useEffect(() => {
+    if (step === 'pin') return
     const timer = setTimeout(() => stepHeadingRef.current?.focus(), 50)
     return () => clearTimeout(timer)
   }, [step, pinStep])

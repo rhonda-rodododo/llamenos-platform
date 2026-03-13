@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, resetTestState } from './helpers'
+import { loginAsAdmin, resetTestState, enterPin } from './helpers'
 
 const TEST_RESET_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
 const resetHeaders = { 'X-Test-Secret': TEST_RESET_SECRET }
@@ -94,18 +94,11 @@ test.describe('In-Browser Admin Bootstrap', () => {
 
     // Step 2: PIN creation
     await expect(page.getByText('Create a PIN')).toBeVisible({ timeout: 5000 })
-    const pinDigit1 = page.locator('input[aria-label="PIN digit 1"]')
-    await pinDigit1.waitFor({ state: 'visible', timeout: 5000 })
-    await pinDigit1.click()
-    await page.keyboard.type('123456', { delay: 50 })
-    await page.keyboard.press('Enter')
+    await enterPin(page, '123456')
 
     // PIN confirmation
     await expect(page.getByText('Confirm your PIN')).toBeVisible({ timeout: 5000 })
-    const confirmDigit1 = page.locator('input[aria-label="PIN digit 1"]')
-    await confirmDigit1.click()
-    await page.keyboard.type('123456', { delay: 50 })
-    await page.keyboard.press('Enter')
+    await enterPin(page, '123456')
 
     // Step 3: Generating + backup
     await expect(page.getByText('Save Your Recovery Key')).toBeVisible({ timeout: 15000 })
@@ -144,11 +137,7 @@ test.describe('In-Browser Admin Bootstrap', () => {
     await expect(page.getByRole('heading', { name: 'Enter your PIN' })).toBeVisible({ timeout: 10000 })
 
     // Enter the correct PIN
-    const unlockDigit1 = page.locator('input[aria-label="PIN digit 1"]')
-    await unlockDigit1.waitFor({ state: 'visible', timeout: 5000 })
-    await unlockDigit1.click()
-    await page.keyboard.type('123456', { delay: 50 })
-    await page.keyboard.press('Enter')
+    await enterPin(page, '123456')
 
     // Should advance back to the wizard after PIN entry
     await expect(page.getByText('Setup Wizard')).toBeVisible({ timeout: 10000 })

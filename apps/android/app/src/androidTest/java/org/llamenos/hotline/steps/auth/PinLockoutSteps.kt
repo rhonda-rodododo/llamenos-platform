@@ -64,7 +64,7 @@ class PinLockoutSteps : BaseSteps() {
             if (!keystoreService.contains(KeystoreService.KEY_ENCRYPTED_KEYS)) {
                 cryptoService.generateKeypair()
                 runBlocking {
-                    val encrypted = cryptoService.encryptForStorage("1234")
+                    val encrypted = cryptoService.encryptForStorage("123456")
                     val stored = Json.encodeToString(
                         StoredKeyData(
                             ciphertext = encrypted.ciphertext,
@@ -243,7 +243,7 @@ class PinLockoutSteps : BaseSteps() {
     fun iShouldNotBeAbleToEnterAPinUntilLockoutExpires() {
         // When locked out, entering a PIN should trigger the lockout error.
         try {
-            enterPin("9999")
+            enterPin("999999")
         } catch (_: Throwable) {
             // PIN pad may not accept input during lockout
         }

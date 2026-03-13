@@ -525,7 +525,7 @@ class CryptoSteps : BaseSteps() {
     @When("I encrypt with the test PIN")
     fun iEncryptWithTheTestPin() {
         try {
-            runBlocking { encryptedKeyData = cryptoService.encryptForStorage("1234") }
+            runBlocking { encryptedKeyData = cryptoService.encryptForStorage("123456") }
         } catch (_: Throwable) {
             // Encryption may fail without native crypto
         }
@@ -554,7 +554,7 @@ class CryptoSteps : BaseSteps() {
         try {
             runBlocking {
                 cryptoService.lock()
-                cryptoService.decryptFromStorage(encryptedKeyData!!, "1234")
+                cryptoService.decryptFromStorage(encryptedKeyData!!, "123456")
                 assertTrue(cryptoService.isUnlocked)
             }
         } catch (_: Throwable) {

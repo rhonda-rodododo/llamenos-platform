@@ -156,12 +156,12 @@ test.describe('Cross-platform crypto interop', () => {
     const { encrypted, pin } = vectors.pinEncryption
 
     // Validate structure (don't decrypt — PBKDF2 is too slow in Playwright)
-    expect(encrypted.salt).toHaveLength(32) // 16 bytes hex
+    expect(encrypted.salt).toHaveLength(64) // 32 bytes hex
     expect(encrypted.nonce).toHaveLength(48) // 24 bytes hex
     expect(encrypted.iterations).toBe(600_000)
     expect(encrypted.ciphertext).toBeTruthy()
     expect(encrypted.pubkey).toBeTruthy()
-    expect(pin).toBe('1234')
+    expect(pin).toBe('123456')
   })
 
   // ─── v2 Tests ──────────────────────────────────────────────
@@ -380,22 +380,24 @@ test.describe('Cross-platform crypto interop', () => {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-/** ECIES unwrap: ECDH → SHA-256(label || sharedX) → XChaCha20-Poly1305 */
+/** ECIES unwrap: ECDH → HKDF-SHA256(sharedX, label) → XChaCha20-Poly1305 */
 function eciesUnwrap(
   envelope: { wrappedKey: string; ephemeralPubkey: string },
   secretKeyHex: string,
   label: string,
 ): Uint8Array {
   const wrappedBytes = hexToBytes(envelope.wrappedKey)
-  const nonce = wrappedBytes.slice(0, 24)
-  const ciphertext = wrappedBytes.slice(24)
+  // v2 format: version(1) + nonce(24) + ciphertext
+  const offset = wrappedBytes[0] === 0x02 ? 1 : 0
+  const nonce = wrappedBytes.slice(offset, offset + 24)
+  const ciphertext = wrappedBytes.slice(offset + 24)
   const ephPubkey = hexToBytes(envelope.ephemeralPubkey)
 
   const sharedPoint = secp256k1.getSharedSecret(hexToBytes(secretKeyHex), ephPubkey)
   const sharedX = sharedPoint.slice(1, 33)
 
-  const keyMaterial = new Uint8Array([...utf8ToBytes(label), ...sharedX])
-  const symmetricKey = sha256(keyMaterial)
+  // v2: HKDF-SHA256 with IKM=sharedX, no salt, info=label
+  const symmetricKey = hkdf(sha256, sharedX, undefined, utf8ToBytes(label), 32)
 
   const cipher = xchacha20poly1305(symmetricKey, nonce)
   return cipher.decrypt(ciphertext)
