@@ -260,20 +260,23 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      minio:
-        image: bitnami/minio:2025.1.20
-        env:
-          MINIO_ROOT_USER: testaccess
-          MINIO_ROOT_PASSWORD: testsecret123456
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-        ports:
-          - 9000:9000
 
     steps:
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=testaccess \
+            -e MINIO_ROOT_PASSWORD=testsecret123456 \
+            minio/minio:RELEASE.2025-01-20T14-49-07Z server /data
+          # Wait for MinIO to be healthy
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live; then
+              echo "MinIO is ready"
+              break
+            fi
+            sleep 2
+          done
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
