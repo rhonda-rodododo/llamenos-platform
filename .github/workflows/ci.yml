@@ -206,15 +206,15 @@ jobs:
       - name: Build and start Docker Compose
         working-directory: deploy/docker
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
         timeout-minutes: 10
 
       - name: Show container status
         if: ${{ !cancelled() }}
         working-directory: deploy/docker
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml ps
-          docker compose -f docker-compose.yml -f docker-compose.test.yml logs --tail=50
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml ps || true
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml logs --tail=50 || true
 
       - name: Run E2E tests
         run: bunx playwright test
@@ -237,7 +237,7 @@ jobs:
       - name: Tear down Docker Compose
         if: always()
         working-directory: deploy/docker
-        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
+        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml down -v
 
   # ─── Node.js Integration Tests ──────────────────────────────
   integration-node:
@@ -550,15 +550,15 @@ jobs:
       - name: Build and start Docker Compose
         working-directory: deploy/docker
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
         timeout-minutes: 10
 
       - name: Show container status
         if: ${{ !cancelled() }}
         working-directory: deploy/docker
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml ps
-          docker compose -f docker-compose.yml -f docker-compose.test.yml logs --tail=50
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml ps || true
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml logs --tail=50 || true
 
       - name: Run UI tests
         working-directory: apps/ios
@@ -573,7 +573,7 @@ jobs:
       - name: Tear down Docker Compose
         if: always()
         working-directory: deploy/docker
-        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v 2>/dev/null || true
+        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml down -v 2>/dev/null || true
 
   # ─── Version Bump & Changelog (main only) ───────────────────
   version:
