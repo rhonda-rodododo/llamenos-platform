@@ -815,3 +815,429 @@ export async function generateCaseNumberViaApi(
   if (status !== 200) throw new Error(`Failed to generate case number: ${status}`)
   return data
 }
+
+// ── Case Management: Templates (Epic 317) ──────────────────────────
+
+export interface TemplateSummary {
+  id: string
+  version: string
+  name: string
+  description: string
+  tags: string[]
+  entityTypeCount: number
+  extends: string[]
+}
+
+export async function listTemplatesViaApi(
+  request: APIRequestContext,
+  nsec = ADMIN_NSEC,
+): Promise<TemplateSummary[]> {
+  const { status, data } = await apiGet<{ templates: TemplateSummary[] }>(request, '/settings/cms/templates', nsec)
+  if (status !== 200) throw new Error(`Failed to list templates: ${status}`)
+  return data.templates
+}
+
+export async function getTemplateViaApi(
+  request: APIRequestContext,
+  templateId: string,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/settings/cms/templates/${templateId}`, nsec)
+  if (status !== 200) throw new Error(`Failed to get template: ${status}`)
+  return data
+}
+
+export async function applyTemplateViaApi(
+  request: APIRequestContext,
+  templateId: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ status: number; data: Record<string, unknown> }> {
+  return apiPost<Record<string, unknown>>(request, '/settings/cms/templates/apply', { templateId }, nsec)
+}
+
+// ── Case Management: Contacts (Epic 318) ──────────────────────────
+
+function dummyEnvelope(nsec = ADMIN_NSEC): { pubkey: string; wrappedKey: string; ephemeralPubkey: string } {
+  const skHex = nsecToSkHex(nsec)
+  const pubkey = skHexToPubkey(skHex)
+  return { pubkey, wrappedKey: 'a'.repeat(64), ephemeralPubkey: pubkey }
+}
+
+export async function createContactViaApi(
+  request: APIRequestContext,
+  options?: {
+    identifierHashes?: string[]
+    nameHash?: string
+    encryptedSummary?: string
+    contactTypeHash?: string
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const envelope = dummyEnvelope(nsec)
+  const { status, data } = await apiPost<Record<string, unknown>>(
+    request,
+    '/directory',
+    {
+      hubId: '',
+      identifierHashes: options?.identifierHashes ?? [`idhash_${Date.now()}_${Math.random().toString(36).slice(2)}`],
+      nameHash: options?.nameHash,
+      encryptedSummary: options?.encryptedSummary ?? 'dGVzdCBjb250YWN0',
+      summaryEnvelopes: [envelope],
+      contactTypeHash: options?.contactTypeHash,
+      tagHashes: [],
+      blindIndexes: {},
+    },
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to create contact: ${status}`)
+  return data
+}
+
+export async function listContactsViaApi(
+  request: APIRequestContext,
+  params?: { page?: number; limit?: number; contactTypeHash?: string },
+  nsec = ADMIN_NSEC,
+): Promise<{ contacts: Record<string, unknown>[]; total: number; hasMore: boolean }> {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  if (params?.contactTypeHash) qs.set('contactTypeHash', params.contactTypeHash)
+  const qsStr = qs.toString()
+  const path = `/directory${qsStr ? `?${qsStr}` : ''}`
+  const { status, data } = await apiGet<{ contacts: Record<string, unknown>[]; total: number; hasMore: boolean }>(request, path, nsec)
+  if (status !== 200) throw new Error(`Failed to list contacts: ${status}`)
+  return data
+}
+
+export async function lookupContactViaApi(
+  request: APIRequestContext,
+  identifierHash: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ contact: Record<string, unknown> | null }> {
+  const { status, data } = await apiGet<{ contact: Record<string, unknown> | null }>(request, `/directory/lookup/${identifierHash}`, nsec)
+  if (status !== 200) throw new Error(`Failed to lookup contact: ${status}`)
+  return data
+}
+
+export async function updateContactViaApi(
+  request: APIRequestContext,
+  contactId: string,
+  updates: Record<string, unknown>,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/directory/${contactId}`, updates, nsec)
+  if (status !== 200) throw new Error(`Failed to update contact: ${status}`)
+  return data
+}
+
+export async function deleteContactViaApi(
+  request: APIRequestContext,
+  contactId: string,
+  nsec = ADMIN_NSEC,
+): Promise<void> {
+  const { status } = await apiDelete(request, `/directory/${contactId}`, nsec)
+  if (status !== 200) throw new Error(`Failed to delete contact: ${status}`)
+}
+
+// ── Case Management: Records (Epic 319) ──────────────────────────
+
+export async function createRecordViaApi(
+  request: APIRequestContext,
+  entityTypeId: string,
+  options?: {
+    statusHash?: string
+    assignedTo?: string[]
+    blindIndexes?: Record<string, string>
+    parentRecordId?: string
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const envelope = dummyEnvelope(nsec)
+  const { status, data } = await apiPost<Record<string, unknown>>(
+    request,
+    '/records',
+    {
+      entityTypeId,
+      statusHash: options?.statusHash ?? 'status_open_hash',
+      assignedTo: options?.assignedTo ?? [],
+      blindIndexes: options?.blindIndexes ?? {},
+      encryptedSummary: 'dGVzdCByZWNvcmQ=',
+      summaryEnvelopes: [envelope],
+      parentRecordId: options?.parentRecordId,
+    },
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to create record: ${status}`)
+  return data
+}
+
+export async function listRecordsViaApi(
+  request: APIRequestContext,
+  params?: { entityTypeId?: string; statusHash?: string; assignedTo?: string; page?: number; limit?: number },
+  nsec = ADMIN_NSEC,
+): Promise<{ records: Record<string, unknown>[]; total: number; hasMore: boolean }> {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  if (params?.entityTypeId) qs.set('entityTypeId', params.entityTypeId)
+  if (params?.statusHash) qs.set('statusHash', params.statusHash)
+  if (params?.assignedTo) qs.set('assignedTo', params.assignedTo)
+  const qsStr = qs.toString()
+  const path = `/records${qsStr ? `?${qsStr}` : ''}`
+  const { status, data } = await apiGet<{ records: Record<string, unknown>[]; total: number; hasMore: boolean }>(request, path, nsec)
+  if (status !== 200) throw new Error(`Failed to list records: ${status}`)
+  return data
+}
+
+export async function getRecordViaApi(
+  request: APIRequestContext,
+  recordId: string,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/records/${recordId}`, nsec)
+  if (status !== 200) throw new Error(`Failed to get record: ${status}`)
+  return data
+}
+
+export async function updateRecordViaApi(
+  request: APIRequestContext,
+  recordId: string,
+  updates: Record<string, unknown>,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/records/${recordId}`, updates, nsec)
+  if (status !== 200) throw new Error(`Failed to update record: ${status}`)
+  return data
+}
+
+export async function linkContactToRecordViaApi(
+  request: APIRequestContext,
+  recordId: string,
+  contactId: string,
+  role: string,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiPost<Record<string, unknown>>(
+    request,
+    `/records/${recordId}/contacts`,
+    { contactId, role },
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to link contact to record: ${status}`)
+  return data
+}
+
+export async function listRecordContactsViaApi(
+  request: APIRequestContext,
+  recordId: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ contacts: Record<string, unknown>[] }> {
+  const { status, data } = await apiGet<{ contacts: Record<string, unknown>[] }>(request, `/records/${recordId}/contacts`, nsec)
+  if (status !== 200) throw new Error(`Failed to list record contacts: ${status}`)
+  return data
+}
+
+export async function assignRecordViaApi(
+  request: APIRequestContext,
+  recordId: string,
+  pubkeys: string[],
+  nsec = ADMIN_NSEC,
+): Promise<void> {
+  const { status } = await apiPost(request, `/records/${recordId}/assign`, { pubkeys }, nsec)
+  if (status !== 200) throw new Error(`Failed to assign record: ${status}`)
+}
+
+// ── Case Management: Events (Epic 320) ──────────────────────────
+
+export async function createEventViaApi(
+  request: APIRequestContext,
+  entityTypeId: string,
+  options?: {
+    startDate?: string
+    endDate?: string
+    eventTypeHash?: string
+    statusHash?: string
+    parentEventId?: string
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const envelope = dummyEnvelope(nsec)
+  const { status, data } = await apiPost<Record<string, unknown>>(
+    request,
+    '/events',
+    {
+      entityTypeId,
+      startDate: options?.startDate ?? new Date().toISOString(),
+      endDate: options?.endDate,
+      parentEventId: options?.parentEventId,
+      eventTypeHash: options?.eventTypeHash ?? 'event_type_hash',
+      statusHash: options?.statusHash ?? 'event_status_hash',
+      blindIndexes: {},
+      encryptedDetails: 'dGVzdCBldmVudA==',
+      detailEnvelopes: [envelope],
+      locationPrecision: 'neighborhood',
+    },
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to create event: ${status}`)
+  return data
+}
+
+export async function linkRecordToEventViaApi(
+  request: APIRequestContext,
+  eventId: string,
+  recordId: string,
+  nsec = ADMIN_NSEC,
+): Promise<void> {
+  const { status } = await apiPost(request, `/events/${eventId}/records`, { recordId }, nsec)
+  if (status !== 201 && status !== 200) throw new Error(`Failed to link record to event: ${status}`)
+}
+
+export async function linkReportToEventViaApi(
+  request: APIRequestContext,
+  eventId: string,
+  reportId: string,
+  nsec = ADMIN_NSEC,
+): Promise<void> {
+  const { status } = await apiPost(request, `/events/${eventId}/reports`, { reportId }, nsec)
+  if (status !== 201 && status !== 200) throw new Error(`Failed to link report to event: ${status}`)
+}
+
+export async function listEventRecordsViaApi(
+  request: APIRequestContext,
+  eventId: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ links: Record<string, unknown>[] }> {
+  const { status, data } = await apiGet<{ links: Record<string, unknown>[] }>(request, `/events/${eventId}/records`, nsec)
+  if (status !== 200) throw new Error(`Failed to list event records: ${status}`)
+  return data
+}
+
+export async function listEventReportsViaApi(
+  request: APIRequestContext,
+  eventId: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ links: Record<string, unknown>[] }> {
+  const { status, data } = await apiGet<{ links: Record<string, unknown>[] }>(request, `/events/${eventId}/reports`, nsec)
+  if (status !== 200) throw new Error(`Failed to list event reports: ${status}`)
+  return data
+}
+
+// ── Case Management: Interactions (Epic 323) ──────────────────────
+
+export async function createInteractionViaApi(
+  request: APIRequestContext,
+  caseId: string,
+  options: {
+    interactionType: string
+    sourceId?: string
+    encryptedContent?: string
+    interactionTypeHash?: string
+    previousStatusHash?: string
+    newStatusHash?: string
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const envelope = dummyEnvelope(nsec)
+  const body: Record<string, unknown> = {
+    interactionType: options.interactionType,
+    interactionTypeHash: options.interactionTypeHash ?? `${options.interactionType}_hash`,
+  }
+  if (options.sourceId) body.sourceId = options.sourceId
+  if (options.encryptedContent) {
+    body.encryptedContent = options.encryptedContent
+    body.contentEnvelopes = [envelope]
+  }
+  if (options.previousStatusHash) body.previousStatusHash = options.previousStatusHash
+  if (options.newStatusHash) body.newStatusHash = options.newStatusHash
+
+  const { status, data } = await apiPost<Record<string, unknown>>(
+    request,
+    `/records/${caseId}/interactions`,
+    body,
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to create interaction: ${status}`)
+  return data
+}
+
+export async function listInteractionsViaApi(
+  request: APIRequestContext,
+  caseId: string,
+  params?: { page?: number; limit?: number; interactionTypeHash?: string },
+  nsec = ADMIN_NSEC,
+): Promise<{ interactions: Record<string, unknown>[]; total: number }> {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  if (params?.interactionTypeHash) qs.set('interactionTypeHash', params.interactionTypeHash)
+  const qsStr = qs.toString()
+  const path = `/records/${caseId}/interactions${qsStr ? `?${qsStr}` : ''}`
+  const { status, data } = await apiGet<{ interactions: Record<string, unknown>[]; total: number }>(request, path, nsec)
+  if (status !== 200) throw new Error(`Failed to list interactions: ${status}`)
+  return data
+}
+
+// ── Case Management: Evidence (Epic 325) ──────────────────────────
+
+export async function uploadEvidenceViaApi(
+  request: APIRequestContext,
+  caseId: string,
+  options?: {
+    fileId?: string
+    filename?: string
+    mimeType?: string
+    sizeBytes?: number
+    classification?: string
+    integrityHash?: string
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const hash = options?.integrityHash ?? 'a'.repeat(64)
+  const { status, data } = await apiPost<Record<string, unknown>>(
+    request,
+    `/records/${caseId}/evidence`,
+    {
+      fileId: options?.fileId ?? `file_${Date.now()}`,
+      filename: options?.filename ?? `test_evidence_${Date.now()}.jpg`,
+      mimeType: options?.mimeType ?? 'image/jpeg',
+      sizeBytes: options?.sizeBytes ?? 1024,
+      classification: options?.classification ?? 'photo',
+      integrityHash: hash,
+      source: 'volunteer_upload',
+    },
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to upload evidence: ${status}`)
+  return data
+}
+
+export async function getEvidenceCustodyViaApi(
+  request: APIRequestContext,
+  evidenceId: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ custodyChain: Record<string, unknown>[]; total: number }> {
+  const { status, data } = await apiGet<{ custodyChain: Record<string, unknown>[]; total: number }>(
+    request,
+    `/evidence/${evidenceId}/custody`,
+    nsec,
+  )
+  if (status !== 200) throw new Error(`Failed to get custody chain: ${status}`)
+  return data
+}
+
+export async function verifyEvidenceIntegrityViaApi(
+  request: APIRequestContext,
+  evidenceId: string,
+  currentHash: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ valid: boolean; originalHash: string; currentHash: string }> {
+  const { status, data } = await apiPost<{ valid: boolean; originalHash: string; currentHash: string }>(
+    request,
+    `/evidence/${evidenceId}/verify`,
+    { currentHash },
+    nsec,
+  )
+  if (status !== 200) throw new Error(`Failed to verify evidence integrity: ${status}`)
+  return data
+}
