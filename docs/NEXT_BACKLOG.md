@@ -552,10 +552,11 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 - [x] **[Epic 311: Mobile Admin Envelope Encryption & Blasts Authorization](epics/epic-311-mobile-admin-envelope-encryption-blasts-auth.md)** — Wire adminDecryptionPubkey into iOS/Android encryption, add requirePermission to 14 blast endpoints, Zod validation for 10 endpoints
 - [x] **Follow-up fixes**: Add requirePermission to GET /conversations/stats and GET /reports/categories, Zod validator for POST /calls/:callId/ban
 
-## Test Infrastructure (Epics 312-313)
+## Test Infrastructure (Epics 312-314, 333)
 - [x] **[Epic 312: Permission Matrix BDD Flakiness](epics/epic-312-permission-matrix-bdd-flakiness.md)** — Was caused by concurrent test suites; backend BDD passes 432/432 when run in isolation
 - [x] **[Epic 313: Worker Integration Test Fixtures](epics/epic-313-worker-integration-test-fixtures.md)** — Fixed 5 stale fixtures: pubkey validation, rate limit key, fallback body key, ECIES pubkey, conversation reopen behavior. 61/61 pass
-- [ ] **Epic 314: Desktop BDD step/UI alignment** — 102 desktop BDD scenarios fail due to UI changes since step definitions were written. Steps reference elements/flows that have been redesigned. Needs step definition updates to match current UI.
+- [x] **[Epic 314: Desktop BDD Step/UI Alignment](epics/epic-314-desktop-bdd-step-alignment.md)** — Phase 1 complete: 78→71 failures (-7), 232→236 passes (+4). Fixed i18n nav mapping, section expansion, custom fields, device link, WebRTC/RCS, reports, ban validation. All feature groups pass individually (0 per-group failures). Remaining 71 are serial state issues (→ Epic 333).
+- [ ] **[Epic 333: BDD Serial Execution Isolation](epics/epic-333-bdd-serial-execution-isolation.md)** — 71 BDD scenarios fail in full serial suite but pass per-group. Fix via Before hook state reset, data seeding helpers, step collision fixes, @resets-state tagging. Goal: 0 failures in full serial run.
 
 ## Case Management System (Epics 315-332) — NEW
 
