@@ -26,6 +26,12 @@ Given('I navigate to the {string} page', async ({ page }, pageName: string) => {
     Conversations: (p) => Navigation.goToConversations(p),
     Blasts: (p) => Navigation.goToBlasts(p),
     Contacts: (p) => Navigation.goToContacts(p),
+    // CMS pages
+    Cases: (p) => navigateAfterLogin(p, '/cases'),
+    'Contact Directory': (p) => navigateAfterLogin(p, '/contacts-directory'),
+    Events: (p) => navigateAfterLogin(p, '/events'),
+    'Case Management': (p) => navigateAfterLogin(p, '/admin/case-management'),
+    'Case Management Settings': (p) => navigateAfterLogin(p, '/admin/case-management'),
   }
   const navFn = navMap[pageName]
   if (navFn) {

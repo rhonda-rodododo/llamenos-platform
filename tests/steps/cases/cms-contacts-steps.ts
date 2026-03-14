@@ -18,7 +18,7 @@ import {
   createRecordViaApi,
   listEntityTypesViaApi,
   createRelationshipViaApi,
-  createGroupViaApi,
+  createAffinityGroupViaApi,
   addGroupMemberViaApi,
 } from '../../api-helpers'
 
@@ -28,31 +28,7 @@ let contactCarlosId = ''
 let contactMariaId = ''
 let contactWithDataId = ''
 
-// --- Page navigation ---
-
-When('I navigate to the {string} page', async ({ page }, pageName: string) => {
-  const { navTestIdMap } = await import('../../test-ids')
-  const testId = navTestIdMap[pageName]
-  if (testId) {
-    const navEl = page.getByTestId(testId)
-    if (await navEl.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await navEl.click()
-      await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
-      return
-    }
-  }
-  // Fallback: URL-based navigation
-  const urlMap: Record<string, string> = {
-    'Cases': '/cases',
-    'Contact Directory': '/contacts-directory',
-    'Events': '/events',
-    'Case Management': '/admin/case-management',
-  }
-  const url = urlMap[pageName]
-  if (url) {
-    await navigateAfterLogin(page, url)
-  }
-})
+// Navigation is handled by common/navigation-steps.ts (added CMS routes there)
 
 When('I navigate to the {string} admin page', async ({ page }, pageName: string) => {
   const urlMap: Record<string, string> = {
@@ -355,7 +331,7 @@ Given('a contact exists with no relationships', async ({ request }) => {
 Given('a contact exists in groups', async ({ request }) => {
   const contact = await createContactViaApi(request, `Group Contact ${Date.now()}`)
   contactWithDataId = (contact as { id: string }).id
-  const group = await createGroupViaApi(
+  const group = await createAffinityGroupViaApi(
     request,
     `Test Group ${Date.now()}`,
     [{ contactId: contactWithDataId }],

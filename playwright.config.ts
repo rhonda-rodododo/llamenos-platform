@@ -4,7 +4,7 @@ import { defineBddProject } from "playwright-bdd";
 // Desktop BDD: exclude tests/steps/backend/ to avoid loading backend-only step defs
 // that use a different createBdd() instance.
 const desktopStepDirs = [
-  "admin", "auth", "calls", "common", "contacts", "conversations",
+  "admin", "auth", "calls", "cases", "common", "contacts", "conversations",
   "crypto", "dashboard", "help", "messaging", "notes", "reports",
   "security", "settings", "shifts",
 ];
