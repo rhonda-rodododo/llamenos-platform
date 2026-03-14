@@ -1,6 +1,6 @@
 # Epic 336: BDD Serial Execution Fixes
 
-**Status**: IN PROGRESS
+**Status**: COMPLETE
 **Priority**: Medium
 **Depends on**: Epic 333 (Serial Execution Isolation -- defines the approach), Epic 335 (CMS scenarios pass per-group first)
 **Blocks**: Epic 334 (Parallel execution assumes serial is clean)
