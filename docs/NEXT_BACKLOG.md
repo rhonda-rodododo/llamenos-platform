@@ -552,13 +552,14 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 - [x] **[Epic 311: Mobile Admin Envelope Encryption & Blasts Authorization](epics/epic-311-mobile-admin-envelope-encryption-blasts-auth.md)** — Wire adminDecryptionPubkey into iOS/Android encryption, add requirePermission to 14 blast endpoints, Zod validation for 10 endpoints
 - [x] **Follow-up fixes**: Add requirePermission to GET /conversations/stats and GET /reports/categories, Zod validator for POST /calls/:callId/ban
 
-## Test Infrastructure (Epics 312-314, 333)
+## Test Infrastructure (Epics 312-314, 333-334)
 - [x] **[Epic 312: Permission Matrix BDD Flakiness](epics/epic-312-permission-matrix-bdd-flakiness.md)** — Was caused by concurrent test suites; backend BDD passes 432/432 when run in isolation
 - [x] **[Epic 313: Worker Integration Test Fixtures](epics/epic-313-worker-integration-test-fixtures.md)** — Fixed 5 stale fixtures: pubkey validation, rate limit key, fallback body key, ECIES pubkey, conversation reopen behavior. 61/61 pass
 - [x] **[Epic 314: Desktop BDD Step/UI Alignment](epics/epic-314-desktop-bdd-step-alignment.md)** — Phase 1 complete: 78→71 failures (-7), 232→236 passes (+4). Fixed i18n nav mapping, section expansion, custom fields, device link, WebRTC/RCS, reports, ban validation. All feature groups pass individually (0 per-group failures). Remaining 71 are serial state issues (→ Epic 333).
 - [ ] **[Epic 333: BDD Serial Execution Isolation](epics/epic-333-bdd-serial-execution-isolation.md)** — 71 BDD scenarios fail in full serial suite but pass per-group. Fix via Before hook state reset, data seeding helpers, step collision fixes, @resets-state tagging. Goal: 0 failures in full serial run.
+- [ ] **[Epic 334: Parallel BDD Execution with CMS Hub Isolation](epics/epic-334-parallel-bdd-execution.md)** — Hub-per-scenario isolation for parallel test execution, 3x speedup target
 
-## Case Management System (Epics 315-332) — NEW
+## Case Management System (Epics 315-332) — COMPLETED
 
 Template-driven entity/relationship schema engine with SugarCRM-level flexibility,
 E2EE case records with blind index search, configurable contact directory, event tracking,
@@ -567,33 +568,35 @@ social services organizations (legal observer, jail support, street medic, immig
 bail fund, DV crisis, anti-trafficking, hate crime, copwatch, tenant organizing, mutual aid,
 missing persons, and general hotline).
 
-Reference documents: `docs/plans/2026-03-14-case-management-*.md` (5 documents, ~3000 lines)
+Reference documents: `docs/plans/2026-03-14-case-management-*.md` (6 documents, ~3000 lines)
+
+**Remaining work:** Desktop BDD step definitions (Epic 334), mobile views (iOS/Android).
 
 ### Phase 1: Infrastructure (sequential)
-- [ ] **[Epic 315: Entity Schema Engine](epics/epic-315-entity-schema-engine.md)** — EntityTypeDefinition, RelationshipTypeDefinition, EnumDefinition, EntityFieldDefinition storage in SettingsDO, CRUD API, 12 new crypto labels, ~30 new permissions
-- [ ] **[Epic 316: Blind Index Infrastructure](epics/epic-316-blind-index-infrastructure.md)** — Hub-key-derived HMAC blind indexes for server-side filtering, epoch bucketing for dates, trigram tokenization for names, Rust implementation in packages/crypto
-- [ ] **[Epic 317: Template System & Catalog](epics/epic-317-template-system-catalog.md)** — Template loading, validation, application, composition, update detection, 13 pre-built JSON templates in packages/protocol/templates/
+- [x] **[Epic 315: Entity Schema Engine](epics/epic-315-entity-schema-engine.md)** — EntityTypeDefinition, RelationshipTypeDefinition, EnumDefinition, EntityFieldDefinition storage in SettingsDO, CRUD API, 12 new crypto labels, ~30 new permissions
+- [x] **[Epic 316: Blind Index Infrastructure](epics/epic-316-blind-index-infrastructure.md)** — Hub-key-derived HMAC blind indexes for server-side filtering, epoch bucketing for dates, trigram tokenization for names, Rust implementation in packages/crypto
+- [x] **[Epic 317: Template System & Catalog](epics/epic-317-template-system-catalog.md)** — Template loading, validation, application, composition, update detection, 13 pre-built JSON templates in packages/protocol/templates/
 
 ### Phase 2: Core Entities + RBAC (mostly sequential)
-- [ ] **[Epic 318: Contact Entity & E2EE Profiles](epics/epic-318-contact-entity-e2ee-profiles.md)** — New ContactDirectoryDO (per-hub), encrypted contact profiles with configurable identifiers, blind index lookup/dedup, trigram name search
-- [ ] **[Epic 319: Record Entity & Core CRUD](epics/epic-319-record-entity-core-crud.md)** — New CaseDO (per-hub), generic record storage for any entity type, 3-tier E2EE (summary/fields/PII), case numbering, contact M:N linking with roles, assignment management
-- [ ] **[Epic 320: Event Entity & Linking](epics/epic-320-event-entity-linking.md)** — Events with time/location/sub-events, configurable location precision, record-event and report-event M:N linking
-- [ ] **[Epic 321: CMS Permissions & RBAC](epics/epic-321-cms-permissions-rbac.md)** — Entity-type-level access control, 3-tier envelope recipient logic, template-suggested role creation
+- [x] **[Epic 318: Contact Entity & E2EE Profiles](epics/epic-318-contact-entity-e2ee-profiles.md)** — New ContactDirectoryDO (per-hub), encrypted contact profiles with configurable identifiers, blind index lookup/dedup, trigram name search
+- [x] **[Epic 319: Record Entity & Core CRUD](epics/epic-319-record-entity-core-crud.md)** — New CaseDO (per-hub), generic record storage for any entity type, 3-tier E2EE (summary/fields/PII), case numbering, contact M:N linking with roles, assignment management
+- [x] **[Epic 320: Event Entity & Linking](epics/epic-320-event-entity-linking.md)** — Events with time/location/sub-events, configurable location precision, record-event and report-event M:N linking
+- [x] **[Epic 321: CMS Permissions & RBAC](epics/epic-321-cms-permissions-rbac.md)** — Entity-type-level access control, 3-tier envelope recipient logic, template-suggested role creation
 
 ### Phase 3: Relationships, Interactions, UI (parallelizable after Phase 2)
-- [ ] **[Epic 322: Contact Relationships & Support Networks](epics/epic-322-contact-relationships-networks.md)** — ContactRelationship model, affinity groups, support contact graph, relationship types (attorney, family, interpreter)
-- [ ] **[Epic 323: Case Interactions & Timeline](epics/epic-323-case-interactions-timeline.md)** — Link existing notes/calls/conversations to cases, inline interactions, unified chronological timeline
-- [ ] **[Epic 324: Report-Record-Event Linking](epics/epic-324-report-record-event-linking.md)** — M:N between existing reports and case records, evidence association
-- [ ] **[Epic 325: Evidence & Chain of Custody](epics/epic-325-evidence-chain-of-custody.md)** — Case file attachments with integrity hashes, custody chain metadata, access logging
-- [ ] **[Epic 329: Desktop Schema Editor & Template Browser](epics/epic-329-desktop-schema-editor.md)** — Admin UI for entity type/field/enum editing, template browser with apply wizard
+- [x] **[Epic 322: Contact Relationships & Support Networks](epics/epic-322-contact-relationships-networks.md)** — ContactRelationship model, affinity groups, support contact graph, relationship types (attorney, family, interpreter)
+- [x] **[Epic 323: Case Interactions & Timeline](epics/epic-323-case-interactions-timeline.md)** — Link existing notes/calls/conversations to cases, inline interactions, unified chronological timeline
+- [x] **[Epic 324: Report-Record-Event Linking](epics/epic-324-report-record-event-linking.md)** — M:N between existing reports and case records, evidence association
+- [x] **[Epic 325: Evidence & Chain of Custody](epics/epic-325-evidence-chain-of-custody.md)** — Case file attachments with integrity hashes, custody chain metadata, access logging
+- [x] **[Epic 329: Desktop Schema Editor & Template Browser](epics/epic-329-desktop-schema-editor.md)** — Admin UI for entity type/field/enum editing, template browser with apply wizard
 
 ### Phase 4: Integration & Desktop UI (parallelizable)
-- [ ] **[Epic 326: Telephony-CRM: Screen Pop & Auto-Link](epics/epic-326-telephony-crm-screen-pop.md)** — Caller identification via contact hash, case history on ring screen, auto-link notes to cases
-- [ ] **[Epic 327: Support Contact Notifications](epics/epic-327-support-contact-notifications.md)** — Case status updates via Signal/SMS/WhatsApp to support contacts
-- [ ] **[Epic 328: Cross-Hub Case Visibility](epics/epic-328-cross-hub-visibility.md)** — Opt-in super-admin access, cross-hub contact correlation, selective envelope sharing
-- [ ] **[Epic 330: Desktop Case Management UI](epics/epic-330-desktop-case-management-ui.md)** — Schema-driven record list/detail/create, assignment, status management, bulk operations
-- [ ] **[Epic 331: Desktop Contact Directory](epics/epic-331-desktop-contact-directory.md)** — Contact list with trigram search, profile viewer, relationship graph, affinity groups, merge tool
-- [ ] **[Epic 332: Desktop Case Timeline & Evidence Viewer](epics/epic-332-desktop-case-timeline-evidence.md)** — Chronological interaction timeline, evidence gallery, chain of custody display
+- [x] **[Epic 326: Telephony-CRM: Screen Pop & Auto-Link](epics/epic-326-telephony-crm-screen-pop.md)** — Caller identification via contact hash, case history on ring screen, auto-link notes to cases
+- [x] **[Epic 327: Support Contact Notifications](epics/epic-327-support-contact-notifications.md)** — Case status updates via Signal/SMS/WhatsApp to support contacts
+- [x] **[Epic 328: Cross-Hub Case Visibility](epics/epic-328-cross-hub-visibility.md)** — Opt-in super-admin access, cross-hub contact correlation, selective envelope sharing
+- [x] **[Epic 330: Desktop Case Management UI](epics/epic-330-desktop-case-management-ui.md)** — Schema-driven record list/detail/create, assignment, status management, bulk operations
+- [x] **[Epic 331: Desktop Contact Directory](epics/epic-331-desktop-contact-directory.md)** — Contact list with trigram search, profile viewer, relationship graph, affinity groups, merge tool
+- [x] **[Epic 332: Desktop Case Timeline & Evidence Viewer](epics/epic-332-desktop-case-timeline-evidence.md)** — Chronological interaction timeline, evidence gallery, chain of custody display
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

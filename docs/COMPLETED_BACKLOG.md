@@ -1,5 +1,54 @@
 # Completed Backlog
 
+## 2026-03-14: Case Management System (Epics 315-332)
+
+### Architecture
+- Template-driven entity/relationship schema engine with SugarCRM-level flexibility
+- 2 new Durable Objects: ContactDirectoryDO (contacts, per-hub), CaseDO (records, per-hub)
+- 3-tier E2EE: summary fields (searchable), custom fields (role-gated), PII (admin-only) with envelope-based RBAC
+- Blind index system in Rust (HMAC + epoch bucketing for dates + trigram tokenization for names) in packages/crypto
+- Telephony-CRM integration: caller identification via contact hash, screen pop with case history, auto-link notes to cases
+- Evidence chain of custody with SHA-256 integrity verification and access logging
+- Cross-hub case visibility with opt-in super-admin access and selective envelope sharing
+- Support contact notifications via Signal/SMS/WhatsApp for case status updates
+
+### Implementation Stats
+- 22 commits, 110+ files, ~27,000 lines
+- 13 pre-built templates: jail support, street medic, ICE rapid response, bail fund, DV crisis, anti-trafficking, hate crime, copwatch, tenant organizing, mutual aid, missing persons, KYR training, general hotline
+- 16 new React components, 3 new routes (cases, contacts, case-timeline)
+- 30 new permissions, 12 new crypto labels (domain separation constants)
+- 57 backend BDD scenarios (all passing), 98 desktop BDD scenarios
+- 6 reference documents in docs/plans/2026-03-14-case-management-*.md (~3000 lines)
+
+### Epics Completed
+- **Epic 315**: Entity Schema Engine — EntityTypeDefinition, RelationshipTypeDefinition, EnumDefinition, EntityFieldDefinition in SettingsDO with CRUD API
+- **Epic 316**: Blind Index Infrastructure — HMAC blind indexes, epoch bucketing, trigram tokenization, Rust implementation
+- **Epic 317**: Template System & Catalog — 13 JSON templates in packages/protocol/templates/, Zod validation at build time
+- **Epic 318**: Contact Entity & E2EE Profiles — ContactDirectoryDO, encrypted profiles, blind index lookup/dedup, trigram search
+- **Epic 319**: Record Entity & Core CRUD — CaseDO, generic record storage, 3-tier E2EE, case numbering, contact M:N linking
+- **Epic 320**: Event Entity & Linking — Events with time/location/sub-events, configurable location precision, M:N linking
+- **Epic 321**: CMS Permissions & RBAC — Entity-type-level access control, 3-tier envelope recipient logic, template-suggested roles
+- **Epic 322**: Contact Relationships & Support Networks — Affinity groups, support contact graph, relationship types
+- **Epic 323**: Case Interactions & Timeline — Notes/calls/conversations linked to cases, unified chronological timeline
+- **Epic 324**: Report-Record-Event Linking — M:N between reports and case records, evidence association
+- **Epic 325**: Evidence & Chain of Custody — File attachments with integrity hashes, custody chain metadata
+- **Epic 326**: Telephony-CRM Screen Pop & Auto-Link — Caller identification, case history on ring screen
+- **Epic 327**: Support Contact Notifications — Case status updates via messaging adapters
+- **Epic 328**: Cross-Hub Case Visibility — Opt-in super-admin, cross-hub contact correlation
+- **Epic 329**: Desktop Schema Editor & Template Browser — Admin UI for entity type/field/enum editing, template apply wizard
+- **Epic 330**: Desktop Case Management UI — Schema-driven record list/detail/create, assignment, status, bulk operations
+- **Epic 331**: Desktop Contact Directory — Contact list with trigram search, profile viewer, relationship graph, merge tool
+- **Epic 332**: Desktop Case Timeline & Evidence Viewer — Chronological timeline, evidence gallery, chain of custody display
+
+### Key Decisions
+- Events are records with `category='event'` — no separate Durable Object needed
+- Court dates: `next_court_date` (indexed via blind index) + `court_history` (narrative log field)
+- "Blind index" never appears in user-facing text — UI uses "encrypted search"
+- Templates are JSON in `packages/protocol/templates/`, validated by Zod at build time
+- DV crisis template has ALL fields marked as PII tier (maximum privacy protection)
+- Hub-per-scenario isolation planned for parallel test execution (Epic 334)
+- Desktop BDD step definitions deferred to Epic 334; mobile views (iOS/Android) remain as future work
+
 ## 2026-03-08: BDD Workflow Overhaul (Epics 301-303)
 
 ### Epic 301: BDD Spec Reorganization + Backend BDD Suite
