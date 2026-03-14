@@ -236,5 +236,17 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
 
 When('I click the delete button on {string}', async ({ page }, fieldLabel: string) => {
   const row = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel })
+  // Set up dialog handler to accept the confirm() before clicking delete
+  page.once('dialog', async (dialog) => {
+    await dialog.accept()
+  })
   await row.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN).click()
+  // Wait for the API response to complete
+  await page.waitForResponse(
+    (res) => res.url().includes('/api/') && res.request().method() === 'PUT',
+    { timeout: 10000 },
+  ).catch(() => {
+    // API might not be available in test env — continue anyway
+  })
+  await page.waitForTimeout(1000)
 })

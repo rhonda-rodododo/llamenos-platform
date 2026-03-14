@@ -163,7 +163,7 @@ Feature: Admin & User Settings
   Scenario: Settings tab displays identity card
     Given I am authenticated and on the main screen
     When I tap the "Settings" tab
-    Then I should see the identity card
+    Then the settings identity card should be visible
     And I should see my npub in monospace text
     And I should see the copy npub button
 
