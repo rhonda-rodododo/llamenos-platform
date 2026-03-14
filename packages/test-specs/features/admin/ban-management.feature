@@ -51,7 +51,7 @@ Feature: Ban Management
 
   Scenario: Phone validation rejects invalid numbers
     When I click the "Ban Number" button
-    And I fill in the phone number with "+12"
+    And I fill in the phone number with "+1234567890123456789"
     And I click "Save"
     Then I should see "invalid phone"
 
