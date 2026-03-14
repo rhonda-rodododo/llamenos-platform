@@ -16,6 +16,8 @@ import { audit } from '../services/audit'
 import { applyTemplate, detectTemplateUpdates } from '../lib/template-engine'
 import type { AppliedTemplateRecord } from '../lib/template-engine'
 import { loadBundledTemplates } from '../lib/template-loader'
+import { isValidPermission } from '@shared/permissions'
+import { createRolesFromTemplateBodySchema } from '../schemas/entity-schema'
 
 const entitySchema = new Hono<AppEnv>()
 
@@ -425,6 +427,75 @@ entitySchema.get('/templates/updates',
     const available = await loadBundledTemplates()
     const updates = detectTemplateUpdates(appliedTemplates, available)
     return c.json({ updates })
+  },
+)
+
+// --- Create roles from template suggestions (Epic 321) ---
+
+entitySchema.post('/roles/from-template',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'Create custom roles from template suggested roles',
+    responses: {
+      201: { description: 'Roles created from template' },
+      ...authErrors,
+    },
+  }),
+  requirePermission('system:manage-roles'),
+  validator('json', createRolesFromTemplateBodySchema),
+  async (c) => {
+    const { roles } = c.req.valid('json')
+    const dos = getDOs(c.env)
+    const pubkey = c.get('pubkey')
+
+    // Validate all permissions in all roles before creating any
+    for (const suggested of roles) {
+      const invalidPerms = suggested.permissions.filter(p => !isValidPermission(p))
+      if (invalidPerms.length > 0) {
+        return c.json({
+          error: `Invalid permissions: ${invalidPerms.join(', ')}`,
+          role: suggested.name,
+        }, 400)
+      }
+    }
+
+    // Fetch existing roles to skip duplicates by slug
+    const existingRes = await dos.settings.fetch(new Request('http://do/settings/roles'))
+    const { roles: existingRoles } = await existingRes.json() as {
+      roles: Array<{ slug: string }>
+    }
+    const existingSlugs = new Set(existingRoles.map(r => r.slug))
+
+    const created: Array<{ id: string; name: string }> = []
+
+    for (const suggested of roles) {
+      // Skip roles that already exist by slug
+      if (existingSlugs.has(suggested.slug)) continue
+
+      const res = await dos.settings.fetch(new Request('http://do/settings/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: suggested.name,
+          slug: suggested.slug,
+          description: suggested.description,
+          permissions: suggested.permissions,
+        }),
+      }))
+
+      if (res.ok) {
+        const role = await res.json() as { id: string; name: string }
+        created.push(role)
+        existingSlugs.add(suggested.slug)
+
+        await audit(dos.records, 'roleCreatedFromTemplate', pubkey, {
+          roleId: role.id,
+          roleName: role.name,
+        })
+      }
+    }
+
+    return c.json({ created, count: created.length }, 201)
   },
 )
 

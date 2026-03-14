@@ -288,3 +288,14 @@ export const caseNumberBodySchema = z.looseObject({
   prefix: z.string().regex(/^[A-Z]{1,5}$/),
   year: z.number().int().min(2020).max(2099).optional(),
 })
+
+// --- Create roles from template suggestions (Epic 321) ---
+
+export const createRolesFromTemplateBodySchema = z.object({
+  roles: z.array(z.object({
+    name: z.string().min(1).max(100),
+    slug: z.string().regex(/^[a-z0-9_-]+$/, 'Slug must be lowercase alphanumeric with hyphens/underscores'),
+    description: z.string().min(1).max(500),
+    permissions: z.array(z.string()).min(1),
+  })).min(1).max(50),
+})

@@ -406,6 +406,22 @@ export const CHANNEL_CLAIM_PERMISSIONS: Record<string, string> = {
  * - conversations:claim-any (bypass channel restrictions)
  * - The specific channel claim permission (e.g., conversations:claim-sms)
  */
+/**
+ * Check if a permission string exists in the PERMISSION_CATALOG.
+ * Accepts exact permissions and domain wildcards (e.g. "cases:*").
+ */
+export function isValidPermission(perm: string): boolean {
+  // Global wildcard
+  if (perm === '*') return true
+  // Domain wildcard (e.g. "cases:*")
+  if (perm.endsWith(':*')) {
+    const domain = perm.slice(0, -2)
+    return Object.keys(PERMISSION_CATALOG).some(k => k.startsWith(`${domain}:`))
+  }
+  // Exact match
+  return perm in PERMISSION_CATALOG
+}
+
 export function canClaimChannel(permissions: string[], channelType: string): boolean {
   // Global or domain wildcard
   if (permissionGranted(permissions, 'conversations:claim-any')) return true

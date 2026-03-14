@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { describeRoute, validator } from 'hono-openapi'
-import type { AppEnv } from '../types'
-import { getScopedDOs } from '../lib/do-access'
+import type { AppEnv, Volunteer } from '../types'
+import { getDOs, getScopedDOs } from '../lib/do-access'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import {
   createRecordBodySchema,
@@ -12,12 +12,58 @@ import {
   unassignBodySchema,
 } from '../schemas/records'
 import type { CaseRecord } from '../schemas/records'
+import type { EntityTypeDefinition } from '../schemas/entity-schema'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/nostr-events'
 import { publishNostrEvent } from '../lib/nostr-events'
+import { resolvePermissions } from '@shared/permissions'
+import { determineEnvelopeRecipients } from '../lib/envelope-recipients'
+import type { HubMemberInfo } from '../lib/envelope-recipients'
 
 const records = new Hono<AppEnv>()
+
+// --- Helper: determine the caller's access level from permissions ---
+function getAccessLevel(permissions: string[]): 'all' | 'assigned' | 'own' | null {
+  if (checkPermission(permissions, 'cases:read-all')) return 'all'
+  if (checkPermission(permissions, 'cases:read-assigned')) return 'assigned'
+  if (checkPermission(permissions, 'cases:read-own')) return 'own'
+  return null
+}
+
+/**
+ * Resolve hub members with their role slugs and permissions
+ * for envelope recipient determination.
+ */
+async function resolveHubMembers(
+  env: AppEnv['Bindings'],
+  hubId: string | undefined,
+): Promise<HubMemberInfo[]> {
+  const dos = getScopedDOs(env, hubId)
+  const globalDOs = getDOs(env)
+
+  // Get all role definitions
+  const rolesRes = await globalDOs.settings.fetch(new Request('http://do/settings/roles'))
+  const { roles: roleDefs } = await rolesRes.json() as { roles: Array<{ id: string; slug: string; permissions: string[] }> }
+
+  // Get all volunteers (hub members)
+  const volRes = await globalDOs.identity.fetch(new Request('http://do/volunteers'))
+  const { volunteers } = await volRes.json() as { volunteers: Volunteer[] }
+
+  return volunteers
+    .filter(v => v.active)
+    .map(v => {
+      const resolvedPerms = resolvePermissions(v.roles, roleDefs as import('@shared/permissions').Role[])
+      const roleSlugs = v.roles
+        .map(roleId => roleDefs.find(r => r.id === roleId)?.slug)
+        .filter((s): s is string => !!s)
+      return {
+        pubkey: v.pubkey,
+        roles: roleSlugs,
+        permissions: resolvedPerms,
+      }
+    })
+}
 
 // --- List records (paginated, with filters) ---
 records.get('/',
@@ -36,11 +82,8 @@ records.get('/',
     const dos = getScopedDOs(c.env, c.get('hubId'))
     const query = c.req.valid('query')
 
-    const canReadAll = checkPermission(permissions, 'cases:read-all')
-    const canReadAssigned = checkPermission(permissions, 'cases:read-assigned')
-    const canReadOwn = checkPermission(permissions, 'cases:read-own')
-
-    if (!canReadAll && !canReadAssigned && !canReadOwn) {
+    const accessLevel = getAccessLevel(permissions)
+    if (!accessLevel) {
       return c.json({ error: 'Forbidden', required: 'cases:read-own' }, 403)
     }
 
@@ -51,8 +94,12 @@ records.get('/',
     if (query.entityTypeId) qs.set('entityTypeId', query.entityTypeId)
     if (query.parentRecordId) qs.set('parentRecordId', query.parentRecordId)
 
-    // For users with only assigned/own read access, filter by assignment
-    if (!canReadAll) {
+    // Scoped read: cases:read-own and cases:read-assigned both filter by pubkey
+    // at the DO level (using the assignment index). The difference:
+    //   - read-own: only records assigned to or created by self
+    //   - read-assigned: records assigned to self or teammates with same roles
+    // Both set assignedTo=pubkey to leverage the DO prefix scan index.
+    if (accessLevel !== 'all') {
       qs.set('assignedTo', pubkey)
     } else if (query.assignedTo) {
       // Admin can explicitly filter by assignment
@@ -88,11 +135,8 @@ records.get('/by-number/:number',
     const number = c.req.param('number')
     const permissions = c.get('permissions')
 
-    const canRead = checkPermission(permissions, 'cases:read-all')
-      || checkPermission(permissions, 'cases:read-assigned')
-      || checkPermission(permissions, 'cases:read-own')
-
-    if (!canRead) {
+    const accessLevel = getAccessLevel(permissions)
+    if (!accessLevel) {
       return c.json({ error: 'Forbidden', required: 'cases:read-own' }, 403)
     }
 
@@ -102,7 +146,7 @@ records.get('/by-number/:number',
 
     // If user can only see assigned records, verify assignment
     const record = await res.json() as CaseRecord
-    if (!checkPermission(permissions, 'cases:read-all')) {
+    if (accessLevel !== 'all') {
       const pubkey = c.get('pubkey')
       if (!record.assignedTo.includes(pubkey) && record.createdBy !== pubkey) {
         return c.json({ error: 'Forbidden' }, 403)
@@ -110,6 +154,49 @@ records.get('/by-number/:number',
     }
 
     return c.json(record)
+  },
+)
+
+// --- Envelope recipients for a record ---
+records.get('/envelope-recipients',
+  describeRoute({
+    tags: ['Records'],
+    summary: 'Get envelope recipient pubkeys for a new record (by entity type)',
+    responses: {
+      200: { description: 'Envelope recipients per tier' },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const permissions = c.get('permissions')
+    const accessLevel = getAccessLevel(permissions)
+    if (!accessLevel) {
+      return c.json({ error: 'Forbidden', required: 'cases:read-own' }, 403)
+    }
+
+    const entityTypeId = c.req.query('entityTypeId')
+    if (!entityTypeId) {
+      return c.json({ error: 'entityTypeId query parameter required' }, 400)
+    }
+
+    const dos = getScopedDOs(c.env, c.get('hubId'))
+
+    // Fetch entity type definition
+    const etRes = await dos.settings.fetch(
+      new Request(`http://do/settings/cms/entity-types/${entityTypeId}`),
+    )
+    if (!etRes.ok) return c.json({ error: 'Entity type not found' }, 404)
+    const entityType = await etRes.json() as EntityTypeDefinition
+
+    // Resolve hub members with permissions
+    const hubMembers = await resolveHubMembers(c.env, c.get('hubId'))
+
+    // assignedTo from query (for existing records) or empty for new records
+    const assignedToParam = c.req.query('assignedTo')
+    const assignedTo = assignedToParam ? assignedToParam.split(',') : []
+
+    const recipients = determineEnvelopeRecipients(entityType, assignedTo, hubMembers)
+    return c.json(recipients)
   },
 )
 
@@ -129,11 +216,8 @@ records.get('/:id',
     const pubkey = c.get('pubkey')
     const permissions = c.get('permissions')
 
-    const canRead = checkPermission(permissions, 'cases:read-all')
-      || checkPermission(permissions, 'cases:read-assigned')
-      || checkPermission(permissions, 'cases:read-own')
-
-    if (!canRead) {
+    const accessLevel = getAccessLevel(permissions)
+    if (!accessLevel) {
       return c.json({ error: 'Forbidden', required: 'cases:read-own' }, 403)
     }
 
@@ -144,13 +228,54 @@ records.get('/:id',
     const record = await res.json() as CaseRecord
 
     // Non-admin users can only see records assigned to them or created by them
-    if (!checkPermission(permissions, 'cases:read-all')) {
+    if (accessLevel !== 'all') {
       if (!record.assignedTo.includes(pubkey) && record.createdBy !== pubkey) {
         return c.json({ error: 'Forbidden' }, 403)
       }
     }
 
     return c.json(record)
+  },
+)
+
+// --- Envelope recipients for an existing record ---
+records.get('/:id/envelope-recipients',
+  describeRoute({
+    tags: ['Records'],
+    summary: 'Get envelope recipient pubkeys for an existing record',
+    responses: {
+      200: { description: 'Envelope recipients per tier' },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  async (c) => {
+    const id = c.req.param('id')
+    const permissions = c.get('permissions')
+    const accessLevel = getAccessLevel(permissions)
+    if (!accessLevel) {
+      return c.json({ error: 'Forbidden', required: 'cases:read-own' }, 403)
+    }
+
+    const dos = getScopedDOs(c.env, c.get('hubId'))
+
+    // Fetch record to get entityTypeId and assignedTo
+    const recordRes = await dos.caseManager.fetch(new Request(`http://do/records/${id}`))
+    if (!recordRes.ok) return c.json({ error: 'Record not found' }, 404)
+    const record = await recordRes.json() as CaseRecord
+
+    // Fetch entity type definition
+    const etRes = await dos.settings.fetch(
+      new Request(`http://do/settings/cms/entity-types/${record.entityTypeId}`),
+    )
+    if (!etRes.ok) return c.json({ error: 'Entity type not found' }, 404)
+    const entityType = await etRes.json() as EntityTypeDefinition
+
+    // Resolve hub members with permissions
+    const hubMembers = await resolveHubMembers(c.env, c.get('hubId'))
+
+    const recipients = determineEnvelopeRecipients(entityType, record.assignedTo, hubMembers)
+    return c.json(recipients)
   },
 )
 

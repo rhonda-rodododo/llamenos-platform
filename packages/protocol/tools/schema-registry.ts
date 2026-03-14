@@ -151,6 +151,19 @@ import {
 
   // system.ts
   systemStatusResponseSchema,
+
+  // events.ts
+  eventSchema,
+  eventDetailsSchema,
+  caseEventSchema,
+  reportEventSchema,
+  createEventBodySchema,
+  updateEventBodySchema,
+  linkRecordToEventBodySchema,
+  linkReportToEventBodySchema,
+  eventListResponseSchema,
+  caseEventListResponseSchema,
+  reportEventListResponseSchema,
 } from '../../../apps/worker/schemas'
 
 import type { ZodType } from 'zod'
@@ -322,6 +335,19 @@ const schemaEntries: Array<[string, ZodType]> = [
 
   // System
   ['systemStatusResponseSchema', systemStatusResponseSchema],
+
+  // Events
+  ['eventSchema', eventSchema],
+  ['eventDetailsSchema', eventDetailsSchema],
+  ['caseEventSchema', caseEventSchema],
+  ['reportEventSchema', reportEventSchema],
+  ['createEventBodySchema', createEventBodySchema],
+  ['updateEventBodySchema', updateEventBodySchema],
+  ['linkRecordToEventBodySchema', linkRecordToEventBodySchema],
+  ['linkReportToEventBodySchema', linkReportToEventBodySchema],
+  ['eventListResponseSchema', eventListResponseSchema],
+  ['caseEventListResponseSchema', caseEventListResponseSchema],
+  ['reportEventListResponseSchema', reportEventListResponseSchema],
 ]
 
 export interface SchemaRegistryEntry {
