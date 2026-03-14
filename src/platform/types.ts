@@ -10,9 +10,13 @@
 export interface StorageApi {
   get<T = unknown>(key: string): Promise<T | undefined>
   put(key: string, value: unknown): Promise<void>
+  /** Batch put — matches CF DurableObjectStorage.put(entries) overload */
+  put(entries: Record<string, unknown>): Promise<void>
   delete(key: string): Promise<void>
+  /** Batch delete — matches CF DurableObjectStorage.delete(keys) overload */
+  delete(keys: string[]): Promise<void>
   deleteAll(): Promise<void>
-  list(options?: { prefix?: string }): Promise<Map<string, unknown>>
+  list(options?: { prefix?: string; limit?: number }): Promise<Map<string, unknown>>
   setAlarm(scheduledTime: number | Date): Promise<void>
   getAlarm(): Promise<number | null>
   deleteAlarm(): Promise<void>

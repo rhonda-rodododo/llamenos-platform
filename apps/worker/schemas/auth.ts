@@ -47,6 +47,7 @@ export const profileUpdateBodySchema = z.looseObject({
   uiLanguage: z.string().max(5).optional(),
   profileCompleted: z.boolean().optional(),
   callPreference: z.enum(['phone', 'browser', 'both']).optional(),
+  specializations: z.array(z.string().max(100)).optional(), // Epic 340
 })
 
 export const availabilityBodySchema = z.looseObject({

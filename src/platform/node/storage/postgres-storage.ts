@@ -43,7 +43,40 @@ export class PostgresStorage implements StorageApi {
     return rows[0].value as T
   }
 
-  async put(key: string, value: unknown): Promise<void> {
+  async put(keyOrEntries: string | Record<string, unknown>, value?: unknown): Promise<void> {
+    // Batch overload: put({ key1: val1, key2: val2, ... })
+    if (typeof keyOrEntries === 'object' && keyOrEntries !== null) {
+      const entries = keyOrEntries as Record<string, unknown>
+      const keys = Object.keys(entries)
+      if (keys.length === 0) return
+      const sql = getPool()
+      await sql.begin(async (tx: any) => {
+        await tx`SELECT pg_advisory_xact_lock(hashtext(${this.namespace}))`
+        for (const k of keys) {
+          const v = entries[k]
+          if (v === null || v === undefined) {
+            await tx`
+              INSERT INTO kv_store (namespace, key, value)
+              VALUES (${this.namespace}, ${k}, 'null'::jsonb)
+              ON CONFLICT (namespace, key)
+              DO UPDATE SET value = EXCLUDED.value
+            `
+          } else {
+            const jsonValue = sql.json(v as JSONValue)
+            await tx`
+              INSERT INTO kv_store (namespace, key, value)
+              VALUES (${this.namespace}, ${k}, ${jsonValue})
+              ON CONFLICT (namespace, key)
+              DO UPDATE SET value = EXCLUDED.value
+            `
+          }
+        }
+      })
+      return
+    }
+
+    // Single key-value overload: put(key, value)
+    const key = keyOrEntries as string
     const sql = getPool()
     await sql.begin(async (tx: any) => {
       // Advisory lock scoped to transaction — serializes writes per namespace
@@ -69,12 +102,21 @@ export class PostgresStorage implements StorageApi {
     })
   }
 
-  async delete(key: string): Promise<void> {
+  async delete(keyOrKeys: string | string[]): Promise<void> {
     const sql = getPool()
-    await sql`
-      DELETE FROM kv_store
-      WHERE namespace = ${this.namespace} AND key = ${key}
-    `
+    if (Array.isArray(keyOrKeys)) {
+      // Batch delete overload
+      if (keyOrKeys.length === 0) return
+      await sql`
+        DELETE FROM kv_store
+        WHERE namespace = ${this.namespace} AND key = ANY(${keyOrKeys})
+      `
+    } else {
+      await sql`
+        DELETE FROM kv_store
+        WHERE namespace = ${this.namespace} AND key = ${keyOrKeys}
+      `
+    }
   }
 
   async deleteAll(): Promise<void> {

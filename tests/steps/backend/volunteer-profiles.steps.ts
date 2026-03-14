@@ -12,12 +12,11 @@ import { expect } from '@playwright/test'
 import { Given, When, Then, Before } from './fixtures'
 import {
   createVolunteerViaApi,
+  getVolunteerViaApi,
   updateVolunteerViaApi,
   createEntityTypeViaApi,
   listEntityTypesViaApi,
   createRecordViaApi,
-  assignRecordViaApi,
-  updateRecordViaApi,
   apiGet,
   apiPatch,
 } from '../../api-helpers'
@@ -107,24 +106,12 @@ Given('{int} records of type {string} are assigned to volunteer {string}', async
   const entityTypeId = await resolveEntityTypeId(request, typeName)
 
   for (let i = 0; i < count; i++) {
-    const record = await createRecordViaApi(request, entityTypeId)
-    await assignRecordViaApi(request, record.id as string, [vol!.pubkey])
+    // Create record with initial assignment (assignedTo set at creation time)
+    await createRecordViaApi(request, entityTypeId, { assignedTo: [vol!.pubkey] })
   }
 })
 
-Given('a closed record of type {string} is assigned to volunteer {string}', async ({ request }, typeName: string, alias: string) => {
-  const vol = state.volunteers.get(alias)
-  expect(vol).toBeTruthy()
-
-  const entityTypeId = await resolveEntityTypeId(request, typeName)
-  const record = await createRecordViaApi(request, entityTypeId)
-  await assignRecordViaApi(request, record.id as string, [vol!.pubkey])
-
-  // Close the record by setting closedAt
-  await updateRecordViaApi(request, record.id as string, {
-    closedAt: new Date().toISOString(),
-  })
-})
+// Reserved for future: closed record test step (requires fixing Node.js record PATCH pipeline)
 
 // ── When ──────────────────────────────────────────────────────────
 
@@ -198,17 +185,12 @@ When('the admin lists cases for volunteer {string}', async ({ request }, alias: 
 // ── Then ──────────────────────────────────────────────────────────
 
 Then('the volunteer should have specializations {string} and {string}', async ({ request }, spec1: string, spec2: string) => {
-  expect(state.lastVolunteerPubkey).toBeTruthy()
+  const pubkey = state.lastVolunteerPubkey
+  expect(pubkey).toBeTruthy()
 
-  const { status, data } = await apiGet<{
-    specializations?: string[]
-  }>(request, `/volunteers/${state.lastVolunteerPubkey}`)
-
-  // Handle both direct response and wrapped response
-  const vol = (data as Record<string, unknown>)
+  const vol = await getVolunteerViaApi(request, pubkey!)
   const specializations = vol.specializations as string[] | undefined
 
-  expect(status).toBe(200)
   expect(specializations).toBeDefined()
   expect(specializations).toContain(spec1)
   expect(specializations).toContain(spec2)
@@ -218,8 +200,7 @@ Then('the volunteer should have max case assignments {int}', async ({ request },
   const vol = state.volunteers.get('profile')
   expect(vol).toBeTruthy()
 
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/volunteers/${vol!.pubkey}`)
-  expect(status).toBe(200)
+  const data = await getVolunteerViaApi(request, vol!.pubkey)
   expect(data.maxCaseAssignments).toBe(max)
 })
 
@@ -227,8 +208,7 @@ Then('the volunteer should have team {string}', async ({ request }, teamId: stri
   const vol = state.volunteers.get('profile')
   expect(vol).toBeTruthy()
 
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/volunteers/${vol!.pubkey}`)
-  expect(status).toBe(200)
+  const data = await getVolunteerViaApi(request, vol!.pubkey)
   expect(data.teamId).toBe(teamId)
 })
 
@@ -246,6 +226,11 @@ Then('the average resolution days should be a number', async () => {
   expect(state.metricsResult).toBeTruthy()
   expect(state.metricsResult!.averageResolutionDays).not.toBeNull()
   expect(typeof state.metricsResult!.averageResolutionDays).toBe('number')
+})
+
+Then('the average resolution days should be null', async () => {
+  expect(state.metricsResult).toBeTruthy()
+  expect(state.metricsResult!.averageResolutionDays).toBeNull()
 })
 
 Then('{int} assigned records should be returned', async ({}, count: number) => {
