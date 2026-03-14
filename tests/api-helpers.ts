@@ -673,3 +673,133 @@ export async function cleanupTestData(
     console.warn('Cleanup errors:', errors.join(', '))
   }
 }
+
+// ── Case Management: Entity Schema (Epic 315) ──────────────────────
+
+export async function enableCaseManagementViaApi(
+  request: APIRequestContext,
+  enabled = true,
+  nsec = ADMIN_NSEC,
+): Promise<{ enabled: boolean }> {
+  return apiPut<{ enabled: boolean }>(request, '/settings/cms/case-management', { enabled }, nsec)
+}
+
+export async function getCaseManagementEnabledViaApi(
+  request: APIRequestContext,
+  nsec = ADMIN_NSEC,
+): Promise<{ enabled: boolean }> {
+  return apiGet<{ enabled: boolean }>(request, '/settings/cms/case-management', nsec)
+}
+
+export async function createEntityTypeViaApi(
+  request: APIRequestContext,
+  options?: {
+    name?: string
+    label?: string
+    category?: string
+    statuses?: Array<{ value: string; label: string; order: number }>
+    fields?: Array<{ name: string; label: string; type: string; required?: boolean; order: number }>
+    numberPrefix?: string
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const name = options?.name ?? `test_type_${Date.now()}`
+  const defaultStatuses = [
+    { value: 'open', label: 'Open', order: 0 },
+    { value: 'closed', label: 'Closed', order: 1, isClosed: true },
+  ]
+  return apiPost<Record<string, unknown>>(
+    request,
+    '/settings/cms/entity-types',
+    {
+      name,
+      label: options?.label ?? name.replace(/_/g, ' '),
+      labelPlural: options?.label ? `${options.label}s` : `${name.replace(/_/g, ' ')}s`,
+      description: `Test entity type ${name}`,
+      category: options?.category ?? 'case',
+      statuses: options?.statuses ?? defaultStatuses,
+      defaultStatus: (options?.statuses ?? defaultStatuses)[0].value,
+      closedStatuses: (options?.statuses ?? defaultStatuses).filter(s => (s as Record<string, unknown>).isClosed).map(s => s.value),
+      fields: (options?.fields ?? []).map((f, i) => ({
+        ...f,
+        label: f.label ?? f.name,
+        required: f.required ?? false,
+        order: f.order ?? i,
+        indexable: false,
+        indexType: 'none',
+        accessLevel: 'all',
+        visibleToVolunteers: true,
+        editableByVolunteers: true,
+        hubEditable: true,
+      })),
+      numberPrefix: options?.numberPrefix,
+      numberingEnabled: !!options?.numberPrefix,
+    },
+    nsec,
+  )
+}
+
+export async function listEntityTypesViaApi(
+  request: APIRequestContext,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>[]> {
+  const data = await apiGet<{ entityTypes: Record<string, unknown>[] }>(request, '/settings/cms/entity-types', nsec)
+  return data.entityTypes
+}
+
+export async function updateEntityTypeViaApi(
+  request: APIRequestContext,
+  id: string,
+  updates: Record<string, unknown>,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  return apiPatch<Record<string, unknown>>(request, `/settings/cms/entity-types/${id}`, updates, nsec)
+}
+
+export async function deleteEntityTypeViaApi(
+  request: APIRequestContext,
+  id: string,
+  nsec = ADMIN_NSEC,
+): Promise<void> {
+  await apiDelete(request, `/settings/cms/entity-types/${id}`, nsec)
+}
+
+export async function createRelationshipTypeViaApi(
+  request: APIRequestContext,
+  options: {
+    sourceEntityTypeId: string
+    targetEntityTypeId: string
+    cardinality?: string
+    label?: string
+    reverseLabel?: string
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  return apiPost<Record<string, unknown>>(
+    request,
+    '/settings/cms/relationship-types',
+    {
+      sourceEntityTypeId: options.sourceEntityTypeId,
+      targetEntityTypeId: options.targetEntityTypeId,
+      cardinality: options.cardinality ?? 'M:N',
+      label: options.label ?? 'Related',
+      reverseLabel: options.reverseLabel ?? 'Related',
+      sourceLabel: 'has',
+      targetLabel: 'belongs to',
+    },
+    nsec,
+  )
+}
+
+export async function generateCaseNumberViaApi(
+  request: APIRequestContext,
+  prefix: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ number: string; sequence: number }> {
+  return apiPost<{ number: string; sequence: number }>(
+    request,
+    '/settings/cms/case-number',
+    { prefix },
+    nsec,
+  )
+}

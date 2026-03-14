@@ -31,6 +31,7 @@ import contactsRoutes from './routes/contacts'
 import healthRoutes from './routes/health'
 import metricsRoutes from './routes/metrics'
 import systemRoutes from './routes/system'
+import entitySchemaRoutes from './routes/entity-schema'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { getDOs } from './lib/do-access'
@@ -133,6 +134,7 @@ authenticated.route('/blasts', blastsRoutes)
 authenticated.route('/devices', devicesRoutes)
 authenticated.route('/contacts', contactsRoutes)
 authenticated.route('/system', systemRoutes)
+authenticated.route('/settings/cms', entitySchemaRoutes)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()

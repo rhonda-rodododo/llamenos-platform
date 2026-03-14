@@ -32,6 +32,18 @@
     "LABEL_SERVER_NOSTR_KEY_INFO": "llamenos:server-nostr-key:v1",
     "LABEL_PUSH_WAKE": "llamenos:push-wake",
     "LABEL_PUSH_FULL": "llamenos:push-full",
-    "LABEL_CONTACT_ID": "llamenos:contact-identifier"
+    "LABEL_CONTACT_ID": "llamenos:contact-identifier",
+    "LABEL_CONTACT_PROFILE": "llamenos:contact-profile",
+    "LABEL_CASE_SUMMARY": "llamenos:case-summary",
+    "LABEL_CASE_FIELDS": "llamenos:case-fields",
+    "LABEL_EVENT_DETAILS": "llamenos:event-details",
+    "LABEL_BLIND_INDEX_KEY": "llamenos:blind-index-key",
+    "LABEL_CROSS_HUB_SHARE": "llamenos:cross-hub-share",
+    "HMAC_CONTACT_NAME": "llamenos:contact-name",
+    "HMAC_CONTACT_TAG": "llamenos:contact-tag",
+    "HMAC_CASE_STATUS": "llamenos:case-status",
+    "HMAC_CASE_SEVERITY": "llamenos:case-severity",
+    "HMAC_CASE_CATEGORY": "llamenos:case-category",
+    "HMAC_EVENT_TYPE": "llamenos:event-type"
   }
 }

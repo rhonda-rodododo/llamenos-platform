@@ -1,7 +1,8 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env, SpamSettings, CallSettings } from '../types'
 import type { CustomFieldDefinition, TelephonyProviderConfig, MessagingConfig, SetupState, EnabledChannels, Hub, ReportType } from '@shared/types'
-import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS, DEFAULT_MESSAGING_CONFIG, DEFAULT_SETUP_STATE, MAX_REPORT_TYPES, MAX_REPORT_TYPE_NAME_LENGTH, MAX_REPORT_TYPE_DESCRIPTION_LENGTH, DEFAULT_REPORT_TYPES } from '@shared/types'
+import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS, DEFAULT_MESSAGING_CONFIG, DEFAULT_SETUP_STATE, MAX_REPORT_TYPES, MAX_REPORT_TYPE_NAME_LENGTH, MAX_REPORT_TYPE_DESCRIPTION_LENGTH, DEFAULT_REPORT_TYPES, MAX_ENTITY_TYPES, MAX_RELATIONSHIP_TYPES } from '@shared/types'
+import type { EntityTypeDefinition, EntityFieldDefinition, RelationshipTypeDefinition } from '../schemas/entity-schema'
 import { IVR_LANGUAGES } from '@shared/languages'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
@@ -128,6 +129,29 @@ export class SettingsDO extends DurableObject<Env> {
 
     // --- Migration Management (Epic 286) ---
     registerMigrationRoutes(this.router, () => this.ctx.storage, 'settings')
+
+    // --- Case Management (Epic 315) ---
+    this.router.get('/settings/case-management', () => this.getCaseManagementEnabled())
+    this.router.put('/settings/case-management', async (req) => this.setCaseManagementEnabled(await req.json()))
+
+    // Entity Types
+    this.router.get('/settings/entity-types', () => this.getEntityTypes())
+    this.router.post('/settings/entity-types', async (req) => this.createEntityType(await req.json()))
+    this.router.patch('/settings/entity-types/:id', async (req, { id }) => this.updateEntityType(id, await req.json()))
+    this.router.delete('/settings/entity-types/:id', (_req, { id }) => this.deleteEntityType(id))
+
+    // Relationship Types
+    this.router.get('/settings/relationship-types', () => this.getRelationshipTypes())
+    this.router.post('/settings/relationship-types', async (req) => this.createRelationshipType(await req.json()))
+    this.router.patch('/settings/relationship-types/:id', async (req, { id }) => this.updateRelationshipType(id, await req.json()))
+    this.router.delete('/settings/relationship-types/:id', (_req, { id }) => this.deleteRelationshipType(id))
+
+    // Case Number Sequence
+    this.router.post('/settings/case-number', async (req) => this.generateCaseNumber(await req.json()))
+
+    // Applied Templates
+    this.router.get('/settings/applied-templates', () => this.getAppliedTemplates())
+    this.router.put('/settings/applied-templates', async (req) => this.setAppliedTemplates(await req.json()))
 
     // --- Test Reset (demo/development only — Epic 258 C3) ---
     this.router.post('/reset', async () => {
@@ -1031,6 +1055,168 @@ export class SettingsDO extends DurableObject<Env> {
     if (!hub) return new Response('Hub not found', { status: 404 })
 
     await this.ctx.storage.put(`hub-key:${hubId}`, data.envelopes)
+    return Response.json({ ok: true })
+  }
+
+  // =====================================================================
+  // Case Management — Entity Type Definitions (Epic 315)
+  // =====================================================================
+
+  private async getCaseManagementEnabled(): Promise<Response> {
+    const enabled = (await this.ctx.storage.get('caseManagementEnabled')) ?? false
+    return Response.json({ enabled })
+  }
+
+  private async setCaseManagementEnabled(data: { enabled: boolean }): Promise<Response> {
+    await this.ctx.storage.put('caseManagementEnabled', !!data.enabled)
+    return Response.json({ enabled: !!data.enabled })
+  }
+
+  private async getEntityTypes(): Promise<Response> {
+    const types = (await this.ctx.storage.get<EntityTypeDefinition[]>('entityTypes')) ?? []
+    return Response.json({ entityTypes: types })
+  }
+
+  private async createEntityType(data: Record<string, unknown>): Promise<Response> {
+    const types = (await this.ctx.storage.get<EntityTypeDefinition[]>('entityTypes')) ?? []
+
+    if (types.length >= MAX_ENTITY_TYPES) {
+      return Response.json({ error: `Maximum of ${MAX_ENTITY_TYPES} entity types allowed` }, { status: 400 })
+    }
+
+    // Check for duplicate name
+    const name = data.name as string
+    if (types.some(t => t.name === name && !t.isArchived)) {
+      return Response.json({ error: `Entity type with name "${name}" already exists` }, { status: 409 })
+    }
+
+    const now = new Date().toISOString()
+    const newType: EntityTypeDefinition = {
+      ...(data as Omit<EntityTypeDefinition, 'id' | 'hubId' | 'createdAt' | 'updatedAt'>),
+      id: crypto.randomUUID(),
+      hubId: '', // Set by route handler
+      fields: ((data.fields as EntityFieldDefinition[]) ?? []).map(f => ({
+        ...f,
+        id: f.id || crypto.randomUUID(),
+      })),
+      createdAt: now,
+      updatedAt: now,
+    } as EntityTypeDefinition
+
+    types.push(newType)
+    await this.ctx.storage.put('entityTypes', types)
+    return Response.json(newType, { status: 201 })
+  }
+
+  private async updateEntityType(id: string, data: Record<string, unknown>): Promise<Response> {
+    const types = (await this.ctx.storage.get<EntityTypeDefinition[]>('entityTypes')) ?? []
+    const idx = types.findIndex(t => t.id === id)
+    if (idx === -1) return Response.json({ error: 'Entity type not found' }, { status: 404 })
+
+    // Assign IDs to new fields
+    if (data.fields && Array.isArray(data.fields)) {
+      data.fields = (data.fields as EntityFieldDefinition[]).map(f => ({
+        ...f,
+        id: f.id || crypto.randomUUID(),
+      }))
+    }
+
+    types[idx] = {
+      ...types[idx],
+      ...(data as Partial<EntityTypeDefinition>),
+      id, // preserve
+      hubId: types[idx].hubId, // preserve
+      createdAt: types[idx].createdAt, // preserve
+      updatedAt: new Date().toISOString(),
+    }
+
+    await this.ctx.storage.put('entityTypes', types)
+    return Response.json(types[idx])
+  }
+
+  private async deleteEntityType(id: string): Promise<Response> {
+    const types = (await this.ctx.storage.get<EntityTypeDefinition[]>('entityTypes')) ?? []
+    const filtered = types.filter(t => t.id !== id)
+    if (filtered.length === types.length) {
+      return Response.json({ error: 'Entity type not found' }, { status: 404 })
+    }
+    await this.ctx.storage.put('entityTypes', filtered)
+    return Response.json({ deleted: true })
+  }
+
+  private async getRelationshipTypes(): Promise<Response> {
+    const types = (await this.ctx.storage.get<RelationshipTypeDefinition[]>('relationshipTypes')) ?? []
+    return Response.json({ relationshipTypes: types })
+  }
+
+  private async createRelationshipType(data: Record<string, unknown>): Promise<Response> {
+    const types = (await this.ctx.storage.get<RelationshipTypeDefinition[]>('relationshipTypes')) ?? []
+
+    if (types.length >= MAX_RELATIONSHIP_TYPES) {
+      return Response.json({ error: `Maximum of ${MAX_RELATIONSHIP_TYPES} relationship types allowed` }, { status: 400 })
+    }
+
+    const now = new Date().toISOString()
+    const newType: RelationshipTypeDefinition = {
+      ...(data as Omit<RelationshipTypeDefinition, 'id' | 'hubId' | 'createdAt' | 'updatedAt'>),
+      id: crypto.randomUUID(),
+      hubId: '',
+      createdAt: now,
+      updatedAt: now,
+    } as RelationshipTypeDefinition
+
+    types.push(newType)
+    await this.ctx.storage.put('relationshipTypes', types)
+    return Response.json(newType, { status: 201 })
+  }
+
+  private async updateRelationshipType(id: string, data: Record<string, unknown>): Promise<Response> {
+    const types = (await this.ctx.storage.get<RelationshipTypeDefinition[]>('relationshipTypes')) ?? []
+    const idx = types.findIndex(t => t.id === id)
+    if (idx === -1) return Response.json({ error: 'Relationship type not found' }, { status: 404 })
+
+    types[idx] = {
+      ...types[idx],
+      ...(data as Partial<RelationshipTypeDefinition>),
+      id,
+      hubId: types[idx].hubId,
+      createdAt: types[idx].createdAt,
+      updatedAt: new Date().toISOString(),
+    }
+
+    await this.ctx.storage.put('relationshipTypes', types)
+    return Response.json(types[idx])
+  }
+
+  private async deleteRelationshipType(id: string): Promise<Response> {
+    const types = (await this.ctx.storage.get<RelationshipTypeDefinition[]>('relationshipTypes')) ?? []
+    const filtered = types.filter(t => t.id !== id)
+    if (filtered.length === types.length) {
+      return Response.json({ error: 'Relationship type not found' }, { status: 404 })
+    }
+    await this.ctx.storage.put('relationshipTypes', filtered)
+    return Response.json({ deleted: true })
+  }
+
+  private async generateCaseNumber(data: { prefix: string; year?: number }): Promise<Response> {
+    const year = data.year ?? new Date().getFullYear()
+    const key = `caseNumberSeq:${data.prefix}:${year}`
+    const current = ((await this.ctx.storage.get(key)) ?? 0) as number
+    const next = current + 1
+    await this.ctx.storage.put(key, next)
+    return Response.json({
+      number: `${data.prefix}-${year}-${String(next).padStart(4, '0')}`,
+      sequence: next,
+    })
+  }
+
+  private async getAppliedTemplates(): Promise<Response> {
+    const templates = (await this.ctx.storage.get('appliedTemplates')) ?? []
+    return Response.json({ appliedTemplates: templates })
+  }
+
+  private async setAppliedTemplates(data: { appliedTemplates: unknown[] }): Promise<Response> {
+    await this.ctx.storage.put('appliedTemplates', data.appliedTemplates)
     return Response.json({ ok: true })
   }
 }

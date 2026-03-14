@@ -107,6 +107,43 @@ export const PERMISSION_CATALOG = {
   'files:download-all': 'Download any file',
   'files:share': 'Re-encrypt/share files with others',
 
+  // Cases / Records (CMS)
+  'cases:create': 'Create new cases/records',
+  'cases:read-own': 'Read records assigned to self',
+  'cases:read-assigned': 'Read records assigned to self or team',
+  'cases:read-all': 'Read all records in hub',
+  'cases:update-own': 'Update records assigned to self',
+  'cases:update': 'Update any record',
+  'cases:close': 'Close/resolve records',
+  'cases:delete': 'Delete records',
+  'cases:assign': 'Assign records to volunteers',
+  'cases:link': 'Link records to reports/events/contacts',
+  'cases:manage-types': 'Create/edit entity type definitions',
+  'cases:import': 'Bulk import records',
+  'cases:export': 'Bulk export records',
+
+  // Contacts — CMS (extends existing contacts:view, contacts:view-history)
+  'contacts:create': 'Create new contacts',
+  'contacts:edit': 'Edit contact profiles',
+  'contacts:delete': 'Delete contacts',
+  'contacts:merge': 'Merge duplicate contacts',
+  'contacts:view-pii': 'View contact PII (name, phone, demographics)',
+  'contacts:manage-relationships': 'Manage contact relationships',
+  'contacts:manage-groups': 'Manage affinity groups',
+
+  // Events (CMS)
+  'events:create': 'Create events',
+  'events:read': 'View events',
+  'events:update': 'Update events',
+  'events:delete': 'Delete events',
+  'events:link': 'Link events to records/reports',
+
+  // Evidence (CMS)
+  'evidence:upload': 'Upload evidence files to records',
+  'evidence:download': 'Download evidence from records',
+  'evidence:manage-custody': 'Manage chain of custody records',
+  'evidence:delete': 'Delete evidence files',
+
   // System (super-admin only)
   'system:manage-roles': 'Create/edit/delete custom roles',
   'system:manage-hubs': 'Create/manage hubs',
@@ -163,11 +200,11 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'volunteers:*', 'shifts:*', 'settings:*', 'audit:read',
       'bans:*', 'invites:*', 'notes:*',
       'reports:*', 'conversations:*', 'calls:*', 'blasts:*', 'files:*',
-      'contacts:view', 'contacts:view-history',
+      'contacts:*', 'cases:*', 'events:*', 'evidence:*',
     ],
     isDefault: true,
     isSystem: false,
-    description: 'Full control within assigned hub(s) — manages volunteers, shifts, settings',
+    description: 'Full control within assigned hub(s) — manages volunteers, shifts, settings, cases',
   },
   {
     id: 'role-reviewer',
@@ -179,10 +216,13 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'reports:update', 'reports:send-message',
       'conversations:read-assigned', 'conversations:send',
       'shifts:read-own', 'files:download-own', 'files:upload',
+      'cases:read-assigned', 'cases:update',
+      'contacts:view', 'contacts:view-pii',
+      'events:read', 'evidence:download',
     ],
     isDefault: true,
     isSystem: false,
-    description: 'Reviews notes and reports from assigned volunteers or shifts',
+    description: 'Reviews notes, reports, and cases from assigned volunteers or shifts',
   },
   {
     id: 'role-volunteer',
@@ -197,10 +237,12 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'shifts:read-own', 'bans:report',
       'reports:read-assigned', 'reports:send-message',
       'files:upload', 'files:download-own',
+      'cases:create', 'cases:read-own', 'cases:update-own',
+      'contacts:view', 'events:read', 'evidence:upload',
     ],
     isDefault: true,
     isSystem: false,
-    description: 'Answers calls, writes notes, handles assigned conversations',
+    description: 'Answers calls, writes notes, handles conversations and assigned cases',
   },
   {
     id: 'role-reporter',

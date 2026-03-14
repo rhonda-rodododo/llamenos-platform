@@ -409,6 +409,22 @@ export const DEFAULT_REPORT_TYPES: Omit<ReportType, 'id' | 'createdAt' | 'update
   },
 ]
 
+// --- Entity Schema Types (CMS — Epic 315) ---
+export type { EntityTypeDefinition, EntityFieldDefinition, RelationshipTypeDefinition, EnumOption, EntityCategory } from '@worker/schemas/entity-schema'
+
+export const MAX_ENTITY_TYPES = 50
+export const MAX_ENTITY_FIELDS = 100
+export const MAX_RELATIONSHIP_TYPES = 100
+export const MAX_ENUM_OPTIONS = 50
+export const MAX_FIELD_SECTIONS = 20
+
+export const ENTITY_CATEGORY_LABELS: Record<string, string> = {
+  contact: 'Contact',
+  case: 'Case',
+  event: 'Event',
+  custom: 'Custom Record',
+}
+
 // --- Hub Types ---
 
 export interface Hub {
