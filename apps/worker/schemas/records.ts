@@ -66,9 +66,16 @@ export const createRecordBodySchema = z.object({
 
 export type CreateRecordBody = z.infer<typeof createRecordBodySchema>
 
-// --- Update record body (partial) ---
+// --- Update record body (partial, with optional status change interaction metadata) ---
 
-export const updateRecordBodySchema = createRecordBodySchema.partial()
+export const updateRecordBodySchema = createRecordBodySchema.partial().extend({
+  // Status change interaction metadata (Epic 323) — when statusHash changes,
+  // these fields let the client provide encrypted content for the auto-created
+  // status_change interaction in the case timeline.
+  statusChangeTypeHash: z.string().optional(),
+  statusChangeContent: z.string().optional(),
+  statusChangeEnvelopes: z.array(recipientEnvelopeSchema).optional(),
+})
 
 export type UpdateRecordBody = z.infer<typeof updateRecordBodySchema>
 

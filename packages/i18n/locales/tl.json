@@ -406,7 +406,31 @@
     "roleMedia": "Media",
     "roleDriver": "Driver",
     "roleCoordinator": "Coordinator",
-    "roleCustom": "Other"
+    "roleCustom": "Other",
+    "interactions": "Interactions",
+    "timeline": "Timeline",
+    "addComment": "Add Comment",
+    "commentPlaceholder": "Write a comment...",
+    "noInteractions": "No activity yet.",
+    "interactionTypes": {
+      "note": "Note",
+      "call": "Call",
+      "message": "Message",
+      "status_change": "Status Change",
+      "referral": "Referral",
+      "assessment": "Assessment",
+      "file_upload": "File Upload",
+      "comment": "Comment"
+    },
+    "statusChanged": "Status changed from {{previous}} to {{new}}",
+    "noteLinked": "Note linked to case",
+    "callLinked": "Call linked to case",
+    "messageLinked": "Conversation linked to case",
+    "referredTo": "Referred to {{target}}",
+    "assessmentCompleted": "{{type}} assessment completed",
+    "fileUploaded": "File uploaded",
+    "filterByType": "Filter by type",
+    "showAll": "Show all"
   },
   "blasts": {
     "activeSubscribers": "Active",

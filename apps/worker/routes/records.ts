@@ -419,6 +419,7 @@ records.patch('/:id',
 
     const res = await dos.caseManager.fetch(new Request(`http://do/records/${id}`, {
       method: 'PATCH',
+      headers: { 'x-pubkey': pubkey },
       body: JSON.stringify(body),
     }))
 
