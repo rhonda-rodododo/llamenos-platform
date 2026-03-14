@@ -20,6 +20,8 @@ import { formatRelativeTime } from '@/lib/format'
 import { StatusPill } from '@/components/cases/status-pill'
 import { SchemaForm, type SchemaFieldValues } from '@/components/cases/schema-form'
 import { CreateRecordDialog } from '@/components/cases/create-record-dialog'
+import { CaseTimeline } from '@/components/cases/case-timeline'
+import { EvidenceTab } from '@/components/cases/evidence-tab'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -666,7 +668,16 @@ function RecordDetail({
             isAssigned={isAssigned}
           />
         )}
-        {activeTab === 'timeline' && <TimelinePlaceholder />}
+        {activeTab === 'timeline' && (
+          <CaseTimeline
+            recordId={record.id}
+            volunteerNames={{}}
+            readerPubkeys={publicKey ? [publicKey] : []}
+            statusLabels={Object.fromEntries(
+              entityType.statuses.map(s => [s.value, { label: s.label, color: s.color ?? '#6b7280' }]),
+            )}
+          />
+        )}
         {activeTab === 'contacts' && (
           <ContactsTab
             contacts={contacts}
@@ -674,7 +685,13 @@ function RecordDetail({
             entityType={entityType}
           />
         )}
-        {activeTab === 'evidence' && <EvidencePlaceholder />}
+        {activeTab === 'evidence' && (
+          <EvidenceTab
+            recordId={record.id}
+            volunteerNames={{}}
+            readerPubkeys={publicKey ? [publicKey] : []}
+          />
+        )}
         {activeTab === 'related' && <RelatedPlaceholder />}
       </div>
     </>
@@ -801,28 +818,6 @@ function ContactsTab({
 }
 
 // --- Placeholder tabs ---
-
-function TimelinePlaceholder() {
-  const { t } = useTranslation()
-  return (
-    <div data-testid="case-timeline-tab" className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-      <Clock className="h-8 w-8 mb-2 text-muted-foreground/40" />
-      <p className="text-sm font-medium">{t('cases.timelinePlaceholder', { defaultValue: 'Timeline' })}</p>
-      <p className="text-xs mt-1">{t('cases.timelineHint', { defaultValue: 'Interactions and status changes will appear here.' })}</p>
-    </div>
-  )
-}
-
-function EvidencePlaceholder() {
-  const { t } = useTranslation()
-  return (
-    <div data-testid="case-evidence-tab" className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-      <Link2 className="h-8 w-8 mb-2 text-muted-foreground/40" />
-      <p className="text-sm font-medium">{t('cases.evidencePlaceholder', { defaultValue: 'Evidence' })}</p>
-      <p className="text-xs mt-1">{t('cases.evidenceHint', { defaultValue: 'Linked files and documents will appear here.' })}</p>
-    </div>
-  )
-}
 
 function RelatedPlaceholder() {
   const { t } = useTranslation()
