@@ -1,0 +1,282 @@
+{
+  "id": "street-medic",
+  "version": "1.0.0",
+  "name": "Street Medic",
+  "description": "Protest medical encounter tracking with triage, treatment, and follow-up. Designed for volunteer street medic teams providing first aid at protests and actions.",
+  "author": "Llamenos Project",
+  "license": "CC-BY-SA-4.0",
+  "tags": ["medical", "protest", "triage", "street-medic"],
+  "extends": [],
+
+  "labels": {
+    "en": {
+      "medical_encounter.label": "Medical Encounter",
+      "medical_encounter.labelPlural": "Medical Encounters",
+      "medical_encounter.description": "A patient encounter during a protest or action, including triage, treatment, and disposition",
+      "status.triaged": "Triaged",
+      "status.treating": "Treating",
+      "status.treated": "Treated",
+      "status.transported": "Transported to Hospital",
+      "status.follow_up": "Follow-Up Needed",
+      "status.closed": "Closed",
+      "severity.green": "Green (Minor)",
+      "severity.yellow": "Yellow (Delayed)",
+      "severity.red": "Red (Immediate)",
+      "severity.black": "Black (Deceased)",
+      "role.patient": "Patient",
+      "role.medic": "Treating Medic",
+      "role.witness": "Witness",
+      "field.chief_complaint": "Chief Complaint",
+      "field.mechanism_of_injury": "Mechanism of Injury",
+      "field.treatment_provided": "Treatment Provided",
+      "field.medications": "Medications Administered",
+      "field.allergies": "Known Allergies",
+      "field.disposition": "Disposition",
+      "field.hospital_name": "Hospital",
+      "field.follow_up_needed": "Follow-Up Needed",
+      "field.follow_up_instructions": "Follow-Up Instructions",
+      "field.encounter_time": "Time of Encounter"
+    },
+    "es": {
+      "medical_encounter.label": "Encuentro Medico",
+      "medical_encounter.labelPlural": "Encuentros Medicos",
+      "medical_encounter.description": "Un encuentro con un paciente durante una protesta o accion, incluyendo triaje, tratamiento y disposicion",
+      "status.triaged": "Triado",
+      "status.treating": "En Tratamiento",
+      "status.treated": "Tratado",
+      "status.transported": "Transportado al Hospital",
+      "status.follow_up": "Seguimiento Necesario",
+      "status.closed": "Cerrado",
+      "severity.green": "Verde (Menor)",
+      "severity.yellow": "Amarillo (Demorado)",
+      "severity.red": "Rojo (Inmediato)",
+      "severity.black": "Negro (Fallecido)",
+      "role.patient": "Paciente",
+      "role.medic": "Medico Tratante",
+      "role.witness": "Testigo",
+      "field.chief_complaint": "Queja Principal",
+      "field.mechanism_of_injury": "Mecanismo de Lesion",
+      "field.treatment_provided": "Tratamiento Proporcionado",
+      "field.medications": "Medicamentos Administrados",
+      "field.allergies": "Alergias Conocidas",
+      "field.disposition": "Disposicion",
+      "field.hospital_name": "Hospital",
+      "field.follow_up_needed": "Seguimiento Necesario",
+      "field.follow_up_instructions": "Instrucciones de Seguimiento",
+      "field.encounter_time": "Hora del Encuentro"
+    }
+  },
+
+  "entityTypes": [
+    {
+      "name": "medical_encounter",
+      "label": "medical_encounter.label",
+      "labelPlural": "medical_encounter.labelPlural",
+      "description": "medical_encounter.description",
+      "icon": "stethoscope",
+      "color": "#22c55e",
+      "category": "case",
+      "numberPrefix": "ME",
+      "numberingEnabled": true,
+      "defaultAccessLevel": "assigned",
+      "piiFields": ["allergies", "medications"],
+      "allowSubRecords": false,
+      "allowFileAttachments": true,
+      "allowInteractionLinks": true,
+      "showInNavigation": true,
+      "showInDashboard": true,
+
+      "statuses": [
+        { "value": "triaged", "label": "status.triaged", "color": "#f59e0b", "order": 1 },
+        { "value": "treating", "label": "status.treating", "color": "#3b82f6", "order": 2 },
+        { "value": "treated", "label": "status.treated", "color": "#22c55e", "order": 3 },
+        { "value": "transported", "label": "status.transported", "color": "#ef4444", "order": 4 },
+        { "value": "follow_up", "label": "status.follow_up", "color": "#8b5cf6", "order": 5 },
+        { "value": "closed", "label": "status.closed", "color": "#6b7280", "order": 6, "isClosed": true }
+      ],
+      "defaultStatus": "triaged",
+      "closedStatuses": ["closed"],
+
+      "severities": [
+        { "value": "green", "label": "severity.green", "color": "#22c55e", "icon": "heart", "order": 1 },
+        { "value": "yellow", "label": "severity.yellow", "color": "#f59e0b", "icon": "alert-triangle", "order": 2 },
+        { "value": "red", "label": "severity.red", "color": "#ef4444", "icon": "zap", "order": 3 },
+        { "value": "black", "label": "severity.black", "color": "#000000", "icon": "x-circle", "order": 4 }
+      ],
+      "defaultSeverity": "green",
+
+      "contactRoles": [
+        { "value": "patient", "label": "role.patient", "order": 1 },
+        { "value": "medic", "label": "role.medic", "order": 2 },
+        { "value": "witness", "label": "role.witness", "order": 3 }
+      ],
+
+      "fields": [
+        {
+          "name": "chief_complaint",
+          "label": "field.chief_complaint",
+          "type": "textarea",
+          "required": true,
+          "section": "assessment",
+          "order": 1,
+          "indexable": false,
+          "accessLevel": "assigned"
+        },
+        {
+          "name": "mechanism_of_injury",
+          "label": "field.mechanism_of_injury",
+          "type": "select",
+          "required": false,
+          "options": [
+            { "key": "tear_gas", "label": "Tear Gas" },
+            { "key": "pepper_spray", "label": "Pepper Spray" },
+            { "key": "rubber_bullet", "label": "Rubber Bullet" },
+            { "key": "baton", "label": "Baton" },
+            { "key": "fall", "label": "Fall" },
+            { "key": "other", "label": "Other" }
+          ],
+          "section": "assessment",
+          "order": 2,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "treatment_provided",
+          "label": "field.treatment_provided",
+          "type": "textarea",
+          "required": true,
+          "section": "treatment",
+          "order": 3,
+          "indexable": false,
+          "accessLevel": "assigned"
+        },
+        {
+          "name": "medications",
+          "label": "field.medications",
+          "type": "textarea",
+          "required": false,
+          "section": "treatment",
+          "order": 4,
+          "indexable": false,
+          "accessLevel": "admin"
+        },
+        {
+          "name": "allergies",
+          "label": "field.allergies",
+          "type": "text",
+          "required": false,
+          "section": "patient_info",
+          "order": 5,
+          "indexable": false,
+          "accessLevel": "admin"
+        },
+        {
+          "name": "disposition",
+          "label": "field.disposition",
+          "type": "select",
+          "required": true,
+          "options": [
+            { "key": "treated_released", "label": "Treated & Released" },
+            { "key": "hospital_transport", "label": "Hospital Transport" },
+            { "key": "refused_care", "label": "Refused Care" },
+            { "key": "left_ama", "label": "Left AMA" }
+          ],
+          "section": "outcome",
+          "order": 6,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "hospital_name",
+          "label": "field.hospital_name",
+          "type": "text",
+          "required": false,
+          "section": "outcome",
+          "order": 7,
+          "indexable": false,
+          "accessLevel": "assigned",
+          "showWhen": { "field": "disposition", "operator": "equals", "value": "hospital_transport" }
+        },
+        {
+          "name": "follow_up_needed",
+          "label": "field.follow_up_needed",
+          "type": "checkbox",
+          "required": false,
+          "section": "outcome",
+          "order": 8,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "follow_up_instructions",
+          "label": "field.follow_up_instructions",
+          "type": "textarea",
+          "required": false,
+          "section": "outcome",
+          "order": 9,
+          "indexable": false,
+          "accessLevel": "assigned",
+          "showWhen": { "field": "follow_up_needed", "operator": "equals", "value": true }
+        },
+        {
+          "name": "encounter_time",
+          "label": "field.encounter_time",
+          "type": "text",
+          "required": true,
+          "section": "assessment",
+          "order": 10,
+          "indexable": false,
+          "accessLevel": "all"
+        }
+      ]
+    }
+  ],
+
+  "relationshipTypes": [
+    {
+      "sourceEntityTypeName": "contact",
+      "targetEntityTypeName": "medical_encounter",
+      "cardinality": "M:N",
+      "label": "Medical Encounters",
+      "reverseLabel": "Contacts",
+      "sourceLabel": "has encounter",
+      "targetLabel": "involves",
+      "roles": [
+        { "value": "patient", "label": "Patient", "order": 1 },
+        { "value": "medic", "label": "Treating Medic", "order": 2 },
+        { "value": "witness", "label": "Witness", "order": 3 }
+      ],
+      "defaultRole": "patient",
+      "cascadeDelete": false,
+      "required": true
+    }
+  ],
+
+  "suggestedRoles": [
+    {
+      "name": "Medic Team Lead",
+      "slug": "medic-team-lead",
+      "description": "Coordinates medical team, reviews all encounters",
+      "permissions": [
+        "cases:*", "contacts:*", "events:*", "evidence:*",
+        "notes:*", "reports:*",
+        "shifts:read", "volunteers:read"
+      ]
+    },
+    {
+      "name": "Street Medic",
+      "slug": "street-medic",
+      "description": "Provides care and documents encounters",
+      "permissions": [
+        "cases:create", "cases:read-own", "cases:update-own",
+        "contacts:create", "contacts:view",
+        "notes:create", "notes:read-own",
+        "events:read",
+        "shifts:read-own"
+      ]
+    }
+  ]
+}

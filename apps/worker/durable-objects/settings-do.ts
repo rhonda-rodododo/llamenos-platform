@@ -137,12 +137,14 @@ export class SettingsDO extends DurableObject<Env> {
     // Entity Types
     this.router.get('/settings/entity-types', () => this.getEntityTypes())
     this.router.post('/settings/entity-types', async (req) => this.createEntityType(await req.json()))
+    this.router.put('/settings/entity-types', async (req) => this.bulkSetEntityTypes(await req.json()))
     this.router.patch('/settings/entity-types/:id', async (req, { id }) => this.updateEntityType(id, await req.json()))
     this.router.delete('/settings/entity-types/:id', (_req, { id }) => this.deleteEntityType(id))
 
     // Relationship Types
     this.router.get('/settings/relationship-types', () => this.getRelationshipTypes())
     this.router.post('/settings/relationship-types', async (req) => this.createRelationshipType(await req.json()))
+    this.router.put('/settings/relationship-types', async (req) => this.bulkSetRelationshipTypes(await req.json()))
     this.router.patch('/settings/relationship-types/:id', async (req, { id }) => this.updateRelationshipType(id, await req.json()))
     this.router.delete('/settings/relationship-types/:id', (_req, { id }) => this.deleteRelationshipType(id))
 
@@ -1134,6 +1136,11 @@ export class SettingsDO extends DurableObject<Env> {
     return Response.json(types[idx])
   }
 
+  private async bulkSetEntityTypes(data: { entityTypes: EntityTypeDefinition[] }): Promise<Response> {
+    await this.ctx.storage.put('entityTypes', data.entityTypes)
+    return Response.json({ entityTypes: data.entityTypes })
+  }
+
   private async deleteEntityType(id: string): Promise<Response> {
     const types = (await this.ctx.storage.get<EntityTypeDefinition[]>('entityTypes')) ?? []
     const filtered = types.filter(t => t.id !== id)
@@ -1186,6 +1193,11 @@ export class SettingsDO extends DurableObject<Env> {
 
     await this.ctx.storage.put('relationshipTypes', types)
     return Response.json(types[idx])
+  }
+
+  private async bulkSetRelationshipTypes(data: { relationshipTypes: RelationshipTypeDefinition[] }): Promise<Response> {
+    await this.ctx.storage.put('relationshipTypes', data.relationshipTypes)
+    return Response.json({ relationshipTypes: data.relationshipTypes })
   }
 
   private async deleteRelationshipType(id: string): Promise<Response> {

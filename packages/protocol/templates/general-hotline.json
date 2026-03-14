@@ -1,0 +1,121 @@
+{
+  "id": "general-hotline",
+  "version": "1.0.0",
+  "name": "General Hotline",
+  "description": "Basic hotline case tracking with calls, notes, and contacts. A minimal starting point for custom configurations.",
+  "author": "Llamenos Project",
+  "license": "CC-BY-SA-4.0",
+  "tags": ["hotline", "general", "basic"],
+  "extends": [],
+
+  "labels": {
+    "en": {
+      "general_case.label": "Case",
+      "general_case.labelPlural": "Cases",
+      "general_case.description": "A general hotline case for tracking calls, notes, and follow-ups",
+      "status.open": "Open",
+      "status.in_progress": "In Progress",
+      "status.resolved": "Resolved",
+      "status.closed": "Closed",
+      "field.category": "Category",
+      "field.description": "Description",
+      "field.follow_up_needed": "Follow-Up Needed",
+      "field.resolution": "Resolution"
+    },
+    "es": {
+      "general_case.label": "Caso",
+      "general_case.labelPlural": "Casos",
+      "general_case.description": "Un caso general de la linea de ayuda para seguimiento de llamadas, notas y seguimientos",
+      "status.open": "Abierto",
+      "status.in_progress": "En Progreso",
+      "status.resolved": "Resuelto",
+      "status.closed": "Cerrado",
+      "field.category": "Categoria",
+      "field.description": "Descripcion",
+      "field.follow_up_needed": "Seguimiento Necesario",
+      "field.resolution": "Resolucion"
+    }
+  },
+
+  "entityTypes": [
+    {
+      "name": "general_case",
+      "label": "general_case.label",
+      "labelPlural": "general_case.labelPlural",
+      "description": "general_case.description",
+      "icon": "phone",
+      "color": "#3b82f6",
+      "category": "case",
+      "numberingEnabled": false,
+      "defaultAccessLevel": "assigned",
+      "piiFields": [],
+      "allowSubRecords": false,
+      "allowFileAttachments": true,
+      "allowInteractionLinks": true,
+      "showInNavigation": true,
+      "showInDashboard": true,
+
+      "statuses": [
+        { "value": "open", "label": "status.open", "color": "#3b82f6", "order": 1 },
+        { "value": "in_progress", "label": "status.in_progress", "color": "#f59e0b", "order": 2 },
+        { "value": "resolved", "label": "status.resolved", "color": "#22c55e", "order": 3 },
+        { "value": "closed", "label": "status.closed", "color": "#6b7280", "order": 4, "isClosed": true }
+      ],
+      "defaultStatus": "open",
+      "closedStatuses": ["closed"],
+
+      "fields": [
+        {
+          "name": "category",
+          "label": "field.category",
+          "type": "select",
+          "required": true,
+          "options": [
+            { "key": "general_inquiry", "label": "General Inquiry" },
+            { "key": "referral", "label": "Referral" },
+            { "key": "crisis", "label": "Crisis" },
+            { "key": "complaint", "label": "Complaint" },
+            { "key": "other", "label": "Other" }
+          ],
+          "order": 1,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "description",
+          "label": "field.description",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Describe the nature of the call or issue.",
+          "order": 2,
+          "indexable": false,
+          "accessLevel": "assigned"
+        },
+        {
+          "name": "follow_up_needed",
+          "label": "field.follow_up_needed",
+          "type": "checkbox",
+          "required": false,
+          "order": 3,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "resolution",
+          "label": "field.resolution",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Describe how the case was resolved.",
+          "order": 4,
+          "indexable": false,
+          "accessLevel": "assigned"
+        }
+      ]
+    }
+  ],
+
+  "relationshipTypes": [],
+  "suggestedRoles": []
+}
