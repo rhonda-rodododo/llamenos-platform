@@ -230,8 +230,8 @@ When('I view the event detail', async ({ page, backendRequest: request }) => {
 
 Then('linked case records should be visible', async ({ page }) => {
   // Cases tab in the detail panel
-  const tab = page.getByTestId('case-tab-contacts')
-    .or(page.getByTestId('case-tab-related'))
+  const tab = page.getByTestId('case-contacts-tab')
+    .or(page.getByTestId('case-related-tab'))
   if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
     await tab.click()
     await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
@@ -246,7 +246,7 @@ Then('each case link should show a case number', async ({ page }) => {
 
 Then('the linked cases count should show {int}', async ({ page }, count: number) => {
   // The contact count badge is shown on the Contacts tab button
-  const contactsTab = page.getByTestId('case-tab-contacts')
+  const contactsTab = page.getByTestId('case-contacts-tab')
   if (await contactsTab.isVisible({ timeout: 3000 }).catch(() => false)) {
     // Accept that the count badge may or may not show exact count
     await expect(contactsTab).toBeVisible()

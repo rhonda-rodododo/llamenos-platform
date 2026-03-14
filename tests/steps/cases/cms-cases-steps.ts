@@ -497,7 +497,7 @@ Given('an arrest case is selected with the Timeline tab active', async ({ page, 
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
   await page.waitForTimeout(Timeouts.UI_SETTLE)
-  await page.getByTestId('case-tab-timeline').click()
+  await page.getByTestId('case-timeline').click()
   await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 

@@ -28,12 +28,12 @@ let initialFieldCount = 0
 // --- CMS toggle section ---
 
 Then('the CMS toggle section should be visible', async ({ page }) => {
-  const section = page.getByTestId('cms-toggle').or(page.locator('#cms-toggle'))
+  const section = page.getByTestId('cms-enable-toggle').or(page.locator('#cms-toggle'))
   await expect(section.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I expand the CMS toggle section', async ({ page }) => {
-  const section = page.getByTestId('cms-toggle').or(page.locator('#cms-toggle'))
+  const section = page.getByTestId('cms-enable-toggle').or(page.locator('#cms-toggle'))
   const el = section.first()
   await el.scrollIntoViewIfNeeded()
   // Check if already expanded
@@ -101,7 +101,7 @@ Then('the templates section should not be visible', async ({ page }) => {
 })
 
 Then('the CMS toggle section should show {string} in its status summary', async ({ page }, text: string) => {
-  const section = page.getByTestId('cms-toggle').or(page.locator('#cms-toggle'))
+  const section = page.getByTestId('cms-enable-toggle').or(page.locator('#cms-toggle'))
   await expect(section.first()).toContainText(new RegExp(text, 'i'), { timeout: Timeouts.ELEMENT })
 })
 
