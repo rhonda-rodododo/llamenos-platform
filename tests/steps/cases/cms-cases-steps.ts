@@ -53,10 +53,7 @@ Given('the {string} template has been applied', async ({ backendRequest: request
 
 // --- Cases page loads ---
 
-Then('I should see the {string} page title', async ({ page }, title: string) => {
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toContainText(new RegExp(title, 'i'))
-})
+// 'I should see the {string} page title' moved to common/assertion-steps.ts
 
 Then('the entity type tabs should be visible', async ({ page }) => {
   await expect(page.getByTestId('case-type-tabs')).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -245,9 +242,7 @@ Given('a volunteer without cases:update permission is logged in', async ({ page 
 
 // --- Case list interactions ---
 
-Then('the empty state card should be visible', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.EMPTY_STATE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-})
+// 'the empty state card should be visible' moved to common/assertion-steps.ts
 
 Then('the empty state create button should be visible', async ({ page }) => {
   const btn = page.getByTestId('case-empty-create-btn').or(page.getByTestId('empty-state-create-btn'))

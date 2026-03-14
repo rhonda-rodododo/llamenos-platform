@@ -67,12 +67,7 @@ When('I toggle the CMS enable switch off', async ({ page }) => {
   }
 })
 
-Then('a success toast should appear', async ({ page }) => {
-  const toast = page.locator('[data-sonner-toast][data-type="success"]')
-    .or(page.locator('[data-sonner-toast]'))
-    .or(page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted/i))
-  await expect(toast.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-})
+// 'a success toast should appear' moved to common/assertion-steps.ts
 
 Then('a toast indicating disabled should appear', async ({ page }) => {
   const toast = page.locator('[data-sonner-toast]')

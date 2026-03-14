@@ -1,4 +1,4 @@
-@desktop
+@desktop @resets-state
 Feature: Setup Wizard
   As a new admin
   I want to configure the hotline through a guided wizard

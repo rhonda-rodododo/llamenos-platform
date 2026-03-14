@@ -164,6 +164,24 @@ When('I confirm the reset', async ({ page }) => {
   }
 })
 
+// --- Shared CMS / cross-feature assertions ---
+
+Then('I should see the {string} page title', async ({ page }, title: string) => {
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toContainText(new RegExp(title, 'i'))
+})
+
+Then('a success toast should appear', async ({ page }) => {
+  const toast = page.locator('[data-sonner-toast][data-type="success"]')
+    .or(page.locator('[data-sonner-toast]'))
+    .or(page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted/i))
+  await expect(toast.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
+
+Then('the empty state card should be visible', async ({ page }) => {
+  await expect(page.getByTestId(TestIds.EMPTY_STATE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
+
 Then('no stored keys should remain', async ({ page }) => {
   // After factory reset, stored keys should be removed.
   // In test env, the reset may not execute fully — verify we're on login page instead.
