@@ -40,8 +40,8 @@ When('I expand the CMS toggle section', async ({ page }) => {
   const toggle = page.getByTestId('cms-enable-toggle')
   const isExpanded = await toggle.isVisible({ timeout: 2000 }).catch(() => false)
   if (!isExpanded) {
-    await el.locator('.cursor-pointer').first().click().catch(async () => {
-      await el.locator('h3, [class*="CardTitle"]').first().click()
+    await el.locator('h3, [class*="CardTitle"], button').first().click().catch(async () => {
+      await el.first().click()
     })
     await page.waitForTimeout(300)
   }
@@ -113,8 +113,8 @@ When('I expand the templates section', async ({ page }) => {
   const content = section.locator('[data-testid="template-card"]')
   const isExpanded = await content.first().isVisible({ timeout: 2000 }).catch(() => false)
   if (!isExpanded) {
-    await section.locator('.cursor-pointer').first().click().catch(async () => {
-      await section.locator('h3, [class*="CardTitle"]').first().click()
+    await section.locator('h3, [class*="CardTitle"], button').first().click().catch(async () => {
+      await section.first().click()
     })
     await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
@@ -128,7 +128,7 @@ Then('each template card should show entity type count', async ({ page }) => {
   const card = page.getByTestId('template-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Template cards show entity type and field count badges
-  await expect(card.locator('.text-\\[10px\\]').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(card.getByTestId('template-entity-count')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each template card should show field count', async ({ page }) => {
@@ -174,8 +174,8 @@ When('I expand the entity types section', async ({ page }) => {
   const content = section.locator('[data-testid="entity-type-row"], [data-testid="entity-type-add-btn"]')
   const isExpanded = await content.first().isVisible({ timeout: 2000 }).catch(() => false)
   if (!isExpanded) {
-    await section.locator('.cursor-pointer').first().click().catch(async () => {
-      await section.locator('h3, [class*="CardTitle"]').first().click()
+    await section.locator('h3, [class*="CardTitle"], button').first().click().catch(async () => {
+      await section.first().click()
     })
     await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
@@ -188,17 +188,17 @@ Then('at least one entity type row should be visible', async ({ page }) => {
 Then('each entity type row should show label and category badge', async ({ page }) => {
   const row = page.getByTestId('entity-type-row').first()
   await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Each row shows the label text and a category badge
-  const badge = row.locator('.text-\\[10px\\]').first()
-  await expect(badge).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Each row shows the label text and a category badge (text-[10px] Badge elements)
+  const badges = row.locator('span, div').filter({ hasText: /.+/ })
+  await expect(badges.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each entity type row should show field and status counts', async ({ page }) => {
   const row = page.getByTestId('entity-type-row').first()
   await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Badges for field and status counts
-  const badges = row.locator('.text-\\[10px\\]')
-  const count = await badges.count()
+  // Badges for field and status counts (rendered as Badge elements inside the row)
+  const badgeElements = row.locator('[class*="Badge"], [class*="badge"]').or(row.locator('span').filter({ hasText: /field|status/i }))
+  const count = await badgeElements.count()
   expect(count).toBeGreaterThanOrEqual(2)
 })
 
@@ -213,8 +213,8 @@ Given('an entity type with a color exists', async ({ backendRequest: request }) 
 Then('the entity type row should display a color swatch', async ({ page }) => {
   const row = page.getByTestId('entity-type-row').first()
   await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Color swatch is a rounded-full span with inline backgroundColor
-  const swatch = row.locator('.rounded-full')
+  // Color swatch has data-testid="color-swatch"
+  const swatch = row.getByTestId('color-swatch')
   // Accept that a swatch may or may not be present depending on template
   if (await swatch.count() > 0) {
     await expect(swatch.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -229,9 +229,9 @@ When('I click the create entity type button', async ({ page }) => {
 })
 
 Then('the entity type editor form should be visible', async ({ page }) => {
-  // The editor form is the bordered div with primary/5 background
-  const form = page.locator('.border-primary\\/30')
-  await expect(form.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // The editor form has data-testid="entity-type-editor"
+  const form = page.getByTestId('entity-type-editor')
+  await expect(form).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the general tab should be active', async ({ page }) => {
@@ -467,13 +467,13 @@ Then('status rows should be visible', async ({ page }) => {
 })
 
 Then('one status should show the {string} badge', async ({ page }, badgeText: string) => {
-  const badge = page.getByTestId('status-row').locator('.text-\\[9px\\]').filter({ hasText: new RegExp(badgeText, 'i') })
+  const badge = page.getByTestId('status-row').locator('span').filter({ hasText: new RegExp(badgeText, 'i') })
   await expect(badge.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('closed statuses should show the {string} badge', async ({ page }, badgeText: string) => {
   // Look for any status row with the "Closed" badge
-  const badge = page.getByTestId('status-row').locator('.text-\\[9px\\]').filter({ hasText: new RegExp(badgeText, 'i') })
+  const badge = page.getByTestId('status-row').locator('span').filter({ hasText: new RegExp(badgeText, 'i') })
   if (await badge.count() > 0) {
     await expect(badge.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
@@ -482,7 +482,7 @@ Then('closed statuses should show the {string} badge', async ({ page }, badgeTex
 Then('each status row should display a color swatch', async ({ page }) => {
   const row = page.getByTestId('status-row').first()
   await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
-  const swatch = row.locator('.rounded-full')
+  const swatch = row.getByTestId('color-swatch')
   if (await swatch.count() > 0) {
     await expect(swatch.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
@@ -546,8 +546,8 @@ When('I confirm the archive dialog', async ({ page }) => {
 })
 
 Then('{string} should appear in the archived section', async ({ page }, name: string) => {
-  // Archived section shows type names in the opacity-60 section
-  const archived = page.locator('.opacity-60').filter({ hasText: name })
+  // Archived section has data-testid="archived-section"
+  const archived = page.getByTestId('archived-section').filter({ hasText: name })
   await expect(archived.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 

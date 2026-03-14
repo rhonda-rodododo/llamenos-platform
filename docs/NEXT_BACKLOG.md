@@ -598,6 +598,22 @@ Reference documents: `docs/plans/2026-03-14-case-management-*.md` (6 documents, 
 - [x] **[Epic 331: Desktop Contact Directory](epics/epic-331-desktop-contact-directory.md)** — Contact list with trigram search, profile viewer, relationship graph, affinity groups, merge tool
 - [x] **[Epic 332: Desktop Case Timeline & Evidence Viewer](epics/epic-332-desktop-case-timeline-evidence.md)** — Chronological interaction timeline, evidence gallery, chain of custody display
 
+## Desktop BDD CMS Test Fixes (Epics 335-342)
+
+Fix all desktop BDD step definition issues for the Case Management System feature files.
+Pre-fix batch (Epic 335) addresses compilation errors; remaining epics fix behavioral issues.
+
+- [x] **Epic 335: Desktop BDD CMS Test Fixes — Pre-Fix Batch** — createContactViaApi signature mismatch (20 callsites → createContactByNameViaApi wrapper), navTestIdMap CMS entries, CSS class selectors → data-testid (12 instances across 4 step files), missing data-testid on case-management-section.tsx / template-browser.tsx / cases.tsx components
+- [ ] **Epic 336: CMS Admin Settings BDD Fixes** — Template browser interaction, entity type CRUD lifecycle, field editor save/delete, status/severity editor, archive/unarchive flow
+- [ ] **Epic 337: CMS Cases BDD Fixes** — Case creation dialog, entity type filtering, case detail tabs, status pill interaction, timeline comment submission, evidence view toggle
+- [ ] **Epic 338: CMS Contacts BDD Fixes** — Contact directory search with debounce, type filter, contact creation dialog, profile tabs (identifiers, cases, relationships, groups), privacy-aware display
+- [ ] **Epic 339: CMS Events BDD Fixes** — Event creation, event-case linking, event-report linking, event status changes
+- [ ] **Epic 340: CMS Backend BDD Coverage** — Backend BDD scenarios for CMS API endpoints (entity types, contacts, records, events, templates)
+- [ ] **Epic 341: CMS Mobile Step Definitions (iOS)** — iOS XCUITest step definitions for CMS feature files
+- [ ] **Epic 342: CMS Mobile Step Definitions (Android)** — Android Cucumber step definitions for CMS feature files
+
+**Dependency order:** 335 (pre-fixes) → (336 | 337 | 338 | 339) in parallel → 340 → (341 | 342)
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)

@@ -400,6 +400,10 @@ export class IdentityDO extends DurableObject<Env> {
     roleIds?: string[]
     roles?: string[]
     encryptedSecretKey: string
+    specializations?: string[]
+    maxCaseAssignments?: number
+    teamId?: string
+    supervisorPubkey?: string
   }): Promise<Response> {
     const volunteer: Volunteer = {
       pubkey: data.pubkey,
@@ -415,6 +419,11 @@ export class IdentityDO extends DurableObject<Env> {
       profileCompleted: false,
       onBreak: false,
       callPreference: 'phone',
+      // Epic 340: Volunteer profile extensions
+      ...(data.specializations && { specializations: data.specializations }),
+      ...(data.maxCaseAssignments !== undefined && { maxCaseAssignments: data.maxCaseAssignments }),
+      ...(data.teamId && { teamId: data.teamId }),
+      ...(data.supervisorPubkey && { supervisorPubkey: data.supervisorPubkey }),
     }
     await this.saveVolunteer(volunteer)
     return Response.json({ volunteer: { ...volunteer, encryptedSecretKey: undefined } })
@@ -423,6 +432,7 @@ export class IdentityDO extends DurableObject<Env> {
   private static readonly VOLUNTEER_SAFE_FIELDS = new Set([
     'name', 'phone', 'spokenLanguages', 'uiLanguage', 'profileCompleted',
     'transcriptionEnabled', 'onBreak', 'callPreference',
+    'specializations', // Epic 340: volunteers can self-update specializations
   ])
 
   private async updateVolunteer(pubkey: string, data: Partial<Volunteer>, isAdmin = false): Promise<Response> {

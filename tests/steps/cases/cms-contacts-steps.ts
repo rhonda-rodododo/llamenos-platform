@@ -12,7 +12,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
-  createContactViaApi,
+  createContactByNameViaApi,
   listContactsViaApi,
   linkContactToRecordViaApi,
   createRecordViaApi,
@@ -61,7 +61,7 @@ Given('contacts {string} and {string} exist', async ({ backendRequest: request }
   const existingNames = existing.contacts.map(c => (c as { displayName?: string }).displayName)
 
   if (!existingNames.includes(name1)) {
-    const c1 = await createContactViaApi(request, name1)
+    const c1 = await createContactByNameViaApi(request, name1)
     contactCarlosId = (c1 as { id: string }).id
   } else {
     const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name1)
@@ -69,7 +69,7 @@ Given('contacts {string} and {string} exist', async ({ backendRequest: request }
   }
 
   if (!existingNames.includes(name2)) {
-    const c2 = await createContactViaApi(request, name2)
+    const c2 = await createContactByNameViaApi(request, name2)
     contactMariaId = (c2 as { id: string }).id
   } else {
     const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name2)
@@ -80,15 +80,15 @@ Given('contacts {string} and {string} exist', async ({ backendRequest: request }
 Given('contacts exist', async ({ backendRequest: request }) => {
   const existing = await listContactsViaApi(request)
   if (existing.contacts.length === 0) {
-    await createContactViaApi(request, `Seed Contact ${Date.now()}`)
+    await createContactByNameViaApi(request, `Seed Contact ${Date.now()}`)
   }
 })
 
 Given('contacts of type {string} and {string} exist', async ({ backendRequest: request }, type1: string, type2: string) => {
   const hash1 = type1.toLowerCase().replace(/\s+/g, '_')
   const hash2 = type2.toLowerCase().replace(/\s+/g, '_')
-  await createContactViaApi(request, `${type1} Contact ${Date.now()}`, { contactTypeHash: hash1 })
-  await createContactViaApi(request, `${type2} Contact ${Date.now()}`, { contactTypeHash: hash2 })
+  await createContactByNameViaApi(request, `${type1} Contact ${Date.now()}`, { contactTypeHash: hash1 })
+  await createContactByNameViaApi(request, `${type2} Contact ${Date.now()}`, { contactTypeHash: hash2 })
 })
 
 When('I type {string} in the contact search input', async ({ page }, query: string) => {
@@ -263,7 +263,7 @@ Given('a contact {string} exists', async ({ backendRequest: request }, name: str
   if (found) {
     contactWithDataId = (found as { id: string }).id
   } else {
-    const created = await createContactViaApi(request, name)
+    const created = await createContactByNameViaApi(request, name)
     contactWithDataId = (created as { id: string }).id
   }
 })
@@ -274,30 +274,30 @@ Given('a contact {string} exists with profile data', async ({ backendRequest: re
   if (found) {
     contactWithDataId = (found as { id: string }).id
   } else {
-    const created = await createContactViaApi(request, name)
+    const created = await createContactByNameViaApi(request, name)
     contactWithDataId = (created as { id: string }).id
   }
 })
 
 Given('a contact exists with no profile data', async ({ backendRequest: request }) => {
-  const created = await createContactViaApi(request, `No-Profile ${Date.now()}`)
+  const created = await createContactByNameViaApi(request, `No-Profile ${Date.now()}`)
   contactWithDataId = (created as { id: string }).id
 })
 
 Given('a contact exists with phone and email identifiers', async ({ backendRequest: request }) => {
-  const created = await createContactViaApi(request, `Identifiers Contact ${Date.now()}`)
+  const created = await createContactByNameViaApi(request, `Identifiers Contact ${Date.now()}`)
   contactWithDataId = (created as { id: string }).id
 })
 
 Given('a contact exists with no identifiers', async ({ backendRequest: request }) => {
-  const created = await createContactViaApi(request, `No-ID Contact ${Date.now()}`)
+  const created = await createContactByNameViaApi(request, `No-ID Contact ${Date.now()}`)
   contactWithDataId = (created as { id: string }).id
 })
 
 Given('a contact exists with linked cases', async ({ backendRequest: request }) => {
   const entityTypes = await listEntityTypesViaApi(request)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  const contact = await createContactViaApi(request, `Cases Contact ${Date.now()}`)
+  const contact = await createContactByNameViaApi(request, `Cases Contact ${Date.now()}`)
   contactWithDataId = (contact as { id: string }).id
   if (arrestType) {
     const etId = (arrestType as { id: string }).id
@@ -307,13 +307,13 @@ Given('a contact exists with linked cases', async ({ backendRequest: request }) 
 })
 
 Given('a contact exists with no linked cases', async ({ backendRequest: request }) => {
-  const created = await createContactViaApi(request, `No-Cases Contact ${Date.now()}`)
+  const created = await createContactByNameViaApi(request, `No-Cases Contact ${Date.now()}`)
   contactWithDataId = (created as { id: string }).id
 })
 
 Given('a contact exists with relationships', async ({ backendRequest: request }) => {
-  const c1 = await createContactViaApi(request, `Rel Source ${Date.now()}`)
-  const c2 = await createContactViaApi(request, `Rel Target ${Date.now()}`)
+  const c1 = await createContactByNameViaApi(request, `Rel Source ${Date.now()}`)
+  const c2 = await createContactByNameViaApi(request, `Rel Target ${Date.now()}`)
   contactWithDataId = (c1 as { id: string }).id
   await createRelationshipViaApi(
     request,
@@ -324,12 +324,12 @@ Given('a contact exists with relationships', async ({ backendRequest: request })
 })
 
 Given('a contact exists with no relationships', async ({ backendRequest: request }) => {
-  const created = await createContactViaApi(request, `No-Rel Contact ${Date.now()}`)
+  const created = await createContactByNameViaApi(request, `No-Rel Contact ${Date.now()}`)
   contactWithDataId = (created as { id: string }).id
 })
 
 Given('a contact exists in groups', async ({ backendRequest: request }) => {
-  const contact = await createContactViaApi(request, `Group Contact ${Date.now()}`)
+  const contact = await createContactByNameViaApi(request, `Group Contact ${Date.now()}`)
   contactWithDataId = (contact as { id: string }).id
   const group = await createAffinityGroupViaApi(
     request,
@@ -342,7 +342,7 @@ Given('a contact exists in groups', async ({ backendRequest: request }) => {
 })
 
 Given('a contact exists not in any groups', async ({ backendRequest: request }) => {
-  const created = await createContactViaApi(request, `No-Group Contact ${Date.now()}`)
+  const created = await createContactByNameViaApi(request, `No-Group Contact ${Date.now()}`)
   contactWithDataId = (created as { id: string }).id
 })
 
@@ -464,7 +464,7 @@ Then('the contact groups empty state should be visible', async ({ page }) => {
 // --- Privacy-aware display ---
 
 Given('a contact with PII data exists', async ({ backendRequest: request }) => {
-  const contact = await createContactViaApi(request, `PII Contact ${Date.now()}`)
+  const contact = await createContactByNameViaApi(request, `PII Contact ${Date.now()}`)
   contactWithDataId = (contact as { id: string }).id
 })
 

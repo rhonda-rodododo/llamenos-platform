@@ -22,7 +22,7 @@ import {
   listRecordsViaApi,
   createInteractionViaApi,
   uploadEvidenceViaApi,
-  createContactViaApi,
+  createContactByNameViaApi,
   linkContactToRecordViaApi,
 } from '../../api-helpers'
 
@@ -261,16 +261,16 @@ Then('at least one case card should be visible', async ({ page }) => {
 Then('each case card should show a status badge', async ({ page }) => {
   const firstCard = page.getByTestId('case-card').first()
   await expect(firstCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Status badge is rendered as a colored Badge inside the card
-  const badge = firstCard.locator('.rounded-full')
-  await expect(badge.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Status badge has data-testid="case-card-status-badge"
+  const badge = firstCard.getByTestId('case-card-status-badge')
+  await expect(badge).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each case card should show a relative timestamp', async ({ page }) => {
   const firstCard = page.getByTestId('case-card').first()
   await expect(firstCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Timestamp is rendered next to a Clock icon
-  const time = firstCard.locator('.text-muted-foreground').last()
+  // Timestamp has data-testid="case-card-timestamp"
+  const time = firstCard.getByTestId('case-card-timestamp')
   await expect(time).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -288,8 +288,8 @@ Then('the case detail header should be visible', async ({ page }) => {
 Then('the case number should be displayed', async ({ page }) => {
   const header = page.getByTestId('case-detail-header')
   await expect(header).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Case number is in a font-mono span
-  const caseNum = header.locator('.font-mono').first()
+  // Case number is in a font-mono span inside the header
+  const caseNum = header.locator('span.font-mono, [class*="font-mono"]').first()
   await expect(caseNum).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -593,7 +593,7 @@ Given('an arrest case with linked contacts exists', async ({ backendRequest: req
   const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
   const recordId = (record as { id: string }).id
   lastCreatedRecordId = recordId
-  const contact = await createContactViaApi(request, `Test Contact ${Date.now()}`)
+  const contact = await createContactByNameViaApi(request, `Test Contact ${Date.now()}`)
   const contactId = (contact as { id: string }).id
   await linkContactToRecordViaApi(request, recordId, contactId, 'defendant')
 })

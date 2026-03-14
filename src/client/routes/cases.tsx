@@ -442,7 +442,7 @@ function RecordCard({
         <span className="truncate text-sm font-medium text-foreground flex-1">
           {record.caseNumber || record.id.slice(0, 8)}
         </span>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+        <span data-testid="case-card-timestamp" className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
           <Clock className="h-3 w-3" />
           {relativeTime}
         </span>
@@ -451,6 +451,7 @@ function RecordCard({
       <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
         {/* Status badge */}
         <Badge
+          data-testid="case-card-status-badge"
           variant="secondary"
           className="text-[10px] gap-1"
           style={{

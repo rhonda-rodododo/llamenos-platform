@@ -90,17 +90,17 @@ Then('at least one event card should be visible', async ({ page }) => {
 Then('each event card should show a start date', async ({ page }) => {
   const card = page.getByTestId('case-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Date/time is shown in the card — look for the Clock icon's sibling text
-  const time = card.locator('.text-muted-foreground').last()
+  // Date/time is shown via data-testid="case-card-timestamp"
+  const time = card.getByTestId('case-card-timestamp')
   await expect(time).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each event card should show a status badge', async ({ page }) => {
   const card = page.getByTestId('case-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Status badge has a colored dot
-  const dot = card.locator('.rounded-full').first()
-  await expect(dot).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Status badge has data-testid="case-card-status-badge"
+  const badge = card.getByTestId('case-card-status-badge')
+  await expect(badge).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Event creation ---

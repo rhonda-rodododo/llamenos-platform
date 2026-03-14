@@ -263,6 +263,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
                       </Badge>
                       {et.color && (
                         <span
+                          data-testid="color-swatch"
                           className="inline-block h-3 w-3 rounded-full border border-border"
                           style={{ backgroundColor: et.color }}
                         />
@@ -292,7 +293,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
 
           {/* Archived types */}
           {archivedTypes.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div data-testid="archived-section" className="mt-4 space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {t('caseManagement.archived')} ({archivedTypes.length})
               </p>
@@ -320,7 +321,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
 
           {/* Add/Edit form */}
           {editing ? (
-            <div className="space-y-4 rounded-lg border border-primary/30 bg-primary/5 p-4 mt-4">
+            <div data-testid="entity-type-editor" className="space-y-4 rounded-lg border border-primary/30 bg-primary/5 p-4 mt-4">
               <h4 className="text-sm font-medium">
                 {editing.id ? t('caseManagement.editEntityType') : t('caseManagement.createEntityType')}
               </h4>
@@ -918,6 +919,7 @@ function EnumListEditor({
               </div>
               {showColor && item.color && (
                 <span
+                  data-testid="color-swatch"
                   className="inline-block h-3 w-3 rounded-full border border-border"
                   style={{ backgroundColor: item.color }}
                 />

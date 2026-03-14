@@ -301,6 +301,11 @@ export const navTestIdMap: Record<string, string> = {
   'Admin Settings': 'nav-admin-settings',
   'Hubs': 'nav-admin-hubs',
   'System Health': 'nav-admin-system',
+  'Cases': 'nav-cases',
+  'Contact Directory': 'nav-contacts-directory',
+  'Events': 'nav-events',
+  'Case Management': 'nav-admin-case-management',
+  'Case Management Settings': 'nav-admin-case-management',
   'Help': 'nav-help',
   // Spanish (es) nav labels
   'Panel': 'nav-dashboard',

@@ -218,10 +218,20 @@ export async function listVolunteersViaApi(
   return data.volunteers
 }
 
+export async function getVolunteerViaApi(
+  request: APIRequestContext,
+  pubkey: string,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/volunteers/${pubkey}`, nsec)
+  if (status !== 200) throw new Error(`Failed to get volunteer: ${status}`)
+  return data
+}
+
 export async function updateVolunteerViaApi(
   request: APIRequestContext,
   pubkey: string,
-  updates: { name?: string; phone?: string; roles?: string[]; active?: boolean },
+  updates: Record<string, unknown>,
 ): Promise<void> {
   const { status } = await apiPatch(request, `/volunteers/${pubkey}`, updates)
   if (status !== 200) throw new Error(`Failed to update volunteer: ${status}`)
@@ -856,6 +866,24 @@ export async function applyTemplateViaApi(
 }
 
 // ── Case Management: Contacts (Epic 318) ──────────────────────────
+
+/**
+ * Convenience wrapper: create a contact by display name.
+ * The actual API expects encrypted payloads, so we encode the displayName
+ * into encryptedSummary and generate a unique identifier hash.
+ */
+export async function createContactByNameViaApi(
+  request: APIRequestContext,
+  displayName: string,
+  extraOptions?: { contactTypeHash?: string },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  return createContactViaApi(request, {
+    encryptedSummary: btoa(JSON.stringify({ displayName })),
+    identifierHashes: [`name_${Date.now()}_${Math.random().toString(36).slice(2)}`],
+    contactTypeHash: extraOptions?.contactTypeHash,
+  }, nsec)
+}
 
 function dummyEnvelope(nsec = ADMIN_NSEC): { pubkey: string; wrappedKey: string; ephemeralPubkey: string } {
   const skHex = nsecToSkHex(nsec)

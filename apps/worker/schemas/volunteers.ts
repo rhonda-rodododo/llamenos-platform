@@ -16,6 +16,11 @@ export const volunteerResponseSchema = z.object({
   profileCompleted: z.boolean().optional(),
   onBreak: z.boolean().optional(),
   callPreference: z.string().optional(),
+  // Epic 340: Volunteer profile extensions
+  specializations: z.array(z.string()).optional(),
+  maxCaseAssignments: z.number().optional(),
+  teamId: z.string().optional(),
+  supervisorPubkey: z.string().optional(),
 })
 
 // --- Input schemas ---
@@ -27,6 +32,11 @@ export const createVolunteerBodySchema = z.looseObject({
   roleIds: z.array(z.string()).optional(),
   roles: z.array(z.string()).optional(),
   encryptedSecretKey: z.string().optional(),
+  // Epic 340: Volunteer profile extensions
+  specializations: z.array(z.string().max(100)).optional(),
+  maxCaseAssignments: z.number().int().min(0).optional(),
+  teamId: z.string().max(100).optional(),
+  supervisorPubkey: pubkeySchema.optional(),
 })
 
 export const updateVolunteerBodySchema = z.looseObject({
@@ -38,6 +48,8 @@ export const updateVolunteerBodySchema = z.looseObject({
   transcriptionEnabled: z.boolean().optional(),
   onBreak: z.boolean().optional(),
   callPreference: z.enum(['phone', 'browser', 'both']).optional(),
+  // Epic 340: Volunteers can self-update specializations
+  specializations: z.array(z.string().max(100)).optional(),
 })
 
 export const adminUpdateVolunteerBodySchema = updateVolunteerBodySchema.extend({
@@ -45,4 +57,8 @@ export const adminUpdateVolunteerBodySchema = updateVolunteerBodySchema.extend({
   active: z.boolean().optional(),
   messagingEnabled: z.boolean().optional(),
   supportedMessagingChannels: z.array(messagingChannelTypeSchema).optional(),
+  // Epic 340: Admin-only profile fields
+  maxCaseAssignments: z.number().int().min(0).optional(),
+  teamId: z.string().max(100).optional(),
+  supervisorPubkey: pubkeySchema.optional(),
 })

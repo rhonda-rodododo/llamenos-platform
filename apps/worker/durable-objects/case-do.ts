@@ -646,6 +646,12 @@ export class CaseDO extends DurableObject<Env> {
 
       return Response.json({ assignedTo: record.assignedTo })
     })
+
+    // --- Count records assigned to a volunteer (Epic 340 — lightweight) ---
+    this.router.get('/records/count-by-assignment/:pubkey', async (_req, { pubkey }) => {
+      const assignedKeys = await this.ctx.storage.list<boolean>({ prefix: `idx:assigned:${pubkey}:` })
+      return Response.json({ pubkey, count: assignedKeys.size })
+    })
   }
 
   // ============================================================

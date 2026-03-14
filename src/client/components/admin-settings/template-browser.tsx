@@ -135,10 +135,10 @@ function TemplateCard({
 
       {/* Stats */}
       <div className="flex flex-wrap gap-1.5">
-        <Badge variant="outline" className="text-[10px]">
+        <Badge data-testid="template-entity-count" variant="outline" className="text-[10px]">
           {t('caseManagement.entityTypesInTemplate', { count: template.entityTypeCount })}
         </Badge>
-        <Badge variant="outline" className="text-[10px]">
+        <Badge data-testid="template-field-count" variant="outline" className="text-[10px]">
           {t('caseManagement.fieldsInTemplate', { count: template.totalFieldCount })}
         </Badge>
         {template.suggestedRoleCount > 0 && (

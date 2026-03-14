@@ -131,6 +131,11 @@ export interface Volunteer {
   // Messaging channel capabilities (Epic 68)
   supportedMessagingChannels?: MessagingChannelType[]  // SMS, WhatsApp, Signal, RCS (empty = all)
   messagingEnabled?: boolean  // Whether volunteer can handle messaging conversations
+  // Volunteer profile extensions (Epic 340)
+  specializations?: string[]        // e.g., ["immigration", "domestic_violence", "legal_observer"]
+  maxCaseAssignments?: number       // Capacity limit (0 = unlimited, default: 0)
+  teamId?: string                   // Team/group membership
+  supervisorPubkey?: string         // Who reviews this volunteer's cases
 }
 
 export interface Shift {
