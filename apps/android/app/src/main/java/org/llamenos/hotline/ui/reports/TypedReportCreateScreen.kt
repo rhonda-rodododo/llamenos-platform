@@ -372,7 +372,7 @@ private fun DynamicField(
         // Help text below the field
         if (field.helpText != null) {
             Text(
-                text = field.helpText ?: "",
+                text = field.helpText,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier

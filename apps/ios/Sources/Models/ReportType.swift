@@ -1,14 +1,16 @@
 import Foundation
 
-// MARK: - ReportTypeDefinition
+// MARK: - ClientReportTypeDefinition
 
-/// Definition of a template-driven report type, matching the backend CMS
-/// `reportTypeDefinitionSchema`. Fetched from `GET /api/settings/cms/report-types`
-/// (full CMS definitions) or `GET /api/reports/types` (legacy endpoint).
+/// Client-side report type definition for runtime use. Named `Client*` to avoid
+/// conflict with the generated `ReportTypeDefinition` from protocol codegen
+/// (packages/protocol/generated/swift/Types.swift), following the same pattern
+/// as `ClientReportResponse` vs `ReportResponse`.
 ///
-/// Property names match the backend JSON (camelCase). Optional fields with defaults
-/// allow decoding responses from both the full CMS endpoint and the older reports endpoint.
-struct ReportTypeDefinition: Codable, Identifiable, Equatable, Sendable {
+/// Fetched from `GET /api/settings/cms/report-types` (full CMS definitions)
+/// or `GET /api/reports/types` (legacy endpoint). Optional fields allow decoding
+/// responses from both endpoints.
+struct ClientReportTypeDefinition: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let label: String
@@ -17,7 +19,7 @@ struct ReportTypeDefinition: Codable, Identifiable, Equatable, Sendable {
     let icon: String?
     let color: String?
     let category: String  // always "report"
-    let fields: [ReportFieldDefinition]
+    let fields: [ClientReportFieldDefinition]
     let statuses: [StatusOption]
     let defaultStatus: String
     let allowFileAttachments: Bool
@@ -37,14 +39,13 @@ struct ReportTypeDefinition: Codable, Identifiable, Equatable, Sendable {
     let updatedAt: String?
 }
 
-// MARK: - ReportFieldDefinition
+// MARK: - ClientReportFieldDefinition
 
-/// Definition of a single field within a report type template.
-/// Drives dynamic form rendering in `TypedReportCreateView`.
+/// Client-side field definition for runtime use. Named `Client*` to avoid
+/// conflict with the generated `ReportFieldDefinition` from protocol codegen.
 ///
-/// Property names match the backend JSON. The `required` field uses a CodingKey
-/// because `required` is a Swift keyword in some contexts.
-struct ReportFieldDefinition: Codable, Identifiable, Equatable, Sendable {
+/// Drives dynamic form rendering in `TypedReportCreateView`.
+struct ClientReportFieldDefinition: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let name: String
     let label: String
@@ -80,7 +81,7 @@ struct ReportFieldDefinition: Codable, Identifiable, Equatable, Sendable {
     func isVisible(given fieldValues: [String: AnyCodableValue]) -> Bool {
         guard let condition = showWhen else { return true }
         let currentValue = fieldValues[condition.field]
-        switch condition.operator {
+        switch condition.`operator` {
         case "equals":
             return matchesValue(currentValue, condition.value)
         case "not_equals":
@@ -186,6 +187,12 @@ struct FieldShowWhen: Codable, Equatable, Sendable {
     let field: String
     let `operator`: String  // equals, not_equals, is_set, contains
     let value: FieldDefaultValue?
+
+    enum CodingKeys: String, CodingKey {
+        case field
+        case `operator` = "operator"
+        case value
+    }
 }
 
 // MARK: - StatusOption
@@ -203,11 +210,11 @@ struct StatusOption: Codable, Identifiable, Equatable, Sendable {
     let icon: String?
 }
 
-// MARK: - ReportTypesResponse
+// MARK: - ClientReportTypesResponse
 
 /// API response from `GET /api/reports/types` or `GET /api/settings/cms/report-types`.
-struct ReportTypesResponse: Codable, Sendable {
-    let reportTypes: [ReportTypeDefinition]
+struct ClientReportTypesResponse: Codable, Sendable {
+    let reportTypes: [ClientReportTypeDefinition]
 }
 
 // MARK: - CreateTypedReportRequest

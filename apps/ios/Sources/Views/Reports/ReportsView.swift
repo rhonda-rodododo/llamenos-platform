@@ -8,7 +8,7 @@ import SwiftUI
 struct ReportsView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel: ReportsViewModel?
-    @State private var selectedReportType: ReportTypeDefinition?
+    @State private var selectedReportType: ClientReportTypeDefinition?
 
     var body: some View {
         let vm = resolvedViewModel

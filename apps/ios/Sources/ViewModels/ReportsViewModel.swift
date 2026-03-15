@@ -23,11 +23,11 @@ final class ReportsViewModel {
     /// Report type definitions fetched from CMS settings.
     /// Populated from `GET /api/settings/cms/report-types` (preferred) with fallback
     /// to `GET /api/reports/types` (legacy).
-    var reportTypes: [ReportTypeDefinition] = []
+    var reportTypes: [ClientReportTypeDefinition] = []
 
     /// CMS report types fetched directly from the settings endpoint.
     /// Includes full CMS-specific fields (hubId, isSystem, numberingEnabled, etc.).
-    var cmsReportTypes: [ReportTypeDefinition] = []
+    var cmsReportTypes: [ClientReportTypeDefinition] = []
 
     /// Current status filter.
     var selectedFilter: ReportStatusFilter = .all
@@ -66,7 +66,7 @@ final class ReportsViewModel {
     }
 
     /// Mobile-optimized, non-archived report types available for submission.
-    var mobileReportTypes: [ReportTypeDefinition] {
+    var mobileReportTypes: [ClientReportTypeDefinition] {
         reportTypes.filter { $0.mobileOptimized && !$0.isArchived }
     }
 
@@ -343,7 +343,7 @@ final class ReportsViewModel {
 
     private func fetchReportTypes() async {
         do {
-            let response: ReportTypesResponse = try await apiService.request(
+            let response: ClientReportTypesResponse = try await apiService.request(
                 method: "GET",
                 path: "/api/reports/types"
             )

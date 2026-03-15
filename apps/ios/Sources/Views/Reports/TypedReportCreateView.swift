@@ -3,11 +3,17 @@ import SwiftUI
 // MARK: - TypedReportCreateView
 
 /// Template-driven report creation form. Renders fields dynamically from a
-/// `ReportTypeDefinition`. Each field type maps to a native SwiftUI control.
+/// `ClientReportTypeDefinition`. Each field type maps to a native SwiftUI control.
 /// Textarea fields with `supportAudioInput: true` show a mic button for
 /// speech-to-text dictation.
+///
+/// Supports:
+/// - Conditional field visibility via `showWhen` rules
+/// - Field validation constraints (min/max, pattern, length)
+/// - Placeholder text from field definitions
+/// - Default values from field definitions
 struct TypedReportCreateView: View {
-    let reportType: ReportTypeDefinition
+    let reportType: ClientReportTypeDefinition
     let onSubmit: (String, [String: AnyCodableValue]) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
@@ -17,17 +23,24 @@ struct TypedReportCreateView: View {
     @State private var dateValues: [String: Date] = [:]
     @State private var isSaving: Bool = false
     @State private var errorMessage: String?
+    @State private var validationErrors: [String: String] = [:]
+    @State private var hasInitializedDefaults: Bool = false
 
     /// Fields sorted by order, grouped by section.
-    private var sortedFields: [ReportFieldDefinition] {
+    private var sortedFields: [ClientReportFieldDefinition] {
         reportType.fields.sorted { $0.order < $1.order }
     }
 
-    /// Fields grouped by section (nil section = default group).
-    private var fieldSections: [(section: String?, fields: [ReportFieldDefinition])] {
-        let grouped = Dictionary(grouping: sortedFields) { $0.section }
+    /// Visible fields after evaluating `showWhen` conditions against current values.
+    private var visibleFields: [ClientReportFieldDefinition] {
+        sortedFields.filter { $0.isVisible(given: fieldValues) }
+    }
+
+    /// Visible fields grouped by section (nil section = default group).
+    private var fieldSections: [(section: String?, fields: [ClientReportFieldDefinition])] {
+        let grouped = Dictionary(grouping: visibleFields) { $0.section }
         // Preserve order: nil section first, then named sections in field order
-        var result: [(section: String?, fields: [ReportFieldDefinition])] = []
+        var result: [(section: String?, fields: [ClientReportFieldDefinition])] = []
         if let defaultFields = grouped[nil], !defaultFields.isEmpty {
             result.append((section: nil, fields: defaultFields))
         }
@@ -107,13 +120,41 @@ struct TypedReportCreateView: View {
                 message: NSLocalizedString("report_create_saving", comment: "Encrypting & submitting...")
             )
             .interactiveDismissDisabled(isSaving)
+            .onAppear {
+                initializeDefaults()
+            }
+        }
+    }
+
+    // MARK: - Default Value Initialization
+
+    /// Set default values from field definitions on first appearance.
+    private func initializeDefaults() {
+        guard !hasInitializedDefaults else { return }
+        hasInitializedDefaults = true
+
+        for field in sortedFields {
+            guard let defaultValue = field.defaultValue else { continue }
+            // Only set if the field doesn't already have a value
+            guard fieldValues[field.name] == nil else { continue }
+
+            switch (field.fieldType, defaultValue) {
+            case (.text, .string(let val)), (.textarea, .string(let val)), (.select, .string(let val)):
+                fieldValues[field.name] = .string(val)
+            case (.number, .double(let val)):
+                fieldValues[field.name] = .int(Int(val))
+            case (.checkbox, .bool(let val)):
+                fieldValues[field.name] = .bool(val)
+            default:
+                break
+            }
         }
     }
 
     // MARK: - Validation
 
     private var isFormValid: Bool {
-        for field in sortedFields where field.required {
+        for field in visibleFields where field.required {
             switch field.fieldType {
             case .multiselect:
                 if multiselectValues[field.name]?.isEmpty ?? true {
@@ -129,13 +170,76 @@ struct TypedReportCreateView: View {
                 }
             }
         }
-        return true
+        // Also check that there are no validation errors
+        return validationErrors.isEmpty
+    }
+
+    /// Validate a field value against its validation constraints.
+    /// Returns an error message string if validation fails, nil if valid.
+    private func validateField(_ field: ClientReportFieldDefinition, value: AnyCodableValue?) -> String? {
+        guard let validation = field.validation else { return nil }
+
+        switch field.fieldType {
+        case .text, .textarea:
+            if case .string(let str) = value {
+                if let minLen = validation.minLength, Double(str.count) < minLen {
+                    return String(
+                        format: NSLocalizedString("field_validation_min_length", comment: "Must be at least %d characters"),
+                        Int(minLen)
+                    )
+                }
+                if let maxLen = validation.maxLength, Double(str.count) > maxLen {
+                    return String(
+                        format: NSLocalizedString("field_validation_max_length", comment: "Must be at most %d characters"),
+                        Int(maxLen)
+                    )
+                }
+                if let pattern = validation.pattern {
+                    let regex = try? NSRegularExpression(pattern: pattern)
+                    let range = NSRange(str.startIndex..., in: str)
+                    if regex?.firstMatch(in: str, range: range) == nil {
+                        return NSLocalizedString("field_validation_pattern", comment: "Invalid format")
+                    }
+                }
+            }
+
+        case .number:
+            if case .int(let num) = value {
+                if let min = validation.min, Double(num) < min {
+                    return String(
+                        format: NSLocalizedString("field_validation_min", comment: "Must be at least %d"),
+                        Int(min)
+                    )
+                }
+                if let max = validation.max, Double(num) > max {
+                    return String(
+                        format: NSLocalizedString("field_validation_max", comment: "Must be at most %d"),
+                        Int(max)
+                    )
+                }
+            }
+
+        default:
+            break
+        }
+
+        return nil
+    }
+
+    /// Run validation for a specific field and update the validation errors map.
+    private func runValidation(for field: ClientReportFieldDefinition) {
+        let error = validateField(field, value: fieldValues[field.name])
+        if let error {
+            validationErrors[field.name] = error
+        } else {
+            validationErrors.removeValue(forKey: field.name)
+        }
     }
 
     // MARK: - Field Rendering
 
     @ViewBuilder
-    private func fieldInput(for field: ReportFieldDefinition) -> some View {
+    private func fieldInput(for field: ClientReportFieldDefinition) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             switch field.fieldType {
             case .text:
@@ -171,8 +275,16 @@ struct TypedReportCreateView: View {
                     .foregroundStyle(Color.brandMutedForeground)
             }
 
-            // Required indicator
-            if field.required {
+            // Validation error
+            if let validationError = validationErrors[field.name] {
+                Text(validationError)
+                    .font(.brand(.caption2))
+                    .foregroundStyle(Color.brandDestructive)
+                    .accessibilityIdentifier("field-\(field.name)-validation-error")
+            }
+
+            // Required indicator (shown only when no validation error is displayed)
+            if field.required, validationErrors[field.name] == nil {
                 let hasValue: Bool = {
                     switch field.fieldType {
                     case .multiselect:
@@ -196,15 +308,18 @@ struct TypedReportCreateView: View {
     // MARK: - Text Field
 
     @ViewBuilder
-    private func textField(for field: ReportFieldDefinition) -> some View {
-        TextField(field.label, text: textBinding(for: field.name))
-            .font(.brand(.body))
+    private func textField(for field: ClientReportFieldDefinition) -> some View {
+        TextField(
+            field.placeholder ?? field.label,
+            text: validatedTextBinding(for: field)
+        )
+        .font(.brand(.body))
     }
 
     // MARK: - Textarea Field
 
     @ViewBuilder
-    private func textareaField(for field: ReportFieldDefinition) -> some View {
+    private func textareaField(for field: ClientReportFieldDefinition) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(field.label)
@@ -220,11 +335,11 @@ struct TypedReportCreateView: View {
 
                 // Audio input button for fields that support it
                 if field.supportAudioInput {
-                    AudioInputButton(text: textBinding(for: field.name))
+                    AudioInputButton(text: validatedTextBinding(for: field))
                 }
             }
 
-            TextEditor(text: textBinding(for: field.name))
+            TextEditor(text: validatedTextBinding(for: field))
                 .frame(minHeight: 100)
                 .font(.brand(.body))
                 .foregroundStyle(Color.brandForeground)
@@ -235,19 +350,36 @@ struct TypedReportCreateView: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(
-                            textBinding(for: field.name).wrappedValue.isEmpty
-                                ? Color.brandBorder
-                                : Color.brandPrimary.opacity(0.5),
+                            validationErrors[field.name] != nil
+                                ? Color.brandDestructive.opacity(0.7)
+                                : (textBinding(for: field.name).wrappedValue.isEmpty
+                                    ? Color.brandBorder
+                                    : Color.brandPrimary.opacity(0.5)),
                             lineWidth: 1
                         )
                 )
+
+            // Character count for fields with maxLength validation
+            if let maxLen = field.validation?.maxLength {
+                let currentLen = (textBinding(for: field.name).wrappedValue).count
+                HStack {
+                    Spacer()
+                    Text("\(currentLen)/\(Int(maxLen))")
+                        .font(.brand(.caption2))
+                        .foregroundStyle(
+                            Double(currentLen) > maxLen
+                                ? Color.brandDestructive
+                                : Color.brandMutedForeground
+                        )
+                }
+            }
         }
     }
 
     // MARK: - Number Field
 
     @ViewBuilder
-    private func numberField(for field: ReportFieldDefinition) -> some View {
+    private func numberField(for field: ClientReportFieldDefinition) -> some View {
         HStack {
             Text(field.label)
                 .font(.brand(.body))
@@ -259,20 +391,23 @@ struct TypedReportCreateView: View {
 
             Spacer()
 
-            TextField("0", text: numberBinding(for: field.name))
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.trailing)
-                .font(.brand(.body))
-                .frame(width: 80)
+            TextField(
+                field.placeholder ?? "0",
+                text: validatedNumberBinding(for: field)
+            )
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.trailing)
+            .font(.brand(.body))
+            .frame(width: 80)
         }
     }
 
     // MARK: - Select Field
 
     @ViewBuilder
-    private func selectField(for field: ReportFieldDefinition) -> some View {
+    private func selectField(for field: ClientReportFieldDefinition) -> some View {
         Picker(selection: selectBinding(for: field.name)) {
-            Text(NSLocalizedString("select_placeholder", comment: "Select..."))
+            Text(field.placeholder ?? NSLocalizedString("select_placeholder", comment: "Select..."))
                 .tag("")
             if let options = field.options {
                 ForEach(options, id: \.key) { option in
@@ -294,7 +429,7 @@ struct TypedReportCreateView: View {
     // MARK: - Multiselect Field
 
     @ViewBuilder
-    private func multiselectField(for field: ReportFieldDefinition) -> some View {
+    private func multiselectField(for field: ClientReportFieldDefinition) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 2) {
                 Text(field.label)
@@ -319,7 +454,7 @@ struct TypedReportCreateView: View {
     // MARK: - Checkbox Field
 
     @ViewBuilder
-    private func checkboxField(for field: ReportFieldDefinition) -> some View {
+    private func checkboxField(for field: ClientReportFieldDefinition) -> some View {
         Toggle(field.label, isOn: checkboxBinding(for: field.name))
             .font(.brand(.body))
     }
@@ -327,7 +462,7 @@ struct TypedReportCreateView: View {
     // MARK: - Date Field
 
     @ViewBuilder
-    private func dateField(for field: ReportFieldDefinition) -> some View {
+    private func dateField(for field: ClientReportFieldDefinition) -> some View {
         DatePicker(
             selection: dateBinding(for: field.name),
             displayedComponents: [.date, .hourAndMinute]
@@ -346,7 +481,7 @@ struct TypedReportCreateView: View {
     // MARK: - File Placeholder
 
     @ViewBuilder
-    private func fileFieldPlaceholder(for field: ReportFieldDefinition) -> some View {
+    private func fileFieldPlaceholder(for field: ClientReportFieldDefinition) -> some View {
         HStack {
             Image(systemName: "paperclip")
                 .foregroundStyle(Color.brandMutedForeground)
@@ -380,6 +515,26 @@ struct TypedReportCreateView: View {
         )
     }
 
+    /// Text binding that also triggers validation on change.
+    private func validatedTextBinding(for field: ClientReportFieldDefinition) -> Binding<String> {
+        Binding<String>(
+            get: {
+                if case .string(let val) = fieldValues[field.name] {
+                    return val
+                }
+                return ""
+            },
+            set: { newValue in
+                if newValue.isEmpty {
+                    fieldValues.removeValue(forKey: field.name)
+                } else {
+                    fieldValues[field.name] = .string(newValue)
+                }
+                runValidation(for: field)
+            }
+        )
+    }
+
     private func numberBinding(for name: String) -> Binding<String> {
         Binding<String>(
             get: {
@@ -394,6 +549,26 @@ struct TypedReportCreateView: View {
                 } else if newValue.isEmpty {
                     fieldValues.removeValue(forKey: name)
                 }
+            }
+        )
+    }
+
+    /// Number binding that also triggers validation on change.
+    private func validatedNumberBinding(for field: ClientReportFieldDefinition) -> Binding<String> {
+        Binding<String>(
+            get: {
+                if case .int(let val) = fieldValues[field.name] {
+                    return "\(val)"
+                }
+                return ""
+            },
+            set: { newValue in
+                if let intVal = Int(newValue) {
+                    fieldValues[field.name] = .int(intVal)
+                } else if newValue.isEmpty {
+                    fieldValues.removeValue(forKey: field.name)
+                }
+                runValidation(for: field)
             }
         )
     }
@@ -471,8 +646,8 @@ struct TypedReportCreateView: View {
     // MARK: - Submit
 
     private func submitReport() async {
-        // Validate required fields
-        for field in sortedFields where field.required {
+        // Validate all visible required fields
+        for field in visibleFields where field.required {
             let hasValue: Bool
             switch field.fieldType {
             case .multiselect:
@@ -490,6 +665,15 @@ struct TypedReportCreateView: View {
                 )
                 return
             }
+        }
+
+        // Run validation on all visible fields before submit
+        for field in visibleFields {
+            runValidation(for: field)
+        }
+        guard validationErrors.isEmpty else {
+            errorMessage = NSLocalizedString("report_validation_errors", comment: "Please fix the errors above before submitting.")
+            return
         }
 
         isSaving = true
@@ -537,32 +721,49 @@ struct TypedReportCreateView: View {
 #if DEBUG
 #Preview("Typed Report Form") {
     TypedReportCreateView(
-        reportType: ReportTypeDefinition(
+        reportType: ClientReportTypeDefinition(
             id: "1", name: "arrest_report", label: "Arrest Report",
             labelPlural: "Arrest Reports",
             description: "Document an arrest observed in the field",
             icon: "exclamationmark.shield.fill", color: "#E74C3C",
             category: "report",
             fields: [
-                ReportFieldDefinition(
+                ClientReportFieldDefinition(
                     id: "f1", name: "location", label: "Location",
                     type: "text", required: true, options: nil,
                     section: nil, helpText: "Street address or intersection",
-                    order: 0, accessLevel: "all", supportAudioInput: false
+                    order: 0, accessLevel: "all", supportAudioInput: false,
+                    placeholder: "123 Main St", defaultValue: nil,
+                    validation: nil, showWhen: nil, indexable: nil,
+                    indexType: nil, hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
                 ),
-                ReportFieldDefinition(
+                ClientReportFieldDefinition(
                     id: "f2", name: "description", label: "Description",
                     type: "textarea", required: true, options: nil,
                     section: nil, helpText: "Describe what you observed",
-                    order: 1, accessLevel: "all", supportAudioInput: true
+                    order: 1, accessLevel: "all", supportAudioInput: true,
+                    placeholder: nil, defaultValue: nil,
+                    validation: FieldValidation(min: nil, max: nil, minLength: 10, maxLength: 2000, pattern: nil),
+                    showWhen: nil, indexable: nil, indexType: nil,
+                    hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
                 ),
-                ReportFieldDefinition(
+                ClientReportFieldDefinition(
                     id: "f3", name: "num_arrested", label: "Number Arrested",
                     type: "number", required: false, options: nil,
                     section: "Details", helpText: nil,
-                    order: 2, accessLevel: "all", supportAudioInput: false
+                    order: 2, accessLevel: "all", supportAudioInput: false,
+                    placeholder: nil, defaultValue: nil,
+                    validation: FieldValidation(min: 0, max: 1000, minLength: nil, maxLength: nil, pattern: nil),
+                    showWhen: nil, indexable: nil, indexType: nil,
+                    hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
                 ),
-                ReportFieldDefinition(
+                ClientReportFieldDefinition(
                     id: "f4", name: "arrest_type", label: "Arrest Type",
                     type: "select", required: true,
                     options: [
@@ -571,16 +772,44 @@ struct TypedReportCreateView: View {
                         FieldOption(key: "unknown", label: "Unknown"),
                     ],
                     section: "Details", helpText: nil,
-                    order: 3, accessLevel: "all", supportAudioInput: false
+                    order: 3, accessLevel: "all", supportAudioInput: false,
+                    placeholder: nil, defaultValue: nil, validation: nil,
+                    showWhen: nil, indexable: nil, indexType: nil,
+                    hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
                 ),
-                ReportFieldDefinition(
+                ClientReportFieldDefinition(
                     id: "f5", name: "force_used", label: "Force Used",
                     type: "checkbox", required: false, options: nil,
                     section: "Details", helpText: nil,
-                    order: 4, accessLevel: "all", supportAudioInput: false
+                    order: 4, accessLevel: "all", supportAudioInput: false,
+                    placeholder: nil, defaultValue: nil, validation: nil,
+                    showWhen: nil, indexable: nil, indexType: nil,
+                    hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
                 ),
-                ReportFieldDefinition(
-                    id: "f6", name: "charges", label: "Charges",
+                ClientReportFieldDefinition(
+                    id: "f6", name: "force_type", label: "Type of Force",
+                    type: "select", required: false,
+                    options: [
+                        FieldOption(key: "physical", label: "Physical"),
+                        FieldOption(key: "chemical", label: "Chemical (pepper spray, tear gas)"),
+                        FieldOption(key: "taser", label: "Taser/ECD"),
+                        FieldOption(key: "firearm", label: "Firearm"),
+                    ],
+                    section: "Details", helpText: nil,
+                    order: 5, accessLevel: "all", supportAudioInput: false,
+                    placeholder: nil, defaultValue: nil, validation: nil,
+                    showWhen: FieldShowWhen(field: "force_used", operator: "equals", value: .bool(true)),
+                    indexable: nil, indexType: nil,
+                    hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
+                ),
+                ClientReportFieldDefinition(
+                    id: "f7", name: "charges", label: "Charges",
                     type: "multiselect", required: false,
                     options: [
                         FieldOption(key: "trespass", label: "Trespass"),
@@ -589,19 +818,32 @@ struct TypedReportCreateView: View {
                         FieldOption(key: "other", label: "Other"),
                     ],
                     section: "Details", helpText: nil,
-                    order: 5, accessLevel: "all", supportAudioInput: false
+                    order: 6, accessLevel: "all", supportAudioInput: false,
+                    placeholder: nil, defaultValue: nil, validation: nil,
+                    showWhen: nil, indexable: nil, indexType: nil,
+                    hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
                 ),
-                ReportFieldDefinition(
-                    id: "f7", name: "arrest_time", label: "Time of Arrest",
+                ClientReportFieldDefinition(
+                    id: "f8", name: "arrest_time", label: "Time of Arrest",
                     type: "date", required: false, options: nil,
                     section: "Details", helpText: nil,
-                    order: 6, accessLevel: "all", supportAudioInput: false
+                    order: 7, accessLevel: "all", supportAudioInput: false,
+                    placeholder: nil, defaultValue: nil, validation: nil,
+                    showWhen: nil, indexable: nil, indexType: nil,
+                    hubEditable: nil, editableByVolunteers: nil,
+                    visibleToVolunteers: nil, accessRoles: nil, templateId: nil,
+                    lookupId: nil
                 ),
             ],
-            statuses: [StatusOption(value: "open", label: "Open", color: nil, order: 0, isClosed: nil)],
+            statuses: [StatusOption(value: "open", label: "Open", color: nil, order: 0, isClosed: nil, isDefault: true, isDeprecated: nil, icon: nil)],
             defaultStatus: "open",
             allowFileAttachments: true, allowCaseConversion: true,
-            mobileOptimized: true, isArchived: false
+            mobileOptimized: true, isArchived: false,
+            hubId: nil, isSystem: nil, numberingEnabled: nil, numberPrefix: nil,
+            templateId: nil, templateVersion: nil, closedStatuses: nil,
+            createdAt: nil, updatedAt: nil
         ),
         onSubmit: { _, _ in true }
     )

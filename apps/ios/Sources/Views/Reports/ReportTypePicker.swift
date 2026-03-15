@@ -5,8 +5,8 @@ import SwiftUI
 /// Shows available mobile-optimized report types as cards. Tapping a card
 /// navigates to the template-driven report form for that type.
 struct ReportTypePicker: View {
-    let reportTypes: [ReportTypeDefinition]
-    let onSelect: (ReportTypeDefinition) -> Void
+    let reportTypes: [ClientReportTypeDefinition]
+    let onSelect: (ClientReportTypeDefinition) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -37,7 +37,7 @@ struct ReportTypePicker: View {
     // MARK: - Report Type Card
 
     @ViewBuilder
-    private func reportTypeCard(_ reportType: ReportTypeDefinition) -> some View {
+    private func reportTypeCard(_ reportType: ClientReportTypeDefinition) -> some View {
         Button {
             onSelect(reportType)
         } label: {
@@ -91,7 +91,7 @@ struct ReportTypePicker: View {
     // MARK: - Helpers
 
     /// Parse hex color from the report type definition, falling back to brand primary.
-    private func typeColor(_ reportType: ReportTypeDefinition) -> Color {
+    private func typeColor(_ reportType: ClientReportTypeDefinition) -> Color {
         if let hex = reportType.color {
             return Color(hex: hex) ?? .brandPrimary
         }
@@ -125,27 +125,33 @@ private extension Color {
 #Preview("Report Type Picker") {
     ReportTypePicker(
         reportTypes: [
-            ReportTypeDefinition(
+            ClientReportTypeDefinition(
                 id: "1", name: "arrest_report", label: "Arrest Report",
                 labelPlural: "Arrest Reports",
                 description: "Document an arrest observed in the field",
                 icon: "exclamationmark.shield.fill", color: "#E74C3C",
                 category: "report",
-                fields: [], statuses: [StatusOption(value: "open", label: "Open", color: nil, order: 0, isClosed: nil)],
+                fields: [], statuses: [StatusOption(value: "open", label: "Open", color: nil, order: 0, isClosed: nil, isDefault: true, isDeprecated: nil, icon: nil)],
                 defaultStatus: "open",
                 allowFileAttachments: true, allowCaseConversion: true,
-                mobileOptimized: true, isArchived: false
+                mobileOptimized: true, isArchived: false,
+                hubId: nil, isSystem: nil, numberingEnabled: nil, numberPrefix: nil,
+                templateId: nil, templateVersion: nil, closedStatuses: nil,
+                createdAt: nil, updatedAt: nil
             ),
-            ReportTypeDefinition(
+            ClientReportTypeDefinition(
                 id: "2", name: "misconduct_report", label: "Misconduct Report",
                 labelPlural: "Misconduct Reports",
                 description: "Report police misconduct or use of force",
                 icon: "hand.raised.slash.fill", color: "#F39C12",
                 category: "report",
-                fields: [], statuses: [StatusOption(value: "open", label: "Open", color: nil, order: 0, isClosed: nil)],
+                fields: [], statuses: [StatusOption(value: "open", label: "Open", color: nil, order: 0, isClosed: nil, isDefault: true, isDeprecated: nil, icon: nil)],
                 defaultStatus: "open",
                 allowFileAttachments: true, allowCaseConversion: false,
-                mobileOptimized: true, isArchived: false
+                mobileOptimized: true, isArchived: false,
+                hubId: nil, isSystem: nil, numberingEnabled: nil, numberPrefix: nil,
+                templateId: nil, templateVersion: nil, closedStatuses: nil,
+                createdAt: nil, updatedAt: nil
             ),
         ],
         onSelect: { _ in }

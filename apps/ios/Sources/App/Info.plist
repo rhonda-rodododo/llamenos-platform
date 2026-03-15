@@ -22,5 +22,9 @@
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Llamenos uses the microphone for voice-to-text input when filling out report fields.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Llamenos uses speech recognition to transcribe voice input into report fields.</string>
 </dict>
 </plist>
