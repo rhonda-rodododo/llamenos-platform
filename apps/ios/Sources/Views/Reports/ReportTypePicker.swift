@@ -101,7 +101,7 @@ struct ReportTypePicker: View {
 
 // MARK: - Color Hex Extension
 
-private extension Color {
+extension Color {
     /// Initialize a Color from a hex string like "#FF5733".
     init?(hex: String) {
         var cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines)
