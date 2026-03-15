@@ -335,7 +335,7 @@ struct CaseDetailView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        ForEach(viewModel.interactions) { interaction in
+                        ForEach(viewModel.interactions, id: \.id) { interaction in
                             TimelineItemRow(interaction: interaction, entityType: entityType)
                                 .accessibilityIdentifier("timeline-item-\(interaction.id)")
                         }
