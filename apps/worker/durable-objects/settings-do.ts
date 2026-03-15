@@ -3,6 +3,7 @@ import type { Env, SpamSettings, CallSettings } from '../types'
 import type { CustomFieldDefinition, TelephonyProviderConfig, MessagingConfig, SetupState, EnabledChannels, Hub, ReportType } from '@shared/types'
 import { MAX_CUSTOM_FIELDS, MAX_SELECT_OPTIONS, MAX_FIELD_NAME_LENGTH, MAX_FIELD_LABEL_LENGTH, MAX_OPTION_LENGTH, FIELD_NAME_REGEX, PROVIDER_REQUIRED_FIELDS, DEFAULT_MESSAGING_CONFIG, DEFAULT_SETUP_STATE, MAX_REPORT_TYPES, MAX_REPORT_TYPE_NAME_LENGTH, MAX_REPORT_TYPE_DESCRIPTION_LENGTH, DEFAULT_REPORT_TYPES, MAX_ENTITY_TYPES, MAX_RELATIONSHIP_TYPES } from '@shared/types'
 import type { EntityTypeDefinition, EntityFieldDefinition, RelationshipTypeDefinition } from '../schemas/entity-schema'
+import type { ReportTypeDefinition, ReportFieldDefinition } from '../schemas/report-types'
 import { IVR_LANGUAGES } from '@shared/languages'
 import { DORouter } from '../lib/do-router'
 import { runMigrations } from '@shared/migrations/runner'
@@ -155,6 +156,14 @@ export class SettingsDO extends DurableObject<Env> {
     // Applied Templates
     this.router.get('/settings/applied-templates', () => this.getAppliedTemplates())
     this.router.put('/settings/applied-templates', async (req) => this.setAppliedTemplates(await req.json()))
+
+    // CMS Report Type Definitions (Epic 343)
+    this.router.get('/settings/cms-report-types', () => this.getCmsReportTypes())
+    this.router.get('/settings/cms-report-types/:id', (_req, { id }) => this.getCmsReportTypeById(id))
+    this.router.post('/settings/cms-report-types', async (req) => this.createCmsReportType(await req.json()))
+    this.router.put('/settings/cms-report-types', async (req) => this.bulkSetCmsReportTypes(await req.json()))
+    this.router.patch('/settings/cms-report-types/:id', async (req, { id }) => this.updateCmsReportType(id, await req.json()))
+    this.router.delete('/settings/cms-report-types/:id', (_req, { id }) => this.deleteCmsReportType(id))
 
     // --- Cross-Hub Sharing (Epic 328) ---
     this.router.get('/settings/cross-hub-sharing', () => this.getCrossHubSharingEnabled())
@@ -1256,5 +1265,101 @@ export class SettingsDO extends DurableObject<Env> {
   private async setAppliedTemplates(data: { appliedTemplates: unknown[] }): Promise<Response> {
     await this.ctx.storage.put('appliedTemplates', data.appliedTemplates)
     return Response.json({ ok: true })
+  }
+
+  // =====================================================================
+  // CMS Report Type Definitions (Epic 343)
+  // =====================================================================
+
+  private async getCmsReportTypes(): Promise<Response> {
+    const types = (await this.ctx.storage.get<ReportTypeDefinition[]>('cmsReportTypes')) ?? []
+    return Response.json({ reportTypes: types })
+  }
+
+  private async getCmsReportTypeById(id: string): Promise<Response> {
+    const types = (await this.ctx.storage.get<ReportTypeDefinition[]>('cmsReportTypes')) ?? []
+    const reportType = types.find(t => t.id === id)
+    if (!reportType) return Response.json({ error: 'Report type not found' }, { status: 404 })
+    return Response.json(reportType)
+  }
+
+  private async createCmsReportType(data: Record<string, unknown>): Promise<Response> {
+    const types = (await this.ctx.storage.get<ReportTypeDefinition[]>('cmsReportTypes')) ?? []
+
+    if (types.length >= MAX_ENTITY_TYPES) {
+      return Response.json({ error: `Maximum of ${MAX_ENTITY_TYPES} report type definitions allowed` }, { status: 400 })
+    }
+
+    // Check for duplicate name
+    const name = data.name as string
+    if (types.some(t => t.name === name && !t.isArchived)) {
+      return Response.json({ error: `Report type with name "${name}" already exists` }, { status: 409 })
+    }
+
+    const now = new Date().toISOString()
+    const newType: ReportTypeDefinition = {
+      ...(data as Omit<ReportTypeDefinition, 'id' | 'hubId' | 'category' | 'createdAt' | 'updatedAt'>),
+      id: crypto.randomUUID(),
+      hubId: '',
+      category: 'report',
+      fields: ((data.fields as ReportFieldDefinition[]) ?? []).map(f => ({
+        ...f,
+        id: f.id || crypto.randomUUID(),
+      })),
+      createdAt: now,
+      updatedAt: now,
+    } as ReportTypeDefinition
+
+    types.push(newType)
+    await this.ctx.storage.put('cmsReportTypes', types)
+    return Response.json(newType, { status: 201 })
+  }
+
+  private async updateCmsReportType(id: string, data: Record<string, unknown>): Promise<Response> {
+    const types = (await this.ctx.storage.get<ReportTypeDefinition[]>('cmsReportTypes')) ?? []
+    const idx = types.findIndex(t => t.id === id)
+    if (idx === -1) return Response.json({ error: 'Report type not found' }, { status: 404 })
+
+    // Assign IDs to new fields
+    if (data.fields && Array.isArray(data.fields)) {
+      data.fields = (data.fields as ReportFieldDefinition[]).map(f => ({
+        ...f,
+        id: f.id || crypto.randomUUID(),
+      }))
+    }
+
+    types[idx] = {
+      ...types[idx],
+      ...(data as Partial<ReportTypeDefinition>),
+      id, // preserve
+      hubId: types[idx].hubId, // preserve
+      category: 'report', // always report
+      createdAt: types[idx].createdAt, // preserve
+      updatedAt: new Date().toISOString(),
+    }
+
+    await this.ctx.storage.put('cmsReportTypes', types)
+    return Response.json(types[idx])
+  }
+
+  private async bulkSetCmsReportTypes(data: { reportTypes: ReportTypeDefinition[] }): Promise<Response> {
+    await this.ctx.storage.put('cmsReportTypes', data.reportTypes)
+    return Response.json({ reportTypes: data.reportTypes })
+  }
+
+  private async deleteCmsReportType(id: string): Promise<Response> {
+    const types = (await this.ctx.storage.get<ReportTypeDefinition[]>('cmsReportTypes')) ?? []
+    const idx = types.findIndex(t => t.id === id)
+    if (idx === -1) return Response.json({ error: 'Report type not found' }, { status: 404 })
+
+    // Soft delete: mark as archived
+    types[idx] = {
+      ...types[idx],
+      isArchived: true,
+      updatedAt: new Date().toISOString(),
+    }
+
+    await this.ctx.storage.put('cmsReportTypes', types)
+    return Response.json({ archived: true, id })
   }
 }

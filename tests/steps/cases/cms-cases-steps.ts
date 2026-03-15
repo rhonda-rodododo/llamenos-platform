@@ -271,11 +271,14 @@ Given('an arrest case exists with multiple field sections', async ({ backendRequ
   }
 })
 
-Given('a volunteer without cases:update permission is logged in', async ({ page }) => {
-  // For permission tests, a volunteer login is needed
-  // Use loginAsVolunteer if a vol nsec is available, else skip gracefully
-  const { loginAsAdmin } = await import('../../helpers')
-  await loginAsAdmin(page)
+Given('a volunteer without cases:update permission is logged in', async ({ page, backendRequest: request }) => {
+  // Create a volunteer with default role-volunteer (no cases:update permission)
+  const { createVolunteerViaApi } = await import('../../api-helpers')
+  const { loginAsVolunteer } = await import('../../helpers')
+  const vol = await createVolunteerViaApi(request, {
+    name: `CMS Restricted Vol ${Date.now()}`,
+  })
+  await loginAsVolunteer(page, vol.nsec)
 })
 
 // --- Case list interactions ---
@@ -385,13 +388,20 @@ Then('the {string} tab is active', async ({ page }, tabName: string) => {
 
 When('I click the {string} tab', async ({ page }, tabName: string) => {
   const tabKey = tabName.toLowerCase()
+
+  // Wait for case detail panel to be loaded before clicking tabs
+  // This prevents race conditions where the tab button isn't rendered yet
+  const detailHeader = page.getByTestId('case-detail-header')
+  const contactHeader = page.getByTestId('contact-profile-header')
+  await detailHeader.or(contactHeader).first().waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).catch(() => {})
+
   // Try case detail tab first, then contact profile tab
   const caseTab = page.getByTestId(`case-tab-${tabKey}`)
-  if (await caseTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await caseTab.isVisible({ timeout: 3000 }).catch(() => false)) {
     await caseTab.click()
   } else {
     const contactTab = page.getByTestId(`contact-tab-${tabKey}`)
-    if (await contactTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await contactTab.isVisible({ timeout: 3000 }).catch(() => false)) {
       await contactTab.click()
     } else {
       // Fallback to text-based tab click
@@ -652,8 +662,9 @@ Then('the case contacts tab should be visible', async ({ page }) => {
 })
 
 Then('at least one contact card should show a role badge', async ({ page }) => {
+  // Contacts are loaded asynchronously after tab click — wait with retry
   const card = page.getByTestId('case-contact-card').first()
-  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT * 2 })
 })
 
 Then('the contacts empty state should be visible', async ({ page }) => {

@@ -867,6 +867,100 @@ export async function applyTemplateViaApi(
   return apiPost<Record<string, unknown>>(request, '/settings/cms/templates/apply', { templateId }, nsec)
 }
 
+// ── Case Management: CMS Report Types (Epic 343) ────────────────
+
+export async function listCmsReportTypesViaApi(
+  request: APIRequestContext,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>[]> {
+  const { data } = await apiGet<{ reportTypes: Record<string, unknown>[] }>(request, '/settings/cms/report-types', nsec)
+  return data?.reportTypes ?? []
+}
+
+export async function getCmsReportTypeViaApi(
+  request: APIRequestContext,
+  id: string,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/settings/cms/report-types/${id}`, nsec)
+  if (status !== 200) throw new Error(`Failed to get CMS report type: ${status}`)
+  return data
+}
+
+export async function createCmsReportTypeViaApi(
+  request: APIRequestContext,
+  options?: {
+    name?: string
+    label?: string
+    labelPlural?: string
+    description?: string
+    fields?: Array<Record<string, unknown>>
+    statuses?: Array<{ value: string; label: string; order: number }>
+    allowCaseConversion?: boolean
+    mobileOptimized?: boolean
+    allowFileAttachments?: boolean
+  },
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const name = options?.name ?? `test_report_type_${Date.now()}`
+  const defaultStatuses = [
+    { value: 'submitted', label: 'Submitted', order: 0 },
+    { value: 'closed', label: 'Closed', order: 1, isClosed: true },
+  ]
+  const { status, data } = await apiPost<Record<string, unknown>>(
+    request,
+    '/settings/cms/report-types',
+    {
+      name,
+      label: options?.label ?? name.replace(/_/g, ' '),
+      labelPlural: options?.labelPlural ?? `${name.replace(/_/g, ' ')}s`,
+      description: options?.description ?? `Test report type ${name}`,
+      statuses: options?.statuses ?? defaultStatuses,
+      defaultStatus: (options?.statuses ?? defaultStatuses)[0].value,
+      closedStatuses: (options?.statuses ?? defaultStatuses).filter(s => (s as Record<string, unknown>).isClosed).map(s => s.value),
+      fields: (options?.fields ?? []).map((f, i) => ({
+        ...f,
+        label: f.label ?? f.name,
+        required: f.required ?? false,
+        order: f.order ?? i,
+        indexable: false,
+        indexType: 'none',
+        accessLevel: 'all',
+        visibleToVolunteers: true,
+        editableByVolunteers: true,
+        hubEditable: true,
+        supportAudioInput: f.supportAudioInput ?? false,
+      })),
+      allowCaseConversion: options?.allowCaseConversion ?? false,
+      mobileOptimized: options?.mobileOptimized ?? false,
+      allowFileAttachments: options?.allowFileAttachments ?? true,
+    },
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to create CMS report type: ${status}`)
+  return data
+}
+
+export async function updateCmsReportTypeViaApi(
+  request: APIRequestContext,
+  id: string,
+  updates: Record<string, unknown>,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/settings/cms/report-types/${id}`, updates, nsec)
+  if (status !== 200) throw new Error(`Failed to update CMS report type: ${status}`)
+  return data
+}
+
+export async function deleteCmsReportTypeViaApi(
+  request: APIRequestContext,
+  id: string,
+  nsec = ADMIN_NSEC,
+): Promise<void> {
+  const { status } = await apiDelete(request, `/settings/cms/report-types/${id}`, nsec)
+  if (status !== 200) throw new Error(`Failed to archive CMS report type: ${status}`)
+}
+
 // ── Case Management: Contacts (Epic 318) ──────────────────────────
 
 /**

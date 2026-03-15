@@ -1,6 +1,6 @@
 {
   "id": "jail-support",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Jail Support",
   "description": "Mass arrest intake, arraignment tracking, bail coordination, and release monitoring. Designed for NLG hotlines and jail support operations. Supports multiple court dates, attorney matching, medical flagging, and immigration hold tracking.",
   "author": "Llamenos Project",
@@ -15,14 +15,26 @@
       "arrest_case.description": "Track an individual through the arrest, arraignment, and release process",
       "mass_arrest_event.label": "Mass Arrest Event",
       "mass_arrest_event.labelPlural": "Mass Arrest Events",
-      "mass_arrest_event.description": "A mass arrest at a specific location and time. Links to individual arrest cases."
+      "mass_arrest_event.description": "A mass arrest at a specific location and time. Links to individual arrest cases.",
+      "lo_arrest_report.label": "LO Arrest Report",
+      "lo_arrest_report.labelPlural": "LO Arrest Reports",
+      "lo_arrest_report.description": "Legal observer field report documenting arrests. Freeform textarea for arrestee details, supports photo/video attachments.",
+      "lo_misconduct_report.label": "LO Misconduct Report",
+      "lo_misconduct_report.labelPlural": "LO Misconduct Reports",
+      "lo_misconduct_report.description": "Legal observer documentation of police misconduct — badge numbers, force type, and evidence for lawsuits."
     },
     "es": {
       "arrest_case.label": "Caso de Arresto",
       "arrest_case.labelPlural": "Casos de Arresto",
       "arrest_case.description": "Seguimiento de una persona a traves del proceso de arresto, procesamiento y liberacion",
       "mass_arrest_event.label": "Evento de Arresto Masivo",
-      "mass_arrest_event.labelPlural": "Eventos de Arresto Masivo"
+      "mass_arrest_event.labelPlural": "Eventos de Arresto Masivo",
+      "lo_arrest_report.label": "Reporte de Arresto LO",
+      "lo_arrest_report.labelPlural": "Reportes de Arresto LO",
+      "lo_arrest_report.description": "Reporte de campo de observador legal documentando arrestos.",
+      "lo_misconduct_report.label": "Reporte de Mala Conducta LO",
+      "lo_misconduct_report.labelPlural": "Reportes de Mala Conducta LO",
+      "lo_misconduct_report.description": "Documentacion de mala conducta policial por observador legal."
     }
   },
 
@@ -498,6 +510,188 @@
       "targetLabel": "includes",
       "cascadeDelete": false,
       "required": false
+    }
+  ],
+
+  "reportTypes": [
+    {
+      "name": "lo_arrest_report",
+      "label": "lo_arrest_report.label",
+      "labelPlural": "lo_arrest_report.labelPlural",
+      "description": "lo_arrest_report.description",
+      "icon": "clipboard-list",
+      "color": "#ef4444",
+      "allowFileAttachments": true,
+      "allowCaseConversion": true,
+      "mobileOptimized": true,
+      "numberPrefix": "AR",
+      "numberingEnabled": true,
+      "statuses": [
+        { "value": "submitted", "label": "Submitted", "color": "#f59e0b", "order": 1 },
+        { "value": "in_review", "label": "In Review", "color": "#3b82f6", "order": 2 },
+        { "value": "triaged", "label": "Triaged", "color": "#8b5cf6", "order": 3 },
+        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 4, "isClosed": true }
+      ],
+      "defaultStatus": "submitted",
+      "closedStatuses": ["closed"],
+      "fields": [
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "text",
+          "required": true,
+          "helpText": "Intersection or landmark where arrests occurred.",
+          "order": 1,
+          "accessLevel": "all"
+        },
+        {
+          "name": "time",
+          "label": "Time of Arrests",
+          "type": "text",
+          "required": true,
+          "helpText": "Approximate time arrests began.",
+          "order": 2,
+          "accessLevel": "all"
+        },
+        {
+          "name": "agency",
+          "label": "Arresting Agency",
+          "type": "select",
+          "required": false,
+          "options": [
+            { "key": "local_pd", "label": "Local PD" },
+            { "key": "state_police", "label": "State Police" },
+            { "key": "federal", "label": "Federal" },
+            { "key": "multiple", "label": "Multiple Agencies" }
+          ],
+          "order": 3,
+          "accessLevel": "all"
+        },
+        {
+          "name": "count",
+          "label": "Number Arrested",
+          "type": "number",
+          "required": false,
+          "helpText": "Approximate count of people arrested.",
+          "order": 4,
+          "accessLevel": "all"
+        },
+        {
+          "name": "arrestee_details",
+          "label": "Arrestee Details",
+          "type": "textarea",
+          "required": true,
+          "helpText": "List all arrestees — one per line. Include name, physical description, clothing. LOs: dictate if you cannot type.",
+          "order": 5,
+          "accessLevel": "all",
+          "supportAudioInput": true
+        },
+        {
+          "name": "notes",
+          "label": "Additional Notes",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Anything else relevant — conditions, police behavior, etc.",
+          "order": 6,
+          "accessLevel": "all",
+          "supportAudioInput": true
+        }
+      ]
+    },
+    {
+      "name": "lo_misconduct_report",
+      "label": "lo_misconduct_report.label",
+      "labelPlural": "lo_misconduct_report.labelPlural",
+      "description": "lo_misconduct_report.description",
+      "icon": "shield-alert",
+      "color": "#dc2626",
+      "allowFileAttachments": true,
+      "allowCaseConversion": false,
+      "mobileOptimized": true,
+      "numberPrefix": "MC",
+      "numberingEnabled": true,
+      "statuses": [
+        { "value": "submitted", "label": "Submitted", "color": "#f59e0b", "order": 1 },
+        { "value": "under_review", "label": "Under Review", "color": "#3b82f6", "order": 2 },
+        { "value": "documented", "label": "Documented", "color": "#22c55e", "order": 3 },
+        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 4, "isClosed": true }
+      ],
+      "defaultStatus": "submitted",
+      "closedStatuses": ["closed"],
+      "fields": [
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "text",
+          "required": true,
+          "helpText": "Intersection or landmark where misconduct occurred.",
+          "order": 1,
+          "accessLevel": "all"
+        },
+        {
+          "name": "time",
+          "label": "Time of Incident",
+          "type": "text",
+          "required": true,
+          "helpText": "Approximate time the misconduct occurred.",
+          "order": 2,
+          "accessLevel": "all"
+        },
+        {
+          "name": "agency",
+          "label": "Agency",
+          "type": "select",
+          "required": true,
+          "options": [
+            { "key": "local_pd", "label": "Local PD" },
+            { "key": "state_police", "label": "State Police" },
+            { "key": "federal", "label": "Federal" },
+            { "key": "campus_police", "label": "Campus Police" },
+            { "key": "other", "label": "Other" }
+          ],
+          "order": 3,
+          "accessLevel": "all"
+        },
+        {
+          "name": "badge_numbers",
+          "label": "Badge Numbers / Officer IDs",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Badge numbers, names, vehicle plates. One per line.",
+          "order": 4,
+          "accessLevel": "all"
+        },
+        {
+          "name": "force_type",
+          "label": "Type of Force / Misconduct",
+          "type": "multiselect",
+          "required": true,
+          "options": [
+            { "key": "verbal_abuse", "label": "Verbal Abuse / Threats" },
+            { "key": "excessive_force", "label": "Excessive Physical Force" },
+            { "key": "chemical_weapons", "label": "Chemical Weapons (pepper spray, tear gas)" },
+            { "key": "projectiles", "label": "Projectiles (rubber bullets, beanbags)" },
+            { "key": "kettling", "label": "Kettling / Containment" },
+            { "key": "unlawful_arrest", "label": "Unlawful Arrest" },
+            { "key": "destruction_property", "label": "Destruction of Property" },
+            { "key": "medical_denial", "label": "Denial of Medical Attention" },
+            { "key": "surveillance", "label": "Targeted Surveillance / Photography" },
+            { "key": "other", "label": "Other" }
+          ],
+          "order": 5,
+          "accessLevel": "all"
+        },
+        {
+          "name": "description",
+          "label": "Detailed Description",
+          "type": "textarea",
+          "required": true,
+          "helpText": "Describe what happened in detail. Include sequence of events, who was affected, and any witnesses.",
+          "order": 6,
+          "accessLevel": "all",
+          "supportAudioInput": true
+        }
+      ]
     }
   ],
 

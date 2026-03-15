@@ -82,7 +82,7 @@ interface CmsState {
 
 let cms: CmsState
 
-Before({ tags: '@cases or @contacts or @events or @evidence' }, async () => {
+Before({ tags: '@cases or @contacts or @events or @evidence or @templates or @reports' }, async () => {
   cms = {
     templateCatalog: [],
     contacts: [],

@@ -1710,6 +1710,95 @@ export async function applyTemplate(templateId: string) {
   })
 }
 
+// --- CMS Report Type Definitions (Epic 343) ---
+
+export interface ReportTypeDefinition {
+  id: string
+  hubId: string
+  name: string
+  label: string
+  labelPlural: string
+  description: string
+  icon?: string
+  color?: string
+  category: 'report'
+  templateId?: string
+  templateVersion?: string
+  fields: Array<EntityFieldDefinition & { supportAudioInput?: boolean }>
+  statuses: EnumOption[]
+  defaultStatus: string
+  closedStatuses: string[]
+  numberPrefix?: string
+  numberingEnabled: boolean
+  allowFileAttachments: boolean
+  allowCaseConversion: boolean
+  mobileOptimized: boolean
+  isArchived: boolean
+  isSystem: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export async function listCmsReportTypes() {
+  return request<{ reportTypes: ReportTypeDefinition[] }>(hp('/settings/cms/report-types'))
+}
+
+export async function getCmsReportType(id: string) {
+  return request<ReportTypeDefinition>(hp(`/settings/cms/report-types/${id}`))
+}
+
+export async function createCmsReportType(body: {
+  name: string
+  label: string
+  labelPlural: string
+  description?: string
+  icon?: string
+  color?: string
+  fields?: Array<Partial<EntityFieldDefinition> & { supportAudioInput?: boolean }>
+  statuses: EnumOption[]
+  defaultStatus: string
+  closedStatuses?: string[]
+  numberPrefix?: string
+  numberingEnabled?: boolean
+  allowFileAttachments?: boolean
+  allowCaseConversion?: boolean
+  mobileOptimized?: boolean
+}) {
+  return request<ReportTypeDefinition>(hp('/settings/cms/report-types'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function updateCmsReportType(id: string, body: Partial<{
+  label: string
+  labelPlural: string
+  description: string
+  icon: string
+  color: string
+  fields: Array<Partial<EntityFieldDefinition> & { supportAudioInput?: boolean }>
+  statuses: EnumOption[]
+  defaultStatus: string
+  closedStatuses: string[]
+  numberPrefix: string
+  numberingEnabled: boolean
+  allowFileAttachments: boolean
+  allowCaseConversion: boolean
+  mobileOptimized: boolean
+  isArchived: boolean
+}>) {
+  return request<ReportTypeDefinition>(hp(`/settings/cms/report-types/${id}`), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteCmsReportType(id: string) {
+  return request<{ archived: boolean; id: string }>(hp(`/settings/cms/report-types/${id}`), {
+    method: 'DELETE',
+  })
+}
+
 // --- Case Records (Epic 330) ---
 
 export interface CaseRecord {

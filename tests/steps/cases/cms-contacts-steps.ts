@@ -583,10 +583,14 @@ Given('a contact with PII data exists', async ({ backendRequest: request }) => {
   contactWithDataId = (contact as { id: string }).id
 })
 
-Given('I am logged in as a volunteer without PII access', async ({ page }) => {
-  // In test context, admin has PII access. We test the UI elements generically.
-  const { loginAsAdmin } = await import('../../helpers')
-  await loginAsAdmin(page)
+Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request }) => {
+  // Create a volunteer with default role-volunteer (no contacts:view-pii permission)
+  const { createVolunteerViaApi } = await import('../../api-helpers')
+  const { loginAsVolunteer } = await import('../../helpers')
+  const vol = await createVolunteerViaApi(request, {
+    name: `PII Restricted Vol ${Date.now()}`,
+  })
+  await loginAsVolunteer(page, vol.nsec)
 })
 
 When('I click on the restricted contact card', async ({ page }) => {

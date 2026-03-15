@@ -12,6 +12,11 @@ import {
   caseNumberBodySchema,
 } from '../schemas/entity-schema'
 import type { EntityTypeDefinition, RelationshipTypeDefinition } from '../schemas/entity-schema'
+import {
+  createReportTypeBodySchema,
+  updateReportTypeBodySchema,
+} from '../schemas/report-types'
+import type { ReportTypeDefinition } from '../schemas/report-types'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { applyTemplate, detectTemplateUpdates } from '../lib/template-engine'
@@ -388,6 +393,7 @@ entitySchema.get('/templates',
         description: t.description,
         tags: t.tags,
         entityTypeCount: t.entityTypes.length,
+        reportTypeCount: t.reportTypes?.length ?? 0,
         totalFieldCount: t.entityTypes.reduce((sum, et) => sum + (et.fields?.length ?? 0), 0),
         suggestedRoleCount: t.suggestedRoles?.length ?? 0,
         extends: t.extends,
@@ -441,11 +447,15 @@ entitySchema.post('/templates/apply',
     const existingRes = await dos.settings.fetch(new Request('http://do/settings/entity-types'))
     const { entityTypes: existing } = await existingRes.json() as { entityTypes: EntityTypeDefinition[] }
 
+    // Get existing CMS report types
+    const existingReportTypesRes = await dos.settings.fetch(new Request('http://do/settings/cms-report-types'))
+    const { reportTypes: existingReportTypes } = await existingReportTypesRes.json() as { reportTypes: ReportTypeDefinition[] }
+
     // Apply template
     const allTemplatesMap = new Map(templates.map(t => [t.id, t]))
-    const result = applyTemplate(template, '', allTemplatesMap, existing)
+    const result = applyTemplate(template, '', allTemplatesMap, existing, existingReportTypes)
 
-    // Merge: replace matching names, add new
+    // Merge entity types: replace matching names, add new
     const merged = [...existing]
     for (const newET of result.entityTypes) {
       const idx = merged.findIndex(e => e.name === newET.name)
@@ -469,6 +479,21 @@ entitySchema.post('/templates/apply',
       body: JSON.stringify({ relationshipTypes: [...existingRels, ...result.relationshipTypes] }),
     }))
 
+    // Merge CMS report types: replace matching names, add new (Epic 343)
+    if (result.reportTypes.length > 0) {
+      const mergedReportTypes = [...existingReportTypes]
+      for (const newRT of result.reportTypes) {
+        const idx = mergedReportTypes.findIndex(r => r.name === newRT.name)
+        if (idx >= 0) mergedReportTypes[idx] = newRT
+        else mergedReportTypes.push(newRT)
+      }
+      await dos.settings.fetch(new Request('http://do/settings/cms-report-types', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportTypes: mergedReportTypes }),
+      }))
+    }
+
     // Track applied template
     const appliedRes = await dos.settings.fetch(new Request('http://do/settings/applied-templates'))
     const { appliedTemplates = [] } = await appliedRes.json() as { appliedTemplates: unknown[] }
@@ -491,12 +516,14 @@ entitySchema.post('/templates/apply',
       templateVersion: template.version,
       entityTypesCreated: result.entityTypes.length,
       relationshipTypesCreated: result.relationshipTypes.length,
+      reportTypesCreated: result.reportTypes.length,
     })
 
     return c.json({
       applied: true,
       entityTypes: result.entityTypes.length,
       relationshipTypes: result.relationshipTypes.length,
+      reportTypes: result.reportTypes.length,
       suggestedRoles: template.suggestedRoles,
     }, 201)
   },
@@ -588,6 +615,120 @@ entitySchema.post('/roles/from-template',
     }
 
     return c.json({ created, count: created.length }, 201)
+  },
+)
+
+// --- CMS Report Type Definitions (Epic 343) ---
+
+entitySchema.get('/report-types',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'List CMS report type definitions',
+    responses: {
+      200: { description: 'Report types list' },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:read'),
+  async (c) => {
+    const dos = getDOs(c.env)
+    const res = await dos.settings.fetch(new Request('http://do/settings/cms-report-types'))
+    return new Response(res.body, res)
+  },
+)
+
+entitySchema.post('/report-types',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'Create a new CMS report type definition',
+    responses: {
+      201: { description: 'Report type created' },
+      ...authErrors,
+    },
+  }),
+  requirePermission('cases:manage-types'),
+  validator('json', createReportTypeBodySchema),
+  async (c) => {
+    const dos = getDOs(c.env)
+    const body = c.req.valid('json')
+    const res = await dos.settings.fetch(new Request('http://do/settings/cms-report-types', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }))
+    if (!res.ok) return new Response(res.body, res)
+    const created = await res.json() as { id: string; name: string }
+    await audit(dos.records, 'reportTypeCreated', c.get('pubkey'), { reportTypeId: created.id, name: created.name })
+    return c.json(created, 201)
+  },
+)
+
+entitySchema.get('/report-types/:id',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'Get a CMS report type definition',
+    responses: {
+      200: { description: 'Report type details' },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('settings:read'),
+  async (c) => {
+    const id = c.req.param('id')
+    const dos = getDOs(c.env)
+    const res = await dos.settings.fetch(new Request(`http://do/settings/cms-report-types/${id}`))
+    return new Response(res.body, res)
+  },
+)
+
+entitySchema.patch('/report-types/:id',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'Update a CMS report type definition',
+    responses: {
+      200: { description: 'Report type updated' },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('cases:manage-types'),
+  validator('json', updateReportTypeBodySchema),
+  async (c) => {
+    const id = c.req.param('id')
+    const dos = getDOs(c.env)
+    const body = c.req.valid('json')
+    const res = await dos.settings.fetch(new Request(`http://do/settings/cms-report-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }))
+    if (!res.ok) return new Response(res.body, res)
+    await audit(dos.records, 'reportTypeUpdated', c.get('pubkey'), { reportTypeId: id })
+    return new Response(res.body, res)
+  },
+)
+
+entitySchema.delete('/report-types/:id',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'Archive a CMS report type definition',
+    responses: {
+      200: { description: 'Report type archived' },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('cases:manage-types'),
+  async (c) => {
+    const id = c.req.param('id')
+    const dos = getDOs(c.env)
+    const res = await dos.settings.fetch(new Request(`http://do/settings/cms-report-types/${id}`, {
+      method: 'DELETE',
+    }))
+    if (!res.ok) return new Response(res.body, res)
+    await audit(dos.records, 'reportTypeArchived', c.get('pubkey'), { reportTypeId: id })
+    return new Response(res.body, res)
   },
 )
 

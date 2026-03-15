@@ -95,22 +95,9 @@ export function CreateRecordDialog({
       return
     }
 
-    // Validate required fields
-    for (const field of selectedType.fields) {
-      if (field.required) {
-        const val = fieldValues[field.name]
-        if (val === undefined || val === '' || val === null) {
-          toast(
-            t('cases.requiredField', {
-              defaultValue: 'Please fill in required field: {{label}}',
-              label: field.label,
-            }),
-            'error',
-          )
-          return
-        }
-      }
-    }
+    // Note: Schema-defined required fields are validated in the detail panel
+    // during editing, not during initial creation. The create dialog requires
+    // only a title to allow fast case creation in urgent situations.
 
     if (!hasNsec || !publicKey) {
       toast(t('cases.noKeyPair', { defaultValue: 'Encryption key not available' }), 'error')

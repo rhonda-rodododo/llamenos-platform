@@ -41,6 +41,7 @@ const fieldTemplateSchema = z.object({
   accessLevel: z.enum(['all', 'admin', 'assigned', 'custom']).default('all'),
   showWhen: showWhenTemplateSchema.optional(),
   hubEditable: z.boolean().default(true),
+  supportAudioInput: z.boolean().default(false),
 })
 
 const entityTypeTemplateSchema = z.object({
@@ -84,6 +85,24 @@ const relationshipTypeTemplateSchema = z.object({
   required: z.boolean().default(false),
 })
 
+const reportTypeTemplateSchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  labelPlural: z.string(),
+  description: z.string().optional(),
+  icon: z.string().optional(),
+  color: z.string().optional(),
+  allowFileAttachments: z.boolean().default(true),
+  allowCaseConversion: z.boolean().default(false),
+  mobileOptimized: z.boolean().default(false),
+  numberPrefix: z.string().optional(),
+  numberingEnabled: z.boolean().default(false),
+  statuses: z.array(enumOptionTemplateSchema),
+  defaultStatus: z.string(),
+  closedStatuses: z.array(z.string()).default([]),
+  fields: z.array(fieldTemplateSchema),
+})
+
 const suggestedRoleTemplateSchema = z.object({
   name: z.string(),
   slug: z.string(),
@@ -109,6 +128,7 @@ export const templateManifestSchema = z.object({
 
   entityTypes: z.array(entityTypeTemplateSchema),
   relationshipTypes: z.array(relationshipTypeTemplateSchema).default([]),
+  reportTypes: z.array(reportTypeTemplateSchema).default([]),
   suggestedRoles: z.array(suggestedRoleTemplateSchema).default([]),
 })
 
