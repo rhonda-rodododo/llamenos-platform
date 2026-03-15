@@ -21,23 +21,21 @@ struct CaseListView: View {
         let vm = self.vm
 
         NavigationStack {
-            ZStack {
+            Group {
                 if vm.cmsEnabled == nil {
-                    ProgressView()
-                        .accessibilityIdentifier("case-loading")
+                    loadingView
                 } else if vm.cmsEnabled == false {
                     cmsDisabledView
                 } else if vm.isLoading && vm.records.isEmpty {
-                    ProgressView()
-                        .accessibilityIdentifier("case-loading")
+                    loadingView
                 } else if vm.records.isEmpty && vm.entityTypeFilter == nil && vm.statusFilter == nil {
                     emptyStateView(vm: vm)
                 } else {
                     caseListContent(vm: vm)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(NSLocalizedString("cases_title", comment: "Cases"))
-            .accessibilityIdentifier("cases-title")
             .task {
                 await vm.loadInitial()
             }
@@ -45,6 +43,18 @@ struct CaseListView: View {
                 await vm.refresh()
             }
         }
+    }
+
+    // MARK: - Loading
+
+    private var loadingView: some View {
+        VStack {
+            Spacer()
+            ProgressView()
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityIdentifier("case-loading")
     }
 
     // MARK: - CMS Disabled
