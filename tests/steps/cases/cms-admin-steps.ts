@@ -177,13 +177,15 @@ Then('the applied badge should appear on the template card', async ({ page }) =>
 })
 
 Then('the applied template should show the applied badge', async ({ page }) => {
+  // Wait for templates to load, then check for the applied badge
+  await expect(page.getByTestId('template-card').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   await expect(page.getByTestId('template-applied-badge').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the apply button on the applied template should be disabled', async ({ page }) => {
   const appliedCard = page.getByTestId('template-card').filter({
     has: page.getByTestId('template-applied-badge'),
-  })
+  }).first()
   const applyBtn = appliedCard.getByTestId('template-apply-btn')
   await expect(applyBtn).toBeDisabled()
 })
@@ -209,7 +211,10 @@ When('I expand the entity types section', async ({ page }) => {
     } else {
       await section.locator('h3, [class*="CardTitle"]').first().click()
     }
+    // Wait for Collapsible animation + async entity type data load
     await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
+    // Entity types load asynchronously on first expand — wait for rows or add button
+    await content.first().waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).catch(() => {})
   }
 })
 
@@ -609,8 +614,11 @@ Then('{string} should appear in the archived section', async ({ page }, name: st
   // Archived section has data-testid="archived-section"
   // UI shows the label (spaces) not the name (underscores)
   const label = name.replace(/_/g, ' ')
-  const archived = page.getByTestId('archived-section').filter({ hasText: new RegExp(label, 'i') })
-  await expect(archived.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // After archiving, loadEntityTypes() runs async — wait longer for the section to appear
+  const archived = page.getByTestId('archived-section')
+  await expect(archived).toBeVisible({ timeout: Timeouts.ELEMENT * 2 })
+  // Verify the archived entity type label is present within the section
+  await expect(archived.getByText(new RegExp(label, 'i')).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('an archived entity type exists', async ({ backendRequest: request }) => {

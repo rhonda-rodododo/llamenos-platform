@@ -60,13 +60,30 @@ export default defineConfig({
           ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
         ],
         featuresRoot: "packages/test-specs/features",
-        tags: "@desktop and not @backend and not @wip",
+        tags: "@desktop and not @backend and not @wip and not @resets-state",
         // Backend-only scenarios have steps not defined in desktop — skip them
         missingSteps: "skip-scenario",
       }),
       use: { ...devices["Desktop Chrome"] },
-      // Hub isolation + @resets-state hooks allow parallel execution
       fullyParallel: true,
+      dependencies: ["setup"],
+    },
+    {
+      // @resets-state tests modify shared server state (toggle CMS, apply templates,
+      // create/archive entity types) — must run serially to avoid parallel conflicts.
+      ...defineBddProject({
+        name: "bdd-serial",
+        features: "packages/test-specs/features/**/*.feature",
+        steps: [
+          "tests/steps/*.ts",
+          ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
+        ],
+        featuresRoot: "packages/test-specs/features",
+        tags: "@desktop and @resets-state and not @backend and not @wip",
+        missingSteps: "skip-scenario",
+      }),
+      use: { ...devices["Desktop Chrome"] },
+      fullyParallel: false,
       dependencies: ["setup"],
     },
     {
