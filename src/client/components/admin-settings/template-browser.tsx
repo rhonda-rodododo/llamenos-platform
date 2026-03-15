@@ -28,7 +28,12 @@ export function TemplateBrowser({ expanded, onToggle, statusSummary, onTemplateA
 
   const loadTemplates = useCallback(() => {
     listTemplates()
-      .then(({ templates: t }) => setTemplates(t))
+      .then(({ templates: t, appliedTemplateIds }) => {
+        setTemplates(t)
+        if (appliedTemplateIds?.length) {
+          setAppliedIds(prev => new Set([...prev, ...appliedTemplateIds]))
+        }
+      })
       .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps

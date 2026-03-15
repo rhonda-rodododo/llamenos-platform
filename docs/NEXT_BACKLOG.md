@@ -552,12 +552,12 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 - [x] **[Epic 311: Mobile Admin Envelope Encryption & Blasts Authorization](epics/epic-311-mobile-admin-envelope-encryption-blasts-auth.md)** — Wire adminDecryptionPubkey into iOS/Android encryption, add requirePermission to 14 blast endpoints, Zod validation for 10 endpoints
 - [x] **Follow-up fixes**: Add requirePermission to GET /conversations/stats and GET /reports/categories, Zod validator for POST /calls/:callId/ban
 
-## Test Infrastructure (Epics 312-314, 333-334)
+## Test Infrastructure (Epics 312-314, 333-334) ✅ COMPLETED
 - [x] **[Epic 312: Permission Matrix BDD Flakiness](epics/epic-312-permission-matrix-bdd-flakiness.md)** — Was caused by concurrent test suites; backend BDD passes 432/432 when run in isolation
 - [x] **[Epic 313: Worker Integration Test Fixtures](epics/epic-313-worker-integration-test-fixtures.md)** — Fixed 5 stale fixtures: pubkey validation, rate limit key, fallback body key, ECIES pubkey, conversation reopen behavior. 61/61 pass
 - [x] **[Epic 314: Desktop BDD Step/UI Alignment](epics/epic-314-desktop-bdd-step-alignment.md)** — Phase 1 complete: 78→71 failures (-7), 232→236 passes (+4). Fixed i18n nav mapping, section expansion, custom fields, device link, WebRTC/RCS, reports, ban validation. All feature groups pass individually (0 per-group failures). Remaining 71 are serial state issues (→ Epic 333).
-- [ ] **[Epic 333: BDD Serial Execution Isolation](epics/epic-333-bdd-serial-execution-isolation.md)** — 71 BDD scenarios fail in full serial suite but pass per-group. Fix via Before hook state reset, data seeding helpers, step collision fixes, @resets-state tagging. Goal: 0 failures in full serial run.
-- [ ] **[Epic 334: Parallel BDD Execution with CMS Hub Isolation](epics/epic-334-parallel-bdd-execution.md)** — Hub-per-scenario isolation for parallel test execution, 3x speedup target
+- [x] **[Epic 333: BDD Serial Execution Isolation](epics/epic-333-bdd-serial-execution-isolation.md)** — Obsoleted by Epic 336 which delivered the full solution (Before hooks, @resets-state, step collision fixes). 282 passed, 0 failures in full serial run.
+- [x] **[Epic 334: Parallel BDD Execution with CMS Hub Isolation](epics/epic-334-parallel-bdd-execution.md)** — 3x speedup achieved: 281 passed, 0 failed, 3 skipped in 16.1 min (down from 47.5 min serial). fullyParallel: true with @resets-state isolation.
 
 ## Case Management System (Epics 315-332) — COMPLETED
 
@@ -598,21 +598,24 @@ Reference documents: `docs/plans/2026-03-14-case-management-*.md` (6 documents, 
 - [x] **[Epic 331: Desktop Contact Directory](epics/epic-331-desktop-contact-directory.md)** — Contact list with trigram search, profile viewer, relationship graph, affinity groups, merge tool
 - [x] **[Epic 332: Desktop Case Timeline & Evidence Viewer](epics/epic-332-desktop-case-timeline-evidence.md)** — Chronological interaction timeline, evidence gallery, chain of custody display
 
-## Desktop BDD CMS Test Fixes (Epics 335-342)
+## CMS Completion & Polish (Epics 335-342)
 
-Fix all desktop BDD step definition issues for the Case Management System feature files.
-Pre-fix batch (Epic 335) addresses compilation errors; remaining epics fix behavioral issues.
+CMS backend + desktop UI complete (Epics 315-332). Remaining work: test execution, volunteer profiles, smart assignment, translations, docs, mobile views.
 
-- [x] **Epic 335: Desktop BDD CMS Test Fixes — Pre-Fix Batch** — createContactViaApi signature mismatch (20 callsites → createContactByNameViaApi wrapper), navTestIdMap CMS entries, CSS class selectors → data-testid (12 instances across 4 step files), missing data-testid on case-management-section.tsx / template-browser.tsx / cases.tsx components
-- [ ] **Epic 336: CMS Admin Settings BDD Fixes** — Template browser interaction, entity type CRUD lifecycle, field editor save/delete, status/severity editor, archive/unarchive flow
-- [ ] **Epic 337: CMS Cases BDD Fixes** — Case creation dialog, entity type filtering, case detail tabs, status pill interaction, timeline comment submission, evidence view toggle
-- [ ] **Epic 338: CMS Contacts BDD Fixes** — Contact directory search with debounce, type filter, contact creation dialog, profile tabs (identifiers, cases, relationships, groups), privacy-aware display
-- [ ] **Epic 339: CMS Events BDD Fixes** — Event creation, event-case linking, event-report linking, event status changes
-- [ ] **Epic 340: CMS Backend BDD Coverage** — Backend BDD scenarios for CMS API endpoints (entity types, contacts, records, events, templates)
-- [ ] **Epic 341: CMS Mobile Step Definitions (iOS)** — iOS XCUITest step definitions for CMS feature files
-- [ ] **Epic 342: CMS Mobile Step Definitions (Android)** — Android Cucumber step definitions for CMS feature files
+### Completed
+- [x] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — Pre-fix batch: createContactViaApi wrapper, navTestIdMap CMS entries, CSS→data-testid selectors, component test IDs
+- [x] **[Epic 336: BDD Serial Execution Fixes](epics/epic-336-bdd-serial-execution-fixes.md)** — Before hook @resets-state, step collision fixes, data seeding helpers. 282 passed, 0 failures in full serial run
+- [x] **[Epic 340: Volunteer Profiles with Case Workload](epics/epic-340-volunteer-profiles-case-workload.md)** — Specializations, case workload tracking, Cases tab on volunteer profile, workload dashboard widget
+- [x] **[Epic 341: Hub Context & Multi-Hub UX](epics/epic-341-hub-context-and-multi-hub-ux.md)** — HubSwitcher component, hub context on all CMS API calls, key-based remount on hub change
 
-**Dependency order:** 335 (pre-fixes) → (336 | 337 | 338 | 339) in parallel → 340 → (341 | 342)
+### Remaining
+- [ ] **[Epic 335: Desktop BDD CMS Test Execution](epics/epic-335-desktop-bdd-cms-test-execution.md)** — Run all 98 CMS scenarios, fix failures until all pass per-feature-group
+- [ ] **[Epic 342: Smart Case Assignment & Routing](epics/epic-342-case-assignment-routing.md)** — Suggest-assignees API, enhanced assignment UI with match reasons, auto-assignment for high-volume
+- [ ] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — CMS translations for 11 non-EN/ES locales, template i18n key mappings, codegen + validation
+- [ ] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip component, operator handbook CMS section, template authoring guide, API narrative docs
+- [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — Template-driven iOS (SwiftUI) + Android (Compose) CMS views: CaseList, CaseSummary, QuickStatus, DateCalendar, AddComment
+
+**Dependency order:** 335 → 342 → (338 | 339 | 337)
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

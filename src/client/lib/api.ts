@@ -1699,12 +1699,14 @@ export interface TemplateSummary {
 }
 
 export async function listTemplates() {
-  return request<{ templates: TemplateSummary[] }>(hp('/settings/cms/templates'))
+  return request<{ templates: TemplateSummary[]; appliedTemplateIds?: string[] }>(hp('/settings/cms/templates'))
 }
 
 export async function applyTemplate(templateId: string) {
-  return request<{ applied: boolean; entityTypes: number }>(hp(`/settings/cms/templates/${templateId}/apply`), {
+  return request<{ applied: boolean; entityTypes: number }>(hp('/settings/cms/templates/apply'), {
     method: 'POST',
+    body: JSON.stringify({ templateId }),
+    headers: { 'Content-Type': 'application/json' },
   })
 }
 

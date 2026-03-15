@@ -331,7 +331,12 @@ entitySchema.get('/templates',
   }),
   requirePermission('settings:read'),
   async (c) => {
+    const dos = getDOs(c.env)
     const templates = await loadBundledTemplates()
+    // Fetch applied templates to include appliedTemplateIds in response
+    const appliedRes = await dos.settings.fetch(new Request('http://do/settings/applied-templates'))
+    const { appliedTemplates = [] } = await appliedRes.json() as { appliedTemplates: AppliedTemplateRecord[] }
+    const appliedIds = appliedTemplates.map(at => at.templateId)
     return c.json({
       templates: templates.map(t => ({
         id: t.id,
@@ -340,8 +345,11 @@ entitySchema.get('/templates',
         description: t.description,
         tags: t.tags,
         entityTypeCount: t.entityTypes.length,
+        totalFieldCount: t.entityTypes.reduce((sum, et) => sum + (et.fields?.length ?? 0), 0),
+        suggestedRoleCount: t.suggestedRoles?.length ?? 0,
         extends: t.extends,
       })),
+      appliedTemplateIds: appliedIds,
     })
   },
 )

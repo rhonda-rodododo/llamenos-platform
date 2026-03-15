@@ -710,6 +710,7 @@ export async function createEntityTypeViaApi(
     name?: string
     label?: string
     category?: string
+    color?: string
     statuses?: Array<{ value: string; label: string; order: number }>
     fields?: Array<{ name: string; label: string; type: string; required?: boolean; order: number }>
     numberPrefix?: string
@@ -730,6 +731,7 @@ export async function createEntityTypeViaApi(
       labelPlural: options?.label ? `${options.label}s` : `${name.replace(/_/g, ' ')}s`,
       description: `Test entity type ${name}`,
       category: options?.category ?? 'case',
+      color: options?.color,
       statuses: options?.statuses ?? defaultStatuses,
       defaultStatus: (options?.statuses ?? defaultStatuses)[0].value,
       closedStatuses: (options?.statuses ?? defaultStatuses).filter(s => (s as Record<string, unknown>).isClosed).map(s => s.value),

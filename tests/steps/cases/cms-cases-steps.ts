@@ -126,7 +126,8 @@ When('I click the create case submit button', async ({ page }) => {
 })
 
 Then('a toast {string} should appear', async ({ page }, toastText: string) => {
-  const toast = page.locator('[data-sonner-toast]').filter({ hasText: new RegExp(toastText, 'i') })
+  // Custom ToastProvider renders with role="status" (success/info) or role="alert" (error)
+  const toast = page.locator('[role="status"], [role="alert"]').filter({ hasText: new RegExp(toastText, 'i') })
     .or(page.getByText(new RegExp(toastText, 'i')))
   await expect(toast.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

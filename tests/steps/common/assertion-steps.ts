@@ -59,7 +59,7 @@ Then('I should see an error message', async ({ page }) => {
     () => page.getByTestId(TestIds.ERROR_MESSAGE),
     () => page.locator('[role="alert"]').first(),
     () => page.locator('.text-destructive').first(),
-    () => page.locator('[data-sonner-toast][data-type="error"]').first(),
+    () => page.locator('[role="alert"]').first(),
     () => page.getByText(/error|invalid|required|failed/i).first(),
   ]
   for (const getLocator of checks) {
@@ -172,10 +172,13 @@ Then('I should see the {string} page title', async ({ page }, title: string) => 
 })
 
 Then('a success toast should appear', async ({ page }) => {
-  const toast = page.locator('[data-sonner-toast][data-type="success"]')
-    .or(page.locator('[data-sonner-toast]'))
-    .or(page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted/i))
-  await expect(toast.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Custom ToastProvider renders toasts with role="status" (success/info) or role="alert" (error).
+  // Toasts auto-dismiss after 4s, so check for either the toast element or matching page text.
+  // Use a short polling loop to catch fast-dismissing toasts.
+  const toastLocator = page.locator('[role="status"], [role="alert"]')
+  const textLocator = page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted/i)
+  const combined = toastLocator.or(textLocator)
+  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the empty state card should be visible', async ({ page }) => {

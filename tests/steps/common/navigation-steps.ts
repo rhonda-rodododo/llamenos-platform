@@ -29,7 +29,7 @@ Given('I navigate to the {string} page', async ({ page }, pageName: string) => {
     // CMS pages
     Cases: (p) => navigateAfterLogin(p, '/cases'),
     'Contact Directory': (p) => navigateAfterLogin(p, '/contacts-directory'),
-    Events: (p) => navigateAfterLogin(p, '/events'),
+    Events: (p) => navigateAfterLogin(p, '/cases'), // Events are entity types on the cases page
     'Case Management': (p) => navigateAfterLogin(p, '/admin/case-management'),
     'Case Management Settings': (p) => navigateAfterLogin(p, '/admin/case-management'),
   }

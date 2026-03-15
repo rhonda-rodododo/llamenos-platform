@@ -251,8 +251,8 @@ Feature: Case Management Settings
     And I expand the entity types section
     And I click the archive button on "test_archive_type"
     And I confirm the archive dialog
-    Then "test_archive_type" should appear in the archived section
-    And a success toast should appear
+    Then a success toast should appear
+    And "test_archive_type" should appear in the archived section
 
   Scenario: Delete an archived entity type removes it permanently
     Given case management is enabled
@@ -261,8 +261,8 @@ Feature: Case Management Settings
     And I expand the entity types section
     And I click the delete button on the archived entity type
     And I confirm the delete dialog
-    Then the entity type should be removed from the list
-    And a success toast should appear
+    Then a success toast should appear
+    And the entity type should be removed from the list
 
   # --- Deep link support ---
 
