@@ -32,6 +32,7 @@ export const TestIds = {
   NAV_AUDIT: 'nav-audit',
   NAV_ADMIN_SETTINGS: 'nav-admin-settings',
   NAV_ADMIN_HUBS: 'nav-admin-hubs',
+  NAV_TRIAGE: 'nav-triage',
   NAV_HELP: 'nav-help',
   LOGOUT_BTN: 'logout-btn',
 
@@ -306,6 +307,7 @@ export const navTestIdMap: Record<string, string> = {
   'Events': 'nav-events',
   'Case Management': 'nav-admin-case-management',
   'Case Management Settings': 'nav-admin-case-management',
+  'Triage': 'nav-triage',
   'Help': 'nav-help',
   // Spanish (es) nav labels
   'Panel': 'nav-dashboard',

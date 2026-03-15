@@ -56,7 +56,31 @@ reports.get('/',
       return c.json({ error: 'Failed to fetch reports' }, 500)
     }
 
-    const data = await res.json()
+    const data = await res.json() as { conversations: Array<{ metadata?: { reportTypeId?: string; conversionStatus?: string } }>; total: number }
+
+    // Triage queue filtering: only reports whose report type allows case conversion
+    if (query.conversionEnabled) {
+      const rtRes = await dos.settings.fetch(new Request('http://do/settings/cms-report-types'))
+      if (rtRes.ok) {
+        const rtData = await rtRes.json() as { reportTypes: Array<{ id: string; allowCaseConversion: boolean }> }
+        const conversionTypeIds = new Set(
+          rtData.reportTypes.filter(rt => rt.allowCaseConversion).map(rt => rt.id),
+        )
+        data.conversations = data.conversations.filter(
+          c => c.metadata?.reportTypeId && conversionTypeIds.has(c.metadata.reportTypeId),
+        )
+        data.total = data.conversations.length
+      }
+    }
+
+    // Filter by conversion status if specified
+    if (query.conversionStatus) {
+      data.conversations = data.conversations.filter(
+        c => c.metadata?.conversionStatus === query.conversionStatus,
+      )
+      data.total = data.conversations.length
+    }
+
     return c.json(data)
   },
 )
@@ -426,9 +450,16 @@ reports.patch('/:id',
     const dos = getScopedDOs(c.env, c.get('hubId'))
     const body = c.req.valid('json')
 
+    // Build the update payload — conversionStatus goes into metadata
+    const patchBody: Record<string, unknown> = {}
+    if (body.status) patchBody.status = body.status
+    if (body.conversionStatus) {
+      patchBody.metadata = { conversionStatus: body.conversionStatus }
+    }
+
     const res = await dos.conversations.fetch(new Request(`http://do/conversations/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(body),
+      body: JSON.stringify(patchBody),
     }))
 
     if (!res.ok) {

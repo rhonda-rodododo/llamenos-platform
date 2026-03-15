@@ -48,6 +48,7 @@ import {
   BookUser,
   FolderOpen,
   Calendar,
+  Inbox,
 } from 'lucide-react'
 
 export const Route = createRootRoute({
@@ -305,6 +306,11 @@ function AuthenticatedLayout() {
               {(channels?.reports || isAdmin) && (
                 <NavLink to="/reports" icon={<FileText className="h-4 w-4" />}>
                   {t('nav.reports', { defaultValue: 'Reports' })}
+                </NavLink>
+              )}
+              {hasPermission('reports:read-all') && (
+                <NavLink to="/triage" icon={<Inbox className="h-4 w-4" />}>
+                  {t('nav.triage', { defaultValue: 'Triage' })}
                 </NavLink>
               )}
               {hasPermission('blasts:read') && (

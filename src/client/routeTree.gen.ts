@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VolunteersRouteImport } from './routes/volunteers'
+import { Route as TriageRouteImport } from './routes/triage'
 import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -40,6 +41,11 @@ import { Route as AdminCaseManagementRouteImport } from './routes/admin/case-man
 const VolunteersRoute = VolunteersRouteImport.update({
   id: '/volunteers',
   path: '/volunteers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TriageRoute = TriageRouteImport.update({
+  id: '/triage',
+  path: '/triage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShiftsRoute = ShiftsRouteImport.update({
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
+  '/triage': typeof TriageRoute
   '/volunteers': typeof VolunteersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
   '/admin/hubs': typeof AdminHubsRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
+  '/triage': typeof TriageRoute
   '/volunteers': typeof VolunteersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
   '/admin/hubs': typeof AdminHubsRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
+  '/triage': typeof TriageRoute
   '/volunteers': typeof VolunteersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
   '/admin/hubs': typeof AdminHubsRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/shifts'
+    | '/triage'
     | '/volunteers'
     | '/admin/case-management'
     | '/admin/hubs'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/shifts'
+    | '/triage'
     | '/volunteers'
     | '/admin/case-management'
     | '/admin/hubs'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/setup'
     | '/shifts'
+    | '/triage'
     | '/volunteers'
     | '/admin/case-management'
     | '/admin/hubs'
@@ -373,6 +385,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SetupRoute: typeof SetupRoute
   ShiftsRoute: typeof ShiftsRoute
+  TriageRoute: typeof TriageRoute
   VolunteersRoute: typeof VolunteersRoute
   AdminCaseManagementRoute: typeof AdminCaseManagementRoute
   AdminHubsRoute: typeof AdminHubsRoute
@@ -388,6 +401,13 @@ declare module '@tanstack/react-router' {
       path: '/volunteers'
       fullPath: '/volunteers'
       preLoaderRoute: typeof VolunteersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/triage': {
+      id: '/triage'
+      path: '/triage'
+      fullPath: '/triage'
+      preLoaderRoute: typeof TriageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shifts': {
@@ -597,6 +617,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SetupRoute: SetupRoute,
   ShiftsRoute: ShiftsRoute,
+  TriageRoute: TriageRoute,
   VolunteersRoute: VolunteersRoute,
   AdminCaseManagementRoute: AdminCaseManagementRoute,
   AdminHubsRoute: AdminHubsRoute,

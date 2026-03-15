@@ -1172,6 +1172,8 @@ export async function testWhatsAppConnection(data: { phoneNumberId: string; acce
 
 // --- Reports ---
 
+export type ConversionStatus = 'pending' | 'in_progress' | 'completed'
+
 export interface Report extends Conversation {
   metadata: {
     type: 'report'
@@ -1181,6 +1183,7 @@ export interface Report extends Conversation {
     customFieldValues?: string
     linkedCallId?: string
     reportId?: string
+    conversionStatus?: ConversionStatus
   }
 }
 
@@ -1284,6 +1287,40 @@ export async function archiveReportType(id: string) {
 
 export async function getReportFiles(id: string) {
   return request<{ files: import('@shared/types').FileRecord[] }>(hp(`/reports/${id}/files`))
+}
+
+// --- Triage Queue (Epic 342) ---
+
+export async function listTriageQueue(params?: { conversionStatus?: ConversionStatus; page?: number; limit?: number }) {
+  const qs = new URLSearchParams({ conversionEnabled: 'true' })
+  if (params?.conversionStatus) qs.set('conversionStatus', params.conversionStatus)
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  return request<{ conversations: Report[]; total: number }>(hp(`/reports?${qs}`))
+}
+
+export async function updateReportConversionStatus(reportId: string, conversionStatus: ConversionStatus) {
+  return request<Report>(hp(`/reports/${reportId}`), {
+    method: 'PATCH',
+    body: JSON.stringify({ conversionStatus }),
+  })
+}
+
+export async function getLinkedCasesForReport(reportId: string) {
+  return request<{ records: Array<{ reportId: string; caseId: string; linkedAt: string; linkedBy: string }>; total: number }>(hp(`/reports/${reportId}/records`))
+}
+
+export async function createCaseFromReport(
+  reportId: string,
+  recordBody: CreateRecordBody,
+) {
+  const record = await createRecord(recordBody)
+  // Link the newly-created case to the report
+  await request(hp(`/reports/${reportId}/records`), {
+    method: 'POST',
+    body: JSON.stringify({ caseId: record.id }),
+  })
+  return record
 }
 
 // --- File Uploads ---

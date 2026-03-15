@@ -518,7 +518,7 @@ export async function listReportsViaApi(
  */
 export async function createReportViaApi(
   request: APIRequestContext,
-  options?: { title?: string; category?: string; status?: string },
+  options?: { title?: string; category?: string; status?: string; reportTypeId?: string },
 ): Promise<ReportRecord> {
   const skHex = nsecToSkHex(ADMIN_NSEC)
   const pubkey = skHexToPubkey(skHex)
@@ -531,12 +531,15 @@ export async function createReportViaApi(
   }
 
   const title = options?.title ?? `Test Report ${Date.now()}`
-  const { status, data } = await apiPost<ReportRecord>(request, '/reports', {
+  const body: Record<string, unknown> = {
     title,
     category: options?.category ?? 'test',
     encryptedContent: 'dGVzdCByZXBvcnQgY29udGVudA==', // base64 "test report content"
     readerEnvelopes: [dummyEnvelope],
-  })
+  }
+  if (options?.reportTypeId) body.reportTypeId = options.reportTypeId
+
+  const { status, data } = await apiPost<ReportRecord>(request, '/reports', body)
   if (status !== 201 && status !== 200) {
     throw new Error(`Failed to create report: ${status} ${JSON.stringify(data)}`)
   }
@@ -1673,4 +1676,63 @@ export async function getAffinityGroupViaApi(
   )
   if (status !== 200) throw new Error(`Failed to get affinity group: ${status}`)
   return data
+}
+
+// ── Triage Queue (Epic 342) ──────────────────────────────────────
+
+export async function listTriageQueueViaApi(
+  request: APIRequestContext,
+  params?: { conversionStatus?: string },
+  nsec = ADMIN_NSEC,
+): Promise<{ conversations: Record<string, unknown>[]; total: number }> {
+  const qs = new URLSearchParams({ conversionEnabled: 'true' })
+  if (params?.conversionStatus) qs.set('conversionStatus', params.conversionStatus)
+  const path = `/reports?${qs}`
+  const { status, data } = await apiGet<{ conversations: Record<string, unknown>[]; total: number }>(request, path, nsec)
+  if (status !== 200) throw new Error(`Failed to list triage queue: ${status}`)
+  return data
+}
+
+export async function updateReportConversionStatusViaApi(
+  request: APIRequestContext,
+  reportId: string,
+  conversionStatus: string,
+  nsec = ADMIN_NSEC,
+): Promise<Record<string, unknown>> {
+  const { status, data } = await apiPatch<Record<string, unknown>>(
+    request,
+    `/reports/${reportId}`,
+    { conversionStatus },
+    nsec,
+  )
+  if (status !== 200) throw new Error(`Failed to update conversion status: ${status}`)
+  return data
+}
+
+export async function createCaseFromReportViaApi(
+  request: APIRequestContext,
+  reportId: string,
+  entityTypeId: string,
+  nsec = ADMIN_NSEC,
+): Promise<{ recordId: string; linkId: string }> {
+  const envelope = dummyEnvelope(nsec)
+  // Create the record first
+  const record = await createRecordViaApi(request, entityTypeId, {
+    statusHash: 'status_open_hash',
+  }, nsec)
+  const recordId = (record as { id: string }).id
+
+  // Link it to the report
+  const { status, data } = await apiPost<{ reportId: string; caseId: string }>(
+    request,
+    `/reports/${reportId}/records`,
+    {
+      caseId: recordId,
+      encryptedNotes: 'dGVzdCBsaW5r',
+      notesEnvelopes: [envelope],
+    },
+    nsec,
+  )
+  if (status !== 201 && status !== 200) throw new Error(`Failed to link case to report: ${status}`)
+  return { recordId, linkId: (data as Record<string, unknown>).id as string ?? recordId }
 }

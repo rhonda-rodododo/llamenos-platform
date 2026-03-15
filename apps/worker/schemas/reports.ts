@@ -28,11 +28,15 @@ export const reportMessageResponseSchema = z.object({
   createdAt: z.string(),
 })
 
+export const conversionStatusEnum = z.enum(['pending', 'in_progress', 'completed'])
+
 // --- Input schemas ---
 
 export const listReportsQuerySchema = paginationSchema.extend({
   status: z.string().optional(),
   category: z.string().optional(),
+  conversionEnabled: z.coerce.boolean().optional(),
+  conversionStatus: conversionStatusEnum.optional(),
 })
 
 export const createReportBodySchema = z.looseObject({
@@ -55,4 +59,5 @@ export const assignReportBodySchema = z.looseObject({
 
 export const updateReportBodySchema = z.looseObject({
   status: z.enum(['waiting', 'active', 'closed']).optional(),
+  conversionStatus: conversionStatusEnum.optional(),
 })
