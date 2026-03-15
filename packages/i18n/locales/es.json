@@ -416,10 +416,10 @@
       "note": "Note",
       "call": "Call",
       "message": "Message",
-      "status_change": "Status Change",
+      "statusChange": "Status Change",
       "referral": "Referral",
       "assessment": "Assessment",
-      "file_upload": "File Upload",
+      "fileUpload": "File Upload",
       "comment": "Comment"
     },
     "statusChanged": "Status changed from {{previous}} to {{new}}",
@@ -469,7 +469,7 @@
       "search": "La búsqueda funciona comparando tokens cifrados — el servidor ayuda a filtrar resultados sin ver los datos reales.",
       "accessTiers": "Los datos están organizados en tres niveles de acceso: Resumen (visible para su equipo), Detalles (visible para voluntarios asignados y administradores) y Restringido (visible solo para administradores).",
       "evidence": "Los archivos de evidencia están cifrados y rastreados con cadena de custodia — cada vista, descarga y compartido se registra.",
-      "templates_howto": "Explore las plantillas disponibles a continuación. Aplicar una plantilla crea tipos de caso y campos automáticamente. Puede personalizar todo después de aplicar."
+      "templatesHowto": "Explore las plantillas disponibles a continuación. Aplicar una plantilla crea tipos de caso y campos automáticamente. Puede personalizar todo después de aplicar."
     },
     "onboarding": {
       "welcome": "Bienvenido a la Gestión de Casos",
@@ -1655,7 +1655,31 @@
     "submit": "Submit",
     "titleLabel": "Title",
     "titlePlaceholder": "Report title",
-    "untitled": "Untitled Report"
+    "untitled": "Untitled Report",
+    "filterAllTypes": "All Types",
+    "fileComingSoon": "Coming soon",
+    "validationErrors": "Please fix the errors above before submitting.",
+    "typePicker": {
+      "title": "Select Report Type",
+      "loading": "Loading report types...",
+      "empty": "No report types available for mobile.",
+      "subtitle": "Choose a report type to get started"
+    },
+    "typed": {
+      "createTitle": "New %@ Report",
+      "titleLabel": "Title",
+      "required": "*",
+      "titlePlaceholder": "Brief description of the report",
+      "submit": "Submit Report",
+      "selectOption": "Select an option",
+      "datePick": "Pick a date",
+      "audioStart": "Start voice input",
+      "audioStop": "Stop recording",
+      "audioListening": "Listening...",
+      "audioUnavailable": "Speech recognition is not available on this device",
+      "audioPermissionDenied": "Microphone permission is required for voice input",
+      "audioError": "An error occurred during speech recognition"
+    }
   },
   "reportTypes": {
     "addType": "Add Report Type",
@@ -2462,5 +2486,17 @@
       "noFilteredItems": "Ninguna evidencia coincide con este filtro",
       "noItems": "Aún no se ha subido evidencia. Los archivos de evidencia están cifrados y rastreados con cadena de custodia."
     }
+  },
+  "audioInput": {
+    "start": "Start voice input",
+    "stop": "Stop recording",
+    "permissionTitle": "Speech Recognition"
+  },
+  "fieldValidation": {
+    "minLength": "Must be at least %@ characters",
+    "maxLength": "Must be at most %@ characters",
+    "pattern": "Invalid format",
+    "min": "Must be at least %@",
+    "max": "Must be at most %@"
   }
 }

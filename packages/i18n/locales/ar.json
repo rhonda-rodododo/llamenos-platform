@@ -416,10 +416,10 @@
       "note": "Note",
       "call": "Call",
       "message": "Message",
-      "status_change": "Status Change",
+      "statusChange": "Status Change",
       "referral": "Referral",
       "assessment": "Assessment",
-      "file_upload": "File Upload",
+      "fileUpload": "File Upload",
       "comment": "Comment"
     },
     "statusChanged": "Status changed from {{previous}} to {{new}}",
@@ -469,7 +469,7 @@
       "search": "يعمل البحث بمقارنة رموز مشفرة — يساعد الخادم في تصفية النتائج دون رؤية البيانات الفعلية أبداً.",
       "accessTiers": "البيانات منظمة في ثلاثة مستويات وصول: الملخص (مرئي لفريقك)، التفاصيل (مرئي للمتطوعين المعينين والمسؤولين)، والمقيد (مرئي للمسؤولين فقط).",
       "evidence": "ملفات الأدلة مشفرة ومتتبعة بسلسلة حفظ — يتم تسجيل كل عرض وتنزيل ومشاركة.",
-      "templates_howto": "تصفح القوالب المتاحة أدناه. يؤدي تطبيق قالب إلى إنشاء أنواع الحالات والحقول تلقائياً. يمكنك تخصيص كل شيء بعد التطبيق."
+      "templatesHowto": "تصفح القوالب المتاحة أدناه. يؤدي تطبيق قالب إلى إنشاء أنواع الحالات والحقول تلقائياً. يمكنك تخصيص كل شيء بعد التطبيق."
     },
     "onboarding": {
       "welcome": "مرحباً في إدارة الحالات",
@@ -1655,7 +1655,31 @@
     "submit": "Submit",
     "titleLabel": "Title",
     "titlePlaceholder": "Report title",
-    "untitled": "Untitled Report"
+    "untitled": "Untitled Report",
+    "filterAllTypes": "All Types",
+    "fileComingSoon": "Coming soon",
+    "validationErrors": "Please fix the errors above before submitting.",
+    "typePicker": {
+      "title": "Select Report Type",
+      "loading": "Loading report types...",
+      "empty": "No report types available for mobile.",
+      "subtitle": "Choose a report type to get started"
+    },
+    "typed": {
+      "createTitle": "New %@ Report",
+      "titleLabel": "Title",
+      "required": "*",
+      "titlePlaceholder": "Brief description of the report",
+      "submit": "Submit Report",
+      "selectOption": "Select an option",
+      "datePick": "Pick a date",
+      "audioStart": "Start voice input",
+      "audioStop": "Stop recording",
+      "audioListening": "Listening...",
+      "audioUnavailable": "Speech recognition is not available on this device",
+      "audioPermissionDenied": "Microphone permission is required for voice input",
+      "audioError": "An error occurred during speech recognition"
+    }
   },
   "reportTypes": {
     "addType": "Add Report Type",
@@ -2462,5 +2486,17 @@
       "noFilteredItems": "لا توجد أدلة تطابق هذا الفلتر",
       "noItems": "لم يتم رفع أدلة بعد. ملفات الأدلة مشفرة ومتتبعة بسلسلة حفظ."
     }
+  },
+  "audioInput": {
+    "start": "Start voice input",
+    "stop": "Stop recording",
+    "permissionTitle": "Speech Recognition"
+  },
+  "fieldValidation": {
+    "minLength": "Must be at least %@ characters",
+    "maxLength": "Must be at most %@ characters",
+    "pattern": "Invalid format",
+    "min": "Must be at least %@",
+    "max": "Must be at most %@"
   }
 }

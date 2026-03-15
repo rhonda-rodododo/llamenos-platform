@@ -74,7 +74,7 @@ export function TemplateBrowser({ expanded, onToggle, statusSummary, onTemplateA
       <div className="flex items-start gap-2 rounded-md border border-border/50 bg-muted/30 px-3 py-2.5 mb-3">
         <HelpCircle className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground">
-          {t('caseManagement.help.templates_howto', { defaultValue: 'Browse available templates below. Applying a template creates case types and fields automatically. You can customize everything after applying.' })}
+          {t('caseManagement.help.templatesHowto', { defaultValue: 'Browse available templates below. Applying a template creates case types and fields automatically. You can customize everything after applying.' })}
         </p>
       </div>
 

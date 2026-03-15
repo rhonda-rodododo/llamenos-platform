@@ -416,10 +416,10 @@
       "note": "Note",
       "call": "Call",
       "message": "Message",
-      "status_change": "Status Change",
+      "statusChange": "Status Change",
       "referral": "Referral",
       "assessment": "Assessment",
-      "file_upload": "File Upload",
+      "fileUpload": "File Upload",
       "comment": "Comment"
     },
     "statusChanged": "Status changed from {{previous}} to {{new}}",
@@ -469,7 +469,7 @@
       "search": "搜索通过比较加密令牌来工作——服务器帮助过滤结果，但永远看不到实际数据。",
       "accessTiers": "数据分为三个访问级别：摘要（对您的团队可见）、详细信息（对分配的志愿者和管理员可见）和受限（仅对管理员可见）。",
       "evidence": "证据文件经过加密并通过保管链跟踪——每次查看、下载和共享都会被记录。",
-      "templates_howto": "浏览下方可用的模板。应用模板会自动创建案例类型和字段。应用后您可以自定义所有内容。"
+      "templatesHowto": "浏览下方可用的模板。应用模板会自动创建案例类型和字段。应用后您可以自定义所有内容。"
     },
     "onboarding": {
       "welcome": "欢迎使用案例管理",
@@ -1655,7 +1655,31 @@
     "submit": "Submit",
     "titleLabel": "Title",
     "titlePlaceholder": "Report title",
-    "untitled": "Untitled Report"
+    "untitled": "Untitled Report",
+    "filterAllTypes": "All Types",
+    "fileComingSoon": "Coming soon",
+    "validationErrors": "Please fix the errors above before submitting.",
+    "typePicker": {
+      "title": "Select Report Type",
+      "loading": "Loading report types...",
+      "empty": "No report types available for mobile.",
+      "subtitle": "Choose a report type to get started"
+    },
+    "typed": {
+      "createTitle": "New %@ Report",
+      "titleLabel": "Title",
+      "required": "*",
+      "titlePlaceholder": "Brief description of the report",
+      "submit": "Submit Report",
+      "selectOption": "Select an option",
+      "datePick": "Pick a date",
+      "audioStart": "Start voice input",
+      "audioStop": "Stop recording",
+      "audioListening": "Listening...",
+      "audioUnavailable": "Speech recognition is not available on this device",
+      "audioPermissionDenied": "Microphone permission is required for voice input",
+      "audioError": "An error occurred during speech recognition"
+    }
   },
   "reportTypes": {
     "addType": "Add Report Type",
@@ -2462,5 +2486,17 @@
       "noFilteredItems": "没有匹配此筛选条件的证据",
       "noItems": "暂未上传证据。证据文件经过加密并通过保管链跟踪。"
     }
+  },
+  "audioInput": {
+    "start": "Start voice input",
+    "stop": "Stop recording",
+    "permissionTitle": "Speech Recognition"
+  },
+  "fieldValidation": {
+    "minLength": "Must be at least %@ characters",
+    "maxLength": "Must be at most %@ characters",
+    "pattern": "Invalid format",
+    "min": "Must be at least %@",
+    "max": "Must be at most %@"
   }
 }

@@ -416,10 +416,10 @@
       "note": "Note",
       "call": "Call",
       "message": "Message",
-      "status_change": "Status Change",
+      "statusChange": "Status Change",
       "referral": "Referral",
       "assessment": "Assessment",
-      "file_upload": "File Upload",
+      "fileUpload": "File Upload",
       "comment": "Comment"
     },
     "statusChanged": "Status changed from {{previous}} to {{new}}",
@@ -469,7 +469,7 @@
       "search": "Search works by comparing encrypted tokens — the server helps filter results without ever seeing the actual data.",
       "accessTiers": "Data is organized in three access tiers: Summary (visible to your team), Details (visible to assigned volunteers and admins), and Restricted (visible to admins only).",
       "evidence": "Evidence files are encrypted and tracked with a chain of custody — every view, download, and share is logged.",
-      "templates_howto": "Browse available templates below. Applying a template creates case types and fields automatically. You can customize everything after applying."
+      "templatesHowto": "Browse available templates below. Applying a template creates case types and fields automatically. You can customize everything after applying."
     },
     "onboarding": {
       "welcome": "Welcome to Case Management",
@@ -1655,7 +1655,31 @@
     "submit": "Submit",
     "titleLabel": "Title",
     "titlePlaceholder": "Report title",
-    "untitled": "Untitled Report"
+    "untitled": "Untitled Report",
+    "filterAllTypes": "All Types",
+    "fileComingSoon": "Coming soon",
+    "validationErrors": "Please fix the errors above before submitting.",
+    "typePicker": {
+      "title": "Select Report Type",
+      "loading": "Loading report types...",
+      "empty": "No report types available for mobile.",
+      "subtitle": "Choose a report type to get started"
+    },
+    "typed": {
+      "createTitle": "New %@ Report",
+      "titleLabel": "Title",
+      "required": "*",
+      "titlePlaceholder": "Brief description of the report",
+      "submit": "Submit Report",
+      "selectOption": "Select an option",
+      "datePick": "Pick a date",
+      "audioStart": "Start voice input",
+      "audioStop": "Stop recording",
+      "audioListening": "Listening...",
+      "audioUnavailable": "Speech recognition is not available on this device",
+      "audioPermissionDenied": "Microphone permission is required for voice input",
+      "audioError": "An error occurred during speech recognition"
+    }
   },
   "reportTypes": {
     "addType": "Add Report Type",
@@ -2462,5 +2486,17 @@
       "noFilteredItems": "No evidence matches this filter",
       "noItems": "No evidence uploaded yet. Evidence files are encrypted and tracked with a chain of custody."
     }
+  },
+  "audioInput": {
+    "start": "Start voice input",
+    "stop": "Stop recording",
+    "permissionTitle": "Speech Recognition"
+  },
+  "fieldValidation": {
+    "minLength": "Must be at least %@ characters",
+    "maxLength": "Must be at most %@ characters",
+    "pattern": "Invalid format",
+    "min": "Must be at least %@",
+    "max": "Must be at most %@"
   }
 }
