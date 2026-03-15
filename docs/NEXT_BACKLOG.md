@@ -598,26 +598,27 @@ Reference documents: `docs/plans/2026-03-14-case-management-*.md` (6 documents, 
 - [x] **[Epic 331: Desktop Contact Directory](epics/epic-331-desktop-contact-directory.md)** — Contact list with trigram search, profile viewer, relationship graph, affinity groups, merge tool
 - [x] **[Epic 332: Desktop Case Timeline & Evidence Viewer](epics/epic-332-desktop-case-timeline-evidence.md)** — Chronological interaction timeline, evidence gallery, chain of custody display
 
-## CMS Completion & Polish (Epics 335-342)
+## CMS Completion & Polish (Epics 335-343)
 
-CMS backend + desktop UI complete (Epics 315-332). Remaining work: test execution, volunteer profiles, smart assignment, translations, docs, mobile views.
+CMS backend + desktop UI complete (Epics 315-332). Remaining work: test execution, template-defined report types, report triage/case conversion, smart assignment, translations, docs, mobile views (including field report submission with audio input).
 
 ### Completed
 - [x] **[Epic 336: BDD Serial Execution Fixes](epics/epic-336-bdd-serial-execution-fixes.md)** — Before hook @resets-state, step collision fixes, data seeding helpers. 282 passed, 0 failures in full serial run
 - [x] **[Epic 340: Volunteer Profiles with Case Workload](epics/epic-340-volunteer-profiles-case-workload.md)** — Specializations, case workload tracking, Cases tab on volunteer profile, workload dashboard widget
+- [x] **[Epic 341: Hub Context & Multi-Hub UX](epics/epic-341-hub-context-and-multi-hub-ux.md)** — HubSwitcher component, hub context on all CMS API calls, key-based remount on hub change
 
 ### In Progress
 - [ ] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 89/99 BDD pass (90%). Events route, E2EE contact directory, template label fix done. [10 remaining TODOs](epics/epic-335-remaining-todos.md): test-reset cleanup, volunteer fixture, interaction timing
-- [ ] **[Epic 342: Smart Case Assignment & Routing](epics/epic-342-case-assignment-routing.md)** — Backend API + UI implemented. BDD step definitions and test pass-through pending
+- [ ] **[Epic 342: Smart Case Assignment & Report-to-Case Conversion](epics/epic-342-case-assignment-routing.md)** — Smart assignment (suggest-assignees API, ranked UI, auto-assign) + report triage queue for template report types with `allowCaseConversion: true`, LLM-assisted freeform text parsing into structured cases
 - [ ] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — 61 keys × 12 locales added (ES/FR/PT translated). Template i18n mappings, codegen validation, RTL testing still needed
-- [x] **[Epic 341: Hub Context & Multi-Hub UX](epics/epic-341-hub-context-and-multi-hub-ux.md)** — HubSwitcher component, hub context on all CMS API calls, key-based remount on hub change
 
 ### Remaining
+- [ ] **[Epic 343: Template-Defined Report Types](epics/epic-343-template-defined-report-types.md)** — Templates define `reportTypes[]` with custom fields, statuses, file attachments, `allowCaseConversion` flag, `mobileOptimized` flag, audio input support on textarea fields. Report creation validates against type schema. Enables jail-support template's `lo_arrest_report` / `lo_misconduct_report` and similar report types in other templates.
 - [ ] **[Epic 335 TODOs](epics/epic-335-remaining-todos.md)** — 10 remaining BDD failures: test-reset doesn't clear CMS data, volunteer fixture needed, interaction timing
 - [ ] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip component, operator handbook CMS section, template authoring guide, API narrative docs
-- [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — Template-driven iOS (SwiftUI) + Android (Compose) CMS views: CaseList, CaseSummary, QuickStatus, DateCalendar, AddComment
+- [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — Template-driven iOS (SwiftUI) + Android (Compose) CMS views: CaseList, CaseSummary, QuickStatus, DateCalendar, AddComment, **SubmitReport** (freeform textarea + audio input + media attach), MyReports. Field report submission is the highest-priority mobile CMS use case.
 
-**Dependency order:** 339 and 337 can run in parallel. 335 TODOs are independent fixes.
+**Dependency order:** 343 (report types) → 342 (triage/conversion depends on report types) → 337 (mobile report submission depends on report types). 335 TODOs and 339 are independent.
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
