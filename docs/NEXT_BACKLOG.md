@@ -606,19 +606,18 @@ CMS backend + desktop UI complete (Epics 315-332). Remaining work: test executio
 - [x] **[Epic 336: BDD Serial Execution Fixes](epics/epic-336-bdd-serial-execution-fixes.md)** — Before hook @resets-state, step collision fixes, data seeding helpers. 282 passed, 0 failures in full serial run
 - [x] **[Epic 340: Volunteer Profiles with Case Workload](epics/epic-340-volunteer-profiles-case-workload.md)** — Specializations, case workload tracking, Cases tab on volunteer profile, workload dashboard widget
 - [x] **[Epic 341: Hub Context & Multi-Hub UX](epics/epic-341-hub-context-and-multi-hub-ux.md)** — HubSwitcher component, hub context on all CMS API calls, key-based remount on hub change
+- [x] **[Epic 343: Template-Defined Report Types](epics/epic-343-template-defined-report-types.md)** — ReportTypeDefinition schema, SettingsDO CRUD, template engine extension, API routes. jail-support template v1.2.0 with `lo_arrest_report` (allowCaseConversion, mobileOptimized, supportAudioInput) and `lo_misconduct_report`. **6/6 backend BDD pass.**
 
 ### In Progress
-- [ ] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 89/99 BDD pass (90%). Events route, E2EE contact directory, template label fix done. [10 remaining TODOs](epics/epic-335-remaining-todos.md): test-reset cleanup, volunteer fixture, interaction timing
-- [ ] **[Epic 342: Smart Case Assignment & Report-to-Case Conversion](epics/epic-342-case-assignment-routing.md)** — Smart assignment (suggest-assignees API, ranked UI, auto-assign) + report triage queue for template report types with `allowCaseConversion: true`, LLM-assisted freeform text parsing into structured cases
+- [ ] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 89/99 BDD pass (90%). Events route, E2EE contact directory, template label fix done. [Remaining TODOs](epics/epic-335-remaining-todos.md) being fixed.
+- [ ] **[Epic 342: Smart Case Assignment & Report-to-Case Conversion](epics/epic-342-case-assignment-routing.md)** — Part 1 done (suggest-assignees API, ranked UI, auto-assign). Part 2 (report triage/conversion) unblocked by Epic 343.
 - [ ] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — 61 keys × 12 locales added (ES/FR/PT translated). Template i18n mappings, codegen validation, RTL testing still needed
 
 ### Remaining
-- [ ] **[Epic 343: Template-Defined Report Types](epics/epic-343-template-defined-report-types.md)** — Templates define `reportTypes[]` with custom fields, statuses, file attachments, `allowCaseConversion` flag, `mobileOptimized` flag, audio input support on textarea fields. Report creation validates against type schema. Enables jail-support template's `lo_arrest_report` / `lo_misconduct_report` and similar report types in other templates.
-- [ ] **[Epic 335 TODOs](epics/epic-335-remaining-todos.md)** — 10 remaining BDD failures: test-reset doesn't clear CMS data, volunteer fixture needed, interaction timing
 - [ ] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip component, operator handbook CMS section, template authoring guide, API narrative docs
 - [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — Template-driven iOS (SwiftUI) + Android (Compose) CMS views: CaseList, CaseSummary, QuickStatus, DateCalendar, AddComment, **SubmitReport** (freeform textarea + audio input + media attach), MyReports. Field report submission is the highest-priority mobile CMS use case.
 
-**Dependency order:** 343 (report types) → 342 (triage/conversion depends on report types) → 337 (mobile report submission depends on report types). 335 TODOs and 339 are independent.
+**Dependency order:** 342 Part 2 (triage/conversion, now unblocked) → 337 (mobile report submission). 335 TODOs and 339 are independent.
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
