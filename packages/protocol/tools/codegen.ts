@@ -241,13 +241,8 @@ function stripSwiftConvenienceExtensions(lines: string[]): string {
   output = output.replace(/^(enum |\/\/ MARK: - )Operator\b(?! *[A-Z])/gm, '$1FieldOperator')
   output = output.replace(/\bshowWhenOperator: Operator\b/g, 'showWhenOperator: FieldOperator')
 
-  // `CaseInteraction` collides with iOS app's CaseInteraction in CaseRecord.swift —
-  // rename to ProtocolCaseInteraction.
-  output = output.replace(/\bCaseInteraction\b/g, 'ProtocolCaseInteraction')
-
-  // `EvidenceListResponse` collides with iOS app's EvidenceListResponse in CaseRecord.swift —
-  // rename to ProtocolEvidenceListResponse.
-  output = output.replace(/\bEvidenceListResponse\b/g, 'ProtocolEvidenceListResponse')
+  // Note: CaseInteraction and EvidenceListResponse are NOT renamed — the iOS app
+  // uses the generated types directly (custom duplicates removed from CaseRecord.swift).
 
   // Clean up consecutive blank lines
   output = output.replace(/\n{3,}/g, '\n\n')
