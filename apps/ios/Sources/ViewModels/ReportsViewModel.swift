@@ -20,8 +20,14 @@ final class ReportsViewModel {
     /// Available report categories from the server.
     var categories: [String] = []
 
-    /// Report type definitions fetched from the CMS settings.
+    /// Report type definitions fetched from CMS settings.
+    /// Populated from `GET /api/settings/cms/report-types` (preferred) with fallback
+    /// to `GET /api/reports/types` (legacy).
     var reportTypes: [ReportTypeDefinition] = []
+
+    /// CMS report types fetched directly from the settings endpoint.
+    /// Includes full CMS-specific fields (hubId, isSystem, numberingEnabled, etc.).
+    var cmsReportTypes: [ReportTypeDefinition] = []
 
     /// Current status filter.
     var selectedFilter: ReportStatusFilter = .all

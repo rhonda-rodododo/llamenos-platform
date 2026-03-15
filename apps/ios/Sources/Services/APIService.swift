@@ -294,6 +294,24 @@ final class APIService: @unchecked Sendable {
         let _: EmptyResponse = try await request(method: method, path: path, body: body)
     }
 
+    // MARK: - CMS Report Types
+
+    /// Fetch CMS report type definitions from the settings endpoint.
+    ///
+    /// Calls `GET /api/settings/cms/report-types` which returns the full
+    /// `ReportTypeDefinition` schema including CMS-specific fields like
+    /// `hubId`, `isSystem`, `numberingEnabled`, `closedStatuses`, etc.
+    ///
+    /// Uses a plain `JSONDecoder` (no snake_case conversion) because the
+    /// backend returns camelCase keys natively for this endpoint.
+    func fetchCmsReportTypes() async throws -> [ReportTypeDefinition] {
+        let response: ReportTypesResponse = try await request(
+            method: "GET",
+            path: "/api/settings/cms/report-types"
+        )
+        return response.reportTypes
+    }
+
     // MARK: - Version Check
 
     /// Compare this client's API version against the server's config.

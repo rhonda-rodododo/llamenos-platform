@@ -2,9 +2,12 @@ import Foundation
 
 // MARK: - ReportTypeDefinition
 
-/// Definition of a template-driven report type, matching the backend `reportTypeDefinitionSchema`.
-/// Fetched from `GET /api/reports/types`. Each report type defines structured fields,
-/// statuses, and display options for mobile report submission.
+/// Definition of a template-driven report type, matching the backend CMS
+/// `reportTypeDefinitionSchema`. Fetched from `GET /api/settings/cms/report-types`
+/// (full CMS definitions) or `GET /api/reports/types` (legacy endpoint).
+///
+/// Property names match the backend JSON (camelCase). Optional fields with defaults
+/// allow decoding responses from both the full CMS endpoint and the older reports endpoint.
 struct ReportTypeDefinition: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -21,12 +24,26 @@ struct ReportTypeDefinition: Codable, Identifiable, Equatable, Sendable {
     let allowCaseConversion: Bool
     let mobileOptimized: Bool
     let isArchived: Bool
+
+    // CMS-specific fields (present from /api/settings/cms/report-types)
+    let hubId: String?
+    let isSystem: Bool?
+    let numberingEnabled: Bool?
+    let numberPrefix: String?
+    let templateId: String?
+    let templateVersion: String?
+    let closedStatuses: [String]?
+    let createdAt: String?
+    let updatedAt: String?
 }
 
 // MARK: - ReportFieldDefinition
 
 /// Definition of a single field within a report type template.
 /// Drives dynamic form rendering in `TypedReportCreateView`.
+///
+/// Property names match the backend JSON. The `required` field uses a CodingKey
+/// because `required` is a Swift keyword in some contexts.
 struct ReportFieldDefinition: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -40,9 +57,56 @@ struct ReportFieldDefinition: Codable, Identifiable, Equatable, Sendable {
     let accessLevel: String
     let supportAudioInput: Bool
 
+    // Extended fields from CMS schema
+    let placeholder: String?
+    let defaultValue: FieldDefaultValue?
+    let validation: FieldValidation?
+    let showWhen: FieldShowWhen?
+    let indexable: Bool?
+    let indexType: String?
+    let hubEditable: Bool?
+    let editableByVolunteers: Bool?
+    let visibleToVolunteers: Bool?
+    let accessRoles: [String]?
+    let templateId: String?
+    let lookupId: String?
+
     /// Field type as a strongly-typed enum for switch exhaustivity.
     var fieldType: ReportFieldType {
         ReportFieldType(rawValue: type) ?? .text
+    }
+
+    /// Whether this field should be visible given the current form values.
+    func isVisible(given fieldValues: [String: AnyCodableValue]) -> Bool {
+        guard let condition = showWhen else { return true }
+        let currentValue = fieldValues[condition.field]
+        switch condition.operator {
+        case "equals":
+            return matchesValue(currentValue, condition.value)
+        case "not_equals":
+            return !matchesValue(currentValue, condition.value)
+        case "is_set":
+            return currentValue != nil
+        case "contains":
+            if case .string(let str) = currentValue,
+               case .string(let target) = condition.value {
+                return str.contains(target)
+            }
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func matchesValue(_ current: AnyCodableValue?, _ expected: FieldDefaultValue?) -> Bool {
+        guard let current, let expected else { return current == nil && expected == nil }
+        switch (current, expected) {
+        case (.string(let a), .string(let b)): return a == b
+        case (.bool(let a), .bool(let b)): return a == b
+        case (.int(let a), .double(let b)): return Double(a) == b
+        case (.double(let a), .double(let b)): return a == b
+        default: return false
+        }
     }
 }
 
@@ -68,6 +132,62 @@ struct FieldOption: Codable, Equatable, Sendable {
     let label: String
 }
 
+// MARK: - FieldDefaultValue
+
+/// Type-erased default value for a field definition. Matches the backend's
+/// `defaultValue` which can be a string, number, or boolean.
+enum FieldDefaultValue: Codable, Equatable, Sendable {
+    case string(String)
+    case double(Double)
+    case bool(Bool)
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let val = try? container.decode(Bool.self) {
+            self = .bool(val)
+        } else if let val = try? container.decode(Double.self) {
+            self = .double(val)
+        } else if let val = try? container.decode(String.self) {
+            self = .string(val)
+        } else {
+            throw DecodingError.typeMismatch(
+                FieldDefaultValue.self,
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Cannot decode FieldDefaultValue")
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let val): try container.encode(val)
+        case .double(let val): try container.encode(val)
+        case .bool(let val): try container.encode(val)
+        }
+    }
+}
+
+// MARK: - FieldValidation
+
+/// Validation constraints for a field definition.
+struct FieldValidation: Codable, Equatable, Sendable {
+    let min: Double?
+    let max: Double?
+    let minLength: Double?
+    let maxLength: Double?
+    let pattern: String?
+}
+
+// MARK: - FieldShowWhen
+
+/// Conditional visibility rule for a field. The field is shown only when
+/// the referenced field's value satisfies the operator/value condition.
+struct FieldShowWhen: Codable, Equatable, Sendable {
+    let field: String
+    let `operator`: String  // equals, not_equals, is_set, contains
+    let value: FieldDefaultValue?
+}
+
 // MARK: - StatusOption
 
 /// Status option with display metadata, used in report type definitions.
@@ -78,11 +198,14 @@ struct StatusOption: Codable, Identifiable, Equatable, Sendable {
     let color: String?
     let order: Int
     let isClosed: Bool?
+    let isDefault: Bool?
+    let isDeprecated: Bool?
+    let icon: String?
 }
 
 // MARK: - ReportTypesResponse
 
-/// API response from `GET /api/reports/types`.
+/// API response from `GET /api/reports/types` or `GET /api/settings/cms/report-types`.
 struct ReportTypesResponse: Codable, Sendable {
     let reportTypes: [ReportTypeDefinition]
 }
