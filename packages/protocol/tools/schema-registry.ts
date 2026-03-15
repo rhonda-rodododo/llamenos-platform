@@ -101,8 +101,14 @@ import {
   customFieldResponseSchema,
   reportTypeResponseSchema,
   customFieldsBodySchema,
-  createReportTypeBodySchema,
-  updateReportTypeBodySchema,
+  createReportTypeBodySchema as settingsCreateReportTypeBodySchema,
+  updateReportTypeBodySchema as settingsUpdateReportTypeBodySchema,
+
+  // report-types.ts (CMS — Epic 343)
+  reportTypeDefinitionSchema,
+  reportFieldDefinitionSchema,
+  createCmsReportTypeBodySchema,
+  updateCmsReportTypeBodySchema,
   ttlOverridesBodySchema,
   setupCompleteBodySchema,
   spamSettingsSchema,
@@ -324,8 +330,15 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['customFieldResponseSchema', customFieldResponseSchema],
   ['reportTypeResponseSchema', reportTypeResponseSchema],
   ['customFieldsBodySchema', customFieldsBodySchema],
-  ['createReportTypeBodySchema', createReportTypeBodySchema],
-  ['updateReportTypeBodySchema', updateReportTypeBodySchema],
+  ['createReportTypeBodySchema', settingsCreateReportTypeBodySchema],
+  ['updateReportTypeBodySchema', settingsUpdateReportTypeBodySchema],
+
+  // CMS Report Types (Epic 343)
+  ['reportTypeDefinitionSchema', reportTypeDefinitionSchema],
+  ['reportFieldDefinitionSchema', reportFieldDefinitionSchema],
+  ['createCmsReportTypeBodySchema', createCmsReportTypeBodySchema],
+  ['updateCmsReportTypeBodySchema', updateCmsReportTypeBodySchema],
+
   ['ttlOverridesBodySchema', ttlOverridesBodySchema],
   ['setupCompleteBodySchema', setupCompleteBodySchema],
   ['spamSettingsSchema', spamSettingsSchema],

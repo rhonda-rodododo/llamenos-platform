@@ -61,7 +61,7 @@ export type ReportTypeDefinition = z.infer<typeof reportTypeDefinitionSchema>
 
 // --- Input schemas for CRUD ---
 
-export const createReportTypeBodySchema = z.looseObject({
+export const createCmsReportTypeBodySchema = z.looseObject({
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().min(1).max(200),
   labelPlural: z.string().min(1).max(200),
@@ -88,7 +88,7 @@ export const createReportTypeBodySchema = z.looseObject({
   templateVersion: z.string().optional(),
 })
 
-export const updateReportTypeBodySchema = z.looseObject({
+export const updateCmsReportTypeBodySchema = z.looseObject({
   label: z.string().min(1).max(200).optional(),
   labelPlural: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),

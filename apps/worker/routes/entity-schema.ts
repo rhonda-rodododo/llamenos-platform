@@ -13,8 +13,8 @@ import {
 } from '../schemas/entity-schema'
 import type { EntityTypeDefinition, RelationshipTypeDefinition } from '../schemas/entity-schema'
 import {
-  createReportTypeBodySchema,
-  updateReportTypeBodySchema,
+  createCmsReportTypeBodySchema,
+  updateCmsReportTypeBodySchema,
 } from '../schemas/report-types'
 import type { ReportTypeDefinition } from '../schemas/report-types'
 import { authErrors, notFoundError } from '../openapi/helpers'
@@ -648,7 +648,7 @@ entitySchema.post('/report-types',
     },
   }),
   requirePermission('cases:manage-types'),
-  validator('json', createReportTypeBodySchema),
+  validator('json', createCmsReportTypeBodySchema),
   async (c) => {
     const dos = getDOs(c.env)
     const body = c.req.valid('json')
@@ -694,7 +694,7 @@ entitySchema.patch('/report-types/:id',
     },
   }),
   requirePermission('cases:manage-types'),
-  validator('json', updateReportTypeBodySchema),
+  validator('json', updateCmsReportTypeBodySchema),
   async (c) => {
     const id = c.req.param('id')
     const dos = getDOs(c.env)
