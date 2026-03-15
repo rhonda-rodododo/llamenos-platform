@@ -49,7 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.ReportTypeDefinition
+import org.llamenos.protocol.ReportTypeDefinition
 
 /**
  * Report type picker screen.

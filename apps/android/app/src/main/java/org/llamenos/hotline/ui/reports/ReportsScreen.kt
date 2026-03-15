@@ -245,7 +245,7 @@ fun ReportsScreen(
 @Composable
 private fun ReportCard(
     report: Report,
-    reportTypes: List<org.llamenos.hotline.model.ReportTypeDefinition> = emptyList(),
+    reportTypes: List<org.llamenos.protocol.ReportTypeDefinition> = emptyList(),
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {

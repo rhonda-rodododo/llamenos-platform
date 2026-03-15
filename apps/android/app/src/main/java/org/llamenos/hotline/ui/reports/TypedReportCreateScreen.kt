@@ -56,7 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.ReportFieldDefinition
+import org.llamenos.protocol.ReportFieldDefinitionType
+import org.llamenos.protocol.ReportTypeDefinitionField
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -285,10 +286,13 @@ fun TypedReportCreateScreen(
 
 /**
  * Renders a single dynamic field based on its type definition.
+ *
+ * Uses the protocol-generated [ReportTypeDefinitionField] with its enum-typed
+ * [ReportFieldDefinitionType] for exhaustive matching.
  */
 @Composable
 private fun DynamicField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -303,7 +307,7 @@ private fun DynamicField(
 
     Column(modifier = modifier.fillMaxWidth()) {
         when (field.type) {
-            "text" -> TextInputField(
+            ReportFieldDefinitionType.Text -> TextInputField(
                 field = field,
                 label = labelText,
                 value = value,
@@ -311,52 +315,53 @@ private fun DynamicField(
                 singleLine = true,
             )
 
-            "textarea" -> TextAreaField(
+            ReportFieldDefinitionType.Textarea -> TextAreaField(
                 field = field,
                 label = labelText,
                 value = value,
                 onValueChange = onValueChange,
             )
 
-            "number" -> NumberInputField(
+            ReportFieldDefinitionType.Number -> NumberInputField(
                 field = field,
                 label = labelText,
                 value = value,
                 onValueChange = onValueChange,
             )
 
-            "select" -> SelectField(
+            ReportFieldDefinitionType.Select -> SelectField(
                 field = field,
                 label = labelText,
                 value = value,
                 onValueChange = onValueChange,
             )
 
-            "multiselect" -> MultiselectField(
+            ReportFieldDefinitionType.Multiselect -> MultiselectField(
                 field = field,
                 label = labelText,
                 value = value,
                 onValueChange = onValueChange,
             )
 
-            "checkbox" -> CheckboxField(
+            ReportFieldDefinitionType.Checkbox -> CheckboxField(
                 field = field,
                 value = value,
                 onValueChange = onValueChange,
             )
 
-            "date" -> DateField(
+            ReportFieldDefinitionType.Date -> DateField(
                 field = field,
                 label = labelText,
                 value = value,
                 onValueChange = onValueChange,
             )
 
-            else -> {
-                // Unknown field type — render as text input for forward compatibility
+            ReportFieldDefinitionType.File -> {
+                // File uploads are not supported in the mobile form —
+                // render as a disabled text field indicating desktop-only
                 TextInputField(
                     field = field,
-                    label = labelText,
+                    label = "$labelText (desktop only)",
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
@@ -367,7 +372,7 @@ private fun DynamicField(
         // Help text below the field
         if (field.helpText != null) {
             Text(
-                text = field.helpText,
+                text = field.helpText ?: "",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier
@@ -382,7 +387,7 @@ private fun DynamicField(
 
 @Composable
 private fun TextInputField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
@@ -401,7 +406,7 @@ private fun TextInputField(
 
 @Composable
 private fun TextAreaField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
@@ -432,7 +437,7 @@ private fun TextAreaField(
 
 @Composable
 private fun NumberInputField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
@@ -460,14 +465,14 @@ private fun NumberInputField(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SelectField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val options = field.options ?: emptyList()
-    val displayValue = options.find { it.value == value }?.label ?: value
+    val displayValue = options.find { it.key == value }?.label ?: value
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -494,10 +499,10 @@ private fun SelectField(
                 DropdownMenuItem(
                     text = { Text(option.label) },
                     onClick = {
-                        onValueChange(option.value)
+                        onValueChange(option.key)
                         expanded = false
                     },
-                    modifier = Modifier.testTag("field-${field.name}-option-${option.value}"),
+                    modifier = Modifier.testTag("field-${field.name}-option-${option.key}"),
                 )
             }
         }
@@ -507,13 +512,13 @@ private fun SelectField(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MultiselectField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
 ) {
     val options = field.options ?: emptyList()
-    // Value is stored as comma-separated list of selected option values
+    // Value is stored as comma-separated list of selected option keys
     val selectedValues = if (value.isBlank()) emptySet()
     else value.split(",").map { it.trim() }.toSet()
 
@@ -533,19 +538,19 @@ private fun MultiselectField(
             modifier = Modifier.testTag("field-${field.name}"),
         ) {
             options.forEach { option ->
-                val isSelected = option.value in selectedValues
+                val isSelected = option.key in selectedValues
                 FilterChip(
                     selected = isSelected,
                     onClick = {
                         val newSelected = if (isSelected) {
-                            selectedValues - option.value
+                            selectedValues - option.key
                         } else {
-                            selectedValues + option.value
+                            selectedValues + option.key
                         }
                         onValueChange(newSelected.joinToString(","))
                     },
                     label = { Text(option.label) },
-                    modifier = Modifier.testTag("field-${field.name}-chip-${option.value}"),
+                    modifier = Modifier.testTag("field-${field.name}-chip-${option.key}"),
                 )
             }
         }
@@ -554,7 +559,7 @@ private fun MultiselectField(
 
 @Composable
 private fun CheckboxField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     value: String,
     onValueChange: (String) -> Unit,
 ) {
@@ -591,7 +596,7 @@ private fun CheckboxField(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateField(
-    field: ReportFieldDefinition,
+    field: ReportTypeDefinitionField,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,

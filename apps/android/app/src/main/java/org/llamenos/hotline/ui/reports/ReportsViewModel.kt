@@ -21,9 +21,9 @@ import org.llamenos.hotline.model.Report
 import org.llamenos.hotline.model.ReportCategoriesResponse
 import org.llamenos.hotline.model.ReportEnvelope
 import org.llamenos.hotline.model.CmsReportTypesResponse
-import org.llamenos.hotline.model.ReportTypeDefinition
 import org.llamenos.hotline.model.ReportsListResponse
 import org.llamenos.hotline.model.UpdateReportRequest
+import org.llamenos.protocol.ReportTypeDefinition
 import javax.inject.Inject
 
 data class ReportsUiState(
@@ -313,7 +313,7 @@ class ReportsViewModel @Inject constructor(
                 val reportType = _uiState.value.reportTypes.find { it.id == reportTypeId }
                 val request = CreateTypedReportRequest(
                     title = title,
-                    category = reportType?.category?.takeIf { it.isNotBlank() && it != "report" },
+                    category = reportType?.category?.value?.takeIf { it.isNotBlank() && it != "report" },
                     reportTypeId = reportTypeId,
                     encryptedContent = encrypted.ciphertext,
                     readerEnvelopes = envelopes,

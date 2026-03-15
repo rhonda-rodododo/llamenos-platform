@@ -1,76 +1,12 @@
 package org.llamenos.hotline.model
 
 import kotlinx.serialization.Serializable
-
-/**
- * A report type definition from the CMS settings.
- *
- * Each report type defines a template with custom fields, statuses,
- * and metadata (icon, color, category). Mobile-optimized types are
- * surfaced in the report type picker on Android.
- */
-@Serializable
-data class ReportTypeDefinition(
-    val id: String,
-    val name: String,
-    val label: String,
-    val labelPlural: String,
-    val description: String = "",
-    val icon: String? = null,
-    val color: String? = null,
-    val category: String = "report",
-    val fields: List<ReportFieldDefinition> = emptyList(),
-    val statuses: List<StatusOption> = emptyList(),
-    val defaultStatus: String = "submitted",
-    val allowFileAttachments: Boolean = true,
-    val allowCaseConversion: Boolean = false,
-    val mobileOptimized: Boolean = false,
-    val isArchived: Boolean = false,
-)
-
-/**
- * A field within a report type template.
- *
- * Drives dynamic form rendering — each field type maps to a Compose widget
- * (OutlinedTextField, ExposedDropdownMenuBox, FilterChip row, Checkbox, DatePicker).
- */
-@Serializable
-data class ReportFieldDefinition(
-    val id: String,
-    val name: String,
-    val label: String,
-    val type: String, // text, textarea, number, select, multiselect, checkbox, date, file
-    val required: Boolean = false,
-    val options: List<FieldOption>? = null,
-    val section: String? = null,
-    val helpText: String? = null,
-    val order: Int = 0,
-    val accessLevel: String = "all",
-    val supportAudioInput: Boolean = false,
-)
-
-/**
- * An option within a select or multiselect field.
- */
-@Serializable
-data class FieldOption(
-    val value: String,
-    val label: String,
-)
-
-/**
- * A status option for a report type's workflow.
- */
-@Serializable
-data class StatusOption(
-    val value: String,
-    val label: String,
-    val color: String? = null,
-)
+import org.llamenos.protocol.ReportTypeDefinition
 
 /**
  * API response for GET /api/settings/cms/report-types.
  *
+ * Uses the protocol-generated [ReportTypeDefinition] for the report type shape.
  * Distinct from [org.llamenos.hotline.model.ReportTypesResponse] in AdminModels
  * which returns report categories from the legacy /api/settings/report-types endpoint.
  */

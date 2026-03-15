@@ -92,6 +92,7 @@ final class ReportsViewModel {
     // MARK: - Data Loading
 
     /// Load reports, categories, and report types from the API.
+    /// Fetches CMS report types first (preferred), falling back to legacy endpoint.
     func loadReports() async {
         guard !isLoading else { return }
         isLoading = true
@@ -100,12 +101,31 @@ final class ReportsViewModel {
         async let reportsResult: Void = fetchReports()
         async let categoriesResult: Void = fetchCategories()
         async let typesResult: Void = fetchReportTypes()
+        async let cmsTypesResult: Void = loadCmsReportTypes()
 
         await reportsResult
         await categoriesResult
         await typesResult
+        await cmsTypesResult
+
+        // Prefer CMS report types over legacy if available
+        if !cmsReportTypes.isEmpty {
+            reportTypes = cmsReportTypes
+        }
 
         isLoading = false
+    }
+
+    /// Load CMS report type definitions from `GET /api/settings/cms/report-types`.
+    /// This endpoint returns full definitions with CMS-specific fields.
+    func loadCmsReportTypes() async {
+        do {
+            let types = try await apiService.fetchCmsReportTypes()
+            cmsReportTypes = types
+        } catch {
+            // CMS endpoint may not be available — fall back to legacy types
+            cmsReportTypes = []
+        }
     }
 
     /// Refresh reports (pull-to-refresh).
