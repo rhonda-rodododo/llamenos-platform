@@ -19,8 +19,8 @@ export type InteractionType = z.infer<typeof interactionTypeSchema>
 // --- CaseInteraction (stored in CaseDO) ---
 
 export const caseInteractionSchema = z.object({
-  id: z.string().uuid(),
-  caseId: z.string().uuid(),
+  id: z.uuid(),
+  caseId: z.uuid(),
 
   // --- Source link (for linked interactions) ---
   interactionType: interactionTypeSchema,

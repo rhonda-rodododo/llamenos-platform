@@ -123,7 +123,30 @@ arraignment tracking, release coordination, and attorney matching.
       "field.release_status": "Release Status",
       "field.release_time": "Release Time",
       "field.physical_description": "Physical Description",
-      "field.property_seized": "Property Seized"
+      "field.property_seized": "Property Seized",
+
+      "lo_arrest_report.label": "LO Arrest Report",
+      "lo_arrest_report.labelPlural": "LO Arrest Reports",
+      "lo_arrest_report.description": "Legal observer field report listing arrested individuals. Submit one report with all names — jail support creates individual cases later.",
+      "lo_misconduct_report.label": "LO Misconduct Report",
+      "lo_misconduct_report.labelPlural": "LO Misconduct Reports",
+      "lo_misconduct_report.description": "Legal observer report of police misconduct, excessive force, or abuse. Attach photos and video for lawsuit evidence.",
+
+      "status.submitted": "Submitted",
+      "status.in_review": "In Review",
+      "status.cases_created": "Cases Created",
+      "status.reviewed": "Reviewed",
+      "status.evidence_preserved": "Evidence Preserved",
+
+      "field.location": "Location",
+      "field.time": "Time",
+      "field.agency": "Agency",
+      "field.estimated_count": "Estimated Arrest Count",
+      "field.arrestee_details": "Arrestee Details",
+      "field.general_notes": "General Notes",
+      "field.badge_numbers": "Badge Numbers",
+      "field.force_type": "Force Type",
+      "field.description": "Description"
     },
     "es": {
       "arrest_case.label": "Caso de Arresto",
@@ -133,7 +156,18 @@ arraignment tracking, release coordination, and attorney matching.
       "status.in_custody": "En Custodia",
       "status.arraigned": "Procesado",
       "status.released": "Liberado",
-      "status.case_closed": "Caso Cerrado"
+      "status.case_closed": "Caso Cerrado",
+
+      "lo_arrest_report.label": "Reporte de Arrestos (OL)",
+      "lo_arrest_report.labelPlural": "Reportes de Arrestos (OL)",
+      "lo_misconduct_report.label": "Reporte de Abuso Policial (OL)",
+      "lo_misconduct_report.labelPlural": "Reportes de Abuso Policial (OL)",
+      "status.submitted": "Enviado",
+      "status.in_review": "En Revisión",
+      "status.cases_created": "Casos Creados",
+      "field.arrestee_details": "Detalles de Arrestados",
+      "field.badge_numbers": "Números de Placa",
+      "field.force_type": "Tipo de Fuerza"
     }
   },
 
@@ -416,6 +450,71 @@ arraignment tracking, release coordination, and attorney matching.
     }
   ],
 
+  "reportTypes": [
+    {
+      "name": "lo_arrest_report",
+      "label": "lo_arrest_report.label",
+      "labelPlural": "lo_arrest_report.labelPlural",
+      "description": "lo_arrest_report.description",
+      "icon": "clipboard-list",
+      "color": "#f59e0b",
+      "category": "report",
+      "numberPrefix": "AR",
+      "numberingEnabled": true,
+      "allowFileAttachments": true,
+      "allowCaseConversion": true,
+      "mobileOptimized": true,
+
+      "statuses": [
+        { "value": "submitted", "label": "status.submitted", "color": "#f59e0b", "order": 1 },
+        { "value": "in_review", "label": "status.in_review", "color": "#3b82f6", "order": 2 },
+        { "value": "cases_created", "label": "status.cases_created", "color": "#22c55e", "order": 3, "isClosed": true }
+      ],
+      "defaultStatus": "submitted",
+      "closedStatuses": ["cases_created"],
+
+      "fields": [
+        { "name": "location", "label": "field.location", "type": "text", "required": true, "order": 1, "accessLevel": "all", "helpText": "Where the arrests happened" },
+        { "name": "time", "label": "field.time", "type": "text", "required": true, "order": 2, "accessLevel": "all" },
+        { "name": "arresting_agency", "label": "field.arresting_agency", "type": "select", "required": true, "options": ["NYPD", "State Police", "Federal", "ICE/CBP", "Other"], "order": 3, "accessLevel": "all" },
+        { "name": "estimated_count", "label": "field.estimated_count", "type": "number", "required": false, "order": 4, "accessLevel": "all", "helpText": "Approximate total arrested" },
+        { "name": "arrestee_details", "label": "field.arrestee_details", "type": "textarea", "required": true, "order": 5, "accessLevel": "assigned", "helpText": "List names, physical descriptions, and any details. One person per line. E.g.:\nMaria Garcia - red jacket, Broadway side\nJohn Doe - glasses, needs insulin\nUnknown male - green backpack, beaten by officers" },
+        { "name": "general_notes", "label": "field.general_notes", "type": "textarea", "required": false, "order": 6, "accessLevel": "all" }
+      ]
+    },
+    {
+      "name": "lo_misconduct_report",
+      "label": "lo_misconduct_report.label",
+      "labelPlural": "lo_misconduct_report.labelPlural",
+      "description": "lo_misconduct_report.description",
+      "icon": "shield-alert",
+      "color": "#dc2626",
+      "category": "report",
+      "numberPrefix": "MC",
+      "numberingEnabled": true,
+      "allowFileAttachments": true,
+      "allowCaseConversion": false,
+      "mobileOptimized": true,
+
+      "statuses": [
+        { "value": "submitted", "label": "status.submitted", "color": "#f59e0b", "order": 1 },
+        { "value": "reviewed", "label": "status.reviewed", "color": "#3b82f6", "order": 2 },
+        { "value": "evidence_preserved", "label": "status.evidence_preserved", "color": "#22c55e", "order": 3, "isClosed": true }
+      ],
+      "defaultStatus": "submitted",
+      "closedStatuses": ["evidence_preserved"],
+
+      "fields": [
+        { "name": "location", "label": "field.location", "type": "text", "required": true, "order": 1, "accessLevel": "all" },
+        { "name": "time", "label": "field.time", "type": "text", "required": true, "order": 2, "accessLevel": "all" },
+        { "name": "agency", "label": "field.agency", "type": "select", "required": true, "options": ["NYPD", "State Police", "Federal", "ICE/CBP", "Other"], "order": 3, "accessLevel": "all" },
+        { "name": "badge_numbers", "label": "field.badge_numbers", "type": "text", "required": false, "order": 4, "accessLevel": "assigned", "helpText": "All badge numbers observed, comma-separated" },
+        { "name": "force_type", "label": "field.force_type", "type": "multi-select", "required": false, "options": ["Pepper Spray", "Baton", "Rubber Bullet", "Taser", "Kettle", "Tackle", "Chokehold", "Other"], "order": 5, "accessLevel": "all" },
+        { "name": "description", "label": "field.description", "type": "textarea", "required": true, "order": 6, "accessLevel": "assigned", "helpText": "Detailed account: what happened, victim names, officer descriptions, sequence of events" }
+      ]
+    }
+  ],
+
   "relationshipTypes": [
     {
       "sourceEntityTypeId": "contact",
@@ -445,6 +544,39 @@ arraignment tracking, release coordination, and attorney matching.
       "targetLabel": "includes",
       "cascadeDelete": false,
       "required": false
+    },
+    {
+      "sourceEntityTypeId": "arrest_case",
+      "targetEntityTypeId": "lo_arrest_report",
+      "cardinality": "M:1",
+      "label": "Source Report",
+      "reverseLabel": "Cases Created",
+      "sourceLabel": "created from",
+      "targetLabel": "generated",
+      "cascadeDelete": false,
+      "required": false
+    },
+    {
+      "sourceEntityTypeId": "lo_misconduct_report",
+      "targetEntityTypeId": "arrest_case",
+      "cardinality": "M:N",
+      "label": "Related Cases",
+      "reverseLabel": "Misconduct Reports",
+      "sourceLabel": "documents misconduct in",
+      "targetLabel": "has misconduct report",
+      "cascadeDelete": false,
+      "required": false
+    },
+    {
+      "sourceEntityTypeId": "lo_misconduct_report",
+      "targetEntityTypeId": "mass_arrest_event",
+      "cardinality": "M:N",
+      "label": "Related Events",
+      "reverseLabel": "Misconduct Reports",
+      "sourceLabel": "occurred during",
+      "targetLabel": "has misconduct report",
+      "cascadeDelete": false,
+      "required": false
     }
   ],
 
@@ -452,7 +584,7 @@ arraignment tracking, release coordination, and attorney matching.
     {
       "name": "Hotline Coordinator",
       "slug": "hotline-coordinator",
-      "description": "Manages the hotline during actions — full case and event access",
+      "description": "Manages the hotline during actions — full case, event, and report access",
       "permissions": [
         "cases:*", "contacts:*", "events:*", "evidence:*",
         "calls:*", "notes:*", "conversations:*", "reports:*",
@@ -468,21 +600,32 @@ arraignment tracking, release coordination, and attorney matching.
         "contacts:create", "contacts:view",
         "calls:answer", "calls:read-active",
         "notes:create", "notes:read-own",
-        "events:read",
+        "events:read", "reports:read-all",
         "shifts:read-own"
       ]
     },
     {
       "name": "Jail Support Coordinator",
       "slug": "jail-support-coordinator",
-      "description": "Tracks arraignments, bail status, and release coordination",
+      "description": "Tracks arraignments, bail, and release. Converts LO field reports into individual cases.",
       "permissions": [
-        "cases:read-all", "cases:update", "cases:assign", "cases:close",
-        "contacts:view", "contacts:view-pii", "contacts:edit",
+        "cases:create", "cases:read-all", "cases:update", "cases:assign", "cases:close",
+        "contacts:create", "contacts:view", "contacts:view-pii", "contacts:edit",
         "events:read", "events:update",
         "evidence:download",
         "notes:read-all", "notes:create",
+        "reports:read-all", "reports:update",
         "shifts:read"
+      ]
+    },
+    {
+      "name": "Legal Observer",
+      "slug": "legal-observer",
+      "description": "Submits field reports (arrest lists + misconduct) from mobile. Cannot see cases or PII.",
+      "permissions": [
+        "reports:create", "reports:read-own", "reports:update-own",
+        "events:read",
+        "evidence:upload"
       ]
     },
     {

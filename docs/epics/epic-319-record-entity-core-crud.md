@@ -98,9 +98,9 @@ import { z } from 'zod'
 import { recipientEnvelopeSchema, paginationSchema } from './common'
 
 export const recordSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
-  entityTypeId: z.string().uuid(),
+  entityTypeId: z.uuid(),
   caseNumber: z.string().optional(),
   statusHash: z.string(),
   severityHash: z.string().optional(),
@@ -125,7 +125,7 @@ export const recordSchema = z.object({
 })
 
 export const createRecordBodySchema = z.object({
-  entityTypeId: z.string().uuid(),
+  entityTypeId: z.uuid(),
   statusHash: z.string(),
   severityHash: z.string().optional(),
   categoryHash: z.string().optional(),
@@ -137,9 +137,9 @@ export const createRecordBodySchema = z.object({
   fieldEnvelopes: z.array(recipientEnvelopeSchema).optional(),
   encryptedPII: z.string().optional(),
   piiEnvelopes: z.array(recipientEnvelopeSchema).optional(),
-  parentRecordId: z.string().uuid().optional(),
+  parentRecordId: z.uuid().optional(),
   contactLinks: z.array(z.object({
-    contactId: z.string().uuid(),
+    contactId: z.uuid(),
     role: z.string(),
   })).optional(),
 })
@@ -155,15 +155,15 @@ export const listRecordsQuerySchema = paginationSchema.extend({
 })
 
 export const recordContactSchema = z.object({
-  recordId: z.string().uuid(),
-  contactId: z.string().uuid(),
+  recordId: z.uuid(),
+  contactId: z.uuid(),
   role: z.string(),
   addedAt: z.string(),
   addedBy: z.string(),
 })
 
 export const linkContactBodySchema = z.object({
-  contactId: z.string().uuid(),
+  contactId: z.uuid(),
   role: z.string(),
 })
 

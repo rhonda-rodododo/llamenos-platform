@@ -135,7 +135,7 @@ export type EnumOption = z.infer<typeof enumOptionSchema>
 // --- Entity Field Definition ---
 
 export const entityFieldDefinitionSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(50),
   label: z.string().max(200),
   type: z.enum([
@@ -190,7 +190,7 @@ export type EntityFieldDefinition = z.infer<typeof entityFieldDefinitionSchema>
 // --- Entity Type Definition ---
 
 export const entityTypeDefinitionSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
 
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
@@ -245,7 +245,7 @@ export type EntityTypeDefinition = z.infer<typeof entityTypeDefinitionSchema>
 // --- Relationship Type Definition ---
 
 export const relationshipTypeDefinitionSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
 
   sourceEntityTypeId: z.string(),

@@ -371,6 +371,26 @@ status changes, evidence uploads). Evidence viewer with chain of custody display
 
 ---
 
+## Post-Phase 4: CMS Polish & Extension (Epics 335-343)
+
+| # | Title | Status | Category |
+|---|-------|--------|----------|
+| 335 | Desktop BDD CMS Test Execution | In Progress | Testing |
+| 336 | BDD Serial Execution Fixes | Completed | Testing |
+| 337 | Mobile CMS Views + Field Reports | Pending | Mobile |
+| 338 | Template Translations | In Progress | i18n |
+| 339 | CMS Docs & Operator Guide | Pending | Docs |
+| 340 | Volunteer Profiles + Workload | Completed | Desktop UI |
+| 341 | Hub Context & Multi-Hub UX | Completed | Desktop UI |
+| 342 | Smart Assignment + Report Triage | In Progress | Desktop UI |
+| 343 | Template-Defined Report Types | Pending | Infrastructure |
+
+**Epic 343** adds `reportTypes[]` to the template system — templates can define custom report types with fields, statuses, file attachment support, case conversion flags, and mobile-optimization hints. Report types support `allowCaseConversion: true` (enables the triage queue in Epic 342) and audio input on textarea fields (for field workers dictating reports). This is the foundation for Epic 337's mobile report submission and Epic 342's report-to-case conversion.
+
+**Epic 337** updated to include field report submission from mobile (SubmitReport + MyReports views), audio input via platform speech-to-text, media attachments (photos/video), and offline queue for reports.
+
+**Epic 342** expanded to include report-to-case conversion: a generic triage queue for report types with `allowCaseConversion: true`, split-panel triage view, LLM-assisted parsing of freeform text into structured case entries (prompt generated from entity type field definitions), and conversion progress tracking.
+
 ## What's NOT in Scope (Future Phases)
 
 - **Activity timelines** (CiviCRM-style required activity schedules) — Phase 2 feature
@@ -378,7 +398,6 @@ status changes, evidence uploads). Evidence viewer with chain of custody display
 - **Conditional workflows** (if status=X, require field Y) — Phase 2
 - **Custom list views** (saved filter configurations) — Phase 2
 - **Report builder** (aggregate analytics across cases) — Phase 2
-- **Mobile case management UI** (iOS/Android) — separate epic batch
 - **Import/Export** (CSV, CiviCRM migration) — separate epic
 - **Print/PDF generation** (case summaries for courts) — separate epic
 - **Offline case access** (mobile field work) — separate epic

@@ -46,7 +46,7 @@ export const custodyActionSchema = z.enum([
 export type CustodyAction = z.infer<typeof custodyActionSchema>
 
 export const custodyEntrySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   action: custodyActionSchema,
   actorPubkey: z.string(),
   timestamp: z.string(),               // ISO 8601
@@ -59,8 +59,8 @@ export const custodyEntrySchema = z.object({
 export type CustodyEntry = z.infer<typeof custodyEntrySchema>
 
 export const evidenceMetadataSchema = z.object({
-  id: z.string().uuid(),
-  caseId: z.string().uuid(),
+  id: z.uuid(),
+  caseId: z.uuid(),
   fileId: z.string(),                   // Reference to the R2 file
   filename: z.string(),
   mimeType: z.string(),
@@ -90,7 +90,7 @@ export const evidenceMetadataSchema = z.object({
 export type EvidenceMetadata = z.infer<typeof evidenceMetadataSchema>
 
 export const uploadEvidenceBodySchema = z.object({
-  caseId: z.string().uuid(),
+  caseId: z.uuid(),
   classification: evidenceClassificationSchema,
   source: z.string().optional(),
   sourceDescription: z.string().optional(),

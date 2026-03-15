@@ -24,22 +24,77 @@ Each use case describes:
 
 **Who**: National Lawyers Guild legal observer programs at protests and direct actions.
 
-**Scenario**: It's a large march. 20 NLG legal observers are deployed wearing green hats. A mass arrest occurs — 47 people are kettled and arrested. The legal observer hotline starts receiving calls from arrested individuals using their one phone call, from support contacts reporting arrests they witnessed, and from legal observers calling in badge numbers and arrest details.
+**Scenario**: It's a large march. 20 NLG legal observers are deployed wearing green hats. A mass arrest occurs — 47 people are kettled and arrested.
+
+**Two report types flow in from the field:**
+
+1. **Arrest Reports** — LOs submit a single report listing multiple arrestee names (not one form per person). LOs in the field don't have time for individual intake forms. A single report might say: "Mass arrest at Broadway & 4th, ~15 people. Names: [list]. Photos attached." This report may include photos and video evidence. Later, jail support volunteers on the desktop app break each name out into an individual arrest case — typically when the arrestee calls from jail, or when a support contact reaches out to confirm. Support contacts may also call in asking "was [name] arrested?" — the LO report is the reference for confirming.
+
+2. **Police Misconduct Reports** — LOs document police abuse, excessive force, badge numbers, use of weapons, kettling tactics, etc. These reports are filed for use in lawsuits and are linked to cases and events as evidence. They may include photos and video.
+
+Both report types are submitted from mobile devices (iOS/Android) in the field.
 
 **Entities**:
 - **Contacts**: Arrestees, legal observers, attorneys, support contacts
-- **Cases**: One case per arrestee — tracks their journey through the system
+- **Cases**: One case per arrestee — created from LO arrest reports by jail support volunteers, OR directly when an arrestee calls from jail
 - **Events**: The protest/march itself, the mass arrest event (child of the protest)
-- **Reports**: Legal observers submit field observations (police conduct, use of force, badge numbers)
+- **Reports**: Two template-defined report types:
+  - `lo_arrest_report` — batch report with repeating "arrestee" rows (name, description, location), plus media attachments. LO submits one report covering many arrests.
+  - `lo_misconduct_report` — police abuse documentation with badge numbers, force descriptions, media evidence. Used for lawsuits.
+
+**Key Workflow: Report → Cases Conversion** (powered by generic report triage — see Epic 342):
+
+This workflow is not built into the app. It emerges from the jail-support template's configuration: `lo_arrest_report` has `allowCaseConversion: true`, so the generic report triage queue shows these reports. The case creation form is rendered from the `arrest_case` entity type definition. The LLM parsing prompt (if used) is generated from the same entity type fields. A street medic hub would have a completely different triage workflow driven by its own template.
+
+```
+1. Field volunteer submits a report (template-defined report type with allowCaseConversion: true)
+2. Report appears in the generic "Incoming Reports" triage queue on desktop
+3. Coordinator reviews report, sees freeform text with names/details
+4. For each person mentioned:
+   a. Person calls in → coordinator creates case from triage view, auto-links to report
+   b. Support contact calls about person → same flow
+   c. Coordinator proactively creates case from report → status uses template default
+5. Each created case links back to the source report via ReportCaseLink
+6. Report tracks conversion progress (how many cases created)
+7. Optional: LLM parses freeform text into suggested case entries (prompt from template fields)
+```
 
 **Roles**:
 | Role | Description | Permissions |
 |------|------------|-------------|
-| Hotline Coordinator | Manages the hotline during actions | cases:*, events:*, contacts:* |
+| Hotline Coordinator | Manages the hotline during actions | cases:*, events:*, contacts:*, reports:* |
 | Intake Volunteer | Answers calls, creates arrest records | cases:create, contacts:create, cases:read-own |
-| Jail Support Coordinator | Tracks arraignments, bail, release | cases:*, contacts:view-pii |
-| Legal Observer | Submits field observations | reports:create, events:read |
+| Jail Support Coordinator | Tracks arraignments, bail, release; converts LO reports into cases | cases:*, contacts:view-pii, reports:read-all |
+| Legal Observer | Submits field reports (arrests + misconduct) from mobile | reports:create, reports:read-own, events:read, evidence:upload |
 | Attorney Coordinator | Matches attorneys with arrestees | cases:assign, cases:read-all, contacts:view-pii |
+
+**Report Type: "LO Arrest Report"** (template-defined, mobile-optimized):
+
+LOs in the field need to submit fast. The primary input is a **single freeform text field** where the LO lists names, descriptions, and details however they naturally would. No structured forms per person — speed is everything. Jail support volunteers on desktop parse this later when creating individual cases.
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| Location | text | yes | Where arrests occurred |
+| Time | text | yes | When arrests occurred |
+| Arresting Agency | select | yes | NYPD, State Police, Federal, Other |
+| Estimated Arrest Count | number | no | Approximate total if names unknown |
+| Arrestee Details | textarea | yes | **Freeform text** — LO lists names, descriptions, details in whatever format is fastest. Example: "Maria Garcia - red jacket, taken from Broadway side / John Doe - glasses, medical needs (insulin) / Unknown male - green backpack, resisted, beaten by officers" |
+| General Notes | textarea | no | Overall observations about the arrest scene |
+| Media | file-attachments | no | Photos and video from the scene |
+
+**Report Type: "LO Misconduct Report"** (template-defined, mobile-optimized):
+
+Also freeform-first for field speed. Evidence attachments are the most important part — detailed descriptions can be added or refined later.
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| Location | text | yes | Where misconduct occurred |
+| Time | text | yes | When it occurred |
+| Agency | select | yes | Which agency |
+| Badge Numbers | text | no | All badge numbers observed (freeform, e.g. "4521, 8903, unknown third") |
+| Force Type | multi-select | no | Pepper spray, baton, rubber bullet, taser, kettle, tackle, other |
+| Description | textarea | yes | Detailed account of what happened — names of victims, officer descriptions, sequence of events |
+| Media | file-attachments | no | Photos and video evidence — **critical for lawsuits**. This is the primary evidentiary value of these reports |
 
 **Case Type: "Arrest / Jail Support"**:
 | Field | Type | Required | Notes |
@@ -62,6 +117,7 @@ Each use case describes:
 | Release Time | text | no | |
 | Physical Description | textarea | no | For identification when name unknown |
 | Property Seized | textarea | no | Phone, ID, belongings taken |
+| Source Report | report-link | no | Links back to the LO arrest report this case was created from |
 
 **Statuses**: `reported` → `confirmed` → `in_custody` → `arraigned` → `released` → `case_closed`
 **Severities**: `urgent` (medical need, minor, vulnerable person), `standard`, `low` (already has attorney)
@@ -69,6 +125,7 @@ Each use case describes:
 **Event Type: "Mass Arrest"**:
 - Location, time, number of arrests, arresting agency, legal observer count deployed
 - Links to all arrest cases from this event
+- Links to all LO reports from this event
 
 **Cross-hub**: An NLG hub might share case summary data with a bail fund hub (which cases need bail posted) and a street medic hub (which arrestees reported medical needs).
 

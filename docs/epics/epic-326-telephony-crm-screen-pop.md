@@ -146,8 +146,8 @@ Add optional `contactId` and `caseId` fields to the note creation body:
 
 ```typescript
 // Add to create note body schema:
-contactId: z.string().uuid().optional(),  // Auto-linked contact
-caseId: z.string().uuid().optional(),     // Linked case (user-selected)
+contactId: z.uuid().optional(),  // Auto-linked contact
+caseId: z.uuid().optional(),     // Linked case (user-selected)
 ```
 
 #### Task 5: Active Cases for Contact API

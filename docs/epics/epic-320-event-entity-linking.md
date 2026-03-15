@@ -42,15 +42,15 @@ export const locationPrecisionSchema = z.enum([
 export type LocationPrecision = z.infer<typeof locationPrecisionSchema>
 
 export const eventSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
-  entityTypeId: z.string().uuid(),
+  entityTypeId: z.uuid(),
   caseNumber: z.string().optional(),
 
   // --- Event-specific cleartext metadata ---
   startDate: z.string(),                        // ISO 8601
   endDate: z.string().optional(),               // ISO 8601
-  parentEventId: z.string().uuid().optional(),   // Sub-event hierarchy
+  parentEventId: z.uuid().optional(),   // Sub-event hierarchy
   locationPrecision: locationPrecisionSchema.default('neighborhood'),
   locationApproximate: z.string().optional(),    // Cleartext approximate location
 
@@ -76,10 +76,10 @@ export const eventSchema = z.object({
 export type Event = z.infer<typeof eventSchema>
 
 export const createEventBodySchema = z.object({
-  entityTypeId: z.string().uuid(),
+  entityTypeId: z.uuid(),
   startDate: z.string().min(1),
   endDate: z.string().optional(),
-  parentEventId: z.string().uuid().optional(),
+  parentEventId: z.uuid().optional(),
   locationPrecision: locationPrecisionSchema.default('neighborhood'),
   locationApproximate: z.string().optional(),
   eventTypeHash: z.string(),
@@ -104,8 +104,8 @@ export const listEventsQuerySchema = z.object({
 // --- Join schemas ---
 
 export const caseEventSchema = z.object({
-  recordId: z.string().uuid(),
-  eventId: z.string().uuid(),
+  recordId: z.uuid(),
+  eventId: z.uuid(),
   linkedAt: z.string(),
   linkedBy: z.string(),
 })
@@ -114,7 +114,7 @@ export type CaseEvent = z.infer<typeof caseEventSchema>
 
 export const reportEventSchema = z.object({
   reportId: z.string(),             // Conversation ID of the report
-  eventId: z.string().uuid(),
+  eventId: z.uuid(),
   linkedAt: z.string(),
   linkedBy: z.string(),
 })
@@ -122,7 +122,7 @@ export const reportEventSchema = z.object({
 export type ReportEvent = z.infer<typeof reportEventSchema>
 
 export const linkRecordToEventBodySchema = z.object({
-  recordId: z.string().uuid(),
+  recordId: z.uuid(),
 })
 
 export const linkReportToEventBodySchema = z.object({

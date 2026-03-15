@@ -170,7 +170,7 @@ export const meResponseSchema = z.object({
 // --- Notes ---
 
 export const noteResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   callId: z.string().optional(),
   conversationId: z.string().optional(),
   contactHash: z.string().optional(),

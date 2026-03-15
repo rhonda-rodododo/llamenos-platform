@@ -33,6 +33,8 @@ dev.post('/test-reset', async (c) => {
   await dos.shifts.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.calls.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.conversations.fetch(new Request('http://do/reset', { method: 'POST' }))
+  await dos.contactDirectory.fetch(new Request('http://do/reset', { method: 'POST' }))
+  await dos.caseManager.fetch(new Request('http://do/reset', { method: 'POST' }))
   return c.json({ ok: true })
 })
 
@@ -54,6 +56,8 @@ dev.post('/test-reset-no-admin', async (c) => {
   await dos.shifts.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.calls.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.conversations.fetch(new Request('http://do/reset', { method: 'POST' }))
+  await dos.contactDirectory.fetch(new Request('http://do/reset', { method: 'POST' }))
+  await dos.caseManager.fetch(new Request('http://do/reset', { method: 'POST' }))
   // Tell IdentityDO to skip admin re-creation from ADMIN_PUBKEY on next ensureInit().
   // Without this, the next fetch to IdentityDO calls ensureInit() which re-seeds
   // the admin from the ADMIN_PUBKEY env var, defeating the "no admin" state.
@@ -84,6 +88,8 @@ dev.post('/test-reset-records', async (c) => {
   await dos.shifts.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.calls.fetch(new Request('http://do/reset', { method: 'POST' }))
   await dos.conversations.fetch(new Request('http://do/reset', { method: 'POST' }))
+  await dos.contactDirectory.fetch(new Request('http://do/reset', { method: 'POST' }))
+  await dos.caseManager.fetch(new Request('http://do/reset', { method: 'POST' }))
   return c.json({ ok: true })
 })
 

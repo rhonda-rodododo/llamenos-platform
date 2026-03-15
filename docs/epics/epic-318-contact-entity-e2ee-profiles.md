@@ -268,7 +268,7 @@ import { z } from 'zod'
 import { recipientEnvelopeSchema, paginationSchema } from './common'
 
 export const contactSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
   identifierHashes: z.array(z.string()),
   nameHash: z.string().optional(),

@@ -20,8 +20,8 @@ export type CustodyAction = z.infer<typeof custodyActionSchema>
 // --- Custody Entry (stored per evidence access) ---
 
 export const custodyEntrySchema = z.object({
-  id: z.string().uuid(),
-  evidenceId: z.string().uuid(),
+  id: z.uuid(),
+  evidenceId: z.uuid(),
   action: custodyActionSchema,
   actorPubkey: z.string(),
   timestamp: z.string(),               // ISO 8601
@@ -36,8 +36,8 @@ export type CustodyEntry = z.infer<typeof custodyEntrySchema>
 // --- Evidence Metadata (stored per evidence file) ---
 
 export const evidenceMetadataSchema = z.object({
-  id: z.string().uuid(),
-  caseId: z.string().uuid(),
+  id: z.uuid(),
+  caseId: z.uuid(),
   fileId: z.string(),                   // Reference to the R2 file
   filename: z.string(),
   mimeType: z.string(),

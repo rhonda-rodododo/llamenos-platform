@@ -4,9 +4,9 @@ import { recipientEnvelopeSchema, paginationSchema } from './common'
 // --- Record (stored in CaseDO) ---
 
 export const recordSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
-  entityTypeId: z.string().uuid(),
+  entityTypeId: z.uuid(),
   caseNumber: z.string().optional(),
 
   // --- Blind indexes (server-filterable) ---
@@ -33,7 +33,7 @@ export const recordSchema = z.object({
   reportCount: z.number(),
   eventIds: z.array(z.string()),
   reportIds: z.array(z.string()),
-  parentRecordId: z.string().uuid().optional(),
+  parentRecordId: z.uuid().optional(),
 
   // --- Timestamps ---
   createdAt: z.string(),
@@ -47,7 +47,7 @@ export type CaseRecord = z.infer<typeof recordSchema>
 // --- Create record body ---
 
 export const createRecordBodySchema = z.object({
-  entityTypeId: z.string().uuid(),
+  entityTypeId: z.uuid(),
   statusHash: z.string(),
   severityHash: z.string().optional(),
   categoryHash: z.string().optional(),
@@ -59,9 +59,9 @@ export const createRecordBodySchema = z.object({
   fieldEnvelopes: z.array(recipientEnvelopeSchema).optional(),
   encryptedPII: z.string().optional(),
   piiEnvelopes: z.array(recipientEnvelopeSchema).optional(),
-  parentRecordId: z.string().uuid().optional(),
+  parentRecordId: z.uuid().optional(),
   contactLinks: z.array(z.object({
-    contactId: z.string().uuid(),
+    contactId: z.uuid(),
     role: z.string(),
   })).optional(),
 })
@@ -98,8 +98,8 @@ export type ListRecordsQuery = z.infer<typeof listRecordsQuerySchema>
 // --- Record-contact join ---
 
 export const recordContactSchema = z.object({
-  recordId: z.string().uuid(),
-  contactId: z.string().uuid(),
+  recordId: z.uuid(),
+  contactId: z.uuid(),
   role: z.string(),
   addedAt: z.string(),
   addedBy: z.string(),
@@ -110,7 +110,7 @@ export type RecordContact = z.infer<typeof recordContactSchema>
 // --- Link contact to record ---
 
 export const linkContactBodySchema = z.object({
-  contactId: z.string().uuid(),
+  contactId: z.uuid(),
   role: z.string(),
 })
 

@@ -45,12 +45,19 @@ export class ContactDirectoryDO extends DurableObject<Env> {
       const url = new URL(req.url)
       const page = parseInt(url.searchParams.get('page') ?? '1')
       const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '20'), 100)
+      const contactTypeFilter = url.searchParams.get('contactTypeHash')
       const filters = parseBlindIndexFilters(url.searchParams)
+      // Remove contactTypeHash from blind index filters since it's a top-level field
+      filters.delete('contactTypeHash')
 
       const allKeys = await this.ctx.storage.list<Contact>({ prefix: 'contact:', limit: 1000 })
       const contacts: Contact[] = []
       for (const [, value] of allKeys) {
         const contact = value
+        // Filter by contactTypeHash (top-level field, not in blindIndexes)
+        if (contactTypeFilter && contact.contactTypeHash !== contactTypeFilter) {
+          continue
+        }
         if (filters.size > 0 && !matchesBlindIndexFilters(contact.blindIndexes ?? {}, filters)) {
           continue
         }

@@ -34,7 +34,7 @@ import { recipientEnvelopeSchema } from './common'
 
 export const reportCaseLinkSchema = z.object({
   reportId: z.string(),              // Conversation ID
-  caseId: z.string().uuid(),
+  caseId: z.uuid(),
   linkedAt: z.string(),
   linkedBy: z.string(),              // Pubkey
   encryptedNotes: z.string().optional(),  // Why this report is linked
@@ -50,7 +50,7 @@ export const linkReportToCaseBodySchema = z.object({
 })
 
 export const linkCaseToReportBodySchema = z.object({
-  caseId: z.string().uuid(),
+  caseId: z.uuid(),
   encryptedNotes: z.string().optional(),
   notesEnvelopes: z.array(recipientEnvelopeSchema).optional(),
 })

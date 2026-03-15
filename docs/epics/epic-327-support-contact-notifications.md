@@ -240,8 +240,8 @@ export const notificationResultSchema = z.object({
 })
 
 export const statusChangeNotificationSchema = z.object({
-  recordId: z.string().uuid(),
-  entityTypeId: z.string().uuid(),
+  recordId: z.uuid(),
+  entityTypeId: z.uuid(),
   oldStatusHash: z.string(),
   newStatusHash: z.string(),
   changedBy: z.string(),

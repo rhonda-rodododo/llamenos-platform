@@ -41,10 +41,10 @@ export const relationshipDirectionSchema = z.enum(['a_to_b', 'b_to_a', 'bidirect
 export type RelationshipDirection = z.infer<typeof relationshipDirectionSchema>
 
 export const contactRelationshipSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
-  contactIdA: z.string().uuid(),
-  contactIdB: z.string().uuid(),
+  contactIdA: z.uuid(),
+  contactIdB: z.uuid(),
   relationshipType: z.string().max(50),
   direction: relationshipDirectionSchema,
   encryptedNotes: z.string().optional(),
@@ -56,7 +56,7 @@ export const contactRelationshipSchema = z.object({
 export type ContactRelationship = z.infer<typeof contactRelationshipSchema>
 
 export const createRelationshipBodySchema = z.object({
-  contactIdB: z.string().uuid(),
+  contactIdB: z.uuid(),
   relationshipType: z.string().max(50),
   direction: relationshipDirectionSchema.default('bidirectional'),
   encryptedNotes: z.string().optional(),
@@ -80,7 +80,7 @@ export const RELATIONSHIP_TYPES = [
 // --- Affinity Group ---
 
 export const affinityGroupSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   hubId: z.string(),
   encryptedDetails: z.string(),
   detailEnvelopes: z.array(recipientEnvelopeSchema).min(1),
@@ -96,7 +96,7 @@ export const createAffinityGroupBodySchema = z.object({
   encryptedDetails: z.string().min(1),
   detailEnvelopes: z.array(recipientEnvelopeSchema).min(1),
   members: z.array(z.object({
-    contactId: z.string().uuid(),
+    contactId: z.uuid(),
     role: z.string().max(50).optional(),
     isPrimary: z.boolean().default(false),
   })).min(1),
@@ -108,7 +108,7 @@ export const updateAffinityGroupBodySchema = z.object({
 })
 
 export const addGroupMemberBodySchema = z.object({
-  contactId: z.string().uuid(),
+  contactId: z.uuid(),
   role: z.string().max(50).optional(),
   isPrimary: z.boolean().default(false),
 })
@@ -119,7 +119,7 @@ export const affinityGroupDetailsSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   members: z.array(z.object({
-    contactId: z.string().uuid(),
+    contactId: z.uuid(),
     role: z.string().optional(),
     isPrimary: z.boolean(),
   })),

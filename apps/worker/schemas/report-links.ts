@@ -5,7 +5,7 @@ import { recipientEnvelopeSchema } from './common'
 
 export const reportCaseLinkSchema = z.object({
   reportId: z.string(),              // Conversation ID (report)
-  caseId: z.string().uuid(),         // Record ID (case)
+  caseId: z.uuid(),         // Record ID (case)
   linkedAt: z.string(),              // ISO 8601
   linkedBy: z.string(),              // Pubkey of person who linked
   encryptedNotes: z.string().optional(),  // E2EE notes on why linked
@@ -27,7 +27,7 @@ export type LinkReportToCaseBody = z.infer<typeof linkReportToCaseBodySchema>
 // --- Link case to report body (from report side: POST /reports/:id/records) ---
 
 export const linkCaseToReportBodySchema = z.object({
-  caseId: z.string().uuid(),
+  caseId: z.uuid(),
   encryptedNotes: z.string().optional(),
   notesEnvelopes: z.array(recipientEnvelopeSchema).optional(),
 })

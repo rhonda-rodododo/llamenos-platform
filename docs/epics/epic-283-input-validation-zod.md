@@ -48,7 +48,7 @@ import { z } from 'zod'
 export const pubkeySchema = z.string().regex(/^[0-9a-f]{64}$/, 'Must be a 64-character hex string')
 
 /** UUID v4 */
-export const uuidSchema = z.string().uuid()
+export const uuidSchema = z.uuid()
 
 /** E.164 phone number */
 export const e164PhoneSchema = z.string().regex(/^\+\d{7,15}$/, 'Must be E.164 format (+XXXXXXXXXXX)')
@@ -286,7 +286,7 @@ export const bootstrapBodySchema = z.object({
 })
 
 export const redeemInviteBodySchema = z.object({
-  code: z.string().uuid(),
+  code: z.uuid(),
   pubkey: pubkeySchema,
 })
 

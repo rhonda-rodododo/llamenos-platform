@@ -200,10 +200,10 @@ import { z } from 'zod'
 import { recipientEnvelopeSchema } from './common'
 
 export const referralSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   sourceHubId: z.string(),
   targetHubId: z.string(),
-  sourceRecordId: z.string().uuid(),
+  sourceRecordId: z.uuid(),
   encryptedSummary: z.string(),
   summaryEnvelopes: z.array(recipientEnvelopeSchema).min(1),
   status: z.enum(['pending', 'accepted', 'declined']),
@@ -211,7 +211,7 @@ export const referralSchema = z.object({
   createdBy: z.string(),
   acceptedAt: z.string().optional(),
   declinedAt: z.string().optional(),
-  targetRecordId: z.string().uuid().optional(),  // Created when accepted
+  targetRecordId: z.uuid().optional(),  // Created when accepted
 })
 
 export type Referral = z.infer<typeof referralSchema>
@@ -219,7 +219,7 @@ export type Referral = z.infer<typeof referralSchema>
 export const createReferralBodySchema = z.object({
   sourceHubId: z.string(),
   targetHubId: z.string(),
-  sourceRecordId: z.string().uuid(),
+  sourceRecordId: z.uuid(),
   encryptedSummary: z.string().min(1),
   summaryEnvelopes: z.array(recipientEnvelopeSchema).min(1),
 })
@@ -229,7 +229,7 @@ export type CreateReferralBody = z.infer<typeof createReferralBodySchema>
 export const crossHubContactResultSchema = z.object({
   hubId: z.string(),
   hubName: z.string(),
-  contactId: z.string().uuid(),
+  contactId: z.uuid(),
   caseCount: z.number(),
   lastInteractionAt: z.string(),
   encryptedSummary: z.string(),
