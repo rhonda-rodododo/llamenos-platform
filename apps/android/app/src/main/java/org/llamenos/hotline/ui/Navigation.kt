@@ -34,8 +34,10 @@ import org.llamenos.hotline.ui.contacts.ContactTimelineScreen
 import org.llamenos.hotline.ui.contacts.ContactTimelineViewModel
 import org.llamenos.hotline.ui.reports.ReportCreateScreen
 import org.llamenos.hotline.ui.reports.ReportDetailScreen
+import org.llamenos.hotline.ui.reports.ReportTypePickerScreen
 import org.llamenos.hotline.ui.reports.ReportsScreen
 import org.llamenos.hotline.ui.reports.ReportsViewModel
+import org.llamenos.hotline.ui.reports.TypedReportCreateScreen
 import org.llamenos.hotline.ui.auth.LoginScreen
 import org.llamenos.hotline.ui.auth.OnboardingScreen
 import org.llamenos.hotline.ui.auth.PINSetScreen
@@ -117,9 +119,23 @@ sealed interface LlamenosRoute {
         override val route = "reports"
     }
 
-    /** Report creation form. */
+    /** Report creation form (legacy, no report type). */
     data object ReportCreate : LlamenosRoute {
         override val route = "report_create"
+    }
+
+    /** Report type picker for template-driven report creation. */
+    data object ReportTypePicker : LlamenosRoute {
+        override val route = "report_type_picker"
+    }
+
+    /** Typed report creation form with template fields. */
+    data class TypedReportCreate(val reportTypeId: String) : LlamenosRoute {
+        override val route = "typed_report_create/$reportTypeId"
+
+        companion object {
+            const val ROUTE_PATTERN = "typed_report_create/{reportTypeId}"
+        }
     }
 
     /** Contacts list. */
@@ -460,6 +476,9 @@ fun LlamenosNavigation(
                 onNavigateToReportCreate = {
                     navController.navigate(LlamenosRoute.ReportCreate.route)
                 },
+                onNavigateToReportTypePicker = {
+                    navController.navigate(LlamenosRoute.ReportTypePicker.route)
+                },
             )
         }
 
@@ -467,6 +486,37 @@ fun LlamenosNavigation(
             val reportsViewModel: ReportsViewModel = hiltViewModel()
             ReportCreateScreen(
                 viewModel = reportsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.ReportTypePicker.route) {
+            val reportsViewModel: ReportsViewModel = hiltViewModel()
+            ReportTypePickerScreen(
+                viewModel = reportsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToTypedReport = { reportTypeId ->
+                    navController.navigate("typed_report_create/$reportTypeId")
+                },
+                onNavigateToLegacyReport = {
+                    navController.navigate(LlamenosRoute.ReportCreate.route)
+                },
+            )
+        }
+
+        composable(
+            LlamenosRoute.TypedReportCreate.ROUTE_PATTERN,
+            arguments = listOf(
+                navArgument("reportTypeId") {
+                    type = NavType.StringType
+                },
+            ),
+        ) { backStackEntry ->
+            val reportTypeId = backStackEntry.arguments?.getString("reportTypeId") ?: ""
+            val reportsViewModel: ReportsViewModel = hiltViewModel()
+            TypedReportCreateScreen(
+                viewModel = reportsViewModel,
+                reportTypeId = reportTypeId,
                 onNavigateBack = { navController.popBackStack() },
             )
         }

@@ -1349,6 +1349,28 @@
     <string name="reports_upload_error">Failed to upload %s</string>
     <string name="reports_upload_failed">Failed</string>
     <string name="reports_video_not_supported">Your browser does not support video playback.</string>
+
+    <!-- Report type picker & typed report creation -->
+    <string name="report_type_picker_title">New Report</string>
+    <string name="report_type_picker_subtitle">Select a report type</string>
+    <string name="report_type_picker_loading">Loading report types...</string>
+    <string name="report_type_picker_empty">No report types available. Contact an admin to configure report templates.</string>
+    <string name="report_typed_create_title">New %s</string>
+    <string name="report_typed_title_label">Title</string>
+    <string name="report_typed_title_placeholder">Brief description</string>
+    <string name="report_typed_required">*</string>
+    <string name="report_typed_submit">Submit</string>
+    <string name="report_typed_select_option">Select...</string>
+    <string name="report_typed_date_pick">Pick a date</string>
+    <string name="report_typed_section_header">%s</string>
+    <string name="report_typed_audio_start">Start voice input</string>
+    <string name="report_typed_audio_stop">Stop voice input</string>
+    <string name="report_typed_audio_listening">Listening...</string>
+    <string name="report_typed_audio_unavailable">Speech recognition is not available on this device</string>
+    <string name="report_typed_audio_permission_denied">Microphone permission required for voice input</string>
+    <string name="report_typed_audio_error">Voice input error</string>
+    <string name="report_typed_audio_appending">Appending transcribed text...</string>
+
     <string name="reset_identity">Reset Identity</string>
     <string name="retry">Retry</string>
     <string name="role_admin">Admin</string>

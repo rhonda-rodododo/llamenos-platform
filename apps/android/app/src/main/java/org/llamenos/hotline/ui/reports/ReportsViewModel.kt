@@ -8,14 +8,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.model.AssignReportRequest
 import org.llamenos.hotline.model.CreateReportRequest
+import org.llamenos.hotline.model.CreateTypedReportRequest
 import org.llamenos.hotline.model.Report
 import org.llamenos.hotline.model.ReportCategoriesResponse
 import org.llamenos.hotline.model.ReportEnvelope
+import org.llamenos.hotline.model.CmsReportTypesResponse
+import org.llamenos.hotline.model.ReportTypeDefinition
 import org.llamenos.hotline.model.ReportsListResponse
 import org.llamenos.hotline.model.UpdateReportRequest
 import javax.inject.Inject
@@ -31,13 +37,35 @@ data class ReportsUiState(
     val categories: List<String> = emptyList(),
     val selectedReport: Report? = null,
 
+    // Report types
+    val reportTypes: List<ReportTypeDefinition> = emptyList(),
+    val isLoadingReportTypes: Boolean = false,
+    val reportTypesError: String? = null,
+    val selectedReportType: ReportTypeDefinition? = null,
+    val fieldValues: Map<String, String> = emptyMap(),
+
     // Action states
     val isCreating: Boolean = false,
     val isClaiming: Boolean = false,
     val isClosing: Boolean = false,
     val createSuccess: Boolean = false,
     val actionError: String? = null,
-)
+) {
+    /**
+     * Report types filtered to those marked as mobile-optimized.
+     * Falls back to all non-archived types if none are mobile-optimized.
+     */
+    val mobileReportTypes: List<ReportTypeDefinition>
+        get() {
+            val activeTypes = reportTypes.filter { !it.isArchived }
+            val mobileTypes = activeTypes.filter { it.mobileOptimized }
+            return mobileTypes.ifEmpty { activeTypes }
+        }
+
+    /** Whether CMS report types are available for this hub. */
+    val hasReportTypes: Boolean
+        get() = reportTypes.any { !it.isArchived }
+}
 
 enum class ReportStatusFilter(val queryParam: String?) {
     ALL(null),
@@ -50,7 +78,8 @@ enum class ReportStatusFilter(val queryParam: String?) {
  * ViewModel for the reports screen.
  *
  * Loads reports from GET /reports with status and category filtering.
- * Supports creating, claiming, and closing reports.
+ * Supports creating (both legacy and typed), claiming, and closing reports.
+ * Fetches CMS report type definitions to drive template-based report creation.
  */
 @HiltViewModel
 class ReportsViewModel @Inject constructor(
@@ -62,9 +91,15 @@ class ReportsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ReportsUiState())
     val uiState: StateFlow<ReportsUiState> = _uiState.asStateFlow()
 
+    private val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
     init {
         loadCategories()
         loadReports()
+        loadReportTypes()
     }
 
     fun loadReports() {
@@ -120,6 +155,72 @@ class ReportsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fetch CMS report type definitions from the backend.
+     *
+     * Report types drive the template-based report creation flow.
+     * If the hub has no CMS report types configured, the legacy
+     * free-form report creation screen is used as a fallback.
+     */
+    fun loadReportTypes() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingReportTypes = true, reportTypesError = null) }
+            try {
+                val response = apiService.request<CmsReportTypesResponse>(
+                    "GET",
+                    "/api/settings/cms/report-types",
+                )
+                _uiState.update {
+                    it.copy(
+                        reportTypes = response.reportTypes,
+                        isLoadingReportTypes = false,
+                    )
+                }
+            } catch (_: Exception) {
+                // Non-critical — fall back to legacy report creation
+                _uiState.update {
+                    it.copy(
+                        isLoadingReportTypes = false,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Select a report type for the typed report creation form.
+     */
+    fun selectReportType(reportType: ReportTypeDefinition) {
+        _uiState.update {
+            it.copy(
+                selectedReportType = reportType,
+                fieldValues = emptyMap(),
+                actionError = null,
+            )
+        }
+    }
+
+    /**
+     * Update a field value in the current typed report form.
+     */
+    fun updateFieldValue(fieldName: String, value: String) {
+        _uiState.update {
+            it.copy(fieldValues = it.fieldValues + (fieldName to value))
+        }
+    }
+
+    /**
+     * Clear the selected report type and field values.
+     */
+    fun clearReportType() {
+        _uiState.update {
+            it.copy(
+                selectedReportType = null,
+                fieldValues = emptyMap(),
+            )
+        }
+    }
+
     fun refresh() {
         loadReports()
     }
@@ -139,7 +240,7 @@ class ReportsViewModel @Inject constructor(
     }
 
     /**
-     * Create a new encrypted report.
+     * Create a new encrypted report (legacy flow without report type).
      *
      * Encrypts the report body using the same envelope pattern as notes,
      * then sends the title, optional category, and encrypted content to the API.
@@ -164,6 +265,68 @@ class ReportsViewModel @Inject constructor(
                 )
                 apiService.request<Report>("POST", "/api/reports", request)
                 _uiState.update { it.copy(isCreating = false, createSuccess = true) }
+                refresh()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isCreating = false,
+                        actionError = e.message ?: "Failed to create report",
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Create a typed report using the selected report type template.
+     *
+     * Field values are serialized to JSON, encrypted with the same E2EE
+     * envelope pattern, and submitted with the reportTypeId attached.
+     *
+     * @param reportTypeId The CMS report type ID
+     * @param title The user-provided report title
+     * @param fieldValues Map of field name to value (strings, including serialized selections)
+     */
+    fun createTypedReport(
+        reportTypeId: String,
+        title: String,
+        fieldValues: Map<String, String>,
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreating = true, actionError = null, createSuccess = false) }
+            try {
+                // Serialize field values as JSON for E2EE encryption
+                val fieldsJson = json.encodeToString(
+                    MapSerializer(String.serializer(), String.serializer()),
+                    fieldValues,
+                )
+
+                val encrypted = cryptoService.encryptNote(fieldsJson, sessionState.adminPubkeys)
+                val envelopes = encrypted.envelopes.map { env ->
+                    ReportEnvelope(
+                        pubkey = env.recipientPubkey,
+                        wrappedKey = env.wrappedKey,
+                        ephemeralPubkey = env.ephemeralPubkey,
+                    )
+                }
+
+                val reportType = _uiState.value.reportTypes.find { it.id == reportTypeId }
+                val request = CreateTypedReportRequest(
+                    title = title,
+                    category = reportType?.category?.takeIf { it.isNotBlank() && it != "report" },
+                    reportTypeId = reportTypeId,
+                    encryptedContent = encrypted.ciphertext,
+                    readerEnvelopes = envelopes,
+                )
+                apiService.request<Report>("POST", "/api/reports", request)
+                _uiState.update {
+                    it.copy(
+                        isCreating = false,
+                        createSuccess = true,
+                        fieldValues = emptyMap(),
+                        selectedReportType = null,
+                    )
+                }
                 refresh()
             } catch (e: Exception) {
                 _uiState.update {

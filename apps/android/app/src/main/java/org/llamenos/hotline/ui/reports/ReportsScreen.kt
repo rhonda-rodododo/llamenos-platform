@@ -50,10 +50,13 @@ import org.llamenos.hotline.util.DateFormatUtils
 
 /**
  * Reports screen showing a list of structured reports with status
- * indicators, category badges, and message counts.
+ * indicators, category badges, report type labels, and message counts.
  *
  * Reports are specialized conversations with metadata (title, category,
  * linked call, custom fields). Supports filtering by status and category.
+ *
+ * The FAB navigates to the report type picker when CMS report types are
+ * available, otherwise falls back to the legacy report creation screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +65,7 @@ fun ReportsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToReportDetail: (String) -> Unit,
     onNavigateToReportCreate: () -> Unit = {},
+    onNavigateToReportTypePicker: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -94,7 +98,15 @@ fun ReportsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onNavigateToReportCreate,
+                onClick = {
+                    // Navigate to type picker if CMS report types are available,
+                    // otherwise fall back to legacy report creation
+                    if (uiState.hasReportTypes) {
+                        onNavigateToReportTypePicker()
+                    } else {
+                        onNavigateToReportCreate()
+                    }
+                },
                 modifier = Modifier.testTag("report-create-fab"),
             ) {
                 Icon(
@@ -211,6 +223,7 @@ fun ReportsScreen(
                             ) { report ->
                                 ReportCard(
                                     report = report,
+                                    reportTypes = uiState.reportTypes,
                                     onClick = {
                                         viewModel.selectReport(report)
                                         onNavigateToReportDetail(report.id)
@@ -227,11 +240,12 @@ fun ReportsScreen(
 
 /**
  * Card displaying a single report with status indicator, title,
- * category badge, and message count.
+ * report type label, category badge, and message count.
  */
 @Composable
 private fun ReportCard(
     report: Report,
+    reportTypes: List<org.llamenos.hotline.model.ReportTypeDefinition> = emptyList(),
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -240,6 +254,11 @@ private fun ReportCard(
         "waiting" -> MaterialTheme.colorScheme.tertiary
         "closed" -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    // Look up the report type label from the loaded definitions
+    val reportTypeLabel = report.metadata?.type?.let { typeName ->
+        reportTypes.find { it.name == typeName || it.id == typeName }?.label
     }
 
     Card(
@@ -309,6 +328,16 @@ private fun ReportCard(
                     color = statusColor,
                     modifier = Modifier.testTag("report-status-label"),
                 )
+
+                // Report type label (from CMS definitions)
+                if (reportTypeLabel != null) {
+                    Text(
+                        text = reportTypeLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        modifier = Modifier.testTag("report-type-label"),
+                    )
+                }
 
                 // Category badge
                 val category = report.metadata?.reportCategory
