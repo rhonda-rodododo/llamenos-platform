@@ -149,22 +149,10 @@ struct CaseFieldValidation: Codable, Sendable {
     let pattern: String?
 }
 
-// MARK: - CaseInteraction
-
-/// A timeline entry linked to a case record (comment, status change, note link, etc.).
-struct CaseInteraction: Codable, Identifiable, Sendable {
-    let id: String
-    let caseId: String
-    let interactionType: String
-    let sourceId: String?
-    let encryptedContent: String?
-    let contentEnvelopes: [CaseEnvelope]?
-    let authorPubkey: String
-    let interactionTypeHash: String?
-    let createdAt: String
-    let previousStatusHash: String?
-    let newStatusHash: String?
-}
+// CaseInteraction and Interaction are defined in the generated Types.swift (protocol codegen).
+// Add Identifiable conformance for SwiftUI ForEach compatibility.
+extension CaseInteraction: Identifiable {}
+extension Interaction: Identifiable {}
 
 // MARK: - RecordContact
 
@@ -216,24 +204,10 @@ struct EntityTypesResponse: Codable, Sendable {
     let entityTypes: [CaseEntityTypeDefinition]
 }
 
-struct InteractionsResponse: Codable, Sendable {
-    let interactions: [CaseInteraction]
-    let total: Int?
-    let page: Int?
-    let limit: Int?
-    let hasMore: Bool?
-}
+// InteractionsResponse and EvidenceListResponse are defined in generated Types.swift.
 
 struct RecordContactsResponse: Codable, Sendable {
     let contacts: [RecordContact]
-}
-
-struct EvidenceListResponse: Codable, Sendable {
-    let evidence: [EvidenceItem]
-    let total: Int?
-    let page: Int?
-    let limit: Int?
-    let hasMore: Bool?
 }
 
 struct CaseManagementEnabledResponse: Codable, Sendable {

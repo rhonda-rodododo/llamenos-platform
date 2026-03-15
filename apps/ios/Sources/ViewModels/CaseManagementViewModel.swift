@@ -34,13 +34,15 @@ final class CaseManagementViewModel {
     var activeTab: DetailTab = .details
 
     /// Interactions (timeline) for the selected record.
-    var interactions: [CaseInteraction] = []
+    /// Uses the generated `Interaction` type from protocol codegen (list endpoint response).
+    var interactions: [Interaction] = []
 
     /// Contacts linked to the selected record.
     var contacts: [RecordContact] = []
 
     /// Evidence items for the selected record.
-    var evidence: [EvidenceItem] = []
+    /// Uses the generated `Evidence` type from protocol codegen.
+    var evidence: [Evidence] = []
 
     // Filters
     var entityTypeFilter: String? = nil
@@ -184,7 +186,7 @@ final class CaseManagementViewModel {
         defer { isLoadingInteractions = false }
 
         do {
-            let response: InteractionsResponse = try await apiService.request(
+            let response: InteractionListResponse = try await apiService.request(
                 method: "GET", path: "/api/records/\(recordId)/interactions?limit=100"
             )
             interactions = response.interactions
@@ -286,7 +288,7 @@ final class CaseManagementViewModel {
                 interactionTypeHash: "comment_hash"
             )
 
-            let _: CaseInteraction = try await apiService.request(
+            let _: CaseInteraction = try await apiService.request( // Returns full CaseInteraction on create
                 method: "POST", path: "/api/records/\(recordId)/interactions",
                 body: body
             )

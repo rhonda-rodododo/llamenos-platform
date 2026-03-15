@@ -456,7 +456,7 @@ struct CaseDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("case-evidence-empty")
             } else {
-                List(viewModel.evidence) { item in
+                List(viewModel.evidence, id: \.id) { item in
                     HStack {
                         Image(systemName: evidenceIcon(item.mimeType))
                             .font(.title3)
@@ -465,12 +465,12 @@ struct CaseDetailView: View {
                             Text(item.filename)
                                 .font(.brand(.body))
                                 .lineLimit(1)
-                            Text(item.classification)
+                            Text(item.classification.rawValue)
                                 .font(.brand(.caption2))
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(item.classification)
+                        Text(item.classification.rawValue)
                             .font(.brand(.caption2))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
@@ -498,7 +498,7 @@ struct CaseDetailView: View {
 // MARK: - TimelineItemRow
 
 private struct TimelineItemRow: View {
-    let interaction: CaseInteraction
+    let interaction: Interaction
     let entityType: CaseEntityTypeDefinition
 
     var body: some View {
@@ -532,7 +532,7 @@ private struct TimelineItemRow: View {
                     .accessibilityIdentifier("timeline-item-author")
 
                 // Status change details
-                if interaction.interactionType == "status_change",
+                if interaction.interactionType == .statusChange,
                    let newHash = interaction.newStatusHash,
                    let newStatus = entityType.statuses.first(where: { $0.value == newHash }) {
                     HStack(spacing: 4) {
@@ -555,36 +555,36 @@ private struct TimelineItemRow: View {
 
     private var typeIcon: String {
         switch interaction.interactionType {
-        case "comment": return "text.bubble"
-        case "status_change": return "arrow.triangle.2.circlepath"
-        case "note": return "note.text"
-        case "call": return "phone"
-        case "message": return "message"
-        case "file_upload": return "arrow.up.doc"
+        case .comment: return "text.bubble"
+        case .statusChange: return "arrow.triangle.2.circlepath"
+        case .note: return "note.text"
+        case .call: return "phone"
+        case .message: return "message"
+        case .fileUpload: return "arrow.up.doc"
         default: return "clock"
         }
     }
 
     private var typeLabel: String {
         switch interaction.interactionType {
-        case "comment": return "Comment"
-        case "status_change": return "Status Change"
-        case "note": return "Note"
-        case "call": return "Call"
-        case "message": return "Message"
-        case "file_upload": return "File Upload"
-        default: return interaction.interactionType.replacingOccurrences(of: "_", with: " ").capitalized
+        case .comment: return "Comment"
+        case .statusChange: return "Status Change"
+        case .note: return "Note"
+        case .call: return "Call"
+        case .message: return "Message"
+        case .fileUpload: return "File Upload"
+        default: return interaction.interactionType.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
 
     private var typeColor: Color {
         switch interaction.interactionType {
-        case "comment": return .blue
-        case "status_change": return .purple
-        case "note": return .orange
-        case "call": return .green
-        case "message": return .teal
-        case "file_upload": return .indigo
+        case .comment: return .blue
+        case .statusChange: return .purple
+        case .note: return .orange
+        case .call: return .green
+        case .message: return .teal
+        case .fileUpload: return .indigo
         default: return .gray
         }
     }
