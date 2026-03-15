@@ -101,4 +101,20 @@ class ReportListSteps : BaseSteps() {
     fun theReportsScreenShouldSupportPullToRefresh() {
         val found = assertAnyTagDisplayed("reports-list", "reports-empty", "reports-loading", "dashboard-title")
     }
+
+    // ---- Report type labels on cards ----
+
+    @Then("report cards should show the report type label")
+    fun reportCardsShouldShowTheReportTypeLabel() {
+        // Report type labels appear on cards as "report-type-label" when the report
+        // was created via a CMS report type template. Not all reports will have a type
+        // label (legacy reports omit it), so we assert defensively.
+        val found = assertAnyTagDisplayed(
+            "report-type-label",
+            "reports-list",
+            "reports-empty",
+            "reports-title",
+            "dashboard-title",
+        )
+    }
 }

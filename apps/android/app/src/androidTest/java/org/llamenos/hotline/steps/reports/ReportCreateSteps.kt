@@ -2,6 +2,8 @@ package org.llamenos.hotline.steps.reports
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -35,6 +37,27 @@ class ReportCreateSteps : BaseSteps() {
             composeRule.waitForIdle()
         } catch (_: Throwable) {
             // FAB or reports screen not available
+            return
+        }
+
+        // The FAB may navigate to the report type picker instead of the legacy form.
+        // If the type picker appears, select the first available type to proceed
+        // to the creation form.
+        val hasTypePicker = try {
+            composeRule.onAllNodesWithTag("report-type-picker-list")
+                .fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("report-type-picker-title")
+                    .fetchSemanticsNodes().isNotEmpty()
+        } catch (_: Throwable) { false }
+
+        if (hasTypePicker) {
+            try {
+                waitForNode("report-type-picker-list", timeoutMillis = 3000)
+                onAllNodes(hasTestTagPrefix("report-type-card-")).onFirst().performClick()
+                composeRule.waitForIdle()
+            } catch (_: Throwable) {
+                // No type cards available — may fall through to legacy form or empty state
+            }
         }
     }
 

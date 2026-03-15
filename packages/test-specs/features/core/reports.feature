@@ -213,3 +213,26 @@ Feature: Reports
     And a reporter is logged in
     When they navigate to "/volunteers" via SPA
     Then they should see "Access Denied"
+
+  # ── Template-Driven Report Types ─────────────────────────────────────
+
+  @android
+  Scenario: Report type picker shows mobile-optimized types
+    Given the "jail-support" template is applied
+    When I tap the create report button
+    Then the report type picker should show available types
+    And each type card should show a label and description
+
+  @android
+  Scenario: Template-driven report form renders dynamic fields
+    Given the "jail-support" template is applied
+    And I select report type "LO Arrest Report"
+    Then I should see fields for location, time, and arrestee details
+    And the arrestee details field should have an audio input button
+
+  @android
+  Scenario: Submit a template-driven report
+    Given I fill in the template report form
+    When I tap the submit button
+    Then a success message should appear
+    And the report should appear in my reports list
