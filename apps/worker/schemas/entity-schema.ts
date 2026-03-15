@@ -74,6 +74,9 @@ export const entityFieldDefinitionSchema = z.object({
   // Template tracking
   templateId: z.string().optional(),
   hubEditable: z.boolean().default(true),
+
+  // Audit
+  createdAt: z.string().optional(),
 })
 
 export type EntityFieldDefinition = z.infer<typeof entityFieldDefinitionSchema>
