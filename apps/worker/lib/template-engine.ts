@@ -7,6 +7,7 @@
  */
 import type { CaseManagementTemplate } from '../../../packages/protocol/template-types'
 import type { EntityTypeDefinition, RelationshipTypeDefinition, EntityFieldDefinition } from '../schemas/entity-schema'
+import type { ReportTypeDefinition, ReportFieldDefinition } from '../schemas/report-types'
 
 export interface AppliedTemplateRecord {
   templateId: string
@@ -14,6 +15,7 @@ export interface AppliedTemplateRecord {
   appliedAt: string
   entityTypeIds: string[]
   relationshipTypeIds: string[]
+  reportTypeIds: string[]
 }
 
 /**
@@ -27,9 +29,11 @@ export function applyTemplate(
   hubId: string,
   allTemplates: Map<string, CaseManagementTemplate>,
   existingEntityTypes: EntityTypeDefinition[],
+  existingReportTypes: ReportTypeDefinition[] = [],
 ): {
   entityTypes: EntityTypeDefinition[]
   relationshipTypes: RelationshipTypeDefinition[]
+  reportTypes: ReportTypeDefinition[]
   appliedRecord: AppliedTemplateRecord
 } {
   // 1. Resolve extends chain (depth-first)
@@ -65,7 +69,7 @@ export function applyTemplate(
 
   // Resolve label reference strings from template labels section
   // Template labels are keyed by locale, e.g. template.labels.en["arrest_case.label"] = "Arrest Case"
-  const defaultLabels: Record<string, string> = (template.labels as Record<string, Record<string, string>> | undefined)?.en ?? {}
+  const defaultLabels = template.labels.en ?? {}
   const resolveLabel = (ref: string): string => defaultLabels[ref] ?? ref
 
   for (const [, templateET] of resolvedEntityTypes) {
@@ -85,7 +89,7 @@ export function applyTemplate(
       category: templateET.category,
       templateId: template.id,
       templateVersion: template.version,
-      fields: templateET.fields.map((f: typeof templateET.fields[number], i: number) => ({
+      fields: templateET.fields.map((f, i): EntityFieldDefinition => ({
         id: crypto.randomUUID(),
         name: f.name,
         label: resolveLabel(f.label),
@@ -103,8 +107,7 @@ export function applyTemplate(
         showWhen: f.showWhen,
         templateId: template.id,
         hubEditable: f.hubEditable ?? true,
-        createdAt: now,
-      } as EntityFieldDefinition)),
+      })),
       statuses: templateET.statuses,
       defaultStatus: templateET.defaultStatus,
       closedStatuses: templateET.closedStatuses,
@@ -160,15 +163,90 @@ export function applyTemplate(
     })
   }
 
+  // 5. Convert report types (Epic 343)
+  // CaseManagementTemplate already includes reportTypes via Zod schema
+  type TemplateReportType = CaseManagementTemplate['reportTypes'][number]
+  type TemplateField = CaseManagementTemplate['reportTypes'][number]['fields'][number]
+
+  const createdReportTypes: ReportTypeDefinition[] = []
+
+  // Resolve parent template report types (same depth-first pattern as entity types)
+  const resolvedReportTypes = new Map<string, TemplateReportType>()
+  for (const parentId of template.extends) {
+    const parent = allTemplates.get(parentId)
+    if (!parent) continue
+    for (const rt of parent.reportTypes) {
+      resolvedReportTypes.set(rt.name, rt)
+    }
+  }
+  for (const rt of template.reportTypes) {
+    resolvedReportTypes.set(rt.name, rt)
+  }
+
+  for (const [, templateRT] of resolvedReportTypes) {
+    const existingRT = existingReportTypes.find(e => e.name === templateRT.name)
+    const id = existingRT?.id || crypto.randomUUID()
+
+    const reportType: ReportTypeDefinition = {
+      id,
+      hubId,
+      name: templateRT.name,
+      label: resolveLabel(templateRT.label),
+      labelPlural: resolveLabel(templateRT.labelPlural),
+      description: resolveLabel(templateRT.description ?? ''),
+      icon: templateRT.icon,
+      color: templateRT.color,
+      category: 'report',
+      templateId: template.id,
+      templateVersion: template.version,
+      fields: templateRT.fields.map((f: TemplateField, i: number): ReportFieldDefinition => ({
+        id: crypto.randomUUID(),
+        name: f.name,
+        label: resolveLabel(f.label),
+        type: f.type,
+        required: f.required ?? false,
+        options: f.options,
+        section: f.section ? resolveLabel(f.section) : undefined,
+        helpText: f.helpText ? resolveLabel(f.helpText) : undefined,
+        order: f.order ?? i,
+        indexable: f.indexable ?? false,
+        indexType: f.indexType ?? 'none',
+        accessLevel: f.accessLevel ?? 'all',
+        visibleToVolunteers: true,
+        editableByVolunteers: true,
+        showWhen: f.showWhen,
+        templateId: template.id,
+        hubEditable: f.hubEditable ?? true,
+        supportAudioInput: f.supportAudioInput ?? false,
+      })),
+      statuses: templateRT.statuses,
+      defaultStatus: templateRT.defaultStatus,
+      closedStatuses: templateRT.closedStatuses ?? [],
+      numberPrefix: templateRT.numberPrefix,
+      numberingEnabled: templateRT.numberingEnabled ?? false,
+      allowFileAttachments: templateRT.allowFileAttachments ?? true,
+      allowCaseConversion: templateRT.allowCaseConversion ?? false,
+      mobileOptimized: templateRT.mobileOptimized ?? false,
+      isArchived: false,
+      isSystem: false,
+      createdAt: existingRT?.createdAt ?? now,
+      updatedAt: now,
+    }
+
+    createdReportTypes.push(reportType)
+  }
+
   return {
     entityTypes: createdEntityTypes,
     relationshipTypes: createdRelationshipTypes,
+    reportTypes: createdReportTypes,
     appliedRecord: {
       templateId: template.id,
       templateVersion: template.version,
       appliedAt: now,
       entityTypeIds: createdEntityTypes.map(e => e.id),
       relationshipTypeIds: createdRelationshipTypes.map(r => r.id),
+      reportTypeIds: createdReportTypes.map(r => r.id),
     },
   }
 }
