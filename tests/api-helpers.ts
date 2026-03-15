@@ -871,8 +871,9 @@ export async function applyTemplateViaApi(
 
 /**
  * Convenience wrapper: create a contact by display name.
- * The actual API expects encrypted payloads, so we encode the displayName
- * into encryptedSummary and generate a unique identifier hash.
+ * Uses the /directory/contacts endpoint (same as frontend UI) so contacts
+ * appear in the directory listing. Falls back to the encrypted /directory
+ * endpoint if the plain-text endpoint fails.
  */
 export async function createContactByNameViaApi(
   request: APIRequestContext,
@@ -880,6 +881,22 @@ export async function createContactByNameViaApi(
   extraOptions?: { contactTypeHash?: string },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
+  // Try the plain-text /directory/contacts endpoint first (matches frontend)
+  try {
+    const { status, data } = await apiPost<Record<string, unknown>>(
+      request,
+      '/directory/contacts',
+      {
+        displayName,
+        contactType: extraOptions?.contactTypeHash ?? 'individual',
+      },
+      nsec,
+    )
+    if (status === 200 || status === 201) return data
+  } catch {
+    // Fall through to encrypted endpoint
+  }
+  // Fallback: encrypted /directory endpoint
   return createContactViaApi(request, {
     encryptedSummary: btoa(JSON.stringify({ displayName })),
     identifierHashes: [`name_${Date.now()}_${Math.random().toString(36).slice(2)}`],
@@ -1172,6 +1189,14 @@ export async function createInteractionViaApi(
   const body: Record<string, unknown> = {
     interactionType: options.interactionType,
     interactionTypeHash: options.interactionTypeHash ?? `${options.interactionType}_hash`,
+  }
+  // Schema requires sourceId for note/call/message; encryptedContent for comment
+  if (options.interactionType === 'comment' && !options.encryptedContent) {
+    body.encryptedContent = 'dGVzdCBjb21tZW50' // base64 "test comment"
+    body.contentEnvelopes = [envelope]
+  }
+  if (['note', 'call', 'message'].includes(options.interactionType) && !options.sourceId) {
+    body.sourceId = crypto.randomUUID()
   }
   if (options.sourceId) body.sourceId = options.sourceId
   if (options.encryptedContent) {
