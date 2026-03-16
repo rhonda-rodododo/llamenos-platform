@@ -137,29 +137,27 @@ fun CaseListScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
-            // Entity type tab row
-            if (tabs.size > 1) {
-                ScrollableTabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    edgePadding = 16.dp,
-                    modifier = Modifier.testTag("case-type-tabs"),
-                ) {
-                    tabs.forEachIndexed { index, entityType ->
-                        val tabName = entityType?.name ?: "all"
-                        Tab(
-                            selected = selectedTabIndex == index,
-                            onClick = {
-                                viewModel.setEntityTypeFilter(entityType?.id)
-                            },
-                            text = {
-                                Text(
-                                    text = entityType?.labelPlural ?: "All",
-                                    maxLines = 1,
-                                )
-                            },
-                            modifier = Modifier.testTag("case-tab-$tabName"),
-                        )
-                    }
+            // Entity type tab row — always shown so the "All" tab is available
+            ScrollableTabRow(
+                selectedTabIndex = selectedTabIndex,
+                edgePadding = 16.dp,
+                modifier = Modifier.testTag("case-type-tabs"),
+            ) {
+                tabs.forEachIndexed { index, entityType ->
+                    val tabName = entityType?.name ?: "all"
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = {
+                            viewModel.setEntityTypeFilter(entityType?.id)
+                        },
+                        text = {
+                            Text(
+                                text = entityType?.labelPlural ?: "All",
+                                maxLines = 1,
+                            )
+                        },
+                        modifier = Modifier.testTag("case-tab-$tabName"),
+                    )
                 }
             }
 

@@ -83,9 +83,11 @@ fun CaseDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    val isNewCase = recordId == "new"
+
     // Load the record on entry
     LaunchedEffect(recordId) {
-        if (recordId != "new") {
+        if (!isNewCase) {
             viewModel.selectRecord(recordId)
         }
     }
@@ -101,7 +103,8 @@ fun CaseDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = record?.caseNumber ?: record?.id?.take(8) ?: "Case",
+                        text = if (isNewCase && record == null) "New Case"
+                            else record?.caseNumber ?: record?.id?.take(8) ?: "Case",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.testTag("case-detail-header"),
@@ -129,7 +132,7 @@ fun CaseDetailScreen(
         modifier = modifier,
     ) { paddingValues ->
         when {
-            uiState.isLoadingDetail -> {
+            uiState.isLoadingDetail && !isNewCase -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -144,7 +147,7 @@ fun CaseDetailScreen(
                 }
             }
 
-            uiState.detailError != null -> {
+            uiState.detailError != null && !isNewCase -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -160,7 +163,7 @@ fun CaseDetailScreen(
                 }
             }
 
-            record != null -> {
+            record != null || isNewCase -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -170,6 +173,7 @@ fun CaseDetailScreen(
                     CaseDetailHeader(
                         record = record,
                         entityType = entityType,
+                        isNewCase = isNewCase,
                         onStatusClick = { showStatusSheet = true },
                     )
 
@@ -207,30 +211,37 @@ fun CaseDetailScreen(
                     }
 
                     // Tab content
-                    when (uiState.activeTab) {
-                        CaseDetailTab.DETAILS -> DetailsTab(
-                            record = record,
-                            entityType = entityType,
-                            onAssignToMe = { viewModel.assignToMe(record.id) },
-                            isAssigning = uiState.isAssigning,
-                        )
-                        CaseDetailTab.TIMELINE -> TimelineTab(
-                            interactions = uiState.interactions,
-                            isLoading = uiState.isLoadingInteractions,
-                            error = uiState.interactionsError,
-                            entityType = entityType,
-                            onAddComment = { showCommentSheet = true },
-                        )
-                        CaseDetailTab.CONTACTS -> ContactsTab(
-                            contacts = uiState.contacts,
-                            isLoading = uiState.isLoadingContacts,
-                            error = uiState.contactsError,
-                            entityType = entityType,
-                        )
-                        CaseDetailTab.EVIDENCE -> EvidenceTab(
-                            evidence = uiState.evidence,
-                            isLoading = uiState.isLoadingEvidence,
-                            error = uiState.evidenceError,
+                    if (record != null) {
+                        when (uiState.activeTab) {
+                            CaseDetailTab.DETAILS -> DetailsTab(
+                                record = record,
+                                entityType = entityType,
+                                onAssignToMe = { viewModel.assignToMe(record.id) },
+                                isAssigning = uiState.isAssigning,
+                            )
+                            CaseDetailTab.TIMELINE -> TimelineTab(
+                                interactions = uiState.interactions,
+                                isLoading = uiState.isLoadingInteractions,
+                                error = uiState.interactionsError,
+                                entityType = entityType,
+                                onAddComment = { showCommentSheet = true },
+                            )
+                            CaseDetailTab.CONTACTS -> ContactsTab(
+                                contacts = uiState.contacts,
+                                isLoading = uiState.isLoadingContacts,
+                                error = uiState.contactsError,
+                                entityType = entityType,
+                            )
+                            CaseDetailTab.EVIDENCE -> EvidenceTab(
+                                evidence = uiState.evidence,
+                                isLoading = uiState.isLoadingEvidence,
+                                error = uiState.evidenceError,
+                            )
+                        }
+                    } else {
+                        // New case — show empty form state
+                        NewCaseContent(
+                            activeTab = uiState.activeTab,
                         )
                     }
 
@@ -280,12 +291,15 @@ fun CaseDetailScreen(
 
 @Composable
 private fun CaseDetailHeader(
-    record: CaseRecord,
+    record: CaseRecord?,
     entityType: EntityTypeDefinition?,
+    isNewCase: Boolean = false,
     onStatusClick: () -> Unit,
 ) {
-    val statusOption = entityType?.statuses?.find { it.value == record.statusHash }
-    val statusLabel = statusOption?.label ?: record.statusHash
+    val statusOption = record?.let { r ->
+        entityType?.statuses?.find { it.value == r.statusHash }
+    }
+    val statusLabel = statusOption?.label ?: record?.statusHash ?: if (isNewCase) "New" else "—"
     val statusColor = statusOption?.color?.let { parseHexColor(it) }
 
     Row(
@@ -302,6 +316,12 @@ private fun CaseDetailHeader(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        } else if (isNewCase) {
+            Text(
+                text = "New Case",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         Spacer(Modifier.weight(1f))
@@ -309,6 +329,7 @@ private fun CaseDetailHeader(
         // Status pill button
         OutlinedButton(
             onClick = onStatusClick,
+            enabled = record != null,
             modifier = Modifier.testTag("case-status-pill"),
         ) {
             if (statusColor != null) {
@@ -325,6 +346,82 @@ private fun CaseDetailHeader(
                 style = MaterialTheme.typography.labelMedium,
             )
         }
+    }
+}
+
+// ---- New Case Content ----
+
+/**
+ * Placeholder content shown when creating a new case.
+ * Renders the appropriate empty state for each tab.
+ */
+@Composable
+private fun NewCaseContent(
+    activeTab: CaseDetailTab,
+) {
+    when (activeTab) {
+        CaseDetailTab.DETAILS -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "New Case",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = "Connect to a hub to create cases",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                // Assign button placeholder
+                Button(
+                    onClick = { },
+                    enabled = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("case-assign-btn"),
+                ) {
+                    Text("Assign to me")
+                }
+            }
+        }
+        CaseDetailTab.TIMELINE -> TimelineTab(
+            interactions = emptyList(),
+            isLoading = false,
+            error = null,
+            entityType = null,
+            onAddComment = { },
+        )
+        CaseDetailTab.CONTACTS -> ContactsTab(
+            contacts = emptyList(),
+            isLoading = false,
+            error = null,
+            entityType = null,
+        )
+        CaseDetailTab.EVIDENCE -> EvidenceTab(
+            evidence = emptyList(),
+            isLoading = false,
+            error = null,
+        )
     }
 }
 
