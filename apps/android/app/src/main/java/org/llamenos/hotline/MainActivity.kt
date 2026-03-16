@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
 
     private var backgroundTimestamp: Long? = null
 
-    /// Pending deep link destination, consumed by LlamenosNavigation on composition.
+    /** Pending deep link destination, consumed by LlamenosNavigation on composition. */
     internal var pendingDeepLink: DeepLinkDestination? = null
         private set
 

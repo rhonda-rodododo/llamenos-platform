@@ -70,6 +70,11 @@ final class APIService: @unchecked Sendable {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
+    /// Offline write queue. Set by AppState after initialization.
+    /// When a write request fails with a network error, the operation is
+    /// automatically enqueued for replay when connectivity is restored.
+    var offlineQueue: OfflineQueue?
+
     /// Certificate pinning delegate (H14). Retained by the URLSession.
     private let pinningDelegate = CertificatePinningDelegate()
 
@@ -190,6 +195,16 @@ final class APIService: @unchecked Sendable {
         do {
             (data, response) = try await session.data(for: urlRequest)
         } catch {
+            // On network error for write operations, enqueue for offline replay
+            if OfflineQueue.isQueueableMethod(method) {
+                let bodyString: String?
+                if let httpBody = urlRequest.httpBody {
+                    bodyString = String(data: httpBody, encoding: .utf8)
+                } else {
+                    bodyString = nil
+                }
+                offlineQueue?.enqueue(path: path, method: method.uppercased(), body: bodyString)
+            }
             throw APIError.networkError(error)
         }
 
@@ -260,6 +275,11 @@ final class APIService: @unchecked Sendable {
         do {
             (data, response) = try await session.data(for: urlRequest)
         } catch {
+            // On network error for write operations, enqueue for offline replay
+            if OfflineQueue.isQueueableMethod(method) {
+                let bodyString = String(data: rawBody, encoding: .utf8)
+                offlineQueue?.enqueue(path: path, method: method.uppercased(), body: bodyString)
+            }
             throw APIError.networkError(error)
         }
 

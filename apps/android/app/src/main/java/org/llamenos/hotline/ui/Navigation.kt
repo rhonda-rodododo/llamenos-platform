@@ -310,6 +310,8 @@ fun LlamenosNavigation(
     keystoreService: KeystoreService,
     networkMonitor: NetworkMonitor,
     versionChecker: VersionChecker,
+    pendingDeepLink: DeepLinkDestination? = null,
+    onDeepLinkConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
@@ -411,6 +413,37 @@ fun LlamenosNavigation(
         }
 
         composable(LlamenosRoute.Main.route) {
+            // Handle pending deep link after reaching the main authenticated screen
+            LaunchedEffect(pendingDeepLink) {
+                val destination = pendingDeepLink ?: return@LaunchedEffect
+                onDeepLinkConsumed()
+                when (destination) {
+                    is DeepLinkDestination.Cases ->
+                        navController.navigate(LlamenosRoute.CaseList.route)
+                    is DeepLinkDestination.CaseDetail ->
+                        navController.navigate("case/${destination.id}")
+                    is DeepLinkDestination.Notes ->
+                        { /* Already on main — user can tap Notes tab */ }
+                    is DeepLinkDestination.NoteDetail ->
+                        navController.navigate("note/${destination.id}")
+                    is DeepLinkDestination.CallHistory ->
+                        navController.navigate(LlamenosRoute.CallHistory.route)
+                    is DeepLinkDestination.CallDetail ->
+                        navController.navigate(LlamenosRoute.CallHistory.route)
+                    is DeepLinkDestination.Conversations ->
+                        { /* Already on main — user can tap Conversations tab */ }
+                    is DeepLinkDestination.ConversationDetail ->
+                        navController.navigate("conversation/${destination.id}")
+                    is DeepLinkDestination.Reports ->
+                        navController.navigate(LlamenosRoute.Reports.route)
+                    is DeepLinkDestination.ReportDetail ->
+                        navController.navigate("report/${destination.id}")
+                    is DeepLinkDestination.Settings ->
+                        { /* Already on main — user can tap Settings tab */ }
+                    is DeepLinkDestination.Admin ->
+                        navController.navigate(LlamenosRoute.Admin.route)
+                }
+            }
             MainScreen(
                 cryptoService = cryptoService,
                 webSocketService = webSocketService,

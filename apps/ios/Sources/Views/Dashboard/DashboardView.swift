@@ -240,18 +240,16 @@ struct DashboardView: View {
                         destination: .contacts,
                         accessibilityID: "dashboard-contacts-action"
                     )
-                }
-            }
 
-            if appState.isAdmin {
-                GridRow {
                     quickActionCard(
                         title: NSLocalizedString("dashboard_blasts", comment: "Message Blasts"),
                         icon: "megaphone.fill",
                         destination: .blasts,
                         accessibilityID: "dashboard-blasts-action"
                     )
+                }
 
+                GridRow {
                     quickActionCard(
                         title: NSLocalizedString("dashboard_triage", comment: "Triage"),
                         icon: "tray.and.arrow.down.fill",

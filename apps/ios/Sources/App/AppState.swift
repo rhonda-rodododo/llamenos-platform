@@ -90,6 +90,9 @@ final class AppState {
         self.crashReportingService = crashReporting
         self.offlineQueue = offline
 
+        // Wire offline queue into API service for automatic enqueue on network errors
+        api.offlineQueue = offline
+
         #if DEBUG
         // Handle launch arguments BEFORE reading persisted state
         // so --reset-keychain clears everything before we configure services
