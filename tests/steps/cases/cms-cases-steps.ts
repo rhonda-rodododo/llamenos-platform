@@ -209,12 +209,18 @@ Then('the entity type selector should show {string}', async ({ page }, expected:
 // --- Case list preconditions ---
 
 Given('no cases have been created', async ({ backendRequest: request }) => {
-  // Delete all existing records so we get a clean empty state
-  const result = await listRecordsViaApi(request).catch(() => ({ records: [], total: 0, hasMore: false }))
+  // Delete ALL existing records (paginate through all pages)
   const { apiDelete } = await import('../../api-helpers')
-  for (const rec of result.records) {
-    const id = (rec as { id: string }).id
-    await apiDelete(request, `/records/${id}`).catch(() => {})
+  let page = 1
+  let hasMore = true
+  while (hasMore) {
+    const result = await listRecordsViaApi(request, { page, limit: 100 }).catch(() => ({ records: [], total: 0, hasMore: false }))
+    for (const rec of result.records) {
+      const id = (rec as { id: string }).id
+      await apiDelete(request, `/records/${id}`).catch(() => {})
+    }
+    hasMore = result.records.length === 100
+    page++
   }
 })
 
