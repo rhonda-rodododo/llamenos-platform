@@ -1,19 +1,23 @@
 package org.llamenos.hotline.steps.cases
 
+import android.util.Log
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import io.cucumber.java.en.And
-import android.util.Log
-import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 
@@ -27,6 +31,13 @@ import org.llamenos.hotline.steps.BaseSteps
  * not just element existence.
  */
 class CaseListSteps : BaseSteps() {
+
+    /** Hilt entry point to access CryptoService from test code. */
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface NpubEntryPoint {
+        fun cryptoService(): CryptoService
+    }
 
     // ---- Background / Given ----
 
@@ -42,10 +53,74 @@ class CaseListSteps : BaseSteps() {
             Log.w("CaseListSteps", "CMS setup failed: ${e.message}")
         }
 
-        // Phase 2: Launch app — onboarding registers identity as volunteer.
-        // The volunteer role now includes cases:read (granted by test-setup-cms),
-        // so all records are visible without explicit assignment.
+        // Phase 2: Launch app — onboarding creates a local identity and registers
+        // it as a volunteer on the backend.
         navigateToMainScreen()
+
+        // Phase 3: Read the app's npub from Settings screen and promote to admin.
+        // The backend's authenticateRequest() requires the pubkey to be registered
+        // as a volunteer, and CMS endpoints require admin role.
+        val npub = readNpubFromSettings()
+        if (npub != null) {
+            try {
+                // promoteToAdmin accepts npub bech32 — the backend decodes it to hex
+                val promoteResult = SimulationClient.promoteToAdmin(npub)
+                Log.d("CaseListSteps", "Promote to admin: ok=${promoteResult.ok}, error=${promoteResult.error}")
+
+                // Re-run CMS setup with the pubkey so the sample record is assigned
+                val cmsResult = SimulationClient.setupCms(npub)
+                Log.d("CaseListSteps", "CMS re-setup with pubkey: ok=${cmsResult.ok}, entityTypes=${cmsResult.entityTypeCount}")
+            } catch (e: Throwable) {
+                Log.w("CaseListSteps", "Post-launch setup failed: ${e.message}")
+            }
+        } else {
+            Log.w("CaseListSteps", "Could not read npub from Settings screen")
+        }
+    }
+
+    /**
+     * Read the app's npub by accessing the running Activity's Hilt-injected CryptoService.
+     * Falls back to reading from the Settings UI if programmatic access fails.
+     */
+    private fun readNpubFromSettings(): String? {
+        // Approach 1: Read programmatically from CryptoService via the Activity
+        try {
+            var npubText: String? = null
+            activityScenarioHolder.scenario?.onActivity { activity ->
+                try {
+                    val entryPoint = EntryPointAccessors.fromApplication(
+                        activity.applicationContext,
+                        CaseListSteps.NpubEntryPoint::class.java
+                    )
+                    npubText = entryPoint.cryptoService().npub
+                    Log.d("CaseListSteps", "Read npub via EntryPoint: ${npubText?.take(20)}...")
+                } catch (e: Throwable) {
+                    Log.w("CaseListSteps", "EntryPoint access failed: ${e.message}")
+                }
+            }
+            if (!npubText.isNullOrBlank()) return npubText
+        } catch (e: Throwable) {
+            Log.w("CaseListSteps", "Programmatic npub read failed: ${e.message}")
+        }
+
+        // Approach 2: Fall back to UI — navigate to Settings and read the npub text
+        try {
+            navigateToTab(NAV_SETTINGS)
+            composeRule.waitUntil(8_000) {
+                composeRule.onAllNodesWithTag("settings-npub").fetchSemanticsNodes().isNotEmpty()
+            }
+            val npubNodes = composeRule.onAllNodesWithTag("settings-npub").fetchSemanticsNodes()
+            val npubText = npubNodes.firstOrNull()?.config?.getOrNull(
+                SemanticsProperties.Text
+            )?.firstOrNull()?.text
+            Log.d("CaseListSteps", "Read npub from Settings UI: ${npubText?.take(20)}...")
+            navigateToTab(NAV_DASHBOARD)
+            return npubText
+        } catch (e: Throwable) {
+            Log.w("CaseListSteps", "UI npub read failed: ${e.message}")
+            try { navigateToTab(NAV_DASHBOARD) } catch (_: Throwable) {}
+            return null
+        }
     }
 
     @Given("cases exist in the system")

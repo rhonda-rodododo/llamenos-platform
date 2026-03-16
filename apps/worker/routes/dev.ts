@@ -5,6 +5,20 @@ import { getDOs } from '../lib/do-access'
 import { hashPhone } from '../lib/crypto'
 import { publishNostrEvent } from '../lib/nostr-events'
 import { KIND_MESSAGE_NEW } from '@shared/nostr-events'
+import { nip19 } from 'nostr-tools'
+
+/**
+ * Decode a pubkey that may be in npub1... bech32 format or raw hex.
+ * Returns the hex pubkey string.
+ */
+function decodePubkey(input: string): string {
+  if (input.startsWith('npub1')) {
+    const decoded = nip19.decode(input)
+    if (decoded.type === 'npub') return decoded.data
+    throw new Error(`Invalid npub: decoded type was ${decoded.type}`)
+  }
+  return input
+}
 
 const dev = new Hono<AppEnv>()
 
@@ -107,12 +121,19 @@ dev.post('/test-promote-admin', async (c) => {
   if (!body.pubkey) {
     return c.json({ error: 'pubkey is required' }, 400)
   }
+  let pubkey: string
+  try {
+    pubkey = decodePubkey(body.pubkey)
+  } catch (e) {
+    return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
+  }
   const dos = getDOs(c.env)
-  // Try to update existing volunteer to admin role
-  const updateRes = await dos.identity.fetch(new Request(`http://do/volunteers/${body.pubkey}`, {
+  // Try to update existing volunteer to super-admin role.
+  // Must use the admin PATCH route to update roles (non-admin PATCH strips role changes).
+  const updateRes = await dos.identity.fetch(new Request(`http://do/admin/volunteers/${pubkey}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ roleIds: ['role-admin'] }),
+    body: JSON.stringify({ roles: ['role-super-admin'] }),
   }))
   if (!updateRes.ok) {
     // Volunteer may not exist yet — create with admin role
@@ -120,14 +141,15 @@ dev.post('/test-promote-admin', async (c) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        pubkey: body.pubkey,
+        pubkey,
         name: 'BDD Test Admin',
         phone: '+15550000001',
-        roleIds: ['role-admin'],
+        roleIds: ['role-super-admin'],
+        encryptedSecretKey: '',
       }),
     }))
   }
-  return c.json({ ok: true, pubkey: body.pubkey })
+  return c.json({ ok: true, pubkey })
 })
 
 // ─── CMS Test Setup (E2E test helpers) ──────────────────────────────────────
@@ -143,6 +165,14 @@ dev.post('/test-setup-cms', async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({})) as { pubkey?: string }
+  let pubkey: string | undefined
+  if (body.pubkey) {
+    try {
+      pubkey = decodePubkey(body.pubkey)
+    } catch {
+      pubkey = body.pubkey // Fall back to raw value if decode fails
+    }
+  }
   const dos = getDOs(c.env)
   const templateId = 'jail-support'
 
@@ -222,7 +252,7 @@ dev.post('/test-setup-cms', async (c) => {
   let recordId: string | null = null
   if (entityTypes.length > 0) {
     const et = entityTypes[0]
-    const assignedTo = body.pubkey ? [body.pubkey] : []
+    const assignedTo = pubkey ? [pubkey] : []
     const createRes = await dos.caseManager.fetch(new Request('http://do/records', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -233,7 +263,7 @@ dev.post('/test-setup-cms', async (c) => {
         blindIndexes: {},
         encryptedSummary: btoa('{"title":"Test Case","summary":"BDD test case"}'),
         summaryEnvelopes: [],
-        createdBy: body.pubkey ?? '',
+        createdBy: pubkey ?? '',
       }),
     }))
     if (createRes.ok) {
