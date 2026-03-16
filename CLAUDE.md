@@ -91,8 +91,9 @@ packages/
     types.ts          # Shared types (CustomFieldDefinition, NotePayload, etc.)
     crypto-labels.ts  # Domain separation constants (re-exported from protocol)
   protocol/           # Cross-platform type codegen (Zod → quicktype)
-    tools/codegen.ts  # Zod → toJSONSchema() → quicktype → TS/Swift/Kotlin
-    tools/schema-registry.ts  # Maps Zod schemas to named JSON Schemas
+    schemas/          # 30+ Zod schema files (source of truth for all types)
+    tools/codegen.ts  # Zod → toJSONSchema() → quicktype → TS/Swift/Kotlin (with Kotlin default injection + Swift renaming)
+    tools/schema-registry.ts  # Maps 85+ Zod schemas to named JSON Schemas
     openapi-snapshot.json     # OpenAPI spec snapshot (written by dev server on startup)
     generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
     crypto-labels.json # 28 domain separation constants (source of truth)
@@ -114,10 +115,11 @@ docs/
   epics/              # Feature epic documents
 ```
 
-**Path aliases** (tsconfig.json + vite.config.ts):
+**Path aliases** (tsconfig.json + vite.config.ts + esbuild.node.mjs):
 - `@/*` → `./src/client/*`
 - `@worker/*` → `./apps/worker/*`
 - `@shared/*` → `./packages/shared/*`
+- `@protocol/*` → `./packages/protocol/*`
 - `@llamenos/i18n` → `./packages/i18n/index.ts`
 
 ## Key Technical Patterns
@@ -132,7 +134,7 @@ docs/
 - **E2EE messaging**: Per-message envelope encryption — random symmetric key, ECIES-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
 - **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. The nsec NEVER enters the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.
 - **packages/crypto**: Shared Rust crypto crate (formerly separate `llamenos-core` repo). All crypto operations (ECIES, Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305) implemented once in Rust, compiled to native (Tauri), WASM (browser), and UniFFI (mobile). Desktop links via `apps/desktop/Cargo.toml` path dep to `../../packages/crypto`.
-- **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates TypeScript interfaces, Swift Codable structs, and Kotlin @Serializable data classes from Zod schemas (via `toJSONSchema()` + quicktype). Also generates crypto label constants from `crypto-labels.json`. Zod schemas in `apps/worker/schemas/` are the single source of truth. Run `bun run codegen` after schema changes. Generated output is gitignored — codegen runs as a build prerequisite.
+- **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates TypeScript interfaces, Swift Codable structs, and Kotlin @Serializable data classes from Zod schemas (via `toJSONSchema()` + quicktype). Also generates crypto label constants from `crypto-labels.json`. Zod schemas in `packages/protocol/schemas/` are the single source of truth (moved from `apps/worker/schemas/`). Schema registry in `packages/protocol/tools/schema-registry.ts` maps 85+ Zod schemas to named types. Kotlin post-processor injects `@Serializable` defaults for `.optional().default()` fields. Swift post-processor strips convenience extensions, adds `Sendable`, renames 15 types that shadow builtins. Run `bun run codegen` after schema changes. Generated output is gitignored — codegen runs as a build prerequisite.
 - **Key management**: PIN-encrypted keys stored in Tauri Store (desktop), iOS Keychain, or Android Keystore (EncryptedSharedPreferences). Rust CryptoState holds the nsec; UI only sees pubkey. Device linking via ephemeral ECDH provisioning rooms.
 - **Tauri IPC mock for tests**: Playwright tests run in a regular browser. `PLAYWRIGHT_TEST=true` triggers Vite aliases that route `@tauri-apps/api/core` and `@tauri-apps/plugin-store` to JS mock implementations in `tests/mocks/`. The mock maintains a CryptoState that mirrors the Rust side.
 - **Mobile crypto**: iOS uses UniFFI XCFramework from `packages/crypto/`, Android uses JNI `.so` files. Both wrap CryptoService as a singleton — `nsecHex` is private and never leaves the service layer.
@@ -157,6 +159,8 @@ docs/
 - **Worker config**: `wrangler.jsonc` lives at `apps/worker/wrangler.jsonc`. All wrangler commands use `--config apps/worker/wrangler.jsonc`.
 - **iOS UniFFI**: Build with `packages/crypto/scripts/build-mobile.sh ios`, copy XCFramework to `apps/ios/`. Stand-in mock types enabled via `#if !canImport(LlamenosCore)`.
 - **Android JNI**: Build with `packages/crypto/scripts/build-mobile.sh android`, place `.so` files in `apps/android/app/src/main/jniLibs/`. Placeholder mock crypto active until native libs are linked.
+- **Zod `.optional().default()` pattern**: Always use `.optional().default(value)` for fields with defaults in `packages/protocol/schemas/`. Never use bare `.default(value)` — it produces wrong JSON Schema output in Zod 4, breaking Kotlin/Swift codegen defaults. The Kotlin post-processor in `codegen.ts` reads `"default"` values from JSON Schema and injects them into generated `@Serializable` data classes.
+- **Schemas moved to protocol**: All Zod schemas live in `packages/protocol/schemas/` (moved from `apps/worker/schemas/`). Worker routes import from `@protocol/schemas`. Old epic docs may reference the old path — the new path is canonical.
 
 ## Development Commands
 

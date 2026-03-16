@@ -608,19 +608,33 @@ CMS backend + desktop UI complete (Epics 315-332). Remaining work: test executio
 - [x] **[Epic 341: Hub Context & Multi-Hub UX](epics/epic-341-hub-context-and-multi-hub-ux.md)** — HubSwitcher component, hub context on all CMS API calls, key-based remount on hub change
 - [x] **[Epic 343: Template-Defined Report Types](epics/epic-343-template-defined-report-types.md)** — ReportTypeDefinition schema, SettingsDO CRUD, template engine extension, API routes. jail-support template v1.2.0 with `lo_arrest_report` (allowCaseConversion, mobileOptimized, supportAudioInput) and `lo_misconduct_report`. **6/6 backend BDD pass.**
 
-### In Progress
-- [ ] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 89/99 BDD pass (90%). Events route, E2EE contact directory, template label fix done. [Remaining TODOs](epics/epic-335-remaining-todos.md) being fixed.
-- [ ] **[Epic 342: Smart Case Assignment & Report-to-Case Conversion](epics/epic-342-case-assignment-routing.md)** — Part 1 done (suggest-assignees API, ranked UI, auto-assign). Part 2 (report triage/conversion) unblocked by Epic 343.
-- [ ] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — 61 keys × 12 locales added (ES/FR/PT translated). Template i18n mappings, codegen validation, RTL testing still needed
+- [x] **[Epic 342: Smart Case Assignment & Report-to-Case Conversion](epics/epic-342-case-assignment-routing.md)** — Smart assignment API with scoring, auto-assign, report triage queue, template-driven case creation, LLM-assisted parsing
 
 ### In Progress
+- [ ] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 89/99 BDD pass (90%). Events route, E2EE contact directory, template label fix done. [Remaining TODOs](epics/epic-335-remaining-todos.md) being fixed.
+- [ ] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — 61 keys × 12 locales added (ES/FR/PT translated). Template i18n mappings, codegen validation, RTL testing still needed
 - [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — **Phase 1 complete** (report submission): ReportTypePicker, TypedReportForm, AudioInput on both iOS (SwiftUI/Speech) + Android (Compose/SpeechRecognizer). Phase 2 (case views: CaseList, CaseSummary, QuickStatus) and Phase 3 (DateCalendar, AddComment) remaining.
 
 ### Remaining
 - [ ] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip component, operator handbook CMS section, template authoring guide, API narrative docs
-- [ ] **Codegen wiring** — Wire generated `Types.swift` and `Types.kt` into iOS/Android build targets so mobile apps import `ReportTypeDefinition` from codegen instead of hand-written models
 
-**All critical-path CMS epics complete.** Remaining work: 337 Phases 2-3 (mobile case views), 339 (docs), 335 remaining BDD TODOs, codegen wiring.
+**All critical-path CMS epics complete.** Remaining work: 335 remaining BDD TODOs, 337 Phases 2-3 (mobile case views), 338 (translations), 339 (docs).
+
+## Platform Gap Closure (Epics 349-354)
+
+Identified via comprehensive gap analysis (2026-03-16). Covers code-level bugs, deferred work from "completed" epics, and mobile feature parity gaps.
+
+**Dependency order:** 349 (standalone) | 350 (standalone, requires Mac M4) | 354 → 353 (codegen fix enables cleaner mobile types) | 351 | 352
+
+### Tier 1 — Must Fix (breaks existing features)
+- [ ] **[Epic 349: Desktop Case Field Decryption](epics/epic-349-desktop-case-field-decryption.md)** — Wire `decryptMessage` for case summary + custom fields display, encrypted save on edit. Currently shows empty fields.
+- [ ] **[Epic 350: iOS Server Event Decryption](epics/epic-350-ios-server-event-decryption.md)** — Regenerate UniFFI bindings, replace stub with real `decryptServerEventHex` FFI call. iOS can't decrypt any relay events.
+- [ ] **[Epic 352: Relay Event Delivery Queue](epics/epic-352-relay-event-delivery-queue.md)** — PostgreSQL outbox for Node.js, alarm-based drain, fix fire-and-forget publish calls. 10/15 call sites silently drop events on relay outage.
+
+### Tier 2 — Feature Completion (parity & polish)
+- [ ] **[Epic 351: In-Call Action UI — Mobile](epics/epic-351-in-call-action-ui-mobile.md)** — Active call panel on iOS + Android (hangup, ban, spam, quick note). Desktop ban reason prompt. Deferred from Epic 308.
+- [ ] **[Epic 353: Mobile Feature Parity Screens](epics/epic-353-mobile-feature-parity-screens.md)** — Hub management, events, contact directory, triage queue, schema browser, transcription settings on iOS + Android.
+- [ ] **[Epic 354: Kotlin Codegen Nested Defaults](epics/epic-354-kotlin-codegen-nested-defaults.md)** — Enhance Kotlin post-processor for enum/list/string defaults, remove hand-written lenient EntityTypeDefinition from Android.
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

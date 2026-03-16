@@ -23,50 +23,147 @@ Missing a step means type mismatches, runtime crashes, or crypto failures on one
 
 ```
 packages/protocol/
-  schemas/              # 8 JSON Schema files (source of truth)
+  schemas/              # 30+ Zod schema files (SOURCE OF TRUTH)
+    common.ts           # Pagination, errors, envelopes, crypto types
+    auth.ts             # Login, bootstrap, profile, session types
+    notes.ts            # Note CRUD, replies, custom fields
+    conversations.ts    # Messages, threads, assignment
+    calls.ts            # Call state, routing, recording
+    shifts.ts           # Shift scheduling, ring groups
+    volunteers.ts       # Volunteer profiles, activation
+    reports.ts          # Reports, categories, report types
+    entity-schema.ts    # CMS: EntityTypeDefinition, fields, enums, statuses
+    records.ts          # CMS: Case records, assignment, linking
+    evidence.ts         # CMS: Evidence, chain of custody
+    interactions.ts     # CMS: Case interactions, timeline
+    events.ts           # CMS: Events, sub-events, location
+    contact-relationships.ts  # CMS: Relationships, affinity groups
+    report-links.ts     # CMS: Report-record-event M:N links
+    report-types.ts     # CMS: ReportTypeDefinition, report fields
+    blasts.ts           # Broadcast messaging, subscribers
+    hubs.ts             # Multi-hub, hub settings
+    settings.ts         # App settings, feature flags
+    invites.ts          # Invite codes, redemption
+    bans.ts             # Ban list, phone hash bans
+    audit.ts            # Audit log, hash chain
+    devices.ts          # Device linking, provisioning
+    files.ts            # File uploads, chunks, metadata
+    webauthn.ts         # WebAuthn ceremonies
+    webrtc.ts           # WebRTC signaling
+    system.ts           # Health, system status
+    index.ts            # Barrel export of all schemas
+  tools/
+    codegen.ts          # Zod → toJSONSchema() → quicktype-core → TS/Swift/Kotlin
+    schema-registry.ts  # Maps 85+ Zod schemas to named PascalCase types for codegen
+  generated/            # GITIGNORED — regenerated on every `bun run codegen`
+    typescript/types.ts        # ~78 KB TypeScript interfaces
+    typescript/crypto-labels.ts
+    swift/Types.swift          # ~122 KB Swift Codable structs (with Sendable)
+    swift/CryptoLabels.swift
+    kotlin/Types.kt            # ~103 KB Kotlin @Serializable data classes
+    kotlin/CryptoLabels.kt
   crypto-labels.json    # 28 domain separation constants (source of truth)
-  tools/codegen.ts      # quicktype-core generator → TS/Swift/Kotlin
-  generated/
-    typescript/         # Generated TS interfaces
-    swift/              # Generated Swift structs (Codable)
-    kotlin/             # Generated Kotlin data classes (kotlinx.serialization)
 ```
 
-## When to Use This Skill
+## Zod Schema Conventions
 
-- Adding a new message type or envelope format
-- Modifying existing schema fields (adding, removing, renaming)
-- Adding or modifying crypto domain separation labels
-- Changing wire format for encrypted payloads
-- Adding new API request/response types
+Schemas are written in Zod 4. Key patterns:
+
+### Field Defaults (CRITICAL)
+
+**Always use `.optional().default(value)`, NEVER bare `.default(value)`:**
+
+```typescript
+// ✅ CORRECT — generates proper optional+default in all languages
+allowFileAttachments: z.boolean().optional().default(true)
+
+// ❌ WRONG — Zod 4's toJSONSchema() treats as required, breaks Kotlin/Swift
+allowFileAttachments: z.boolean().default(true)
+```
+
+Why: `.optional().default()` makes the field not-required in JSON Schema but includes a `"default"` value. The Kotlin post-processor reads this default and injects it into the generated data class. Bare `.default()` makes the field required with no default, causing deserialization failures when the field is absent.
+
+### Common Patterns
+
+```typescript
+// String with constraints
+name: z.string().min(1).max(200)
+
+// Optional nullable field
+phone: z.string().nullable().optional()
+
+// Enum
+status: z.enum(['active', 'archived', 'deleted'])
+
+// UUID (Zod 4 style — NOT z.string().uuid())
+id: z.uuid()
+
+// Array with default
+tags: z.array(z.string()).optional().default([])
+
+// Nested object reference (import from another schema file)
+envelope: RecipientEnvelopeSchema
+```
+
+### Adding a New Schema
+
+1. Create `packages/protocol/schemas/my-type.ts`
+2. Export Zod schemas (e.g., `export const MyTypeSchema = z.object({...})`)
+3. Register in `packages/protocol/tools/schema-registry.ts`:
+   ```typescript
+   import { MyTypeSchema, MyCreateBodySchema } from '../schemas/my-type.js'
+   // Add to schemaEntries array:
+   ['MyType', MyTypeSchema],
+   ['MyCreateBody', MyCreateBodySchema],
+   ```
+4. Export from `packages/protocol/schemas/index.ts`
+
+## Codegen Pipeline Details
+
+### Kotlin Post-Processor (`postProcessKotlin()`)
+
+Handles a quicktype limitation: quicktype doesn't emit Kotlin default values from JSON Schema `"default"`. The post-processor:
+
+1. Reads the JSON Schema to find fields with `"default"` values
+2. Pattern-matches generated Kotlin `val fieldName: Type,` declarations
+3. Injects defaults: `val fieldName: Type = defaultValue,`
+4. Type-aware: `Boolean` → `false/true`, `Long` → `0L`, `String` → `""`, `List<*>` → `emptyList()`
+5. Skips enum-typed strings to avoid type mismatch
+
+**Limitation**: Only handles scalar defaults and empty lists. Nested object defaults or complex list defaults require hand-written wrapper types (see Android `CaseModels.kt` lenient `EntityTypeDefinition`).
+
+### Swift Post-Processor (`stripSwiftConvenienceExtensions()`)
+
+1. Strips quicktype's verbose convenience initializer extensions (keeps struct/enum + CodingKeys only)
+2. Adds `Sendable` conformance to all structs/enums
+3. Renames 15 types that shadow Swift built-ins or framework types:
+   - `Error` → `InviteError`, `Event` → `ProtocolEvent`, `Record` → `CaseLinkRecord`
+   - `Location` → `EventLocation`, `Value` → `FieldValue`, `Category` → `ReportTypeCategory`
+   - `KeyEnvelope` → `ProtocolKeyEnvelope` (avoids UniFFI collision)
+   - See `codegen.ts` lines 124-251 for full list
+
+### TypeScript Post-Processor
+
+Minimal — adds header comment. quicktype's `just-types: 'true'` mode generates clean interfaces.
 
 ## Schema Change Workflow
 
-### Step 1: Modify the Schema
+### Step 1: Modify the Zod Schema
 
-Edit the relevant JSON Schema file in `packages/protocol/schemas/`:
+Edit the relevant file in `packages/protocol/schemas/`. All schemas use Zod 4.
 
-| Schema | Purpose |
-|--------|---------|
-| `envelope.schema.json` | Encrypted envelope wrapper (ECIES, note envelopes) |
-| `notes.schema.json` | Note payload, custom fields, attachments |
-| `files.schema.json` | File upload metadata, chunk info |
-| `telephony.schema.json` | Call state, provider config, DTMF events |
-| `messaging.schema.json` | Conversation messages, blast payloads |
-| `identity.schema.json` | Volunteer/admin profiles, invite tokens |
-| `settings.schema.json` | Hub settings, feature flags, provider config |
-| `audit.schema.json` | Audit log entries, hash chain |
+### Step 2: Register New Types (if adding schemas)
 
-Follow JSON Schema conventions:
-- Use `"type"` and `"required"` fields
-- Add `"description"` to every field for generated doc comments
-- Use `"enum"` for fixed string unions
-- Use `"$ref"` for shared sub-schemas
-- For new types, consider adding `"additionalProperties": false` to prevent extension
+Add entries to `packages/protocol/tools/schema-registry.ts`. The registry maps Zod schemas to PascalCase type names:
 
-### Step 2: Add/Update Crypto Labels (if needed)
+```typescript
+['MyNewType', MyNewTypeSchema],
+['CreateMyNewTypeBody', CreateMyNewTypeBodySchema],
+```
 
-If the change introduces a new encrypted context, add a label to `packages/protocol/crypto-labels.json`:
+### Step 3: Add/Update Crypto Labels (if needed)
+
+Edit `packages/protocol/crypto-labels.json`:
 
 ```json
 {
@@ -74,110 +171,70 @@ If the change introduces a new encrypted context, add a label to `packages/proto
 }
 ```
 
-Rules for crypto labels:
+Rules:
 - Prefix with `llamenos:`
 - Include version suffix (`:v1`) for future migration
 - Use kebab-case after the prefix
 - NEVER use raw string literals in code — always reference the generated constant
-- Each label must be unique across the entire file
+- Each label must be unique
 
-### Step 3: Run Codegen
+### Step 4: Run Codegen
 
 ```bash
 bun run codegen
 ```
 
-This generates:
-- `packages/protocol/generated/typescript/` — TS interfaces
-- `packages/protocol/generated/swift/` — Swift structs with Codable conformance
-- `packages/protocol/generated/kotlin/` — Kotlin data classes with kotlinx.serialization
-
-Also regenerates crypto label constants for all languages.
-
-### Step 4: Verify Generated Output
-
-```bash
-bun run codegen:check
-```
-
-This verifies the generated files match what codegen would produce. CI runs this to catch
-stale generated files.
-
-Review the generated types:
-- Are field names correct? (quicktype infers names from schema)
-- Are optional fields marked correctly?
-- Do enum values match the schema?
-- For Swift: are structs Codable? Do they have CodingKeys if needed?
-- For Kotlin: are @Serializable annotations present?
-
 ### Step 5: Update Platform Consumers
 
-After codegen, update code that uses the changed types:
+**Worker (TypeScript)** — imports from `@protocol/schemas`:
+- Update route handlers, DO storage, Nostr event payloads
 
-**Desktop (TypeScript)**:
-- Import from `@shared/` or `packages/protocol/generated/typescript/`
-- Update components/hooks that reference changed fields
-- Update platform.ts if crypto operations changed
+**Desktop (TypeScript)** — imports generated types or Zod schemas:
+- Update components, hooks, platform.ts crypto operations
 
-**Worker (TypeScript)**:
-- Update DO storage/retrieval for changed types
-- Update API route handlers
-- Update Nostr event payloads if wire format changed
-
-**iOS (Swift)**:
-- Generated types land in `packages/protocol/generated/swift/`
+**iOS (Swift)** — generated types in `packages/protocol/generated/swift/Types.swift`:
 - Copy to `apps/ios/Sources/Generated/` if not auto-synced
-- Update ViewModels that decode/encode these types
-- Update CryptoService if crypto labels changed
+- Note: 15 types are renamed (see Swift post-processor above)
+- Update ViewModels, CryptoService if labels changed
 
-**Android (Kotlin)**:
-- Generated types land in `packages/protocol/generated/kotlin/`
-- Copy to `apps/android/app/src/main/java/org/llamenos/protocol/` if not auto-synced
-- Update repositories/ViewModels that use these types
-- Update CryptoService if crypto labels changed
+**Android (Kotlin)** — generated types in `packages/protocol/generated/kotlin/Types.kt`:
+- Build imports from `org.llamenos.protocol` package
+- For types with complex nested defaults, may need lenient wrapper in `CaseModels.kt`
+- Update repositories, ViewModels, CryptoService if labels changed
 
 ### Step 6: Update Protocol Documentation
 
-If the change affects the wire format, update `docs/protocol/PROTOCOL.md`:
-- New message type descriptions
-- Updated encryption envelope format
-- New API endpoints that use the type
-- Version compatibility notes
+If the change affects the wire format, update `docs/protocol/PROTOCOL.md`.
 
-### Step 7: Test Across Platforms
+### Step 7: Test
 
 ```bash
 bun run test:changed    # Test affected platforms
-bun run codegen:check   # Verify codegen is fresh
+bun run codegen:check   # Verify codegen is fresh (CI runs this)
 ```
-
-For crypto-related changes, ensure cross-platform interop:
-- Rust test vectors in `packages/crypto/tests/`
-- Desktop Playwright tests that encrypt/decrypt
-- iOS crypto interop tests
-- Android crypto unit tests
 
 ## Breaking vs Non-Breaking Changes
 
 ### Non-Breaking (safe)
-- Adding new optional fields to existing schemas
+- Adding new optional fields (use `.optional()` or `.optional().default()`)
 - Adding new schema files (new types)
 - Adding new crypto labels
 
-### Breaking (requires migration strategy)
+### Breaking (requires migration)
 - Removing or renaming fields
 - Changing field types
 - Changing enum values
 - Modifying crypto label values (changes wire format!)
 
-For pre-production: clean breaks are acceptable. Document the break in the epic.
-
-For production (future): add version byte, implement fallback detection, migration window.
+For pre-production: clean breaks acceptable. Document in the epic.
 
 ## Common Pitfalls
 
-- **Stale codegen**: Always run `bun run codegen` after schema changes. CI catches this via `codegen:check`
+- **Stale codegen**: Always run `bun run codegen` after schema changes. CI catches via `codegen:check`
+- **Bare `.default()`**: MUST use `.optional().default()` — bare `.default()` breaks Kotlin/Swift defaults
 - **Raw string literals**: NEVER use `"llamenos:note-seal"` directly — import from generated constants
-- **Missing platform updates**: Schema change affects ALL platforms. Check desktop, worker, iOS, Android
-- **quicktype quirks**: quicktype may generate unexpected type names. Review the output
+- **Missing platform updates**: Schema changes affect ALL platforms (desktop, worker, iOS, Android)
+- **Swift type collisions**: quicktype may generate names that shadow Swift built-ins. Check the rename list in `codegen.ts`
+- **Kotlin nested defaults**: The post-processor only handles scalar/empty-list defaults. Complex nested types need hand-written lenient wrappers
 - **Crypto label collision**: Every label must be unique. Check existing labels before adding
+- **Import path**: Use `@protocol/schemas` (NOT `@worker/schemas` — old path, schemas moved)
