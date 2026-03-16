@@ -307,7 +307,7 @@ struct ContactDetailView: View {
     // MARK: - Relationships Section
 
     @ViewBuilder
-    private func relationshipsSection(relationships: [ContactRelationship]) -> some View {
+    private func relationshipsSection(relationships: [AppContactRelationship]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(NSLocalizedString("contactDirectory_relationships", comment: "Relationships"))
                 .font(.brand(.headline))

@@ -94,7 +94,7 @@ struct ContactDetailResponse: Codable, Sendable {
 // MARK: - Contact Relationship
 
 /// A relationship between two contacts.
-struct ContactRelationship: Codable, Identifiable, Sendable {
+struct AppContactRelationship: Codable, Identifiable, Sendable {
     var id: String { relatedContactHash + ":" + relationshipType }
     let relatedContactHash: String
     let relatedLast4: String?
@@ -107,8 +107,8 @@ struct ContactRelationship: Codable, Identifiable, Sendable {
     }
 }
 
-struct ContactRelationshipsResponse: Codable, Sendable {
-    let relationships: [ContactRelationship]
+struct AppContactRelationshipsResponse: Codable, Sendable {
+    let relationships: [AppContactRelationship]
 }
 
 // MARK: - Contact Search Response

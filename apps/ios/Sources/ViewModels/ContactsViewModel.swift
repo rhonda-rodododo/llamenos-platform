@@ -151,7 +151,7 @@ final class ContactDetailViewModel {
     let contactHash: String
 
     var contact: ContactDetail?
-    var relationships: [ContactRelationship] = []
+    var relationships: [AppContactRelationship] = []
     var isLoading = false
     var isLoadingRelationships = false
     var errorMessage: String?
@@ -188,7 +188,7 @@ final class ContactDetailViewModel {
         isLoadingRelationships = true
 
         do {
-            let response: ContactRelationshipsResponse = try await apiService.request(
+            let response: AppContactRelationshipsResponse = try await apiService.request(
                 method: "GET",
                 path: "/api/contacts/\(contactHash)/relationships"
             )
