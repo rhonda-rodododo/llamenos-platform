@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
 import org.llamenos.hotline.api.NetworkMonitor
 import org.llamenos.hotline.api.WebSocketService
+import org.llamenos.hotline.service.OfflineQueue
 import org.llamenos.hotline.ui.components.OfflineBanner
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
@@ -88,6 +89,7 @@ fun MainScreen(
     webSocketService: WebSocketService,
     keystoreService: KeystoreService,
     networkMonitor: NetworkMonitor,
+    offlineQueue: OfflineQueue,
     onLock: () -> Unit,
     onLogout: () -> Unit,
     onPanicWipe: () -> Unit,
@@ -163,7 +165,7 @@ fun MainScreen(
         modifier = modifier,
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues)) {
-            OfflineBanner(networkMonitor)
+            OfflineBanner(networkMonitor, offlineQueue)
 
             when (MainTab.entries[selectedTab]) {
                 MainTab.DASHBOARD -> {

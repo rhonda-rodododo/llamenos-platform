@@ -22,6 +22,7 @@ import org.llamenos.hotline.api.NetworkMonitor
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
+import org.llamenos.hotline.service.OfflineQueue
 import org.llamenos.hotline.ui.admin.AdminScreen
 import org.llamenos.hotline.ui.admin.SchemaBrowserScreen
 import org.llamenos.hotline.ui.admin.ShiftDetailScreen
@@ -309,6 +310,7 @@ fun LlamenosNavigation(
     webSocketService: WebSocketService,
     keystoreService: KeystoreService,
     networkMonitor: NetworkMonitor,
+    offlineQueue: OfflineQueue,
     versionChecker: VersionChecker,
     pendingDeepLink: DeepLinkDestination? = null,
     onDeepLinkConsumed: () -> Unit = {},
@@ -449,6 +451,7 @@ fun LlamenosNavigation(
                 webSocketService = webSocketService,
                 keystoreService = keystoreService,
                 networkMonitor = networkMonitor,
+                offlineQueue = offlineQueue,
                 onLock = {
                     cryptoService.lock()
                     authViewModel.resetPinEntry()
