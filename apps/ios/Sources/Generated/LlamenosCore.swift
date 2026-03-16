@@ -1486,6 +1486,23 @@ public func decryptNote(encryptedContent: String, envelope: KeyEnvelope, secretK
 })
 }
 /**
+ * Decrypt a server-encrypted event payload (XChaCha20-Poly1305).
+ *
+ * Input: hex(nonce_24 + ciphertext), 32-byte key as hex.
+ * Output: decrypted UTF-8 string (JSON).
+ *
+ * Used by mobile platforms to decrypt Nostr relay events encrypted
+ * with the server event key (from GET /api/auth/me serverEventKeyHex).
+ */
+public func decryptServerEventHex(encryptedHex: String, keyHex: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_llamenos_core_fn_func_decrypt_server_event_hex(
+        FfiConverterString.lower(encryptedHex),
+        FfiConverterString.lower(keyHex),$0
+    )
+})
+}
+/**
  * Decrypt a stored nsec using a PIN. Returns the nsec bech32 string or error.
  */
 public func decryptWithPin(data: EncryptedKeyData, pin: String)throws  -> String {
@@ -1779,6 +1796,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_decrypt_note() != 17791) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_decrypt_server_event_hex() != 41167) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_decrypt_with_pin() != 5372) {

@@ -627,7 +627,7 @@ Identified via comprehensive gap analysis (2026-03-16). Covers code-level bugs, 
 **Dependency order:** 349 (standalone) | 350 (standalone, requires Mac M4) | 354 → 353 (codegen fix enables cleaner mobile types) | 351 | 352
 
 ### Tier 1 — Must Fix (breaks existing features)
-- [ ] **[Epic 349: Desktop Case Field Decryption](epics/epic-349-desktop-case-field-decryption.md)** — Wire `decryptMessage` for case summary + custom fields display, encrypted save on edit. Currently shows empty fields.
+- [x] **[Epic 349: Desktop Case Field Decryption](epics/epic-349-desktop-case-field-decryption.md)** — Wire `decryptMessage` for case summary + custom fields display, encrypted save on edit. Currently shows empty fields.
 - [ ] **[Epic 350: iOS Server Event Decryption](epics/epic-350-ios-server-event-decryption.md)** — Regenerate UniFFI bindings, replace stub with real `decryptServerEventHex` FFI call. iOS can't decrypt any relay events.
 - [ ] **[Epic 352: Relay Event Delivery Queue](epics/epic-352-relay-event-delivery-queue.md)** — PostgreSQL outbox for Node.js, alarm-based drain, fix fire-and-forget publish calls. 10/15 call sites silently drop events on relay outage.
 

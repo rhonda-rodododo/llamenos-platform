@@ -343,7 +343,8 @@ When('I click the first case card', async ({ page }) => {
   const card = page.getByTestId('case-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
+  // Wait for detail panel to fully render before any tab interactions
+  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the case detail header should be visible', async ({ page }) => {
@@ -571,12 +572,12 @@ Given('an arrest case is selected with the Timeline tab active', async ({ page, 
   const card = page.getByTestId('case-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
+  // Wait for detail panel to fully render before clicking tabs
+  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Click the Timeline TAB button (not the timeline container)
   const timelineTab = page.getByTestId('case-tab-timeline')
-  if (await timelineTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await timelineTab.click()
-  }
+  await expect(timelineTab).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await timelineTab.click()
   await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 

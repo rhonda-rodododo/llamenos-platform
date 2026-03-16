@@ -61,8 +61,7 @@ private func ffiComputeSasCode(sharedXHex: String) throws -> String {
 }
 
 private func ffiDecryptServerEventHex(encryptedHex: String, keyHex: String) throws -> String {
-    // TODO: Wire up UniFFI binding once packages/crypto exports decryptServerEventHex
-    throw CryptoServiceError.noKeyLoaded
+    try decryptServerEventHex(encryptedHex: encryptedHex, keyHex: keyHex)
 }
 
 // MARK: - CryptoService
