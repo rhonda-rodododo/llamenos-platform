@@ -209,6 +209,28 @@ import {
   evidenceListResponseSchema,
   custodyChainResponseSchema,
   verifyIntegrityResponseSchema,
+
+  // entity-schema.ts — CMS entity type definitions
+  enumOptionSchema,
+  entityFieldDefinitionSchema,
+  entityCategorySchema,
+  entityTypeDefinitionSchema,
+  relationshipTypeDefinitionSchema,
+  createEntityTypeBodySchema,
+  updateEntityTypeBodySchema,
+  createRelationshipTypeBodySchema,
+  updateRelationshipTypeBodySchema,
+  caseNumberBodySchema,
+
+  // records.ts — CMS case records
+  recordSchema,
+  createRecordBodySchema,
+  updateRecordBodySchema,
+  listRecordsQuerySchema,
+  recordContactSchema,
+  linkContactBodySchema,
+  assignBodySchema,
+  unassignBodySchema,
 } from '../../../apps/worker/schemas'
 
 import type { ZodType } from 'zod'
@@ -439,6 +461,28 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['evidenceListResponseSchema', evidenceListResponseSchema],
   ['custodyChainResponseSchema', custodyChainResponseSchema],
   ['verifyIntegrityResponseSchema', verifyIntegrityResponseSchema],
+
+  // Entity Schema (CMS entity type definitions)
+  ['enumOptionSchema', enumOptionSchema],
+  ['entityFieldDefinitionSchema', entityFieldDefinitionSchema],
+  ['entityCategorySchema', entityCategorySchema],
+  ['entityTypeDefinitionSchema', entityTypeDefinitionSchema],
+  ['relationshipTypeDefinitionSchema', relationshipTypeDefinitionSchema],
+  ['createEntityTypeBodySchema', createEntityTypeBodySchema],
+  ['updateEntityTypeBodySchema', updateEntityTypeBodySchema],
+  ['createRelationshipTypeBodySchema', createRelationshipTypeBodySchema],
+  ['updateRelationshipTypeBodySchema', updateRelationshipTypeBodySchema],
+  ['caseNumberBodySchema', caseNumberBodySchema],
+
+  // Records (CMS case records)
+  ['recordSchema', recordSchema],
+  ['createRecordBodySchema', createRecordBodySchema],
+  ['updateRecordBodySchema', updateRecordBodySchema],
+  ['listRecordsQuerySchema', listRecordsQuerySchema],
+  ['recordContactSchema', recordContactSchema],
+  ['linkContactBodySchema', linkContactBodySchema],
+  ['assignBodySchema', assignBodySchema],
+  ['unassignBodySchema', unassignBodySchema],
 ]
 
 export interface SchemaRegistryEntry {
