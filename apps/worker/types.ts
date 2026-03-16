@@ -51,6 +51,7 @@ export interface Env {
   HOTLINE_NAME: string
   ENVIRONMENT: string
   HMAC_SECRET: string
+  METRICS_SCRAPE_TOKEN?: string
   E2E_TEST_SECRET?: string
   DEV_RESET_SECRET?: string
 

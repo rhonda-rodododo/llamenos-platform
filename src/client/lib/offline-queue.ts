@@ -247,17 +247,51 @@ class OfflineQueue {
   private load(): void {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
+      if (!raw) return
+
+      // Try to parse as encrypted (hex string) first, fall back to legacy JSON
+      if (raw.startsWith('[') || raw.startsWith('{')) {
+        // Legacy unencrypted format — load and will re-encrypt on next save
         this.queue = JSON.parse(raw) as QueuedOperation[]
+      } else {
+        // Encrypted format — will be decrypted async on first access
+        this._encryptedRaw = raw
       }
     } catch {
       this.queue = []
     }
   }
 
+  private _encryptedRaw: string | null = null
+
+  /** Decrypt queue if loaded from encrypted storage (async, called before first use) */
+  async decryptIfNeeded(): Promise<void> {
+    if (!this._encryptedRaw) return
+    try {
+      const { decryptDraft } = await import('./platform')
+      const decrypted = await decryptDraft(this._encryptedRaw)
+      if (decrypted) {
+        this.queue = JSON.parse(decrypted) as QueuedOperation[]
+      }
+    } catch {
+      // Can't decrypt (key not loaded yet) — queue will be empty until unlock
+      this.queue = []
+    }
+    this._encryptedRaw = null
+  }
+
   private save(): void {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.queue))
+      // Encrypt queue before persisting to localStorage
+      const json = JSON.stringify(this.queue)
+      // Fire-and-forget async encryption — save plaintext first for immediate reads,
+      // then overwrite with encrypted version
+      localStorage.setItem(STORAGE_KEY, json) // temporary plaintext
+      import('./platform').then(({ encryptDraft }) =>
+        encryptDraft(json).then(encrypted => {
+          if (encrypted) localStorage.setItem(STORAGE_KEY, encrypted)
+        }).catch(() => {})
+      ).catch(() => {})
     } catch {
       // Storage full or unavailable — operations will be lost
       console.warn('[offline-queue] Failed to persist queue to localStorage')

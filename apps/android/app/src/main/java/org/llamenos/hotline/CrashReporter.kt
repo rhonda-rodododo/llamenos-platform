@@ -46,7 +46,20 @@ class CrashReporter @Inject constructor(
     private var previousHandler: Thread.UncaughtExceptionHandler? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs: SharedPreferences by lazy {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        try {
+            androidx.security.crypto.EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                androidx.security.crypto.MasterKeys.getOrCreate(
+                    androidx.security.crypto.MasterKeys.AES256_GCM_SPEC
+                ),
+                androidx.security.crypto.EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                androidx.security.crypto.EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (_: Exception) {
+            // Fallback to unencrypted if Keystore unavailable (rare)
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        }
     }
 
     /**

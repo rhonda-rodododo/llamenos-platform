@@ -115,16 +115,35 @@ function formatPrometheusMetrics(): string {
   return lines.join('\n') + '\n'
 }
 
-// Prometheus text format — no auth (for scrapers behind network policy)
+// Prometheus text format — requires bearer token (METRICS_SCRAPE_TOKEN env var)
+// or authenticated admin. Never expose without access control.
 metrics.get('/prometheus',
   describeRoute({
     tags: ['Metrics'],
     summary: 'Prometheus text exposition metrics',
     responses: {
       200: { description: 'Prometheus text format metrics' },
+      401: { description: 'Missing or invalid scrape token' },
     },
   }),
   (c) => {
+  // Check for scrape token (for Prometheus/Grafana scrapers)
+  const authHeader = c.req.header('Authorization') ?? ''
+  const scrapeToken = c.env.METRICS_SCRAPE_TOKEN
+  if (scrapeToken) {
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '')
+    if (bearerToken !== scrapeToken) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+  } else {
+    // No scrape token configured — require authenticated admin
+    const pubkey = c.get('pubkey')
+    if (!pubkey) return c.json({ error: 'Unauthorized' }, 401)
+    const permissions = c.get('permissions')
+    if (!permissions?.includes('audit:read') && !permissions?.includes('*')) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+  }
   return new Response(formatPrometheusMetrics(), {
     headers: { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' },
   })
