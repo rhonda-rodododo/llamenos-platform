@@ -149,7 +149,7 @@ dev.post('/test-setup-cms', async (c) => {
   // 0. Grant the default volunteer role cases:read permission so test
   //    identities (who register as volunteers during onboarding) can see
   //    all records without explicit assignment.
-  await dos.settings.fetch(new Request('http://do/settings/roles/role-volunteer', {
+  const roleRes = await dos.settings.fetch(new Request('http://do/settings/roles/role-volunteer', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -168,7 +168,9 @@ dev.post('/test-setup-cms', async (c) => {
         'events:read', 'events:create', 'evidence:upload', 'evidence:read',
       ],
     }),
-  })).catch(() => {})
+  }))
+  const roleOk = roleRes.ok
+  const roleStatus = roleRes.status
 
   // 1. Enable case management
   await dos.settings.fetch(new Request('http://do/settings/case-management', {
@@ -243,6 +245,8 @@ dev.post('/test-setup-cms', async (c) => {
   return c.json({
     ok: true,
     templateId,
+    rolePatched: roleOk,
+    roleStatus,
     entityTypeCount: entityTypes.length,
     entityTypes: entityTypes.map(et => ({ id: et.id, name: et.name })),
     sampleRecordId: recordId,
