@@ -67,6 +67,10 @@ const buildOptions = {
       build.onResolve({ filter: /^@shared\// }, (args) => ({
         path: resolveWithExtensions(path.resolve('packages/shared', args.path.replace('@shared/', ''))),
       }))
+      // Resolve @protocol/* imports
+      build.onResolve({ filter: /^@protocol\// }, (args) => ({
+        path: resolveWithExtensions(path.resolve('packages/protocol', args.path.replace('@protocol/', ''))),
+      }))
       // Resolve @/* imports (client — shouldn't be used in server code, but just in case)
       build.onResolve({ filter: /^@\// }, (args) => ({
         path: resolveWithExtensions(path.resolve('src/client', args.path.replace('@/', ''))),
