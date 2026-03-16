@@ -717,11 +717,11 @@
         "assessment": "Assessments",
         "call": "Calls",
         "comment": "Comments",
-        "file_upload": "Files",
+        "fileUpload": "Files",
         "message": "Messages",
         "note": "Notes",
         "referral": "Referrals",
-        "status_change": "Status Changes"
+        "statusChange": "Status Changes"
       },
       "loadError": "Failed to load timeline",
       "newestFirst": "Newest first",
@@ -743,7 +743,19 @@
     "titleRequired": "Title is required",
     "unassign": "Unassign",
     "unassignError": "Failed to unassign",
-    "unassigned": "Unassigned"
+    "unassigned": "Unassigned",
+    "metadata": "Record Info",
+    "updated": "Updated",
+    "noInteractions": "No activity yet",
+    "commentPlaceholder": "Add a comment...",
+    "noEvidence": "No evidence uploaded yet",
+    "statusClosed": "Closed",
+    "notEnabledHint": "An admin needs to enable case management.",
+    "empty": "No cases yet",
+    "emptyHint": "Cases will appear here as your team creates them.",
+    "commentEncrypted": "Comments are encrypted end-to-end",
+    "addComment": "Add Comment",
+    "commentSubmit": "Submit"
   },
   "reportLinks": {
     "linkReport": "Link Report",
@@ -1144,6 +1156,7 @@
     "breakDescription": "You won't receive calls while on break",
     "calls": "Calls",
     "callsToday": "Calls Today",
+    "cases": "Cases",
     "connection": "Connection",
     "contacts": "Contacts",
     "contactsSubtitle": "View caller interaction history",
@@ -2438,6 +2451,7 @@
   "statusDisconnected": "Disconnected",
   "statusReconnecting": "Reconnecting...",
   "tab": {
+    "cases": "Cases",
     "conversations": "Messages",
     "dashboard": "Dashboard",
     "notes": "Notes",
