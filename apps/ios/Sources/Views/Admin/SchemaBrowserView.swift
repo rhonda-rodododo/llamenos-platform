@@ -22,7 +22,7 @@ struct SchemaBrowserView: View {
                 ContentUnavailableView {
                     Label(
                         NSLocalizedString("error_title", comment: "Error"),
-                        icon: "exclamationmark.triangle"
+                        systemImage: "exclamationmark.triangle"
                     )
                 } description: {
                     Text(errorMessage)
@@ -36,7 +36,7 @@ struct SchemaBrowserView: View {
                 ContentUnavailableView {
                     Label(
                         NSLocalizedString("cases_no_entity_types", comment: "No Entity Types"),
-                        icon: "doc.text.magnifyingglass"
+                        systemImage: "doc.text.magnifyingglass"
                     )
                 } description: {
                     Text(NSLocalizedString(
