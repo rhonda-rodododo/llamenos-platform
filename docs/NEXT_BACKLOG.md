@@ -612,7 +612,7 @@ CMS backend + desktop UI complete (Epics 315-332). Remaining work: test executio
 
 ### In Progress
 - [~] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 92+/99 BDD pass (~93%). Card click timing fixes applied. Remaining failures: create case toast (mock encryption), empty state persistence, volunteer fixture gaps.
-- [~] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — CMS sections translated for 8 locales (es, fr, pt, zh, ar, de, ru, ko). Remaining: hi, vi, tl, ht still have EN placeholders.
+- [x] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — All 12 non-English locales translated for CMS sections. 175 missing en.json keys added. Desktop i18n validator at 0 missing keys.
 - [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — **Phase 1 complete** (report submission): ReportTypePicker, TypedReportForm, AudioInput on both iOS (SwiftUI/Speech) + Android (Compose/SpeechRecognizer). Phase 2 (case views: CaseList, CaseSummary, QuickStatus) and Phase 3 (DateCalendar, AddComment) remaining.
 
 ### Remaining
