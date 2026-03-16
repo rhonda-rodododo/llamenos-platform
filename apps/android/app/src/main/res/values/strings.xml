@@ -2364,23 +2364,6 @@
     <string name="schema_access_level">Default Access</string>
     <string name="schema_no_fields">No fields defined</string>
 
-    <!-- Contact Directory Enhancement -->
-    <string name="contactDirectory_filter_all">All Types</string>
-    <string name="contactDirectory_detail_title">Contact</string>
-    <string name="contactDirectory_first_seen">First seen</string>
-    <string name="contactDirectory_last_seen">Last seen</string>
-    <string name="contactDirectory_identifiers">Identifiers</string>
-    <string name="contactDirectory_interactions">Interactions</string>
-    <string name="contactDirectory_calls">Calls</string>
-    <string name="contactDirectory_messages">Messages</string>
-    <string name="contactDirectory_notes">Notes</string>
-    <string name="contactDirectory_reports">Reports</string>
-    <string name="contactDirectory_linked_cases">Linked Cases</string>
-    <string name="contactDirectory_relationships">Relationships</string>
-    <string name="contactDirectory_view_timeline">View Full Timeline</string>
-    <string name="contactDirectory_loading">Loading contact…</string>
-    <string name="contactDirectory_error">Unable to Load</string>
-
     <!-- Triage Queue -->
     <string name="triage_title">Triage Queue</string>
     <string name="triage_filter_all">All</string>
