@@ -22,6 +22,7 @@ This runbook provides procedures for common operational tasks, incident response
 8. [Scaling Considerations](#8-scaling-considerations)
 9. [Emergency Procedures](#9-emergency-procedures)
 10. [Disaster Recovery Drills](#10-disaster-recovery-drills)
+11. [Case Management System (CMS)](#11-case-management-system-cms)
 
 > **Key Revocation and Rotation**: For cryptographic key compromise, volunteer departure key revocation, device seizure response, and hub key rotation procedures, see the dedicated [Key Revocation Runbook](security/KEY_REVOCATION_RUNBOOK.md).
 
@@ -1051,3 +1052,156 @@ If a DR drill exceeds the target RTO, investigate the bottleneck (provisioning s
 | Backup retention cleanup | Automatic | Cron script (30-day default) |
 | DR drill (automated) | Quarterly | `just dr-test` — [Section 10](#10-disaster-recovery-drills) |
 | Penetration test | Annually | Engage external security firm |
+
+---
+
+## 11. Case Management System (CMS)
+
+The CMS is an optional module that adds structured case tracking, contact management, and field reporting to Llamenos. Everything in the CMS is template-driven -- entity types, fields, statuses, and report types are all defined by JSON templates, not hardcoded.
+
+For template authoring details, see the [Template Authoring Guide](TEMPLATE_AUTHORING.md).
+
+### 11.1 Enabling CMS
+
+CMS is disabled by default. To enable it:
+
+1. Log in as an admin.
+2. Navigate to **Settings > Case Management**.
+3. Toggle **Enable Case Management** to on.
+4. The toggle calls `PUT /api/settings/cms/case-management` with `{ "enabled": true }`.
+
+Once enabled, the Cases, Contacts, and Reports navigation items appear for users with appropriate permissions.
+
+### 11.2 Applying a Template
+
+Templates define the structure of your CMS. You must apply at least one template before creating cases.
+
+1. Navigate to **Settings > Case Management > Template Browser**.
+2. Browse the 14 bundled templates. Each shows a name, description, and tags.
+   - The API endpoint is `GET /api/settings/cms/templates`, which returns all bundled templates with metadata.
+   - To view full template details: `GET /api/settings/cms/templates/:id`.
+3. Select a template and click **Apply**.
+   - This calls `POST /api/settings/cms/templates/apply` with `{ "templateId": "jail-support" }`.
+4. The system creates:
+   - All entity types defined in the template (with fields, statuses, severities)
+   - Relationship types between entity types and contacts
+   - Report types (if the template defines them)
+   - The template's suggested roles become available for creation
+
+**What applying does NOT do**: It does not create volunteer roles automatically. After applying, go to **Settings > Roles > Create from Template** to create roles from the template's suggestions. This gives you the chance to review and customize permissions before activating them.
+
+**Applying multiple templates**: You can apply more than one template. Entity types from different templates coexist. If two templates define entity types with the same `name`, the second application merges new fields into the existing entity type.
+
+**Checking for updates**: `GET /api/settings/cms/templates/updates` compares applied template versions against bundled versions and reports available updates.
+
+### 11.3 Customizing Entity Types
+
+After applying a template, you can customize entity types through the Schema Editor:
+
+1. Navigate to **Settings > Case Management > Entity Types**.
+2. Select an entity type to edit.
+3. You can:
+   - **Add fields**: New fields are appended to the entity type. Set the `name`, `type`, `accessLevel`, and `order`.
+   - **Modify statuses**: Add, rename, reorder, or remove statuses. Ensure `closedStatuses` stays consistent.
+   - **Change access levels**: Adjust `defaultAccessLevel` on the entity type or `accessLevel` on individual fields.
+   - **Toggle features**: Enable/disable `allowSubRecords`, `allowFileAttachments`, `allowInteractionLinks`, `showInNavigation`, `showInDashboard`.
+
+**API endpoints**:
+- List entity types: `GET /api/settings/cms/entity-types`
+- Create entity type: `POST /api/settings/cms/entity-types`
+- Update entity type: `PATCH /api/settings/cms/entity-types/:id`
+- Delete entity type: `DELETE /api/settings/cms/entity-types/:id`
+
+**Report types** are managed separately:
+- List report types: `GET /api/settings/cms/cms-report-types`
+- Create report type: `POST /api/settings/cms/cms-report-types`
+- Update report type: `PATCH /api/settings/cms/cms-report-types/:id`
+- Delete report type: `DELETE /api/settings/cms/cms-report-types/:id`
+
+### 11.4 Understanding Encryption Tiers
+
+CMS data is encrypted at three tiers:
+
+| Tier | What It Covers | Who Can Read | How It Works |
+|------|---------------|--------------|--------------|
+| **Summary** | Entity type, status, severity, timestamps, case number | All users with `cases:read-*` permission | Encrypted with the hub key. Visible in list views and dashboards. |
+| **Fields** | All non-PII custom fields (descriptions, dates, select values) | Users matching the field's `accessLevel` | Encrypted per-field. Decrypted client-side only when the user has the appropriate access level. |
+| **PII** | Fields listed in `piiFields` (names, addresses, phone numbers, financial data) | Users with explicit `contacts:view-pii` permission | Encrypted with a restricted key. Requires a separate permission grant. Excluded from previews and notifications. |
+
+The encryption tier is determined automatically based on the template configuration:
+- Fields listed in `piiFields` get the PII tier.
+- All other fields get the standard Fields tier.
+- Summary data (status, timestamps, case number) gets the Summary tier.
+
+### 11.5 Contact Directory
+
+The contact directory provides a deduplicated view of all contacts across cases. Contacts are linked to cases via relationship types with specific roles (e.g., "Tenant", "Attorney", "Caller").
+
+**Deduplication via blind index**: When a new contact is created, the system computes a blind index (HMAC) from the contact's key identifiers (name + phone or name + email). If a matching blind index already exists, the system offers to link the existing contact rather than creating a duplicate.
+
+Key operations:
+- Contacts are created when linking a person to a case for the first time.
+- The same contact can be linked to multiple cases in different roles.
+- Contact PII (full name, phone, address) is encrypted at the PII tier.
+- The blind index allows server-side duplicate detection without the server seeing plaintext contact data.
+
+### 11.6 CMS Troubleshooting
+
+#### Template not appearing in the browser
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Template missing from list | Template JSON not in `packages/protocol/templates/` | Add the file and rebuild |
+| Template shows but cannot be applied | JSON validation error | Check server logs for schema validation errors. Common: missing `options` on select fields, duplicate field names |
+| "Template already applied" warning | Template was previously applied | This is informational. Re-applying merges new fields without duplicating existing ones |
+
+#### Fields not saving
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Field appears but value is not persisted | Field `name` contains invalid characters | Use lowercase letters and underscores only |
+| Conditional field never appears | `showWhen` references wrong field name | Verify the `field` value in `showWhen` matches an existing field's `name` |
+| Select field shows empty dropdown | Missing or empty `options` array | Add `options` with `key` and `label` for each choice |
+
+#### Access denied errors
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| Volunteer cannot see cases | Missing `cases:read-own` or `cases:read-assigned` permission | Add the permission to their role |
+| Volunteer cannot see PII fields | Missing `contacts:view-pii` permission | Add if appropriate; PII access is intentionally restricted |
+| Volunteer cannot create reports | Missing `reports:create` permission | Add to their role. Check that report types exist (template must define them) |
+| "Case management not enabled" | CMS feature toggle is off | Admin must enable via Settings > Case Management |
+
+#### Auto-assignment not working
+
+Auto-assignment (`PUT /api/settings/cms/auto-assignment`) routes new cases to available volunteers. If cases are not being assigned:
+
+1. Verify auto-assignment is enabled: **Settings > Case Management > Auto-Assignment**.
+2. Check that volunteers have `cases:accept` permission.
+3. Verify volunteers are on shift and not marked as busy.
+
+#### Database queries for CMS data
+
+```bash
+# Count entity types configured
+docker compose exec postgres psql -U llamenos -d llamenos -c "
+  SELECT key, value->>'id' AS entity_type
+  FROM storage
+  WHERE namespace = 'settings' AND key = 'entityTypes';
+"
+
+# Count cases by namespace
+docker compose exec postgres psql -U llamenos -d llamenos -c "
+  SELECT namespace, count(*)
+  FROM storage
+  WHERE namespace LIKE 'case:%'
+  GROUP BY namespace;
+"
+
+# Check applied templates
+docker compose exec postgres psql -U llamenos -d llamenos -c "
+  SELECT value
+  FROM storage
+  WHERE namespace = 'settings' AND key = 'appliedTemplates';
+"
+```
