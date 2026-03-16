@@ -39,10 +39,12 @@ typealias CreateInteractionRequest = CreateInteractionBody
 // in a different package. So consumers should import directly from org.llamenos.protocol instead.
 
 // ---- Lenient entity type definition ----
-// The codegen EntityTypeDefinition has many required fields that the API may not
-// always return (e.g., simplified test entity types from test-setup-cms).
-// This hand-written version uses defaults for all fields to handle partial responses.
-// TODO: Fix codegen to generate optional fields with defaults, then remove this.
+// The codegen EntityTypeDefinition now has defaults on all fields (Epic 354: Zod schemas
+// updated with .optional().default() + Kotlin post-processor enhanced for enum/SerialName defaults).
+// These hand-written versions remain because they use simple String for enums (vs codegen's
+// EntityCategory/DefaultAccessLevel enum classes) and Int for order (vs codegen's Long).
+// A full migration would require updating all consuming screens to handle enum types.
+// Future: migrate consuming code to use codegen types directly, then delete these.
 
 @Serializable
 data class EntityTypeDefinition(

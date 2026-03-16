@@ -7,7 +7,7 @@ export const enumOptionSchema = z.object({
   label: z.string().max(200),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   icon: z.string().max(50).optional(),
-  order: z.number().int().min(0),
+  order: z.number().int().min(0).optional().default(0),
   isDefault: z.boolean().optional(),
   isClosed: z.boolean().optional(),
   isDeprecated: z.boolean().optional(),
@@ -54,7 +54,7 @@ export const entityFieldDefinitionSchema = z.object({
   helpText: z.string().max(500).optional(),
   placeholder: z.string().max(200).optional(),
   defaultValue: z.union([z.string(), z.number(), z.boolean()]).optional(),
-  order: z.number().int().min(0),
+  order: z.number().int().min(0).optional().default(0),
 
   // Blind index configuration
   indexable: z.boolean().optional().default(false),
@@ -90,25 +90,25 @@ export type EntityCategory = z.infer<typeof entityCategorySchema>
 
 export const entityTypeDefinitionSchema = z.object({
   id: z.uuid(),
-  hubId: z.string(),
+  hubId: z.string().optional().default(''),
 
-  name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
-  label: z.string().max(200),
-  labelPlural: z.string().max(200),
-  description: z.string().max(1000),
+  name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100).optional().default(''),
+  label: z.string().max(200).optional().default(''),
+  labelPlural: z.string().max(200).optional().default(''),
+  description: z.string().max(1000).optional().default(''),
   icon: z.string().max(50).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 
-  category: entityCategorySchema,
+  category: entityCategorySchema.optional().default('case'),
 
   templateId: z.string().optional(),
   templateVersion: z.string().optional(),
 
-  fields: z.array(entityFieldDefinitionSchema).max(100),
+  fields: z.array(entityFieldDefinitionSchema).max(100).optional().default([]),
 
-  statuses: z.array(enumOptionSchema).min(1).max(50),
-  defaultStatus: z.string(),
-  closedStatuses: z.array(z.string()),
+  statuses: z.array(enumOptionSchema).max(50).optional().default([]),
+  defaultStatus: z.string().optional().default(''),
+  closedStatuses: z.array(z.string()).optional().default([]),
 
   severities: z.array(enumOptionSchema).max(20).optional(),
   defaultSeverity: z.string().optional(),
@@ -135,8 +135,8 @@ export const entityTypeDefinitionSchema = z.object({
   isArchived: z.boolean().optional().default(false),
   isSystem: z.boolean().optional().default(false),
 
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.string().optional().default(''),
+  updatedAt: z.string().optional().default(''),
 })
 
 export type EntityTypeDefinition = z.infer<typeof entityTypeDefinitionSchema>

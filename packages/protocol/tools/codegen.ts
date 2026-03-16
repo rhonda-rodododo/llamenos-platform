@@ -297,15 +297,60 @@ function postProcessKotlin(
   //   val fieldName: List<...>,     → val fieldName: List<...> = emptyList(),
   // Only within data class bodies for types that have defaults.
 
+  // Build a map of enum types → { serialName: variant } for enum default injection
+  const enumVariantMap = new Map<string, Map<string, string>>()
+  const enumRegex = /^enum class (\w+)\(val value: String\) \{$/gm
+  const variantRegex = /@SerialName\("(.+?)"\)\s+(\w+)\(".*?"\)/g
+  let enumMatch: RegExpExecArray | null
+  while ((enumMatch = enumRegex.exec(output)) !== null) {
+    const enumName = enumMatch[1]
+    const enumBlock = output.slice(enumMatch.index, output.indexOf('}', enumMatch.index + 1) + 1)
+    const variants = new Map<string, string>()
+    let varMatch: RegExpExecArray | null
+    while ((varMatch = variantRegex.exec(enumBlock)) !== null) {
+      variants.set(varMatch[1], varMatch[2]) // e.g., "case" → "Case"
+    }
+    enumVariantMap.set(enumName, variants)
+  }
+
+  // Build @SerialName → fieldName mapping for fields with renamed properties (e.g., hubId → hubID)
   let currentType: string | null = null
+  let serialNameMap = new Map<string, string>() // serialName → fieldName for current class
   const lines = output.split('\n')
   const result: string[] = []
 
+  // First pass: collect @SerialName mappings per class
+  const classSerialNames = new Map<string, Map<string, string>>()
+  let curClass: string | null = null
+  let pendingSerialName: string | null = null
+  for (const line of lines) {
+    const classMatch = line.match(/^data class (\w+)\s*\(/)
+    if (classMatch) curClass = classMatch[1]
+    if (line.trim() === ')' || line.trim() === ') {') curClass = null
+
+    if (curClass) {
+      const snMatch = line.match(/@SerialName\("(.+?)"\)/)
+      if (snMatch) {
+        pendingSerialName = snMatch[1]
+      } else if (pendingSerialName) {
+        const fMatch = line.match(/^\s+val (\w+):/)
+        if (fMatch) {
+          if (!classSerialNames.has(curClass)) classSerialNames.set(curClass, new Map())
+          classSerialNames.get(curClass)!.set(fMatch[1], pendingSerialName) // hubID → hubId
+        }
+        pendingSerialName = null
+      }
+    }
+  }
+
+  // Second pass: inject defaults
+  currentType = null
   for (const line of lines) {
     // Track which data class we're inside
     const classMatch = line.match(/^data class (\w+)\s*\(/)
     if (classMatch) {
       currentType = classMatch[1]
+      serialNameMap = classSerialNames.get(currentType) ?? new Map()
     }
     if (line.trim() === ')' || line.trim() === ') {') {
       currentType = null
@@ -318,34 +363,37 @@ function postProcessKotlin(
       const fieldMatch = line.match(/^(\s+val )(\w+)(: .+?)(,?\s*)$/)
       if (fieldMatch) {
         const [, prefix, fieldName, typeDecl, suffix] = fieldMatch
-        // Check if quicktype used a different casing (e.g., camelCase from JSON → Kotlin)
-        // quicktype preserves JSON property names in @SerialName but uses camelCase for val names
+        // Look up default using: fieldName, snake_case(fieldName), or @SerialName mapping
+        const jsonPropName = serialNameMap.get(fieldName) // e.g., hubID → hubId
         const defaultVal = defaults.get(fieldName)
-          ?? defaults.get(fieldName.replace(/[A-Z]/g, m => '_' + m.toLowerCase())) // try snake_case
+          ?? defaults.get(fieldName.replace(/[A-Z]/g, m => '_' + m.toLowerCase()))
+          ?? (jsonPropName ? defaults.get(jsonPropName) : undefined)
         if (defaultVal !== undefined && !typeDecl.includes('=')) {
           // Determine the Kotlin default expression
-          let kotlinDefault: string
+          let kotlinDefault: string | undefined
           if (typeof defaultVal === 'boolean') {
             kotlinDefault = String(defaultVal)
           } else if (typeof defaultVal === 'number') {
             kotlinDefault = typeDecl.includes('Long') ? `${defaultVal}L` : String(defaultVal)
           } else if (typeof defaultVal === 'string') {
-            // Skip string defaults for enum types (can't assign String to enum)
             const typeOnly = typeDecl.replace(/^:\s*/, '').replace(/[,\s].*$/, '')
-            if (typeOnly !== 'String' && typeOnly !== 'String?') {
-              result.push(line)
-              continue
+            if (typeOnly === 'String' || typeOnly === 'String?') {
+              kotlinDefault = `"${defaultVal}"`
+            } else {
+              // Try to map string default to enum variant
+              const variants = enumVariantMap.get(typeOnly)
+              if (variants?.has(defaultVal)) {
+                kotlinDefault = `${typeOnly}.${variants.get(defaultVal)}`
+              }
+              // else: skip — can't inject default for unknown types
             }
-            kotlinDefault = `"${defaultVal}"`
           } else if (Array.isArray(defaultVal) && defaultVal.length === 0) {
             kotlinDefault = 'emptyList()'
-          } else {
-            // Skip complex defaults
-            result.push(line)
+          }
+          if (kotlinDefault !== undefined) {
+            result.push(`${prefix}${fieldName}${typeDecl} = ${kotlinDefault}${suffix}`)
             continue
           }
-          result.push(`${prefix}${fieldName}${typeDecl} = ${kotlinDefault}${suffix}`)
-          continue
         }
       }
     }
