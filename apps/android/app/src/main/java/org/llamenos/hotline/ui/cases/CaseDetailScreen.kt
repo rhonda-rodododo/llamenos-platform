@@ -58,8 +58,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.llamenos.protocol.EntityTypeDefinition
-import org.llamenos.protocol.EntityTypeDefinitionField
+import org.llamenos.hotline.model.EntityTypeDefinition
+import org.llamenos.hotline.model.EntityFieldDefinition
 import org.llamenos.protocol.Evidence
 import org.llamenos.protocol.EvidenceClassification
 import org.llamenos.protocol.Interaction
@@ -564,7 +564,7 @@ private fun DetailRow(label: String, value: String) {
  */
 @Composable
 private fun TemplateFieldsSection(
-    fields: List<EntityTypeDefinitionField>,
+    fields: List<EntityFieldDefinition>,
     record: Record,
 ) {
     val sortedFields = fields.sortedBy { it.order }

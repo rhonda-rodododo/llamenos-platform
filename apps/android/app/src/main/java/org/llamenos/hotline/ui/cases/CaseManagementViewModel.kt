@@ -23,7 +23,7 @@ import org.llamenos.hotline.model.RecordContactsResponse
 import org.llamenos.hotline.model.UpdateRecordRequest
 import org.llamenos.protocol.CreateInteractionBody
 import org.llamenos.protocol.CreateInteractionBodyContentEnvelope
-import org.llamenos.protocol.EntityTypeDefinition
+import org.llamenos.hotline.model.EntityTypeDefinition
 import org.llamenos.protocol.Evidence
 import org.llamenos.protocol.Interaction
 import org.llamenos.protocol.InteractionType

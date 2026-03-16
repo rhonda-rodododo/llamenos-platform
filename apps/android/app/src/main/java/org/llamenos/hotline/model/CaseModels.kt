@@ -5,7 +5,6 @@ import org.llamenos.protocol.AssignBody
 import org.llamenos.protocol.CaseInteraction
 import org.llamenos.protocol.CreateInteractionBody
 import org.llamenos.protocol.CreateRecordBody
-import org.llamenos.protocol.EntityTypeDefinition
 import org.llamenos.protocol.Evidence
 import org.llamenos.protocol.EvidenceListResponse
 import org.llamenos.protocol.Interaction
@@ -38,6 +37,72 @@ typealias CreateInteractionRequest = CreateInteractionBody
 // These are re-exported so existing `import org.llamenos.hotline.model.X` imports continue to work.
 // NOTE: Kotlin does not allow re-exporting via typealias when the alias name == original name
 // in a different package. So consumers should import directly from org.llamenos.protocol instead.
+
+// ---- Lenient entity type definition ----
+// The codegen EntityTypeDefinition has many required fields that the API may not
+// always return (e.g., simplified test entity types from test-setup-cms).
+// This hand-written version uses defaults for all fields to handle partial responses.
+// TODO: Fix codegen to generate optional fields with defaults, then remove this.
+
+@Serializable
+data class EntityTypeDefinition(
+    val id: String,
+    val hubId: String = "",
+    val name: String = "",
+    val label: String = "",
+    val labelPlural: String = "",
+    val description: String = "",
+    val icon: String? = null,
+    val color: String? = null,
+    val category: String = "case",
+    val templateId: String? = null,
+    val templateVersion: String? = null,
+    val fields: List<EntityFieldDefinition> = emptyList(),
+    val statuses: List<EnumOption> = emptyList(),
+    val defaultStatus: String = "",
+    val closedStatuses: List<String> = emptyList(),
+    val severities: List<EnumOption>? = null,
+    val defaultSeverity: String? = null,
+    val contactRoles: List<EnumOption>? = null,
+    val numberPrefix: String? = null,
+    val numberingEnabled: Boolean = false,
+    val defaultAccessLevel: String = "assigned",
+    val piiFields: List<String> = emptyList(),
+    val allowSubRecords: Boolean = false,
+    val allowFileAttachments: Boolean = true,
+    val allowInteractionLinks: Boolean = true,
+    val showInNavigation: Boolean = true,
+    val showInDashboard: Boolean = false,
+    val isArchived: Boolean = false,
+    val isSystem: Boolean = false,
+    val createdAt: String = "",
+    val updatedAt: String = "",
+)
+
+@Serializable
+data class EnumOption(
+    val value: String,
+    val label: String,
+    val color: String? = null,
+    val icon: String? = null,
+    val order: Int = 0,
+    val isDefault: Boolean? = null,
+    val isClosed: Boolean? = null,
+    val isDeprecated: Boolean? = null,
+)
+
+@Serializable
+data class EntityFieldDefinition(
+    val id: String = "",
+    val name: String = "",
+    val label: String = "",
+    val type: String = "text",
+    val required: Boolean = false,
+    val section: String? = null,
+    val helpText: String? = null,
+    val order: Int = 0,
+    val accessLevel: String = "all",
+)
 
 // ---- API Response Wrappers ----
 // These wrap codegen types for API response deserialization.

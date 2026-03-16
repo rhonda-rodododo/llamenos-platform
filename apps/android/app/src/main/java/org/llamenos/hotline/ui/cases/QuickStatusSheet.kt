@@ -25,8 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.llamenos.protocol.EntityTypeDefinition
-import org.llamenos.protocol.EntityTypeDefinitionStatus
+import org.llamenos.hotline.model.EntityTypeDefinition
+import org.llamenos.hotline.model.EnumOption
 
 /**
  * Quick status change bottom sheet.
@@ -105,7 +105,7 @@ fun QuickStatusSheet(
 
 @Composable
 private fun StatusOptionRow(
-    status: EntityTypeDefinitionStatus,
+    status: EnumOption,
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
