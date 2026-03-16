@@ -177,17 +177,41 @@ dev.post('/test-setup-cms', async (c) => {
     body: JSON.stringify({ enabled: true }),
   }))
 
-  // 2. Apply the jail-support template
-  const applyRes = await dos.settings.fetch(new Request('http://do/settings/templates/apply', {
+  // 2. Create a test entity type directly (bypassing template engine which requires
+  //    loading bundled template JSON files that may not be available in all environments).
+  const entityTypeId = crypto.randomUUID()
+  const entityTypeName = 'arrest_case'
+  await dos.settings.fetch(new Request('http://do/settings/entity-types', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ templateId }),
-  }))
-  const applyData = applyRes.ok
-    ? await applyRes.json() as { entityTypes?: number }
-    : { entityTypes: 0 }
+    body: JSON.stringify({
+      id: entityTypeId,
+      name: entityTypeName,
+      label: 'Arrest Case',
+      labelPlural: 'Arrest Cases',
+      description: 'BDD test entity type',
+      category: 'case',
+      color: '#ef4444',
+      statuses: [
+        { value: 'reported', label: 'Reported', color: '#f59e0b', order: 1 },
+        { value: 'confirmed', label: 'Confirmed', color: '#3b82f6', order: 2 },
+        { value: 'in_custody', label: 'In Custody', color: '#ef4444', order: 3 },
+        { value: 'released', label: 'Released', color: '#22c55e', order: 4 },
+        { value: 'case_closed', label: 'Case Closed', color: '#6b7280', order: 5, isClosed: true },
+      ],
+      defaultStatus: 'reported',
+      closedStatuses: ['case_closed'],
+      fields: [
+        { id: crypto.randomUUID(), name: 'arrest_datetime', label: 'Arrest Date/Time', type: 'date', required: true, order: 1, accessLevel: 'all', indexable: false, indexType: 'none', visibleToVolunteers: true, editableByVolunteers: true, hubEditable: true },
+        { id: crypto.randomUUID(), name: 'location', label: 'Location', type: 'text', required: false, order: 2, accessLevel: 'all', indexable: false, indexType: 'none', visibleToVolunteers: true, editableByVolunteers: true, hubEditable: true },
+        { id: crypto.randomUUID(), name: 'charges', label: 'Charges', type: 'textarea', required: false, order: 3, accessLevel: 'all', indexable: false, indexType: 'none', visibleToVolunteers: true, editableByVolunteers: true, hubEditable: true },
+      ],
+      numberPrefix: 'JS',
+      numberingEnabled: true,
+    }),
+  })).catch(() => {})
 
-  // 3. Get entity types to find the first one for creating a sample record
+  // 3. Get entity types to verify creation
   const etRes = await dos.settings.fetch(new Request('http://do/settings/entity-types'))
   const etData = await etRes.json() as { entityTypes?: Array<{ id: string; name: string; defaultStatus: string }> }
   const entityTypes = etData.entityTypes ?? []
@@ -219,7 +243,7 @@ dev.post('/test-setup-cms', async (c) => {
   return c.json({
     ok: true,
     templateId,
-    entityTypeCount: applyData.entityTypes ?? entityTypes.length,
+    entityTypeCount: entityTypes.length,
     entityTypes: entityTypes.map(et => ({ id: et.id, name: et.name })),
     sampleRecordId: recordId,
   })
