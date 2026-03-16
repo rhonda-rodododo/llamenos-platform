@@ -217,7 +217,7 @@ struct EventListView: View {
 
     // MARK: - Filtering
 
-    private func filteredEvents(vm: EventsViewModel) -> [CaseEvent] {
+    private func filteredEvents(vm: EventsViewModel) -> [AppCaseEvent] {
         guard !vm.searchQuery.isEmpty else { return vm.events }
         let query = vm.searchQuery.lowercased()
         return vm.events.filter { event in
@@ -241,7 +241,7 @@ struct EventListView: View {
 // MARK: - EventRow
 
 private struct EventRow: View {
-    let event: CaseEvent
+    let event: AppCaseEvent
     let viewModel: EventsViewModel
 
     var body: some View {

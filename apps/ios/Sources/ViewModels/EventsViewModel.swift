@@ -12,12 +12,12 @@ final class EventsViewModel {
 
     // MARK: - State
 
-    var events: [CaseEvent] = []
+    var events: [AppCaseEvent] = []
     var totalEvents: Int = 0
     var currentPage: Int = 1
     let pageSize: Int = 50
 
-    var selectedEvent: CaseEvent?
+    var selectedEvent: AppCaseEvent?
     var selectedEntityType: CaseEntityTypeDefinition?
 
     /// Entity types with category='event' only.
@@ -38,9 +38,9 @@ final class EventsViewModel {
     var isSaving: Bool = false
 
     // Linked data for detail view
-    var linkedCases: [CaseEventLink] = []
+    var linkedCases: [AppCaseEventLink] = []
     var linkedReports: [ReportEventLink] = []
-    var subEvents: [CaseEvent] = []
+    var subEvents: [AppCaseEvent] = []
     var isLoadingLinks: Bool = false
 
     var errorMessage: String?
@@ -60,7 +60,7 @@ final class EventsViewModel {
         allEntityTypes.first { $0.id == id }
     }
 
-    func statusDef(for event: CaseEvent) -> CaseEnumOption? {
+    func statusDef(for event: AppCaseEvent) -> CaseEnumOption? {
         entityType(for: event.entityTypeId)?.statuses.first { $0.value == event.statusHash }
     }
 
@@ -141,7 +141,7 @@ final class EventsViewModel {
 
     // MARK: - Selection
 
-    func selectEvent(_ event: CaseEvent) async {
+    func selectEvent(_ event: AppCaseEvent) async {
         selectedEvent = event
         selectedEntityType = entityType(for: event.entityTypeId)
         await loadLinkedData(for: event)
@@ -157,13 +157,13 @@ final class EventsViewModel {
 
     // MARK: - Linked Data
 
-    private func loadLinkedData(for event: CaseEvent) async {
+    private func loadLinkedData(for event: AppCaseEvent) async {
         isLoadingLinks = true
         defer { isLoadingLinks = false }
 
         // Load linked records (cases)
         do {
-            let response: CaseEventLinksResponse = try await apiService.request(
+            let response: AppCaseEventLinksResponse = try await apiService.request(
                 method: "GET", path: "/api/events/\(event.id)/records"
             )
             linkedCases = response.links
@@ -196,7 +196,7 @@ final class EventsViewModel {
     // MARK: - Decryption
 
     /// Decrypt event details for display (title, description).
-    private func decryptEventDetails(_ events: [CaseEvent]) async {
+    private func decryptEventDetails(_ events: [AppCaseEvent]) async {
         guard cryptoService.isUnlocked, let ourPubkey = cryptoService.pubkey else { return }
 
         for event in events {
@@ -296,7 +296,7 @@ final class EventsViewModel {
         )
 
         do {
-            let _: CaseEvent = try await apiService.request(
+            let _: AppCaseEvent = try await apiService.request(
                 method: "POST", path: "/api/events", body: body
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)

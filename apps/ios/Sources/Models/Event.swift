@@ -1,10 +1,10 @@
 import Foundation
 
-// MARK: - CaseEvent
+// MARK: - AppCaseEvent
 
 /// An event from the CMS — stored in CaseDO as a record with category='event'.
 /// Contains cleartext metadata (dates, location) plus E2EE encrypted details.
-struct CaseEvent: Codable, Identifiable, Sendable {
+struct AppCaseEvent: Codable, Identifiable, Sendable {
     let id: String
     let hubId: String
     let entityTypeId: String
@@ -81,7 +81,7 @@ struct AnyCodable: Codable, Sendable {
 // MARK: - API Responses
 
 struct EventsListResponse: Codable, Sendable {
-    let events: [CaseEvent]
+    let events: [AppCaseEvent]
     let total: Int
     let page: Int?
     let limit: Int?
@@ -89,11 +89,11 @@ struct EventsListResponse: Codable, Sendable {
 }
 
 struct EventResponse: Codable, Sendable {
-    let event: CaseEvent
+    let event: AppCaseEvent
 }
 
 struct SubEventsResponse: Codable, Sendable {
-    let events: [CaseEvent]
+    let events: [AppCaseEvent]
 }
 
 // MARK: - Request Bodies
@@ -119,7 +119,7 @@ struct UpdateEventRequest: Codable, Sendable {
 
 // MARK: - Linked Records/Reports
 
-struct CaseEventLink: Codable, Sendable {
+struct AppCaseEventLink: Codable, Sendable {
     let recordId: String
     let eventId: String
     let linkedAt: String?
@@ -133,8 +133,8 @@ struct ReportEventLink: Codable, Sendable {
     let linkedBy: String?
 }
 
-struct CaseEventLinksResponse: Codable, Sendable {
-    let links: [CaseEventLink]
+struct AppCaseEventLinksResponse: Codable, Sendable {
+    let links: [AppCaseEventLink]
 }
 
 struct ReportEventLinksResponse: Codable, Sendable {

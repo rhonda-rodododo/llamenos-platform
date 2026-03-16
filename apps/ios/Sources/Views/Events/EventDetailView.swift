@@ -5,7 +5,7 @@ import SwiftUI
 /// Detail view for a single event. Shows header info, date range, location,
 /// description, sub-events, and linked records/reports.
 struct EventDetailView: View {
-    let event: CaseEvent
+    let event: AppCaseEvent
     let viewModel: EventsViewModel
 
     @Environment(AppState.self) private var appState
@@ -543,7 +543,7 @@ enum EventDetailTab: String, CaseIterable, Sendable {
 #Preview("Event Detail") {
     NavigationStack {
         EventDetailView(
-            event: CaseEvent(
+            event: AppCaseEvent(
                 id: "test-id",
                 hubId: "hub-1",
                 entityTypeId: "et-1",
