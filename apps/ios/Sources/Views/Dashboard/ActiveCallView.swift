@@ -100,6 +100,7 @@ struct ActiveCallView: View {
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
+        VStack(spacing: 8) {
         HStack(spacing: 12) {
             // Hang up
             Button {
@@ -170,6 +171,7 @@ struct ActiveCallView: View {
             )
         }
         .accessibilityIdentifier("ban-hangup-button")
+        } // VStack
     }
 
     // MARK: - Quick Note
