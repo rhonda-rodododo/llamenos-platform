@@ -198,7 +198,7 @@ Architecture overview: [`docs/architecture/E2EE_ARCHITECTURE.md`](architecture/E
 
 ### Desktop Security & Native Crypto
 - [x] **[Epic 80: Desktop Security Hardening](epics/epic-80-desktop-security.md)** — Tauri isolation pattern, Stronghold PBKDF2, CSP hardening, IPC allowlist, CryptoState memory protection, reproducible builds, single instance
-- [~] **[Epic 81: Native Crypto Migration](epics/epic-81-native-crypto.md)** — Phases 1-5 complete (platform abstraction, all route/component crypto migrated to platform.ts). Phases 6-7 (WASM build for browser, cross-platform test vectors) deferred to post-launch.
+- [x] **[Epic 81: Native Crypto Migration](epics/epic-81-native-crypto.md)** — All 7 phases complete. WASM build (521KB), Vite integration, JS mock eliminated. ALL platforms (desktop, iOS, Android, browser WASM, Playwright) now use single Rust crypto. Cross-platform interop tests validate against Rust test vectors.
 
 ### Trust Verification — COMPLETE
 - [x] **[Epic 79: Reproducible Builds](epics/epic-79-reproducible-builds.md)** — Deterministic build config, Dockerfile.build, verify-build.sh, CHECKSUMS.txt in GitHub Releases, SLSA provenance
@@ -611,14 +611,12 @@ CMS backend + desktop UI complete (Epics 315-332). Remaining work: test executio
 - [x] **[Epic 342: Smart Case Assignment & Report-to-Case Conversion](epics/epic-342-case-assignment-routing.md)** — Smart assignment API with scoring, auto-assign, report triage queue, template-driven case creation, LLM-assisted parsing
 
 ### In Progress
-- [~] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 92+/99 BDD pass (~93%). Card click timing fixes applied. Remaining failures: create case toast (mock encryption), empty state persistence, volunteer fixture gaps.
-- [x] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — All 12 non-English locales translated for CMS sections. 175 missing en.json keys added. Desktop i18n validator at 0 missing keys.
-- [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — **Phase 1 complete** (report submission): ReportTypePicker, TypedReportForm, AudioInput on both iOS (SwiftUI/Speech) + Android (Compose/SpeechRecognizer). Phase 2 (case views: CaseList, CaseSummary, QuickStatus) and Phase 3 (DateCalendar, AddComment) remaining.
+- [~] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 95+/99 BDD pass (~96%). Card click timing + record pagination fixes. Remaining: volunteer fixture for restricted permission tests, pre-existing auth validation issues.
+- [x] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — All 12 non-English locales translated for CMS sections. 175 missing en.json keys added. All 3 platform i18n validators pass at 0 errors.
+- [x] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — All 3 phases complete. iOS: CaseListView + CaseManagementViewModel. Android: CaseDetailScreen + CaseManagementViewModel. Both with entity type filtering, timeline, status management.
+- [x] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip (138 keys), TEMPLATE_AUTHORING.md (595 lines), RUNBOOK.md CMS section.
 
-### Remaining
-- [x] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip (138 keys), TEMPLATE_AUTHORING.md (595 lines), RUNBOOK.md CMS section. API narrative docs deferred.
-
-**All critical-path CMS epics complete.** Remaining work: 335 remaining BDD TODOs, 337 Phases 2-3 (mobile case views), 338 (translations), 339 (docs).
+**All CMS epics complete except Epic 335 (4 remaining BDD failures — pre-existing test infrastructure issues).**
 
 ## Platform Gap Closure (Epics 349-354)
 
@@ -632,8 +630,8 @@ Identified via comprehensive gap analysis (2026-03-16). Covers code-level bugs, 
 - [x] **[Epic 352: Relay Event Delivery Queue](epics/epic-352-relay-event-delivery-queue.md)** — PostgreSQL outbox, 30s drain poller, reconnect cap removed. All publish call sites already had .catch() from Epic 310.
 
 ### Tier 2 — Feature Completion (parity & polish)
-- [~] **[Epic 351: In-Call Action UI — Mobile](epics/epic-351-in-call-action-ui-mobile.md)** — Desktop ban reason prompt done. iOS + Android active call panels (hangup, ban, spam, quick note) remaining.
-- [ ] **[Epic 353: Mobile Feature Parity Screens](epics/epic-353-mobile-feature-parity-screens.md)** — Hub management, events, contact directory, triage queue, schema browser, transcription settings on iOS + Android.
+- [x] **[Epic 351: In-Call Action UI — Mobile](epics/epic-351-in-call-action-ui-mobile.md)** — Desktop ban reason, iOS ActiveCallView, Android ActiveCallCard. All 3 phases complete.
+- [~] **[Epic 353: Mobile Feature Parity Screens](epics/epic-353-mobile-feature-parity-screens.md)** — Hub management (iOS + Android done). Events (iOS + Android done). Remaining: contact directory, triage queue, schema browser, transcription settings.
 - [x] **[Epic 354: Kotlin Codegen Nested Defaults](epics/epic-354-kotlin-codegen-nested-defaults.md)** — Enhanced Kotlin post-processor for enum/SerialName defaults. Schema-level `.optional().default()` on EntityTypeDefinition fields. Android lenient types kept for now (String-vs-enum migration deferred).
 
 ## Low Priority (Post-Launch)
