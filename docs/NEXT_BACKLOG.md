@@ -612,11 +612,11 @@ CMS backend + desktop UI complete (Epics 315-332). Remaining work: test executio
 
 ### In Progress
 - [~] **[Epic 335: Desktop BDD CMS Test Execution & Fixes](epics/epic-335-desktop-bdd-cms-test-execution.md)** — 92+/99 BDD pass (~93%). Card click timing fixes applied. Remaining failures: create case toast (mock encryption), empty state persistence, volunteer fixture gaps.
-- [ ] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — 61 keys × 12 locales added (ES/FR/PT translated). Template i18n mappings, codegen validation, RTL testing still needed
+- [~] **[Epic 338: Template Translations & Locale Completeness](epics/epic-338-template-translations-locale-completeness.md)** — CMS sections translated for 8 locales (es, fr, pt, zh, ar, de, ru, ko). Remaining: hi, vi, tl, ht still have EN placeholders.
 - [ ] **[Epic 337: Mobile Case Management Views](epics/epic-337-mobile-jail-support-views.md)** — **Phase 1 complete** (report submission): ReportTypePicker, TypedReportForm, AudioInput on both iOS (SwiftUI/Speech) + Android (Compose/SpeechRecognizer). Phase 2 (case views: CaseList, CaseSummary, QuickStatus) and Phase 3 (DateCalendar, AddComment) remaining.
 
 ### Remaining
-- [ ] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip component, operator handbook CMS section, template authoring guide, API narrative docs
+- [x] **[Epic 339: CMS Documentation & Operator Guide](epics/epic-339-cms-documentation-operator-guide.md)** — HelpTooltip (138 keys), TEMPLATE_AUTHORING.md (595 lines), RUNBOOK.md CMS section. API narrative docs deferred.
 
 **All critical-path CMS epics complete.** Remaining work: 335 remaining BDD TODOs, 337 Phases 2-3 (mobile case views), 338 (translations), 339 (docs).
 
