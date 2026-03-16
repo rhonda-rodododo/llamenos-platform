@@ -90,7 +90,7 @@ struct EventDetailView: View {
                         BadgeView(
                             text: statusDef.label,
                             icon: nil,
-                            color: Color(hex: statusDef.color ?? "#6b7280"),
+                            color: Color(hex: statusDef.color ?? "#6b7280") ?? .gray,
                             style: .subtle
                         )
                     }

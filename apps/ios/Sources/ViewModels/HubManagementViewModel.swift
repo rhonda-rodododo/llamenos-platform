@@ -84,7 +84,7 @@ final class HubManagementViewModel {
         )
 
         do {
-            let response: HubResponse = try await apiService.request(
+            let response: AppHubResponse = try await apiService.request(
                 method: "POST", path: "/api/hubs", body: body
             )
             hubs.append(response.hub)

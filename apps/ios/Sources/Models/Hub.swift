@@ -48,7 +48,7 @@ struct HubsListResponse: Codable, Sendable {
     let hubs: [Hub]
 }
 
-struct HubResponse: Codable, Sendable {
+struct AppHubResponse: Codable, Sendable {
     let hub: Hub
 }
 
