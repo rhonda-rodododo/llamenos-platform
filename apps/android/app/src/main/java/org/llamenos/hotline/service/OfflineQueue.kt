@@ -168,10 +168,7 @@ class OfflineQueue @Inject constructor(
             if (!networkMonitor.isOnline.value) break
 
             try {
-                api.requestNoContent(op.method, op.path, op.body?.let { rawBody ->
-                    // Wrap raw JSON string as a pre-serialized body
-                    RawJsonBody(rawBody)
-                })
+                api.requestRawNoContent(op.method, op.path, op.body)
                 toRemove.add(op.id)
             } catch (e: ApiException) {
                 val code = e.code
@@ -310,9 +307,3 @@ class OfflineQueue @Inject constructor(
     }
 }
 
-/**
- * Wrapper that holds a pre-serialized JSON string.
- * Used by OfflineQueue to pass already-serialized bodies to ApiService.
- */
-@Serializable
-data class RawJsonBody(val json: String)

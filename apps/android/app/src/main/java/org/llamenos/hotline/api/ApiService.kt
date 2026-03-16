@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
+import org.llamenos.hotline.service.OfflineQueue
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -60,6 +61,13 @@ class ApiService @Inject constructor(
             .build()
     }
 
+    /**
+     * Offline write queue. Set by [LlamenosApp] after initialization.
+     * When a write request fails with a network error, the operation is
+     * automatically enqueued for replay when connectivity is restored.
+     */
+    var offlineQueue: OfflineQueue? = null
+
     @PublishedApi
     internal val json: Json = Json {
         ignoreUnknownKeys = true
@@ -108,7 +116,20 @@ class ApiService @Inject constructor(
             )
             .build()
 
-        val response = client.newCall(request).execute()
+        val response = try {
+            client.newCall(request).execute()
+        } catch (e: IOException) {
+            // On network error for write operations, enqueue for offline replay
+            if (OfflineQueue.isQueueableMethod(httpMethod)) {
+                val bodyString = body?.let { bodyValue ->
+                    val serializer = serializer(bodyValue::class.java)
+                    @Suppress("UNCHECKED_CAST")
+                    json.encodeToString(serializer as kotlinx.serialization.SerializationStrategy<Any>, bodyValue)
+                }
+                offlineQueue?.enqueue(path, httpMethod, bodyString)
+            }
+            throw e
+        }
 
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: response.message
@@ -141,6 +162,61 @@ class ApiService @Inject constructor(
         }
 
         val httpMethod = method.uppercase()
+        val request = Request.Builder()
+            .url(url)
+            .method(
+                httpMethod,
+                when {
+                    requestBody != null -> requestBody
+                    httpMethod in listOf("POST", "PUT", "PATCH") -> "".toRequestBody(mediaType)
+                    else -> null
+                }
+            )
+            .build()
+
+        val response = try {
+            client.newCall(request).execute()
+        } catch (e: IOException) {
+            // On network error for write operations, enqueue for offline replay
+            if (OfflineQueue.isQueueableMethod(httpMethod)) {
+                val bodyString = body?.let { bodyValue ->
+                    val serializer = serializer(bodyValue::class.java)
+                    @Suppress("UNCHECKED_CAST")
+                    json.encodeToString(serializer as kotlinx.serialization.SerializationStrategy<Any>, bodyValue)
+                }
+                offlineQueue?.enqueue(path, httpMethod, bodyString)
+            }
+            throw e
+        }
+
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: response.message
+            throw ApiException(response.code, errorBody)
+        }
+    }
+
+    /**
+     * Execute a request with a pre-serialized JSON string body.
+     *
+     * Used by [OfflineQueue] during replay — the body was already serialized
+     * when the operation was originally enqueued, so we send it as-is.
+     *
+     * @param method HTTP method
+     * @param path API path
+     * @param rawJsonBody Pre-serialized JSON string, or null
+     */
+    suspend fun requestRawNoContent(
+        method: String,
+        path: String,
+        rawJsonBody: String? = null,
+    ): Unit = withContext(Dispatchers.IO) {
+        val baseUrl = getBaseUrl()
+        val url = "$baseUrl$path"
+
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+        val httpMethod = method.uppercase()
+        val requestBody = rawJsonBody?.toRequestBody(mediaType)
+
         val request = Request.Builder()
             .url(url)
             .method(

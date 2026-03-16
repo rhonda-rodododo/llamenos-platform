@@ -12,6 +12,7 @@ import org.llamenos.hotline.api.VersionChecker
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
+import org.llamenos.hotline.service.OfflineQueue
 import org.llamenos.hotline.ui.DeepLinkDestination
 import org.llamenos.hotline.ui.LlamenosNavigation
 import org.llamenos.hotline.ui.theme.LlamenosTheme
@@ -35,6 +36,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var versionChecker: VersionChecker
 
+    @Inject
+    lateinit var offlineQueue: OfflineQueue
+
     private var backgroundTimestamp: Long? = null
 
     /** Pending deep link destination, consumed by LlamenosNavigation on composition. */
@@ -55,6 +59,7 @@ class MainActivity : ComponentActivity() {
                     webSocketService = webSocketService,
                     keystoreService = keystoreService,
                     networkMonitor = networkMonitor,
+                    offlineQueue = offlineQueue,
                     versionChecker = versionChecker,
                     pendingDeepLink = pendingDeepLink,
                     onDeepLinkConsumed = { pendingDeepLink = null },
