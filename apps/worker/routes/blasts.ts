@@ -3,7 +3,7 @@ import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getScopedDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
-import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema } from '../schemas/blasts'
+import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema } from '@protocol/schemas/blasts'
 import { authErrors } from '../openapi/helpers'
 
 const blasts = new Hono<AppEnv>()

@@ -6,8 +6,8 @@
  * RelationshipTypeDefinition records stored in SettingsDO.
  */
 import type { CaseManagementTemplate } from '../../../packages/protocol/template-types'
-import type { EntityTypeDefinition, RelationshipTypeDefinition, EntityFieldDefinition } from '../schemas/entity-schema'
-import type { ReportTypeDefinition, ReportFieldDefinition } from '../schemas/report-types'
+import type { EntityTypeDefinition, RelationshipTypeDefinition, EntityFieldDefinition } from '@protocol/schemas/entity-schema'
+import type { ReportTypeDefinition, ReportFieldDefinition } from '@protocol/schemas/report-types'
 
 export interface AppliedTemplateRecord {
   templateId: string

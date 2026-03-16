@@ -3,7 +3,7 @@
  * Protocol codegen tool.
  *
  * Generates TypeScript interfaces, Swift structs, and Kotlin data classes
- * from Zod schemas (via toJSONSchema()) defined in apps/worker/schemas/.
+ * from Zod schemas (via toJSONSchema()) defined in packages/protocol/schemas/.
  * Also generates crypto label constants.
  *
  * Usage:

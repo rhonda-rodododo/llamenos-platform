@@ -21,7 +21,7 @@ export const eventSchema = z.object({
   startDate: z.string(),                         // ISO 8601
   endDate: z.string().optional(),                 // ISO 8601
   parentEventId: z.uuid().optional(),    // Sub-event hierarchy
-  locationPrecision: locationPrecisionSchema.default('neighborhood'),
+  locationPrecision: locationPrecisionSchema.optional().default('neighborhood'),
   locationApproximate: z.string().optional(),     // Cleartext approximate location
 
   // --- Blind indexes (server-filterable) ---
@@ -53,11 +53,11 @@ export const createEventBodySchema = z.object({
   startDate: z.string().min(1),
   endDate: z.string().optional(),
   parentEventId: z.uuid().optional(),
-  locationPrecision: locationPrecisionSchema.default('neighborhood'),
+  locationPrecision: locationPrecisionSchema.optional().default('neighborhood'),
   locationApproximate: z.string().optional(),
   eventTypeHash: z.string(),
   statusHash: z.string(),
-  blindIndexes: z.record(z.string(), z.union([z.string(), z.array(z.string())])).default({}),
+  blindIndexes: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional().default({}),
   encryptedDetails: z.string().min(1),
   detailEnvelopes: z.array(recipientEnvelopeSchema).min(1),
 })

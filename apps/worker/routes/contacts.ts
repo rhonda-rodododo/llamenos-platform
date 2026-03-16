@@ -3,7 +3,7 @@ import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getScopedDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
-import { paginationSchema } from '../schemas/common'
+import { paginationSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 
 const contacts = new Hono<AppEnv>()

@@ -6,7 +6,7 @@ import { getDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 import { validateExternalUrl } from '../lib/ssrf-guard'
-import { setupStateSchema, setupCompleteBodySchema } from '../schemas/settings'
+import { setupStateSchema, setupCompleteBodySchema } from '@protocol/schemas/settings'
 import { authErrors } from '../openapi/helpers'
 
 const testSignalBodySchema = z.object({

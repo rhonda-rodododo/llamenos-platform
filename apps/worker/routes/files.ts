@@ -8,7 +8,7 @@ import { audit } from '../services/audit'
 import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from './metrics'
-import { shareFileBodySchema } from '../schemas/files'
+import { shareFileBodySchema } from '@protocol/schemas/files'
 import { authErrors } from '../openapi/helpers'
 
 const files = new Hono<AppEnv>()

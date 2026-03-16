@@ -2,7 +2,7 @@ import { createMiddleware } from 'hono/factory'
 import type { AppEnv } from '../types'
 import { permissionGranted } from '@shared/permissions'
 import { getDOs } from '../lib/do-access'
-import type { EntityTypeDefinition } from '../schemas/entity-schema'
+import type { EntityTypeDefinition } from '@protocol/schemas/entity-schema'
 
 /**
  * Middleware that requires the authenticated user to have ALL specified permissions.

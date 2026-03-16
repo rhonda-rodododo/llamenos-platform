@@ -5,8 +5,8 @@ import type { AppEnv, CallRecord } from '../types'
 import { getScopedDOs, getTelephony } from '../lib/do-access'
 import { audit } from '../services/audit'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
-import { callHistoryQuerySchema, callRecordResponseSchema, banCallerBodySchema } from '../schemas/calls'
-import { okResponseSchema, paginatedMeta } from '../schemas/common'
+import { callHistoryQuerySchema, callRecordResponseSchema, banCallerBodySchema } from '@protocol/schemas/calls'
+import { okResponseSchema, paginatedMeta } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 
 const calls = new Hono<AppEnv>()

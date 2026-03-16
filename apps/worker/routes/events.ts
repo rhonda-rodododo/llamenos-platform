@@ -9,8 +9,8 @@ import {
   listEventsQuerySchema,
   linkRecordToEventBodySchema,
   linkReportToEventBodySchema,
-} from '../schemas/events'
-import type { Event } from '../schemas/events'
+} from '@protocol/schemas/events'
+import type { Event } from '@protocol/schemas/events'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/nostr-events'

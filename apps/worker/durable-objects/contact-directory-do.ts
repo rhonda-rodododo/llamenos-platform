@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import type { Env } from '../types'
-import type { Contact, CreateContactBody } from '../schemas/contacts-v2'
-import type { ContactRelationship, AffinityGroup, CreateRelationshipBody, CreateAffinityGroupBody, UpdateAffinityGroupBody, AddGroupMemberBody } from '../schemas/contact-relationships'
+import type { Contact, CreateContactBody } from '@protocol/schemas/contacts-v2'
+import type { ContactRelationship, AffinityGroup, CreateRelationshipBody, CreateAffinityGroupBody, UpdateAffinityGroupBody, AddGroupMemberBody } from '@protocol/schemas/contact-relationships'
 import { DORouter } from '../lib/do-router'
 import { parseBlindIndexFilters, matchesBlindIndexFilters } from '../lib/blind-index-query'
 

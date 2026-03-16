@@ -6,7 +6,7 @@ import { auth } from '../middleware/auth'
 import { checkRateLimit } from '../lib/helpers'
 import { hashIP } from '../lib/crypto'
 import { publicErrors, authErrors } from '../openapi/helpers'
-import { createRoomBodySchema, roomPayloadBodySchema } from '../schemas/provisioning'
+import { createRoomBodySchema, roomPayloadBodySchema } from '@protocol/schemas/provisioning'
 
 const provisioning = new Hono<AppEnv>()
 

@@ -1,4 +1,4 @@
-import type { EntityTypeDefinition } from '../schemas/entity-schema'
+import type { EntityTypeDefinition } from '@protocol/schemas/entity-schema'
 import { permissionGranted } from '@shared/permissions'
 
 /**

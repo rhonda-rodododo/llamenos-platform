@@ -8,7 +8,7 @@ import { hashIP } from '../lib/crypto'
 import { generateRegOptions, verifyRegResponse, generateAuthOptions, verifyAuthResponse } from '../lib/webauthn'
 import { auth as authMiddleware } from '../middleware/auth'
 import { audit } from '../services/audit'
-import { authenticateBodySchema, addCredentialBodySchema, registerCredentialBodySchema } from '../schemas/webauthn'
+import { authenticateBodySchema, addCredentialBodySchema, registerCredentialBodySchema } from '@protocol/schemas/webauthn'
 import { publicErrors, authErrors } from '../openapi/helpers'
 
 const webauthn = new Hono<AppEnv>()

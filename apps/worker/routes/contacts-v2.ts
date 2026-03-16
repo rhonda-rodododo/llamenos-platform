@@ -3,13 +3,13 @@ import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getScopedDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
-import { createContactBodySchema, updateContactBodySchema, listContactsQuerySchema } from '../schemas/contacts-v2'
+import { createContactBodySchema, updateContactBodySchema, listContactsQuerySchema } from '@protocol/schemas/contacts-v2'
 import {
   createRelationshipBodySchema,
   createAffinityGroupBodySchema,
   updateAffinityGroupBodySchema,
   addGroupMemberBodySchema,
-} from '../schemas/contact-relationships'
+} from '@protocol/schemas/contact-relationships'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 

@@ -18,8 +18,8 @@ import {
   createReportTypeBodySchema,
   updateReportTypeBodySchema,
   ttlOverridesBodySchema,
-} from '../schemas/settings'
-import { okResponseSchema } from '../schemas/common'
+} from '@protocol/schemas/settings'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { validateExternalUrl } from '../lib/ssrf-guard'

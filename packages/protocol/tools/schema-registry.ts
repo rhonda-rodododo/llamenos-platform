@@ -1,12 +1,12 @@
 /**
- * Schema registry: imports Zod schemas from apps/worker/schemas/,
+ * Schema registry: imports Zod schemas from packages/protocol/schemas/,
  * converts them to JSON Schema via Zod 4's toJSONSchema(), and
  * maps each to a PascalCase type name for quicktype codegen.
  */
 
 import { toJSONSchema } from 'zod'
 
-// --- Import all schemas from worker ---
+// --- Import all schemas from protocol ---
 import {
   // common.ts — shared types
   paginationSchema,
@@ -231,7 +231,7 @@ import {
   linkContactBodySchema,
   assignBodySchema,
   unassignBodySchema,
-} from '../../../apps/worker/schemas'
+} from '../schemas'
 
 import type { ZodType } from 'zod'
 

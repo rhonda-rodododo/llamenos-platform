@@ -40,7 +40,7 @@ export const entityFieldDefinitionSchema = z.object({
     'text', 'number', 'select', 'multiselect', 'checkbox',
     'textarea', 'date', 'file',
   ]),
-  required: z.boolean().default(false),
+  required: z.boolean().optional().default(false),
   options: z.array(fieldOptionSchema).max(50).optional(),
   lookupId: z.string().optional(),
   validation: z.object({
@@ -57,23 +57,23 @@ export const entityFieldDefinitionSchema = z.object({
   order: z.number().int().min(0),
 
   // Blind index configuration
-  indexable: z.boolean().default(false),
-  indexType: z.enum(['exact', 'none']).default('none'),
+  indexable: z.boolean().optional().default(false),
+  indexType: z.enum(['exact', 'none']).optional().default('none'),
 
   // Access control
-  accessLevel: z.enum(['all', 'admin', 'assigned', 'custom']).default('all'),
+  accessLevel: z.enum(['all', 'admin', 'assigned', 'custom']).optional().default('all'),
   accessRoles: z.array(z.string()).optional(),
 
   // Visibility rules
-  visibleToVolunteers: z.boolean().default(true),
-  editableByVolunteers: z.boolean().default(true),
+  visibleToVolunteers: z.boolean().optional().default(true),
+  editableByVolunteers: z.boolean().optional().default(true),
 
   // Conditional display
   showWhen: showWhenSchema.optional(),
 
   // Template tracking
   templateId: z.string().optional(),
-  hubEditable: z.boolean().default(true),
+  hubEditable: z.boolean().optional().default(true),
 
   // Audit
   createdAt: z.iso.datetime().optional(),
@@ -118,22 +118,22 @@ export const entityTypeDefinitionSchema = z.object({
   contactRoles: z.array(enumOptionSchema).max(20).optional(),
 
   numberPrefix: z.string().regex(/^[A-Z]{1,5}$/).optional(),
-  numberingEnabled: z.boolean().default(false),
+  numberingEnabled: z.boolean().optional().default(false),
 
-  defaultAccessLevel: z.enum(['assigned', 'team', 'hub']).default('assigned'),
-  piiFields: z.array(z.string()).default([]),
+  defaultAccessLevel: z.enum(['assigned', 'team', 'hub']).optional().default('assigned'),
+  piiFields: z.array(z.string()).optional().default([]),
 
-  allowSubRecords: z.boolean().default(false),
-  allowFileAttachments: z.boolean().default(true),
-  allowInteractionLinks: z.boolean().default(true),
-  showInNavigation: z.boolean().default(true),
-  showInDashboard: z.boolean().default(false),
+  allowSubRecords: z.boolean().optional().default(false),
+  allowFileAttachments: z.boolean().optional().default(true),
+  allowInteractionLinks: z.boolean().optional().default(true),
+  showInNavigation: z.boolean().optional().default(true),
+  showInDashboard: z.boolean().optional().default(false),
 
   accessRoles: z.array(z.string()).optional(),
   editRoles: z.array(z.string()).optional(),
 
-  isArchived: z.boolean().default(false),
-  isSystem: z.boolean().default(false),
+  isArchived: z.boolean().optional().default(false),
+  isSystem: z.boolean().optional().default(false),
 
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -162,11 +162,11 @@ export const relationshipTypeDefinitionSchema = z.object({
 
   joinFields: z.array(entityFieldDefinitionSchema).max(20).optional(),
 
-  cascadeDelete: z.boolean().default(false),
-  required: z.boolean().default(false),
+  cascadeDelete: z.boolean().optional().default(false),
+  required: z.boolean().optional().default(false),
 
   templateId: z.string().optional(),
-  isSystem: z.boolean().default(false),
+  isSystem: z.boolean().optional().default(false),
 
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -180,7 +180,7 @@ export const createEntityTypeBodySchema = z.looseObject({
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().min(1).max(200),
   labelPlural: z.string().min(1).max(200),
-  description: z.string().max(1000).default(''),
+  description: z.string().max(1000).optional().default(''),
   icon: z.string().max(50).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 
@@ -188,11 +188,11 @@ export const createEntityTypeBodySchema = z.looseObject({
 
   fields: z.array(entityFieldDefinitionSchema.omit({ id: true }).extend({
     id: z.uuid().optional(),
-  })).max(100).default([]),
+  })).max(100).optional().default([]),
 
   statuses: z.array(enumOptionSchema).min(1).max(50),
   defaultStatus: z.string(),
-  closedStatuses: z.array(z.string()).default([]),
+  closedStatuses: z.array(z.string()).optional().default([]),
 
   severities: z.array(enumOptionSchema).max(20).optional(),
   defaultSeverity: z.string().optional(),
@@ -201,16 +201,16 @@ export const createEntityTypeBodySchema = z.looseObject({
   contactRoles: z.array(enumOptionSchema).max(20).optional(),
 
   numberPrefix: z.string().regex(/^[A-Z]{1,5}$/).optional(),
-  numberingEnabled: z.boolean().default(false),
+  numberingEnabled: z.boolean().optional().default(false),
 
-  defaultAccessLevel: z.enum(['assigned', 'team', 'hub']).default('assigned'),
-  piiFields: z.array(z.string()).default([]),
+  defaultAccessLevel: z.enum(['assigned', 'team', 'hub']).optional().default('assigned'),
+  piiFields: z.array(z.string()).optional().default([]),
 
-  allowSubRecords: z.boolean().default(false),
-  allowFileAttachments: z.boolean().default(true),
-  allowInteractionLinks: z.boolean().default(true),
-  showInNavigation: z.boolean().default(true),
-  showInDashboard: z.boolean().default(false),
+  allowSubRecords: z.boolean().optional().default(false),
+  allowFileAttachments: z.boolean().optional().default(true),
+  allowInteractionLinks: z.boolean().optional().default(true),
+  showInNavigation: z.boolean().optional().default(true),
+  showInDashboard: z.boolean().optional().default(false),
 
   accessRoles: z.array(z.string()).optional(),
   editRoles: z.array(z.string()).optional(),
@@ -271,8 +271,8 @@ export const createRelationshipTypeBodySchema = z.looseObject({
   joinFields: z.array(entityFieldDefinitionSchema.omit({ id: true }).extend({
     id: z.uuid().optional(),
   })).max(20).optional(),
-  cascadeDelete: z.boolean().default(false),
-  required: z.boolean().default(false),
+  cascadeDelete: z.boolean().optional().default(false),
+  required: z.boolean().optional().default(false),
   templateId: z.string().optional(),
 })
 

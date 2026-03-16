@@ -3,7 +3,7 @@ import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getScopedDOs } from '../lib/do-access'
 import { requirePermission } from '../middleware/permission-guard'
-import { listAuditQuerySchema } from '../schemas/audit'
+import { listAuditQuerySchema } from '@protocol/schemas/audit'
 import { authErrors } from '../openapi/helpers'
 
 const auditRoutes = new Hono<AppEnv>()

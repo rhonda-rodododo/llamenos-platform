@@ -54,10 +54,10 @@ export const claimConversationBodySchema = z.looseObject({
 })
 
 export const createConversationBodySchema = z.looseObject({
-  channelType: z.enum(['sms', 'whatsapp', 'signal', 'rcs', 'web']).default('web'),
-  contactIdentifierHash: z.string().default(''),
+  channelType: z.enum(['sms', 'whatsapp', 'signal', 'rcs', 'web']).optional().default('web'),
+  contactIdentifierHash: z.string().optional().default(''),
   contactLast4: z.string().max(4).optional(),
   assignedTo: pubkeySchema.optional(),
-  status: z.enum(['waiting', 'active', 'closed']).default('waiting'),
+  status: z.enum(['waiting', 'active', 'closed']).optional().default('waiting'),
   metadata: z.record(z.string(), z.unknown()).optional(),
 })

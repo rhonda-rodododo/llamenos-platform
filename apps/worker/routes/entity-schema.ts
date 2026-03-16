@@ -10,20 +10,20 @@ import {
   createRelationshipTypeBodySchema,
   updateRelationshipTypeBodySchema,
   caseNumberBodySchema,
-} from '../schemas/entity-schema'
-import type { EntityTypeDefinition, RelationshipTypeDefinition } from '../schemas/entity-schema'
+} from '@protocol/schemas/entity-schema'
+import type { EntityTypeDefinition, RelationshipTypeDefinition } from '@protocol/schemas/entity-schema'
 import {
   createCmsReportTypeBodySchema,
   updateCmsReportTypeBodySchema,
-} from '../schemas/report-types'
-import type { ReportTypeDefinition } from '../schemas/report-types'
+} from '@protocol/schemas/report-types'
+import type { ReportTypeDefinition } from '@protocol/schemas/report-types'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { applyTemplate, detectTemplateUpdates } from '../lib/template-engine'
 import type { AppliedTemplateRecord } from '../lib/template-engine'
 import { loadBundledTemplates } from '../lib/template-loader'
 import { isValidPermission } from '@shared/permissions'
-import { createRolesFromTemplateBodySchema } from '../schemas/entity-schema'
+import { createRolesFromTemplateBodySchema } from '@protocol/schemas/entity-schema'
 
 const entitySchema = new Hono<AppEnv>()
 

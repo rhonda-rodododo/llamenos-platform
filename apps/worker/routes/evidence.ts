@@ -9,8 +9,8 @@ import {
   logCustodyEventBodySchema,
   verifyIntegrityBodySchema,
   listEvidenceQuerySchema,
-} from '../schemas/evidence'
-import type { EvidenceMetadata } from '../schemas/evidence'
+} from '@protocol/schemas/evidence'
+import type { EvidenceMetadata } from '@protocol/schemas/evidence'
 import { authErrors, notFoundError } from '../openapi/helpers'
 
 const evidence = new Hono<AppEnv>()

@@ -17,6 +17,7 @@
       "@/*": ["./src/client/*"],
       "@worker/*": ["./apps/worker/*"],
       "@shared/*": ["./packages/shared/*"],
+      "@protocol/*": ["./packages/protocol/*"],
       "@llamenos/i18n": ["./packages/i18n/index.ts"],
       "@llamenos/i18n/*": ["./packages/i18n/*"]
     },

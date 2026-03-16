@@ -82,7 +82,7 @@ export const contactPIISchema = z.object({
     type: z.enum(['phone', 'signal', 'email', 'nickname', 'legal_name', 'custom']),
     value: z.string(),
     label: z.string().optional(),
-    isPrimary: z.boolean().default(false),
+    isPrimary: z.boolean().optional().default(false),
   })),
   demographics: z.object({
     pronouns: z.string().optional(),

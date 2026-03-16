@@ -8,7 +8,7 @@ import { entityFieldDefinitionSchema, enumOptionSchema } from './entity-schema'
  * `supportAudioInput` enables speech-to-text dictation on textarea fields.
  */
 export const reportFieldDefinitionSchema = entityFieldDefinitionSchema.extend({
-  supportAudioInput: z.boolean().default(false),
+  supportAudioInput: z.boolean().optional().default(false),
 })
 
 export type ReportFieldDefinition = z.infer<typeof reportFieldDefinitionSchema>
@@ -28,7 +28,7 @@ export const reportTypeDefinitionSchema = z.object({
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().max(200),
   labelPlural: z.string().max(200),
-  description: z.string().max(1000).default(''),
+  description: z.string().max(1000).optional().default(''),
   icon: z.string().max(50).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 
@@ -37,21 +37,21 @@ export const reportTypeDefinitionSchema = z.object({
   templateId: z.string().optional(),
   templateVersion: z.string().optional(),
 
-  fields: z.array(reportFieldDefinitionSchema).max(100).default([]),
+  fields: z.array(reportFieldDefinitionSchema).max(100).optional().default([]),
 
   statuses: z.array(enumOptionSchema).min(1).max(50),
   defaultStatus: z.string(),
-  closedStatuses: z.array(z.string()).default([]),
+  closedStatuses: z.array(z.string()).optional().default([]),
 
   numberPrefix: z.string().regex(/^[A-Z]{1,5}$/).optional(),
-  numberingEnabled: z.boolean().default(false),
+  numberingEnabled: z.boolean().optional().default(false),
 
-  allowFileAttachments: z.boolean().default(true),
-  allowCaseConversion: z.boolean().default(false),
-  mobileOptimized: z.boolean().default(false),
+  allowFileAttachments: z.boolean().optional().default(true),
+  allowCaseConversion: z.boolean().optional().default(false),
+  mobileOptimized: z.boolean().optional().default(false),
 
-  isArchived: z.boolean().default(false),
-  isSystem: z.boolean().default(false),
+  isArchived: z.boolean().optional().default(false),
+  isSystem: z.boolean().optional().default(false),
 
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -65,24 +65,24 @@ export const createCmsReportTypeBodySchema = z.looseObject({
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().min(1).max(200),
   labelPlural: z.string().min(1).max(200),
-  description: z.string().max(1000).default(''),
+  description: z.string().max(1000).optional().default(''),
   icon: z.string().max(50).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 
   fields: z.array(reportFieldDefinitionSchema.omit({ id: true }).extend({
     id: z.uuid().optional(),
-  })).max(100).default([]),
+  })).max(100).optional().default([]),
 
   statuses: z.array(enumOptionSchema).min(1).max(50),
   defaultStatus: z.string(),
-  closedStatuses: z.array(z.string()).default([]),
+  closedStatuses: z.array(z.string()).optional().default([]),
 
   numberPrefix: z.string().regex(/^[A-Z]{1,5}$/).optional(),
-  numberingEnabled: z.boolean().default(false),
+  numberingEnabled: z.boolean().optional().default(false),
 
-  allowFileAttachments: z.boolean().default(true),
-  allowCaseConversion: z.boolean().default(false),
-  mobileOptimized: z.boolean().default(false),
+  allowFileAttachments: z.boolean().optional().default(true),
+  allowCaseConversion: z.boolean().optional().default(false),
+  mobileOptimized: z.boolean().optional().default(false),
 
   templateId: z.string().optional(),
   templateVersion: z.string().optional(),

@@ -14,14 +14,14 @@ export const e164PhoneSchema = z.string().regex(/^\+\d{7,15}$/, 'Must be E.164 f
 
 /** Pagination parameters — bounded and defaulted */
 export const paginationSchema = z.object({
-  page: z.coerce.number().int().min(1).max(10000).default(1),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
+  page: z.coerce.number().int().min(1).max(10000).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
 })
 
 /** Cursor-based pagination */
 export const cursorPaginationSchema = z.object({
   cursor: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
 })
 
 /** ISO 8601 date string */

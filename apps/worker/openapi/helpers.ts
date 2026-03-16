@@ -1,5 +1,5 @@
 import { resolver } from 'hono-openapi'
-import { errorResponseSchema } from '../schemas/common'
+import { errorResponseSchema } from '@protocol/schemas/common'
 
 const errorSchema = resolver(errorResponseSchema)
 

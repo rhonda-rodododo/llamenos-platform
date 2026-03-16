@@ -1,12 +1,12 @@
 // --- ECIES Key Envelopes ---
-// Canonical types are inferred from Zod schemas in @worker/schemas/common.
-export type { RecipientEnvelope, KeyEnvelope, RecipientKeyEnvelope, FileKeyEnvelope } from '@worker/schemas/common'
-import type { FileKeyEnvelope } from '@worker/schemas/common'
+// Canonical types are inferred from Zod schemas in @protocol/schemas/common.
+export type { RecipientEnvelope, KeyEnvelope, RecipientKeyEnvelope, FileKeyEnvelope } from '@protocol/schemas/common'
+import type { FileKeyEnvelope } from '@protocol/schemas/common'
 
 // --- Telephony Provider Config ---
-// TelephonyProviderType canonical definition is in @worker/schemas/settings
-export type { TelephonyProviderType } from '@worker/schemas/settings'
-import type { TelephonyProviderType } from '@worker/schemas/settings'
+// TelephonyProviderType canonical definition is in @protocol/schemas/settings
+export type { TelephonyProviderType } from '@protocol/schemas/settings'
+import type { TelephonyProviderType } from '@protocol/schemas/settings'
 
 export const TELEPHONY_PROVIDER_LABELS: Record<TelephonyProviderType, string> = {
   twilio: 'Twilio',
@@ -112,7 +112,7 @@ export interface EncryptedFileMetadata {
   checksum: string   // SHA-256 of plaintext for integrity verification
 }
 
-// FileKeyEnvelope is re-exported from @worker/schemas/common above
+// FileKeyEnvelope is re-exported from @protocol/schemas/common above
 
 export interface FileRecord {
   id: string
@@ -171,9 +171,9 @@ export const CUSTOM_FIELD_CONTEXT_LABELS: Record<CustomFieldContext, string> = {
 }
 
 // --- Messaging Channel Types ---
-// Canonical definitions are in @worker/schemas/settings
-export type { MessagingChannelType, ChannelType } from '@worker/schemas/settings'
-import type { MessagingChannelType, ChannelType } from '@worker/schemas/settings'
+// Canonical definitions are in @protocol/schemas/settings
+export type { MessagingChannelType, ChannelType } from '@protocol/schemas/settings'
+import type { MessagingChannelType, ChannelType } from '@protocol/schemas/settings'
 
 /** Transport security level for each channel */
 export type TransportSecurity = 'none' | 'provider-encrypted' | 'e2ee-to-bridge' | 'e2ee'
@@ -410,7 +410,7 @@ export const DEFAULT_REPORT_TYPES: Omit<ReportType, 'id' | 'createdAt' | 'update
 ]
 
 // --- Entity Schema Types (CMS — Epic 315) ---
-export type { EntityTypeDefinition, EntityFieldDefinition, RelationshipTypeDefinition, EnumOption, EntityCategory } from '@worker/schemas/entity-schema'
+export type { EntityTypeDefinition, EntityFieldDefinition, RelationshipTypeDefinition, EnumOption, EntityCategory } from '@protocol/schemas/entity-schema'
 
 export const MAX_ENTITY_TYPES = 50
 export const MAX_ENTITY_FIELDS = 100

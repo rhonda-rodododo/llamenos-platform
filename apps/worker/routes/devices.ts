@@ -10,7 +10,7 @@ import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getDOs } from '../lib/do-access'
 import { authErrors } from '../openapi/helpers'
-import { registerDeviceBodySchema, voipTokenBodySchema } from '../schemas/devices'
+import { registerDeviceBodySchema, voipTokenBodySchema } from '@protocol/schemas/devices'
 
 const devicesRoutes = new Hono<AppEnv>()
 

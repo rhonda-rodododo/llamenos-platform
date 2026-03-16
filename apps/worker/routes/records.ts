@@ -10,13 +10,13 @@ import {
   linkContactBodySchema,
   assignBodySchema,
   unassignBodySchema,
-} from '../schemas/records'
-import type { CaseRecord } from '../schemas/records'
-import { createInteractionBodySchema, listInteractionsQuerySchema } from '../schemas/interactions'
-import { linkReportToCaseBodySchema } from '../schemas/report-links'
-import { notifyContactsBodySchema } from '../schemas/notifications'
-import type { NotifyContactsResponse, NotificationResultItem } from '../schemas/notifications'
-import type { EntityTypeDefinition } from '../schemas/entity-schema'
+} from '@protocol/schemas/records'
+import type { CaseRecord } from '@protocol/schemas/records'
+import { createInteractionBodySchema, listInteractionsQuerySchema } from '@protocol/schemas/interactions'
+import { linkReportToCaseBodySchema } from '@protocol/schemas/report-links'
+import { notifyContactsBodySchema } from '@protocol/schemas/notifications'
+import type { NotifyContactsResponse, NotificationResultItem } from '@protocol/schemas/notifications'
+import type { EntityTypeDefinition } from '@protocol/schemas/entity-schema'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/nostr-events'

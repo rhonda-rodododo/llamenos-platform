@@ -24,7 +24,7 @@ export type ContactRelationship = z.infer<typeof contactRelationshipSchema>
 export const createRelationshipBodySchema = z.object({
   contactIdB: z.uuid(),
   relationshipType: z.string().max(50),
-  direction: relationshipDirectionSchema.default('bidirectional'),
+  direction: relationshipDirectionSchema.optional().default('bidirectional'),
   encryptedNotes: z.string().optional(),
   notesEnvelopes: z.array(recipientEnvelopeSchema).optional(),
 })
@@ -74,7 +74,7 @@ export const createAffinityGroupBodySchema = z.object({
   members: z.array(z.object({
     contactId: z.uuid(),
     role: z.string().max(50).optional(),
-    isPrimary: z.boolean().default(false),
+    isPrimary: z.boolean().optional().default(false),
   })).min(1),
 })
 
@@ -90,7 +90,7 @@ export type UpdateAffinityGroupBody = z.infer<typeof updateAffinityGroupBodySche
 export const addGroupMemberBodySchema = z.object({
   contactId: z.uuid(),
   role: z.string().max(50).optional(),
-  isPrimary: z.boolean().default(false),
+  isPrimary: z.boolean().optional().default(false),
 })
 
 export type AddGroupMemberBody = z.infer<typeof addGroupMemberBodySchema>
