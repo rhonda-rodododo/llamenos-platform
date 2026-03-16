@@ -93,6 +93,43 @@ dev.post('/test-reset-records', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Identity Promotion (E2E test helpers) ──────────────────────────────────
+// Promotes a test identity to admin role so mobile E2E tests can access all features.
+
+dev.post('/test-promote-admin', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Forbidden' }, 403)
+  }
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string }
+  if (!body.pubkey) {
+    return c.json({ error: 'pubkey is required' }, 400)
+  }
+  const dos = getDOs(c.env)
+  // Try to update existing volunteer to admin role
+  const updateRes = await dos.identity.fetch(new Request(`http://do/volunteers/${body.pubkey}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roleIds: ['role-admin'] }),
+  }))
+  if (!updateRes.ok) {
+    // Volunteer may not exist yet — create with admin role
+    await dos.identity.fetch(new Request('http://do/volunteers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pubkey: body.pubkey,
+        name: 'BDD Test Admin',
+        phone: '+15550000001',
+        roleIds: ['role-admin'],
+      }),
+    }))
+  }
+  return c.json({ ok: true, pubkey: body.pubkey })
+})
+
 // ─── CMS Test Setup (E2E test helpers) ──────────────────────────────────────
 // Sets up CMS data for mobile E2E tests that can't call authenticated API endpoints.
 // Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
@@ -109,20 +146,29 @@ dev.post('/test-setup-cms', async (c) => {
   const dos = getDOs(c.env)
   const templateId = 'jail-support'
 
-  // 0. If a pubkey is provided, register it as a volunteer with admin role
-  //    so the test identity can access CMS endpoints.
-  if (body.pubkey) {
-    await dos.identity.fetch(new Request('http://do/volunteers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pubkey: body.pubkey,
-        name: 'BDD Test Admin',
-        phone: '+15550000001',
-        roleIds: ['role-admin'],
-      }),
-    })).catch(() => {})
-  }
+  // 0. Grant the default volunteer role cases:read permission so test
+  //    identities (who register as volunteers during onboarding) can see
+  //    all records without explicit assignment.
+  await dos.settings.fetch(new Request('http://do/settings/roles/role-volunteer', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      permissions: [
+        'calls:answer', 'calls:read-active',
+        'notes:create', 'notes:read-own', 'notes:update-own', 'notes:reply',
+        'conversations:claim', 'conversations:send', 'conversations:read-assigned',
+        'conversations:claim-sms', 'conversations:claim-whatsapp',
+        'conversations:claim-signal', 'conversations:claim-rcs', 'conversations:claim-web',
+        'shifts:read-own', 'bans:report',
+        'reports:read-assigned', 'reports:send-message',
+        'files:upload', 'files:download-own',
+        // CMS permissions for E2E testing: full access to cases + contacts
+        'cases:create', 'cases:read', 'cases:update', 'cases:assign',
+        'contacts:view', 'contacts:create', 'contacts:update',
+        'events:read', 'events:create', 'evidence:upload', 'evidence:read',
+      ],
+    }),
+  })).catch(() => {})
 
   // 1. Enable case management
   await dos.settings.fetch(new Request('http://do/settings/case-management', {

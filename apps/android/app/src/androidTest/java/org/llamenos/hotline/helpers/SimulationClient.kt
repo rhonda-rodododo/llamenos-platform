@@ -169,6 +169,20 @@ object SimulationClient {
         return json.decodeFromString<StatusResponse>(responseText)
     }
 
+    // ─── Identity Promotion ────────────────────────────────────────
+
+    /**
+     * Promote a pubkey to admin role on the backend.
+     * The pubkey must belong to a registered volunteer (or will be created).
+     *
+     * Corresponds to `POST /api/test-promote-admin`.
+     */
+    fun promoteToAdmin(pubkey: String): StatusResponse {
+        val body = """{"pubkey":"${escapeJson(pubkey)}"}"""
+        val responseText = post("/api/test-promote-admin", body)
+        return json.decodeFromString<StatusResponse>(responseText)
+    }
+
     // ─── CMS Setup ────────────────────────────────────────────────
 
     /**

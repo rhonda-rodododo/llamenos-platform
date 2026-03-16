@@ -8,10 +8,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import io.cucumber.java.en.And
 import android.util.Log
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 
@@ -30,31 +32,20 @@ class CaseListSteps : BaseSteps() {
 
     @Given("the app is launched and authenticated as admin")
     fun theAppIsLaunchedAndAuthenticatedAsAdmin() {
-        // Phase 1: Set up CMS template + entity types (no pubkey yet)
+        // Phase 1: Set up CMS on backend BEFORE app launch.
+        // This enables CMS, applies jail-support template, grants the default
+        // volunteer role cases:read permission, and creates a sample record.
         try {
-            SimulationClient.setupCms()
-            Log.d("CaseListSteps", "CMS template + entity types set up")
+            val result = SimulationClient.setupCms()
+            Log.d("CaseListSteps", "CMS setup: ok=${result.ok}, entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
         } catch (e: Throwable) {
-            Log.w("CaseListSteps", "CMS setup phase 1 failed: ${e.message}")
+            Log.w("CaseListSteps", "CMS setup failed: ${e.message}")
         }
 
-        // Phase 2: Launch app and create identity (generates keypair)
+        // Phase 2: Launch app — onboarding registers identity as volunteer.
+        // The volunteer role now includes cases:read (granted by test-setup-cms),
+        // so all records are visible without explicit assignment.
         navigateToMainScreen()
-
-        // Phase 3: Register the app's identity as admin + create sample records
-        // After navigateToMainScreen(), the CryptoService has the pubkey.
-        try {
-            val crypto = CryptoService()
-            val pubkey = crypto.pubkey
-            if (pubkey != null) {
-                val result = SimulationClient.setupCms(pubkey)
-                Log.d("CaseListSteps", "CMS admin registered: ok=${result.ok}, record=${result.sampleRecordId}")
-            } else {
-                Log.w("CaseListSteps", "No pubkey available after auth — CMS records may not be visible")
-            }
-        } catch (e: Throwable) {
-            Log.w("CaseListSteps", "CMS setup phase 3 failed: ${e.message}")
-        }
     }
 
     @Given("cases exist in the system")
