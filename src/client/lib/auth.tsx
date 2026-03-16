@@ -128,11 +128,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore session on mount
   useEffect(() => {
+    let mounted = true
     // Try session token (WebAuthn session) — always try this first
     const sessionToken = sessionStorage.getItem('llamenos-session-token')
     if (sessionToken) {
       getMe()
         .then((me) => {
+          if (!mounted) return
           lastApiActivity.current = Date.now()
           setState({
             isKeyUnlocked: keyManager.isUnlocked(),
@@ -157,16 +159,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
         })
         .catch(() => {
+          if (!mounted) return
           sessionStorage.removeItem('llamenos-session-token')
           setState(s => ({ ...s, isLoading: false }))
         })
-      return
+      return () => { mounted = false }
     }
     // If key manager is already unlocked (e.g., still in memory from tab switch),
     // try to authenticate with Schnorr token
     if (keyManager.isUnlocked()) {
       getMe()
         .then((me) => {
+          if (!mounted) return
           lastApiActivity.current = Date.now()
           setState({
             isKeyUnlocked: true,
@@ -191,12 +195,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
         })
         .catch(() => {
+          if (!mounted) return
           keyManager.lock()
           setState(s => ({ ...s, isLoading: false }))
         })
-      return
+      return () => { mounted = false }
     }
     setState(s => ({ ...s, isLoading: false }))
+    return () => { mounted = false }
   }, [])
 
   // Sign in with nsec (import flow — onboarding/recovery only)

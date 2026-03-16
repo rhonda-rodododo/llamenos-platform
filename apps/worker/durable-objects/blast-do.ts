@@ -247,6 +247,9 @@ export class BlastDO extends DurableObject<Env> {
     let imported = 0
     let skipped = 0
 
+    // Batch all storage writes to avoid N+1 individual puts
+    const batch = new Map<string, unknown>()
+
     for (const entry of data.subscribers) {
       // Generate identifier hash using HMAC with server secret (consistent with hashPhone pattern)
       const identifierHash = bytesToHex(
@@ -255,19 +258,23 @@ export class BlastDO extends DurableObject<Env> {
 
       const existing = await this.ctx.storage.get<Subscriber>(`subscribers:${identifierHash}`)
       if (existing) {
+        let changed = false
         // Add channel if not present
         const hasChannel = existing.channels.some(ch => ch.type === entry.channel)
         if (!hasChannel) {
           existing.channels.push({ type: entry.channel, verified: false })
-          await this.ctx.storage.put(`subscribers:${identifierHash}`, existing)
+          changed = true
           await this.addToChannelIndex(entry.channel, existing.id)
         }
         if (entry.tags) {
           const newTags = entry.tags.filter(t => !existing.tags.includes(t))
           if (newTags.length > 0) {
             existing.tags.push(...newTags)
-            await this.ctx.storage.put(`subscribers:${identifierHash}`, existing)
+            changed = true
           }
+        }
+        if (changed) {
+          batch.set(`subscribers:${identifierHash}`, existing)
         }
         skipped++
         continue
@@ -285,11 +292,16 @@ export class BlastDO extends DurableObject<Env> {
         preferenceToken: this.generatePreferenceToken(identifierHash),
       }
 
-      await this.ctx.storage.put(`subscribers:${identifierHash}`, subscriber)
+      batch.set(`subscribers:${identifierHash}`, subscriber)
       // Write preference token index for constant-time lookup
-      await this.ctx.storage.put(`preferenceToken:${subscriber.preferenceToken}`, identifierHash)
+      batch.set(`preferenceToken:${subscriber.preferenceToken}`, identifierHash)
       await this.addToChannelIndex(entry.channel, subscriber.id)
       imported++
+    }
+
+    // Single batched write for all subscriber and token entries
+    if (batch.size > 0) {
+      await this.ctx.storage.put(Object.fromEntries(batch))
     }
 
     return Response.json({ imported, skipped, total: imported + skipped })

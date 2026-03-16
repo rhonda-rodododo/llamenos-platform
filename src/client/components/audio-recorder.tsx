@@ -14,6 +14,7 @@ export function AudioRecorder({ onRecorded, existingUrl, onDelete }: AudioRecord
   const [recording, setRecording] = useState(false)
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const [duration, setDuration] = useState(0)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const chunks = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -26,6 +27,14 @@ export function AudioRecorder({ onRecorded, existingUrl, onDelete }: AudioRecord
       }
     }
   }, [])
+
+  // Manage blob URL lifecycle — revoke on change/unmount
+  useEffect(() => {
+    if (!recordedBlob) { setPreviewUrl(existingUrl ?? null); return }
+    const url = URL.createObjectURL(recordedBlob)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [recordedBlob, existingUrl])
 
   async function startRecording() {
     try {
@@ -78,8 +87,6 @@ export function AudioRecorder({ onRecorded, existingUrl, onDelete }: AudioRecord
     setRecordedBlob(null)
     onDelete?.()
   }
-
-  const previewUrl = recordedBlob ? URL.createObjectURL(recordedBlob) : existingUrl
 
   return (
     <div className="space-y-2">

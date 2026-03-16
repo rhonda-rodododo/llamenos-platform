@@ -254,24 +254,32 @@ export class IdentityDO extends DurableObject<Env> {
       // --- Clean up expired WebAuthn challenges ---
       const challengeTTL = resolveTTL('webauthnChallenge', overrides ?? undefined)
       const challengeKeys = await this.ctx.storage.list({ prefix: 'webauthn:challenge:' })
+      const challengeKeysToDelete: string[] = []
       for (const [key, value] of challengeKeys) {
         const data = value as { challenge: string; createdAt: number }
         if (now - data.createdAt > challengeTTL) {
-          await this.ctx.storage.delete(key)
+          challengeKeysToDelete.push(key)
           metrics.webauthnChallengesDeleted++
           incCounter('llamenos_cleanup_items_deleted', { type: 'webauthn_challenge', do: 'identity' })
         }
       }
+      if (challengeKeysToDelete.length > 0) {
+        await this.ctx.storage.delete(challengeKeysToDelete)
+      }
 
       // --- Clean up expired sessions ---
       const sessionKeys = await this.ctx.storage.list({ prefix: 'session:' })
+      const sessionKeysToDelete: string[] = []
       for (const [key, value] of sessionKeys) {
         const session = value as ServerSession
         if (new Date(session.expiresAt).getTime() <= now) {
-          await this.ctx.storage.delete(key)
+          sessionKeysToDelete.push(key)
           metrics.expiredSessionsDeleted++
           incCounter('llamenos_cleanup_items_deleted', { type: 'expired_session', do: 'identity' })
         }
+      }
+      if (sessionKeysToDelete.length > 0) {
+        await this.ctx.storage.delete(sessionKeysToDelete)
       }
 
       // --- Clean up expired provisioning rooms ---

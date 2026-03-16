@@ -52,11 +52,19 @@ function DashboardPage() {
     }
   }, [isAuthenticated, navigate])
 
-  // Fetch calls today count
+  // Fetch calls today count on mount + refresh every 60s
   useEffect(() => {
     if (!isAuthenticated) return
-    getCallsTodayCount().then(r => setCallsToday(r.count)).catch(() => toast(t('common.error'), 'error'))
-  }, [isAuthenticated, activeCalls.length])
+    let mounted = true
+    const fetch = () => {
+      getCallsTodayCount().then(r => { if (mounted) setCallsToday(r.count) }).catch(() => {
+        if (mounted) toast(t('common.error'), 'error')
+      })
+    }
+    fetch()
+    const interval = setInterval(fetch, 60_000)
+    return () => { mounted = false; clearInterval(interval) }
+  }, [isAuthenticated])
 
   // Fetch volunteer presence (admin only) with periodic refresh
   useEffect(() => {

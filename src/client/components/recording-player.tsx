@@ -61,7 +61,8 @@ export function RecordingPlayer({ callId }: RecordingPlayerProps) {
 
   // Auto-play once blob URL is set after initial fetch
   useEffect(() => {
-    if (blobUrl && audioRef.current && !playing && loading === false) {
+    if (!audioRef.current) return
+    if (blobUrl && !playing && loading === false) {
       audioRef.current.play().then(() => setPlaying(true)).catch(() => {
         // Autoplay may be blocked by browser policy — user can click play manually
         console.debug('[recording] Autoplay blocked by browser policy')

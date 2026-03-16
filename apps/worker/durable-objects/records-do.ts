@@ -212,6 +212,12 @@ export class RecordsDO extends DurableObject<Env> {
       replyCount: 0,
     }
     await this.ctx.storage.put(`note:${note.id}`, note)
+
+    // Maintain contact-meta secondary index for getContacts()
+    if (note.contactHash) {
+      await this.updateContactMeta(note.contactHash, note.createdAt)
+    }
+
     return Response.json({ note })
   }
 
@@ -280,18 +286,53 @@ export class RecordsDO extends DurableObject<Env> {
     return Response.json({ reply })
   }
 
+  // --- Contact Meta Index ---
+
+  /** Update the contact-meta secondary index when a note is created/updated */
+  private async updateContactMeta(contactHash: string, noteCreatedAt: string): Promise<void> {
+    const key = `contact-meta:${contactHash}`
+    const existing = await this.ctx.storage.get<{
+      contactHash: string; firstSeen: string; lastSeen: string; noteCount: number
+    }>(key)
+    if (existing) {
+      existing.noteCount++
+      if (noteCreatedAt < existing.firstSeen) existing.firstSeen = noteCreatedAt
+      if (noteCreatedAt > existing.lastSeen) existing.lastSeen = noteCreatedAt
+      await this.ctx.storage.put(key, existing)
+    } else {
+      await this.ctx.storage.put(key, {
+        contactHash,
+        firstSeen: noteCreatedAt,
+        lastSeen: noteCreatedAt,
+        noteCount: 1,
+      })
+    }
+  }
+
   // --- Contact Methods (Epic 123) ---
 
   private async getContacts(page: number, limit: number): Promise<Response> {
+    // Read from contact-meta secondary index instead of scanning all notes
+    const metaMap = await this.ctx.storage.list<{
+      contactHash: string; firstSeen: string; lastSeen: string; noteCount: number
+    }>({ prefix: 'contact-meta:' })
+
+    // If secondary index exists, use it
+    if (metaMap.size > 0) {
+      const contacts = Array.from(metaMap.values())
+        .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime())
+      const total = contacts.length
+      const start = (page - 1) * limit
+      const paged = contacts.slice(start, start + limit)
+      return Response.json({ contacts: paged, total })
+    }
+
+    // Fallback: full scan for legacy data without index (one-time, builds index)
     const noteMap = await this.ctx.storage.list<EncryptedNote>({ prefix: 'note:' })
     const notes = Array.from(noteMap.values())
 
-    // Build contact summaries from notes that have contactHash
     const contactMap = new Map<string, {
-      contactHash: string
-      firstSeen: string
-      lastSeen: string
-      noteCount: number
+      contactHash: string; firstSeen: string; lastSeen: string; noteCount: number
     }>()
 
     for (const note of notes) {
@@ -309,6 +350,15 @@ export class RecordsDO extends DurableObject<Env> {
           noteCount: 1,
         })
       }
+    }
+
+    // Backfill the secondary index so future reads are fast
+    const batch = new Map<string, unknown>()
+    for (const [hash, meta] of contactMap) {
+      batch.set(`contact-meta:${hash}`, meta)
+    }
+    if (batch.size > 0) {
+      await this.ctx.storage.put(Object.fromEntries(batch))
     }
 
     const contacts = Array.from(contactMap.values())

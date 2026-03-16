@@ -234,13 +234,16 @@ export class RelayManager {
     })
 
     // If no AUTH challenge arrives within 2s, assume open relay
-    setTimeout(() => {
+    const authTimer = setTimeout(() => {
       if (!this.authenticated && this.ws === ws && !this.destroyed) {
         this.authenticated = true
         this.setState('connected')
         this.flushPendingSubscriptions()
       }
     }, 2000)
+
+    // Store reference so close() can cancel it
+    ws.addEventListener('close', () => clearTimeout(authTimer), { once: true })
   }
 
   private async handleAuth(challenge: string): Promise<void> {
