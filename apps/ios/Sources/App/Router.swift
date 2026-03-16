@@ -34,6 +34,18 @@ enum Route: Hashable {
     case contactTimeline(hash: String, displayIdentifier: String)
     /// Message blasts (admin only).
     case blasts
+    /// Call history list.
+    case callHistory
+    /// Call detail view.
+    case callDetail(id: String)
+    /// Cases list.
+    case cases
+    /// Case detail view.
+    case caseDetail(id: String)
+    /// Notes list (deep link target).
+    case notes
+    /// Settings screen (deep link target).
+    case settings
     /// Admin management screens.
     case admin
     /// Device linking flow (QR scan + ECDH).

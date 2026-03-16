@@ -1,0 +1,9 @@
+pre-commit:
+  parallel: true
+  commands:
+    typecheck:
+      run: bun run typecheck
+      stage_fixed: true
+    codegen-freshness:
+      glob: "packages/protocol/schemas/*.ts"
+      run: bun run codegen && git diff --exit-code packages/protocol/generated/

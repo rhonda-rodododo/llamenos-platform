@@ -36,11 +36,16 @@ targets:
       properties:
         UIDesignRequiresCompatibility: true
         UILaunchScreen: {}
+    entitlements:
+      path: Sources/App/Llamenos.entitlements
+      properties:
+        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.llamenos.hotline
         INFOPLIST_FILE: Sources/App/Info.plist
         GENERATE_INFOPLIST_FILE: false
+        CODE_SIGN_ENTITLEMENTS: Sources/App/Llamenos.entitlements
     scheme:
       testTargets:
         - LlamenosTests

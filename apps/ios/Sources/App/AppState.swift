@@ -28,6 +28,7 @@ final class AppState {
     let wakeKeyService: WakeKeyService
     let transcriptionService: TranscriptionService
     let crashReportingService: CrashReportingService
+    let offlineQueue: OfflineQueue
 
     // MARK: - Auth State
 
@@ -77,6 +78,7 @@ final class AppState {
         let wake = WakeKeyService(keychainService: keychain, cryptoService: crypto, apiService: api)
         let transcription = TranscriptionService()
         let crashReporting = CrashReportingService()
+        let offline = OfflineQueue(apiService: api)
 
         self.cryptoService = crypto
         self.keychainService = keychain
@@ -86,6 +88,7 @@ final class AppState {
         self.wakeKeyService = wake
         self.transcriptionService = transcription
         self.crashReportingService = crashReporting
+        self.offlineQueue = offline
 
         #if DEBUG
         // Handle launch arguments BEFORE reading persisted state
@@ -286,6 +289,9 @@ final class AppState {
         authStatus = .unlocked
         connectWebSocketIfConfigured()
         fetchUserRole()
+        offlineQueue.startMonitoring()
+        // Replay any queued operations now that we're authenticated
+        Task { await offlineQueue.replay() }
     }
 
     /// Called after successful onboarding (new identity or import + PIN set).
@@ -300,6 +306,7 @@ final class AppState {
 
         connectWebSocketIfConfigured()
         fetchUserRole()
+        offlineQueue.startMonitoring()
     }
 
     /// Called when the user logs out / resets identity.
@@ -309,6 +316,8 @@ final class AppState {
         eventListenerTask?.cancel()
         eventListenerTask = nil
         wakeKeyService.cleanup()
+        offlineQueue.stopMonitoring()
+        offlineQueue.clear()
         authService.logout()
         isLocked = false
         authStatus = .unauthenticated

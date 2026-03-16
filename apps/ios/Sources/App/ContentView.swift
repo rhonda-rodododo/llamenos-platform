@@ -80,6 +80,20 @@ struct ContentView: View {
             ConversationsView()
         case .conversationDetail(let id):
             ConversationDetailView(conversationId: id)
+        case .callHistory:
+            CallHistoryView()
+        case .callDetail:
+            // Handled within CallHistoryView's own NavigationStack
+            EmptyView()
+        case .cases:
+            CaseListView()
+        case .caseDetail:
+            // Handled within CaseListView's own NavigationStack
+            EmptyView()
+        case .notes:
+            NotesView()
+        case .settings:
+            SettingsView()
         case .admin:
             AdminTabView()
         case .deviceLink:

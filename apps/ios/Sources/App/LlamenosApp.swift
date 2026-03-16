@@ -1,10 +1,14 @@
 import SwiftUI
+import UserNotifications
 
 /// The main entry point for the Llamenos iOS app. Manages the app lifecycle,
 /// injects the root `AppState` into the environment, handles background
-/// lock timeout (M26: user-configurable), and screenshot protection (M28).
+/// lock timeout (M26: user-configurable), screenshot protection (M28),
+/// push notifications (APNs), and deep linking.
 @main
 struct LlamenosApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     init() {
         let largeTitleAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont(name: "DMSans-Bold", size: 34) ?? UIFont.systemFont(ofSize: 34, weight: .bold)
@@ -63,6 +67,13 @@ struct LlamenosApp: App {
                 // Install crash reporting handlers and upload pending reports
                 appState.crashReportingService.install()
                 appState.crashReportingService.uploadPendingInBackground()
+                // Register for push notifications
+                requestPushNotificationPermission()
+                // Inject appState into the delegate so it can forward push tokens
+                appDelegate.appState = appState
+            }
+            .onOpenURL { url in
+                handleDeepLink(url)
             }
             .onChange(of: scenePhase) { oldPhase, newPhase in
                 handleScenePhaseChange(from: oldPhase, to: newPhase)
@@ -78,6 +89,75 @@ struct LlamenosApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.15), value: showPrivacyOverlay)
+        }
+    }
+
+    // MARK: - Push Notifications
+
+    /// Request notification authorization and register for remote notifications.
+    private func requestPushNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error {
+                print("[APNs] Authorization error: \(error.localizedDescription)")
+                return
+            }
+            if granted {
+                DispatchQueue.main.async {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            }
+        }
+    }
+
+    // MARK: - Deep Linking
+
+    /// Handle `llamenos://` deep link URLs and navigate to the appropriate screen.
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "llamenos" else { return }
+        guard appState.authStatus == .unlocked else { return }
+
+        let host = url.host ?? ""
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+
+        switch host {
+        case "cases":
+            if let caseId = pathComponents.first {
+                router.navigate(to: .caseDetail(id: caseId))
+            } else {
+                router.navigate(to: .cases)
+            }
+        case "notes":
+            if let noteId = pathComponents.first {
+                router.navigate(to: .noteDetail(id: noteId))
+            } else {
+                router.navigate(to: .notes)
+            }
+        case "calls":
+            if let callId = pathComponents.first {
+                router.navigate(to: .callDetail(id: callId))
+            } else {
+                router.navigate(to: .callHistory)
+            }
+        case "conversations":
+            if let conversationId = pathComponents.first {
+                router.navigate(to: .conversationDetail(id: conversationId))
+            } else {
+                router.navigate(to: .conversations)
+            }
+        case "reports":
+            if let reportId = pathComponents.first {
+                router.navigate(to: .reportDetail(id: reportId))
+            } else {
+                router.navigate(to: .reports)
+            }
+        case "settings":
+            router.navigate(to: .settings)
+        case "admin":
+            if appState.isAdmin {
+                router.navigate(to: .admin)
+            }
+        default:
+            break
         }
     }
 
@@ -107,6 +187,92 @@ struct LlamenosApp: App {
 
         @unknown default:
             break
+        }
+    }
+}
+
+// MARK: - AppDelegate (Push Notifications)
+
+/// UIKit-based AppDelegate for handling APNs push notification callbacks.
+/// SwiftUI's `@UIApplicationDelegateAdaptor` bridges this into the app lifecycle.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    /// Injected by LlamenosApp on appear so the delegate can forward push tokens.
+    var appState: AppState?
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let tokenHex = deviceToken.map { String(format: "%02x", $0) }.joined()
+        print("[APNs] Device token registered: \(tokenHex.prefix(12))...")
+
+        guard let appState else { return }
+        Task {
+            do {
+                try await appState.wakeKeyService.registerDevice(pushToken: tokenHex)
+            } catch {
+                print("[APNs] Device registration failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("[APNs] Registration failed: \(error.localizedDescription)")
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        guard let appState else {
+            completionHandler(.noData)
+            return
+        }
+
+        // Decrypt the ECIES-encrypted wake payload if present
+        guard let encryptedHex = userInfo["encrypted"] as? String else {
+            completionHandler(.noData)
+            return
+        }
+
+        do {
+            let decryptedJSON = try appState.wakeKeyService.decryptWakePayload(encryptedHex: encryptedHex)
+            print("[APNs] Decrypted wake payload: \(decryptedJSON.prefix(80))...")
+
+            // Parse the decrypted payload and post a local notification
+            if let data = decryptedJSON.data(using: .utf8),
+               let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let content = UNMutableNotificationContent()
+                content.title = payload["title"] as? String
+                    ?? NSLocalizedString("notification_incoming_call", comment: "Incoming Call")
+                content.body = payload["body"] as? String
+                    ?? NSLocalizedString("notification_call_body", comment: "A caller needs assistance")
+                content.sound = .default
+
+                // Attach deep link data for navigation on tap
+                if let type = payload["type"] as? String {
+                    content.userInfo["deepLinkType"] = type
+                }
+                if let entityId = payload["entityId"] as? String {
+                    content.userInfo["deepLinkEntityId"] = entityId
+                }
+
+                let request = UNNotificationRequest(
+                    identifier: UUID().uuidString,
+                    content: content,
+                    trigger: nil
+                )
+                UNUserNotificationCenter.current().add(request)
+            }
+
+            completionHandler(.newData)
+        } catch {
+            print("[APNs] Wake payload decryption failed: \(error.localizedDescription)")
+            completionHandler(.failed)
         }
     }
 }

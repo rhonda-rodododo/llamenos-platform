@@ -15,6 +15,9 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    // Offline queue banner
+                    OfflineBanner()
+
                     // Hidden npub for accessibility (BrandCard overlay blocks child identifiers)
                     if let npub = appState.cryptoService.npub {
                         Text(npub)
@@ -100,6 +103,8 @@ struct DashboardView: View {
                     HelpView()
                 case .triage:
                     TriageListView()
+                case .callHistory:
+                    CallHistoryView()
                 }
             }
             .task {
@@ -213,13 +218,22 @@ struct DashboardView: View {
 
             GridRow {
                 quickActionCard(
+                    title: NSLocalizedString("dashboard_call_history", comment: "Call History"),
+                    icon: "clock.arrow.circlepath",
+                    destination: .callHistory,
+                    accessibilityID: "dashboard-call-history-action"
+                )
+
+                quickActionCard(
                     title: NSLocalizedString("dashboard_help", comment: "Help"),
                     icon: "questionmark.circle.fill",
                     destination: .help,
                     accessibilityID: "dashboard-help-action"
                 )
+            }
 
-                if appState.isAdmin {
+            if appState.isAdmin {
+                GridRow {
                     quickActionCard(
                         title: NSLocalizedString("dashboard_contacts", comment: "Contacts"),
                         icon: "person.crop.circle.badge.clock",
@@ -393,6 +407,7 @@ struct DashboardView: View {
         case blasts
         case help
         case triage
+        case callHistory
     }
 
     // MARK: - Shift Status Badge
