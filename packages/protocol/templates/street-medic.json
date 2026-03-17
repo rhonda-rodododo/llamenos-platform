@@ -5,9 +5,13 @@
   "description": "Protest medical encounter tracking with triage, treatment, and follow-up. Designed for volunteer street medic teams providing first aid at protests and actions.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["medical", "protest", "triage", "street-medic"],
+  "tags": [
+    "medical",
+    "protest",
+    "triage",
+    "street-medic"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "medical_encounter.label": "Medical Encounter",
@@ -20,7 +24,6 @@
       "medical_encounter.description": "Un encuentro con un paciente durante una protesta o accion"
     }
   },
-
   "entityTypes": [
     {
       "name": "medical_encounter",
@@ -33,39 +36,112 @@
       "numberPrefix": "ME",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["allergies", "medications", "vital_signs"],
+      "piiFields": [
+        "allergies",
+        "medications",
+        "vital_signs"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "triaged", "label": "Triaged", "color": "#f59e0b", "order": 1 },
-        { "value": "treating", "label": "Treating", "color": "#3b82f6", "order": 2 },
-        { "value": "treated", "label": "Treated", "color": "#22c55e", "order": 3 },
-        { "value": "transported", "label": "Transported to Hospital", "color": "#ef4444", "order": 4 },
-        { "value": "follow_up", "label": "Follow-Up Needed", "color": "#8b5cf6", "order": 5 },
-        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 6, "isClosed": true }
+        {
+          "value": "triaged",
+          "label": "Triaged",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "treating",
+          "label": "Treating",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "treated",
+          "label": "Treated",
+          "color": "#22c55e",
+          "order": 3
+        },
+        {
+          "value": "transported",
+          "label": "Transported to Hospital",
+          "color": "#ef4444",
+          "order": 4
+        },
+        {
+          "value": "follow_up",
+          "label": "Follow-Up Needed",
+          "color": "#8b5cf6",
+          "order": 5
+        },
+        {
+          "value": "closed",
+          "label": "Closed",
+          "color": "#6b7280",
+          "order": 6,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "triaged",
-      "closedStatuses": ["closed"],
-
+      "closedStatuses": [
+        "closed"
+      ],
       "severities": [
-        { "value": "green", "label": "Green (Minor)", "color": "#22c55e", "icon": "heart", "order": 1 },
-        { "value": "yellow", "label": "Yellow (Delayed)", "color": "#f59e0b", "icon": "alert-triangle", "order": 2 },
-        { "value": "red", "label": "Red (Immediate)", "color": "#ef4444", "icon": "zap", "order": 3 },
-        { "value": "black", "label": "Black (Deceased/Expectant)", "color": "#000000", "icon": "x-circle", "order": 4 }
+        {
+          "value": "green",
+          "label": "Green (Minor)",
+          "color": "#22c55e",
+          "icon": "heart",
+          "order": 1
+        },
+        {
+          "value": "yellow",
+          "label": "Yellow (Delayed)",
+          "color": "#f59e0b",
+          "icon": "alert-triangle",
+          "order": 2
+        },
+        {
+          "value": "red",
+          "label": "Red (Immediate)",
+          "color": "#ef4444",
+          "icon": "zap",
+          "order": 3
+        },
+        {
+          "value": "black",
+          "label": "Black (Deceased/Expectant)",
+          "color": "#000000",
+          "icon": "x-circle",
+          "order": 4
+        }
       ],
       "defaultSeverity": "green",
-
       "contactRoles": [
-        { "value": "patient", "label": "Patient", "order": 1 },
-        { "value": "medic", "label": "Treating Medic", "order": 2 },
-        { "value": "witness", "label": "Witness", "order": 3 },
-        { "value": "transporter", "label": "Hospital Transporter", "order": 4 }
+        {
+          "value": "patient",
+          "label": "Patient",
+          "order": 1
+        },
+        {
+          "value": "medic",
+          "label": "Treating Medic",
+          "order": 2
+        },
+        {
+          "value": "witness",
+          "label": "Witness",
+          "order": 3
+        },
+        {
+          "value": "transporter",
+          "label": "Hospital Transporter",
+          "order": 4
+        }
       ],
-
       "fields": [
         {
           "name": "encounter_datetime",
@@ -116,17 +192,50 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "tear_gas", "label": "Tear Gas / CS Gas" },
-            { "key": "pepper_spray", "label": "Pepper Spray / OC" },
-            { "key": "rubber_bullet", "label": "Rubber Bullet / Impact Munition" },
-            { "key": "baton", "label": "Baton / Physical Force" },
-            { "key": "lrad", "label": "LRAD / Acoustic Device" },
-            { "key": "taser", "label": "Taser / Conducted Energy" },
-            { "key": "fall", "label": "Fall / Trampling" },
-            { "key": "heat_exhaustion", "label": "Heat Exhaustion / Dehydration" },
-            { "key": "panic_attack", "label": "Panic Attack / Anxiety" },
-            { "key": "pre_existing", "label": "Pre-Existing Condition" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "tear_gas",
+              "label": "Tear Gas / CS Gas"
+            },
+            {
+              "key": "pepper_spray",
+              "label": "Pepper Spray / OC"
+            },
+            {
+              "key": "rubber_bullet",
+              "label": "Rubber Bullet / Impact Munition"
+            },
+            {
+              "key": "baton",
+              "label": "Baton / Physical Force"
+            },
+            {
+              "key": "lrad",
+              "label": "LRAD / Acoustic Device"
+            },
+            {
+              "key": "taser",
+              "label": "Taser / Conducted Energy"
+            },
+            {
+              "key": "fall",
+              "label": "Fall / Trampling"
+            },
+            {
+              "key": "heat_exhaustion",
+              "label": "Heat Exhaustion / Dehydration"
+            },
+            {
+              "key": "panic_attack",
+              "label": "Panic Attack / Anxiety"
+            },
+            {
+              "key": "pre_existing",
+              "label": "Pre-Existing Condition"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "assessment",
           "order": 5,
@@ -182,10 +291,22 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "treated_released", "label": "Treated & Released" },
-            { "key": "hospital_transport", "label": "Hospital Transport" },
-            { "key": "refused_care", "label": "Refused Care" },
-            { "key": "left_ama", "label": "Left Against Medical Advice" }
+            {
+              "key": "treated_released",
+              "label": "Treated & Released"
+            },
+            {
+              "key": "hospital_transport",
+              "label": "Hospital Transport"
+            },
+            {
+              "key": "refused_care",
+              "label": "Refused Care"
+            },
+            {
+              "key": "left_ama",
+              "label": "Left Against Medical Advice"
+            }
           ],
           "section": "outcome",
           "order": 10,
@@ -202,7 +323,11 @@
           "order": 11,
           "indexable": false,
           "accessLevel": "assigned",
-          "showWhen": { "field": "disposition", "operator": "equals", "value": "hospital_transport" }
+          "showWhen": {
+            "field": "disposition",
+            "operator": "equals",
+            "value": "hospital_transport"
+          }
         },
         {
           "name": "follow_up_needed",
@@ -224,12 +349,15 @@
           "order": 13,
           "indexable": false,
           "accessLevel": "assigned",
-          "showWhen": { "field": "follow_up_needed", "operator": "equals", "value": true }
+          "showWhen": {
+            "field": "follow_up_needed",
+            "operator": "equals",
+            "value": true
+          }
         }
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -240,35 +368,81 @@
       "sourceLabel": "has encounter",
       "targetLabel": "involves",
       "roles": [
-        { "value": "patient", "label": "Patient", "order": 1 },
-        { "value": "medic", "label": "Treating Medic", "order": 2 },
-        { "value": "witness", "label": "Witness", "order": 3 },
-        { "value": "transporter", "label": "Hospital Transporter", "order": 4 }
+        {
+          "value": "patient",
+          "label": "Patient",
+          "order": 1
+        },
+        {
+          "value": "medic",
+          "label": "Treating Medic",
+          "order": 2
+        },
+        {
+          "value": "witness",
+          "label": "Witness",
+          "order": 3
+        },
+        {
+          "value": "transporter",
+          "label": "Hospital Transporter",
+          "order": 4
+        }
       ],
       "defaultRole": "patient",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Medic Team Lead",
       "slug": "medic-team-lead",
       "description": "Coordinates medical team, reviews all encounters, manages follow-ups",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "notes:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "notes:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     },
     {
       "name": "Street Medic",
       "slug": "street-medic",
       "description": "Provides care and documents encounters in the field",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "notes:create", "notes:read-own", "events:read", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "notes:create",
+        "notes:read-own",
+        "events:read",
+        "shifts:read-own",
+        "contacts:search"
+      ]
     },
     {
       "name": "Follow-Up Coordinator",
       "slug": "follow-up-coordinator",
       "description": "Contacts patients needing follow-up care, coordinates hospital referrals",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "contacts:search",
+        "cases:unlink"
+      ]
     }
   ]
 }

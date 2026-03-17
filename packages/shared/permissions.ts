@@ -17,6 +17,9 @@ export const PERMISSION_CATALOG = {
   'calls:read-history': 'View call history',
   'calls:read-presence': 'View volunteer presence',
   'calls:read-recording': 'Listen to call recordings',
+  'calls:hangup': 'Hang up an active call',
+  'calls:report-spam': 'Report a call as spam',
+  'calls:identify-caller': 'Identify caller by hash (screen pop)',
   'calls:debug': 'Debug call state',
 
   // Notes
@@ -30,6 +33,8 @@ export const PERMISSION_CATALOG = {
   // Contacts
   'contacts:view': 'View contacts page and contact timelines',
   'contacts:view-history': 'View past interactions from other volunteers for a contact',
+  'contacts:search': 'Search contacts directory',
+  'contacts:export': 'Export contact data',
 
   // Reports
   'reports:create': 'Submit reports',
@@ -38,6 +43,7 @@ export const PERMISSION_CATALOG = {
   'reports:read-assigned': 'Read assigned reports',
   'reports:assign': 'Assign reports to reviewers/volunteers',
   'reports:update': 'Update report status',
+  'reports:read-types': 'View report type definitions',
   'reports:send-message-own': 'Send messages in own reports',
   'reports:send-message': 'Send messages in any report',
 
@@ -57,6 +63,8 @@ export const PERMISSION_CATALOG = {
 
   // Volunteers
   'volunteers:read': 'List/view volunteer profiles',
+  'volunteers:read-cases': 'View case records assigned to a volunteer',
+  'volunteers:read-metrics': 'View volunteer workload metrics',
   'volunteers:create': 'Create new volunteers',
   'volunteers:update': 'Update volunteer profiles',
   'volunteers:delete': 'Deactivate/delete volunteers',
@@ -84,13 +92,18 @@ export const PERMISSION_CATALOG = {
 
   // Settings
   'settings:read': 'View settings',
-  'settings:manage': 'Modify all settings',
+  'settings:manage': 'Cleanup metrics and admin-only operations',
   'settings:manage-telephony': 'Modify telephony provider',
   'settings:manage-messaging': 'Modify messaging channels',
   'settings:manage-spam': 'Modify spam settings',
   'settings:manage-ivr': 'Modify IVR/language settings',
   'settings:manage-fields': 'Modify custom fields',
   'settings:manage-transcription': 'Modify transcription settings',
+  'settings:manage-calls': 'Modify call timeout and voicemail length',
+  'settings:manage-webauthn': 'Modify WebAuthn settings',
+  'settings:manage-setup': 'Setup wizard access',
+  'settings:manage-ttl': 'Modify TTL/cleanup intervals',
+  'settings:manage-cms': 'Toggle case management feature',
 
   // Audit
   'audit:read': 'View audit log',
@@ -118,6 +131,8 @@ export const PERMISSION_CATALOG = {
   'cases:delete': 'Delete records',
   'cases:assign': 'Assign records to volunteers',
   'cases:link': 'Link records to reports/events/contacts',
+  'cases:unlink': 'Unlink records from reports/events/contacts',
+  'cases:manage': 'Configure auto-assignment settings',
   'cases:manage-types': 'Create/edit entity type definitions',
   'cases:import': 'Bulk import records',
   'cases:export': 'Bulk export records',
@@ -144,7 +159,16 @@ export const PERMISSION_CATALOG = {
   'evidence:manage-custody': 'Manage chain of custody records',
   'evidence:delete': 'Delete evidence files',
 
+  // Hubs
+  'hubs:read': 'View hub list and details',
+  'hubs:manage-members': 'Add/remove members from hubs',
+  'hubs:manage-keys': 'Manage hub key envelopes',
+
+  // Metrics
+  'metrics:read': 'View system metrics (Prometheus, JSON)',
+
   // System (super-admin only)
+  'system:view-roles': 'View role definitions',
   'system:manage-roles': 'Create/edit/delete custom roles',
   'system:manage-hubs': 'Create/manage hubs',
   'system:manage-instance': 'Instance-level settings',
@@ -201,6 +225,8 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'bans:*', 'invites:*', 'notes:*',
       'reports:*', 'conversations:*', 'calls:*', 'blasts:*', 'files:*',
       'contacts:*', 'cases:*', 'events:*', 'evidence:*',
+      'hubs:read', 'hubs:manage-members', 'hubs:manage-keys',
+      'metrics:read', 'system:view-roles',
     ],
     isDefault: true,
     isSystem: false,
@@ -211,14 +237,18 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
     name: 'Reviewer',
     slug: 'reviewer',
     permissions: [
+      'calls:read-active', 'calls:read-presence', 'calls:identify-caller',
       'notes:read-own', 'notes:read-assigned', 'notes:reply',
-      'reports:read-assigned', 'reports:assign',
-      'reports:update', 'reports:send-message',
+      'contacts:view', 'contacts:view-pii', 'contacts:view-history', 'contacts:search',
+      'reports:read-assigned', 'reports:read-all', 'reports:read-types',
+      'reports:assign', 'reports:update', 'reports:send-message',
       'conversations:read-assigned', 'conversations:send',
+      'volunteers:read', 'volunteers:read-cases', 'volunteers:read-metrics',
       'shifts:read-own', 'files:download-own', 'files:upload',
-      'cases:read-assigned', 'cases:update',
-      'contacts:view', 'contacts:view-pii',
-      'events:read', 'evidence:download',
+      'settings:read',
+      'cases:read-assigned', 'cases:update', 'cases:assign', 'cases:link', 'cases:unlink',
+      'events:read', 'events:link', 'evidence:download',
+      'hubs:read',
     ],
     isDefault: true,
     isSystem: false,
@@ -229,16 +259,20 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
     name: 'Volunteer',
     slug: 'volunteer',
     permissions: [
-      'calls:answer', 'calls:read-active',
+      'calls:answer', 'calls:read-active', 'calls:hangup', 'calls:report-spam',
+      'calls:read-presence', 'calls:identify-caller',
       'notes:create', 'notes:read-own', 'notes:update-own', 'notes:reply',
+      'contacts:view', 'contacts:search',
       'conversations:claim', 'conversations:send', 'conversations:read-assigned',
       'conversations:claim-sms', 'conversations:claim-whatsapp',
       'conversations:claim-signal', 'conversations:claim-rcs', 'conversations:claim-web',
       'shifts:read-own', 'bans:report',
-      'reports:read-assigned', 'reports:send-message',
+      'reports:read-assigned', 'reports:read-types', 'reports:send-message',
+      'settings:read',
       'files:upload', 'files:download-own',
       'cases:create', 'cases:read-own', 'cases:update-own',
-      'contacts:view', 'events:read', 'evidence:upload',
+      'events:read', 'evidence:upload',
+      'hubs:read',
     ],
     isDefault: true,
     isSystem: false,
@@ -249,7 +283,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
     name: 'Reporter',
     slug: 'reporter',
     permissions: [
-      'reports:create', 'reports:read-own', 'reports:send-message-own',
+      'reports:create', 'reports:read-own', 'reports:read-types', 'reports:send-message-own',
       'files:upload', 'files:download-own',
     ],
     isDefault: true,

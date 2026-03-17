@@ -5,9 +5,12 @@
   "description": "Missing persons and disappearance tracking for long-running search operations. Tracks last known location, physical description, detention facility checks, DNA samples, cross-referencing with national databases, and family communication. Designed for organizations tracking disappeared people, especially at borders and during conflict.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["missing", "disappeared", "search"],
+  "tags": [
+    "missing",
+    "disappeared",
+    "search"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "missing_person_case.label": "Missing Person Case",
@@ -20,7 +23,6 @@
       "missing_person_case.description": "Seguimiento de una persona desaparecida desde el reporte inicial hasta la resolucion"
     }
   },
-
   "entityTypes": [
     {
       "name": "missing_person_case",
@@ -33,40 +35,117 @@
       "numberPrefix": "MP",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["physical_description", "travel_route", "namus_id"],
+      "piiFields": [
+        "physical_description",
+        "travel_route",
+        "namus_id"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "reported_missing", "label": "Reported Missing", "color": "#ef4444", "order": 1 },
-        { "value": "active_search", "label": "Active Search", "color": "#f59e0b", "order": 2 },
-        { "value": "located_alive", "label": "Located Alive", "color": "#22c55e", "order": 3, "isClosed": true },
-        { "value": "located_deceased", "label": "Located Deceased", "color": "#000000", "order": 4, "isClosed": true },
-        { "value": "unresolved", "label": "Unresolved (Cold Case)", "color": "#6b7280", "order": 5, "isClosed": true }
+        {
+          "value": "reported_missing",
+          "label": "Reported Missing",
+          "color": "#ef4444",
+          "order": 1
+        },
+        {
+          "value": "active_search",
+          "label": "Active Search",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "located_alive",
+          "label": "Located Alive",
+          "color": "#22c55e",
+          "order": 3,
+          "isClosed": true
+        },
+        {
+          "value": "located_deceased",
+          "label": "Located Deceased",
+          "color": "#000000",
+          "order": 4,
+          "isClosed": true
+        },
+        {
+          "value": "unresolved",
+          "label": "Unresolved (Cold Case)",
+          "color": "#6b7280",
+          "order": 5,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "reported_missing",
-      "closedStatuses": ["located_alive", "located_deceased", "unresolved"],
-
+      "closedStatuses": [
+        "located_alive",
+        "located_deceased",
+        "unresolved"
+      ],
       "severities": [
-        { "value": "critical", "label": "Critical (minor, medical condition, foul play suspected)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "high", "label": "High (recent disappearance)", "color": "#f59e0b", "order": 2 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 3 },
-        { "value": "cold", "label": "Cold Case (extended timeframe)", "color": "#6b7280", "order": 4 }
+        {
+          "value": "critical",
+          "label": "Critical (minor, medical condition, foul play suspected)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "high",
+          "label": "High (recent disappearance)",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "cold",
+          "label": "Cold Case (extended timeframe)",
+          "color": "#6b7280",
+          "order": 4
+        }
       ],
       "defaultSeverity": "high",
-
       "contactRoles": [
-        { "value": "missing_person", "label": "Missing Person", "order": 1 },
-        { "value": "family_member", "label": "Family Member", "order": 2 },
-        { "value": "last_contact", "label": "Last Known Contact", "order": 3 },
-        { "value": "search_volunteer", "label": "Search Volunteer", "order": 4 },
-        { "value": "consulate_contact", "label": "Consulate Contact", "order": 5 },
-        { "value": "attorney", "label": "Attorney", "order": 6 }
+        {
+          "value": "missing_person",
+          "label": "Missing Person",
+          "order": 1
+        },
+        {
+          "value": "family_member",
+          "label": "Family Member",
+          "order": 2
+        },
+        {
+          "value": "last_contact",
+          "label": "Last Known Contact",
+          "order": 3
+        },
+        {
+          "value": "search_volunteer",
+          "label": "Search Volunteer",
+          "order": 4
+        },
+        {
+          "value": "consulate_contact",
+          "label": "Consulate Contact",
+          "order": 5
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 6
+        }
       ],
-
       "fields": [
         {
           "name": "last_known_location",
@@ -119,10 +198,22 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "not_checked", "label": "Not Checked" },
-            { "key": "checked_not_found", "label": "Checked - Not Found" },
-            { "key": "checked_found", "label": "Checked - Found" },
-            { "key": "na", "label": "Not Applicable" }
+            {
+              "key": "not_checked",
+              "label": "Not Checked"
+            },
+            {
+              "key": "checked_not_found",
+              "label": "Checked - Not Found"
+            },
+            {
+              "key": "checked_found",
+              "label": "Checked - Found"
+            },
+            {
+              "key": "na",
+              "label": "Not Applicable"
+            }
           ],
           "section": "search",
           "order": 5,
@@ -195,11 +286,26 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "daily", "label": "Daily" },
-            { "key": "weekly", "label": "Weekly" },
-            { "key": "biweekly", "label": "Every Two Weeks" },
-            { "key": "monthly", "label": "Monthly" },
-            { "key": "as_needed", "label": "As Needed" }
+            {
+              "key": "daily",
+              "label": "Daily"
+            },
+            {
+              "key": "weekly",
+              "label": "Weekly"
+            },
+            {
+              "key": "biweekly",
+              "label": "Every Two Weeks"
+            },
+            {
+              "key": "monthly",
+              "label": "Monthly"
+            },
+            {
+              "key": "as_needed",
+              "label": "As Needed"
+            }
           ],
           "section": "communication",
           "helpText": "How frequently the organization should update the family.",
@@ -211,7 +317,6 @@
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -222,43 +327,115 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "missing_person", "label": "Missing Person", "order": 1 },
-        { "value": "family_member", "label": "Family Member", "order": 2 },
-        { "value": "last_contact", "label": "Last Known Contact", "order": 3 },
-        { "value": "search_volunteer", "label": "Search Volunteer", "order": 4 },
-        { "value": "consulate_contact", "label": "Consulate Contact", "order": 5 },
-        { "value": "attorney", "label": "Attorney", "order": 6 }
+        {
+          "value": "missing_person",
+          "label": "Missing Person",
+          "order": 1
+        },
+        {
+          "value": "family_member",
+          "label": "Family Member",
+          "order": 2
+        },
+        {
+          "value": "last_contact",
+          "label": "Last Known Contact",
+          "order": 3
+        },
+        {
+          "value": "search_volunteer",
+          "label": "Search Volunteer",
+          "order": 4
+        },
+        {
+          "value": "consulate_contact",
+          "label": "Consulate Contact",
+          "order": 5
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 6
+        }
       ],
       "defaultRole": "missing_person",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Search Coordinator",
       "slug": "search-coordinator",
       "description": "Manages all missing person cases, coordinates search operations, contacts facilities",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     },
     {
       "name": "Case Worker",
       "slug": "case-worker",
       "description": "Manages individual cases, checks facilities, updates family, coordinates with agencies",
-      "permissions": ["cases:read-all", "cases:update", "cases:assign", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all", "events:read"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "cases:assign",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "events:read",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Intake Volunteer",
       "slug": "intake-volunteer",
       "description": "Takes initial missing person reports, creates case records, collects descriptions",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "calls:answer", "calls:read-active", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "calls:answer",
+        "calls:read-active",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "calls:hangup",
+        "calls:report-spam",
+        "calls:identify-caller",
+        "contacts:search"
+      ]
     },
     {
       "name": "Family Liaison",
       "slug": "family-liaison",
       "description": "Primary point of contact for families, provides regular updates, coordinates support services",
-      "permissions": ["cases:read-all", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all", "conversations:*"]
+      "permissions": [
+        "cases:read-all",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "conversations:*",
+        "contacts:search",
+        "hubs:read"
+      ]
     }
   ]
 }

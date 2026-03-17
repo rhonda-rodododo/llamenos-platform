@@ -151,7 +151,7 @@ settings.get('/call',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-calls'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getCallSettings()
@@ -168,7 +168,7 @@ settings.patch('/call',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-calls'),
   validator('json', callSettingsSchema),
   async (c) => {
     const pubkey = c.get('pubkey')
@@ -227,7 +227,7 @@ settings.get('/webauthn',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-webauthn'),
   async (c) => {
     const services = c.get('services')
     const result = await services.identity.getWebAuthnSettings()
@@ -244,7 +244,7 @@ settings.patch('/webauthn',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-webauthn'),
   validator('json', webauthnSettingsSchema),
   async (c) => {
     const pubkey = c.get('pubkey')
@@ -423,7 +423,7 @@ settings.get('/setup',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-setup'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getSetupState()
@@ -440,7 +440,7 @@ settings.patch('/setup',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-setup'),
   validator('json', setupStateSchema),
   async (c) => {
     const pubkey = c.get('pubkey')
@@ -525,6 +525,7 @@ settings.get('/report-types',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getReportTypes()
@@ -605,6 +606,7 @@ settings.get('/roles',
       ...authErrors,
     },
   }),
+  requirePermission('system:view-roles'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getRoles()
@@ -723,7 +725,7 @@ settings.get('/ttl',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-ttl'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getTTLOverrides()
@@ -740,7 +742,7 @@ settings.patch('/ttl',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-ttl'),
   validator('json', ttlOverridesBodySchema),
   async (c) => {
     const pubkey = c.get('pubkey')

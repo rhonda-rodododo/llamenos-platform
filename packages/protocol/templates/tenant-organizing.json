@@ -5,9 +5,12 @@
   "description": "Tenant union and housing rights case management. Tracks eviction defense, housing court proceedings, building organizing, housing code violations, and tenant protection programs. Supports building-level parent cases with per-unit sub-records.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["tenant", "housing", "eviction"],
+  "tags": [
+    "tenant",
+    "housing",
+    "eviction"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "eviction_defense_case.label": "Eviction Defense Case",
@@ -20,7 +23,6 @@
       "eviction_defense_case.description": "Seguimiento de un caso de desalojo a traves de la organizacion, representacion legal y tribunal de vivienda"
     }
   },
-
   "entityTypes": [
     {
       "name": "eviction_defense_case",
@@ -33,42 +35,129 @@
       "numberPrefix": "ED",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["unit_number", "rent_amount", "arrears"],
+      "piiFields": [
+        "unit_number",
+        "rent_amount",
+        "arrears"
+      ],
       "allowSubRecords": true,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "intake", "label": "Intake", "color": "#f59e0b", "order": 1 },
-        { "value": "organizing", "label": "Organizing", "color": "#3b82f6", "order": 2 },
-        { "value": "legal_representation", "label": "Legal Representation", "color": "#8b5cf6", "order": 3 },
-        { "value": "in_court", "label": "In Court", "color": "#ef4444", "order": 4 },
-        { "value": "settled", "label": "Settled", "color": "#22c55e", "order": 5, "isClosed": true },
-        { "value": "dismissed", "label": "Dismissed", "color": "#22c55e", "order": 6, "isClosed": true },
-        { "value": "evicted", "label": "Evicted", "color": "#6b7280", "order": 7, "isClosed": true }
+        {
+          "value": "intake",
+          "label": "Intake",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "organizing",
+          "label": "Organizing",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "legal_representation",
+          "label": "Legal Representation",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "in_court",
+          "label": "In Court",
+          "color": "#ef4444",
+          "order": 4
+        },
+        {
+          "value": "settled",
+          "label": "Settled",
+          "color": "#22c55e",
+          "order": 5,
+          "isClosed": true
+        },
+        {
+          "value": "dismissed",
+          "label": "Dismissed",
+          "color": "#22c55e",
+          "order": 6,
+          "isClosed": true
+        },
+        {
+          "value": "evicted",
+          "label": "Evicted",
+          "color": "#6b7280",
+          "order": 7,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "intake",
-      "closedStatuses": ["settled", "dismissed", "evicted"],
-
+      "closedStatuses": [
+        "settled",
+        "dismissed",
+        "evicted"
+      ],
       "severities": [
-        { "value": "emergency", "label": "Emergency (marshal notice, lockout)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "urgent", "label": "Urgent (court date imminent)", "color": "#f59e0b", "order": 2 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 3 },
-        { "value": "preventive", "label": "Preventive (organizing, no active case)", "color": "#22c55e", "order": 4 }
+        {
+          "value": "emergency",
+          "label": "Emergency (marshal notice, lockout)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "urgent",
+          "label": "Urgent (court date imminent)",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "preventive",
+          "label": "Preventive (organizing, no active case)",
+          "color": "#22c55e",
+          "order": 4
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "tenant", "label": "Tenant", "order": 1 },
-        { "value": "co_tenant", "label": "Co-Tenant", "order": 2 },
-        { "value": "attorney", "label": "Attorney", "order": 3 },
-        { "value": "organizer", "label": "Organizer", "order": 4 },
-        { "value": "landlord_contact", "label": "Landlord / Management Contact", "order": 5 },
-        { "value": "housing_inspector", "label": "Housing Inspector", "order": 6 }
+        {
+          "value": "tenant",
+          "label": "Tenant",
+          "order": 1
+        },
+        {
+          "value": "co_tenant",
+          "label": "Co-Tenant",
+          "order": 2
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 3
+        },
+        {
+          "value": "organizer",
+          "label": "Organizer",
+          "order": 4
+        },
+        {
+          "value": "landlord_contact",
+          "label": "Landlord / Management Contact",
+          "order": 5
+        },
+        {
+          "value": "housing_inspector",
+          "label": "Housing Inspector",
+          "order": 6
+        }
       ],
-
       "fields": [
         {
           "name": "unit_number",
@@ -96,14 +185,38 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "nonpayment", "label": "Nonpayment of Rent" },
-            { "key": "holdover", "label": "Holdover" },
-            { "key": "owner_occupancy", "label": "Owner Occupancy" },
-            { "key": "nuisance", "label": "Nuisance" },
-            { "key": "illegal_use", "label": "Illegal Use" },
-            { "key": "demolition", "label": "Demolition / Renovation" },
-            { "key": "no_cause", "label": "No-Cause / No-Fault" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "nonpayment",
+              "label": "Nonpayment of Rent"
+            },
+            {
+              "key": "holdover",
+              "label": "Holdover"
+            },
+            {
+              "key": "owner_occupancy",
+              "label": "Owner Occupancy"
+            },
+            {
+              "key": "nuisance",
+              "label": "Nuisance"
+            },
+            {
+              "key": "illegal_use",
+              "label": "Illegal Use"
+            },
+            {
+              "key": "demolition",
+              "label": "Demolition / Renovation"
+            },
+            {
+              "key": "no_cause",
+              "label": "No-Cause / No-Fault"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "legal",
           "order": 3,
@@ -141,12 +254,30 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "needs_attorney", "label": "Needs Attorney" },
-            { "key": "has_attorney", "label": "Has Attorney" },
-            { "key": "legal_aid", "label": "Legal Aid Assigned" },
-            { "key": "right_to_counsel", "label": "Right to Counsel Program" },
-            { "key": "pro_se", "label": "Pro Se (Self-Represented)" },
-            { "key": "unknown", "label": "Unknown" }
+            {
+              "key": "needs_attorney",
+              "label": "Needs Attorney"
+            },
+            {
+              "key": "has_attorney",
+              "label": "Has Attorney"
+            },
+            {
+              "key": "legal_aid",
+              "label": "Legal Aid Assigned"
+            },
+            {
+              "key": "right_to_counsel",
+              "label": "Right to Counsel Program"
+            },
+            {
+              "key": "pro_se",
+              "label": "Pro Se (Self-Represented)"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
           ],
           "section": "legal",
           "order": 6,
@@ -247,7 +378,6 @@
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -258,43 +388,114 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "tenant", "label": "Tenant", "order": 1 },
-        { "value": "co_tenant", "label": "Co-Tenant", "order": 2 },
-        { "value": "attorney", "label": "Attorney", "order": 3 },
-        { "value": "organizer", "label": "Organizer", "order": 4 },
-        { "value": "landlord_contact", "label": "Landlord / Management Contact", "order": 5 },
-        { "value": "housing_inspector", "label": "Housing Inspector", "order": 6 }
+        {
+          "value": "tenant",
+          "label": "Tenant",
+          "order": 1
+        },
+        {
+          "value": "co_tenant",
+          "label": "Co-Tenant",
+          "order": 2
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 3
+        },
+        {
+          "value": "organizer",
+          "label": "Organizer",
+          "order": 4
+        },
+        {
+          "value": "landlord_contact",
+          "label": "Landlord / Management Contact",
+          "order": 5
+        },
+        {
+          "value": "housing_inspector",
+          "label": "Housing Inspector",
+          "order": 6
+        }
       ],
       "defaultRole": "tenant",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Tenant Organizer",
       "slug": "tenant-organizer",
       "description": "Conducts intake, organizes tenants, documents conditions, coordinates building-level campaigns",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "notes:create", "notes:read-own", "events:read", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "notes:create",
+        "notes:read-own",
+        "events:read",
+        "shifts:read-own",
+        "contacts:search"
+      ]
     },
     {
       "name": "Housing Attorney",
       "slug": "housing-attorney",
       "description": "Provides legal representation in housing court, manages court dates and filings",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all", "evidence:*"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "evidence:*",
+        "contacts:search",
+        "hubs:read",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Campaign Coordinator",
       "slug": "campaign-coordinator",
       "description": "Manages building-wide organizing campaigns, coordinates with press and elected officials",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "notes:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "notes:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     },
     {
       "name": "Intake Volunteer",
       "slug": "intake-volunteer",
       "description": "Takes initial calls, creates case records, performs initial needs assessment",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "calls:answer", "calls:read-active", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "calls:answer",
+        "calls:read-active",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "calls:hangup",
+        "calls:report-spam",
+        "calls:identify-caller",
+        "contacts:search"
+      ]
     }
   ]
 }

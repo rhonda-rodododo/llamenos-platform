@@ -5,9 +5,12 @@
   "description": "Hate crime and bias incident documentation, victim support tracking, and advocacy data collection. Tracks incident type, bias motivation, demographics, law enforcement reports, and media coverage. Designed for civil rights organizations and community reporting networks.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["hate-crime", "bias", "reporting"],
+  "tags": [
+    "hate-crime",
+    "bias",
+    "reporting"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "bias_incident.label": "Bias Incident",
@@ -26,7 +29,6 @@
       "incident_cluster.description": "Un patron de incidentes de sesgo relacionados en un area geografica"
     }
   },
-
   "entityTypes": [
     {
       "name": "bias_incident",
@@ -45,32 +47,93 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "reported", "label": "Reported", "color": "#f59e0b", "order": 1 },
-        { "value": "verified", "label": "Verified", "color": "#3b82f6", "order": 2 },
-        { "value": "support_offered", "label": "Support Offered", "color": "#8b5cf6", "order": 3 },
-        { "value": "law_enforcement_referred", "label": "Law Enforcement Referred", "color": "#0ea5e9", "order": 4 },
-        { "value": "advocacy_included", "label": "Included in Advocacy", "color": "#22c55e", "order": 5 },
-        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 6, "isClosed": true }
+        {
+          "value": "reported",
+          "label": "Reported",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "verified",
+          "label": "Verified",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "support_offered",
+          "label": "Support Offered",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "law_enforcement_referred",
+          "label": "Law Enforcement Referred",
+          "color": "#0ea5e9",
+          "order": 4
+        },
+        {
+          "value": "advocacy_included",
+          "label": "Included in Advocacy",
+          "color": "#22c55e",
+          "order": 5
+        },
+        {
+          "value": "closed",
+          "label": "Closed",
+          "color": "#6b7280",
+          "order": 6,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "reported",
-      "closedStatuses": ["closed"],
-
+      "closedStatuses": [
+        "closed"
+      ],
       "severities": [
-        { "value": "severe", "label": "Severe (physical assault, arson, fatality)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "moderate", "label": "Moderate (vandalism, intimidation)", "color": "#f59e0b", "order": 2 },
-        { "value": "low", "label": "Low (verbal harassment, online)", "color": "#3b82f6", "order": 3 }
+        {
+          "value": "severe",
+          "label": "Severe (physical assault, arson, fatality)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "moderate",
+          "label": "Moderate (vandalism, intimidation)",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "low",
+          "label": "Low (verbal harassment, online)",
+          "color": "#3b82f6",
+          "order": 3
+        }
       ],
       "defaultSeverity": "moderate",
-
       "contactRoles": [
-        { "value": "victim", "label": "Victim", "order": 1 },
-        { "value": "witness", "label": "Witness", "order": 2 },
-        { "value": "reporter", "label": "Reporter", "order": 3 },
-        { "value": "advocate", "label": "Victim Advocate", "order": 4 }
+        {
+          "value": "victim",
+          "label": "Victim",
+          "order": 1
+        },
+        {
+          "value": "witness",
+          "label": "Witness",
+          "order": 2
+        },
+        {
+          "value": "reporter",
+          "label": "Reporter",
+          "order": 3
+        },
+        {
+          "value": "advocate",
+          "label": "Victim Advocate",
+          "order": 4
+        }
       ],
-
       "fields": [
         {
           "name": "incident_type",
@@ -78,14 +141,38 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "physical_assault", "label": "Physical Assault" },
-            { "key": "verbal_harassment", "label": "Verbal Harassment" },
-            { "key": "vandalism", "label": "Vandalism / Property Damage" },
-            { "key": "intimidation", "label": "Intimidation / Threats" },
-            { "key": "online_harassment", "label": "Online Harassment" },
-            { "key": "arson", "label": "Arson" },
-            { "key": "stalking", "label": "Stalking" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "physical_assault",
+              "label": "Physical Assault"
+            },
+            {
+              "key": "verbal_harassment",
+              "label": "Verbal Harassment"
+            },
+            {
+              "key": "vandalism",
+              "label": "Vandalism / Property Damage"
+            },
+            {
+              "key": "intimidation",
+              "label": "Intimidation / Threats"
+            },
+            {
+              "key": "online_harassment",
+              "label": "Online Harassment"
+            },
+            {
+              "key": "arson",
+              "label": "Arson"
+            },
+            {
+              "key": "stalking",
+              "label": "Stalking"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "incident",
           "order": 1,
@@ -99,15 +186,42 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "race_ethnicity", "label": "Race / Ethnicity" },
-            { "key": "religion", "label": "Religion" },
-            { "key": "sexual_orientation", "label": "Sexual Orientation" },
-            { "key": "gender_identity", "label": "Gender Identity" },
-            { "key": "disability", "label": "Disability" },
-            { "key": "immigration_status", "label": "Immigration Status" },
-            { "key": "gender", "label": "Gender" },
-            { "key": "multiple", "label": "Multiple / Intersectional" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "race_ethnicity",
+              "label": "Race / Ethnicity"
+            },
+            {
+              "key": "religion",
+              "label": "Religion"
+            },
+            {
+              "key": "sexual_orientation",
+              "label": "Sexual Orientation"
+            },
+            {
+              "key": "gender_identity",
+              "label": "Gender Identity"
+            },
+            {
+              "key": "disability",
+              "label": "Disability"
+            },
+            {
+              "key": "immigration_status",
+              "label": "Immigration Status"
+            },
+            {
+              "key": "gender",
+              "label": "Gender"
+            },
+            {
+              "key": "multiple",
+              "label": "Multiple / Intersectional"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "incident",
           "order": 2,
@@ -121,18 +235,54 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "aapi", "label": "Asian American / Pacific Islander" },
-            { "key": "black", "label": "Black / African American" },
-            { "key": "indigenous", "label": "Indigenous / Native American" },
-            { "key": "latino", "label": "Latino / Hispanic" },
-            { "key": "jewish", "label": "Jewish" },
-            { "key": "muslim", "label": "Muslim" },
-            { "key": "sikh", "label": "Sikh" },
-            { "key": "lgbtq", "label": "LGBTQ+" },
-            { "key": "transgender", "label": "Transgender / Non-Binary" },
-            { "key": "immigrant", "label": "Immigrant / Refugee" },
-            { "key": "disabled", "label": "People with Disabilities" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "aapi",
+              "label": "Asian American / Pacific Islander"
+            },
+            {
+              "key": "black",
+              "label": "Black / African American"
+            },
+            {
+              "key": "indigenous",
+              "label": "Indigenous / Native American"
+            },
+            {
+              "key": "latino",
+              "label": "Latino / Hispanic"
+            },
+            {
+              "key": "jewish",
+              "label": "Jewish"
+            },
+            {
+              "key": "muslim",
+              "label": "Muslim"
+            },
+            {
+              "key": "sikh",
+              "label": "Sikh"
+            },
+            {
+              "key": "lgbtq",
+              "label": "LGBTQ+"
+            },
+            {
+              "key": "transgender",
+              "label": "Transgender / Non-Binary"
+            },
+            {
+              "key": "immigrant",
+              "label": "Immigrant / Refugee"
+            },
+            {
+              "key": "disabled",
+              "label": "People with Disabilities"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "incident",
           "order": 3,
@@ -146,15 +296,42 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "street", "label": "Street / Public Space" },
-            { "key": "home", "label": "Home / Residence" },
-            { "key": "school", "label": "School / University" },
-            { "key": "workplace", "label": "Workplace" },
-            { "key": "transit", "label": "Public Transit" },
-            { "key": "house_of_worship", "label": "House of Worship" },
-            { "key": "business", "label": "Business / Store" },
-            { "key": "online", "label": "Online" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "street",
+              "label": "Street / Public Space"
+            },
+            {
+              "key": "home",
+              "label": "Home / Residence"
+            },
+            {
+              "key": "school",
+              "label": "School / University"
+            },
+            {
+              "key": "workplace",
+              "label": "Workplace"
+            },
+            {
+              "key": "transit",
+              "label": "Public Transit"
+            },
+            {
+              "key": "house_of_worship",
+              "label": "House of Worship"
+            },
+            {
+              "key": "business",
+              "label": "Business / Store"
+            },
+            {
+              "key": "online",
+              "label": "Online"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "incident",
           "order": 4,
@@ -178,11 +355,26 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "none", "label": "None" },
-            { "key": "minor", "label": "Minor" },
-            { "key": "moderate", "label": "Moderate" },
-            { "key": "severe", "label": "Severe" },
-            { "key": "fatal", "label": "Fatal" }
+            {
+              "key": "none",
+              "label": "None"
+            },
+            {
+              "key": "minor",
+              "label": "Minor"
+            },
+            {
+              "key": "moderate",
+              "label": "Moderate"
+            },
+            {
+              "key": "severe",
+              "label": "Severe"
+            },
+            {
+              "key": "fatal",
+              "label": "Fatal"
+            }
           ],
           "section": "impact",
           "order": 6,
@@ -243,27 +435,99 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "identified", "label": "Identified", "color": "#f59e0b", "order": 1 },
-        { "value": "monitoring", "label": "Monitoring", "color": "#3b82f6", "order": 2 },
-        { "value": "response_active", "label": "Response Active", "color": "#ef4444", "order": 3 },
-        { "value": "resolved", "label": "Resolved", "color": "#6b7280", "order": 4, "isClosed": true }
+        {
+          "value": "identified",
+          "label": "Identified",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "monitoring",
+          "label": "Monitoring",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "response_active",
+          "label": "Response Active",
+          "color": "#ef4444",
+          "order": 3
+        },
+        {
+          "value": "resolved",
+          "label": "Resolved",
+          "color": "#6b7280",
+          "order": 4,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "identified",
-      "closedStatuses": ["resolved"],
-
+      "closedStatuses": [
+        "resolved"
+      ],
       "fields": [
-        { "name": "cluster_start_date", "label": "Pattern Start Date", "type": "date", "required": true, "order": 1, "indexable": true, "indexType": "exact", "accessLevel": "all" },
-        { "name": "geographic_area", "label": "Geographic Area", "type": "text", "required": true, "helpText": "Neighborhood, district, or area where the pattern is occurring.", "order": 2, "indexable": false, "accessLevel": "all" },
-        { "name": "incident_count", "label": "Number of Linked Incidents", "type": "number", "required": false, "order": 3, "indexable": false, "accessLevel": "all" },
-        { "name": "pattern_description", "label": "Pattern Description", "type": "textarea", "required": false, "helpText": "Describe the commonalities linking these incidents.", "order": 4, "indexable": false, "accessLevel": "all" },
-        { "name": "community_alert_issued", "label": "Community Alert Issued", "type": "checkbox", "required": false, "order": 5, "indexable": true, "indexType": "exact", "accessLevel": "all" },
-        { "name": "notes", "label": "Notes", "type": "textarea", "required": false, "order": 6, "indexable": false, "accessLevel": "all" }
+        {
+          "name": "cluster_start_date",
+          "label": "Pattern Start Date",
+          "type": "date",
+          "required": true,
+          "order": 1,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "geographic_area",
+          "label": "Geographic Area",
+          "type": "text",
+          "required": true,
+          "helpText": "Neighborhood, district, or area where the pattern is occurring.",
+          "order": 2,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "incident_count",
+          "label": "Number of Linked Incidents",
+          "type": "number",
+          "required": false,
+          "order": 3,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "pattern_description",
+          "label": "Pattern Description",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Describe the commonalities linking these incidents.",
+          "order": 4,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "community_alert_issued",
+          "label": "Community Alert Issued",
+          "type": "checkbox",
+          "required": false,
+          "order": 5,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "order": 6,
+          "indexable": false,
+          "accessLevel": "all"
+        }
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -274,10 +538,26 @@
       "sourceLabel": "reported incident",
       "targetLabel": "involves",
       "roles": [
-        { "value": "victim", "label": "Victim", "order": 1 },
-        { "value": "witness", "label": "Witness", "order": 2 },
-        { "value": "reporter", "label": "Reporter", "order": 3 },
-        { "value": "advocate", "label": "Victim Advocate", "order": 4 }
+        {
+          "value": "victim",
+          "label": "Victim",
+          "order": 1
+        },
+        {
+          "value": "witness",
+          "label": "Witness",
+          "order": 2
+        },
+        {
+          "value": "reporter",
+          "label": "Reporter",
+          "order": 3
+        },
+        {
+          "value": "advocate",
+          "label": "Victim Advocate",
+          "order": 4
+        }
       ],
       "defaultRole": "victim",
       "cascadeDelete": false,
@@ -295,31 +575,75 @@
       "required": false
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Intake Specialist",
       "slug": "intake-specialist",
       "description": "Receives incident reports, documents details, provides immediate victim support referrals",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "calls:answer", "calls:read-active", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "calls:answer",
+        "calls:read-active",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "calls:hangup",
+        "calls:report-spam",
+        "calls:identify-caller",
+        "contacts:search"
+      ]
     },
     {
       "name": "Data Analyst",
       "slug": "data-analyst",
       "description": "Reviews incidents for patterns, manages clusters, generates advocacy reports",
-      "permissions": ["cases:read-all", "events:*", "contacts:view", "notes:read-all", "reports:*"]
+      "permissions": [
+        "cases:read-all",
+        "events:*",
+        "contacts:view",
+        "notes:read-all",
+        "reports:*",
+        "contacts:search",
+        "hubs:read"
+      ]
     },
     {
       "name": "Victim Advocate",
       "slug": "victim-advocate",
       "description": "Provides ongoing support to victims, coordinates referrals, accompanies to law enforcement",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Program Director",
       "slug": "program-director",
       "description": "Full access to all cases, incidents, and reports for organizational oversight",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     }
   ]
 }

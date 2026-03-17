@@ -199,9 +199,9 @@ dev.post('/test-setup-cms', async (c) => {
         'reports:read-assigned', 'reports:send-message',
         'files:upload', 'files:download-own',
         // CMS permissions for E2E testing: full access to cases + contacts
-        'cases:create', 'cases:read', 'cases:update', 'cases:assign',
-        'contacts:view', 'contacts:create', 'contacts:update',
-        'events:read', 'events:create', 'evidence:upload', 'evidence:read',
+        'cases:create', 'cases:read-all', 'cases:update', 'cases:assign',
+        'contacts:view', 'contacts:create', 'contacts:edit',
+        'events:read', 'events:create', 'evidence:upload', 'evidence:download',
       ],
     })
     roleOk = true

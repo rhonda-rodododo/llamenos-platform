@@ -5,9 +5,14 @@
   "description": "Mass arrest intake, arraignment tracking, bail coordination, and release monitoring. Designed for NLG hotlines and jail support operations. Supports multiple court dates, attorney matching, medical flagging, and immigration hold tracking.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["legal", "protest", "jail-support", "mass-arrest", "nlg"],
+  "tags": [
+    "legal",
+    "protest",
+    "jail-support",
+    "mass-arrest",
+    "nlg"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "arrest_case.label": "Arrest Case",
@@ -37,7 +42,6 @@
       "lo_misconduct_report.description": "Documentacion de mala conducta policial por observador legal."
     }
   },
-
   "entityTypes": [
     {
       "name": "arrest_case",
@@ -50,40 +54,113 @@
       "numberPrefix": "JS",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["attorney_name", "attorney_phone", "physical_description"],
+      "piiFields": [
+        "attorney_name",
+        "attorney_phone",
+        "physical_description"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "reported", "label": "Reported", "color": "#f59e0b", "order": 1 },
-        { "value": "confirmed", "label": "Confirmed", "color": "#3b82f6", "order": 2 },
-        { "value": "in_custody", "label": "In Custody", "color": "#ef4444", "order": 3 },
-        { "value": "arraigned", "label": "Arraigned", "color": "#8b5cf6", "order": 4 },
-        { "value": "released", "label": "Released", "color": "#22c55e", "order": 5 },
-        { "value": "case_closed", "label": "Case Closed", "color": "#6b7280", "order": 6, "isClosed": true }
+        {
+          "value": "reported",
+          "label": "Reported",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "confirmed",
+          "label": "Confirmed",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "in_custody",
+          "label": "In Custody",
+          "color": "#ef4444",
+          "order": 3
+        },
+        {
+          "value": "arraigned",
+          "label": "Arraigned",
+          "color": "#8b5cf6",
+          "order": 4
+        },
+        {
+          "value": "released",
+          "label": "Released",
+          "color": "#22c55e",
+          "order": 5
+        },
+        {
+          "value": "case_closed",
+          "label": "Case Closed",
+          "color": "#6b7280",
+          "order": 6,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "reported",
-      "closedStatuses": ["case_closed"],
-
+      "closedStatuses": [
+        "case_closed"
+      ],
       "severities": [
-        { "value": "urgent", "label": "Urgent (medical, minor, vulnerable)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 2 },
-        { "value": "low", "label": "Low (has attorney, stable)", "color": "#6b7280", "order": 3 }
+        {
+          "value": "urgent",
+          "label": "Urgent (medical, minor, vulnerable)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "low",
+          "label": "Low (has attorney, stable)",
+          "color": "#6b7280",
+          "order": 3
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "arrestee", "label": "Arrestee", "order": 1 },
-        { "value": "attorney", "label": "Attorney", "order": 2 },
-        { "value": "support_contact", "label": "Support Contact", "order": 3 },
-        { "value": "legal_observer", "label": "Legal Observer", "order": 4 },
-        { "value": "co_defendant", "label": "Co-Defendant", "order": 5 },
-        { "value": "interpreter", "label": "Interpreter", "order": 6 }
+        {
+          "value": "arrestee",
+          "label": "Arrestee",
+          "order": 1
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 2
+        },
+        {
+          "value": "support_contact",
+          "label": "Support Contact",
+          "order": 3
+        },
+        {
+          "value": "legal_observer",
+          "label": "Legal Observer",
+          "order": 4
+        },
+        {
+          "value": "co_defendant",
+          "label": "Co-Defendant",
+          "order": 5
+        },
+        {
+          "value": "interpreter",
+          "label": "Interpreter",
+          "order": 6
+        }
       ],
-
       "fields": [
         {
           "name": "arrest_datetime",
@@ -113,13 +190,34 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "local_pd", "label": "Local Police Department" },
-            { "key": "sheriff", "label": "Sheriff" },
-            { "key": "state_police", "label": "State Police" },
-            { "key": "federal", "label": "Federal (FBI, Marshals)" },
-            { "key": "ice_cbp", "label": "ICE / CBP" },
-            { "key": "campus_police", "label": "Campus Police" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "local_pd",
+              "label": "Local Police Department"
+            },
+            {
+              "key": "sheriff",
+              "label": "Sheriff"
+            },
+            {
+              "key": "state_police",
+              "label": "State Police"
+            },
+            {
+              "key": "federal",
+              "label": "Federal (FBI, Marshals)"
+            },
+            {
+              "key": "ice_cbp",
+              "label": "ICE / CBP"
+            },
+            {
+              "key": "campus_police",
+              "label": "Campus Police"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "arrest_details",
           "order": 3,
@@ -200,10 +298,22 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "infraction", "label": "Infraction / Violation" },
-            { "key": "misdemeanor", "label": "Misdemeanor" },
-            { "key": "felony", "label": "Felony" },
-            { "key": "unknown", "label": "Unknown" }
+            {
+              "key": "infraction",
+              "label": "Infraction / Violation"
+            },
+            {
+              "key": "misdemeanor",
+              "label": "Misdemeanor"
+            },
+            {
+              "key": "felony",
+              "label": "Felony"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
           ],
           "section": "legal",
           "order": 10,
@@ -227,12 +337,30 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "not_set", "label": "Not Set" },
-            { "key": "cash_bail", "label": "Cash Bail Set" },
-            { "key": "posted", "label": "Bail Posted" },
-            { "key": "ror", "label": "Released on Recognizance" },
-            { "key": "remanded", "label": "Remanded (No Bail)" },
-            { "key": "unknown", "label": "Unknown" }
+            {
+              "key": "not_set",
+              "label": "Not Set"
+            },
+            {
+              "key": "cash_bail",
+              "label": "Cash Bail Set"
+            },
+            {
+              "key": "posted",
+              "label": "Bail Posted"
+            },
+            {
+              "key": "ror",
+              "label": "Released on Recognizance"
+            },
+            {
+              "key": "remanded",
+              "label": "Remanded (No Bail)"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
           ],
           "section": "bail",
           "order": 12,
@@ -249,7 +377,11 @@
           "order": 13,
           "indexable": false,
           "accessLevel": "assigned",
-          "showWhen": { "field": "bail_status", "operator": "equals", "value": "posted" }
+          "showWhen": {
+            "field": "bail_status",
+            "operator": "equals",
+            "value": "posted"
+          }
         },
         {
           "name": "next_court_date",
@@ -290,12 +422,30 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "needs_attorney", "label": "Needs Attorney" },
-            { "key": "has_attorney", "label": "Has Attorney" },
-            { "key": "public_defender", "label": "Public Defender Assigned" },
-            { "key": "nlg_attorney", "label": "NLG Attorney Assigned" },
-            { "key": "declined", "label": "Declined Representation" },
-            { "key": "unknown", "label": "Unknown" }
+            {
+              "key": "needs_attorney",
+              "label": "Needs Attorney"
+            },
+            {
+              "key": "has_attorney",
+              "label": "Has Attorney"
+            },
+            {
+              "key": "public_defender",
+              "label": "Public Defender Assigned"
+            },
+            {
+              "key": "nlg_attorney",
+              "label": "NLG Attorney Assigned"
+            },
+            {
+              "key": "declined",
+              "label": "Declined Representation"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
           ],
           "section": "legal",
           "order": 17,
@@ -312,7 +462,11 @@
           "order": 18,
           "indexable": false,
           "accessLevel": "admin",
-          "showWhen": { "field": "attorney_status", "operator": "not_equals", "value": "needs_attorney" }
+          "showWhen": {
+            "field": "attorney_status",
+            "operator": "not_equals",
+            "value": "needs_attorney"
+          }
         },
         {
           "name": "attorney_phone",
@@ -323,7 +477,11 @@
           "order": 19,
           "indexable": false,
           "accessLevel": "admin",
-          "showWhen": { "field": "attorney_status", "operator": "not_equals", "value": "needs_attorney" }
+          "showWhen": {
+            "field": "attorney_status",
+            "operator": "not_equals",
+            "value": "needs_attorney"
+          }
         },
         {
           "name": "medical_needs",
@@ -347,7 +505,11 @@
           "order": 21,
           "indexable": false,
           "accessLevel": "assigned",
-          "showWhen": { "field": "medical_needs", "operator": "equals", "value": true }
+          "showWhen": {
+            "field": "medical_needs",
+            "operator": "equals",
+            "value": true
+          }
         },
         {
           "name": "is_minor",
@@ -390,12 +552,30 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "in_custody", "label": "In Custody" },
-            { "key": "released_bail", "label": "Released on Bail" },
-            { "key": "released_ror", "label": "Released ROR" },
-            { "key": "released_desk_ticket", "label": "Desk Appearance Ticket" },
-            { "key": "transferred", "label": "Transferred (ICE, federal)" },
-            { "key": "unknown", "label": "Unknown" }
+            {
+              "key": "in_custody",
+              "label": "In Custody"
+            },
+            {
+              "key": "released_bail",
+              "label": "Released on Bail"
+            },
+            {
+              "key": "released_ror",
+              "label": "Released ROR"
+            },
+            {
+              "key": "released_desk_ticket",
+              "label": "Desk Appearance Ticket"
+            },
+            {
+              "key": "transferred",
+              "label": "Transferred (ICE, federal)"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
           ],
           "section": "release",
           "order": 25,
@@ -413,7 +593,11 @@
           "indexable": true,
           "indexType": "exact",
           "accessLevel": "assigned",
-          "showWhen": { "field": "release_status", "operator": "not_equals", "value": "in_custody" }
+          "showWhen": {
+            "field": "release_status",
+            "operator": "not_equals",
+            "value": "in_custody"
+          }
         },
         {
           "name": "physical_description",
@@ -456,29 +640,139 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "active", "label": "Active", "color": "#ef4444", "order": 1 },
-        { "value": "processing", "label": "Processing", "color": "#f59e0b", "order": 2 },
-        { "value": "completed", "label": "Completed", "color": "#22c55e", "order": 3, "isClosed": true }
+        {
+          "value": "active",
+          "label": "Active",
+          "color": "#ef4444",
+          "order": 1
+        },
+        {
+          "value": "processing",
+          "label": "Processing",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "completed",
+          "label": "Completed",
+          "color": "#22c55e",
+          "order": 3,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "active",
-      "closedStatuses": ["completed"],
-
+      "closedStatuses": [
+        "completed"
+      ],
       "fields": [
-        { "name": "event_datetime", "label": "Event Date/Time", "type": "date", "required": true, "order": 1, "indexable": true, "indexType": "exact", "accessLevel": "all" },
-        { "name": "location", "label": "Location", "type": "text", "required": true, "helpText": "Intersection or landmark. Use neighborhood-level precision.", "order": 2, "indexable": false, "accessLevel": "all" },
-        { "name": "arrest_count", "label": "Number Arrested", "type": "number", "required": false, "order": 3, "indexable": false, "accessLevel": "all" },
-        { "name": "agency", "label": "Arresting Agency", "type": "select", "required": true, "options": [{ "key": "local_pd", "label": "Local PD" }, { "key": "state_police", "label": "State Police" }, { "key": "federal", "label": "Federal" }, { "key": "multiple", "label": "Multiple Agencies" }], "order": 4, "indexable": true, "indexType": "exact", "accessLevel": "all" },
-        { "name": "legal_observers_present", "label": "Legal Observers Present", "type": "number", "required": false, "order": 5, "indexable": false, "accessLevel": "all" },
-        { "name": "processing_locations", "label": "Processing Location(s)", "type": "textarea", "required": false, "helpText": "Which precincts/jails people were taken to.", "order": 6, "indexable": false, "accessLevel": "all" },
-        { "name": "common_charges", "label": "Common Charges Filed", "type": "textarea", "required": false, "helpText": "Charges applied to most arrestees in this event.", "order": 7, "indexable": false, "accessLevel": "all" },
-        { "name": "hotline_number", "label": "Jail Support Hotline Number", "type": "text", "required": false, "order": 8, "indexable": false, "accessLevel": "all" },
-        { "name": "notes", "label": "Notes", "type": "textarea", "required": false, "order": 9, "indexable": false, "accessLevel": "all" }
+        {
+          "name": "event_datetime",
+          "label": "Event Date/Time",
+          "type": "date",
+          "required": true,
+          "order": 1,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "text",
+          "required": true,
+          "helpText": "Intersection or landmark. Use neighborhood-level precision.",
+          "order": 2,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "arrest_count",
+          "label": "Number Arrested",
+          "type": "number",
+          "required": false,
+          "order": 3,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "agency",
+          "label": "Arresting Agency",
+          "type": "select",
+          "required": true,
+          "options": [
+            {
+              "key": "local_pd",
+              "label": "Local PD"
+            },
+            {
+              "key": "state_police",
+              "label": "State Police"
+            },
+            {
+              "key": "federal",
+              "label": "Federal"
+            },
+            {
+              "key": "multiple",
+              "label": "Multiple Agencies"
+            }
+          ],
+          "order": 4,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "legal_observers_present",
+          "label": "Legal Observers Present",
+          "type": "number",
+          "required": false,
+          "order": 5,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "processing_locations",
+          "label": "Processing Location(s)",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Which precincts/jails people were taken to.",
+          "order": 6,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "common_charges",
+          "label": "Common Charges Filed",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Charges applied to most arrestees in this event.",
+          "order": 7,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "hotline_number",
+          "label": "Jail Support Hotline Number",
+          "type": "text",
+          "required": false,
+          "order": 8,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "order": 9,
+          "indexable": false,
+          "accessLevel": "all"
+        }
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -489,12 +783,36 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "arrestee", "label": "Arrestee", "order": 1 },
-        { "value": "attorney", "label": "Attorney", "order": 2 },
-        { "value": "support_contact", "label": "Support Contact", "order": 3 },
-        { "value": "legal_observer", "label": "Legal Observer", "order": 4 },
-        { "value": "co_defendant", "label": "Co-Defendant", "order": 5 },
-        { "value": "interpreter", "label": "Interpreter", "order": 6 }
+        {
+          "value": "arrestee",
+          "label": "Arrestee",
+          "order": 1
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 2
+        },
+        {
+          "value": "support_contact",
+          "label": "Support Contact",
+          "order": 3
+        },
+        {
+          "value": "legal_observer",
+          "label": "Legal Observer",
+          "order": 4
+        },
+        {
+          "value": "co_defendant",
+          "label": "Co-Defendant",
+          "order": 5
+        },
+        {
+          "value": "interpreter",
+          "label": "Interpreter",
+          "order": 6
+        }
       ],
       "defaultRole": "arrestee",
       "cascadeDelete": false,
@@ -512,7 +830,6 @@
       "required": false
     }
   ],
-
   "reportTypes": [
     {
       "name": "lo_arrest_report",
@@ -527,13 +844,36 @@
       "numberPrefix": "AR",
       "numberingEnabled": true,
       "statuses": [
-        { "value": "submitted", "label": "Submitted", "color": "#f59e0b", "order": 1 },
-        { "value": "in_review", "label": "In Review", "color": "#3b82f6", "order": 2 },
-        { "value": "triaged", "label": "Triaged", "color": "#8b5cf6", "order": 3 },
-        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 4, "isClosed": true }
+        {
+          "value": "submitted",
+          "label": "Submitted",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "in_review",
+          "label": "In Review",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "triaged",
+          "label": "Triaged",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "closed",
+          "label": "Closed",
+          "color": "#6b7280",
+          "order": 4,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "submitted",
-      "closedStatuses": ["closed"],
+      "closedStatuses": [
+        "closed"
+      ],
       "fields": [
         {
           "name": "location",
@@ -559,10 +899,22 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "local_pd", "label": "Local PD" },
-            { "key": "state_police", "label": "State Police" },
-            { "key": "federal", "label": "Federal" },
-            { "key": "multiple", "label": "Multiple Agencies" }
+            {
+              "key": "local_pd",
+              "label": "Local PD"
+            },
+            {
+              "key": "state_police",
+              "label": "State Police"
+            },
+            {
+              "key": "federal",
+              "label": "Federal"
+            },
+            {
+              "key": "multiple",
+              "label": "Multiple Agencies"
+            }
           ],
           "order": 3,
           "accessLevel": "all"
@@ -611,13 +963,36 @@
       "numberPrefix": "MC",
       "numberingEnabled": true,
       "statuses": [
-        { "value": "submitted", "label": "Submitted", "color": "#f59e0b", "order": 1 },
-        { "value": "under_review", "label": "Under Review", "color": "#3b82f6", "order": 2 },
-        { "value": "documented", "label": "Documented", "color": "#22c55e", "order": 3 },
-        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 4, "isClosed": true }
+        {
+          "value": "submitted",
+          "label": "Submitted",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "under_review",
+          "label": "Under Review",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "documented",
+          "label": "Documented",
+          "color": "#22c55e",
+          "order": 3
+        },
+        {
+          "value": "closed",
+          "label": "Closed",
+          "color": "#6b7280",
+          "order": 4,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "submitted",
-      "closedStatuses": ["closed"],
+      "closedStatuses": [
+        "closed"
+      ],
       "fields": [
         {
           "name": "location",
@@ -643,11 +1018,26 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "local_pd", "label": "Local PD" },
-            { "key": "state_police", "label": "State Police" },
-            { "key": "federal", "label": "Federal" },
-            { "key": "campus_police", "label": "Campus Police" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "local_pd",
+              "label": "Local PD"
+            },
+            {
+              "key": "state_police",
+              "label": "State Police"
+            },
+            {
+              "key": "federal",
+              "label": "Federal"
+            },
+            {
+              "key": "campus_police",
+              "label": "Campus Police"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "order": 3,
           "accessLevel": "all"
@@ -667,16 +1057,46 @@
           "type": "multiselect",
           "required": true,
           "options": [
-            { "key": "verbal_abuse", "label": "Verbal Abuse / Threats" },
-            { "key": "excessive_force", "label": "Excessive Physical Force" },
-            { "key": "chemical_weapons", "label": "Chemical Weapons (pepper spray, tear gas)" },
-            { "key": "projectiles", "label": "Projectiles (rubber bullets, beanbags)" },
-            { "key": "kettling", "label": "Kettling / Containment" },
-            { "key": "unlawful_arrest", "label": "Unlawful Arrest" },
-            { "key": "destruction_property", "label": "Destruction of Property" },
-            { "key": "medical_denial", "label": "Denial of Medical Attention" },
-            { "key": "surveillance", "label": "Targeted Surveillance / Photography" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "verbal_abuse",
+              "label": "Verbal Abuse / Threats"
+            },
+            {
+              "key": "excessive_force",
+              "label": "Excessive Physical Force"
+            },
+            {
+              "key": "chemical_weapons",
+              "label": "Chemical Weapons (pepper spray, tear gas)"
+            },
+            {
+              "key": "projectiles",
+              "label": "Projectiles (rubber bullets, beanbags)"
+            },
+            {
+              "key": "kettling",
+              "label": "Kettling / Containment"
+            },
+            {
+              "key": "unlawful_arrest",
+              "label": "Unlawful Arrest"
+            },
+            {
+              "key": "destruction_property",
+              "label": "Destruction of Property"
+            },
+            {
+              "key": "medical_denial",
+              "label": "Denial of Medical Attention"
+            },
+            {
+              "key": "surveillance",
+              "label": "Targeted Surveillance / Photography"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "order": 5,
           "accessLevel": "all"
@@ -694,31 +1114,85 @@
       ]
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Hotline Coordinator",
       "slug": "hotline-coordinator",
       "description": "Manages the hotline during actions — full case and event access",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read", "bans:*"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "bans:*",
+        "hubs:read"
+      ]
     },
     {
       "name": "Intake Volunteer",
       "slug": "intake-volunteer",
       "description": "Takes arrest reports and creates initial case records from incoming calls",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "calls:answer", "calls:read-active", "notes:create", "notes:read-own", "events:read", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "calls:answer",
+        "calls:read-active",
+        "notes:create",
+        "notes:read-own",
+        "events:read",
+        "shifts:read-own",
+        "calls:hangup",
+        "calls:report-spam",
+        "calls:identify-caller",
+        "contacts:search"
+      ]
     },
     {
       "name": "Jail Support Coordinator",
       "slug": "jail-support-coordinator",
       "description": "Tracks arraignments, bail status, court dates, and release coordination. Full case visibility.",
-      "permissions": ["cases:read-all", "cases:update", "cases:assign", "cases:close", "contacts:view", "contacts:view-pii", "contacts:edit", "events:read", "events:update", "evidence:download", "notes:read-all", "notes:create", "shifts:read"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "cases:assign",
+        "cases:close",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "events:read",
+        "events:update",
+        "evidence:download",
+        "notes:read-all",
+        "notes:create",
+        "shifts:read",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Attorney Coordinator",
       "slug": "attorney-coordinator",
       "description": "Matches attorneys with arrestees, manages legal representation assignments",
-      "permissions": ["cases:read-all", "cases:assign", "cases:update", "contacts:view", "contacts:view-pii", "contacts:edit", "contacts:manage-relationships"]
+      "permissions": [
+        "cases:read-all",
+        "cases:assign",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "contacts:manage-relationships",
+        "contacts:search",
+        "cases:unlink"
+      ]
     }
   ]
 }

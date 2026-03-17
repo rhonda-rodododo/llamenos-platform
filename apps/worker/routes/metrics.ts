@@ -159,7 +159,7 @@ metrics.get('/',
       ...authErrors,
     },
   }),
-  auth, requirePermission('audit:read'), (c) => {
+  auth, requirePermission('metrics:read'), (c) => {
   const summary = getErrorSummary()
   const uptimeSeconds = (Date.now() - startTime) / 1000
 

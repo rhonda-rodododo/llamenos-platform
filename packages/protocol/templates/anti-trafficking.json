@@ -5,9 +5,11 @@
   "description": "Human trafficking tip intake and survivor services coordination. Tracks trafficking type, potential victims, law enforcement referrals, immigration relief options, and multi-service coordination. Designed for anti-trafficking organizations and tip lines.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["trafficking", "survivor-services"],
+  "tags": [
+    "trafficking",
+    "survivor-services"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "trafficking_case.label": "Trafficking Case",
@@ -20,7 +22,6 @@
       "trafficking_case.description": "Seguimiento de un caso de trata desde la denuncia hasta los servicios para sobrevivientes"
     }
   },
-
   "entityTypes": [
     {
       "name": "trafficking_case",
@@ -33,40 +34,114 @@
       "numberPrefix": "TC",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["country_of_origin", "language_needs", "law_enforcement_referral", "agency_referred"],
+      "piiFields": [
+        "country_of_origin",
+        "language_needs",
+        "law_enforcement_referral",
+        "agency_referred"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "tip_received", "label": "Tip Received", "color": "#f59e0b", "order": 1 },
-        { "value": "under_investigation", "label": "Under Investigation", "color": "#3b82f6", "order": 2 },
-        { "value": "services_coordinated", "label": "Services Coordinated", "color": "#8b5cf6", "order": 3 },
-        { "value": "survivor_safe", "label": "Survivor Safe", "color": "#22c55e", "order": 4 },
-        { "value": "case_closed", "label": "Case Closed", "color": "#6b7280", "order": 5, "isClosed": true }
+        {
+          "value": "tip_received",
+          "label": "Tip Received",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "under_investigation",
+          "label": "Under Investigation",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "services_coordinated",
+          "label": "Services Coordinated",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "survivor_safe",
+          "label": "Survivor Safe",
+          "color": "#22c55e",
+          "order": 4
+        },
+        {
+          "value": "case_closed",
+          "label": "Case Closed",
+          "color": "#6b7280",
+          "order": 5,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "tip_received",
-      "closedStatuses": ["case_closed"],
-
+      "closedStatuses": [
+        "case_closed"
+      ],
       "severities": [
-        { "value": "critical", "label": "Critical (minors, imminent danger)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "high", "label": "High", "color": "#f59e0b", "order": 2 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 3 },
-        { "value": "informational", "label": "Informational Tip", "color": "#6b7280", "order": 4 }
+        {
+          "value": "critical",
+          "label": "Critical (minors, imminent danger)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "high",
+          "label": "High",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "informational",
+          "label": "Informational Tip",
+          "color": "#6b7280",
+          "order": 4
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "potential_victim", "label": "Potential Victim", "order": 1 },
-        { "value": "tipster", "label": "Tipster", "order": 2 },
-        { "value": "service_provider", "label": "Service Provider", "order": 3 },
-        { "value": "law_enforcement", "label": "Law Enforcement Contact", "order": 4 },
-        { "value": "attorney", "label": "Attorney", "order": 5 },
-        { "value": "interpreter", "label": "Interpreter", "order": 6 }
+        {
+          "value": "potential_victim",
+          "label": "Potential Victim",
+          "order": 1
+        },
+        {
+          "value": "tipster",
+          "label": "Tipster",
+          "order": 2
+        },
+        {
+          "value": "service_provider",
+          "label": "Service Provider",
+          "order": 3
+        },
+        {
+          "value": "law_enforcement",
+          "label": "Law Enforcement Contact",
+          "order": 4
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 5
+        },
+        {
+          "value": "interpreter",
+          "label": "Interpreter",
+          "order": 6
+        }
       ],
-
       "fields": [
         {
           "name": "trafficking_type",
@@ -74,11 +149,26 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "labor", "label": "Labor Trafficking" },
-            { "key": "sex", "label": "Sex Trafficking" },
-            { "key": "domestic_servitude", "label": "Domestic Servitude" },
-            { "key": "forced_criminality", "label": "Forced Criminality" },
-            { "key": "unknown", "label": "Unknown / Suspected" }
+            {
+              "key": "labor",
+              "label": "Labor Trafficking"
+            },
+            {
+              "key": "sex",
+              "label": "Sex Trafficking"
+            },
+            {
+              "key": "domestic_servitude",
+              "label": "Domestic Servitude"
+            },
+            {
+              "key": "forced_criminality",
+              "label": "Forced Criminality"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown / Suspected"
+            }
           ],
           "section": "classification",
           "order": 1,
@@ -102,16 +192,46 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "business", "label": "Business" },
-            { "key": "residence", "label": "Residence" },
-            { "key": "farm", "label": "Farm / Agricultural" },
-            { "key": "factory", "label": "Factory / Manufacturing" },
-            { "key": "restaurant", "label": "Restaurant / Food Service" },
-            { "key": "construction", "label": "Construction Site" },
-            { "key": "massage_parlor", "label": "Massage Parlor" },
-            { "key": "hotel", "label": "Hotel / Motel" },
-            { "key": "online", "label": "Online / Remote" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "business",
+              "label": "Business"
+            },
+            {
+              "key": "residence",
+              "label": "Residence"
+            },
+            {
+              "key": "farm",
+              "label": "Farm / Agricultural"
+            },
+            {
+              "key": "factory",
+              "label": "Factory / Manufacturing"
+            },
+            {
+              "key": "restaurant",
+              "label": "Restaurant / Food Service"
+            },
+            {
+              "key": "construction",
+              "label": "Construction Site"
+            },
+            {
+              "key": "massage_parlor",
+              "label": "Massage Parlor"
+            },
+            {
+              "key": "hotel",
+              "label": "Hotel / Motel"
+            },
+            {
+              "key": "online",
+              "label": "Online / Remote"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "classification",
           "order": 3,
@@ -140,7 +260,11 @@
           "order": 5,
           "indexable": false,
           "accessLevel": "admin",
-          "showWhen": { "field": "law_enforcement_referral", "operator": "equals", "value": true }
+          "showWhen": {
+            "field": "law_enforcement_referral",
+            "operator": "equals",
+            "value": true
+          }
         },
         {
           "name": "immigration_relief",
@@ -148,12 +272,30 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "t_visa", "label": "T-Visa (Trafficking Victims)" },
-            { "key": "u_visa", "label": "U-Visa (Crime Victims)" },
-            { "key": "sijs", "label": "SIJS (Special Immigrant Juvenile)" },
-            { "key": "asylum", "label": "Asylum" },
-            { "key": "none", "label": "None Available" },
-            { "key": "unknown", "label": "Unknown / Under Review" }
+            {
+              "key": "t_visa",
+              "label": "T-Visa (Trafficking Victims)"
+            },
+            {
+              "key": "u_visa",
+              "label": "U-Visa (Crime Victims)"
+            },
+            {
+              "key": "sijs",
+              "label": "SIJS (Special Immigrant Juvenile)"
+            },
+            {
+              "key": "asylum",
+              "label": "Asylum"
+            },
+            {
+              "key": "none",
+              "label": "None Available"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown / Under Review"
+            }
           ],
           "section": "legal",
           "order": 6,
@@ -200,16 +342,46 @@
           "type": "multiselect",
           "required": false,
           "options": [
-            { "key": "housing", "label": "Housing / Shelter" },
-            { "key": "medical", "label": "Medical Care" },
-            { "key": "mental_health", "label": "Mental Health" },
-            { "key": "legal", "label": "Legal Representation" },
-            { "key": "immigration", "label": "Immigration Assistance" },
-            { "key": "substance_abuse", "label": "Substance Abuse Treatment" },
-            { "key": "job_training", "label": "Job Training / Employment" },
-            { "key": "education", "label": "Education" },
-            { "key": "childcare", "label": "Childcare" },
-            { "key": "transportation", "label": "Transportation" }
+            {
+              "key": "housing",
+              "label": "Housing / Shelter"
+            },
+            {
+              "key": "medical",
+              "label": "Medical Care"
+            },
+            {
+              "key": "mental_health",
+              "label": "Mental Health"
+            },
+            {
+              "key": "legal",
+              "label": "Legal Representation"
+            },
+            {
+              "key": "immigration",
+              "label": "Immigration Assistance"
+            },
+            {
+              "key": "substance_abuse",
+              "label": "Substance Abuse Treatment"
+            },
+            {
+              "key": "job_training",
+              "label": "Job Training / Employment"
+            },
+            {
+              "key": "education",
+              "label": "Education"
+            },
+            {
+              "key": "childcare",
+              "label": "Childcare"
+            },
+            {
+              "key": "transportation",
+              "label": "Transportation"
+            }
           ],
           "section": "services",
           "helpText": "All services needed for the survivor(s).",
@@ -220,7 +392,6 @@
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -231,37 +402,100 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "potential_victim", "label": "Potential Victim", "order": 1 },
-        { "value": "tipster", "label": "Tipster", "order": 2 },
-        { "value": "service_provider", "label": "Service Provider", "order": 3 },
-        { "value": "law_enforcement", "label": "Law Enforcement Contact", "order": 4 },
-        { "value": "attorney", "label": "Attorney", "order": 5 },
-        { "value": "interpreter", "label": "Interpreter", "order": 6 }
+        {
+          "value": "potential_victim",
+          "label": "Potential Victim",
+          "order": 1
+        },
+        {
+          "value": "tipster",
+          "label": "Tipster",
+          "order": 2
+        },
+        {
+          "value": "service_provider",
+          "label": "Service Provider",
+          "order": 3
+        },
+        {
+          "value": "law_enforcement",
+          "label": "Law Enforcement Contact",
+          "order": 4
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 5
+        },
+        {
+          "value": "interpreter",
+          "label": "Interpreter",
+          "order": 6
+        }
       ],
       "defaultRole": "potential_victim",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Intake Specialist",
       "slug": "intake-specialist",
       "description": "Receives tips, conducts initial assessments, creates case records",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "calls:answer", "calls:read-active", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "calls:answer",
+        "calls:read-active",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "calls:hangup",
+        "calls:report-spam",
+        "calls:identify-caller",
+        "contacts:search"
+      ]
     },
     {
       "name": "Case Coordinator",
       "slug": "case-coordinator",
       "description": "Coordinates survivor services, manages referrals, tracks case progress",
-      "permissions": ["cases:read-all", "cases:update", "cases:assign", "contacts:view", "contacts:view-pii", "contacts:edit", "contacts:manage-relationships", "notes:create", "notes:read-all", "events:read"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "cases:assign",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "contacts:manage-relationships",
+        "notes:create",
+        "notes:read-all",
+        "events:read",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Program Director",
       "slug": "program-director",
       "description": "Oversees all cases, manages staff, reviews high-priority cases, generates reports",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     }
   ]
 }

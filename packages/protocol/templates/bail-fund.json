@@ -5,9 +5,12 @@
   "description": "Community bail fund case management. Tracks bail disbursements, bond types, court date compliance, bail return, and fund accounting. Designed for community bail funds and bail collectives.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["bail", "legal", "finance"],
+  "tags": [
+    "bail",
+    "legal",
+    "finance"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "bail_fund_case.label": "Bail Fund Case",
@@ -20,7 +23,6 @@
       "bail_fund_case.description": "Seguimiento del desembolso de fianza, cumplimiento de tribunal y devolucion de fianza"
     }
   },
-
   "entityTypes": [
     {
       "name": "bail_fund_case",
@@ -33,40 +35,115 @@
       "numberPrefix": "BF",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["co_signer", "docket_number"],
+      "piiFields": [
+        "co_signer",
+        "docket_number"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "pending_review", "label": "Pending Review", "color": "#f59e0b", "order": 1 },
-        { "value": "approved", "label": "Approved", "color": "#3b82f6", "order": 2 },
-        { "value": "bail_posted", "label": "Bail Posted", "color": "#8b5cf6", "order": 3 },
-        { "value": "released", "label": "Released", "color": "#22c55e", "order": 4 },
-        { "value": "court_monitoring", "label": "Court Monitoring", "color": "#0ea5e9", "order": 5 },
-        { "value": "bail_returned", "label": "Bail Returned", "color": "#6b7280", "order": 6, "isClosed": true },
-        { "value": "bail_forfeited", "label": "Bail Forfeited", "color": "#ef4444", "order": 7, "isClosed": true }
+        {
+          "value": "pending_review",
+          "label": "Pending Review",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "approved",
+          "label": "Approved",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "bail_posted",
+          "label": "Bail Posted",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "released",
+          "label": "Released",
+          "color": "#22c55e",
+          "order": 4
+        },
+        {
+          "value": "court_monitoring",
+          "label": "Court Monitoring",
+          "color": "#0ea5e9",
+          "order": 5
+        },
+        {
+          "value": "bail_returned",
+          "label": "Bail Returned",
+          "color": "#6b7280",
+          "order": 6,
+          "isClosed": true
+        },
+        {
+          "value": "bail_forfeited",
+          "label": "Bail Forfeited",
+          "color": "#ef4444",
+          "order": 7,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "pending_review",
-      "closedStatuses": ["bail_returned", "bail_forfeited"],
-
+      "closedStatuses": [
+        "bail_returned",
+        "bail_forfeited"
+      ],
       "severities": [
-        { "value": "urgent", "label": "Urgent (imminent court date, vulnerable)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 2 },
-        { "value": "low", "label": "Low", "color": "#6b7280", "order": 3 }
+        {
+          "value": "urgent",
+          "label": "Urgent (imminent court date, vulnerable)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "low",
+          "label": "Low",
+          "color": "#6b7280",
+          "order": 3
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "defendant", "label": "Defendant", "order": 1 },
-        { "value": "co_signer", "label": "Co-Signer", "order": 2 },
-        { "value": "attorney", "label": "Attorney", "order": 3 },
-        { "value": "bail_poster", "label": "Bail Poster", "order": 4 },
-        { "value": "support_contact", "label": "Support Contact", "order": 5 }
+        {
+          "value": "defendant",
+          "label": "Defendant",
+          "order": 1
+        },
+        {
+          "value": "co_signer",
+          "label": "Co-Signer",
+          "order": 2
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 3
+        },
+        {
+          "value": "bail_poster",
+          "label": "Bail Poster",
+          "order": 4
+        },
+        {
+          "value": "support_contact",
+          "label": "Support Contact",
+          "order": 5
+        }
       ],
-
       "fields": [
         {
           "name": "bail_amount",
@@ -84,11 +161,26 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "cash", "label": "Cash Bail" },
-            { "key": "surety", "label": "Surety Bond" },
-            { "key": "property", "label": "Property Bond" },
-            { "key": "ror", "label": "Released on Recognizance" },
-            { "key": "partially_secured", "label": "Partially Secured" }
+            {
+              "key": "cash",
+              "label": "Cash Bail"
+            },
+            {
+              "key": "surety",
+              "label": "Surety Bond"
+            },
+            {
+              "key": "property",
+              "label": "Property Bond"
+            },
+            {
+              "key": "ror",
+              "label": "Released on Recognizance"
+            },
+            {
+              "key": "partially_secured",
+              "label": "Partially Secured"
+            }
           ],
           "section": "bail",
           "order": 2,
@@ -187,7 +279,11 @@
           "order": 10,
           "indexable": false,
           "accessLevel": "admin",
-          "showWhen": { "field": "bail_returned", "operator": "equals", "value": true }
+          "showWhen": {
+            "field": "bail_returned",
+            "operator": "equals",
+            "value": true
+          }
         },
         {
           "name": "co_signer",
@@ -203,7 +299,6 @@
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -214,42 +309,96 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "defendant", "label": "Defendant", "order": 1 },
-        { "value": "co_signer", "label": "Co-Signer", "order": 2 },
-        { "value": "attorney", "label": "Attorney", "order": 3 },
-        { "value": "bail_poster", "label": "Bail Poster", "order": 4 },
-        { "value": "support_contact", "label": "Support Contact", "order": 5 }
+        {
+          "value": "defendant",
+          "label": "Defendant",
+          "order": 1
+        },
+        {
+          "value": "co_signer",
+          "label": "Co-Signer",
+          "order": 2
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 3
+        },
+        {
+          "value": "bail_poster",
+          "label": "Bail Poster",
+          "order": 4
+        },
+        {
+          "value": "support_contact",
+          "label": "Support Contact",
+          "order": 5
+        }
       ],
       "defaultRole": "defendant",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Fund Coordinator",
       "slug": "fund-coordinator",
       "description": "Approves bail disbursements, manages fund operations, full case access",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     },
     {
       "name": "Bail Poster",
       "slug": "bail-poster",
       "description": "Goes to court or jail to physically post bail, updates posting status",
-      "permissions": ["cases:read-own", "cases:update-own", "contacts:view", "notes:create", "notes:read-own"]
+      "permissions": [
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:view",
+        "notes:create",
+        "notes:read-own",
+        "contacts:search"
+      ]
     },
     {
       "name": "Court Monitor",
       "slug": "court-monitor",
       "description": "Tracks court dates, monitors appearances, updates case status",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "notes:create",
+        "notes:read-all",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Finance Admin",
       "slug": "finance-admin",
       "description": "Manages fund accounting, tracks disbursements and returns",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "contacts:view-pii", "reports:*"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "reports:*",
+        "contacts:search",
+        "hubs:read",
+        "cases:unlink"
+      ]
     }
   ]
 }

@@ -187,6 +187,7 @@ volunteers.get('/:targetPubkey/cases',
       ...notFoundError,
     },
   }),
+  requirePermission('volunteers:read-cases'),
   async (c) => {
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')
@@ -238,6 +239,7 @@ volunteers.get('/:targetPubkey/metrics',
       ...notFoundError,
     },
   }),
+  requirePermission('volunteers:read-metrics'),
   async (c) => {
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')

@@ -37,6 +37,7 @@ entitySchema.get('/case-management',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getCaseManagementEnabled()
@@ -53,7 +54,7 @@ entitySchema.put('/case-management',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-cms'),
   async (c) => {
     const body = await c.req.json<{ enabled: boolean }>()
     const services = c.get('services')
@@ -74,6 +75,7 @@ entitySchema.get('/auto-assignment',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId') ?? ''
@@ -114,6 +116,7 @@ entitySchema.get('/cross-hub',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getCrossHubSharingEnabled()
@@ -130,7 +133,7 @@ entitySchema.put('/cross-hub',
       ...authErrors,
     },
   }),
-  requirePermission('settings:manage'),
+  requirePermission('settings:manage-cms'),
   async (c) => {
     const body = await c.req.json<{ enabled: boolean }>()
     const services = c.get('services')

@@ -118,7 +118,7 @@ calls.get('/identify/:identifierHash',
       ...authErrors,
     },
   }),
-  requirePermission('contacts:view'),
+  requirePermission('calls:identify-caller'),
   async (c) => {
     const identifierHash = c.req.param('identifierHash')
     const services = c.get('services')
@@ -201,7 +201,7 @@ calls.post('/:callId/hangup',
       ...notFoundError,
     },
   }),
-  requirePermission('calls:answer'),
+  requirePermission('calls:hangup'),
   async (c) => {
     const callId = c.req.param('callId')
     const pubkey = c.get('pubkey')
@@ -233,7 +233,7 @@ calls.post('/:callId/spam',
       ...notFoundError,
     },
   }),
-  requirePermission('calls:answer'),
+  requirePermission('calls:report-spam'),
   async (c) => {
     const callId = c.req.param('callId')
     const pubkey = c.get('pubkey')

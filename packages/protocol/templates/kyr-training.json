@@ -5,9 +5,12 @@
   "description": "Community education and Know Your Rights training event tracking. Tracks training sessions, attendance, languages, materials distributed, and follow-up requests. Primarily event-tracking rather than case management — events may link to later hotline cases.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["kyr", "training", "education"],
+  "tags": [
+    "kyr",
+    "training",
+    "education"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "community_training.label": "Community Training",
@@ -20,7 +23,6 @@
       "community_training.description": "Seguimiento de una capacitacion de Conozca Sus Derechos o evento de educacion comunitaria"
     }
   },
-
   "entityTypes": [
     {
       "name": "community_training",
@@ -39,18 +41,51 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "scheduled", "label": "Scheduled", "color": "#3b82f6", "order": 1 },
-        { "value": "confirmed", "label": "Confirmed", "color": "#8b5cf6", "order": 2 },
-        { "value": "completed", "label": "Completed", "color": "#22c55e", "order": 3 },
-        { "value": "cancelled", "label": "Cancelled", "color": "#ef4444", "order": 4, "isClosed": true },
-        { "value": "follow_up_pending", "label": "Follow-Up Pending", "color": "#f59e0b", "order": 5 },
-        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 6, "isClosed": true }
+        {
+          "value": "scheduled",
+          "label": "Scheduled",
+          "color": "#3b82f6",
+          "order": 1
+        },
+        {
+          "value": "confirmed",
+          "label": "Confirmed",
+          "color": "#8b5cf6",
+          "order": 2
+        },
+        {
+          "value": "completed",
+          "label": "Completed",
+          "color": "#22c55e",
+          "order": 3
+        },
+        {
+          "value": "cancelled",
+          "label": "Cancelled",
+          "color": "#ef4444",
+          "order": 4,
+          "isClosed": true
+        },
+        {
+          "value": "follow_up_pending",
+          "label": "Follow-Up Pending",
+          "color": "#f59e0b",
+          "order": 5
+        },
+        {
+          "value": "closed",
+          "label": "Closed",
+          "color": "#6b7280",
+          "order": 6,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "scheduled",
-      "closedStatuses": ["cancelled", "closed"],
-
+      "closedStatuses": [
+        "cancelled",
+        "closed"
+      ],
       "fields": [
         {
           "name": "event_type",
@@ -58,15 +93,42 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "kyr_immigration", "label": "Know Your Rights — Immigration" },
-            { "key": "kyr_police", "label": "Know Your Rights — Police Encounters" },
-            { "key": "kyr_tenant", "label": "Know Your Rights — Tenant Rights" },
-            { "key": "kyr_workplace", "label": "Know Your Rights — Workplace" },
-            { "key": "kyr_protest", "label": "Know Your Rights — Protest / First Amendment" },
-            { "key": "community_health", "label": "Community Health Education" },
-            { "key": "legal_clinic", "label": "Legal Clinic" },
-            { "key": "train_the_trainer", "label": "Train the Trainer" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "kyr_immigration",
+              "label": "Know Your Rights — Immigration"
+            },
+            {
+              "key": "kyr_police",
+              "label": "Know Your Rights — Police Encounters"
+            },
+            {
+              "key": "kyr_tenant",
+              "label": "Know Your Rights — Tenant Rights"
+            },
+            {
+              "key": "kyr_workplace",
+              "label": "Know Your Rights — Workplace"
+            },
+            {
+              "key": "kyr_protest",
+              "label": "Know Your Rights — Protest / First Amendment"
+            },
+            {
+              "key": "community_health",
+              "label": "Community Health Education"
+            },
+            {
+              "key": "legal_clinic",
+              "label": "Legal Clinic"
+            },
+            {
+              "key": "train_the_trainer",
+              "label": "Train the Trainer"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "event",
           "order": 1,
@@ -102,18 +164,54 @@
           "type": "multiselect",
           "required": false,
           "options": [
-            { "key": "en", "label": "English" },
-            { "key": "es", "label": "Spanish" },
-            { "key": "zh", "label": "Chinese (Mandarin/Cantonese)" },
-            { "key": "tl", "label": "Tagalog" },
-            { "key": "vi", "label": "Vietnamese" },
-            { "key": "ar", "label": "Arabic" },
-            { "key": "fr", "label": "French / Haitian Creole" },
-            { "key": "ko", "label": "Korean" },
-            { "key": "ru", "label": "Russian" },
-            { "key": "hi", "label": "Hindi" },
-            { "key": "pt", "label": "Portuguese" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "en",
+              "label": "English"
+            },
+            {
+              "key": "es",
+              "label": "Spanish"
+            },
+            {
+              "key": "zh",
+              "label": "Chinese (Mandarin/Cantonese)"
+            },
+            {
+              "key": "tl",
+              "label": "Tagalog"
+            },
+            {
+              "key": "vi",
+              "label": "Vietnamese"
+            },
+            {
+              "key": "ar",
+              "label": "Arabic"
+            },
+            {
+              "key": "fr",
+              "label": "French / Haitian Creole"
+            },
+            {
+              "key": "ko",
+              "label": "Korean"
+            },
+            {
+              "key": "ru",
+              "label": "Russian"
+            },
+            {
+              "key": "hi",
+              "label": "Hindi"
+            },
+            {
+              "key": "pt",
+              "label": "Portuguese"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "logistics",
           "helpText": "Languages in which the training was conducted or materials were available.",
@@ -146,27 +244,50 @@
       ]
     }
   ],
-
   "relationshipTypes": [],
-
   "suggestedRoles": [
     {
       "name": "Training Coordinator",
       "slug": "training-coordinator",
       "description": "Schedules trainings, manages trainers, tracks outreach metrics",
-      "permissions": ["events:*", "contacts:*", "notes:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "events:*",
+        "contacts:*",
+        "notes:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     },
     {
       "name": "Trainer",
       "slug": "trainer",
       "description": "Conducts KYR trainings, reports attendance and materials distributed",
-      "permissions": ["events:read", "events:update", "contacts:create", "contacts:view", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "events:read",
+        "events:update",
+        "contacts:create",
+        "contacts:view",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "contacts:search"
+      ]
     },
     {
       "name": "Program Director",
       "slug": "program-director",
       "description": "Oversees all training programs, generates reports for funders, full access",
-      "permissions": ["events:*", "contacts:*", "notes:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "events:*",
+        "contacts:*",
+        "notes:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     }
   ]
 }

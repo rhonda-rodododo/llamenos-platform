@@ -19,6 +19,7 @@ routes.get('/',
       ...authErrors,
     },
   }),
+  requirePermission('hubs:read'),
   async (c) => {
     const services = c.get('services')
     const volunteer = c.get('volunteer')
@@ -88,6 +89,7 @@ routes.get('/:hubId',
       ...notFoundError,
     },
   }),
+  requirePermission('hubs:read'),
   async (c) => {
     const hubId = c.req.param('hubId')
     const services = c.get('services')
@@ -148,7 +150,7 @@ routes.post('/:hubId/members',
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:manage-roles'),
+  requirePermission('hubs:manage-members'),
   validator('json', addHubMemberBodySchema),
   async (c) => {
     const hubId = c.req.param('hubId')
@@ -185,7 +187,7 @@ routes.delete('/:hubId/members/:pubkey',
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:manage-roles'),
+  requirePermission('hubs:manage-members'),
   async (c) => {
     const hubId = c.req.param('hubId')
     const pubkey = c.req.param('pubkey')
@@ -250,7 +252,7 @@ routes.put('/:hubId/key',
       ...notFoundError,
     },
   }),
-  requirePermission('system:manage-hubs'),
+  requirePermission('hubs:manage-keys'),
   validator('json', hubKeyEnvelopesBodySchema),
   async (c) => {
     const hubId = c.req.param('hubId')

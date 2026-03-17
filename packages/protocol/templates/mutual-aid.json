@@ -5,9 +5,12 @@
   "description": "Mutual aid network coordination for disaster response and resource distribution. Tracks aid requests, urgency, household needs, resource delivery, and volunteer assignments. Optimized for high-volume intake during emergencies with simple statuses for fast processing.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["mutual-aid", "disaster", "resources"],
+  "tags": [
+    "mutual-aid",
+    "disaster",
+    "resources"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "aid_request.label": "Aid Request",
@@ -20,7 +23,6 @@
       "aid_request.description": "Seguimiento de una solicitud de ayuda desde la recepcion hasta la entrega de recursos"
     }
   },
-
   "entityTypes": [
     {
       "name": "aid_request",
@@ -39,33 +41,99 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "requested", "label": "Requested", "color": "#f59e0b", "order": 1 },
-        { "value": "volunteer_assigned", "label": "Volunteer Assigned", "color": "#3b82f6", "order": 2 },
-        { "value": "in_transit", "label": "In Transit", "color": "#8b5cf6", "order": 3 },
-        { "value": "delivered", "label": "Delivered", "color": "#22c55e", "order": 4 },
-        { "value": "follow_up", "label": "Follow-Up Needed", "color": "#0ea5e9", "order": 5 },
-        { "value": "resolved", "label": "Resolved", "color": "#6b7280", "order": 6, "isClosed": true }
+        {
+          "value": "requested",
+          "label": "Requested",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "volunteer_assigned",
+          "label": "Volunteer Assigned",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "in_transit",
+          "label": "In Transit",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "delivered",
+          "label": "Delivered",
+          "color": "#22c55e",
+          "order": 4
+        },
+        {
+          "value": "follow_up",
+          "label": "Follow-Up Needed",
+          "color": "#0ea5e9",
+          "order": 5
+        },
+        {
+          "value": "resolved",
+          "label": "Resolved",
+          "color": "#6b7280",
+          "order": 6,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "requested",
-      "closedStatuses": ["resolved"],
-
+      "closedStatuses": [
+        "resolved"
+      ],
       "severities": [
-        { "value": "life_threatening", "label": "Life-Threatening (medical, trapped)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "urgent", "label": "Urgent (within 24h)", "color": "#f59e0b", "order": 2 },
-        { "value": "standard", "label": "Standard (within 48h)", "color": "#3b82f6", "order": 3 },
-        { "value": "ongoing", "label": "Ongoing Need", "color": "#6b7280", "order": 4 }
+        {
+          "value": "life_threatening",
+          "label": "Life-Threatening (medical, trapped)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "urgent",
+          "label": "Urgent (within 24h)",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "standard",
+          "label": "Standard (within 48h)",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "ongoing",
+          "label": "Ongoing Need",
+          "color": "#6b7280",
+          "order": 4
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "requester", "label": "Requester", "order": 1 },
-        { "value": "household_member", "label": "Household Member", "order": 2 },
-        { "value": "volunteer", "label": "Delivery Volunteer", "order": 3 },
-        { "value": "donor", "label": "Resource Donor", "order": 4 }
+        {
+          "value": "requester",
+          "label": "Requester",
+          "order": 1
+        },
+        {
+          "value": "household_member",
+          "label": "Household Member",
+          "order": 2
+        },
+        {
+          "value": "volunteer",
+          "label": "Delivery Volunteer",
+          "order": 3
+        },
+        {
+          "value": "donor",
+          "label": "Resource Donor",
+          "order": 4
+        }
       ],
-
       "fields": [
         {
           "name": "need_category",
@@ -73,16 +141,46 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "water", "label": "Water" },
-            { "key": "food", "label": "Food" },
-            { "key": "medical", "label": "Medical Supplies" },
-            { "key": "shelter", "label": "Shelter / Housing" },
-            { "key": "transport", "label": "Transportation / Evacuation" },
-            { "key": "power", "label": "Power / Generator / Fuel" },
-            { "key": "clothing", "label": "Clothing / Blankets" },
-            { "key": "hygiene", "label": "Hygiene / Sanitation" },
-            { "key": "childcare", "label": "Childcare" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "water",
+              "label": "Water"
+            },
+            {
+              "key": "food",
+              "label": "Food"
+            },
+            {
+              "key": "medical",
+              "label": "Medical Supplies"
+            },
+            {
+              "key": "shelter",
+              "label": "Shelter / Housing"
+            },
+            {
+              "key": "transport",
+              "label": "Transportation / Evacuation"
+            },
+            {
+              "key": "power",
+              "label": "Power / Generator / Fuel"
+            },
+            {
+              "key": "clothing",
+              "label": "Clothing / Blankets"
+            },
+            {
+              "key": "hygiene",
+              "label": "Hygiene / Sanitation"
+            },
+            {
+              "key": "childcare",
+              "label": "Childcare"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "request",
           "order": 1,
@@ -96,10 +194,22 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "immediate", "label": "Immediate" },
-            { "key": "within_24h", "label": "Within 24 Hours" },
-            { "key": "within_48h", "label": "Within 48 Hours" },
-            { "key": "ongoing", "label": "Ongoing" }
+            {
+              "key": "immediate",
+              "label": "Immediate"
+            },
+            {
+              "key": "within_24h",
+              "label": "Within 24 Hours"
+            },
+            {
+              "key": "within_48h",
+              "label": "Within 48 Hours"
+            },
+            {
+              "key": "ongoing",
+              "label": "Ongoing"
+            }
           ],
           "section": "request",
           "order": 2,
@@ -221,7 +331,6 @@
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -232,41 +341,100 @@
       "sourceLabel": "has request",
       "targetLabel": "involves",
       "roles": [
-        { "value": "requester", "label": "Requester", "order": 1 },
-        { "value": "household_member", "label": "Household Member", "order": 2 },
-        { "value": "volunteer", "label": "Delivery Volunteer", "order": 3 },
-        { "value": "donor", "label": "Resource Donor", "order": 4 }
+        {
+          "value": "requester",
+          "label": "Requester",
+          "order": 1
+        },
+        {
+          "value": "household_member",
+          "label": "Household Member",
+          "order": 2
+        },
+        {
+          "value": "volunteer",
+          "label": "Delivery Volunteer",
+          "order": 3
+        },
+        {
+          "value": "donor",
+          "label": "Resource Donor",
+          "order": 4
+        }
       ],
       "defaultRole": "requester",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Dispatch Coordinator",
       "slug": "dispatch-coordinator",
       "description": "Manages all incoming requests, assigns volunteers, prioritizes deliveries",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     },
     {
       "name": "Intake Volunteer",
       "slug": "intake-volunteer",
       "description": "Takes incoming aid requests by phone or in person, creates request records",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "calls:answer", "calls:read-active", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "calls:answer",
+        "calls:read-active",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "calls:hangup",
+        "calls:report-spam",
+        "calls:identify-caller",
+        "contacts:search"
+      ]
     },
     {
       "name": "Delivery Volunteer",
       "slug": "delivery-volunteer",
       "description": "Picks up and delivers resources to requesting households",
-      "permissions": ["cases:read-own", "cases:update-own", "contacts:view", "notes:create", "notes:read-own"]
+      "permissions": [
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:view",
+        "notes:create",
+        "notes:read-own",
+        "contacts:search"
+      ]
     },
     {
       "name": "Supply Manager",
       "slug": "supply-manager",
       "description": "Tracks available supplies, manages donation intake, coordinates resource allocation",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "notes:create", "notes:read-all", "reports:*"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "notes:create",
+        "notes:read-all",
+        "reports:*",
+        "contacts:search",
+        "hubs:read",
+        "cases:unlink"
+      ]
     }
   ]
 }

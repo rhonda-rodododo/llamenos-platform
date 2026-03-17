@@ -5,9 +5,14 @@
   "description": "Encampment defense and sweep documentation. Track sweeps, displaced individuals, property destruction, service referrals, and legal challenges. Designed for homeless advocacy organizations, mutual aid groups, and legal observers documenting encampment clearances.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["homeless", "sweeps", "encampment", "advocacy", "housing"],
+  "tags": [
+    "homeless",
+    "sweeps",
+    "encampment",
+    "advocacy",
+    "housing"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "displaced_person.label": "Displaced Person",
@@ -38,7 +43,6 @@
       "property_complaint.description": "Documentar propiedad confiscada o destruida durante un desalojo."
     }
   },
-
   "entityTypes": [
     {
       "name": "displaced_person",
@@ -51,74 +55,413 @@
       "numberPrefix": "DP",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["preferred_name", "phone", "id_description", "medical_needs_detail"],
+      "piiFields": [
+        "preferred_name",
+        "phone",
+        "id_description",
+        "medical_needs_detail"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "identified", "label": "Identified", "color": "#f59e0b", "order": 0 },
-        { "value": "contacted", "label": "Contacted", "color": "#3b82f6", "order": 1 },
-        { "value": "services_connected", "label": "Services Connected", "color": "#8b5cf6", "order": 2 },
-        { "value": "sheltered", "label": "Sheltered", "color": "#22c55e", "order": 3 },
-        { "value": "relocated", "label": "Relocated", "color": "#06b6d4", "order": 4 },
-        { "value": "lost_contact", "label": "Lost Contact", "color": "#6b7280", "order": 5, "isClosed": true },
-        { "value": "stable", "label": "Stable Housing", "color": "#10b981", "order": 6, "isClosed": true }
+        {
+          "value": "identified",
+          "label": "Identified",
+          "color": "#f59e0b",
+          "order": 0
+        },
+        {
+          "value": "contacted",
+          "label": "Contacted",
+          "color": "#3b82f6",
+          "order": 1
+        },
+        {
+          "value": "services_connected",
+          "label": "Services Connected",
+          "color": "#8b5cf6",
+          "order": 2
+        },
+        {
+          "value": "sheltered",
+          "label": "Sheltered",
+          "color": "#22c55e",
+          "order": 3
+        },
+        {
+          "value": "relocated",
+          "label": "Relocated",
+          "color": "#06b6d4",
+          "order": 4
+        },
+        {
+          "value": "lost_contact",
+          "label": "Lost Contact",
+          "color": "#6b7280",
+          "order": 5,
+          "isClosed": true
+        },
+        {
+          "value": "stable",
+          "label": "Stable Housing",
+          "color": "#10b981",
+          "order": 6,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "identified",
-      "closedStatuses": ["lost_contact", "stable"],
-
+      "closedStatuses": [
+        "lost_contact",
+        "stable"
+      ],
       "severities": [
-        { "value": "critical", "label": "Critical", "color": "#ef4444", "order": 0 },
-        { "value": "high", "label": "High Need", "color": "#f97316", "order": 1 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 2 },
-        { "value": "low", "label": "Connected", "color": "#22c55e", "order": 3 }
+        {
+          "value": "critical",
+          "label": "Critical",
+          "color": "#ef4444",
+          "order": 0
+        },
+        {
+          "value": "high",
+          "label": "High Need",
+          "color": "#f97316",
+          "order": 1
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "low",
+          "label": "Connected",
+          "color": "#22c55e",
+          "order": 3
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "displaced_person", "label": "Displaced Person", "order": 0 },
-        { "value": "case_worker", "label": "Case Worker", "order": 1 },
-        { "value": "outreach_worker", "label": "Outreach Worker", "order": 2 },
-        { "value": "legal_advocate", "label": "Legal Advocate", "order": 3 },
-        { "value": "service_provider", "label": "Service Provider", "order": 4 },
-        { "value": "family_member", "label": "Family Member", "order": 5 }
+        {
+          "value": "displaced_person",
+          "label": "Displaced Person",
+          "order": 0
+        },
+        {
+          "value": "case_worker",
+          "label": "Case Worker",
+          "order": 1
+        },
+        {
+          "value": "outreach_worker",
+          "label": "Outreach Worker",
+          "order": 2
+        },
+        {
+          "value": "legal_advocate",
+          "label": "Legal Advocate",
+          "order": 3
+        },
+        {
+          "value": "service_provider",
+          "label": "Service Provider",
+          "order": 4
+        },
+        {
+          "value": "family_member",
+          "label": "Family Member",
+          "order": 5
+        }
       ],
-
       "fields": [
-        { "name": "preferred_name", "label": "Preferred Name", "type": "text", "required": true, "section": "Identity", "order": 0, "accessLevel": "assigned", "indexable": true, "indexType": "exact", "hubEditable": true, "supportAudioInput": false },
-        { "name": "id_description", "label": "Physical Description", "type": "textarea", "required": false, "section": "Identity", "helpText": "For identification when name unknown — clothing, distinguishing features", "order": 1, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "sweep_location", "label": "Sweep Location", "type": "text", "required": true, "section": "Displacement", "order": 2, "indexable": true, "indexType": "exact", "accessLevel": "all", "hubEditable": true, "supportAudioInput": false },
-        { "name": "sweep_date", "label": "Sweep Date", "type": "date", "required": true, "section": "Displacement", "order": 3, "indexable": true, "indexType": "exact", "accessLevel": "all", "hubEditable": true, "supportAudioInput": false },
-        { "name": "previous_duration", "label": "Time at Encampment", "type": "text", "required": false, "section": "Displacement", "helpText": "How long the person had been at this encampment", "order": 4, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "property_seized", "label": "Property Seized/Destroyed", "type": "textarea", "required": false, "section": "Property", "helpText": "Description of belongings taken or destroyed — IDs, medications, tents, personal items", "order": 5, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "property_value_estimate", "label": "Estimated Property Value", "type": "number", "required": false, "section": "Property", "order": 6, "accessLevel": "admin", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "property_claim_filed", "label": "Property Claim Filed", "type": "checkbox", "required": false, "section": "Property", "order": 7, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "medical_needs", "label": "Medical Needs", "type": "checkbox", "required": false, "section": "Needs", "order": 8, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "medical_needs_detail", "label": "Medical Details", "type": "textarea", "required": false, "section": "Needs", "helpText": "Medications, conditions, injuries — especially medications that were seized", "order": 9, "accessLevel": "admin", "showWhen": { "field": "medical_needs", "operator": "equals", "value": true }, "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "pet_owner", "label": "Has Pets", "type": "checkbox", "required": false, "section": "Needs", "order": 10, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "pet_details", "label": "Pet Details", "type": "text", "required": false, "section": "Needs", "showWhen": { "field": "pet_owner", "operator": "equals", "value": true }, "order": 11, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "services_needed", "label": "Services Needed", "type": "multiselect", "required": false, "section": "Services", "options": [
-          { "key": "shelter", "label": "Emergency Shelter" },
-          { "key": "food", "label": "Food" },
-          { "key": "medical", "label": "Medical Care" },
-          { "key": "mental_health", "label": "Mental Health" },
-          { "key": "substance_use", "label": "Substance Use Treatment" },
-          { "key": "id_replacement", "label": "ID Replacement" },
-          { "key": "legal", "label": "Legal Aid" },
-          { "key": "housing", "label": "Housing Navigation" },
-          { "key": "storage", "label": "Property Storage" },
-          { "key": "transportation", "label": "Transportation" }
-        ], "order": 12, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "services_connected", "label": "Services Connected To", "type": "textarea", "required": false, "section": "Services", "helpText": "Shelter name, case worker, appointment dates", "order": 13, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "relocation_destination", "label": "Relocated To", "type": "text", "required": false, "section": "Outcome", "order": 14, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "legal_challenge", "label": "Part of Legal Challenge", "type": "checkbox", "required": false, "section": "Legal", "order": 15, "accessLevel": "admin", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "legal_notes", "label": "Legal Notes", "type": "textarea", "required": false, "section": "Legal", "showWhen": { "field": "legal_challenge", "operator": "equals", "value": true }, "order": 16, "accessLevel": "admin", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false }
+        {
+          "name": "preferred_name",
+          "label": "Preferred Name",
+          "type": "text",
+          "required": true,
+          "section": "Identity",
+          "order": 0,
+          "accessLevel": "assigned",
+          "indexable": true,
+          "indexType": "exact",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "id_description",
+          "label": "Physical Description",
+          "type": "textarea",
+          "required": false,
+          "section": "Identity",
+          "helpText": "For identification when name unknown — clothing, distinguishing features",
+          "order": 1,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "sweep_location",
+          "label": "Sweep Location",
+          "type": "text",
+          "required": true,
+          "section": "Displacement",
+          "order": 2,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "sweep_date",
+          "label": "Sweep Date",
+          "type": "date",
+          "required": true,
+          "section": "Displacement",
+          "order": 3,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "previous_duration",
+          "label": "Time at Encampment",
+          "type": "text",
+          "required": false,
+          "section": "Displacement",
+          "helpText": "How long the person had been at this encampment",
+          "order": 4,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "property_seized",
+          "label": "Property Seized/Destroyed",
+          "type": "textarea",
+          "required": false,
+          "section": "Property",
+          "helpText": "Description of belongings taken or destroyed — IDs, medications, tents, personal items",
+          "order": 5,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "property_value_estimate",
+          "label": "Estimated Property Value",
+          "type": "number",
+          "required": false,
+          "section": "Property",
+          "order": 6,
+          "accessLevel": "admin",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "property_claim_filed",
+          "label": "Property Claim Filed",
+          "type": "checkbox",
+          "required": false,
+          "section": "Property",
+          "order": 7,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "medical_needs",
+          "label": "Medical Needs",
+          "type": "checkbox",
+          "required": false,
+          "section": "Needs",
+          "order": 8,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "medical_needs_detail",
+          "label": "Medical Details",
+          "type": "textarea",
+          "required": false,
+          "section": "Needs",
+          "helpText": "Medications, conditions, injuries — especially medications that were seized",
+          "order": 9,
+          "accessLevel": "admin",
+          "showWhen": {
+            "field": "medical_needs",
+            "operator": "equals",
+            "value": true
+          },
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "pet_owner",
+          "label": "Has Pets",
+          "type": "checkbox",
+          "required": false,
+          "section": "Needs",
+          "order": 10,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "pet_details",
+          "label": "Pet Details",
+          "type": "text",
+          "required": false,
+          "section": "Needs",
+          "showWhen": {
+            "field": "pet_owner",
+            "operator": "equals",
+            "value": true
+          },
+          "order": 11,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "services_needed",
+          "label": "Services Needed",
+          "type": "multiselect",
+          "required": false,
+          "section": "Services",
+          "options": [
+            {
+              "key": "shelter",
+              "label": "Emergency Shelter"
+            },
+            {
+              "key": "food",
+              "label": "Food"
+            },
+            {
+              "key": "medical",
+              "label": "Medical Care"
+            },
+            {
+              "key": "mental_health",
+              "label": "Mental Health"
+            },
+            {
+              "key": "substance_use",
+              "label": "Substance Use Treatment"
+            },
+            {
+              "key": "id_replacement",
+              "label": "ID Replacement"
+            },
+            {
+              "key": "legal",
+              "label": "Legal Aid"
+            },
+            {
+              "key": "housing",
+              "label": "Housing Navigation"
+            },
+            {
+              "key": "storage",
+              "label": "Property Storage"
+            },
+            {
+              "key": "transportation",
+              "label": "Transportation"
+            }
+          ],
+          "order": 12,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "services_connected",
+          "label": "Services Connected To",
+          "type": "textarea",
+          "required": false,
+          "section": "Services",
+          "helpText": "Shelter name, case worker, appointment dates",
+          "order": 13,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "relocation_destination",
+          "label": "Relocated To",
+          "type": "text",
+          "required": false,
+          "section": "Outcome",
+          "order": 14,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "legal_challenge",
+          "label": "Part of Legal Challenge",
+          "type": "checkbox",
+          "required": false,
+          "section": "Legal",
+          "order": 15,
+          "accessLevel": "admin",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "legal_notes",
+          "label": "Legal Notes",
+          "type": "textarea",
+          "required": false,
+          "section": "Legal",
+          "showWhen": {
+            "field": "legal_challenge",
+            "operator": "equals",
+            "value": true
+          },
+          "order": 16,
+          "accessLevel": "admin",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        }
       ]
     },
-
     {
       "name": "sweep_event",
       "label": "sweep_event.label",
@@ -136,47 +479,226 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "announced", "label": "Announced", "color": "#f59e0b", "order": 0 },
-        { "value": "in_progress", "label": "In Progress", "color": "#ef4444", "order": 1 },
-        { "value": "completed", "label": "Completed", "color": "#6b7280", "order": 2 },
-        { "value": "challenged", "label": "Legally Challenged", "color": "#8b5cf6", "order": 3 },
-        { "value": "documented", "label": "Documented", "color": "#22c55e", "order": 4, "isClosed": true }
+        {
+          "value": "announced",
+          "label": "Announced",
+          "color": "#f59e0b",
+          "order": 0
+        },
+        {
+          "value": "in_progress",
+          "label": "In Progress",
+          "color": "#ef4444",
+          "order": 1
+        },
+        {
+          "value": "completed",
+          "label": "Completed",
+          "color": "#6b7280",
+          "order": 2
+        },
+        {
+          "value": "challenged",
+          "label": "Legally Challenged",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "documented",
+          "label": "Documented",
+          "color": "#22c55e",
+          "order": 4,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "announced",
-      "closedStatuses": ["documented"],
-
+      "closedStatuses": [
+        "documented"
+      ],
       "fields": [
-        { "name": "location", "label": "Location", "type": "text", "required": true, "order": 0, "indexable": true, "indexType": "exact", "accessLevel": "all", "hubEditable": true, "supportAudioInput": false },
-        { "name": "sweep_date", "label": "Date", "type": "date", "required": true, "order": 1, "indexable": true, "indexType": "exact", "accessLevel": "all", "hubEditable": true, "supportAudioInput": false },
-        { "name": "agency", "label": "Agency", "type": "select", "required": true, "options": [
-          { "key": "city_sanitation", "label": "City Sanitation" },
-          { "key": "police", "label": "Police" },
-          { "key": "parks", "label": "Parks Dept" },
-          { "key": "dot", "label": "Dept of Transportation" },
-          { "key": "private_security", "label": "Private Security" },
-          { "key": "multiple", "label": "Multiple Agencies" },
-          { "key": "other", "label": "Other" }
-        ], "order": 2, "accessLevel": "all", "indexable": true, "indexType": "exact", "hubEditable": true, "supportAudioInput": false },
-        { "name": "estimated_displaced", "label": "Estimated People Displaced", "type": "number", "required": false, "order": 3, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "notice_given", "label": "Notice Given", "type": "select", "required": true, "options": [
-          { "key": "none", "label": "No Notice" },
-          { "key": "24h", "label": "24 Hours" },
-          { "key": "48h", "label": "48 Hours" },
-          { "key": "72h", "label": "72 Hours" },
-          { "key": "week", "label": "1 Week+" },
-          { "key": "unknown", "label": "Unknown" }
-        ], "helpText": "Legal requirements vary by jurisdiction — document what actually happened", "order": 4, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "property_stored", "label": "Property Storage Offered", "type": "checkbox", "required": false, "helpText": "Were people given a way to store their belongings?", "order": 5, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "services_offered", "label": "Services Offered On-Site", "type": "checkbox", "required": false, "helpText": "Were shelter/services offered to displaced people?", "order": 6, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "police_present", "label": "Police Present", "type": "checkbox", "required": false, "order": 7, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "arrests_made", "label": "Arrests Made", "type": "number", "required": false, "order": 8, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "notes", "label": "Notes", "type": "textarea", "required": false, "order": 9, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false }
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "text",
+          "required": true,
+          "order": 0,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "sweep_date",
+          "label": "Date",
+          "type": "date",
+          "required": true,
+          "order": 1,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "agency",
+          "label": "Agency",
+          "type": "select",
+          "required": true,
+          "options": [
+            {
+              "key": "city_sanitation",
+              "label": "City Sanitation"
+            },
+            {
+              "key": "police",
+              "label": "Police"
+            },
+            {
+              "key": "parks",
+              "label": "Parks Dept"
+            },
+            {
+              "key": "dot",
+              "label": "Dept of Transportation"
+            },
+            {
+              "key": "private_security",
+              "label": "Private Security"
+            },
+            {
+              "key": "multiple",
+              "label": "Multiple Agencies"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
+          ],
+          "order": 2,
+          "accessLevel": "all",
+          "indexable": true,
+          "indexType": "exact",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "estimated_displaced",
+          "label": "Estimated People Displaced",
+          "type": "number",
+          "required": false,
+          "order": 3,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "notice_given",
+          "label": "Notice Given",
+          "type": "select",
+          "required": true,
+          "options": [
+            {
+              "key": "none",
+              "label": "No Notice"
+            },
+            {
+              "key": "24h",
+              "label": "24 Hours"
+            },
+            {
+              "key": "48h",
+              "label": "48 Hours"
+            },
+            {
+              "key": "72h",
+              "label": "72 Hours"
+            },
+            {
+              "key": "week",
+              "label": "1 Week+"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
+          ],
+          "helpText": "Legal requirements vary by jurisdiction — document what actually happened",
+          "order": 4,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "property_stored",
+          "label": "Property Storage Offered",
+          "type": "checkbox",
+          "required": false,
+          "helpText": "Were people given a way to store their belongings?",
+          "order": 5,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "services_offered",
+          "label": "Services Offered On-Site",
+          "type": "checkbox",
+          "required": false,
+          "helpText": "Were shelter/services offered to displaced people?",
+          "order": 6,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "police_present",
+          "label": "Police Present",
+          "type": "checkbox",
+          "required": false,
+          "order": 7,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "arrests_made",
+          "label": "Arrests Made",
+          "type": "number",
+          "required": false,
+          "order": 8,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "order": 9,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        }
       ]
     }
   ],
-
   "reportTypes": [
     {
       "name": "sweep_observation",
@@ -191,26 +713,140 @@
       "numberPrefix": "OBS",
       "numberingEnabled": true,
       "statuses": [
-        { "value": "submitted", "label": "Submitted", "color": "#f59e0b", "order": 0 },
-        { "value": "reviewed", "label": "Reviewed", "color": "#3b82f6", "order": 1 },
-        { "value": "cases_created", "label": "Cases Created", "color": "#22c55e", "order": 2, "isClosed": true }
+        {
+          "value": "submitted",
+          "label": "Submitted",
+          "color": "#f59e0b",
+          "order": 0
+        },
+        {
+          "value": "reviewed",
+          "label": "Reviewed",
+          "color": "#3b82f6",
+          "order": 1
+        },
+        {
+          "value": "cases_created",
+          "label": "Cases Created",
+          "color": "#22c55e",
+          "order": 2,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "submitted",
-      "closedStatuses": ["cases_created"],
+      "closedStatuses": [
+        "cases_created"
+      ],
       "fields": [
-        { "name": "location", "label": "Location", "type": "text", "required": true, "order": 0, "indexable": true, "indexType": "exact", "accessLevel": "all", "hubEditable": true, "supportAudioInput": false },
-        { "name": "time", "label": "Time", "type": "text", "required": true, "order": 1, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "agency", "label": "Agency Conducting Sweep", "type": "select", "required": true, "options": [
-          { "key": "city_sanitation", "label": "City Sanitation" },
-          { "key": "police", "label": "Police" },
-          { "key": "parks", "label": "Parks Dept" },
-          { "key": "multiple", "label": "Multiple Agencies" },
-          { "key": "other", "label": "Other" }
-        ], "order": 2, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "people_details", "label": "People Affected", "type": "textarea", "required": true, "helpText": "Names, descriptions, and details of displaced people. List as many as you can — coordinators will create individual cases from this report.", "order": 3, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": true },
-        { "name": "property_destruction", "label": "Property Destruction Observed", "type": "textarea", "required": false, "helpText": "Tents destroyed, belongings thrown away, medications discarded, IDs confiscated — document everything", "order": 4, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": true },
-        { "name": "police_conduct", "label": "Police/Agency Conduct", "type": "textarea", "required": false, "helpText": "Badge numbers, threats, force used, statements made, civil rights violations observed", "order": 5, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": true },
-        { "name": "general_notes", "label": "General Notes", "type": "textarea", "required": false, "order": 6, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": true }
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "text",
+          "required": true,
+          "order": 0,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": true,
+          "order": 1,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "agency",
+          "label": "Agency Conducting Sweep",
+          "type": "select",
+          "required": true,
+          "options": [
+            {
+              "key": "city_sanitation",
+              "label": "City Sanitation"
+            },
+            {
+              "key": "police",
+              "label": "Police"
+            },
+            {
+              "key": "parks",
+              "label": "Parks Dept"
+            },
+            {
+              "key": "multiple",
+              "label": "Multiple Agencies"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
+          ],
+          "order": 2,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "people_details",
+          "label": "People Affected",
+          "type": "textarea",
+          "required": true,
+          "helpText": "Names, descriptions, and details of displaced people. List as many as you can — coordinators will create individual cases from this report.",
+          "order": 3,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": true
+        },
+        {
+          "name": "property_destruction",
+          "label": "Property Destruction Observed",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Tents destroyed, belongings thrown away, medications discarded, IDs confiscated — document everything",
+          "order": 4,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": true
+        },
+        {
+          "name": "police_conduct",
+          "label": "Police/Agency Conduct",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Badge numbers, threats, force used, statements made, civil rights violations observed",
+          "order": 5,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": true
+        },
+        {
+          "name": "general_notes",
+          "label": "General Notes",
+          "type": "textarea",
+          "required": false,
+          "order": 6,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": true
+        }
       ]
     },
     {
@@ -226,30 +862,144 @@
       "numberPrefix": "PC",
       "numberingEnabled": true,
       "statuses": [
-        { "value": "submitted", "label": "Submitted", "color": "#f59e0b", "order": 0 },
-        { "value": "documented", "label": "Documented", "color": "#3b82f6", "order": 1 },
-        { "value": "claim_filed", "label": "Claim Filed", "color": "#8b5cf6", "order": 2 },
-        { "value": "resolved", "label": "Resolved", "color": "#22c55e", "order": 3, "isClosed": true }
+        {
+          "value": "submitted",
+          "label": "Submitted",
+          "color": "#f59e0b",
+          "order": 0
+        },
+        {
+          "value": "documented",
+          "label": "Documented",
+          "color": "#3b82f6",
+          "order": 1
+        },
+        {
+          "value": "claim_filed",
+          "label": "Claim Filed",
+          "color": "#8b5cf6",
+          "order": 2
+        },
+        {
+          "value": "resolved",
+          "label": "Resolved",
+          "color": "#22c55e",
+          "order": 3,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "submitted",
-      "closedStatuses": ["resolved"],
+      "closedStatuses": [
+        "resolved"
+      ],
       "fields": [
-        { "name": "location", "label": "Location", "type": "text", "required": true, "order": 0, "accessLevel": "all", "indexable": true, "indexType": "exact", "hubEditable": true, "supportAudioInput": false },
-        { "name": "date", "label": "Date of Seizure/Destruction", "type": "date", "required": true, "order": 1, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "items_description", "label": "Items Seized or Destroyed", "type": "textarea", "required": true, "helpText": "Detailed list: tent, sleeping bag, medications, ID documents, phone, clothing, etc.", "order": 2, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": true },
-        { "name": "estimated_value", "label": "Estimated Total Value", "type": "number", "required": false, "order": 3, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "medications_seized", "label": "Medications Seized", "type": "checkbox", "required": false, "helpText": "Seizing medications is a life-threatening action — document urgently", "order": 4, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "id_documents_seized", "label": "ID Documents Seized", "type": "checkbox", "required": false, "order": 5, "accessLevel": "assigned", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false },
-        { "name": "storage_offered", "label": "Was Property Storage Offered?", "type": "select", "required": false, "options": [
-          { "key": "yes", "label": "Yes" },
-          { "key": "no", "label": "No" },
-          { "key": "inadequate", "label": "Offered but Inadequate" },
-          { "key": "unknown", "label": "Unknown" }
-        ], "order": 6, "accessLevel": "all", "indexable": false, "indexType": "none", "hubEditable": true, "supportAudioInput": false }
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "text",
+          "required": true,
+          "order": 0,
+          "accessLevel": "all",
+          "indexable": true,
+          "indexType": "exact",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "date",
+          "label": "Date of Seizure/Destruction",
+          "type": "date",
+          "required": true,
+          "order": 1,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "items_description",
+          "label": "Items Seized or Destroyed",
+          "type": "textarea",
+          "required": true,
+          "helpText": "Detailed list: tent, sleeping bag, medications, ID documents, phone, clothing, etc.",
+          "order": 2,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": true
+        },
+        {
+          "name": "estimated_value",
+          "label": "Estimated Total Value",
+          "type": "number",
+          "required": false,
+          "order": 3,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "medications_seized",
+          "label": "Medications Seized",
+          "type": "checkbox",
+          "required": false,
+          "helpText": "Seizing medications is a life-threatening action — document urgently",
+          "order": 4,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "id_documents_seized",
+          "label": "ID Documents Seized",
+          "type": "checkbox",
+          "required": false,
+          "order": 5,
+          "accessLevel": "assigned",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        },
+        {
+          "name": "storage_offered",
+          "label": "Was Property Storage Offered?",
+          "type": "select",
+          "required": false,
+          "options": [
+            {
+              "key": "yes",
+              "label": "Yes"
+            },
+            {
+              "key": "no",
+              "label": "No"
+            },
+            {
+              "key": "inadequate",
+              "label": "Offered but Inadequate"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
+          ],
+          "order": 6,
+          "accessLevel": "all",
+          "indexable": false,
+          "indexType": "none",
+          "hubEditable": true,
+          "supportAudioInput": false
+        }
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -260,11 +1010,31 @@
       "sourceLabel": "contact",
       "targetLabel": "displaced person case",
       "roles": [
-        { "value": "displaced_person", "label": "Displaced Person", "order": 0 },
-        { "value": "case_worker", "label": "Case Worker", "order": 1 },
-        { "value": "outreach_worker", "label": "Outreach Worker", "order": 2 },
-        { "value": "legal_advocate", "label": "Legal Advocate", "order": 3 },
-        { "value": "family_member", "label": "Family Member", "order": 4 }
+        {
+          "value": "displaced_person",
+          "label": "Displaced Person",
+          "order": 0
+        },
+        {
+          "value": "case_worker",
+          "label": "Case Worker",
+          "order": 1
+        },
+        {
+          "value": "outreach_worker",
+          "label": "Outreach Worker",
+          "order": 2
+        },
+        {
+          "value": "legal_advocate",
+          "label": "Legal Advocate",
+          "order": 3
+        },
+        {
+          "value": "family_member",
+          "label": "Family Member",
+          "order": 4
+        }
       ],
       "required": true,
       "cascadeDelete": false
@@ -281,20 +1051,33 @@
       "cascadeDelete": false
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Sweep Response Coordinator",
       "slug": "sweep-coordinator",
       "description": "Manages sweep response operations, triages field reports into individual cases, coordinates service referrals",
       "permissions": [
-        "cases:create", "cases:read-all", "cases:update", "cases:assign",
+        "cases:create",
+        "cases:read-all",
+        "cases:update",
+        "cases:assign",
         "cases:manage-types",
-        "contacts:create", "contacts:view", "contacts:view-pii",
-        "events:create", "events:read", "events:update",
-        "reports:read-all", "reports:create",
-        "evidence:upload", "evidence:read", "evidence:download",
-        "blasts:create", "blasts:read"
+        "contacts:create",
+        "contacts:view",
+        "contacts:view-pii",
+        "events:create",
+        "events:read",
+        "events:update",
+        "reports:read-all",
+        "reports:create",
+        "evidence:upload",
+        "evidence:read",
+        "evidence:download",
+        "blasts:create",
+        "blasts:read",
+        "contacts:search",
+        "reports:read-types",
+        "cases:unlink"
       ]
     },
     {
@@ -302,9 +1085,11 @@
       "slug": "field-observer",
       "description": "On-site at sweeps documenting conditions, submitting observation reports with photos/video",
       "permissions": [
-        "reports:create", "reports:read-own",
+        "reports:create",
+        "reports:read-own",
         "events:read",
-        "evidence:upload"
+        "evidence:upload",
+        "reports:read-types"
       ]
     },
     {
@@ -312,9 +1097,14 @@
       "slug": "outreach-worker",
       "description": "Connects displaced people with services, creates and manages individual cases",
       "permissions": [
-        "cases:create", "cases:read-own", "cases:read-assigned", "cases:update-own",
-        "contacts:create", "contacts:view",
-        "events:read"
+        "cases:create",
+        "cases:read-own",
+        "cases:read-assigned",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "events:read",
+        "contacts:search"
       ]
     },
     {
@@ -322,11 +1112,17 @@
       "slug": "legal-advocate",
       "description": "Documents civil rights violations, prepares legal challenges, needs access to all evidence",
       "permissions": [
-        "cases:read-all", "cases:update",
-        "contacts:view", "contacts:view-pii",
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
         "events:read",
         "reports:read-all",
-        "evidence:read", "evidence:download"
+        "evidence:read",
+        "evidence:download",
+        "contacts:search",
+        "reports:read-types",
+        "cases:unlink"
       ]
     }
   ]

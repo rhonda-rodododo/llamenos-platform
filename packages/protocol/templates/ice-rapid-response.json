@@ -5,9 +5,12 @@
   "description": "Immigration enforcement rapid response coordination. Tracks ICE operations, affected individuals, legal referrals, accompaniment deployment, and know-your-rights outreach. Designed for immigrant rights rapid response networks.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["immigration", "ice", "rapid-response"],
+  "tags": [
+    "immigration",
+    "ice",
+    "rapid-response"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "immigration_case.label": "Immigration Case",
@@ -26,7 +29,6 @@
       "ice_operation.description": "Una accion de aplicacion de la ley de inmigracion en un lugar especifico"
     }
   },
-
   "entityTypes": [
     {
       "name": "immigration_case",
@@ -39,40 +41,114 @@
       "numberPrefix": "ICE",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["a_number", "detention_facility", "bond_amount"],
+      "piiFields": [
+        "a_number",
+        "detention_facility",
+        "bond_amount"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "reported", "label": "Reported", "color": "#f59e0b", "order": 1 },
-        { "value": "response_active", "label": "Response Active", "color": "#ef4444", "order": 2 },
-        { "value": "stabilized", "label": "Stabilized", "color": "#3b82f6", "order": 3 },
-        { "value": "legal_referral", "label": "Legal Referral", "color": "#8b5cf6", "order": 4 },
-        { "value": "ongoing_support", "label": "Ongoing Support", "color": "#22c55e", "order": 5 },
-        { "value": "resolved", "label": "Resolved", "color": "#6b7280", "order": 6, "isClosed": true }
+        {
+          "value": "reported",
+          "label": "Reported",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "response_active",
+          "label": "Response Active",
+          "color": "#ef4444",
+          "order": 2
+        },
+        {
+          "value": "stabilized",
+          "label": "Stabilized",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "legal_referral",
+          "label": "Legal Referral",
+          "color": "#8b5cf6",
+          "order": 4
+        },
+        {
+          "value": "ongoing_support",
+          "label": "Ongoing Support",
+          "color": "#22c55e",
+          "order": 5
+        },
+        {
+          "value": "resolved",
+          "label": "Resolved",
+          "color": "#6b7280",
+          "order": 6,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "reported",
-      "closedStatuses": ["resolved"],
-
+      "closedStatuses": [
+        "resolved"
+      ],
       "severities": [
-        { "value": "critical", "label": "Critical (detention imminent, minors)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "high", "label": "High (active operation)", "color": "#f59e0b", "order": 2 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 3 },
-        { "value": "monitoring", "label": "Monitoring", "color": "#6b7280", "order": 4 }
+        {
+          "value": "critical",
+          "label": "Critical (detention imminent, minors)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "high",
+          "label": "High (active operation)",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "monitoring",
+          "label": "Monitoring",
+          "color": "#6b7280",
+          "order": 4
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "affected_individual", "label": "Affected Individual", "order": 1 },
-        { "value": "family_member", "label": "Family Member", "order": 2 },
-        { "value": "attorney", "label": "Attorney", "order": 3 },
-        { "value": "community_reporter", "label": "Community Reporter", "order": 4 },
-        { "value": "accompaniment_volunteer", "label": "Accompaniment Volunteer", "order": 5 }
+        {
+          "value": "affected_individual",
+          "label": "Affected Individual",
+          "order": 1
+        },
+        {
+          "value": "family_member",
+          "label": "Family Member",
+          "order": 2
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 3
+        },
+        {
+          "value": "community_reporter",
+          "label": "Community Reporter",
+          "order": 4
+        },
+        {
+          "value": "accompaniment_volunteer",
+          "label": "Accompaniment Volunteer",
+          "order": 5
+        }
       ],
-
       "fields": [
         {
           "name": "operation_type",
@@ -80,13 +156,34 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "raid", "label": "Raid" },
-            { "key": "traffic_stop", "label": "Traffic Stop" },
-            { "key": "courthouse", "label": "Courthouse Arrest" },
-            { "key": "workplace", "label": "Workplace Enforcement" },
-            { "key": "home_visit", "label": "Home Visit" },
-            { "key": "check_in", "label": "Check-In Arrest" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "raid",
+              "label": "Raid"
+            },
+            {
+              "key": "traffic_stop",
+              "label": "Traffic Stop"
+            },
+            {
+              "key": "courthouse",
+              "label": "Courthouse Arrest"
+            },
+            {
+              "key": "workplace",
+              "label": "Workplace Enforcement"
+            },
+            {
+              "key": "home_visit",
+              "label": "Home Visit"
+            },
+            {
+              "key": "check_in",
+              "label": "Check-In Arrest"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "operation",
           "order": 1,
@@ -110,13 +207,34 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "undocumented", "label": "Undocumented" },
-            { "key": "daca", "label": "DACA" },
-            { "key": "tps", "label": "TPS" },
-            { "key": "asylum_pending", "label": "Asylum Pending" },
-            { "key": "lpr", "label": "Lawful Permanent Resident" },
-            { "key": "visa_holder", "label": "Visa Holder" },
-            { "key": "unknown", "label": "Unknown" }
+            {
+              "key": "undocumented",
+              "label": "Undocumented"
+            },
+            {
+              "key": "daca",
+              "label": "DACA"
+            },
+            {
+              "key": "tps",
+              "label": "TPS"
+            },
+            {
+              "key": "asylum_pending",
+              "label": "Asylum Pending"
+            },
+            {
+              "key": "lpr",
+              "label": "Lawful Permanent Resident"
+            },
+            {
+              "key": "visa_holder",
+              "label": "Visa Holder"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
           ],
           "section": "legal",
           "order": 3,
@@ -210,11 +328,26 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "needs_attorney", "label": "Needs Attorney" },
-            { "key": "has_attorney", "label": "Has Attorney" },
-            { "key": "pro_bono_matched", "label": "Pro Bono Attorney Matched" },
-            { "key": "legal_aid_referred", "label": "Legal Aid Referred" },
-            { "key": "unknown", "label": "Unknown" }
+            {
+              "key": "needs_attorney",
+              "label": "Needs Attorney"
+            },
+            {
+              "key": "has_attorney",
+              "label": "Has Attorney"
+            },
+            {
+              "key": "pro_bono_matched",
+              "label": "Pro Bono Attorney Matched"
+            },
+            {
+              "key": "legal_aid_referred",
+              "label": "Legal Aid Referred"
+            },
+            {
+              "key": "unknown",
+              "label": "Unknown"
+            }
           ],
           "section": "legal",
           "order": 11,
@@ -241,29 +374,136 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "reported", "label": "Reported", "color": "#f59e0b", "order": 1 },
-        { "value": "response_active", "label": "Response Active", "color": "#ef4444", "order": 2 },
-        { "value": "monitoring", "label": "Monitoring", "color": "#3b82f6", "order": 3 },
-        { "value": "concluded", "label": "Concluded", "color": "#6b7280", "order": 4, "isClosed": true }
+        {
+          "value": "reported",
+          "label": "Reported",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "response_active",
+          "label": "Response Active",
+          "color": "#ef4444",
+          "order": 2
+        },
+        {
+          "value": "monitoring",
+          "label": "Monitoring",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "concluded",
+          "label": "Concluded",
+          "color": "#6b7280",
+          "order": 4,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "reported",
-      "closedStatuses": ["concluded"],
-
+      "closedStatuses": [
+        "concluded"
+      ],
       "fields": [
-        { "name": "operation_datetime", "label": "Operation Date/Time", "type": "date", "required": true, "order": 1, "indexable": true, "indexType": "exact", "accessLevel": "all" },
-        { "name": "location", "label": "Location (Approximate)", "type": "text", "required": true, "helpText": "Neighborhood-level only. Do NOT record exact addresses for security.", "order": 2, "indexable": false, "accessLevel": "all" },
-        { "name": "agent_count", "label": "Number of Agents", "type": "number", "required": false, "order": 3, "indexable": false, "accessLevel": "all" },
-        { "name": "vehicles", "label": "Vehicle Descriptions", "type": "textarea", "required": false, "helpText": "Descriptions of vehicles for evidence. One per line.", "order": 4, "indexable": false, "accessLevel": "all" },
-        { "name": "scope", "label": "Operation Scope", "type": "select", "required": false, "options": [{ "key": "individual", "label": "Individual Target" }, { "key": "building", "label": "Building Sweep" }, { "key": "neighborhood", "label": "Neighborhood Operation" }, { "key": "workplace", "label": "Workplace Raid" }], "order": 5, "indexable": true, "indexType": "exact", "accessLevel": "all" },
-        { "name": "affected_count", "label": "Total Affected Individuals", "type": "number", "required": false, "order": 6, "indexable": false, "accessLevel": "all" },
-        { "name": "response_actions", "label": "Response Actions Taken", "type": "textarea", "required": false, "helpText": "Summary of community response actions deployed.", "order": 7, "indexable": false, "accessLevel": "all" },
-        { "name": "notes", "label": "Notes", "type": "textarea", "required": false, "order": 8, "indexable": false, "accessLevel": "all" }
+        {
+          "name": "operation_datetime",
+          "label": "Operation Date/Time",
+          "type": "date",
+          "required": true,
+          "order": 1,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "location",
+          "label": "Location (Approximate)",
+          "type": "text",
+          "required": true,
+          "helpText": "Neighborhood-level only. Do NOT record exact addresses for security.",
+          "order": 2,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "agent_count",
+          "label": "Number of Agents",
+          "type": "number",
+          "required": false,
+          "order": 3,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "vehicles",
+          "label": "Vehicle Descriptions",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Descriptions of vehicles for evidence. One per line.",
+          "order": 4,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "scope",
+          "label": "Operation Scope",
+          "type": "select",
+          "required": false,
+          "options": [
+            {
+              "key": "individual",
+              "label": "Individual Target"
+            },
+            {
+              "key": "building",
+              "label": "Building Sweep"
+            },
+            {
+              "key": "neighborhood",
+              "label": "Neighborhood Operation"
+            },
+            {
+              "key": "workplace",
+              "label": "Workplace Raid"
+            }
+          ],
+          "order": 5,
+          "indexable": true,
+          "indexType": "exact",
+          "accessLevel": "all"
+        },
+        {
+          "name": "affected_count",
+          "label": "Total Affected Individuals",
+          "type": "number",
+          "required": false,
+          "order": 6,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "response_actions",
+          "label": "Response Actions Taken",
+          "type": "textarea",
+          "required": false,
+          "helpText": "Summary of community response actions deployed.",
+          "order": 7,
+          "indexable": false,
+          "accessLevel": "all"
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "order": 8,
+          "indexable": false,
+          "accessLevel": "all"
+        }
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -274,11 +514,31 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "affected_individual", "label": "Affected Individual", "order": 1 },
-        { "value": "family_member", "label": "Family Member", "order": 2 },
-        { "value": "attorney", "label": "Attorney", "order": 3 },
-        { "value": "community_reporter", "label": "Community Reporter", "order": 4 },
-        { "value": "accompaniment_volunteer", "label": "Accompaniment Volunteer", "order": 5 }
+        {
+          "value": "affected_individual",
+          "label": "Affected Individual",
+          "order": 1
+        },
+        {
+          "value": "family_member",
+          "label": "Family Member",
+          "order": 2
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 3
+        },
+        {
+          "value": "community_reporter",
+          "label": "Community Reporter",
+          "order": 4
+        },
+        {
+          "value": "accompaniment_volunteer",
+          "label": "Accompaniment Volunteer",
+          "order": 5
+        }
       ],
       "defaultRole": "affected_individual",
       "cascadeDelete": false,
@@ -296,31 +556,77 @@
       "required": false
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Dispatch Coordinator",
       "slug": "dispatch-coordinator",
       "description": "Receives reports, activates rapid response teams, manages all cases and operations",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read", "bans:*"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "bans:*",
+        "hubs:read"
+      ]
     },
     {
       "name": "Accompaniment Volunteer",
       "slug": "accompaniment-volunteer",
       "description": "Deploys to locations to provide community presence and witness ICE actions",
-      "permissions": ["cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "notes:create", "notes:read-own", "events:read", "shifts:read-own"]
+      "permissions": [
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "notes:create",
+        "notes:read-own",
+        "events:read",
+        "shifts:read-own",
+        "contacts:search"
+      ]
     },
     {
       "name": "Legal Intake Specialist",
       "slug": "legal-intake",
       "description": "Connects affected individuals with attorneys and tracks legal referrals",
-      "permissions": ["cases:read-all", "cases:update", "cases:assign", "contacts:view", "contacts:view-pii", "contacts:edit", "contacts:manage-relationships", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "cases:assign",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "contacts:manage-relationships",
+        "notes:create",
+        "notes:read-all",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Case Manager",
       "slug": "case-manager",
       "description": "Long-term case tracking for bond, court dates, and ongoing immigration proceedings",
-      "permissions": ["cases:read-all", "cases:update", "cases:close", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all", "events:read"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "cases:close",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "events:read",
+        "contacts:search",
+        "cases:unlink"
+      ]
     }
   ]
 }

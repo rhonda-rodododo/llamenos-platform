@@ -21,7 +21,7 @@ const testWhatsAppBodySchema = z.object({
 const setup = new Hono<AppEnv>()
 
 // Get setup state (admin only — gated for defense-in-depth)
-setup.get('/state', requirePermission('settings:manage'),
+setup.get('/state', requirePermission('settings:manage-setup'),
   describeRoute({
     tags: ['Setup'],
     summary: 'Get setup wizard state',
@@ -37,7 +37,7 @@ setup.get('/state', requirePermission('settings:manage'),
   })
 
 // Update setup state (admin only)
-setup.patch('/state', requirePermission('settings:manage'),
+setup.patch('/state', requirePermission('settings:manage-setup'),
   describeRoute({
     tags: ['Setup'],
     summary: 'Update setup wizard state',
@@ -57,7 +57,7 @@ setup.patch('/state', requirePermission('settings:manage'),
   })
 
 // Complete setup (admin only) — also creates default hub if none exists
-setup.post('/complete', requirePermission('settings:manage'),
+setup.post('/complete', requirePermission('settings:manage-setup'),
   describeRoute({
     tags: ['Setup'],
     summary: 'Complete setup wizard',

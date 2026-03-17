@@ -5,9 +5,12 @@
   "description": "Police conduct documentation and accountability tracking. Records badge numbers, incident types, use of force, complaints filed, CCRB/IAB referrals, civil lawsuits, and evidence chain of custody. Designed for copwatch organizations and police accountability groups.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["police", "accountability", "copwatch"],
+  "tags": [
+    "police",
+    "accountability",
+    "copwatch"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "police_conduct_case.label": "Police Conduct Case",
@@ -20,7 +23,6 @@
       "police_conduct_case.description": "Documentar un incidente de conducta policial, seguimiento de quejas y gestion de evidencia"
     }
   },
-
   "entityTypes": [
     {
       "name": "police_conduct_case",
@@ -33,40 +35,112 @@
       "numberPrefix": "CW",
       "numberingEnabled": true,
       "defaultAccessLevel": "assigned",
-      "piiFields": ["officer_names"],
+      "piiFields": [
+        "officer_names"
+      ],
       "allowSubRecords": false,
       "allowFileAttachments": true,
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "documented", "label": "Documented", "color": "#f59e0b", "order": 1 },
-        { "value": "evidence_gathered", "label": "Evidence Gathered", "color": "#3b82f6", "order": 2 },
-        { "value": "complaint_filed", "label": "Complaint Filed", "color": "#8b5cf6", "order": 3 },
-        { "value": "under_review", "label": "Under Review", "color": "#0ea5e9", "order": 4 },
-        { "value": "resolved", "label": "Resolved", "color": "#22c55e", "order": 5, "isClosed": true },
-        { "value": "litigation", "label": "In Litigation", "color": "#ef4444", "order": 6 }
+        {
+          "value": "documented",
+          "label": "Documented",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "evidence_gathered",
+          "label": "Evidence Gathered",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "complaint_filed",
+          "label": "Complaint Filed",
+          "color": "#8b5cf6",
+          "order": 3
+        },
+        {
+          "value": "under_review",
+          "label": "Under Review",
+          "color": "#0ea5e9",
+          "order": 4
+        },
+        {
+          "value": "resolved",
+          "label": "Resolved",
+          "color": "#22c55e",
+          "order": 5,
+          "isClosed": true
+        },
+        {
+          "value": "litigation",
+          "label": "In Litigation",
+          "color": "#ef4444",
+          "order": 6
+        }
       ],
       "defaultStatus": "documented",
-      "closedStatuses": ["resolved"],
-
+      "closedStatuses": [
+        "resolved"
+      ],
       "severities": [
-        { "value": "critical", "label": "Critical (shooting, death in custody)", "color": "#ef4444", "icon": "alert-triangle", "order": 1 },
-        { "value": "high", "label": "High (excessive force, false arrest)", "color": "#f59e0b", "order": 2 },
-        { "value": "standard", "label": "Standard", "color": "#3b82f6", "order": 3 },
-        { "value": "low", "label": "Low (procedural violation)", "color": "#6b7280", "order": 4 }
+        {
+          "value": "critical",
+          "label": "Critical (shooting, death in custody)",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "high",
+          "label": "High (excessive force, false arrest)",
+          "color": "#f59e0b",
+          "order": 2
+        },
+        {
+          "value": "standard",
+          "label": "Standard",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "low",
+          "label": "Low (procedural violation)",
+          "color": "#6b7280",
+          "order": 4
+        }
       ],
       "defaultSeverity": "standard",
-
       "contactRoles": [
-        { "value": "subject", "label": "Subject (person affected)", "order": 1 },
-        { "value": "witness", "label": "Witness", "order": 2 },
-        { "value": "copwatch_observer", "label": "Copwatch Observer", "order": 3 },
-        { "value": "attorney", "label": "Attorney", "order": 4 },
-        { "value": "journalist", "label": "Journalist", "order": 5 }
+        {
+          "value": "subject",
+          "label": "Subject (person affected)",
+          "order": 1
+        },
+        {
+          "value": "witness",
+          "label": "Witness",
+          "order": 2
+        },
+        {
+          "value": "copwatch_observer",
+          "label": "Copwatch Observer",
+          "order": 3
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 4
+        },
+        {
+          "value": "journalist",
+          "label": "Journalist",
+          "order": 5
+        }
       ],
-
       "fields": [
         {
           "name": "badge_numbers",
@@ -96,14 +170,38 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "local_pd", "label": "Local Police Department" },
-            { "key": "sheriff", "label": "Sheriff's Department" },
-            { "key": "state_police", "label": "State Police" },
-            { "key": "transit_police", "label": "Transit Police" },
-            { "key": "school_police", "label": "School / Campus Police" },
-            { "key": "federal", "label": "Federal Agency" },
-            { "key": "private_security", "label": "Private Security" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "local_pd",
+              "label": "Local Police Department"
+            },
+            {
+              "key": "sheriff",
+              "label": "Sheriff's Department"
+            },
+            {
+              "key": "state_police",
+              "label": "State Police"
+            },
+            {
+              "key": "transit_police",
+              "label": "Transit Police"
+            },
+            {
+              "key": "school_police",
+              "label": "School / Campus Police"
+            },
+            {
+              "key": "federal",
+              "label": "Federal Agency"
+            },
+            {
+              "key": "private_security",
+              "label": "Private Security"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "officers",
           "order": 3,
@@ -117,16 +215,46 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "excessive_force", "label": "Excessive Force" },
-            { "key": "unlawful_search", "label": "Unlawful Search / Seizure" },
-            { "key": "racial_profiling", "label": "Racial Profiling" },
-            { "key": "false_arrest", "label": "False Arrest" },
-            { "key": "intimidation", "label": "Intimidation / Harassment" },
-            { "key": "destruction_of_evidence", "label": "Destruction of Evidence" },
-            { "key": "retaliation", "label": "Retaliation (for recording)" },
-            { "key": "shooting", "label": "Police Shooting" },
-            { "key": "death_in_custody", "label": "Death in Custody" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "excessive_force",
+              "label": "Excessive Force"
+            },
+            {
+              "key": "unlawful_search",
+              "label": "Unlawful Search / Seizure"
+            },
+            {
+              "key": "racial_profiling",
+              "label": "Racial Profiling"
+            },
+            {
+              "key": "false_arrest",
+              "label": "False Arrest"
+            },
+            {
+              "key": "intimidation",
+              "label": "Intimidation / Harassment"
+            },
+            {
+              "key": "destruction_of_evidence",
+              "label": "Destruction of Evidence"
+            },
+            {
+              "key": "retaliation",
+              "label": "Retaliation (for recording)"
+            },
+            {
+              "key": "shooting",
+              "label": "Police Shooting"
+            },
+            {
+              "key": "death_in_custody",
+              "label": "Death in Custody"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "incident",
           "order": 4,
@@ -140,16 +268,46 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "hands", "label": "Physical / Hands" },
-            { "key": "baton", "label": "Baton / Impact Weapon" },
-            { "key": "taser", "label": "Taser / Conducted Energy" },
-            { "key": "oc_spray", "label": "OC Spray / Pepper Spray" },
-            { "key": "rubber_bullets", "label": "Rubber Bullets / Projectiles" },
-            { "key": "firearm", "label": "Firearm" },
-            { "key": "k9", "label": "K-9 / Police Dog" },
-            { "key": "vehicle", "label": "Vehicle" },
-            { "key": "none", "label": "None / Not Applicable" },
-            { "key": "other", "label": "Other" }
+            {
+              "key": "hands",
+              "label": "Physical / Hands"
+            },
+            {
+              "key": "baton",
+              "label": "Baton / Impact Weapon"
+            },
+            {
+              "key": "taser",
+              "label": "Taser / Conducted Energy"
+            },
+            {
+              "key": "oc_spray",
+              "label": "OC Spray / Pepper Spray"
+            },
+            {
+              "key": "rubber_bullets",
+              "label": "Rubber Bullets / Projectiles"
+            },
+            {
+              "key": "firearm",
+              "label": "Firearm"
+            },
+            {
+              "key": "k9",
+              "label": "K-9 / Police Dog"
+            },
+            {
+              "key": "vehicle",
+              "label": "Vehicle"
+            },
+            {
+              "key": "none",
+              "label": "None / Not Applicable"
+            },
+            {
+              "key": "other",
+              "label": "Other"
+            }
           ],
           "section": "incident",
           "order": 5,
@@ -178,7 +336,11 @@
           "indexable": true,
           "indexType": "exact",
           "accessLevel": "assigned",
-          "showWhen": { "field": "complaint_filed", "operator": "equals", "value": true }
+          "showWhen": {
+            "field": "complaint_filed",
+            "operator": "equals",
+            "value": true
+          }
         },
         {
           "name": "ccrb_referral",
@@ -229,7 +391,6 @@
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -240,42 +401,101 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "subject", "label": "Subject (person affected)", "order": 1 },
-        { "value": "witness", "label": "Witness", "order": 2 },
-        { "value": "copwatch_observer", "label": "Copwatch Observer", "order": 3 },
-        { "value": "attorney", "label": "Attorney", "order": 4 },
-        { "value": "journalist", "label": "Journalist", "order": 5 }
+        {
+          "value": "subject",
+          "label": "Subject (person affected)",
+          "order": 1
+        },
+        {
+          "value": "witness",
+          "label": "Witness",
+          "order": 2
+        },
+        {
+          "value": "copwatch_observer",
+          "label": "Copwatch Observer",
+          "order": 3
+        },
+        {
+          "value": "attorney",
+          "label": "Attorney",
+          "order": 4
+        },
+        {
+          "value": "journalist",
+          "label": "Journalist",
+          "order": 5
+        }
       ],
       "defaultRole": "subject",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Copwatch Coordinator",
       "slug": "copwatch-coordinator",
       "description": "Manages all cases, coordinates observers, reviews evidence, files complaints",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     },
     {
       "name": "Field Observer",
       "slug": "field-observer",
       "description": "Documents police conduct in the field, uploads evidence, creates initial reports",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "evidence:upload", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "evidence:upload",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "contacts:search"
+      ]
     },
     {
       "name": "Legal Liaison",
       "slug": "legal-liaison",
       "description": "Manages complaint filings, CCRB referrals, FOIL requests, and attorney coordination",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "contacts:view-pii", "contacts:edit", "evidence:download", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "evidence:download",
+        "notes:create",
+        "notes:read-all",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Evidence Manager",
       "slug": "evidence-manager",
       "description": "Manages evidence chain of custody, organizes media files, prepares evidence packages",
-      "permissions": ["cases:read-all", "evidence:*", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "evidence:*",
+        "notes:create",
+        "notes:read-all",
+        "hubs:read"
+      ]
     }
   ]
 }

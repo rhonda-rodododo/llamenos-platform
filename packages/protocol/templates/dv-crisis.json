@@ -5,9 +5,13 @@
   "description": "Domestic violence and intimate partner violence crisis hotline. Tracks lethality assessments, safety planning, shelter placement, protection orders, and ongoing survivor support. Requires heightened PII protections — perpetrator info is admin-only, address confidentiality enforced.",
   "author": "Llamenos Project",
   "license": "CC-BY-SA-4.0",
-  "tags": ["dv", "ipv", "crisis", "shelter"],
+  "tags": [
+    "dv",
+    "ipv",
+    "crisis",
+    "shelter"
+  ],
   "extends": [],
-
   "labels": {
     "en": {
       "safety_plan_case.label": "Safety Plan Case",
@@ -20,7 +24,6 @@
       "safety_plan_case.description": "Seguimiento de una persona sobreviviente a traves de la planificacion de seguridad y apoyo continuo"
     }
   },
-
   "entityTypes": [
     {
       "name": "safety_plan_case",
@@ -50,36 +53,116 @@
       "allowInteractionLinks": true,
       "showInNavigation": true,
       "showInDashboard": true,
-
       "statuses": [
-        { "value": "intake", "label": "Intake", "color": "#f59e0b", "order": 1 },
-        { "value": "active_crisis", "label": "Active Crisis", "color": "#ef4444", "order": 2 },
-        { "value": "safety_planned", "label": "Safety Planned", "color": "#3b82f6", "order": 3 },
-        { "value": "sheltered", "label": "Sheltered", "color": "#8b5cf6", "order": 4 },
-        { "value": "community_plan", "label": "Community Safety Plan", "color": "#0ea5e9", "order": 5 },
-        { "value": "follow_up", "label": "Follow-Up", "color": "#22c55e", "order": 6 },
-        { "value": "closed", "label": "Closed", "color": "#6b7280", "order": 7, "isClosed": true }
+        {
+          "value": "intake",
+          "label": "Intake",
+          "color": "#f59e0b",
+          "order": 1
+        },
+        {
+          "value": "active_crisis",
+          "label": "Active Crisis",
+          "color": "#ef4444",
+          "order": 2
+        },
+        {
+          "value": "safety_planned",
+          "label": "Safety Planned",
+          "color": "#3b82f6",
+          "order": 3
+        },
+        {
+          "value": "sheltered",
+          "label": "Sheltered",
+          "color": "#8b5cf6",
+          "order": 4
+        },
+        {
+          "value": "community_plan",
+          "label": "Community Safety Plan",
+          "color": "#0ea5e9",
+          "order": 5
+        },
+        {
+          "value": "follow_up",
+          "label": "Follow-Up",
+          "color": "#22c55e",
+          "order": 6
+        },
+        {
+          "value": "closed",
+          "label": "Closed",
+          "color": "#6b7280",
+          "order": 7,
+          "isClosed": true
+        }
       ],
       "defaultStatus": "intake",
-      "closedStatuses": ["closed"],
-
+      "closedStatuses": [
+        "closed"
+      ],
       "severities": [
-        { "value": "extreme", "label": "Extreme (high lethality, weapons, strangulation)", "color": "#dc2626", "icon": "alert-triangle", "order": 1 },
-        { "value": "high", "label": "High Risk", "color": "#ef4444", "icon": "alert-triangle", "order": 2 },
-        { "value": "medium", "label": "Medium Risk", "color": "#f59e0b", "order": 3 },
-        { "value": "low", "label": "Low Risk", "color": "#22c55e", "order": 4 }
+        {
+          "value": "extreme",
+          "label": "Extreme (high lethality, weapons, strangulation)",
+          "color": "#dc2626",
+          "icon": "alert-triangle",
+          "order": 1
+        },
+        {
+          "value": "high",
+          "label": "High Risk",
+          "color": "#ef4444",
+          "icon": "alert-triangle",
+          "order": 2
+        },
+        {
+          "value": "medium",
+          "label": "Medium Risk",
+          "color": "#f59e0b",
+          "order": 3
+        },
+        {
+          "value": "low",
+          "label": "Low Risk",
+          "color": "#22c55e",
+          "order": 4
+        }
       ],
       "defaultSeverity": "medium",
-
       "contactRoles": [
-        { "value": "survivor", "label": "Survivor", "order": 1 },
-        { "value": "child_dependent", "label": "Child/Dependent", "order": 2 },
-        { "value": "advocate", "label": "Advocate", "order": 3 },
-        { "value": "legal_advocate", "label": "Legal Advocate", "order": 4 },
-        { "value": "shelter_contact", "label": "Shelter Contact", "order": 5 },
-        { "value": "emergency_contact", "label": "Emergency Contact", "order": 6 }
+        {
+          "value": "survivor",
+          "label": "Survivor",
+          "order": 1
+        },
+        {
+          "value": "child_dependent",
+          "label": "Child/Dependent",
+          "order": 2
+        },
+        {
+          "value": "advocate",
+          "label": "Advocate",
+          "order": 3
+        },
+        {
+          "value": "legal_advocate",
+          "label": "Legal Advocate",
+          "order": 4
+        },
+        {
+          "value": "shelter_contact",
+          "label": "Shelter Contact",
+          "order": 5
+        },
+        {
+          "value": "emergency_contact",
+          "label": "Emergency Contact",
+          "order": 6
+        }
       ],
-
       "fields": [
         {
           "name": "lethality_score",
@@ -98,10 +181,22 @@
           "type": "select",
           "required": true,
           "options": [
-            { "key": "low", "label": "Low" },
-            { "key": "medium", "label": "Medium" },
-            { "key": "high", "label": "High" },
-            { "key": "extreme", "label": "Extreme" }
+            {
+              "key": "low",
+              "label": "Low"
+            },
+            {
+              "key": "medium",
+              "label": "Medium"
+            },
+            {
+              "key": "high",
+              "label": "High"
+            },
+            {
+              "key": "extreme",
+              "label": "Extreme"
+            }
           ],
           "section": "assessment",
           "order": 2,
@@ -131,7 +226,11 @@
           "indexable": true,
           "indexType": "exact",
           "accessLevel": "assigned",
-          "showWhen": { "field": "shelter_needed", "operator": "equals", "value": true }
+          "showWhen": {
+            "field": "shelter_needed",
+            "operator": "equals",
+            "value": true
+          }
         },
         {
           "name": "children_count",
@@ -150,11 +249,26 @@
           "type": "select",
           "required": false,
           "options": [
-            { "key": "none", "label": "None" },
-            { "key": "filed", "label": "Filed" },
-            { "key": "granted", "label": "Granted" },
-            { "key": "expired", "label": "Expired" },
-            { "key": "violated", "label": "Violated" }
+            {
+              "key": "none",
+              "label": "None"
+            },
+            {
+              "key": "filed",
+              "label": "Filed"
+            },
+            {
+              "key": "granted",
+              "label": "Granted"
+            },
+            {
+              "key": "expired",
+              "label": "Expired"
+            },
+            {
+              "key": "violated",
+              "label": "Violated"
+            }
           ],
           "section": "legal",
           "order": 6,
@@ -213,7 +327,6 @@
       ]
     }
   ],
-
   "relationshipTypes": [
     {
       "sourceEntityTypeName": "contact",
@@ -224,49 +337,133 @@
       "sourceLabel": "has case",
       "targetLabel": "involves",
       "roles": [
-        { "value": "survivor", "label": "Survivor", "order": 1 },
-        { "value": "child_dependent", "label": "Child/Dependent", "order": 2 },
-        { "value": "advocate", "label": "Advocate", "order": 3 },
-        { "value": "legal_advocate", "label": "Legal Advocate", "order": 4 },
-        { "value": "shelter_contact", "label": "Shelter Contact", "order": 5 },
-        { "value": "emergency_contact", "label": "Emergency Contact", "order": 6 }
+        {
+          "value": "survivor",
+          "label": "Survivor",
+          "order": 1
+        },
+        {
+          "value": "child_dependent",
+          "label": "Child/Dependent",
+          "order": 2
+        },
+        {
+          "value": "advocate",
+          "label": "Advocate",
+          "order": 3
+        },
+        {
+          "value": "legal_advocate",
+          "label": "Legal Advocate",
+          "order": 4
+        },
+        {
+          "value": "shelter_contact",
+          "label": "Shelter Contact",
+          "order": 5
+        },
+        {
+          "value": "emergency_contact",
+          "label": "Emergency Contact",
+          "order": 6
+        }
       ],
       "defaultRole": "survivor",
       "cascadeDelete": false,
       "required": true
     }
   ],
-
   "suggestedRoles": [
     {
       "name": "Crisis Advocate",
       "slug": "crisis-advocate",
       "description": "Answers crisis calls, conducts lethality assessments, develops safety plans",
-      "permissions": ["cases:create", "cases:read-own", "cases:update-own", "contacts:create", "contacts:view", "calls:answer", "calls:read-active", "notes:create", "notes:read-own", "shifts:read-own"]
+      "permissions": [
+        "cases:create",
+        "cases:read-own",
+        "cases:update-own",
+        "contacts:create",
+        "contacts:view",
+        "calls:answer",
+        "calls:read-active",
+        "notes:create",
+        "notes:read-own",
+        "shifts:read-own",
+        "calls:hangup",
+        "calls:report-spam",
+        "calls:identify-caller",
+        "contacts:search"
+      ]
     },
     {
       "name": "Shelter Coordinator",
       "slug": "shelter-coordinator",
       "description": "Manages shelter placements, coordinates emergency housing",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Legal Advocate",
       "slug": "legal-advocate",
       "description": "Assists with protection orders, court accompaniment, legal referrals",
-      "permissions": ["cases:read-all", "cases:update", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "contacts:search",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Case Manager",
       "slug": "case-manager",
       "description": "Long-term safety planning, follow-up, and ongoing survivor support",
-      "permissions": ["cases:read-all", "cases:update", "cases:assign", "cases:close", "contacts:view", "contacts:view-pii", "contacts:edit", "notes:create", "notes:read-all", "reports:*"]
+      "permissions": [
+        "cases:read-all",
+        "cases:update",
+        "cases:assign",
+        "cases:close",
+        "contacts:view",
+        "contacts:view-pii",
+        "contacts:edit",
+        "notes:create",
+        "notes:read-all",
+        "reports:*",
+        "contacts:search",
+        "hubs:read",
+        "cases:unlink"
+      ]
     },
     {
       "name": "Supervisor",
       "slug": "supervisor",
       "description": "Reviews high-lethality cases, oversees all advocates and case managers",
-      "permissions": ["cases:*", "contacts:*", "events:*", "evidence:*", "calls:*", "notes:*", "conversations:*", "reports:*", "shifts:read", "volunteers:read"]
+      "permissions": [
+        "cases:*",
+        "contacts:*",
+        "events:*",
+        "evidence:*",
+        "calls:*",
+        "notes:*",
+        "conversations:*",
+        "reports:*",
+        "shifts:read",
+        "volunteers:read",
+        "hubs:read"
+      ]
     }
   ]
 }
