@@ -155,6 +155,13 @@ messaging.post('/:channel/webhook', async (c) => {
   // Forward to ConversationsService for processing
   const convResult = await services.conversations.handleIncoming(incoming, c.env.ADMIN_PUBKEY)
 
+  // Publish new inbound message event to Nostr relay
+  publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+    type: 'message:new',
+    conversationId: convResult.conversationId,
+    channelType: channel,
+  }).catch((e) => { console.error('[messaging] Failed to publish inbound message event:', e) })
+
   // Auto-assignment for new conversations
   if (convResult.isNew && convResult.status === 'waiting') {
     c.executionCtx.waitUntil(

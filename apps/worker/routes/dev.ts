@@ -3,7 +3,7 @@ import type { AppEnv } from '../types'
 import type { MessagingChannelType } from '@shared/types'
 import { hashPhone } from '../lib/crypto'
 import { publishNostrEvent } from '../lib/nostr-events'
-import { KIND_MESSAGE_NEW } from '@shared/nostr-events'
+import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
 import { nip19 } from 'nostr-tools'
 
 /**
@@ -365,6 +365,12 @@ dev.post('/test-simulate/incoming-call', async (c) => {
     callerNumber: body.callerNumber,
   })
 
+  // Publish call ring event (mirrors real telephony flow)
+  publishNostrEvent(c.env, KIND_CALL_RING, {
+    type: 'call:ring',
+    callId,
+  }).catch(() => {})
+
   return c.json({ ok: true, callId, status: 'ringing' })
 })
 
@@ -381,6 +387,19 @@ dev.post('/test-simulate/answer-call', async (c) => {
   const services = c.get('services')
   const hubId = c.get('hubId') ?? ''
   await services.calls.answerCall(hubId, body.callId, body.pubkey)
+
+  // Publish call update event (mirrors real telephony flow)
+  publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+    type: 'call:update',
+    callId: body.callId,
+    status: 'in-progress',
+  }).catch(() => {})
+
+  // Publish presence update (mirrors real telephony flow)
+  publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
+    type: 'presence:summary',
+    callId: body.callId,
+  }).catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'in-progress' })
 })
@@ -399,6 +418,13 @@ dev.post('/test-simulate/end-call', async (c) => {
   const hubId = c.get('hubId') ?? ''
   await services.calls.endCall(hubId, body.callId)
 
+  // Publish call update event (mirrors real telephony flow)
+  publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+    type: 'call:update',
+    callId: body.callId,
+    status: 'completed',
+  }).catch(() => {})
+
   return c.json({ ok: true, callId: body.callId, status: 'completed' })
 })
 
@@ -416,6 +442,12 @@ dev.post('/test-simulate/voicemail', async (c) => {
   const hubId = c.get('hubId') ?? ''
   // Voicemail = call ends without being answered → status becomes 'unanswered'
   await services.calls.endCall(hubId, body.callId)
+
+  // Publish voicemail event (mirrors real telephony flow)
+  publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
+    type: 'voicemail:new',
+    callId: body.callId,
+  }).catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'unanswered' })
 })

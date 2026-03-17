@@ -16,26 +16,17 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
   let authResult = await authenticateRequest(c.req.raw, services.identity)
 
   // Dev-mode signature bypass: when ENVIRONMENT=development and Schnorr verification
-  // fails, fall back to pubkey-only auth. This handles mobile E2E tests where the
-  // Rust native crypto library may produce signatures that fail verification due to
-  // cross-architecture interop differences (e.g., x86_64 emulator vs. backend).
+  // fails, fall back to pubkey-only auth for REGISTERED volunteers only.
+  // This handles mobile E2E tests where the Rust native crypto library may produce
+  // signatures that fail verification due to cross-architecture interop differences
+  // (e.g., x86_64 emulator vs. backend).
   // Still validates token format and freshness — only bypasses signature verification.
+  // Does NOT auto-register unknown pubkeys — unregistered keys still get 401.
   if (!authResult && c.env.ENVIRONMENT === 'development') {
     const devAuthHeader = c.req.header('Authorization') ?? null
     const authPayload = parseAuthHeader(devAuthHeader)
     if (authPayload?.pubkey && validateToken(authPayload)) {
-      let volunteer = await services.identity.getVolunteerInternal(authPayload.pubkey)
-      if (!volunteer) {
-        // Auto-register the identity as a volunteer in dev mode.
-        await services.identity.createVolunteer({
-          pubkey: authPayload.pubkey,
-          name: 'Dev Auto-Registered',
-          phone: '+15550000000',
-          roleIds: ['role-volunteer'],
-          encryptedSecretKey: '',
-        })
-        volunteer = await services.identity.getVolunteerInternal(authPayload.pubkey)
-      }
+      const volunteer = await services.identity.getVolunteerInternal(authPayload.pubkey)
       if (volunteer) {
         authResult = { pubkey: authPayload.pubkey, volunteer }
         reqLog.info('Dev-mode signature bypass', { pubkeyPrefix: authPayload.pubkey.slice(0, 8) })

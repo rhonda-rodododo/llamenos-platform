@@ -28,8 +28,8 @@ Feature: Permission Matrix
 
     Examples:
       | role         | expected  | status |
-      | super-admin  | has       | 200    |
-      | hub-admin    | has       | 200    |
+      | super-admin  | has       | 201    |
+      | hub-admin    | has       | 201    |
       | reviewer     | denied    | 403    |
       | volunteer    | denied    | 403    |
       | reporter     | denied    | 403    |
@@ -80,8 +80,8 @@ Feature: Permission Matrix
 
     Examples:
       | role         | expected  | status |
-      | super-admin  | has       | 200    |
-      | hub-admin    | has       | 200    |
+      | super-admin  | has       | 201    |
+      | hub-admin    | has       | 201    |
       | reviewer     | denied    | 403    |
       | volunteer    | denied    | 403    |
       | reporter     | denied    | 403    |
@@ -207,10 +207,10 @@ Feature: Permission Matrix
 
     Examples:
       | role         | expected  | status |
-      | super-admin  | has       | 200    |
-      | hub-admin    | has       | 200    |
+      | super-admin  | has       | 201    |
+      | hub-admin    | has       | 201    |
       | reviewer     | denied    | 403    |
-      | volunteer    | has       | 200    |
+      | volunteer    | has       | 201    |
       | reporter     | denied    | 403    |
 
   Scenario Outline: <role> <expected> access to reply to note
@@ -220,10 +220,10 @@ Feature: Permission Matrix
 
     Examples:
       | role         | expected  | status |
-      | super-admin  | has       | 200    |
-      | hub-admin    | has       | 200    |
-      | reviewer     | has       | 200    |
-      | volunteer    | has       | 200    |
+      | super-admin  | has       | 201    |
+      | hub-admin    | has       | 201    |
+      | reviewer     | has       | 201    |
+      | volunteer    | has       | 201    |
       | reporter     | denied    | 403    |
 
   # ─── Calls Domain ─────────────────────────────────────────────────
@@ -324,8 +324,8 @@ Feature: Permission Matrix
 
     Examples:
       | role         | expected  | status |
-      | super-admin  | has       | 200    |
-      | hub-admin    | has       | 200    |
+      | super-admin  | has       | 201    |
+      | hub-admin    | has       | 201    |
       | reviewer     | denied    | 403    |
       | volunteer    | denied    | 403    |
       | reporter     | denied    | 403    |
@@ -678,11 +678,11 @@ Feature: Permission Matrix
 
     Examples:
       | role         | expected  | status |
-      | super-admin  | has       | 200    |
-      | hub-admin    | has       | 200    |
+      | super-admin  | has       | 201    |
+      | hub-admin    | has       | 201    |
       | reviewer     | denied    | 403    |
       | volunteer    | denied    | 403    |
-      | reporter     | has       | 200    |
+      | reporter     | has       | 201    |
 
   # ─── Unauthenticated Access ───────────────────────────────────────
 

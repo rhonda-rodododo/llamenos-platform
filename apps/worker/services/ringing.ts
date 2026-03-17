@@ -2,6 +2,8 @@ import type { Env } from '../types'
 import type { Services } from '../services'
 import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/do-access'
 import { dispatchVoipPushFromService } from '../lib/voip-push'
+import { publishNostrEvent } from '../lib/nostr-events'
+import { KIND_CALL_RING } from '@shared/nostr-events'
 import { createLogger } from '../lib/logger'
 import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
@@ -69,6 +71,12 @@ export async function startParallelRinging(
       callerLast4: callerNumber.slice(-4),
       status: 'ringing',
     })
+
+    // Publish call ring event to Nostr relay
+    publishNostrEvent(env, KIND_CALL_RING, {
+      type: 'call:ring',
+      callId: callSid,
+    }).catch((e) => { console.error('[ringing] Failed to publish event:', e) })
 
     // Dispatch VoIP push notifications to mobile volunteers with registered VoIP tokens.
     const callerLast4 = callerNumber.slice(-4)

@@ -105,7 +105,7 @@ notes.post('/',
       }).catch((e) => { console.error('[notes] Failed to create case interaction:', e) })
     }
 
-    return c.json(note, 201)
+    return c.json({ note }, 201)
   },
 )
 
@@ -142,7 +142,7 @@ notes.patch('/:id',
     })
 
     await audit(services.audit, 'noteEdited', pubkey, { noteId: id })
-    return c.json(updated)
+    return c.json({ note: updated })
   },
 )
 
@@ -206,7 +206,7 @@ notes.post('/:id/replies',
     })
 
     await audit(services.audit, 'noteReplyCreated', pubkey, { noteId: id })
-    return c.json(reply, 201)
+    return c.json({ reply }, 201)
   },
 )
 

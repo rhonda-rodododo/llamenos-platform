@@ -32,7 +32,7 @@ interface EntitySchemaState {
 
 let state: EntitySchemaState
 
-Before({ tags: '@cases' }, async () => {
+Before({ tags: '@cases or @contacts or @events or @evidence or @templates or @reports' }, async () => {
   state = { caseNumbers: [] }
 })
 

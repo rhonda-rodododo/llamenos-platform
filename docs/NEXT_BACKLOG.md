@@ -644,6 +644,7 @@ Complete backend modernization: replace Node.js with Bun runtime, then replace t
 - [x] **[Epic 358: Drop DO Architecture — Drizzle ORM + Direct PostgreSQL](epics/epic-358-drop-do-architecture.md)** — Replaced 9 DOs (8,160 lines) + platform layer (1,200 lines) with 11 Drizzle-backed service classes (9,081 lines). 51 typed PostgreSQL tables with GIN/partial indexes. Net -10,680 lines deleted. ConversationDO/BlastDO subscriber data integrity bug fixed.
 - [x] **[Epic 359: BDD Test Compatibility — Fix Service Response Shapes](epics/epic-359-bdd-service-compat.md)** — Fixed 3 root causes: response shape wrapping (shifts/bans/events), auth dev-mode token validation, audit log reset. Results: 417→455 passed (+38), 230→~48 remaining failures.
 - [ ] **Epic 360: BDD Test Parity — Fix Remaining 48 Failures** — Remaining failures: Nostr relay event delivery (8 tests), permission matrix edge cases (16 tests), E2EE roundtrip (4 tests), CMS evidence/events (5 tests), response field type mismatches (15 tests)
+- [ ] **[Epic 361: Mobile Client Compatibility — Drizzle Backend Validation](epics/epic-361-mobile-drizzle-compat.md)** — Verify iOS/Android/Desktop compatibility with Drizzle backend via codegen pipeline. OpenAPI snapshot diff, codegen:check, mobile build + test. Codegen drives all client types.
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)

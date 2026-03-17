@@ -180,7 +180,7 @@ calls.post('/:callId/answer',
 
     try {
       const result = await services.calls.answerCall(hubId, callId, pubkey)
-      return c.json(result)
+      return c.json({ call: result })
     } catch (err) {
       if (err instanceof Error && 'status' in err && (err as { status: number }).status === 409) {
         return c.json({ error: 'Call already answered' }, 409)
@@ -215,7 +215,7 @@ calls.post('/:callId/hangup',
 
     try {
       const result = await services.calls.endCall(hubId, callId)
-      return c.json(result)
+      return c.json({ call: result })
     } catch {
       return c.json({ error: 'Failed to hang up call' }, 500)
     }
