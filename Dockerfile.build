@@ -49,6 +49,6 @@ COPY apps/worker/ apps/worker/
 COPY packages/shared/ packages/shared/
 COPY packages/i18n/ packages/i18n/
 COPY packages/protocol/ packages/protocol/
-RUN bun build src/platform/bun/server.ts --target=bun --outdir=dist/server --sourcemap
+RUN bun build src/server/index.ts --target=bun --outdir=dist/server --sourcemap
 
 # Output: /build/dist/client/ and /build/dist/server/

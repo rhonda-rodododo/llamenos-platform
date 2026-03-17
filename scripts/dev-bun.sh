@@ -67,7 +67,7 @@ cmd_start() {
   echo ""
 
   # Bun --watch restarts on any imported .ts file change
-  exec bun --watch src/platform/bun/server.ts
+  exec bun --watch src/server/index.ts
 }
 
 ACTION="${1:-start}"

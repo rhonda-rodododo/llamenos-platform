@@ -1,14 +1,23 @@
-import type { BlobStorage, TranscriptionService } from '../../src/platform/types'
 import type { MessagingChannelType, RecipientEnvelope, KeyEnvelope } from '@shared/types'
 
 /**
  * Environment bindings.
  *
- * On Cloudflare Workers: these are real CF bindings (DurableObjectNamespace, Ai, R2Bucket, Fetcher).
- * On Bun: these are shims from src/platform/bun/ that implement the same method signatures.
- *
- * We use structural typing — the interfaces only require the methods we actually call.
+ * These are the shared interfaces for blob storage, transcription, and other
+ * platform services. Structural typing — only the methods we actually call.
  */
+
+/** Blob storage interface (MinIO/S3). */
+export interface BlobStorage {
+  put(key: string, body: ReadableStream | ArrayBuffer | Uint8Array | string): Promise<void>
+  get(key: string): Promise<{ body: ReadableStream; size: number; arrayBuffer(): Promise<ArrayBuffer> } | null>
+  delete(key: string): Promise<void>
+}
+
+/** Transcription service interface (Whisper). */
+export interface TranscriptionService {
+  run(model: string, input: { audio: number[] }): Promise<{ text: string }>
+}
 
 /** Minimal DurableObjectStub — only .fetch() is used */
 export interface DOStub {

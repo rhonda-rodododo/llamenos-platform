@@ -52,4 +52,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
   CMD bun -e "fetch('http://localhost:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)})" || exit 1
 
-CMD ["bun", "--sql-preconnect", "src/platform/bun/server.ts"]
+CMD ["bun", "src/server/index.ts"]

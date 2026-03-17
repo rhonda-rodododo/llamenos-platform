@@ -5,7 +5,9 @@
  *
  * Uses FOR UPDATE SKIP LOCKED for safe concurrent draining across replicas.
  */
-import { getPool } from './postgres-pool'
+import { eq, and, lt, sql } from 'drizzle-orm'
+import type { Database } from '../db'
+import { nostrEventOutbox } from '../db/schema'
 
 export interface OutboxEvent {
   id: number
@@ -14,15 +16,13 @@ export interface OutboxEvent {
 }
 
 export class EventOutbox {
-  /**
-   * Insert an event into the outbox for delivery.
-   */
+  constructor(private db: Database) {}
+
+  /** Insert an event into the outbox for delivery. */
   async enqueue(eventJson: Record<string, unknown>): Promise<void> {
-    const sql = getPool()
-    await sql`
-      INSERT INTO nostr_event_outbox (event_json)
-      VALUES (${JSON.stringify(eventJson)}::jsonb)
-    `
+    await this.db.insert(nostrEventOutbox).values({
+      eventJson,
+    })
   }
 
   /**
@@ -30,10 +30,8 @@ export class EventOutbox {
    * Uses FOR UPDATE SKIP LOCKED to prevent duplicate processing across replicas.
    */
   async drainBatch(limit: number): Promise<OutboxEvent[]> {
-    const sql = getPool()
-    // Use any for tx to preserve tagged template call signatures
-    const rows = await sql.begin(async (tx: any) => {
-      return tx`
+    const rows = await this.db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
         UPDATE nostr_event_outbox
         SET status = 'delivering'
         WHERE id IN (
@@ -44,26 +42,22 @@ export class EventOutbox {
           FOR UPDATE SKIP LOCKED
         )
         RETURNING id, event_json, attempts
-      `
+      `)
+      return Array.isArray(result) ? result : []
     })
 
-    return (rows as Array<{ id: number; event_json: Record<string, unknown>; attempts: number }>).map((row) => ({
-      id: row.id,
-      event_json: row.event_json,
-      attempts: row.attempts,
+    return rows.map((row: Record<string, unknown>) => ({
+      id: row.id as number,
+      event_json: row.event_json as Record<string, unknown>,
+      attempts: row.attempts as number,
     }))
   }
 
-  /**
-   * Mark an event as successfully delivered (will be cleaned up later).
-   */
+  /** Mark an event as successfully delivered (will be cleaned up later). */
   async markDelivered(id: number): Promise<void> {
-    const sql = getPool()
-    await sql`
-      UPDATE nostr_event_outbox
-      SET status = 'delivered'
-      WHERE id = ${id}
-    `
+    await this.db.update(nostrEventOutbox)
+      .set({ status: 'delivered' })
+      .where(eq(nostrEventOutbox.id, id))
   }
 
   /**
@@ -71,15 +65,14 @@ export class EventOutbox {
    * Backoff: 30s, 60s, 120s, 240s, 480s (capped at 8 min).
    */
   async markFailed(id: number, attempts: number): Promise<void> {
-    const sql = getPool()
     const backoffSeconds = Math.min(30 * Math.pow(2, attempts), 480)
-    await sql`
-      UPDATE nostr_event_outbox
-      SET status = 'pending',
-          attempts = ${attempts + 1},
-          next_retry_at = NOW() + ${`${backoffSeconds} seconds`}::interval
-      WHERE id = ${id}
-    `
+    await this.db.update(nostrEventOutbox)
+      .set({
+        status: 'pending',
+        attempts: attempts + 1,
+        nextRetryAt: sql`NOW() + ${`${backoffSeconds} seconds`}::interval`,
+      })
+      .where(eq(nostrEventOutbox.id, id))
   }
 
   /**
@@ -88,28 +81,25 @@ export class EventOutbox {
    * - Failed events (>20 attempts) older than 24 hours
    */
   async cleanup(): Promise<void> {
-    const sql = getPool()
-    await sql`
+    await this.db.execute(sql`
       DELETE FROM nostr_event_outbox
       WHERE (status = 'delivered' AND created_at < NOW() - INTERVAL '1 hour')
          OR (attempts > 20 AND created_at < NOW() - INTERVAL '24 hours')
-    `
+    `)
   }
 
-  /**
-   * Get current outbox statistics.
-   */
+  /** Get current outbox statistics. */
   async stats(): Promise<{ pending: number; failed: number }> {
-    const sql = getPool()
-    const rows = await sql`
+    const rows = await this.db.execute(sql`
       SELECT
         COUNT(*) FILTER (WHERE status = 'pending') AS pending,
         COUNT(*) FILTER (WHERE attempts > 0 AND status = 'pending') AS failed
       FROM nostr_event_outbox
-    `
+    `)
+    const row = Array.isArray(rows) ? rows[0] : { pending: 0, failed: 0 }
     return {
-      pending: Number(rows[0].pending),
-      failed: Number(rows[0].failed),
+      pending: Number(row?.pending ?? 0),
+      failed: Number(row?.failed ?? 0),
     }
   }
 }

@@ -5,8 +5,8 @@
  *
  * Follows the same pattern as alarm-poller.ts.
  */
-import type { EventOutbox } from './outbox'
-import type { NodeNostrPublisher } from '../../../../apps/worker/lib/nostr-publisher'
+import type { EventOutbox } from './nostr-outbox'
+import type { NodeNostrPublisher } from './nostr-publisher'
 
 const DRAIN_INTERVAL_MS = 30_000
 const CLEANUP_INTERVAL_MS = 5 * 60_000

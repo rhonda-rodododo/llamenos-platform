@@ -16,18 +16,16 @@ async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
   const checks: Record<string, 'ok' | 'failing'> = {}
   const details: Record<string, string> = {}
 
-  // PostgreSQL check (Node.js self-hosted only — CF Workers use Durable Objects)
-  const isSelfHosted = typeof process !== 'undefined' && process.env?.PLATFORM === 'bun'
-  if (isSelfHosted) {
-    try {
-      const { getPool } = await import('../../../src/platform/bun/storage/postgres-pool')
-      const sql = getPool()
-      await sql`SELECT 1`
-      checks.postgres = 'ok'
-    } catch (err) {
-      checks.postgres = 'failing'
-      details.postgres = err instanceof Error ? err.message : 'Connection failed'
-    }
+  // PostgreSQL check via Drizzle
+  try {
+    const { getDb } = await import('../db')
+    const db = getDb()
+    const { sql } = await import('drizzle-orm')
+    await db.execute(sql`SELECT 1`)
+    checks.postgres = 'ok'
+  } catch (err) {
+    checks.postgres = 'failing'
+    details.postgres = err instanceof Error ? err.message : 'Connection failed'
   }
 
   // Blob storage check (R2 on CF, MinIO on Node.js)
