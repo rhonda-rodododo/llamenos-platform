@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { auth } from '../middleware/auth'
 import { checkRateLimit } from '../lib/helpers'
 import { hashIP } from '../lib/crypto'
 import { publicErrors, authErrors } from '../openapi/helpers'
-import { createRoomBodySchema, roomPayloadBodySchema } from '@protocol/schemas/provisioning'
+import { okResponseSchema } from '@protocol/schemas/common'
+import { createRoomBodySchema, roomPayloadBodySchema, provisionRoomResponseSchema, provisionRoomStatusResponseSchema } from '@protocol/schemas/provisioning'
 
 const provisioning = new Hono<AppEnv>()
 
@@ -25,7 +26,14 @@ provisioning.post('/rooms',
     tags: ['Provisioning'],
     summary: 'Create a device provisioning room',
     responses: {
-      200: { description: 'Room created with ID and token' },
+      200: {
+        description: 'Room created with ID and token',
+        content: {
+          'application/json': {
+            schema: resolver(provisionRoomResponseSchema),
+          },
+        },
+      },
       ...publicErrors,
     },
   }),
@@ -44,7 +52,14 @@ provisioning.get('/rooms/:id',
     summary: 'Poll provisioning room status',
     responses: {
       ...publicErrors,
-      200: { description: 'Room status and optional encrypted payload' },
+      200: {
+        description: 'Room status and optional encrypted payload',
+        content: {
+          'application/json': {
+            schema: resolver(provisionRoomStatusResponseSchema),
+          },
+        },
+      },
       400: { description: 'Missing token' },
       429: { description: 'Rate limited' },
     },
@@ -67,7 +82,14 @@ provisioning.post('/rooms/:id/payload', auth,
     tags: ['Provisioning'],
     summary: 'Send encrypted provisioning payload to room',
     responses: {
-      200: { description: 'Payload delivered' },
+      200: {
+        description: 'Payload delivered',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

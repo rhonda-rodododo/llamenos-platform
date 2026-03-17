@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import type { AppEnv, WebAuthnCredential } from '../types'
 import { uint8ArrayToBase64URL, checkRateLimit } from '../lib/helpers'
@@ -7,7 +7,8 @@ import { hashIP } from '../lib/crypto'
 import { generateRegOptions, verifyRegResponse, generateAuthOptions, verifyAuthResponse } from '../lib/webauthn'
 import { auth as authMiddleware } from '../middleware/auth'
 import { audit } from '../services/audit'
-import { authenticateBodySchema, addCredentialBodySchema, registerCredentialBodySchema } from '@protocol/schemas/webauthn'
+import { authenticateBodySchema, addCredentialBodySchema, registerCredentialBodySchema, webauthnCredentialResponseSchema, webauthnOptionsResponseSchema, webauthnLoginResponseSchema, webauthnCredentialsListResponseSchema } from '@protocol/schemas/webauthn'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { publicErrors, authErrors } from '../openapi/helpers'
 
 const webauthn = new Hono<AppEnv>()
@@ -19,7 +20,14 @@ webauthn.post('/login/options',
     tags: ['WebAuthn'],
     summary: 'Generate WebAuthn login challenge',
     responses: {
-      200: { description: 'Authentication options with challenge' },
+      200: {
+        description: 'Authentication options with challenge',
+        content: {
+          'application/json': {
+            schema: resolver(webauthnOptionsResponseSchema),
+          },
+        },
+      },
       429: { description: 'Rate limited' },
       ...publicErrors,
     },
@@ -44,7 +52,14 @@ webauthn.post('/login/verify',
     summary: 'Verify WebAuthn login assertion',
     responses: {
       ...publicErrors,
-      200: { description: 'Login successful with session token' },
+      200: {
+        description: 'Login successful with session token',
+        content: {
+          'application/json': {
+            schema: resolver(webauthnLoginResponseSchema),
+          },
+        },
+      },
       400: { description: 'Invalid or expired challenge' },
       401: { description: 'Verification failed' },
       429: { description: 'Rate limited' },
@@ -99,7 +114,14 @@ webauthn.post('/register/options',
     tags: ['WebAuthn'],
     summary: 'Generate WebAuthn registration challenge',
     responses: {
-      200: { description: 'Registration options with challenge' },
+      200: {
+        description: 'Registration options with challenge',
+        content: {
+          'application/json': {
+            schema: resolver(webauthnOptionsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -124,7 +146,14 @@ webauthn.post('/register/verify',
     summary: 'Verify WebAuthn registration attestation',
     responses: {
       ...authErrors,
-      200: { description: 'Registration successful' },
+      200: {
+        description: 'Registration successful',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       400: { description: 'Invalid challenge or verification failed' },
     },
   }),
@@ -171,7 +200,14 @@ webauthn.get('/credentials',
     tags: ['WebAuthn'],
     summary: 'List registered WebAuthn credentials',
     responses: {
-      200: { description: 'List of credentials' },
+      200: {
+        description: 'List of credentials',
+        content: {
+          'application/json': {
+            schema: resolver(webauthnCredentialsListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -196,7 +232,14 @@ webauthn.delete('/credentials/:credId',
     summary: 'Delete a WebAuthn credential',
     responses: {
       ...authErrors,
-      200: { description: 'Credential deleted' },
+      200: {
+        description: 'Credential deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       400: { description: 'Invalid credential ID' },
     },
   }),

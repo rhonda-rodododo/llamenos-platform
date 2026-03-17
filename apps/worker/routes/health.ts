@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
+import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
+import { healthResponseSchema, livenessResponseSchema, readinessResponseSchema } from '@protocol/schemas/health'
 
 declare const __BUILD_VERSION__: string
 
@@ -55,7 +56,14 @@ health.get('/',
     tags: ['Health'],
     summary: 'Full health check with dependency status',
     responses: {
-      200: { description: 'All dependencies healthy' },
+      200: {
+        description: 'All dependencies healthy',
+        content: {
+          'application/json': {
+            schema: resolver(healthResponseSchema),
+          },
+        },
+      },
       503: { description: 'One or more dependencies degraded or failing' },
     },
   }),
@@ -78,7 +86,14 @@ health.get('/live',
     tags: ['Health'],
     summary: 'Kubernetes liveness probe',
     responses: {
-      200: { description: 'Process is alive' },
+      200: {
+        description: 'Process is alive',
+        content: {
+          'application/json': {
+            schema: resolver(livenessResponseSchema),
+          },
+        },
+      },
     },
   }),
   (c) => c.json({ status: 'ok' }),
@@ -90,7 +105,14 @@ health.get('/ready',
     tags: ['Health'],
     summary: 'Kubernetes readiness probe with dependency verification',
     responses: {
-      200: { description: 'All dependencies ready' },
+      200: {
+        description: 'All dependencies ready',
+        content: {
+          'application/json': {
+            schema: resolver(readinessResponseSchema),
+          },
+        },
+      },
       503: { description: 'One or more dependencies not ready' },
     },
   }),

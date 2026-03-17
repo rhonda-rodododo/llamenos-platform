@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { paginationSchema, pubkeySchema, recipientEnvelopeSchema, keyEnvelopeSchema } from './common'
+import { paginationSchema, paginatedMeta, pubkeySchema, recipientEnvelopeSchema, keyEnvelopeSchema } from './common'
 
 // --- Response schemas ---
 
@@ -15,6 +15,17 @@ export const noteResponseSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   replyCount: z.number().optional(),
+})
+
+// --- List/wrapper response schemas ---
+
+export const noteListResponseSchema = z.object({
+  notes: z.array(noteResponseSchema),
+  ...paginatedMeta,
+})
+
+export const noteRepliesResponseSchema = z.object({
+  replies: z.array(noteResponseSchema),
 })
 
 // --- Input schemas ---

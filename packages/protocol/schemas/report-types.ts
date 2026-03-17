@@ -59,6 +59,12 @@ export const reportTypeDefinitionSchema = z.object({
 
 export type ReportTypeDefinition = z.infer<typeof reportTypeDefinitionSchema>
 
+// --- List/wrapper response schemas ---
+
+export const cmsReportTypeListResponseSchema = z.object({
+  reportTypes: z.array(reportTypeDefinitionSchema),
+})
+
 // --- Input schemas for CRUD ---
 
 export const createCmsReportTypeBodySchema = z.looseObject({

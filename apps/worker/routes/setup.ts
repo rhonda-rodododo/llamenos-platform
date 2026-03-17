@@ -1,22 +1,12 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
-import { z } from 'zod'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 import { validateExternalUrl } from '../lib/ssrf-guard'
 import { setupStateSchema, setupCompleteBodySchema } from '@protocol/schemas/settings'
+import { setupStateResponseSchema, connectionTestResponseSchema, testSignalBodySchema, testWhatsAppBodySchema } from '@protocol/schemas/setup'
 import { authErrors } from '../openapi/helpers'
-
-const testSignalBodySchema = z.object({
-  bridgeUrl: z.string().min(1, 'Bridge URL is required'),
-  bridgeApiKey: z.string().optional(),
-})
-
-const testWhatsAppBodySchema = z.object({
-  phoneNumberId: z.string().min(1, 'Phone Number ID is required'),
-  accessToken: z.string().min(1, 'Access Token is required'),
-})
 
 const setup = new Hono<AppEnv>()
 
@@ -26,7 +16,14 @@ setup.get('/state', requirePermission('settings:manage-setup'),
     tags: ['Setup'],
     summary: 'Get setup wizard state',
     responses: {
-      200: { description: 'Current setup state' },
+      200: {
+        description: 'Current setup state',
+        content: {
+          'application/json': {
+            schema: resolver(setupStateResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -42,7 +39,14 @@ setup.patch('/state', requirePermission('settings:manage-setup'),
     tags: ['Setup'],
     summary: 'Update setup wizard state',
     responses: {
-      200: { description: 'Setup state updated' },
+      200: {
+        description: 'Setup state updated',
+        content: {
+          'application/json': {
+            schema: resolver(setupStateResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -62,7 +66,14 @@ setup.post('/complete', requirePermission('settings:manage-setup'),
     tags: ['Setup'],
     summary: 'Complete setup wizard',
     responses: {
-      200: { description: 'Setup completed' },
+      200: {
+        description: 'Setup completed',
+        content: {
+          'application/json': {
+            schema: resolver(setupStateResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -108,7 +119,14 @@ setup.post('/test/signal', requirePermission('settings:manage-messaging'),
     tags: ['Setup'],
     summary: 'Test Signal bridge connection',
     responses: {
-      200: { description: 'Connection test result' },
+      200: {
+        description: 'Connection test result',
+        content: {
+          'application/json': {
+            schema: resolver(connectionTestResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -149,7 +167,14 @@ setup.post('/test/whatsapp', requirePermission('settings:manage-messaging'),
     tags: ['Setup'],
     summary: 'Test WhatsApp API connection',
     responses: {
-      200: { description: 'Connection test result' },
+      200: {
+        description: 'Connection test result',
+        content: {
+          'application/json': {
+            schema: resolver(connectionTestResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

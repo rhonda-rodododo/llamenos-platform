@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
-import { createHubBodySchema, updateHubBodySchema, addHubMemberBodySchema, hubKeyEnvelopesBodySchema } from '@protocol/schemas/hubs'
+import { createHubBodySchema, updateHubBodySchema, addHubMemberBodySchema, hubKeyEnvelopesBodySchema, hubResponseSchema, hubListResponseSchema, hubDetailResponseSchema, hubKeyEnvelopeResponseSchema } from '@protocol/schemas/hubs'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import type { Hub } from '@shared/types'
@@ -15,7 +15,14 @@ routes.get('/',
     tags: ['Hubs'],
     summary: 'List hubs visible to the current user',
     responses: {
-      200: { description: 'List of hubs' },
+      200: {
+        description: 'List of hubs',
+        content: {
+          'application/json': {
+            schema: resolver(hubListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -44,7 +51,14 @@ routes.post('/',
     tags: ['Hubs'],
     summary: 'Create a new hub',
     responses: {
-      201: { description: 'Hub created' },
+      201: {
+        description: 'Hub created',
+        content: {
+          'application/json': {
+            schema: resolver(hubDetailResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -84,7 +98,14 @@ routes.get('/:hubId',
     tags: ['Hubs'],
     summary: 'Get hub details',
     responses: {
-      200: { description: 'Hub details' },
+      200: {
+        description: 'Hub details',
+        content: {
+          'application/json': {
+            schema: resolver(hubDetailResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -119,7 +140,14 @@ routes.patch('/:hubId',
     tags: ['Hubs'],
     summary: 'Update a hub',
     responses: {
-      200: { description: 'Hub updated' },
+      200: {
+        description: 'Hub updated',
+        content: {
+          'application/json': {
+            schema: resolver(hubResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -146,7 +174,14 @@ routes.post('/:hubId/members',
     tags: ['Hubs'],
     summary: 'Add a member to a hub',
     responses: {
-      200: { description: 'Member added' },
+      200: {
+        description: 'Member added',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -210,7 +245,14 @@ routes.get('/:hubId/key',
     tags: ['Hubs'],
     summary: 'Get hub key envelope for current user',
     responses: {
-      200: { description: 'Hub key envelope' },
+      200: {
+        description: 'Hub key envelope',
+        content: {
+          'application/json': {
+            schema: resolver(hubKeyEnvelopeResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },

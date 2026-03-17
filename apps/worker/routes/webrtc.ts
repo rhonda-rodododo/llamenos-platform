@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
+import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { generateWebRtcToken, isWebRtcConfigured } from '../telephony/webrtc-tokens'
 import { generateSipParams, isSipConfigured } from '../telephony/sip-tokens'
+import { webrtcTokenResponseSchema, sipTokenResponseSchema, telephonyStatusResponseSchema } from '@protocol/schemas/webrtc'
 import { authErrors } from '../openapi/helpers'
 
 const webrtc = new Hono<AppEnv>()
@@ -18,7 +19,14 @@ webrtc.get('/webrtc-token',
     summary: 'Generate WebRTC access token',
     responses: {
       ...authErrors,
-      200: { description: 'WebRTC token with provider info' },
+      200: {
+        description: 'WebRTC token with provider info',
+        content: {
+          'application/json': {
+            schema: resolver(webrtcTokenResponseSchema),
+          },
+        },
+      },
       400: { description: 'Call preference is phone only or WebRTC not configured' },
       404: { description: 'No telephony provider configured' },
     },
@@ -65,7 +73,14 @@ webrtc.get('/sip-token',
     summary: 'Generate SIP connection parameters',
     responses: {
       ...authErrors,
-      200: { description: 'SIP connection parameters' },
+      200: {
+        description: 'SIP connection parameters',
+        content: {
+          'application/json': {
+            schema: resolver(sipTokenResponseSchema),
+          },
+        },
+      },
       400: { description: 'Call preference is phone only or SIP not configured' },
       404: { description: 'No telephony provider configured' },
     },
@@ -109,7 +124,14 @@ webrtc.get('/sip-status',
     tags: ['WebRTC'],
     summary: 'Check SIP availability',
     responses: {
-      200: { description: 'SIP availability status' },
+      200: {
+        description: 'SIP availability status',
+        content: {
+          'application/json': {
+            schema: resolver(telephonyStatusResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -131,7 +153,14 @@ webrtc.get('/webrtc-status',
     tags: ['WebRTC'],
     summary: 'Check WebRTC availability',
     responses: {
-      200: { description: 'WebRTC availability status' },
+      200: {
+        description: 'WebRTC availability status',
+        content: {
+          'application/json': {
+            schema: resolver(telephonyStatusResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

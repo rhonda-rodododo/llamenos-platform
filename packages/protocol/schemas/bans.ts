@@ -10,6 +10,16 @@ export const banResponseSchema = z.object({
   bannedAt: z.string(),
 })
 
+// --- List/wrapper response schemas ---
+
+export const banListResponseSchema = z.object({
+  bans: z.array(banResponseSchema),
+})
+
+export const bulkBanResponseSchema = z.object({
+  count: z.number(),
+})
+
 // --- Input schemas ---
 
 export const createBanBodySchema = z.looseObject({

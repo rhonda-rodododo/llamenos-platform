@@ -1,14 +1,30 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { createContactBodySchema, updateContactBodySchema, listContactsQuerySchema } from '@protocol/schemas/contacts-v2'
 import {
+  contactSchema,
+  contactListResponseSchema,
+  contactLookupResponseSchema,
+  contactSearchResponseSchema,
+  createContactBodySchema,
+  updateContactBodySchema,
+  listContactsQuerySchema,
+} from '@protocol/schemas/contacts-v2'
+import {
+  contactRelationshipSchema,
+  contactRelationshipListResponseSchema,
+  affinityGroupSchema,
+  affinityGroupListResponseSchema,
+  affinityGroupWithMembersResponseSchema,
+  groupMemberSchema,
+  groupMemberListResponseSchema,
   createRelationshipBodySchema,
   createAffinityGroupBodySchema,
   updateAffinityGroupBodySchema,
   addGroupMemberBodySchema,
 } from '@protocol/schemas/contact-relationships'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 
@@ -24,7 +40,10 @@ contactsV2.get('/',
     tags: ['Contact Directory'],
     summary: 'List contacts with E2EE profiles',
     responses: {
-      200: { description: 'Paginated list of contacts' },
+      200: {
+        description: 'Paginated list of contacts',
+        content: { 'application/json': { schema: resolver(contactListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -52,7 +71,10 @@ contactsV2.get('/lookup/:identifierHash',
     tags: ['Contact Directory'],
     summary: 'Lookup contact by identifier hash',
     responses: {
-      200: { description: 'Contact or null' },
+      200: {
+        description: 'Contact or null',
+        content: { 'application/json': { schema: resolver(contactLookupResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -73,7 +95,10 @@ contactsV2.get('/search',
     tags: ['Contact Directory'],
     summary: 'Search contacts by name trigrams',
     responses: {
-      200: { description: 'Matching contacts' },
+      200: {
+        description: 'Matching contacts',
+        content: { 'application/json': { schema: resolver(contactSearchResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -97,7 +122,10 @@ contactsV2.post('/',
     tags: ['Contact Directory'],
     summary: 'Create a new contact with encrypted profile',
     responses: {
-      201: { description: 'Contact created' },
+      201: {
+        description: 'Contact created',
+        content: { 'application/json': { schema: resolver(contactSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -127,7 +155,10 @@ contactsV2.get('/groups',
     tags: ['Affinity Groups'],
     summary: 'List all affinity groups',
     responses: {
-      200: { description: 'List of groups' },
+      200: {
+        description: 'List of groups',
+        content: { 'application/json': { schema: resolver(affinityGroupListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -146,7 +177,10 @@ contactsV2.post('/groups',
     tags: ['Affinity Groups'],
     summary: 'Create an affinity group with members',
     responses: {
-      201: { description: 'Group created' },
+      201: {
+        description: 'Group created',
+        content: { 'application/json': { schema: resolver(affinityGroupSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -174,7 +208,10 @@ contactsV2.get('/groups/:groupId',
     tags: ['Affinity Groups'],
     summary: 'Get an affinity group with its members',
     responses: {
-      200: { description: 'Group details with members' },
+      200: {
+        description: 'Group details with members',
+        content: { 'application/json': { schema: resolver(affinityGroupWithMembersResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -199,7 +236,10 @@ contactsV2.patch('/groups/:groupId',
     tags: ['Affinity Groups'],
     summary: 'Update an affinity group',
     responses: {
-      200: { description: 'Group updated' },
+      200: {
+        description: 'Group updated',
+        content: { 'application/json': { schema: resolver(affinityGroupSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -224,7 +264,10 @@ contactsV2.delete('/groups/:groupId',
     tags: ['Affinity Groups'],
     summary: 'Delete an affinity group',
     responses: {
-      200: { description: 'Group deleted' },
+      200: {
+        description: 'Group deleted',
+        content: { 'application/json': { schema: resolver(okResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -247,7 +290,10 @@ contactsV2.post('/groups/:groupId/members',
     tags: ['Affinity Groups'],
     summary: 'Add a member to an affinity group',
     responses: {
-      201: { description: 'Member added' },
+      201: {
+        description: 'Member added',
+        content: { 'application/json': { schema: resolver(groupMemberSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -275,7 +321,10 @@ contactsV2.delete('/groups/:groupId/members/:contactId',
     tags: ['Affinity Groups'],
     summary: 'Remove a member from an affinity group',
     responses: {
-      200: { description: 'Member removed' },
+      200: {
+        description: 'Member removed',
+        content: { 'application/json': { schema: resolver(okResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -299,7 +348,10 @@ contactsV2.get('/groups/:groupId/members',
     tags: ['Affinity Groups'],
     summary: 'List members of an affinity group',
     responses: {
-      200: { description: 'List of members' },
+      200: {
+        description: 'List of members',
+        content: { 'application/json': { schema: resolver(groupMemberListResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -324,7 +376,10 @@ contactsV2.patch('/:id',
     tags: ['Contact Directory'],
     summary: 'Update contact profile',
     responses: {
-      200: { description: 'Contact updated' },
+      200: {
+        description: 'Contact updated',
+        content: { 'application/json': { schema: resolver(contactSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -349,7 +404,10 @@ contactsV2.delete('/:id',
     tags: ['Contact Directory'],
     summary: 'Delete a contact',
     responses: {
-      200: { description: 'Contact deleted' },
+      200: {
+        description: 'Contact deleted',
+        content: { 'application/json': { schema: resolver(okResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -372,7 +430,10 @@ contactsV2.post('/:id/relationships',
     tags: ['Contact Relationships'],
     summary: 'Create a relationship between two contacts',
     responses: {
-      201: { description: 'Relationship created' },
+      201: {
+        description: 'Relationship created',
+        content: { 'application/json': { schema: resolver(contactRelationshipSchema) } },
+      },
       404: { description: 'Contact not found' },
       409: { description: 'Relationship already exists' },
       ...authErrors,
@@ -410,7 +471,10 @@ contactsV2.delete('/:id/relationships/:relId',
     tags: ['Contact Relationships'],
     summary: 'Delete a relationship',
     responses: {
-      200: { description: 'Relationship deleted' },
+      200: {
+        description: 'Relationship deleted',
+        content: { 'application/json': { schema: resolver(okResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -437,7 +501,10 @@ contactsV2.get('/:id/relationships',
     tags: ['Contact Relationships'],
     summary: 'List all relationships for a contact',
     responses: {
-      200: { description: 'List of relationships' },
+      200: {
+        description: 'List of relationships',
+        content: { 'application/json': { schema: resolver(contactRelationshipListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -456,7 +523,10 @@ contactsV2.get('/:id/groups',
     tags: ['Affinity Groups'],
     summary: 'List groups a contact belongs to',
     responses: {
-      200: { description: 'List of groups' },
+      200: {
+        description: 'List of groups',
+        content: { 'application/json': { schema: resolver(affinityGroupListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -475,7 +545,10 @@ contactsV2.get('/:id',
     tags: ['Contact Directory'],
     summary: 'Get a single contact',
     responses: {
-      200: { description: 'Contact details' },
+      200: {
+        description: 'Contact details',
+        content: { 'application/json': { schema: resolver(contactSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },

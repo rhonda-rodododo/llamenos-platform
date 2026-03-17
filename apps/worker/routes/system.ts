@@ -6,9 +6,10 @@
  * failures don't break the entire response.
  */
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
+import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
+import { systemHealthResponseSchema } from '@protocol/schemas/system'
 import { authErrors } from '../openapi/helpers'
 import type { Services } from '../services'
 
@@ -138,7 +139,14 @@ systemRoutes.get('/health',
     tags: ['System'],
     summary: 'Aggregated system health dashboard for admins',
     responses: {
-      200: { description: 'System health including server, services, calls, storage, and volunteers' },
+      200: {
+        description: 'System health including server, services, calls, storage, and volunteers',
+        content: {
+          'application/json': {
+            schema: resolver(systemHealthResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

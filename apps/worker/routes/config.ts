@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
+import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { deriveServerKeypair } from '../lib/nostr-publisher'
 import { CURRENT_API_VERSION, MIN_API_VERSION } from '../lib/api-versions'
 import type { EnabledChannels, Hub, SetupState } from '@shared/types'
+import { configResponseSchema, configVerifyResponseSchema } from '@protocol/schemas/config'
 import { publicErrors } from '../openapi/helpers'
 
 const config = new Hono<AppEnv>()
@@ -13,7 +14,14 @@ config.get('/',
     tags: ['Config'],
     summary: 'Get public application configuration',
     responses: {
-      200: { description: 'Application configuration' },
+      200: {
+        description: 'Application configuration',
+        content: {
+          'application/json': {
+            schema: resolver(configResponseSchema),
+          },
+        },
+      },
       ...publicErrors,
     },
   }),
@@ -100,7 +108,14 @@ config.get('/verify',
     tags: ['Config'],
     summary: 'Get build verification info',
     responses: {
-      200: { description: 'Build verification metadata' },
+      200: {
+        description: 'Build verification metadata',
+        content: {
+          'application/json': {
+            schema: resolver(configVerifyResponseSchema),
+          },
+        },
+      },
     },
   }),
   (c) => {

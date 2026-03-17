@@ -22,6 +22,12 @@ export const inviteValidationResponseSchema = z.object({
   roleIds: z.array(z.string()).optional(),
 })
 
+// --- List/wrapper response schemas ---
+
+export const inviteListResponseSchema = z.object({
+  invites: z.array(inviteResponseSchema),
+})
+
 // --- Input schemas ---
 
 export const redeemInviteBodySchema = z.looseObject({

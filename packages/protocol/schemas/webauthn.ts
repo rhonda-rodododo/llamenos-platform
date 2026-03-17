@@ -31,3 +31,23 @@ export const webauthnCredentialResponseSchema = z.object({
 export const webauthnChallengeResponseSchema = z.object({
   challenge: z.string(),
 })
+
+export const webauthnOptionsResponseSchema = z.looseObject({
+  challengeId: z.string(),
+  challenge: z.string(),
+})
+
+export const webauthnLoginResponseSchema = z.object({
+  token: z.string(),
+  pubkey: z.string(),
+})
+
+export const webauthnCredentialsListResponseSchema = z.object({
+  credentials: z.array(z.object({
+    id: z.string(),
+    label: z.string().optional(),
+    backedUp: z.boolean().optional(),
+    createdAt: z.string().optional(),
+    lastUsedAt: z.string().optional(),
+  })),
+})

@@ -1,10 +1,9 @@
 import { Hono } from 'hono'
-import { z } from 'zod'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
-import { listNotesQuerySchema, createNoteBodySchema, updateNoteBodySchema, createReplyBodySchema, noteResponseSchema } from '@protocol/schemas/notes'
-import { okResponseSchema, paginatedMeta } from '@protocol/schemas/common'
+import { listNotesQuerySchema, createNoteBodySchema, updateNoteBodySchema, createReplyBodySchema, noteResponseSchema, noteListResponseSchema, noteRepliesResponseSchema } from '@protocol/schemas/notes'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 
@@ -21,10 +20,7 @@ notes.get('/',
         description: 'Paginated list of notes',
         content: {
           'application/json': {
-            schema: resolver(z.object({
-              notes: z.array(noteResponseSchema),
-              ...paginatedMeta,
-            })),
+            schema: resolver(noteListResponseSchema),
           },
         },
       },
@@ -157,9 +153,7 @@ notes.get('/:id/replies',
         description: 'List of replies',
         content: {
           'application/json': {
-            schema: resolver(z.object({
-              replies: z.array(noteResponseSchema),
-            })),
+            schema: resolver(noteRepliesResponseSchema),
           },
         },
       },

@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
+import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import {
@@ -8,7 +9,14 @@ import {
   listEventsQuerySchema,
   linkRecordToEventBodySchema,
   linkReportToEventBodySchema,
+  eventSchema,
+  eventListResponseSchema,
+  caseEventSchema,
+  caseEventListResponseSchema,
+  reportEventSchema,
+  reportEventListResponseSchema,
 } from '@protocol/schemas/events'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/nostr-events'
@@ -22,7 +30,14 @@ events.get('/',
     tags: ['Events'],
     summary: 'List events with pagination and filters',
     responses: {
-      200: { description: 'Paginated list of events' },
+      200: {
+        description: 'Paginated list of events',
+        content: {
+          'application/json': {
+            schema: resolver(eventListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -54,7 +69,14 @@ events.get('/:id',
     tags: ['Events'],
     summary: 'Get a single event',
     responses: {
-      200: { description: 'Event details' },
+      200: {
+        description: 'Event details',
+        content: {
+          'application/json': {
+            schema: resolver(eventSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -74,7 +96,14 @@ events.post('/',
     tags: ['Events'],
     summary: 'Create a new event',
     responses: {
-      201: { description: 'Event created' },
+      201: {
+        description: 'Event created',
+        content: {
+          'application/json': {
+            schema: resolver(eventSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -130,7 +159,14 @@ events.patch('/:id',
     tags: ['Events'],
     summary: 'Update an event',
     responses: {
-      200: { description: 'Event updated' },
+      200: {
+        description: 'Event updated',
+        content: {
+          'application/json': {
+            schema: resolver(eventSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -162,7 +198,14 @@ events.delete('/:id',
     tags: ['Events'],
     summary: 'Delete an event',
     responses: {
-      200: { description: 'Event deleted' },
+      200: {
+        description: 'Event deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -187,7 +230,14 @@ events.get('/:id/subevents',
     tags: ['Events'],
     summary: 'List sub-events of an event',
     responses: {
-      200: { description: 'Sub-events list' },
+      200: {
+        description: 'Sub-events list',
+        content: {
+          'application/json': {
+            schema: resolver(eventListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -214,7 +264,14 @@ events.post('/:id/records',
     tags: ['Events'],
     summary: 'Link a record to an event',
     responses: {
-      201: { description: 'Record linked to event' },
+      201: {
+        description: 'Record linked to event',
+        content: {
+          'application/json': {
+            schema: resolver(caseEventSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -244,7 +301,14 @@ events.delete('/:id/records/:recordId',
     tags: ['Events'],
     summary: 'Unlink a record from an event',
     responses: {
-      200: { description: 'Record unlinked from event' },
+      200: {
+        description: 'Record unlinked from event',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -273,7 +337,14 @@ events.get('/:id/records',
     tags: ['Events'],
     summary: 'List records linked to an event',
     responses: {
-      200: { description: 'Linked records' },
+      200: {
+        description: 'Linked records',
+        content: {
+          'application/json': {
+            schema: resolver(caseEventListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -293,7 +364,14 @@ events.post('/:id/reports',
     tags: ['Events'],
     summary: 'Link a report to an event',
     responses: {
-      201: { description: 'Report linked to event' },
+      201: {
+        description: 'Report linked to event',
+        content: {
+          'application/json': {
+            schema: resolver(reportEventSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -323,7 +401,14 @@ events.delete('/:id/reports/:reportId',
     tags: ['Events'],
     summary: 'Unlink a report from an event',
     responses: {
-      200: { description: 'Report unlinked from event' },
+      200: {
+        description: 'Report unlinked from event',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -352,7 +437,14 @@ events.get('/:id/reports',
     tags: ['Events'],
     summary: 'List reports linked to an event',
     responses: {
-      200: { description: 'Linked reports' },
+      200: {
+        description: 'Linked reports',
+        content: {
+          'application/json': {
+            schema: resolver(reportEventListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },

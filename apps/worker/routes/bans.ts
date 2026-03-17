@@ -4,7 +4,7 @@ import type { AppEnv } from '../types'
 import { isValidE164 } from '../lib/helpers'
 import { requirePermission } from '../middleware/permission-guard'
 import { okResponseSchema } from '@protocol/schemas/common'
-import { createBanBodySchema, bulkBanBodySchema } from '@protocol/schemas/bans'
+import { createBanBodySchema, bulkBanBodySchema, banListResponseSchema, bulkBanResponseSchema } from '@protocol/schemas/bans'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 
@@ -53,7 +53,14 @@ bans.get('/',
     tags: ['Bans'],
     summary: 'List all banned numbers',
     responses: {
-      200: { description: 'List of banned numbers' },
+      200: {
+        description: 'List of banned numbers',
+        content: {
+          'application/json': {
+            schema: resolver(banListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -75,7 +82,7 @@ bans.post('/bulk',
         description: 'Numbers banned',
         content: {
           'application/json': {
-            schema: resolver(okResponseSchema),
+            schema: resolver(bulkBanResponseSchema),
           },
         },
       },

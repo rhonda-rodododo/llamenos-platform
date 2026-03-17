@@ -30,6 +30,34 @@ export const reportMessageResponseSchema = z.object({
 
 export const conversionStatusEnum = z.enum(['pending', 'in_progress', 'completed'])
 
+// --- List/wrapper response schemas ---
+
+export const reportListResponseSchema = z.object({
+  conversations: z.array(z.unknown()),
+  total: z.number(),
+})
+
+export const reportCategoriesResponseSchema = z.object({
+  categories: z.array(z.string()),
+})
+
+export const reportFilesResponseSchema = z.object({
+  files: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    size: z.number().optional(),
+    mimeType: z.string().optional(),
+  })),
+})
+
+export const reportLinkedCasesResponseSchema = z.object({
+  cases: z.array(z.object({
+    id: z.string(),
+    caseNumber: z.string().optional(),
+    reportId: z.string(),
+  })),
+})
+
 // --- Input schemas ---
 
 export const listReportsQuerySchema = paginationSchema.extend({

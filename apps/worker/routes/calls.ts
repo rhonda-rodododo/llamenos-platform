@@ -5,8 +5,8 @@ import type { AppEnv } from '../types'
 import { getTelephonyFromService } from '../lib/do-access'
 import { audit } from '../services/audit'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
-import { callHistoryQuerySchema, callRecordResponseSchema, banCallerBodySchema } from '@protocol/schemas/calls'
-import { okResponseSchema, paginatedMeta } from '@protocol/schemas/common'
+import { callHistoryQuerySchema, callPresenceResponseSchema, banCallerBodySchema, activeCallsResponseSchema, todayCountResponseSchema, callerIdentifyResponseSchema, callActionResponseSchema, banCallResponseSchema, callHistoryResponseSchema } from '@protocol/schemas/calls'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 
 const calls = new Hono<AppEnv>()
@@ -16,7 +16,14 @@ calls.get('/active',
     tags: ['Calls'],
     summary: 'List active calls',
     responses: {
-      200: { description: 'Active calls' },
+      200: {
+        description: 'Active calls',
+        content: {
+          'application/json': {
+            schema: resolver(activeCallsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -40,7 +47,14 @@ calls.get('/today-count',
     tags: ['Calls'],
     summary: 'Get today\'s call count',
     responses: {
-      200: { description: 'Today\'s call count' },
+      200: {
+        description: 'Today\'s call count',
+        content: {
+          'application/json': {
+            schema: resolver(todayCountResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -58,7 +72,14 @@ calls.get('/presence',
     tags: ['Calls'],
     summary: 'Get call presence status',
     responses: {
-      200: { description: 'Presence status' },
+      200: {
+        description: 'Presence status',
+        content: {
+          'application/json': {
+            schema: resolver(callPresenceResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -80,10 +101,7 @@ calls.get('/history',
         description: 'Paginated call records',
         content: {
           'application/json': {
-            schema: resolver(z.object({
-              calls: z.array(callRecordResponseSchema),
-              ...paginatedMeta,
-            })),
+            schema: resolver(callHistoryResponseSchema),
           },
         },
       },
@@ -114,7 +132,14 @@ calls.get('/identify/:identifierHash',
     tags: ['Calls'],
     summary: 'Identify a caller by identifier hash and return matching contact with active cases',
     responses: {
-      200: { description: 'Contact identification result' },
+      200: {
+        description: 'Contact identification result',
+        content: {
+          'application/json': {
+            schema: resolver(callerIdentifyResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -167,7 +192,14 @@ calls.post('/:callId/answer',
     tags: ['Calls'],
     summary: 'Answer a ringing call',
     responses: {
-      200: { description: 'Call answered' },
+      200: {
+        description: 'Call answered',
+        content: {
+          'application/json': {
+            schema: resolver(callActionResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -196,7 +228,14 @@ calls.post('/:callId/hangup',
     tags: ['Calls'],
     summary: 'Hang up an active call',
     responses: {
-      200: { description: 'Call hung up' },
+      200: {
+        description: 'Call hung up',
+        content: {
+          'application/json': {
+            schema: resolver(callActionResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -228,7 +267,14 @@ calls.post('/:callId/spam',
     tags: ['Calls'],
     summary: 'Report a call as spam',
     responses: {
-      200: { description: 'Call reported as spam' },
+      200: {
+        description: 'Call reported as spam',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -260,7 +306,14 @@ calls.post('/:callId/ban',
     tags: ['Calls'],
     summary: 'Ban the caller and hang up',
     responses: {
-      200: { description: 'Caller banned and call ended' },
+      200: {
+        description: 'Caller banned and call ended',
+        content: {
+          'application/json': {
+            schema: resolver(banCallResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -369,7 +422,14 @@ calls.get('/debug',
     tags: ['Calls'],
     summary: 'Debug call routing state',
     responses: {
-      200: { description: 'Debug information' },
+      200: {
+        description: 'Debug information',
+        content: {
+          'application/json': {
+            schema: resolver(z.record(z.string(), z.unknown())),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

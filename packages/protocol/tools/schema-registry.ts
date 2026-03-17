@@ -28,12 +28,16 @@ import {
 
   // notes.ts
   noteResponseSchema,
+  noteListResponseSchema,
+  noteRepliesResponseSchema,
   createNoteBodySchema,
   updateNoteBodySchema,
   createReplyBodySchema,
 
   // volunteers.ts
   volunteerResponseSchema,
+  volunteerListResponseSchema,
+  volunteerMetricsResponseSchema,
   createVolunteerBodySchema,
   updateVolunteerBodySchema,
   adminUpdateVolunteerBodySchema,
@@ -41,11 +45,19 @@ import {
   // calls.ts
   callRecordResponseSchema,
   callPresenceResponseSchema,
+  callHistoryResponseSchema,
   banCallerBodySchema,
+  activeCallsResponseSchema,
+  todayCountResponseSchema,
+  callerIdentifyResponseSchema,
+  callActionResponseSchema,
+  banCallResponseSchema,
 
   // conversations.ts
   conversationResponseSchema,
+  conversationListResponseSchema,
   messageResponseSchema,
+  messageListResponseSchema,
   sendMessageBodySchema,
   updateConversationBodySchema,
   claimConversationBodySchema,
@@ -54,6 +66,7 @@ import {
   // shifts.ts
   shiftResponseSchema,
   myStatusResponseSchema,
+  shiftListResponseSchema,
   createShiftBodySchema,
   updateShiftBodySchema,
   fallbackGroupSchema,
@@ -61,6 +74,9 @@ import {
   // blasts.ts
   blastResponseSchema,
   subscriberResponseSchema,
+  subscriberListResponseSchema,
+  blastListResponseSchema,
+  importSubscribersResponseSchema,
   subscriberStatsResponseSchema,
   blastSettingsResponseSchema,
   createBlastBodySchema,
@@ -81,6 +97,9 @@ import {
   // hubs.ts
   hubResponseSchema,
   hubMemberResponseSchema,
+  hubListResponseSchema,
+  hubDetailResponseSchema,
+  hubKeyEnvelopeResponseSchema,
   createHubBodySchema,
   updateHubBodySchema,
   addHubMemberBodySchema,
@@ -89,10 +108,15 @@ import {
   // uploads.ts
   uploadResponseSchema,
   uploadInitBodySchema,
+  uploadInitResponseSchema,
+  chunkUploadResponseSchema,
+  uploadCompleteResponseSchema,
+  uploadStatusResponseSchema,
 
   // invites.ts
   inviteResponseSchema,
   inviteValidationResponseSchema,
+  inviteListResponseSchema,
   redeemInviteBodySchema,
   createInviteBodySchema,
 
@@ -103,6 +127,15 @@ import {
   customFieldsBodySchema,
   createReportTypeBodySchema as settingsCreateReportTypeBodySchema,
   updateReportTypeBodySchema as settingsUpdateReportTypeBodySchema,
+  customFieldsListResponseSchema,
+  roleListResponseSchema,
+  reportTypeListResponseSchema,
+  ivrAudioPromptsResponseSchema,
+  successResponseSchema,
+  permissionsCatalogResponseSchema,
+  migrationStatusResponseSchema,
+  cleanupMetricsResponseSchema,
+  ttlOverridesResponseSchema,
 
   // report-types.ts (CMS — Epic 343)
   reportTypeDefinitionSchema,
@@ -124,11 +157,14 @@ import {
 
   // bans.ts
   banResponseSchema,
+  banListResponseSchema,
+  bulkBanResponseSchema,
   createBanBodySchema,
   bulkBanBodySchema,
 
   // audit.ts
   auditEntryResponseSchema,
+  auditListResponseSchema,
 
   // devices.ts
   deviceResponseSchema,
@@ -145,6 +181,9 @@ import {
   authenticateBodySchema,
   addCredentialBodySchema,
   registerCredentialBodySchema,
+  webauthnOptionsResponseSchema,
+  webauthnLoginResponseSchema,
+  webauthnCredentialsListResponseSchema,
 
   // provisioning.ts
   provisionRoomResponseSchema,
@@ -154,9 +193,12 @@ import {
 
   // webrtc.ts
   webrtcTokenResponseSchema,
+  sipTokenResponseSchema,
+  telephonyStatusResponseSchema,
 
   // system.ts
   systemStatusResponseSchema,
+  systemHealthResponseSchema,
 
   // events.ts
   eventSchema,
@@ -176,6 +218,7 @@ import {
   createRelationshipBodySchema,
   affinityGroupSchema,
   groupMemberSchema,
+  groupMemberListResponseSchema,
   createAffinityGroupBodySchema,
   updateAffinityGroupBodySchema,
   addGroupMemberBodySchema,
@@ -221,9 +264,55 @@ import {
   createRelationshipTypeBodySchema,
   updateRelationshipTypeBodySchema,
   caseNumberBodySchema,
+  entityTypeListResponseSchema,
+  relationshipTypeListResponseSchema,
+  caseNumberResponseSchema,
+  templateListResponseSchema,
+  templateApplyResponseSchema,
+  templateUpdatesResponseSchema,
+  rolesFromTemplateResponseSchema,
+  enabledResponseSchema,
+
+  // report-types.ts — CMS list response
+  cmsReportTypeListResponseSchema,
+
+  // reports.ts — list/wrapper responses
+  reportListResponseSchema,
+  reportCategoriesResponseSchema,
+  reportFilesResponseSchema,
+  reportLinkedCasesResponseSchema,
+
+  // files.ts — response schemas
+  fileEnvelopesResponseSchema,
+  fileMetadataResponseSchema,
+
+  // setup.ts — response schemas
+  setupStateResponseSchema,
+  connectionTestResponseSchema,
+
+  // contacts.ts (legacy) — response schemas
+  contactTimelineListResponseSchema,
+  contactTimelineDetailResponseSchema,
+
+  // config.ts
+  configResponseSchema,
+  configVerifyResponseSchema,
+
+  // health.ts
+  healthResponseSchema,
+  livenessResponseSchema,
+  readinessResponseSchema,
+
+  // metrics.ts
+  metricsResponseSchema,
 
   // records.ts — CMS case records
   recordSchema,
+  recordListResponseSchema,
+  recordContactListResponseSchema,
+  envelopeRecipientsResponseSchema,
+  suggestAssigneesResponseSchema,
+  recordsByContactResponseSchema,
   createRecordBodySchema,
   updateRecordBodySchema,
   listRecordsQuerySchema,
@@ -279,12 +368,16 @@ const schemaEntries: Array<[string, ZodType]> = [
 
   // Notes
   ['noteResponseSchema', noteResponseSchema],
+  ['noteListResponseSchema', noteListResponseSchema],
+  ['noteRepliesResponseSchema', noteRepliesResponseSchema],
   ['createNoteBodySchema', createNoteBodySchema],
   ['updateNoteBodySchema', updateNoteBodySchema],
   ['createReplyBodySchema', createReplyBodySchema],
 
   // Volunteers
   ['volunteerResponseSchema', volunteerResponseSchema],
+  ['volunteerListResponseSchema', volunteerListResponseSchema],
+  ['volunteerMetricsResponseSchema', volunteerMetricsResponseSchema],
   ['createVolunteerBodySchema', createVolunteerBodySchema],
   ['updateVolunteerBodySchema', updateVolunteerBodySchema],
   ['adminUpdateVolunteerBodySchema', adminUpdateVolunteerBodySchema],
@@ -292,11 +385,19 @@ const schemaEntries: Array<[string, ZodType]> = [
   // Calls
   ['callRecordResponseSchema', callRecordResponseSchema],
   ['callPresenceResponseSchema', callPresenceResponseSchema],
+  ['callHistoryResponseSchema', callHistoryResponseSchema],
   ['banCallerBodySchema', banCallerBodySchema],
+  ['activeCallsResponseSchema', activeCallsResponseSchema],
+  ['todayCountResponseSchema', todayCountResponseSchema],
+  ['callerIdentifyResponseSchema', callerIdentifyResponseSchema],
+  ['callActionResponseSchema', callActionResponseSchema],
+  ['banCallResponseSchema', banCallResponseSchema],
 
   // Conversations
   ['conversationResponseSchema', conversationResponseSchema],
+  ['conversationListResponseSchema', conversationListResponseSchema],
   ['messageResponseSchema', messageResponseSchema],
+  ['messageListResponseSchema', messageListResponseSchema],
   ['sendMessageBodySchema', sendMessageBodySchema],
   ['updateConversationBodySchema', updateConversationBodySchema],
   ['claimConversationBodySchema', claimConversationBodySchema],
@@ -308,10 +409,14 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['createShiftBodySchema', createShiftBodySchema],
   ['updateShiftBodySchema', updateShiftBodySchema],
   ['fallbackGroupSchema', fallbackGroupSchema],
+  ['shiftListResponseSchema', shiftListResponseSchema],
 
   // Blasts
   ['blastResponseSchema', blastResponseSchema],
   ['subscriberResponseSchema', subscriberResponseSchema],
+  ['subscriberListResponseSchema', subscriberListResponseSchema],
+  ['blastListResponseSchema', blastListResponseSchema],
+  ['importSubscribersResponseSchema', importSubscribersResponseSchema],
   ['subscriberStatsResponseSchema', subscriberStatsResponseSchema],
   ['blastSettingsResponseSchema', blastSettingsResponseSchema],
   ['createBlastBodySchema', createBlastBodySchema],
@@ -336,16 +441,24 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['updateHubBodySchema', updateHubBodySchema],
   ['addHubMemberBodySchema', addHubMemberBodySchema],
   ['hubKeyEnvelopesBodySchema', hubKeyEnvelopesBodySchema],
+  ['hubListResponseSchema', hubListResponseSchema],
+  ['hubDetailResponseSchema', hubDetailResponseSchema],
+  ['hubKeyEnvelopeResponseSchema', hubKeyEnvelopeResponseSchema],
 
   // Uploads
   ['uploadResponseSchema', uploadResponseSchema],
   ['uploadInitBodySchema', uploadInitBodySchema],
+  ['uploadInitResponseSchema', uploadInitResponseSchema],
+  ['chunkUploadResponseSchema', chunkUploadResponseSchema],
+  ['uploadCompleteResponseSchema', uploadCompleteResponseSchema],
+  ['uploadStatusResponseSchema', uploadStatusResponseSchema],
 
   // Invites
   ['inviteResponseSchema', inviteResponseSchema],
   ['inviteValidationResponseSchema', inviteValidationResponseSchema],
   ['redeemInviteBodySchema', redeemInviteBodySchema],
   ['createInviteBodySchema', createInviteBodySchema],
+  ['inviteListResponseSchema', inviteListResponseSchema],
 
   // Settings
   ['roleResponseSchema', roleResponseSchema],
@@ -373,14 +486,26 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['transcriptionSettingsSchema', transcriptionSettingsSchema],
   ['ivrLanguagesSchema', ivrLanguagesSchema],
   ['setupStateSchema', setupStateSchema],
+  ['customFieldsListResponseSchema', customFieldsListResponseSchema],
+  ['roleListResponseSchema', roleListResponseSchema],
+  ['reportTypeListResponseSchema', reportTypeListResponseSchema],
+  ['ivrAudioPromptsResponseSchema', ivrAudioPromptsResponseSchema],
+  ['successResponseSchema', successResponseSchema],
+  ['permissionsCatalogResponseSchema', permissionsCatalogResponseSchema],
+  ['migrationStatusResponseSchema', migrationStatusResponseSchema],
+  ['cleanupMetricsResponseSchema', cleanupMetricsResponseSchema],
+  ['ttlOverridesResponseSchema', ttlOverridesResponseSchema],
 
   // Bans
   ['banResponseSchema', banResponseSchema],
+  ['banListResponseSchema', banListResponseSchema],
+  ['bulkBanResponseSchema', bulkBanResponseSchema],
   ['createBanBodySchema', createBanBodySchema],
   ['bulkBanBodySchema', bulkBanBodySchema],
 
   // Audit
   ['auditEntryResponseSchema', auditEntryResponseSchema],
+  ['auditListResponseSchema', auditListResponseSchema],
 
   // Devices
   ['deviceResponseSchema', deviceResponseSchema],
@@ -397,6 +522,9 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['authenticateBodySchema', authenticateBodySchema],
   ['addCredentialBodySchema', addCredentialBodySchema],
   ['registerCredentialBodySchema', registerCredentialBodySchema],
+  ['webauthnOptionsResponseSchema', webauthnOptionsResponseSchema],
+  ['webauthnLoginResponseSchema', webauthnLoginResponseSchema],
+  ['webauthnCredentialsListResponseSchema', webauthnCredentialsListResponseSchema],
 
   // Provisioning
   ['provisionRoomResponseSchema', provisionRoomResponseSchema],
@@ -406,9 +534,12 @@ const schemaEntries: Array<[string, ZodType]> = [
 
   // WebRTC
   ['webrtcTokenResponseSchema', webrtcTokenResponseSchema],
+  ['sipTokenResponseSchema', sipTokenResponseSchema],
+  ['telephonyStatusResponseSchema', telephonyStatusResponseSchema],
 
   // System
   ['systemStatusResponseSchema', systemStatusResponseSchema],
+  ['systemHealthResponseSchema', systemHealthResponseSchema],
 
   // Events
   ['eventSchema', eventSchema],
@@ -428,6 +559,7 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['createRelationshipBodySchema', createRelationshipBodySchema],
   ['affinityGroupSchema', affinityGroupSchema],
   ['groupMemberSchema', groupMemberSchema],
+  ['groupMemberListResponseSchema', groupMemberListResponseSchema],
   ['createAffinityGroupBodySchema', createAffinityGroupBodySchema],
   ['updateAffinityGroupBodySchema', updateAffinityGroupBodySchema],
   ['addGroupMemberBodySchema', addGroupMemberBodySchema],
@@ -473,9 +605,41 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['createRelationshipTypeBodySchema', createRelationshipTypeBodySchema],
   ['updateRelationshipTypeBodySchema', updateRelationshipTypeBodySchema],
   ['caseNumberBodySchema', caseNumberBodySchema],
+  ['entityTypeListResponseSchema', entityTypeListResponseSchema],
+  ['relationshipTypeListResponseSchema', relationshipTypeListResponseSchema],
+  ['caseNumberResponseSchema', caseNumberResponseSchema],
+  ['templateListResponseSchema', templateListResponseSchema],
+  ['templateApplyResponseSchema', templateApplyResponseSchema],
+  ['templateUpdatesResponseSchema', templateUpdatesResponseSchema],
+  ['rolesFromTemplateResponseSchema', rolesFromTemplateResponseSchema],
+  ['enabledResponseSchema', enabledResponseSchema],
+  ['cmsReportTypeListResponseSchema', cmsReportTypeListResponseSchema],
+
+  // Reports — list/wrapper responses
+  ['reportListResponseSchema', reportListResponseSchema],
+  ['reportCategoriesResponseSchema', reportCategoriesResponseSchema],
+  ['reportFilesResponseSchema', reportFilesResponseSchema],
+  ['reportLinkedCasesResponseSchema', reportLinkedCasesResponseSchema],
+
+  // Files — response schemas
+  ['fileEnvelopesResponseSchema', fileEnvelopesResponseSchema],
+  ['fileMetadataResponseSchema', fileMetadataResponseSchema],
+
+  // Setup — response schemas
+  ['setupStateResponseSchema', setupStateResponseSchema],
+  ['connectionTestResponseSchema', connectionTestResponseSchema],
+
+  // Contact Timeline (aggregated interaction view)
+  ['contactTimelineListResponseSchema', contactTimelineListResponseSchema],
+  ['contactTimelineDetailResponseSchema', contactTimelineDetailResponseSchema],
 
   // Records (CMS case records)
   ['recordSchema', recordSchema],
+  ['recordListResponseSchema', recordListResponseSchema],
+  ['recordContactListResponseSchema', recordContactListResponseSchema],
+  ['envelopeRecipientsResponseSchema', envelopeRecipientsResponseSchema],
+  ['suggestAssigneesResponseSchema', suggestAssigneesResponseSchema],
+  ['recordsByContactResponseSchema', recordsByContactResponseSchema],
   ['createRecordBodySchema', createRecordBodySchema],
   ['updateRecordBodySchema', updateRecordBodySchema],
   ['listRecordsQuerySchema', listRecordsQuerySchema],
@@ -483,6 +647,18 @@ const schemaEntries: Array<[string, ZodType]> = [
   ['linkContactBodySchema', linkContactBodySchema],
   ['assignBodySchema', assignBodySchema],
   ['unassignBodySchema', unassignBodySchema],
+
+  // Config
+  ['configResponseSchema', configResponseSchema],
+  ['configVerifyResponseSchema', configVerifyResponseSchema],
+
+  // Health
+  ['healthResponseSchema', healthResponseSchema],
+  ['livenessResponseSchema', livenessResponseSchema],
+  ['readinessResponseSchema', readinessResponseSchema],
+
+  // Metrics
+  ['metricsResponseSchema', metricsResponseSchema],
 ]
 
 export interface SchemaRegistryEntry {

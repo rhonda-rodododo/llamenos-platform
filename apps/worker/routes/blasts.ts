@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema } from '@protocol/schemas/blasts'
+import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, importSubscribersResponseSchema } from '@protocol/schemas/blasts'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 
 const blasts = new Hono<AppEnv>()
@@ -13,7 +14,14 @@ blasts.get('/subscribers',
     tags: ['Blasts'],
     summary: 'List blast subscribers',
     responses: {
-      200: { description: 'List of subscribers' },
+      200: {
+        description: 'List of subscribers',
+        content: {
+          'application/json': {
+            schema: resolver(subscriberListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -46,7 +54,14 @@ blasts.delete('/subscribers/:id',
     tags: ['Blasts'],
     summary: 'Remove a subscriber',
     responses: {
-      200: { description: 'Subscriber removed' },
+      200: {
+        description: 'Subscriber removed',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -64,7 +79,14 @@ blasts.get('/subscribers/stats',
     tags: ['Blasts'],
     summary: 'Get subscriber statistics',
     responses: {
-      200: { description: 'Subscriber stats' },
+      200: {
+        description: 'Subscriber stats',
+        content: {
+          'application/json': {
+            schema: resolver(subscriberStatsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -82,7 +104,14 @@ blasts.post('/subscribers/import',
     tags: ['Blasts'],
     summary: 'Import subscribers in bulk',
     responses: {
-      200: { description: 'Import results' },
+      200: {
+        description: 'Import results',
+        content: {
+          'application/json': {
+            schema: resolver(importSubscribersResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -103,7 +132,14 @@ blasts.get('/',
     tags: ['Blasts'],
     summary: 'List blasts',
     responses: {
-      200: { description: 'Paginated list of blasts' },
+      200: {
+        description: 'Paginated list of blasts',
+        content: {
+          'application/json': {
+            schema: resolver(blastListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -135,7 +171,14 @@ blasts.post('/',
     tags: ['Blasts'],
     summary: 'Create a new blast',
     responses: {
-      201: { description: 'Blast created' },
+      201: {
+        description: 'Blast created',
+        content: {
+          'application/json': {
+            schema: resolver(blastResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -162,7 +205,14 @@ blasts.get('/:id',
     tags: ['Blasts'],
     summary: 'Get a single blast',
     responses: {
-      200: { description: 'Blast details' },
+      200: {
+        description: 'Blast details',
+        content: {
+          'application/json': {
+            schema: resolver(blastResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -180,7 +230,14 @@ blasts.patch('/:id',
     tags: ['Blasts'],
     summary: 'Update a blast',
     responses: {
-      200: { description: 'Blast updated' },
+      200: {
+        description: 'Blast updated',
+        content: {
+          'application/json': {
+            schema: resolver(blastResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -204,7 +261,14 @@ blasts.delete('/:id',
     tags: ['Blasts'],
     summary: 'Delete a blast',
     responses: {
-      200: { description: 'Blast deleted' },
+      200: {
+        description: 'Blast deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -222,7 +286,14 @@ blasts.post('/:id/send',
     tags: ['Blasts'],
     summary: 'Send a blast immediately',
     responses: {
-      200: { description: 'Blast sent' },
+      200: {
+        description: 'Blast sent',
+        content: {
+          'application/json': {
+            schema: resolver(blastResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -241,7 +312,14 @@ blasts.post('/:id/schedule',
     tags: ['Blasts'],
     summary: 'Schedule a blast for later delivery',
     responses: {
-      200: { description: 'Blast scheduled' },
+      200: {
+        description: 'Blast scheduled',
+        content: {
+          'application/json': {
+            schema: resolver(blastResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -261,7 +339,14 @@ blasts.post('/:id/cancel',
     tags: ['Blasts'],
     summary: 'Cancel a scheduled blast',
     responses: {
-      200: { description: 'Blast cancelled' },
+      200: {
+        description: 'Blast cancelled',
+        content: {
+          'application/json': {
+            schema: resolver(blastResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -280,7 +365,14 @@ blasts.get('/settings',
     tags: ['Blasts'],
     summary: 'Get blast settings',
     responses: {
-      200: { description: 'Blast settings' },
+      200: {
+        description: 'Blast settings',
+        content: {
+          'application/json': {
+            schema: resolver(blastSettingsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -298,7 +390,14 @@ blasts.patch('/settings',
     tags: ['Blasts'],
     summary: 'Update blast settings',
     responses: {
-      200: { description: 'Blast settings updated' },
+      200: {
+        description: 'Blast settings updated',
+        content: {
+          'application/json': {
+            schema: resolver(blastSettingsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

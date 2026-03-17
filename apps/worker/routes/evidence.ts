@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, requireAnyPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
@@ -8,6 +8,11 @@ import {
   logCustodyEventBodySchema,
   verifyIntegrityBodySchema,
   listEvidenceQuerySchema,
+  evidenceMetadataSchema,
+  evidenceListResponseSchema,
+  custodyChainResponseSchema,
+  custodyEntrySchema,
+  verifyIntegrityResponseSchema,
 } from '@protocol/schemas/evidence'
 import { authErrors, notFoundError } from '../openapi/helpers'
 
@@ -26,7 +31,14 @@ evidence.post('/records/:id/evidence',
     tags: ['Evidence'],
     summary: 'Upload evidence to a case record',
     responses: {
-      201: { description: 'Evidence metadata created with initial custody entry' },
+      201: {
+        description: 'Evidence metadata created with initial custody entry',
+        content: {
+          'application/json': {
+            schema: resolver(evidenceMetadataSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -77,7 +89,14 @@ evidence.get('/records/:id/evidence',
     tags: ['Evidence'],
     summary: 'List evidence for a case record',
     responses: {
-      200: { description: 'Paginated list of evidence' },
+      200: {
+        description: 'Paginated list of evidence',
+        content: {
+          'application/json': {
+            schema: resolver(evidenceListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -109,7 +128,14 @@ evidence.get('/evidence/:evidenceId',
     tags: ['Evidence'],
     summary: 'Get single evidence metadata',
     responses: {
-      200: { description: 'Evidence metadata' },
+      200: {
+        description: 'Evidence metadata',
+        content: {
+          'application/json': {
+            schema: resolver(evidenceMetadataSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -129,7 +155,14 @@ evidence.get('/evidence/:evidenceId/custody',
     tags: ['Evidence'],
     summary: 'Get chain of custody for evidence',
     responses: {
-      200: { description: 'Chronological custody chain' },
+      200: {
+        description: 'Chronological custody chain',
+        content: {
+          'application/json': {
+            schema: resolver(custodyChainResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -149,7 +182,14 @@ evidence.post('/evidence/:evidenceId/access',
     tags: ['Evidence'],
     summary: 'Log evidence access event (view, download, share)',
     responses: {
-      201: { description: 'Custody entry created' },
+      201: {
+        description: 'Custody entry created',
+        content: {
+          'application/json': {
+            schema: resolver(custodyEntrySchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -183,7 +223,14 @@ evidence.post('/evidence/:evidenceId/verify',
     tags: ['Evidence'],
     summary: 'Verify evidence integrity (compare current hash to stored hash)',
     responses: {
-      200: { description: 'Verification result' },
+      200: {
+        description: 'Verification result',
+        content: {
+          'application/json': {
+            schema: resolver(verifyIntegrityResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },

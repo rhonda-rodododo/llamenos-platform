@@ -23,6 +23,19 @@ export const volunteerResponseSchema = z.object({
   supervisorPubkey: z.string().optional(),
 })
 
+// --- List/wrapper response schemas ---
+
+export const volunteerListResponseSchema = z.object({
+  volunteers: z.array(volunteerResponseSchema),
+})
+
+export const volunteerMetricsResponseSchema = z.object({
+  pubkey: z.string(),
+  activeCaseCount: z.number(),
+  totalCasesHandled: z.number(),
+  averageResolutionDays: z.number().nullable(),
+})
+
 // --- Input schemas ---
 
 export const createVolunteerBodySchema = z.looseObject({

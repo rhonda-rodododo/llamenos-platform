@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { paginationSchema } from './common'
+import { paginationSchema, paginatedMeta } from './common'
 
 // --- Response schemas ---
 
@@ -56,6 +56,24 @@ export const blastSettingsResponseSchema = z.object({
   unsubscribeMessage: z.string().optional(),
   doubleOptIn: z.boolean().optional(),
   maxBlastsPerDay: z.number().optional(),
+})
+
+// --- List/wrapper response schemas ---
+
+export const subscriberListResponseSchema = z.object({
+  subscribers: z.array(subscriberResponseSchema),
+  ...paginatedMeta,
+})
+
+export const blastListResponseSchema = z.object({
+  blasts: z.array(blastResponseSchema),
+  ...paginatedMeta,
+})
+
+export const importSubscribersResponseSchema = z.object({
+  imported: z.number(),
+  skipped: z.number(),
+  errors: z.array(z.object({ identifier: z.string(), error: z.string() })).optional(),
 })
 
 // --- Input schemas ---

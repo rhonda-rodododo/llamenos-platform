@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from './metrics'
-import { shareFileBodySchema } from '@protocol/schemas/files'
+import { shareFileBodySchema, fileEnvelopesResponseSchema, fileMetadataResponseSchema } from '@protocol/schemas/files'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 
 const files = new Hono<AppEnv>()
@@ -87,7 +88,14 @@ files.get('/:id/envelopes',
     summary: 'Get file key envelopes',
     responses: {
       ...authErrors,
-      200: { description: 'File key envelopes for authorized recipients' },
+      200: {
+        description: 'File key envelopes for authorized recipients',
+        content: {
+          'application/json': {
+            schema: resolver(fileEnvelopesResponseSchema),
+          },
+        },
+      },
       403: { description: 'Forbidden' },
       404: { description: 'File not found' },
     },
@@ -125,7 +133,14 @@ files.get('/:id/metadata',
     summary: 'Get encrypted file metadata',
     responses: {
       ...authErrors,
-      200: { description: 'Encrypted metadata for authorized recipients' },
+      200: {
+        description: 'Encrypted metadata for authorized recipients',
+        content: {
+          'application/json': {
+            schema: resolver(fileMetadataResponseSchema),
+          },
+        },
+      },
       403: { description: 'Forbidden' },
       404: { description: 'File not found' },
     },
@@ -163,7 +178,14 @@ files.post('/:id/share', requirePermission('files:share'),
     tags: ['Files'],
     summary: 'Share file with a new recipient',
     responses: {
-      200: { description: 'File shared successfully' },
+      200: {
+        description: 'File shared successfully',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       500: { description: 'Failed to share file' },
       ...authErrors,
     },

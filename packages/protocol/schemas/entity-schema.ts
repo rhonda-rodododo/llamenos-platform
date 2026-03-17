@@ -294,6 +294,49 @@ export const caseNumberBodySchema = z.looseObject({
 
 // --- Create roles from template suggestions (Epic 321) ---
 
+// --- List/wrapper response schemas ---
+
+export const entityTypeListResponseSchema = z.object({
+  entityTypes: z.array(entityTypeDefinitionSchema),
+})
+
+export const relationshipTypeListResponseSchema = z.object({
+  relationshipTypes: z.array(relationshipTypeDefinitionSchema),
+})
+
+export const caseNumberResponseSchema = z.object({
+  number: z.string(),
+  prefix: z.string(),
+})
+
+export const templateListResponseSchema = z.object({
+  templates: z.array(z.unknown()),
+  appliedTemplateIds: z.array(z.string()),
+})
+
+export const templateApplyResponseSchema = z.object({
+  applied: z.boolean(),
+  entityTypes: z.number(),
+  relationshipTypes: z.number(),
+  reportTypes: z.number(),
+  suggestedRoles: z.array(z.unknown()).optional(),
+})
+
+export const templateUpdatesResponseSchema = z.object({
+  updates: z.array(z.unknown()),
+})
+
+export const rolesFromTemplateResponseSchema = z.object({
+  created: z.array(z.object({ id: z.string(), name: z.string() })),
+  count: z.number(),
+})
+
+export const enabledResponseSchema = z.object({
+  enabled: z.boolean(),
+})
+
+// --- Create roles from template suggestions (Epic 321) ---
+
 export const createRolesFromTemplateBodySchema = z.object({
   roles: z.array(z.object({
     name: z.string().min(1).max(100),

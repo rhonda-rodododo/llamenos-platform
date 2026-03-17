@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { pubkeySchema } from './common'
+import { pubkeySchema, recipientEnvelopeSchema } from './common'
 
 // --- Response schemas ---
 
@@ -19,6 +19,20 @@ export const hubMemberResponseSchema = z.object({
   name: z.string(),
   roles: z.array(z.string()),
   joinedAt: z.string().optional(),
+})
+
+// --- List/wrapper response schemas ---
+
+export const hubListResponseSchema = z.object({
+  hubs: z.array(hubResponseSchema),
+})
+
+export const hubDetailResponseSchema = z.object({
+  hub: hubResponseSchema,
+})
+
+export const hubKeyEnvelopeResponseSchema = z.object({
+  envelope: recipientEnvelopeSchema,
 })
 
 // --- Input schemas ---

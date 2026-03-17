@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { pubkeySchema, paginationSchema, recipientEnvelopeSchema } from './common'
+import { pubkeySchema, paginationSchema, paginatedMeta, recipientEnvelopeSchema } from './common'
 
 // --- Response schemas ---
 
@@ -25,6 +25,18 @@ export const messageResponseSchema = z.object({
   readerEnvelopes: z.array(recipientEnvelopeSchema),
   createdAt: z.string(),
   status: z.string().optional(),
+})
+
+// --- List/wrapper response schemas ---
+
+export const conversationListResponseSchema = z.object({
+  conversations: z.array(conversationResponseSchema),
+  ...paginatedMeta,
+})
+
+export const messageListResponseSchema = z.object({
+  messages: z.array(messageResponseSchema),
+  ...paginatedMeta,
 })
 
 // --- Input schemas ---

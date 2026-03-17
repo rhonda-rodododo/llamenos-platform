@@ -160,3 +160,53 @@ export const setupStateSchema = z.looseObject({
   completed: z.boolean().optional(),
   step: z.string().optional(),
 })
+
+// --- List/wrapper response schemas ---
+
+export const customFieldsListResponseSchema = z.object({
+  fields: z.array(customFieldResponseSchema),
+})
+
+export const roleListResponseSchema = z.object({
+  roles: z.array(roleResponseSchema),
+})
+
+export const reportTypeListResponseSchema = z.object({
+  reportTypes: z.array(reportTypeResponseSchema),
+})
+
+export const ivrAudioPromptsResponseSchema = z.object({
+  prompts: z.array(z.object({
+    type: z.string(),
+    languages: z.array(z.string()),
+  })),
+})
+
+export const successResponseSchema = z.object({
+  success: z.boolean(),
+})
+
+export const permissionsCatalogResponseSchema = z.object({
+  permissions: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    domain: z.string(),
+  })),
+  byDomain: z.record(z.string(), z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+  }))),
+})
+
+export const migrationStatusResponseSchema = z.object({
+  namespaces: z.array(z.unknown()),
+  note: z.string(),
+})
+
+export const cleanupMetricsResponseSchema = z.object({
+  settings: z.record(z.string(), z.unknown()),
+  identity: z.record(z.string(), z.unknown()),
+  conversation: z.record(z.string(), z.unknown()),
+})
+
+export const ttlOverridesResponseSchema = z.record(z.string(), z.number())

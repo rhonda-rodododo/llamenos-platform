@@ -1,9 +1,8 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { createVolunteerBodySchema, adminUpdateVolunteerBodySchema, volunteerResponseSchema } from '@protocol/schemas/volunteers'
+import { createVolunteerBodySchema, adminUpdateVolunteerBodySchema, volunteerResponseSchema, volunteerListResponseSchema, volunteerMetricsResponseSchema } from '@protocol/schemas/volunteers'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -20,7 +19,7 @@ volunteers.get('/',
         description: 'List of volunteers',
         content: {
           'application/json': {
-            schema: resolver(z.object({ volunteers: z.array(volunteerResponseSchema) })),
+            schema: resolver(volunteerListResponseSchema),
           },
         },
       },
@@ -226,12 +225,7 @@ volunteers.get('/:targetPubkey/metrics',
         description: 'Volunteer metrics',
         content: {
           'application/json': {
-            schema: resolver(z.object({
-              pubkey: z.string(),
-              activeCaseCount: z.number(),
-              totalCasesHandled: z.number(),
-              averageResolutionDays: z.number().nullable(),
-            })),
+            schema: resolver(volunteerMetricsResponseSchema),
           },
         },
       },

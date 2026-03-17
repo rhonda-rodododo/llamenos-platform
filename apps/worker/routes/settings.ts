@@ -17,6 +17,17 @@ import {
   createReportTypeBodySchema,
   updateReportTypeBodySchema,
   ttlOverridesBodySchema,
+  roleResponseSchema,
+  reportTypeResponseSchema,
+  customFieldsListResponseSchema,
+  roleListResponseSchema,
+  reportTypeListResponseSchema,
+  ivrAudioPromptsResponseSchema,
+  successResponseSchema,
+  permissionsCatalogResponseSchema,
+  migrationStatusResponseSchema,
+  cleanupMetricsResponseSchema,
+  ttlOverridesResponseSchema,
 } from '@protocol/schemas/settings'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
@@ -31,7 +42,14 @@ settings.get('/transcription',
     tags: ['Settings'],
     summary: 'Get transcription settings',
     responses: {
-      200: { description: 'Transcription settings' },
+      200: {
+        description: 'Transcription settings',
+        content: {
+          'application/json': {
+            schema: resolver(transcriptionSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -47,7 +65,14 @@ settings.patch('/transcription',
     tags: ['Settings'],
     summary: 'Update transcription settings',
     responses: {
-      200: { description: 'Transcription settings updated' },
+      200: {
+        description: 'Transcription settings updated',
+        content: {
+          'application/json': {
+            schema: resolver(transcriptionSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -69,7 +94,14 @@ settings.get('/custom-fields',
     tags: ['Settings'],
     summary: 'Get custom field definitions',
     responses: {
-      200: { description: 'Custom field definitions' },
+      200: {
+        description: 'Custom field definitions',
+        content: {
+          'application/json': {
+            schema: resolver(customFieldsListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -87,7 +119,14 @@ settings.put('/custom-fields',
     tags: ['Settings'],
     summary: 'Replace custom field definitions',
     responses: {
-      200: { description: 'Custom fields updated' },
+      200: {
+        description: 'Custom fields updated',
+        content: {
+          'application/json': {
+            schema: resolver(customFieldsListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -109,7 +148,14 @@ settings.get('/spam',
     tags: ['Settings'],
     summary: 'Get spam mitigation settings',
     responses: {
-      200: { description: 'Spam settings' },
+      200: {
+        description: 'Spam settings',
+        content: {
+          'application/json': {
+            schema: resolver(spamSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -126,7 +172,14 @@ settings.patch('/spam',
     tags: ['Settings'],
     summary: 'Update spam mitigation settings',
     responses: {
-      200: { description: 'Spam settings updated' },
+      200: {
+        description: 'Spam settings updated',
+        content: {
+          'application/json': {
+            schema: resolver(spamSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -147,7 +200,14 @@ settings.get('/call',
     tags: ['Settings'],
     summary: 'Get call settings',
     responses: {
-      200: { description: 'Call settings' },
+      200: {
+        description: 'Call settings',
+        content: {
+          'application/json': {
+            schema: resolver(callSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -164,7 +224,14 @@ settings.patch('/call',
     tags: ['Settings'],
     summary: 'Update call settings',
     responses: {
-      200: { description: 'Call settings updated' },
+      200: {
+        description: 'Call settings updated',
+        content: {
+          'application/json': {
+            schema: resolver(callSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -185,7 +252,14 @@ settings.get('/ivr-languages',
     tags: ['Settings'],
     summary: 'Get IVR language settings',
     responses: {
-      200: { description: 'IVR language settings' },
+      200: {
+        description: 'IVR language settings',
+        content: {
+          'application/json': {
+            schema: resolver(ivrLanguagesSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -202,7 +276,14 @@ settings.patch('/ivr-languages',
     tags: ['Settings'],
     summary: 'Update IVR language settings',
     responses: {
-      200: { description: 'IVR language settings updated' },
+      200: {
+        description: 'IVR language settings updated',
+        content: {
+          'application/json': {
+            schema: resolver(ivrLanguagesSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -223,7 +304,14 @@ settings.get('/webauthn',
     tags: ['Settings'],
     summary: 'Get WebAuthn settings',
     responses: {
-      200: { description: 'WebAuthn settings' },
+      200: {
+        description: 'WebAuthn settings',
+        content: {
+          'application/json': {
+            schema: resolver(webauthnSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -240,7 +328,14 @@ settings.patch('/webauthn',
     tags: ['Settings'],
     summary: 'Update WebAuthn settings',
     responses: {
-      200: { description: 'WebAuthn settings updated' },
+      200: {
+        description: 'WebAuthn settings updated',
+        content: {
+          'application/json': {
+            schema: resolver(webauthnSettingsSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -262,7 +357,14 @@ settings.get('/telephony-provider',
     tags: ['Settings'],
     summary: 'Get telephony provider settings',
     responses: {
-      200: { description: 'Telephony provider settings' },
+      200: {
+        description: 'Telephony provider settings',
+        content: {
+          'application/json': {
+            schema: resolver(telephonyProviderSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -279,7 +381,14 @@ settings.patch('/telephony-provider',
     tags: ['Settings'],
     summary: 'Update telephony provider settings',
     responses: {
-      200: { description: 'Telephony provider settings updated' },
+      200: {
+        description: 'Telephony provider settings updated',
+        content: {
+          'application/json': {
+            schema: resolver(telephonyProviderSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -380,7 +489,14 @@ settings.get('/messaging',
     tags: ['Settings'],
     summary: 'Get messaging configuration',
     responses: {
-      200: { description: 'Messaging configuration' },
+      200: {
+        description: 'Messaging configuration',
+        content: {
+          'application/json': {
+            schema: resolver(messagingConfigSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -397,7 +513,14 @@ settings.patch('/messaging',
     tags: ['Settings'],
     summary: 'Update messaging configuration',
     responses: {
-      200: { description: 'Messaging configuration updated' },
+      200: {
+        description: 'Messaging configuration updated',
+        content: {
+          'application/json': {
+            schema: resolver(messagingConfigSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -419,7 +542,14 @@ settings.get('/setup',
     tags: ['Settings'],
     summary: 'Get setup wizard state',
     responses: {
-      200: { description: 'Setup state' },
+      200: {
+        description: 'Setup state',
+        content: {
+          'application/json': {
+            schema: resolver(setupStateSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -436,7 +566,14 @@ settings.patch('/setup',
     tags: ['Settings'],
     summary: 'Update setup wizard state',
     responses: {
-      200: { description: 'Setup state updated' },
+      200: {
+        description: 'Setup state updated',
+        content: {
+          'application/json': {
+            schema: resolver(setupStateSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -457,7 +594,14 @@ settings.get('/ivr-audio',
     tags: ['Settings'],
     summary: 'Get IVR audio prompts',
     responses: {
-      200: { description: 'IVR audio prompt metadata' },
+      200: {
+        description: 'IVR audio prompt metadata',
+        content: {
+          'application/json': {
+            schema: resolver(ivrAudioPromptsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -474,7 +618,14 @@ settings.put('/ivr-audio/:promptType/:language',
     tags: ['Settings'],
     summary: 'Upload IVR audio prompt',
     responses: {
-      200: { description: 'Audio prompt uploaded' },
+      200: {
+        description: 'Audio prompt uploaded',
+        content: {
+          'application/json': {
+            schema: resolver(successResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -499,7 +650,14 @@ settings.delete('/ivr-audio/:promptType/:language',
     tags: ['Settings'],
     summary: 'Delete IVR audio prompt',
     responses: {
-      200: { description: 'Audio prompt deleted' },
+      200: {
+        description: 'Audio prompt deleted',
+        content: {
+          'application/json': {
+            schema: resolver(successResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -521,7 +679,14 @@ settings.get('/report-types',
     tags: ['Settings'],
     summary: 'Get report type definitions',
     responses: {
-      200: { description: 'Report types' },
+      200: {
+        description: 'Report types',
+        content: {
+          'application/json': {
+            schema: resolver(reportTypeListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -538,7 +703,14 @@ settings.post('/report-types',
     tags: ['Settings'],
     summary: 'Create a report type',
     responses: {
-      201: { description: 'Report type created' },
+      201: {
+        description: 'Report type created',
+        content: {
+          'application/json': {
+            schema: resolver(reportTypeResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -559,7 +731,14 @@ settings.patch('/report-types/:id',
     tags: ['Settings'],
     summary: 'Update a report type',
     responses: {
-      200: { description: 'Report type updated' },
+      200: {
+        description: 'Report type updated',
+        content: {
+          'application/json': {
+            schema: resolver(reportTypeResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -581,7 +760,14 @@ settings.delete('/report-types/:id',
     tags: ['Settings'],
     summary: 'Delete a report type',
     responses: {
-      200: { description: 'Report type deleted' },
+      200: {
+        description: 'Report type deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -602,7 +788,14 @@ settings.get('/roles',
     tags: ['Settings'],
     summary: 'List all roles',
     responses: {
-      200: { description: 'List of roles' },
+      200: {
+        description: 'List of roles',
+        content: {
+          'application/json': {
+            schema: resolver(roleListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -619,7 +812,14 @@ settings.post('/roles',
     tags: ['Settings'],
     summary: 'Create a custom role',
     responses: {
-      201: { description: 'Role created' },
+      201: {
+        description: 'Role created',
+        content: {
+          'application/json': {
+            schema: resolver(roleResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -640,7 +840,14 @@ settings.patch('/roles/:id',
     tags: ['Settings'],
     summary: 'Update a role',
     responses: {
-      200: { description: 'Role updated' },
+      200: {
+        description: 'Role updated',
+        content: {
+          'application/json': {
+            schema: resolver(roleResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -662,7 +869,14 @@ settings.delete('/roles/:id',
     tags: ['Settings'],
     summary: 'Delete a role',
     responses: {
-      200: { description: 'Role deleted' },
+      200: {
+        description: 'Role deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -683,7 +897,14 @@ settings.get('/permissions',
     tags: ['Settings'],
     summary: 'Get permissions catalog',
     responses: {
-      200: { description: 'Permissions catalog' },
+      200: {
+        description: 'Permissions catalog',
+        content: {
+          'application/json': {
+            schema: resolver(permissionsCatalogResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -704,7 +925,14 @@ settings.get('/migrations',
     tags: ['Settings'],
     summary: 'Get migration status for all Durable Objects',
     responses: {
-      200: { description: 'Migration status per DO namespace' },
+      200: {
+        description: 'Migration status per DO namespace',
+        content: {
+          'application/json': {
+            schema: resolver(migrationStatusResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -721,7 +949,14 @@ settings.get('/ttl',
     tags: ['Settings'],
     summary: 'Get TTL override settings',
     responses: {
-      200: { description: 'TTL override settings' },
+      200: {
+        description: 'TTL override settings',
+        content: {
+          'application/json': {
+            schema: resolver(ttlOverridesResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -738,7 +973,14 @@ settings.patch('/ttl',
     tags: ['Settings'],
     summary: 'Update TTL override settings',
     responses: {
-      200: { description: 'TTL overrides updated' },
+      200: {
+        description: 'TTL overrides updated',
+        content: {
+          'application/json': {
+            schema: resolver(ttlOverridesResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -760,7 +1002,14 @@ settings.get('/cleanup-metrics',
     tags: ['Settings'],
     summary: 'Get aggregated cleanup metrics',
     responses: {
-      200: { description: 'Cleanup metrics from all DOs' },
+      200: {
+        description: 'Cleanup metrics from all DOs',
+        content: {
+          'application/json': {
+            schema: resolver(cleanupMetricsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

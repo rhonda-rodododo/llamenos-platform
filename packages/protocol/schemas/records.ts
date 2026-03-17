@@ -166,3 +166,23 @@ export const recordListResponseSchema = z.object({
 export const recordContactListResponseSchema = z.object({
   contacts: z.array(recordContactSchema),
 })
+
+export const envelopeRecipientsResponseSchema = z.object({
+  summary: z.array(z.string()),
+  fields: z.array(z.string()),
+  pii: z.array(z.string()),
+})
+
+export const suggestAssigneesResponseSchema = z.object({
+  suggestions: z.array(z.object({
+    pubkey: z.string(),
+    score: z.number(),
+    reasons: z.array(z.string()),
+    activeCaseCount: z.number(),
+    maxCases: z.number(),
+  })),
+})
+
+export const recordsByContactResponseSchema = z.object({
+  records: z.array(recordSchema),
+})

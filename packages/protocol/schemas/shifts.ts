@@ -19,6 +19,12 @@ export const myStatusResponseSchema = z.object({
   nextShift: z.object({ name: z.string(), startTime: z.string(), endTime: z.string(), day: z.number() }).nullable(),
 })
 
+// --- List/wrapper response schemas ---
+
+export const shiftListResponseSchema = z.object({
+  shifts: z.array(shiftResponseSchema),
+})
+
 // --- Input schemas ---
 
 export const createShiftBodySchema = z.looseObject({

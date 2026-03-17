@@ -132,3 +132,7 @@ export const affinityGroupListResponseSchema = z.object({
 export const affinityGroupWithMembersResponseSchema = affinityGroupSchema.extend({
   members: z.array(groupMemberSchema),
 })
+
+export const groupMemberListResponseSchema = z.object({
+  members: z.array(groupMemberSchema),
+})

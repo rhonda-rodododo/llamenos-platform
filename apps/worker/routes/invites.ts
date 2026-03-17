@@ -6,7 +6,7 @@ import { hashIP } from '../lib/crypto'
 import { verifyAuthToken } from '../lib/auth'
 import { auth as authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission-guard'
-import { redeemInviteBodySchema, createInviteBodySchema } from '@protocol/schemas/invites'
+import { redeemInviteBodySchema, createInviteBodySchema, inviteResponseSchema, inviteValidationResponseSchema, inviteListResponseSchema } from '@protocol/schemas/invites'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { publicErrors, authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -22,7 +22,14 @@ invites.get('/validate/:code',
     tags: ['Invites'],
     summary: 'Validate an invite code',
     responses: {
-      200: { description: 'Invite validation result' },
+      200: {
+        description: 'Invite validation result',
+        content: {
+          'application/json': {
+            schema: resolver(inviteValidationResponseSchema),
+          },
+        },
+      },
       ...publicErrors,
     },
   }),
@@ -85,7 +92,14 @@ invites.get('/',
     tags: ['Invites'],
     summary: 'List all invites',
     responses: {
-      200: { description: 'List of invites' },
+      200: {
+        description: 'List of invites',
+        content: {
+          'application/json': {
+            schema: resolver(inviteListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -101,7 +115,14 @@ invites.post('/',
     tags: ['Invites'],
     summary: 'Create a new invite',
     responses: {
-      201: { description: 'Invite created' },
+      201: {
+        description: 'Invite created',
+        content: {
+          'application/json': {
+            schema: resolver(inviteResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { paginationSchema } from './common'
+import { paginationSchema, paginatedMeta } from './common'
 
 // --- Input schemas ---
 
@@ -21,4 +21,11 @@ export const auditEntryResponseSchema = z.object({
   createdAt: z.string(),
   previousEntryHash: z.string().optional(),
   entryHash: z.string().optional(),
+})
+
+// --- List response schema ---
+
+export const auditListResponseSchema = z.object({
+  entries: z.array(auditEntryResponseSchema),
+  ...paginatedMeta,
 })

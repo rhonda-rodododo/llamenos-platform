@@ -1,9 +1,8 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { createShiftBodySchema, updateShiftBodySchema, fallbackGroupSchema, shiftResponseSchema } from '@protocol/schemas/shifts'
+import { createShiftBodySchema, updateShiftBodySchema, fallbackGroupSchema, shiftResponseSchema, myStatusResponseSchema, shiftListResponseSchema } from '@protocol/schemas/shifts'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -16,7 +15,14 @@ shifts.get('/my-status',
     tags: ['Shifts'],
     summary: 'Get current user shift status',
     responses: {
-      200: { description: 'Shift status for the current user' },
+      200: {
+        description: 'Shift status for the current user',
+        content: {
+          'application/json': {
+            schema: resolver(myStatusResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -36,7 +42,14 @@ shifts.get('/fallback',
     tags: ['Shifts'],
     summary: 'Get fallback ring group',
     responses: {
-      200: { description: 'Fallback group configuration' },
+      200: {
+        description: 'Fallback group configuration',
+        content: {
+          'application/json': {
+            schema: resolver(fallbackGroupSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -53,7 +66,14 @@ shifts.put('/fallback',
     tags: ['Shifts'],
     summary: 'Update fallback ring group',
     responses: {
-      200: { description: 'Fallback group updated' },
+      200: {
+        description: 'Fallback group updated',
+        content: {
+          'application/json': {
+            schema: resolver(fallbackGroupSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -76,7 +96,7 @@ shifts.get('/',
         description: 'List of shifts',
         content: {
           'application/json': {
-            schema: resolver(z.object({ shifts: z.array(shiftResponseSchema) })),
+            schema: resolver(shiftListResponseSchema),
           },
         },
       },

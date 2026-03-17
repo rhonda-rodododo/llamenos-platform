@@ -12,6 +12,14 @@ export const shareFileBodySchema = z.object({
 
 // --- Response schemas ---
 
+export const fileEnvelopesResponseSchema = z.object({
+  envelopes: z.array(z.looseObject({ pubkey: z.string() })),
+})
+
+export const fileMetadataResponseSchema = z.object({
+  metadata: z.array(z.looseObject({ pubkey: z.string() })),
+})
+
 export const fileResponseSchema = z.object({
   id: z.string(),
   conversationId: z.string(),

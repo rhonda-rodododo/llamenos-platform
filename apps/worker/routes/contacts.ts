@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { paginationSchema } from '@protocol/schemas/common'
+import { contactTimelineListResponseSchema, contactTimelineDetailResponseSchema } from '@protocol/schemas/contacts'
 import { authErrors } from '../openapi/helpers'
 
 const contacts = new Hono<AppEnv>()
@@ -14,7 +15,14 @@ contacts.get('/',
     tags: ['Contacts'],
     summary: 'List contacts with aggregated counts',
     responses: {
-      200: { description: 'Paginated list of contacts' },
+      200: {
+        description: 'Paginated list of contacts',
+        content: {
+          'application/json': {
+            schema: resolver(contactTimelineListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -90,7 +98,14 @@ contacts.get('/:hash',
     tags: ['Contacts'],
     summary: 'Get unified timeline for a contact',
     responses: {
-      200: { description: 'Notes and conversations for the contact' },
+      200: {
+        description: 'Notes and conversations for the contact',
+        content: {
+          'application/json': {
+            schema: resolver(contactTimelineDetailResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

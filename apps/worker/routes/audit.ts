@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { listAuditQuerySchema } from '@protocol/schemas/audit'
+import { listAuditQuerySchema, auditListResponseSchema } from '@protocol/schemas/audit'
 import { authErrors } from '../openapi/helpers'
 
 const auditRoutes = new Hono<AppEnv>()
@@ -13,7 +13,14 @@ auditRoutes.get('/',
     tags: ['Audit'],
     summary: 'List audit log entries',
     responses: {
-      200: { description: 'Paginated audit entries' },
+      200: {
+        description: 'Paginated audit entries',
+        content: {
+          'application/json': {
+            schema: resolver(auditListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

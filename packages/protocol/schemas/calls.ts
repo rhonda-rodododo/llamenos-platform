@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { paginationSchema } from './common'
+import { paginationSchema, paginatedMeta } from './common'
 
 // --- Response schemas ---
 
@@ -21,6 +21,40 @@ export const callPresenceResponseSchema = z.object({
     pubkey: z.string(),
     status: z.enum(['available', 'on-call', 'online']),
   })),
+})
+
+// --- List/wrapper response schemas ---
+
+export const activeCallsResponseSchema = z.object({
+  calls: z.array(callRecordResponseSchema),
+})
+
+export const todayCountResponseSchema = z.object({
+  count: z.number(),
+})
+
+export const callerIdentifyResponseSchema = z.object({
+  contact: z.unknown().nullable(),
+  activeCaseCount: z.number(),
+  recentCases: z.array(z.object({
+    id: z.string(),
+    caseNumber: z.string().optional(),
+    status: z.string(),
+  })),
+})
+
+export const callActionResponseSchema = z.object({
+  call: callRecordResponseSchema,
+})
+
+export const banCallResponseSchema = z.object({
+  banned: z.boolean(),
+  hungUp: z.boolean(),
+})
+
+export const callHistoryResponseSchema = z.object({
+  calls: z.array(callRecordResponseSchema),
+  ...paginatedMeta,
 })
 
 // --- Input schemas ---

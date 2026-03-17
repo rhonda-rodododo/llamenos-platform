@@ -10,12 +10,13 @@
  * since CF provides its own analytics.
  */
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
+import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getErrorSummary } from '../lib/error-counter'
 import { auth } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission-guard'
 import { getAllCircuitBreakerMetrics } from '../lib/circuit-breaker'
+import { metricsResponseSchema } from '@protocol/schemas/metrics'
 import { authErrors } from '../openapi/helpers'
 
 const metrics = new Hono<AppEnv>()
@@ -122,7 +123,14 @@ metrics.get('/prometheus',
     tags: ['Metrics'],
     summary: 'Prometheus text exposition metrics',
     responses: {
-      200: { description: 'Prometheus text format metrics' },
+      200: {
+        description: 'Prometheus text format metrics',
+        content: {
+          'text/plain': {
+            schema: { type: 'string' },
+          },
+        },
+      },
       401: { description: 'Missing or invalid scrape token' },
     },
   }),
@@ -155,7 +163,14 @@ metrics.get('/',
     tags: ['Metrics'],
     summary: 'JSON metrics summary for admin dashboards',
     responses: {
-      200: { description: 'JSON metrics including uptime, request counts, and errors' },
+      200: {
+        description: 'JSON metrics including uptime, request counts, and errors',
+        content: {
+          'application/json': {
+            schema: resolver(metricsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

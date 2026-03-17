@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv, Volunteer } from '../types'
 import { getMessagingAdapterFromService } from '../lib/do-access'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
@@ -10,12 +10,21 @@ import {
   linkContactBodySchema,
   assignBodySchema,
   unassignBodySchema,
+  recordSchema,
+  recordListResponseSchema,
+  recordContactSchema,
+  recordContactListResponseSchema,
+  envelopeRecipientsResponseSchema,
+  suggestAssigneesResponseSchema,
+  recordsByContactResponseSchema,
 } from '@protocol/schemas/records'
 import type { CaseRecord } from '@protocol/schemas/records'
-import { createInteractionBodySchema, listInteractionsQuerySchema } from '@protocol/schemas/interactions'
-import { linkReportToCaseBodySchema } from '@protocol/schemas/report-links'
+import { createInteractionBodySchema, listInteractionsQuerySchema, caseInteractionSchema, interactionListResponseSchema, sourceInteractionLookupResponseSchema } from '@protocol/schemas/interactions'
+import { linkReportToCaseBodySchema, reportCaseLinkSchema, reportCaseLinkListResponseSchema } from '@protocol/schemas/report-links'
 import { notifyContactsBodySchema } from '@protocol/schemas/notifications'
 import type { NotifyContactsResponse, NotificationResultItem } from '@protocol/schemas/notifications'
+import { notifyContactsResponseSchema } from '@protocol/schemas/notifications'
+import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/nostr-events'
@@ -67,7 +76,14 @@ records.get('/',
     tags: ['Records'],
     summary: 'List case records with pagination and filters',
     responses: {
-      200: { description: 'Paginated list of records' },
+      200: {
+        description: 'Paginated list of records',
+        content: {
+          'application/json': {
+            schema: resolver(recordListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -111,7 +127,14 @@ records.get('/by-number/:number',
     tags: ['Records'],
     summary: 'Lookup record by case number',
     responses: {
-      200: { description: 'Record details' },
+      200: {
+        description: 'Record details',
+        content: {
+          'application/json': {
+            schema: resolver(recordSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -146,7 +169,14 @@ records.get('/envelope-recipients',
     tags: ['Records'],
     summary: 'Get envelope recipient pubkeys for a new record (by entity type)',
     responses: {
-      200: { description: 'Envelope recipients per tier' },
+      200: {
+        description: 'Envelope recipients per tier',
+        content: {
+          'application/json': {
+            schema: resolver(envelopeRecipientsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -186,7 +216,14 @@ records.get('/by-contact/:contactId',
     tags: ['Records'],
     summary: 'List active (non-closed) records linked to a contact',
     responses: {
-      200: { description: 'Active records for the contact' },
+      200: {
+        description: 'Active records for the contact',
+        content: {
+          'application/json': {
+            schema: resolver(recordsByContactResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -211,7 +248,14 @@ records.get('/interactions/by-source/:sourceId',
     tags: ['Interactions'],
     summary: 'Check if a source entity is linked to a case',
     responses: {
-      200: { description: 'Source link status' },
+      200: {
+        description: 'Source link status',
+        content: {
+          'application/json': {
+            schema: resolver(sourceInteractionLookupResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -236,7 +280,14 @@ records.get('/:id',
     tags: ['Records'],
     summary: 'Get a single record',
     responses: {
-      200: { description: 'Record details' },
+      200: {
+        description: 'Record details',
+        content: {
+          'application/json': {
+            schema: resolver(recordSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -271,7 +322,14 @@ records.get('/:id/envelope-recipients',
     tags: ['Records'],
     summary: 'Get envelope recipient pubkeys for an existing record',
     responses: {
-      200: { description: 'Envelope recipients per tier' },
+      200: {
+        description: 'Envelope recipients per tier',
+        content: {
+          'application/json': {
+            schema: resolver(envelopeRecipientsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -309,7 +367,14 @@ records.post('/',
     tags: ['Records'],
     summary: 'Create a new case record',
     responses: {
-      201: { description: 'Record created' },
+      201: {
+        description: 'Record created',
+        content: {
+          'application/json': {
+            schema: resolver(recordSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -365,7 +430,14 @@ records.patch('/:id',
     tags: ['Records'],
     summary: 'Update a case record',
     responses: {
-      200: { description: 'Record updated' },
+      200: {
+        description: 'Record updated',
+        content: {
+          'application/json': {
+            schema: resolver(recordSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -414,7 +486,14 @@ records.delete('/:id',
     tags: ['Records'],
     summary: 'Delete a case record',
     responses: {
-      200: { description: 'Record deleted' },
+      200: {
+        description: 'Record deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -439,7 +518,14 @@ records.post('/:id/contacts',
     tags: ['Records'],
     summary: 'Link a contact to a record with a role',
     responses: {
-      201: { description: 'Contact linked' },
+      201: {
+        description: 'Contact linked',
+        content: {
+          'application/json': {
+            schema: resolver(recordContactSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -470,7 +556,14 @@ records.delete('/:id/contacts/:contactId',
     tags: ['Records'],
     summary: 'Unlink a contact from a record',
     responses: {
-      200: { description: 'Contact unlinked' },
+      200: {
+        description: 'Contact unlinked',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -499,7 +592,14 @@ records.get('/:id/contacts',
     tags: ['Records'],
     summary: 'List contacts linked to a record',
     responses: {
-      200: { description: 'Linked contacts' },
+      200: {
+        description: 'Linked contacts',
+        content: {
+          'application/json': {
+            schema: resolver(recordContactListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -528,7 +628,14 @@ records.get('/:id/suggest-assignees',
     tags: ['Records'],
     summary: 'Get ranked volunteer suggestions for case assignment',
     responses: {
-      200: { description: 'Assignment suggestions' },
+      200: {
+        description: 'Assignment suggestions',
+        content: {
+          'application/json': {
+            schema: resolver(suggestAssigneesResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -616,7 +723,14 @@ records.post('/:id/assign',
     tags: ['Records'],
     summary: 'Assign volunteers to a record',
     responses: {
-      200: { description: 'Volunteers assigned' },
+      200: {
+        description: 'Volunteers assigned',
+        content: {
+          'application/json': {
+            schema: resolver(recordSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -653,7 +767,14 @@ records.post('/:id/unassign',
     tags: ['Records'],
     summary: 'Unassign a volunteer from a record',
     responses: {
-      200: { description: 'Volunteer unassigned' },
+      200: {
+        description: 'Volunteer unassigned',
+        content: {
+          'application/json': {
+            schema: resolver(recordSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -694,7 +815,14 @@ records.get('/:id/interactions',
     tags: ['Interactions'],
     summary: 'List interactions for a case (chronological timeline)',
     responses: {
-      200: { description: 'Paginated list of interactions' },
+      200: {
+        description: 'Paginated list of interactions',
+        content: {
+          'application/json': {
+            schema: resolver(interactionListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -731,7 +859,14 @@ records.post('/:id/interactions',
     tags: ['Interactions'],
     summary: 'Create an interaction on a case',
     responses: {
-      201: { description: 'Interaction created' },
+      201: {
+        description: 'Interaction created',
+        content: {
+          'application/json': {
+            schema: resolver(caseInteractionSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -777,7 +912,14 @@ records.delete('/:id/interactions/:interactionId',
     tags: ['Interactions'],
     summary: 'Delete an interaction from a case',
     responses: {
-      200: { description: 'Interaction deleted' },
+      200: {
+        description: 'Interaction deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -810,7 +952,14 @@ records.post('/:id/reports',
     tags: ['Records'],
     summary: 'Link a report to a case record',
     responses: {
-      201: { description: 'Report linked' },
+      201: {
+        description: 'Report linked',
+        content: {
+          'application/json': {
+            schema: resolver(reportCaseLinkSchema),
+          },
+        },
+      },
       409: { description: 'Already linked' },
       ...authErrors,
       ...notFoundError,
@@ -841,7 +990,14 @@ records.delete('/:id/reports/:reportId',
     tags: ['Records'],
     summary: 'Unlink a report from a case record',
     responses: {
-      200: { description: 'Report unlinked' },
+      200: {
+        description: 'Report unlinked',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -870,7 +1026,14 @@ records.get('/:id/reports',
     tags: ['Records'],
     summary: 'List reports linked to a case record',
     responses: {
-      200: { description: 'Linked reports' },
+      200: {
+        description: 'Linked reports',
+        content: {
+          'application/json': {
+            schema: resolver(reportCaseLinkListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -915,7 +1078,14 @@ records.post('/:id/notify-contacts',
     tags: ['Records', 'Notifications'],
     summary: 'Send notifications to support contacts for a record',
     responses: {
-      200: { description: 'Notification dispatch results' },
+      200: {
+        description: 'Notification dispatch results',
+        content: {
+          'application/json': {
+            schema: resolver(notifyContactsResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       404: { description: 'Record not found' },
     },

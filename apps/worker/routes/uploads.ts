@@ -3,7 +3,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import type { FileRecord } from '@shared/types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
-import { uploadInitBodySchema } from '@protocol/schemas/uploads'
+import { uploadInitBodySchema, uploadInitResponseSchema, chunkUploadResponseSchema, uploadCompleteResponseSchema, uploadStatusResponseSchema } from '@protocol/schemas/uploads'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -23,7 +23,14 @@ uploads.post('/init',
     tags: ['Uploads'],
     summary: 'Initialize a chunked upload',
     responses: {
-      200: { description: 'Upload initialized with uploadId' },
+      200: {
+        description: 'Upload initialized with uploadId',
+        content: {
+          'application/json': {
+            schema: resolver(uploadInitResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -67,7 +74,14 @@ uploads.put('/:id/chunks/:chunkIndex',
     tags: ['Uploads'],
     summary: 'Upload a single chunk',
     responses: {
-      200: { description: 'Chunk uploaded' },
+      200: {
+        description: 'Chunk uploaded',
+        content: {
+          'application/json': {
+            schema: resolver(chunkUploadResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -134,7 +148,14 @@ uploads.post('/:id/complete',
     tags: ['Uploads'],
     summary: 'Complete a chunked upload',
     responses: {
-      200: { description: 'Upload completed' },
+      200: {
+        description: 'Upload completed',
+        content: {
+          'application/json': {
+            schema: resolver(uploadCompleteResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -241,7 +262,14 @@ uploads.get('/:id/status',
     tags: ['Uploads'],
     summary: 'Get upload status for resume',
     responses: {
-      200: { description: 'Upload status' },
+      200: {
+        description: 'Upload status',
+        content: {
+          'application/json': {
+            schema: resolver(uploadStatusResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },

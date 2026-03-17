@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, requireAnyPermission } from '../middleware/permission-guard'
 import {
@@ -9,11 +9,24 @@ import {
   createRelationshipTypeBodySchema,
   updateRelationshipTypeBodySchema,
   caseNumberBodySchema,
+  entityTypeDefinitionSchema,
+  relationshipTypeDefinitionSchema,
+  entityTypeListResponseSchema,
+  relationshipTypeListResponseSchema,
+  caseNumberResponseSchema,
+  templateListResponseSchema,
+  templateApplyResponseSchema,
+  templateUpdatesResponseSchema,
+  rolesFromTemplateResponseSchema,
+  enabledResponseSchema,
+  createRolesFromTemplateBodySchema,
 } from '@protocol/schemas/entity-schema'
 import type { EntityTypeDefinition, RelationshipTypeDefinition } from '@protocol/schemas/entity-schema'
 import {
   createCmsReportTypeBodySchema,
   updateCmsReportTypeBodySchema,
+  reportTypeDefinitionSchema,
+  cmsReportTypeListResponseSchema,
 } from '@protocol/schemas/report-types'
 import type { ReportTypeDefinition } from '@protocol/schemas/report-types'
 import { authErrors, notFoundError } from '../openapi/helpers'
@@ -22,7 +35,6 @@ import { applyTemplate, detectTemplateUpdates } from '../lib/template-engine'
 import type { AppliedTemplateRecord } from '../lib/template-engine'
 import { loadBundledTemplates } from '../lib/template-loader'
 import { isValidPermission } from '@shared/permissions'
-import { createRolesFromTemplateBodySchema } from '@protocol/schemas/entity-schema'
 
 const entitySchema = new Hono<AppEnv>()
 
@@ -33,7 +45,10 @@ entitySchema.get('/case-management',
     tags: ['Case Management'],
     summary: 'Get case management enabled status',
     responses: {
-      200: { description: 'Case management status' },
+      200: {
+        description: 'Case management status',
+        content: { 'application/json': { schema: resolver(enabledResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -50,13 +65,17 @@ entitySchema.put('/case-management',
     tags: ['Case Management'],
     summary: 'Enable or disable case management',
     responses: {
-      200: { description: 'Case management status updated' },
+      200: {
+        description: 'Case management status updated',
+        content: { 'application/json': { schema: resolver(enabledResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
   requirePermission('settings:manage-cms'),
+  validator('json', enabledResponseSchema),
   async (c) => {
-    const body = await c.req.json<{ enabled: boolean }>()
+    const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.setCaseManagementEnabled(body)
     await audit(services.audit, 'caseManagementToggled', c.get('pubkey'), body)
@@ -71,7 +90,10 @@ entitySchema.get('/auto-assignment',
     tags: ['Case Management'],
     summary: 'Get auto-assignment setting',
     responses: {
-      200: { description: 'Auto-assignment status' },
+      200: {
+        description: 'Auto-assignment status',
+        content: { 'application/json': { schema: resolver(enabledResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -89,7 +111,10 @@ entitySchema.put('/auto-assignment',
     tags: ['Case Management'],
     summary: 'Toggle auto-assignment for new cases',
     responses: {
-      200: { description: 'Auto-assignment updated' },
+      200: {
+        description: 'Auto-assignment updated',
+        content: { 'application/json': { schema: resolver(enabledResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -112,7 +137,10 @@ entitySchema.get('/cross-hub',
     tags: ['Case Management'],
     summary: 'Get cross-hub sharing status',
     responses: {
-      200: { description: 'Cross-hub sharing status' },
+      200: {
+        description: 'Cross-hub sharing status',
+        content: { 'application/json': { schema: resolver(enabledResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -129,13 +157,17 @@ entitySchema.put('/cross-hub',
     tags: ['Case Management'],
     summary: 'Enable or disable cross-hub sharing',
     responses: {
-      200: { description: 'Cross-hub sharing status updated' },
+      200: {
+        description: 'Cross-hub sharing status updated',
+        content: { 'application/json': { schema: resolver(enabledResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
   requirePermission('settings:manage-cms'),
+  validator('json', enabledResponseSchema),
   async (c) => {
-    const body = await c.req.json<{ enabled: boolean }>()
+    const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.setCrossHubSharingEnabled(body)
     await audit(services.audit, 'crossHubSharingToggled', c.get('pubkey'), body)
@@ -150,7 +182,10 @@ entitySchema.get('/entity-types',
     tags: ['Case Management'],
     summary: 'List entity type definitions',
     responses: {
-      200: { description: 'Entity types list' },
+      200: {
+        description: 'Entity types list',
+        content: { 'application/json': { schema: resolver(entityTypeListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -168,7 +203,10 @@ entitySchema.post('/entity-types',
     tags: ['Case Management'],
     summary: 'Create a new entity type definition',
     responses: {
-      201: { description: 'Entity type created' },
+      201: {
+        description: 'Entity type created',
+        content: { 'application/json': { schema: resolver(entityTypeDefinitionSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -188,7 +226,10 @@ entitySchema.patch('/entity-types/:id',
     tags: ['Case Management'],
     summary: 'Update an entity type definition',
     responses: {
-      200: { description: 'Entity type updated' },
+      200: {
+        description: 'Entity type updated',
+        content: { 'application/json': { schema: resolver(entityTypeDefinitionSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -210,7 +251,10 @@ entitySchema.delete('/entity-types/:id',
     tags: ['Case Management'],
     summary: 'Delete an entity type definition',
     responses: {
-      200: { description: 'Entity type deleted' },
+      200: {
+        description: 'Entity type deleted',
+        content: { 'application/json': { schema: resolver(entityTypeDefinitionSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -232,7 +276,10 @@ entitySchema.get('/relationship-types',
     tags: ['Case Management'],
     summary: 'List relationship type definitions',
     responses: {
-      200: { description: 'Relationship types list' },
+      200: {
+        description: 'Relationship types list',
+        content: { 'application/json': { schema: resolver(relationshipTypeListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -249,7 +296,10 @@ entitySchema.post('/relationship-types',
     tags: ['Case Management'],
     summary: 'Create a new relationship type definition',
     responses: {
-      201: { description: 'Relationship type created' },
+      201: {
+        description: 'Relationship type created',
+        content: { 'application/json': { schema: resolver(relationshipTypeDefinitionSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -269,7 +319,10 @@ entitySchema.patch('/relationship-types/:id',
     tags: ['Case Management'],
     summary: 'Update a relationship type definition',
     responses: {
-      200: { description: 'Relationship type updated' },
+      200: {
+        description: 'Relationship type updated',
+        content: { 'application/json': { schema: resolver(relationshipTypeDefinitionSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -291,7 +344,10 @@ entitySchema.delete('/relationship-types/:id',
     tags: ['Case Management'],
     summary: 'Delete a relationship type definition',
     responses: {
-      200: { description: 'Relationship type deleted' },
+      200: {
+        description: 'Relationship type deleted',
+        content: { 'application/json': { schema: resolver(relationshipTypeDefinitionSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -313,7 +369,10 @@ entitySchema.post('/case-number',
     tags: ['Case Management'],
     summary: 'Generate next case number for a prefix',
     responses: {
-      200: { description: 'Generated case number' },
+      200: {
+        description: 'Generated case number',
+        content: { 'application/json': { schema: resolver(caseNumberResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -334,7 +393,10 @@ entitySchema.get('/templates',
     tags: ['Case Management'],
     summary: 'List available case management templates',
     responses: {
-      200: { description: 'Template catalog' },
+      200: {
+        description: 'Template catalog',
+        content: { 'application/json': { schema: resolver(templateListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -368,7 +430,10 @@ entitySchema.get('/templates/:id',
     tags: ['Case Management'],
     summary: 'Get full template details',
     responses: {
-      200: { description: 'Template details' },
+      200: {
+        description: 'Template details',
+        content: { 'application/json': { schema: resolver(z.unknown()) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -388,14 +453,18 @@ entitySchema.post('/templates/apply',
     tags: ['Case Management'],
     summary: 'Apply a template to the current hub',
     responses: {
-      201: { description: 'Template applied' },
+      201: {
+        description: 'Template applied',
+        content: { 'application/json': { schema: resolver(templateApplyResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
   }),
   requirePermission('cases:manage-types'),
+  validator('json', z.object({ templateId: z.string() })),
   async (c) => {
-    const { templateId } = await c.req.json<{ templateId: string }>()
+    const { templateId } = c.req.valid('json')
     const services = c.get('services')
 
     // Load template
@@ -472,7 +541,10 @@ entitySchema.get('/templates/updates',
     tags: ['Case Management'],
     summary: 'Check for available template updates',
     responses: {
-      200: { description: 'Available updates' },
+      200: {
+        description: 'Available updates',
+        content: { 'application/json': { schema: resolver(templateUpdatesResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -493,7 +565,10 @@ entitySchema.post('/roles/from-template',
     tags: ['Case Management'],
     summary: 'Create custom roles from template suggested roles',
     responses: {
-      201: { description: 'Roles created from template' },
+      201: {
+        description: 'Roles created from template',
+        content: { 'application/json': { schema: resolver(rolesFromTemplateResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -552,7 +627,10 @@ entitySchema.get('/report-types',
     tags: ['Case Management'],
     summary: 'List CMS report type definitions',
     responses: {
-      200: { description: 'Report types list' },
+      200: {
+        description: 'Report types list',
+        content: { 'application/json': { schema: resolver(cmsReportTypeListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -569,7 +647,10 @@ entitySchema.post('/report-types',
     tags: ['Case Management'],
     summary: 'Create a new CMS report type definition',
     responses: {
-      201: { description: 'Report type created' },
+      201: {
+        description: 'Report type created',
+        content: { 'application/json': { schema: resolver(reportTypeDefinitionSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -589,7 +670,10 @@ entitySchema.get('/report-types/:id',
     tags: ['Case Management'],
     summary: 'Get a CMS report type definition',
     responses: {
-      200: { description: 'Report type details' },
+      200: {
+        description: 'Report type details',
+        content: { 'application/json': { schema: resolver(reportTypeDefinitionSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -608,7 +692,10 @@ entitySchema.patch('/report-types/:id',
     tags: ['Case Management'],
     summary: 'Update a CMS report type definition',
     responses: {
-      200: { description: 'Report type updated' },
+      200: {
+        description: 'Report type updated',
+        content: { 'application/json': { schema: resolver(reportTypeDefinitionSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -630,7 +717,10 @@ entitySchema.delete('/report-types/:id',
     tags: ['Case Management'],
     summary: 'Archive a CMS report type definition',
     responses: {
-      200: { description: 'Report type archived' },
+      200: {
+        description: 'Report type archived',
+        content: { 'application/json': { schema: resolver(reportTypeDefinitionSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },

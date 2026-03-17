@@ -1,12 +1,11 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import { z } from 'zod'
 import type { AppEnv, EncryptedMessage } from '../types'
 import type { MessagingChannelType } from '@shared/types'
 import { getMessagingAdapterFromService } from '../lib/do-access'
 import { checkPermission, requirePermission } from '../middleware/permission-guard'
-import { listConversationsQuerySchema, sendMessageBodySchema, updateConversationBodySchema, conversationResponseSchema, messageResponseSchema } from '@protocol/schemas/conversations'
-import { paginationSchema, okResponseSchema, paginatedMeta } from '@protocol/schemas/common'
+import { listConversationsQuerySchema, sendMessageBodySchema, updateConversationBodySchema, conversationResponseSchema, messageResponseSchema, conversationListResponseSchema, messageListResponseSchema } from '@protocol/schemas/conversations'
+import { paginationSchema, okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { canClaimChannel, getClaimableChannels } from '@shared/permissions'
@@ -53,10 +52,7 @@ conversations.get('/',
         description: 'List of conversations',
         content: {
           'application/json': {
-            schema: resolver(z.object({
-              conversations: z.array(conversationResponseSchema),
-              ...paginatedMeta,
-            })),
+            schema: resolver(conversationListResponseSchema),
           },
         },
       },
@@ -236,10 +232,7 @@ conversations.get('/:id/messages',
         description: 'Paginated messages',
         content: {
           'application/json': {
-            schema: resolver(z.object({
-              messages: z.array(messageResponseSchema),
-              ...paginatedMeta,
-            })),
+            schema: resolver(messageListResponseSchema),
           },
         },
       },

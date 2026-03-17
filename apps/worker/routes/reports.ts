@@ -2,10 +2,11 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
-import { listReportsQuerySchema, createReportBodySchema, reportMessageBodySchema, assignReportBodySchema, updateReportBodySchema } from '@protocol/schemas/reports'
-import { paginationSchema } from '@protocol/schemas/common'
+import { listReportsQuerySchema, createReportBodySchema, reportMessageBodySchema, assignReportBodySchema, updateReportBodySchema, reportListResponseSchema, reportCategoriesResponseSchema, reportFilesResponseSchema, reportLinkedCasesResponseSchema } from '@protocol/schemas/reports'
+import { paginationSchema, paginatedMeta } from '@protocol/schemas/common'
 import { conversationResponseSchema, messageResponseSchema } from '@protocol/schemas/conversations'
 import { okResponseSchema } from '@protocol/schemas/common'
+import { reportTypeListResponseSchema } from '@protocol/schemas/settings'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/nostr-events'
@@ -21,7 +22,14 @@ reports.get('/',
     tags: ['Reports'],
     summary: 'List reports',
     responses: {
-      200: { description: 'Paginated list of reports' },
+      200: {
+        description: 'Paginated list of reports',
+        content: {
+          'application/json': {
+            schema: resolver(reportListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -151,7 +159,14 @@ reports.get('/categories',
     tags: ['Reports'],
     summary: 'Get report categories (deprecated)',
     responses: {
-      200: { description: 'Report categories' },
+      200: {
+        description: 'Report categories',
+        content: {
+          'application/json': {
+            schema: resolver(reportCategoriesResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -174,7 +189,14 @@ reports.get('/types',
     tags: ['Reports'],
     summary: 'Get report types',
     responses: {
-      200: { description: 'Report types' },
+      200: {
+        description: 'Report types',
+        content: {
+          'application/json': {
+            schema: resolver(reportTypeListResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -358,7 +380,14 @@ reports.post('/:id/assign',
     tags: ['Reports'],
     summary: 'Assign a volunteer to a report',
     responses: {
-      200: { description: 'Report assigned' },
+      200: {
+        description: 'Report assigned',
+        content: {
+          'application/json': {
+            schema: resolver(conversationResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -395,7 +424,14 @@ reports.patch('/:id',
     tags: ['Reports'],
     summary: 'Update report status',
     responses: {
-      200: { description: 'Report updated' },
+      200: {
+        description: 'Report updated',
+        content: {
+          'application/json': {
+            schema: resolver(conversationResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -428,7 +464,14 @@ reports.get('/:id/files',
     tags: ['Reports'],
     summary: 'Get files attached to a report',
     responses: {
-      200: { description: 'Report files' },
+      200: {
+        description: 'Report files',
+        content: {
+          'application/json': {
+            schema: resolver(reportFilesResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
@@ -465,7 +508,14 @@ reports.get('/:id/records',
     tags: ['Reports'],
     summary: 'List case records linked to a report',
     responses: {
-      200: { description: 'Linked case records' },
+      200: {
+        description: 'Linked case records',
+        content: {
+          'application/json': {
+            schema: resolver(reportLinkedCasesResponseSchema),
+          },
+        },
+      },
       ...authErrors,
     },
   }),
@@ -494,7 +544,14 @@ reports.post('/:id/records',
     tags: ['Reports'],
     summary: 'Link a case record to a report',
     responses: {
-      201: { description: 'Case linked to report' },
+      201: {
+        description: 'Case linked to report',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       409: { description: 'Already linked' },
       ...authErrors,
       ...notFoundError,
@@ -525,7 +582,14 @@ reports.delete('/:id/records/:caseId',
     tags: ['Reports'],
     summary: 'Unlink a case record from a report',
     responses: {
-      200: { description: 'Case unlinked from report' },
+      200: {
+        description: 'Case unlinked from report',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
       ...authErrors,
       ...notFoundError,
     },
