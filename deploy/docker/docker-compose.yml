@@ -1,7 +1,7 @@
 # Llamenos Self-Hosted Docker Compose
 #
 # Core services (always start):
-#   app      - Llamenos application (Node.js)
+#   app      - Llamenos application (Bun)
 #   postgres - PostgreSQL database
 #   caddy    - Reverse proxy with automatic TLS
 #   minio    - S3-compatible blob storage
@@ -39,7 +39,7 @@ services:
     tmpfs:
       - /tmp:size=64M
     environment:
-      - PLATFORM=node
+      - PLATFORM=bun
       - PORT=3000
       - DATABASE_URL=postgresql://llamenos:${PG_PASSWORD:?PG_PASSWORD is required}@postgres:5432/llamenos
       - PG_POOL_SIZE=${PG_POOL_SIZE:-10}

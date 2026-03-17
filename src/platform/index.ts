@@ -1,12 +1,9 @@
 /**
  * Platform abstraction module.
  *
- * When building for Node.js, the bundler (esbuild) aliases
- * 'cloudflare:workers' to this module. This way, all DO files
+ * For the Bun self-hosted runtime, the 'cloudflare:workers' import
+ * is aliased to this module via tsconfig.json paths. All DO files
  * keep their `import { DurableObject } from 'cloudflare:workers'`
- * unchanged — the bundler transparently swaps the import target.
- *
- * - CF build (wrangler): resolves 'cloudflare:workers' natively
- * - Node build (esbuild): resolves 'cloudflare:workers' → this file
+ * unchanged — Bun's runtime module resolution swaps the import target.
  */
-export { DurableObject } from './node/durable-object'
+export { DurableObject } from './bun/durable-object'

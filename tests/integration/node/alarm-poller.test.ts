@@ -14,8 +14,8 @@
  * we manually query the DB the same way the poller does.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
-import { initPostgresPool, getPool, closePool } from '../../../src/platform/node/storage/postgres-pool'
-import { PostgresStorage } from '../../../src/platform/node/storage/postgres-storage'
+import { initPostgresPool, getPool, closePool } from '../../../src/platform/bun/storage/postgres-pool'
+import { PostgresStorage } from '../../../src/platform/bun/storage/postgres-storage'
 
 const skipIfNoDB = !process.env.DATABASE_URL
 

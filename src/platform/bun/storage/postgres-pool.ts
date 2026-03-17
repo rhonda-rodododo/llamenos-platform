@@ -1,16 +1,16 @@
 /**
- * Singleton PostgreSQL connection pool using postgres.js.
+ * Singleton PostgreSQL connection pool using Bun's built-in SQL driver.
  * Reads DATABASE_URL from env, auto-creates tables on first connect.
  */
-import postgres from 'postgres'
+import { SQL } from 'bun'
 
-let pool: ReturnType<typeof postgres> | null = null
+let pool: SQL | null = null
 
 /**
  * Initialize the PostgreSQL connection pool.
  * Must be called before creating any PostgresStorage instances.
  */
-export async function initPostgresPool(): Promise<ReturnType<typeof postgres>> {
+export async function initPostgresPool(): Promise<SQL> {
   if (pool) return pool
 
   const databaseUrl = process.env.DATABASE_URL
@@ -20,10 +20,11 @@ export async function initPostgresPool(): Promise<ReturnType<typeof postgres>> {
 
   const poolSize = parseInt(process.env.PG_POOL_SIZE || '10', 10)
 
-  pool = postgres(databaseUrl, {
+  pool = new SQL({
+    url: databaseUrl,
     max: poolSize,
-    idle_timeout: 20,
-    connect_timeout: 10,
+    idleTimeout: 20,
+    connectionTimeout: 10,
   })
 
   // Auto-create tables. Wrapped in try/catch because concurrent
@@ -81,7 +82,7 @@ export async function initPostgresPool(): Promise<ReturnType<typeof postgres>> {
  * Get the active pool instance.
  * Throws if pool hasn't been initialized.
  */
-export function getPool(): ReturnType<typeof postgres> {
+export function getPool(): SQL {
   if (!pool) {
     throw new Error('PostgreSQL pool not initialized — call initPostgresPool() first')
   }
@@ -93,7 +94,7 @@ export function getPool(): ReturnType<typeof postgres> {
  */
 export async function closePool(): Promise<void> {
   if (pool) {
-    await pool.end()
+    await pool.close()
     pool = null
     console.log('[postgres] Pool closed')
   }

@@ -9,7 +9,7 @@
  * Requires DATABASE_URL env var pointing to a real PostgreSQL instance.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { initPostgresPool, getPool, closePool } from '../../../src/platform/node/storage/postgres-pool'
+import { initPostgresPool, getPool, closePool } from '../../../src/platform/bun/storage/postgres-pool'
 
 const skipIfNoDB = !process.env.DATABASE_URL
 

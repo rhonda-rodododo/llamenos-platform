@@ -42,7 +42,7 @@ spec:
               protocol: TCP
           env:
             - name: PLATFORM
-              value: "node"
+              value: "bun"
             - name: PORT
               value: {{ .Values.app.port | quote }}
             - name: PG_PASSWORD

@@ -96,8 +96,8 @@ jobs:
       - name: Build frontend (with Tauri IPC mocks for test builds)
         run: PLAYWRIGHT_TEST=true bun run build
 
-      - name: Build Node.js server
-        run: bun run build:node
+      - name: Build server
+        run: bun run build:server
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -585,9 +585,9 @@ jobs:
           name: app-build
           path: dist/
 
-      - name: Start Node.js backend
+      - name: Start Bun backend
         run: |
-          nohup node dist/server/index.js &>/tmp/backend.log &
+          nohup bun dist/server/index.js &>/tmp/backend.log &
           for i in $(seq 1 30); do
             if curl -sf http://localhost:3000/api/health; then
               echo "Backend is ready"
@@ -596,7 +596,7 @@ jobs:
             sleep 2
           done
         env:
-          PLATFORM: node
+          PLATFORM: bun
           PORT: "3000"
           DATABASE_URL: postgresql://llamenos@localhost:5432/llamenos
           PG_POOL_SIZE: "5"
@@ -628,7 +628,7 @@ jobs:
       - name: Stop backend services
         if: always()
         run: |
-          pkill -f "node dist/server/index.js" || true
+          pkill -f "bun dist/server/index.js" || true
           pkill -f minio || true
           pg_ctl -D /tmp/pgdata stop 2>/dev/null || true
 

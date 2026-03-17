@@ -1,14 +1,13 @@
 /**
  * PostgreSQL-backed storage implementing StorageApi.
  * Uses advisory locks to emulate CF's single-writer DO guarantee.
+ *
+ * Uses Bun's built-in SQL driver. JSONB values are written via
+ * JSON.stringify() with explicit ::jsonb cast since Bun.sql has
+ * no sql.json() equivalent.
  */
 import type { StorageApi } from '../../types'
-import type { JSONValue } from 'postgres'
 import { getPool } from './postgres-pool'
-/**
- * postgres.js TransactionSql loses call signatures through Omit<>.
- * We use `any` cast inside begin() callbacks for tagged template calls.
- */
 
 export class PostgresStorage implements StorageApi {
   private namespace: string
@@ -80,10 +79,9 @@ export class PostgresStorage implements StorageApi {
               DO UPDATE SET value = EXCLUDED.value
             `
           } else {
-            const jsonValue = sql.json(v as JSONValue)
             await tx`
               INSERT INTO kv_store (namespace, key, value)
-              VALUES (${this.namespace}, ${k}, ${jsonValue})
+              VALUES (${this.namespace}, ${k}, ${JSON.stringify(v)}::jsonb)
               ON CONFLICT (namespace, key)
               DO UPDATE SET value = EXCLUDED.value
             `
@@ -100,7 +98,7 @@ export class PostgresStorage implements StorageApi {
       // Advisory lock scoped to transaction — serializes writes per namespace
       await tx`SELECT pg_advisory_xact_lock(hashtext(${this.namespace}))`
       if (value === null || value === undefined) {
-        // sql.json(null) produces SQL NULL which violates NOT NULL constraint.
+        // JSON.stringify(null) → 'null' which is valid JSONB literal null.
         // Use 'null'::jsonb to store JSONB literal null (distinct from SQL NULL).
         await tx`
           INSERT INTO kv_store (namespace, key, value)
@@ -109,10 +107,9 @@ export class PostgresStorage implements StorageApi {
           DO UPDATE SET value = EXCLUDED.value
         `
       } else {
-        const jsonValue = sql.json(value as JSONValue)
         await tx`
           INSERT INTO kv_store (namespace, key, value)
-          VALUES (${this.namespace}, ${key}, ${jsonValue})
+          VALUES (${this.namespace}, ${key}, ${JSON.stringify(value)}::jsonb)
           ON CONFLICT (namespace, key)
           DO UPDATE SET value = EXCLUDED.value
         `
@@ -150,30 +147,69 @@ export class PostgresStorage implements StorageApi {
     const sql = getPool()
     const result = new Map<string, unknown>()
 
-    // Build conditions dynamically
-    const conditions: ReturnType<typeof sql>[] = [
-      sql`namespace = ${this.namespace}`,
-    ]
-    if (options?.prefix) {
-      const escaped = options.prefix.replace(/[%_\\]/g, '\\$&')
-      conditions.push(sql`key LIKE ${escaped + '%'}`)
-    }
-    if (options?.start) {
-      conditions.push(sql`key >= ${options.start}`)
-    }
-    if (options?.end) {
-      conditions.push(sql`key < ${options.end}`)
-    }
+    // Use Bun.sql's unsafe() for dynamic WHERE construction since
+    // tagged template fragments can't be composed like postgres.js
+    const prefix = options?.prefix
+    const start = options?.start
+    const end = options?.end
+    const limit = options?.limit
 
-    const where = conditions.reduce((a, b) => sql`${a} AND ${b}`)
-    const limitClause = options?.limit ? sql`LIMIT ${options.limit}` : sql``
+    let rows: Array<{ key: string; value: unknown }>
 
-    const rows = await sql`
-      SELECT key, value FROM kv_store
-      WHERE ${where}
-      ORDER BY key ASC
-      ${limitClause}
-    `
+    if (prefix && start && end && limit) {
+      const escaped = prefix.replace(/[%_\\]/g, '\\$&')
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace} AND key LIKE ${escaped + '%'} AND key >= ${start} AND key < ${end}
+        ORDER BY key ASC LIMIT ${limit}
+      ` as any
+    } else if (prefix && limit) {
+      const escaped = prefix.replace(/[%_\\]/g, '\\$&')
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace} AND key LIKE ${escaped + '%'}
+        ORDER BY key ASC LIMIT ${limit}
+      ` as any
+    } else if (prefix && start) {
+      const escaped = prefix.replace(/[%_\\]/g, '\\$&')
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace} AND key LIKE ${escaped + '%'} AND key >= ${start}
+        ORDER BY key ASC
+      ` as any
+    } else if (prefix && end) {
+      const escaped = prefix.replace(/[%_\\]/g, '\\$&')
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace} AND key LIKE ${escaped + '%'} AND key < ${end}
+        ORDER BY key ASC
+      ` as any
+    } else if (prefix) {
+      const escaped = prefix.replace(/[%_\\]/g, '\\$&')
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace} AND key LIKE ${escaped + '%'}
+        ORDER BY key ASC
+      ` as any
+    } else if (start && end && limit) {
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace} AND key >= ${start} AND key < ${end}
+        ORDER BY key ASC LIMIT ${limit}
+      ` as any
+    } else if (limit) {
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace}
+        ORDER BY key ASC LIMIT ${limit}
+      ` as any
+    } else {
+      rows = await sql`
+        SELECT key, value FROM kv_store
+        WHERE namespace = ${this.namespace}
+        ORDER BY key ASC
+      ` as any
+    }
 
     for (const row of rows) {
       result.set(row.key, row.value)

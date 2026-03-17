@@ -23,7 +23,7 @@ services:
     tmpfs:
       - /tmp:size=64M
     environment:
-      - PLATFORM=node
+      - PLATFORM=bun
       - PORT=3000
       - DATABASE_URL=postgresql://llamenos:${PG_PASSWORD}@postgres:5432/llamenos
       - PG_POOL_SIZE=${PG_POOL_SIZE}

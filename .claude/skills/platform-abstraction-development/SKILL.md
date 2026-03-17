@@ -28,14 +28,14 @@ The shim implements the same structural interfaces (`DONamespace`, `DOStub`, `St
 | `src/platform/types.ts` | Shared interfaces: `StorageApi`, `DOContext`, `BlobStorage`, `TranscriptionService` |
 | `src/platform/index.ts` | Re-export hub (aliased from `cloudflare:workers` in Node.js builds) |
 | `src/platform/cloudflare.ts` | Passthrough to native `cloudflare:workers` |
-| `src/platform/node/env.ts` | Creates full `Env` object; dynamically imports all DOs |
-| `src/platform/node/durable-object.ts` | Base class shim + `WebSocketManager` + `createDONamespace()` + `storageInstances` map |
-| `src/platform/node/storage/postgres-storage.ts` | `StorageApi` impl with per-operation advisory locks |
-| `src/platform/node/storage/alarm-poller.ts` | 30s background loop firing due alarms |
-| `src/platform/node/storage/startup-migrations.ts` | Runs migrations per-namespace at boot |
-| `src/platform/node/storage/postgres-pool.ts` | Connection pool (postgres.js) |
-| `src/platform/node/blob-storage.ts` | MinIO S3 client implementing `BlobStorage` |
-| `src/platform/node/transcription.ts` | Self-hosted Whisper HTTP client |
+| `src/platform/bun/env.ts` | Creates full `Env` object; dynamically imports all DOs |
+| `src/platform/bun/durable-object.ts` | Base class shim + `WebSocketManager` + `createDONamespace()` + `storageInstances` map |
+| `src/platform/bun/storage/postgres-storage.ts` | `StorageApi` impl with per-operation advisory locks |
+| `src/platform/bun/storage/alarm-poller.ts` | 30s background loop firing due alarms |
+| `src/platform/bun/storage/startup-migrations.ts` | Runs migrations per-namespace at boot |
+| `src/platform/bun/storage/postgres-pool.ts` | Connection pool (postgres.js) |
+| `src/platform/bun/blob-storage.ts` | MinIO S3 client implementing `BlobStorage` |
+| `src/platform/bun/transcription.ts` | Self-hosted Whisper HTTP client |
 | `apps/worker/types.ts` | `Env` type with all DO namespace bindings |
 | `apps/worker/lib/do-access.ts` | `getDOs()` / `getScopedDOs()` / `getHubDOs()` helpers |
 
@@ -127,7 +127,7 @@ If the DO is hub-scoped, also add it to `getHubDOs()` and `HubDurableObjects`.
 
 ### Step 6: Add to Node.js env.ts (CRITICAL -- most commonly forgotten)
 
-In `src/platform/node/env.ts`, add the dynamic import and `createDONamespace()` call:
+In `src/platform/bun/env.ts`, add the dynamic import and `createDONamespace()` call:
 
 ```typescript
 const { ExampleDO } = await import('../../../apps/worker/durable-objects/example-do')
@@ -179,7 +179,7 @@ SELECT pg_advisory_xact_lock(hashtext('namespace_string'))
 
 ## Alarm Poller
 
-On CF Workers, `alarm()` is called natively. On Node.js, a background poller in `src/platform/node/storage/alarm-poller.ts` simulates this.
+On CF Workers, `alarm()` is called natively. On Node.js, a background poller in `src/platform/bun/storage/alarm-poller.ts` simulates this.
 
 **Configuration:**
 - Poll interval: 30 seconds (`POLL_INTERVAL_MS = 30_000`)
@@ -227,7 +227,7 @@ Optional services (via Docker Compose profiles):
 
 ### 1. Forgetting env.ts registration
 **Symptom:** Works on CF Workers, crashes on Node.js with "Cannot read properties of undefined (reading 'idFromName')".
-**Fix:** Always add the dynamic import + `createDONamespace()` call in `src/platform/node/env.ts`. This is the single most common miss because CF deployments never exercise this code path.
+**Fix:** Always add the dynamic import + `createDONamespace()` call in `src/platform/bun/env.ts`. This is the single most common miss because CF deployments never exercise this code path.
 
 ### 2. Missing wrangler.jsonc migration tag
 **Symptom:** `wrangler dev` or `wrangler deploy` fails with "class ExampleDO is not declared in a migration tag".

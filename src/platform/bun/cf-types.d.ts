@@ -1,5 +1,5 @@
 /**
- * Type declarations that replace @cloudflare/workers-types for Node.js builds.
+ * Type declarations that replace @cloudflare/workers-types for Bun builds.
  * These provide the minimal type surface our DO code actually uses.
  */
 
@@ -13,8 +13,8 @@ declare global {
   interface DurableObjectState extends DOContext {}
 
   /**
-   * WebSocketPair — not used in the Node.js build
-   * (WebSocket handling goes through the ws package).
+   * WebSocketPair — not used in the Bun build
+   * (WebSocket handling uses Bun's native WebSocket).
    */
   class WebSocketPair {
     0: WebSocket

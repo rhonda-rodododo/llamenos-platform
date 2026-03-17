@@ -64,8 +64,8 @@ function formatStatus(history: MigrationHistoryEntry[]): void {
 
 async function tryConnectPostgres(): Promise<{ sql: any; PostgresStorage: any } | null> {
   try {
-    const { initPostgresPool, getPool } = await import('../src/platform/node/storage/postgres-pool')
-    const { PostgresStorage } = await import('../src/platform/node/storage/postgres-storage')
+    const { initPostgresPool, getPool } = await import('../src/platform/bun/storage/postgres-pool')
+    const { PostgresStorage } = await import('../src/platform/bun/storage/postgres-storage')
     await initPostgresPool()
     return { sql: getPool(), PostgresStorage }
   } catch {

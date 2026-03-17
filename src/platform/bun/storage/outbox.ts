@@ -5,7 +5,6 @@
  *
  * Uses FOR UPDATE SKIP LOCKED for safe concurrent draining across replicas.
  */
-import type { JSONValue } from 'postgres'
 import { getPool } from './postgres-pool'
 
 export interface OutboxEvent {
@@ -17,13 +16,12 @@ export interface OutboxEvent {
 export class EventOutbox {
   /**
    * Insert an event into the outbox for delivery.
-   * Uses sql.json() for JSONB writes per project convention.
    */
   async enqueue(eventJson: Record<string, unknown>): Promise<void> {
     const sql = getPool()
     await sql`
       INSERT INTO nostr_event_outbox (event_json)
-      VALUES (${sql.json(eventJson as JSONValue)})
+      VALUES (${JSON.stringify(eventJson)}::jsonb)
     `
   }
 
@@ -33,7 +31,7 @@ export class EventOutbox {
    */
   async drainBatch(limit: number): Promise<OutboxEvent[]> {
     const sql = getPool()
-    // postgres.js TransactionSql loses call signatures through Omit<> — use any for tx
+    // Use any for tx to preserve tagged template call signatures
     const rows = await sql.begin(async (tx: any) => {
       return tx`
         UPDATE nostr_event_outbox

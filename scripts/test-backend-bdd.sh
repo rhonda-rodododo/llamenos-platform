@@ -46,7 +46,7 @@ fi
 HUB_URL="${TEST_HUB_URL:-http://localhost:3000}"
 if ! reporter_run_step "health-check" curl -sf "${HUB_URL}/api/health" >/dev/null 2>&1; then
   echo "Backend not reachable at ${HUB_URL}. Start it with:"
-  echo "  docker compose -f deploy/docker/docker-compose.dev.yml up -d && bun run dev:node"
+  echo "  docker compose -f deploy/docker/docker-compose.dev.yml up -d && bun run dev:server"
   overall_result="fail"
   reporter_record_suite "health-check" 0 1 0
   reporter_summary "$overall_result"

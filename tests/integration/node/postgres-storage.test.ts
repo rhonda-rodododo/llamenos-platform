@@ -5,8 +5,8 @@
  * Tables are auto-created by initPostgresPool().
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
-import { initPostgresPool, getPool, closePool } from '../../../src/platform/node/storage/postgres-pool'
-import { PostgresStorage } from '../../../src/platform/node/storage/postgres-storage'
+import { initPostgresPool, getPool, closePool } from '../../../src/platform/bun/storage/postgres-pool'
+import { PostgresStorage } from '../../../src/platform/bun/storage/postgres-storage'
 
 const skipIfNoDB = !process.env.DATABASE_URL
 

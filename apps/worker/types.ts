@@ -5,7 +5,7 @@ import type { MessagingChannelType, RecipientEnvelope, KeyEnvelope } from '@shar
  * Environment bindings.
  *
  * On Cloudflare Workers: these are real CF bindings (DurableObjectNamespace, Ai, R2Bucket, Fetcher).
- * On Node.js: these are shims from src/platform/node/ that implement the same method signatures.
+ * On Bun: these are shims from src/platform/bun/ that implement the same method signatures.
  *
  * We use structural typing — the interfaces only require the methods we actually call.
  */
@@ -78,7 +78,7 @@ export interface Env {
   // Push notifications (Epic 86) — FCM (Android)
   FCM_SERVICE_ACCOUNT_KEY?: string  // Google Cloud service account JSON
 
-  // Pre-configured NostrPublisher (Node.js only — set by createNodeEnv with outbox wired)
+  // Pre-configured NostrPublisher (self-hosted only — set by createBunEnv with outbox wired)
   NOSTR_PUBLISHER?: import('./lib/nostr-publisher').NostrPublisher
 }
 

@@ -17,10 +17,10 @@ async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
   const details: Record<string, string> = {}
 
   // PostgreSQL check (Node.js self-hosted only — CF Workers use Durable Objects)
-  const isNode = typeof process !== 'undefined' && process.env?.PLATFORM === 'node'
-  if (isNode) {
+  const isSelfHosted = typeof process !== 'undefined' && process.env?.PLATFORM === 'bun'
+  if (isSelfHosted) {
     try {
-      const { getPool } = await import('../../../src/platform/node/storage/postgres-pool')
+      const { getPool } = await import('../../../src/platform/bun/storage/postgres-pool')
       const sql = getPool()
       await sql`SELECT 1`
       checks.postgres = 'ok'

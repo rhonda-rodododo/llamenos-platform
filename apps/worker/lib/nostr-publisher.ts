@@ -22,7 +22,7 @@ import { getCircuitBreaker } from './circuit-breaker'
 
 /**
  * Outbox interface for persistent event storage.
- * Matches EventOutbox from src/platform/node/storage/outbox.ts.
+ * Matches EventOutbox from src/platform/bun/storage/outbox.ts.
  */
 export interface NostrEventOutbox {
   enqueue(eventJson: Record<string, unknown>): Promise<void>

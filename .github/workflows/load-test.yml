@@ -58,18 +58,15 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build backend
-        run: bun run build:node
-
       - name: Start backend
         env:
-          PLATFORM: node
+          PLATFORM: bun
           ENVIRONMENT: development
           DATABASE_URL: postgres://llamenos:llamenos-test@localhost:5432/llamenos
           TEST_SECRET: ci-test-secret
           HMAC_SECRET: ci-hmac-secret-for-load-testing
         run: |
-          bun run start:node &
+          bun run start:server &
           for i in $(seq 1 30); do
             if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
               echo "Backend ready"

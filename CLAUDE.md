@@ -31,7 +31,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 - **Desktop**: Tauri v2 + Vite + TanStack Router + shadcn/ui — native Rust backend with webview frontend
 - **iOS**: Native SwiftUI (iOS 17+, `@Observable`, SPM)
 - **Android**: Native Kotlin 2.3/Compose (minSdk 26, Material 3, Hilt DI + KSP, AGP 9.1, Gradle 9.4)
-- **Backend**: Cloudflare Workers + Durable Objects (cloud) / Node.js + PostgreSQL (self-hosted)
+- **Backend**: Bun + PostgreSQL (self-hosted), Cloudflare Workers (marketing site only)
 - **Shared Crypto**: `packages/crypto/` Rust crate — single auditable implementation for all platforms (native, WASM, UniFFI)
 - **Protocol**: `packages/protocol/` JSON Schema → codegen (TypeScript, Swift, Kotlin via quicktype-core)
 - **Telephony**: Twilio via a `TelephonyAdapter` interface (designed for future provider swaps, e.g. SIP trunks)
@@ -115,7 +115,7 @@ docs/
   epics/              # Feature epic documents
 ```
 
-**Path aliases** (tsconfig.json + vite.config.ts + esbuild.node.mjs):
+**Path aliases** (tsconfig.json + vite.config.ts):
 - `@/*` → `./src/client/*`
 - `@worker/*` → `./apps/worker/*`
 - `@shared/*` → `./packages/shared/*`
@@ -166,14 +166,14 @@ docs/
 
 ### Local Backend Setup (REQUIRED for backend development and testing)
 
-**Always use dev compose (backing services) + `bun run dev:node` (app with file watching):**
+**Always use dev compose (backing services) + `bun run dev:server` (app with file watching):**
 
 ```bash
 # 1. Start backing services (PostgreSQL, MinIO, strfry)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # 2. Start app locally (auto-reloads on code changes via --watch)
-bun run dev:node
+bun run dev:server
 
 # 3. Run backend BDD tests
 bun run test:backend:bdd

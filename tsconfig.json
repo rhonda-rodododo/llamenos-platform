@@ -19,9 +19,10 @@
       "@shared/*": ["./packages/shared/*"],
       "@protocol/*": ["./packages/protocol/*"],
       "@llamenos/i18n": ["./packages/i18n/index.ts"],
-      "@llamenos/i18n/*": ["./packages/i18n/*"]
+      "@llamenos/i18n/*": ["./packages/i18n/*"],
+      "cloudflare:workers": ["./src/platform/index.ts"]
     },
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types", "@types/bun"]
   },
   "include": ["src/**/*", "apps/**/*", "packages/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist", "packages/i18n/tools/add-cms-translations.ts"]

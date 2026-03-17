@@ -1,5 +1,5 @@
 /**
- * DurableObject shim for Node.js — provides the same base class API
+ * DurableObject shim for Bun — provides the same base class API
  * as cloudflare:workers DurableObject, backed by PostgreSQL.
  */
 import type { StorageApi, DOContext } from '../types'

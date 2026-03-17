@@ -1,11 +1,11 @@
-# Llamenos Dev Services (Node.js development)
+# Llamenos Dev Services
 #
 # Starts only the backing services (PostgreSQL, MinIO, strfry) without the app.
-# The app runs locally via `bun run dev:node` or `node dist/server/index.js`.
+# The app runs locally via `bun run dev:server`.
 #
 # Usage:
 #   docker compose -f deploy/docker/docker-compose.dev.yml up -d
-#   bun run dev:node
+#   bun run dev:server
 #
 # Stop:
 #   docker compose -f deploy/docker/docker-compose.dev.yml down

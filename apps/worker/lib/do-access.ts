@@ -184,7 +184,7 @@ let cachedPublisher: NostrPublisher | null = null
  */
 export function getNostrPublisher(env: Env): NostrPublisher {
   if (!cachedPublisher) {
-    // Check if a pre-configured publisher was set by createNodeEnv() (with outbox wired)
+    // Check if a pre-configured publisher was set by createBunEnv() (with outbox wired)
     if (env.NOSTR_PUBLISHER) {
       cachedPublisher = env.NOSTR_PUBLISHER
     } else {

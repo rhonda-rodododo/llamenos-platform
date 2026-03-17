@@ -10,7 +10,7 @@
  * acceptWebSocket, getWebSockets, and getTags on the context object.
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createDOContext } from '../../../src/platform/node/durable-object'
+import { createDOContext } from '../../../src/platform/bun/durable-object'
 
 /**
  * Create a minimal mock WebSocket object.

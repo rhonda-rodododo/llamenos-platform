@@ -9,7 +9,7 @@
  * Tests are skipped if credentials are not set.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
-import { createBlobStorage } from '../../../src/platform/node/blob-storage'
+import { createBlobStorage } from '../../../src/platform/bun/blob-storage'
 import type { BlobStorage } from '../../../src/platform/types'
 import { S3Client, CreateBucketCommand, HeadBucketCommand } from '@aws-sdk/client-s3'
 

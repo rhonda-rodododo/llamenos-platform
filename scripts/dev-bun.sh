@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Local Node.js development server
+# Local Bun development server
 #
 # Starts backing services (PostgreSQL, MinIO, strfry) via Docker Compose,
-# builds the Node.js server, and runs it with file watching.
+# then runs the server directly with Bun's --watch mode (single process).
 #
 # Usage:
-#   ./scripts/dev-node.sh          # Start everything
-#   ./scripts/dev-node.sh stop     # Stop backing services
-#   ./scripts/dev-node.sh logs     # Show Docker Compose logs
+#   ./scripts/dev-bun.sh          # Start everything
+#   ./scripts/dev-bun.sh stop     # Stop backing services
+#   ./scripts/dev-bun.sh logs     # Show Docker Compose logs
 set -euo pipefail
 
 COMPOSE_FILE="deploy/docker/docker-compose.dev.yml"
@@ -18,8 +18,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-log() { echo -e "${GREEN}[dev:node]${NC} $*"; }
-warn() { echo -e "${YELLOW}[dev:node]${NC} $*"; }
+log() { echo -e "${GREEN}[dev:server]${NC} $*"; }
+warn() { echo -e "${YELLOW}[dev:server]${NC} $*"; }
 
 cmd_stop() {
   log "Stopping backing services..."
@@ -41,17 +41,8 @@ cmd_start() {
     log "Backing services already running"
   fi
 
-  # Initial build
-  log "Building Node.js server..."
-  node esbuild.node.mjs
-
-  # Start esbuild in watch mode (rebuilds bundle on source changes)
-  node esbuild.node.mjs --watch &
-  ESBUILD_PID=$!
-  trap "kill $ESBUILD_PID 2>/dev/null" EXIT
-
   # Set environment variables for local development
-  export PLATFORM=node
+  export PLATFORM=bun
   export PORT=3000
   export DATABASE_URL="postgresql://llamenos:dev@localhost:5432/llamenos"
   export PG_POOL_SIZE=5
@@ -70,13 +61,13 @@ cmd_start() {
   export SERVER_NOSTR_SECRET="${SERVER_NOSTR_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}"
   export NOSTR_RELAY_URL=ws://localhost:7777
 
-  log "Starting Node.js server on http://localhost:${PORT}..."
-  log "esbuild watches source → rebuilds bundle → node restarts automatically"
+  log "Starting Bun server on http://localhost:${PORT}..."
+  log "Bun watches source files directly — single process, no build step"
   log "Press Ctrl+C to stop"
   echo ""
 
-  # node --watch restarts when esbuild rewrites the bundle
-  exec node --watch dist/server/index.js
+  # Bun --watch restarts on any imported .ts file change
+  exec bun --watch src/platform/bun/server.ts
 }
 
 ACTION="${1:-start}"

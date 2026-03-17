@@ -22,10 +22,10 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   error: 3,
 }
 
-const isNode = typeof process !== 'undefined' && process.env?.PLATFORM === 'node'
+const isSelfHosted = typeof process !== 'undefined' && process.env?.PLATFORM === 'bun'
 
 // Minimum log level — configurable via LOG_LEVEL env var
-const minLevel: LogLevel = isNode
+const minLevel: LogLevel = isSelfHosted
   ? (process.env.LOG_LEVEL as LogLevel) || 'info'
   : 'info'
 
@@ -55,7 +55,7 @@ function shouldLog(level: LogLevel): boolean {
 function emit(entry: LogEntry): void {
   if (!shouldLog(entry.level)) return
 
-  if (isNode) {
+  if (isSelfHosted) {
     // Structured JSON output for log aggregators
     const line = JSON.stringify(entry)
     if (entry.level === 'error') {

@@ -634,6 +634,15 @@ Identified via comprehensive gap analysis (2026-03-16). Covers code-level bugs, 
 - [x] **[Epic 353: Mobile Feature Parity Screens](epics/epic-353-mobile-feature-parity-screens.md)** — All 6 phases: hub management, events, contact directory, triage queue, schema browser, navigation wiring on iOS + Android.
 - [x] **[Epic 354: Kotlin Codegen Nested Defaults](epics/epic-354-kotlin-codegen-nested-defaults.md)** — Enhanced Kotlin post-processor for enum/SerialName defaults. Schema-level `.optional().default()` on EntityTypeDefinition fields. Android lenient types kept for now (String-vs-enum migration deferred).
 
+## Runtime & Architecture Migration (Epics 357-358)
+
+Complete backend modernization: replace Node.js with Bun runtime, then replace the Cloudflare Durable Object architecture with direct PostgreSQL services.
+
+**Dependency order:** 357 → 358
+
+- [x] **[Epic 357: Migrate from Node.js to Bun Runtime](epics/epic-357-bun-runtime-migration.md)** — Server entry point (Hono Bun adapter), PostgreSQL driver (Bun.sql), remove esbuild, Docker image (oven/bun:1-slim), dev scripts, WebSocket, deploy configs (Compose, Helm, Ansible), documentation
+- [ ] **[Epic 358: Drop DO Architecture — Direct PostgreSQL Services](epics/epic-358-drop-do-architecture.md)** — Replace 9 DOs with service classes, `kv_store` → ~40 typed tables with proper indexes/constraints, eliminate platform abstraction (1,194 lines), do-router, do-access, Request/Response serialization overhead. Hub scoping via `hub_id` columns. Scheduled task system replaces DO alarms.
+
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
 - [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)

@@ -1,5 +1,5 @@
 /**
- * Node.js environment shim — creates an Env object that matches
+ * Bun environment shim — creates an Env object that matches
  * the Cloudflare Workers Env interface, using local implementations.
  *
  * - DO namespaces → PostgreSQL-backed singletons
@@ -32,13 +32,13 @@ function readSecret(name: string, envKey?: string): string {
 }
 
 /**
- * Creates the full Env object for Node.js runtime.
+ * Creates the full Env object for Bun runtime.
  * This is called once at server startup.
  *
  * The DO classes are imported dynamically to avoid circular dependencies
  * with the platform module.
  */
-export async function createNodeEnv(): Promise<Record<string, unknown>> {
+export async function createBunEnv(): Promise<Record<string, unknown>> {
   // Initialize PostgreSQL
   await initPostgresPool()
 
@@ -107,7 +107,7 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
   // Start alarm poller (storageInstances is populated as DOs are created above)
   startAlarmPoller(storageInstances)
 
-  // Create Nostr publisher with persistent outbox (Node.js only)
+  // Create Nostr publisher with persistent outbox
   if (serverNostrSecret && nostrRelayUrl) {
     const publisher = createNostrPublisher({
       SERVER_NOSTR_SECRET: serverNostrSecret,
@@ -119,7 +119,7 @@ export async function createNodeEnv(): Promise<Record<string, unknown>> {
       publisher.setOutbox(outbox)
       startOutboxPoller(outbox, publisher)
       publisher.connect().catch((err) => {
-        console.warn('[node-env] Initial relay connection failed (outbox will retry):', err)
+        console.warn('[bun-env] Initial relay connection failed (outbox will retry):', err)
       })
     }
 
