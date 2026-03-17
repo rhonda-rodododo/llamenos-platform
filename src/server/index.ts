@@ -33,18 +33,19 @@ const databaseUrl = process.env.DATABASE_URL || 'postgresql://llamenos:dev@local
 const db = createDatabase(databaseUrl)
 console.log('[llamenos] Database initialized')
 
-// --- Create services ---
-const services: Services = createServices(db)
-console.log('[llamenos] Services initialized')
-
-// --- Build env bindings (secrets + blob storage + transcription) ---
+// --- Read secrets ---
+const hmacSecret = readSecret('hmac-secret', 'HMAC_SECRET')
 const serverNostrSecret = readSecret('server-nostr-secret', 'SERVER_NOSTR_SECRET')
 const nostrRelayUrl = process.env.NOSTR_RELAY_URL || ''
+
+// --- Create services (pass HMAC secret for encryption operations) ---
+const services: Services = createServices(db, { hmacSecret })
+console.log('[llamenos] Services initialized')
 
 const env: Record<string, unknown> = {
   ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
   ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
-  HMAC_SECRET: readSecret('hmac-secret', 'HMAC_SECRET'),
+  HMAC_SECRET: hmacSecret,
   HOTLINE_NAME: process.env.HOTLINE_NAME || 'Hotline',
   ENVIRONMENT: process.env.ENVIRONMENT || 'production',
   TWILIO_ACCOUNT_SID: readSecret('twilio-account-sid', 'TWILIO_ACCOUNT_SID'),

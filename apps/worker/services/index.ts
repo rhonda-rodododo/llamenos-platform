@@ -32,7 +32,7 @@ export interface Services {
   scheduler: TaskScheduler
 }
 
-export function createServices(db: Database): Services {
+export function createServices(db: Database, opts?: { hmacSecret?: string }): Services {
   const audit = new AuditService(db)
   return {
     identity: new IdentityService(db),
@@ -41,8 +41,8 @@ export function createServices(db: Database): Services {
     audit,
     shifts: new ShiftsService(db),
     calls: new CallsService(db),
-    conversations: new ConversationsService(db),
-    blasts: new BlastsService(db),
+    conversations: new ConversationsService(db, opts?.hmacSecret),
+    blasts: new BlastsService(db, opts?.hmacSecret),
     contacts: new ContactsService(db),
     cases: new CasesService(db),
     scheduler: new TaskScheduler(db),

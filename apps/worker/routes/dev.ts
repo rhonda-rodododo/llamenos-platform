@@ -47,8 +47,19 @@ dev.post('/test-reset', async (c) => {
   await services.shifts.reset('')
   await services.calls.reset('')
   await services.conversations.reset()
+  await services.blasts.reset()
   await services.contacts.reset(env)
   await services.cases.reset(env)
+
+  // Re-seed admin and default settings after reset
+  // (In the DO architecture, ensureInit() was called on every request.
+  //  Now we must explicitly re-seed after truncating tables.)
+  const adminPubkey = c.env.ADMIN_PUBKEY
+  const demoMode = c.env.DEMO_MODE === 'true'
+  if (adminPubkey) {
+    await services.identity.ensureInit(adminPubkey, demoMode)
+  }
+  await services.settings.ensureInit()
   return c.json({ ok: true })
 })
 
