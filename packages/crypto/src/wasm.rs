@@ -123,7 +123,12 @@ impl WasmCryptoState {
             "encryptedKeyData": encrypted,
             "pubkey": pubkey,
         });
-        serde_wasm_bindgen::to_value(&result).map_err(to_js_err)
+        // Use json_compatible serializer so serde_json::Value::Object becomes a plain JS object
+        // (not a JS Map). JSON.stringify on a JS Map gives {}, breaking localStorage persistence.
+        use serde::Serialize as _;
+        result
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(to_js_err)
     }
 
     /// Lock the crypto state — zeroize the secret key.

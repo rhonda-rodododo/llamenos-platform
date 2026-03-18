@@ -182,6 +182,9 @@ export async function loginAsAdmin(page: Page) {
   await page.goto('/login')
   await page.evaluate(() => {
     sessionStorage.clear()
+    // Browser store uses 'llamenos:' prefix — clear the correct key
+    localStorage.removeItem('llamenos:llamenos-encrypted-key')
+    // Legacy/Tauri keys — clear for safety
     localStorage.removeItem('llamenos-encrypted-key')
     localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
   })
@@ -218,6 +221,9 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await page.goto('/login')
   await page.evaluate(() => {
     sessionStorage.clear()
+    // Browser store uses 'llamenos:' prefix — clear the correct key
+    localStorage.removeItem('llamenos:llamenos-encrypted-key')
+    // Legacy/Tauri keys — clear for safety
     localStorage.removeItem('llamenos-encrypted-key')
     localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
   })

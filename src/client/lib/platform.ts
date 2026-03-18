@@ -668,6 +668,24 @@ export async function verifySchnorr(
   }
 }
 
+// ── WASM value conversion ────────────────────────────────────────────
+
+/**
+ * Convert a value returned by serde_wasm_bindgen 0.6 (default serializer) to a plain JS object.
+ * serde_wasm_bindgen 0.6 converts Rust/serde map types (including serde_json::Value::Object)
+ * to JS Map objects, which serialize as {} with JSON.stringify. This recursively converts
+ * Maps to plain objects so the result can be stored and retrieved correctly.
+ */
+function fromWasmValue(val: unknown): unknown {
+  if (val instanceof Map) {
+    const obj: Record<string, unknown> = {}
+    val.forEach((v: unknown, k: unknown) => { obj[String(k)] = fromWasmValue(v) })
+    return obj
+  }
+  if (Array.isArray(val)) return val.map(fromWasmValue)
+  return val
+}
+
 // ── Key persistence ─────────────────────────────────────────────────
 
 const STORE_KEY = 'llamenos-encrypted-key'
@@ -715,7 +733,11 @@ export async function encryptWithPin(
     })
   } else {
     const state = await getWasmState()
-    encryptedData = state.importKey(nsec, pin)
+    // importKey returns { encryptedKeyData: EncryptedKeyData, pubkey: string }.
+    // serde_wasm_bindgen 0.6 converts serde_json::Value::Object to JS Map (not plain object),
+    // so JSON.stringify gives {}. Use fromWasmValue to get plain objects, then extract the inner data.
+    const result = fromWasmValue(state.importKey(nsec, pin)) as { encryptedKeyData: EncryptedKeyData }
+    encryptedData = result.encryptedKeyData
   }
   const store = await getStore()
   await store.set(STORE_KEY, encryptedData)
