@@ -51,6 +51,6 @@ Feature: Data Isolation
   Scenario: Deactivated volunteer loses all access immediately
     Given an active volunteer with notes and shift access
     When an admin deactivates the volunteer
-    Then the volunteer should receive 403 when listing notes
-    And the volunteer should receive 403 when listing shifts
-    And the volunteer should receive 403 when accessing their profile
+    Then the volunteer should receive 401 when listing notes
+    And the volunteer should receive 401 when listing shifts
+    And the volunteer should receive 401 when accessing their profile

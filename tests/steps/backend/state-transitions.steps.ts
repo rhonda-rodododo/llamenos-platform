@@ -13,6 +13,8 @@ import {
   apiPost,
   apiGet,
   createVolunteerViaApi,
+  createEntityTypeViaApi,
+  enableCaseManagementViaApi,
   generateTestKeypair,
   uniqueName,
 } from '../../api-helpers'
@@ -72,30 +74,11 @@ When('the admin converts the submitted report to a case', async ({ request }) =>
 
   // Ensure an entity type exists for case records
   if (!ts.entityTypeId) {
-    const { data, status } = await apiGet<{ entityTypes: Array<{ id: string; slug: string }> }>(
-      request,
-      '/entity-types',
-    )
-    if (status === 200 && data.entityTypes?.length > 0) {
-      const caseType = data.entityTypes.find(et => et.slug === 'case' || et.slug === 'cases')
-      ts.entityTypeId = caseType?.id ?? data.entityTypes[0].id
-    }
-  }
-
-  if (!ts.entityTypeId) {
-    const { data, status } = await apiPost<{ id?: string; entityType?: { id: string } }>(
-      request,
-      '/entity-types',
-      {
-        name: uniqueName('Case Type'),
-        slug: `case-${Date.now()}`,
-        fields: [],
-      },
-    )
-    if (status < 300) {
-      ts.entityTypeId = (data as Record<string, unknown>)?.id as string
-        ?? ((data as Record<string, unknown>)?.entityType as Record<string, unknown>)?.id as string
-    }
+    await enableCaseManagementViaApi(request, true)
+    const et = await createEntityTypeViaApi(request, {
+      name: `case_type_${Date.now()}`,
+    })
+    ts.entityTypeId = et.id as string
   }
 
   // Create case record

@@ -5,11 +5,11 @@
 import { sql } from 'drizzle-orm'
 import {
   index,
-  jsonb,
   pgTable,
   text,
   timestamp,
 } from 'drizzle-orm/pg-core'
+import { jsonb } from '../bun-jsonb'
 
 // ---------------------------------------------------------------------------
 // scheduled_tasks

@@ -10,10 +10,7 @@ import {
   apiGet,
   apiPut,
   apiPost,
-  apiDelete,
   createVolunteerViaApi,
-  generateTestKeypair,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 
 // ── Local State ────────────────────────────────────────────────────
@@ -24,12 +21,18 @@ interface HubMember {
   pubkey: string
 }
 
+interface EnvelopeEntry {
+  pubkey: string
+  wrappedKey: string
+  ephemeralPubkey: string
+}
+
 interface HubKeyState {
   hubId?: string
   members: Map<string, HubMember>
-  /** Original envelopes keyed by member name */
+  /** Original wrappedKey values keyed by member name */
   originalEnvelopes: Map<string, string>
-  /** Current envelopes keyed by member name */
+  /** Current wrappedKey values keyed by member name */
   currentEnvelopes: Map<string, string>
   /** Fetch results per member */
   fetchResults: Map<string, { status: number; envelope?: string }>
@@ -50,9 +53,11 @@ Before({ tags: '@crypto' }, async () => {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function generateMockEnvelope(pubkey: string, seed: string): string {
-  // Generate a deterministic but unique mock envelope per member + seed
-  return Buffer.from(`envelope:${pubkey}:${seed}:${Date.now()}`).toString('base64')
+function generateMockEnvelopeEntry(pubkey: string, seed: string): EnvelopeEntry {
+  // wrappedKey encodes pubkey+seed so each member gets a DISTINCT value
+  const wrappedKey = Buffer.from(`wrapped:${pubkey}:${seed}`).toString('base64')
+  // ephemeralPubkey must match pubkeySchema: ^[0-9a-f]{64}$ — real pubkeys satisfy this
+  return { pubkey, wrappedKey, ephemeralPubkey: pubkey }
 }
 
 async function createHub(request: import('@playwright/test').APIRequestContext): Promise<string> {
@@ -95,12 +100,12 @@ When(
   async ({ request }, count: number) => {
     expect(hkState.hubId).toBeTruthy()
 
-    const envelopes: Record<string, string> = {}
+    const envelopes: EnvelopeEntry[] = []
     for (const [name, member] of hkState.members) {
-      const envelope = generateMockEnvelope(member.pubkey, 'initial')
-      envelopes[member.pubkey] = envelope
-      hkState.originalEnvelopes.set(name, envelope)
-      hkState.currentEnvelopes.set(name, envelope)
+      const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
+      envelopes.push(entry)
+      hkState.originalEnvelopes.set(name, entry.wrappedKey)
+      hkState.currentEnvelopes.set(name, entry.wrappedKey)
     }
 
     const res = await apiPut(
@@ -115,12 +120,12 @@ When(
 Given('hub key envelopes are set for all {int} members', async ({ request }, count: number) => {
   expect(hkState.hubId).toBeTruthy()
 
-  const envelopes: Record<string, string> = {}
+  const envelopes: EnvelopeEntry[] = []
   for (const [name, member] of hkState.members) {
-    const envelope = generateMockEnvelope(member.pubkey, 'initial')
-    envelopes[member.pubkey] = envelope
-    hkState.originalEnvelopes.set(name, envelope)
-    hkState.currentEnvelopes.set(name, envelope)
+    const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
+    envelopes.push(entry)
+    hkState.originalEnvelopes.set(name, entry.wrappedKey)
+    hkState.currentEnvelopes.set(name, entry.wrappedKey)
   }
 
   const res = await apiPut(
@@ -140,14 +145,15 @@ Then(
     const member = hkState.members.get(name)
     expect(member).toBeTruthy()
 
-    const res = await apiGet<{ envelope: string }>(
+    const res = await apiGet<{ envelope: { pubkey: string; wrappedKey: string; ephemeralPubkey: string } }>(
       request,
       `/hubs/${hkState.hubId}/key`,
       member!.nsec,
     )
     expect(res.status).toBe(200)
     expect(res.data.envelope).toBeTruthy()
-    hkState.fetchResults.set(name, { status: res.status, envelope: res.data.envelope })
+    expect(res.data.envelope.wrappedKey).toBeTruthy()
+    hkState.fetchResults.set(name, { status: res.status, envelope: res.data.envelope.wrappedKey })
   },
 )
 
@@ -163,13 +169,14 @@ Then('each envelope should be unique per member', async () => {
 
 // ── When: Remove member ───────────────────────────────────────────
 
-When('{string} is removed from the hub', async ({ request }, name: string) => {
-  const member = hkState.members.get(name)
-  expect(member).toBeTruthy()
-
-  // Deactivate the volunteer (removes from hub)
-  const res = await apiDelete(request, `/volunteers/${member!.pubkey}`)
-  expect(res.status).toBe(200)
+When('{string} is removed from the hub', async ({}, name: string) => {
+  // Mark as removed in local state — omit from subsequent key PUTs.
+  // Hub membership is modelled by envelope presence: a replace-all PUT that
+  // excludes this member's entry causes setHubKeyEnvelopes to delete their row,
+  // so their subsequent GET returns 404 ("No key envelope for this user").
+  // Do NOT call DELETE /volunteers/:pubkey — that permanently deletes the account,
+  // causing subsequent Schnorr auth to return 401 rather than 404 on GET /hubs/:id/key.
+  hkState.currentEnvelopes.delete(name)
 })
 
 When(
@@ -177,13 +184,13 @@ When(
   async ({ request }, name1: string, name2: string) => {
     expect(hkState.hubId).toBeTruthy()
 
-    const envelopes: Record<string, string> = {}
+    const envelopes: EnvelopeEntry[] = []
     for (const name of [name1, name2]) {
       const member = hkState.members.get(name)
       expect(member).toBeTruthy()
-      const envelope = generateMockEnvelope(member!.pubkey, 'rotated')
-      envelopes[member!.pubkey] = envelope
-      hkState.currentEnvelopes.set(name, envelope)
+      const entry = generateMockEnvelopeEntry(member!.pubkey, 'rotated')
+      envelopes.push(entry)
+      hkState.currentEnvelopes.set(name, entry.wrappedKey)
     }
 
     const res = await apiPut(
@@ -192,7 +199,7 @@ When(
       { envelopes },
     )
     expect(res.status).toBe(200)
-    hkState.lastEnvelopeCount = Object.keys(envelopes).length
+    hkState.lastEnvelopeCount = envelopes.length
   },
 )
 
@@ -222,28 +229,23 @@ When(
   async ({ request }) => {
     expect(hkState.hubId).toBeTruthy()
 
-    const envelopes: Record<string, string> = {}
-    let count = 0
+    const envelopes: EnvelopeEntry[] = []
     for (const [name, member] of hkState.members) {
-      // Skip removed members (check by trying to see if they were just removed)
-      // In practice, we wrap for all non-removed members
+      // Only wrap for members still tracked in currentEnvelopes (non-removed)
       if (hkState.currentEnvelopes.has(name)) {
-        const envelope = generateMockEnvelope(member.pubkey, 'new-key')
-        envelopes[member.pubkey] = envelope
-        hkState.currentEnvelopes.set(name, envelope)
-        count++
+        const entry = generateMockEnvelopeEntry(member.pubkey, 'new-key')
+        envelopes.push(entry)
+        hkState.currentEnvelopes.set(name, entry.wrappedKey)
       }
     }
 
-    // Only wrap for members who still have envelopes
-    // The removed member's envelope was cleared when we updated for name1 and name2 only
     const res = await apiPut(
       request,
       `/hubs/${hkState.hubId}/key`,
       { envelopes },
     )
     expect(res.status).toBe(200)
-    hkState.lastEnvelopeCount = count
+    hkState.lastEnvelopeCount = envelopes.length
   },
 )
 

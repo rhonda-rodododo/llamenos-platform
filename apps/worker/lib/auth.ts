@@ -60,6 +60,7 @@ export async function authenticateRequest(
       const session = await identityService.validateSession(sessionToken)
       const volunteer = await identityService.getVolunteerInternal(session.pubkey)
       if (!volunteer) return null
+      if (volunteer.active === false) return null
       return { pubkey: session.pubkey, volunteer }
     } catch {
       return null
@@ -76,6 +77,7 @@ export async function authenticateRequest(
   try {
     const volunteer = await identityService.getVolunteerInternal(auth.pubkey)
     if (!volunteer) return null
+    if (volunteer.active === false) return null
     return { pubkey: auth.pubkey, volunteer }
   } catch {
     return null

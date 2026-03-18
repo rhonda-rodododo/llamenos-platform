@@ -7,12 +7,12 @@ import {
   boolean,
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
 } from 'drizzle-orm/pg-core'
+import { jsonb } from '../bun-jsonb'
 
 // ---------------------------------------------------------------------------
 // contacts

@@ -398,8 +398,10 @@ When('the admin removes the first volunteer from the shift', async ({ request })
 })
 
 Then('only the second volunteer should be rung', async ({}) => {
-  // Call was created; shift only has second volunteer
-  expect(xdo.callId).toBeDefined()
+  // callId is set by call-lifecycle.steps.ts via state.callId;
+  // xdo.callId is set by cross-do-internal call steps. Accept either.
+  const callId = xdo.callId ?? state.callId
+  expect(callId).toBeDefined()
 })
 
 // ─── Conversation Notes ─────────────────────────────────────────────

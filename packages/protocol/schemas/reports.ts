@@ -51,11 +51,14 @@ export const reportFilesResponseSchema = z.object({
 })
 
 export const reportLinkedCasesResponseSchema = z.object({
-  cases: z.array(z.object({
-    id: z.string(),
-    caseNumber: z.string().optional(),
+  records: z.array(z.object({
     reportId: z.string(),
+    caseId: z.string(),
+    linkedAt: z.string(),
+    linkedBy: z.string(),
+    encryptedNotes: z.string().optional(),
   })),
+  total: z.number(),
 })
 
 // --- Input schemas ---

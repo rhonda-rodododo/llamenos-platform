@@ -58,8 +58,7 @@ async function ensureEntityType(
   if (lc.entityTypeId) return lc.entityTypeId
   await enableCaseManagementViaApi(request, true)
   const et = await createEntityTypeViaApi(request, {
-    name: `Lifecycle Case ${Date.now()}`,
-    slug: `lifecycle-case-${Date.now()}`,
+    name: `lifecycle_case_${Date.now()}`,
   })
   lc.entityTypeId = et.id
   return et.id
@@ -116,13 +115,13 @@ Then('listing the report should show the linked case ID', async ({ request }) =>
   expect(lc.caseRecordId).toBeTruthy()
 
   // Fetch the report's linked records
-  const res = await apiGet<{ records: Array<{ id: string }> }>(
+  const res = await apiGet<{ records: Array<{ caseId: string }> }>(
     request,
     `/reports/${lc.reportId}/records`,
   )
   // The report should have a linked case
   if (res.status === 200 && res.data.records) {
-    const linkedIds = res.data.records.map(r => r.id)
+    const linkedIds = res.data.records.map((r: { caseId: string }) => r.caseId)
     expect(linkedIds).toContain(lc.caseRecordId)
   }
 })
@@ -146,11 +145,14 @@ Given(
     const vol = await createVolunteerViaApi(request, {
       name: `Reporter ${reporterName} ${Date.now()}`,
     })
-    await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: ['reporter'] })
+    await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: ['role-reporter'] })
 
-    // Create a report as admin (reports don't have per-user nsec in createReportViaApi yet)
-    // but we track it per reporter for isolation checks
-    const report = await createReportViaApi(request, { title })
+    // Create the report authenticated as the reporter so the server records their pubkey
+    // as the contact/author — required for the reporter-isolation filter in GET /reports
+    const report = await createReportViaApi(request, {
+      title,
+      nsec: vol.nsec,
+    })
 
     if (!lc.reporters.has(reporterName)) {
       lc.reporters.set(reporterName, {

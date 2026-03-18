@@ -7,11 +7,11 @@ import {
   boolean,
   index,
   integer,
-  jsonb,
   pgTable,
   text,
   timestamp,
 } from 'drizzle-orm/pg-core'
+import { jsonb } from '../bun-jsonb'
 
 // ---------------------------------------------------------------------------
 // volunteers

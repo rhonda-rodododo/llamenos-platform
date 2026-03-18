@@ -4,12 +4,12 @@
 import { relations, sql } from 'drizzle-orm'
 import {
   boolean,
-  jsonb,
   pgTable,
   text,
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core'
+import { jsonb } from '../bun-jsonb'
 
 // ---------------------------------------------------------------------------
 // subscribers

@@ -518,13 +518,14 @@ export async function listReportsViaApi(
  */
 export async function createReportViaApi(
   request: APIRequestContext,
-  options?: { title?: string; category?: string; status?: string; reportTypeId?: string },
+  options?: { title?: string; category?: string; status?: string; reportTypeId?: string; nsec?: string },
 ): Promise<ReportRecord> {
-  const skHex = nsecToSkHex(ADMIN_NSEC)
+  const nsec = options?.nsec ?? ADMIN_NSEC
+  const skHex = nsecToSkHex(nsec)
   const pubkey = skHexToPubkey(skHex)
 
   // Dummy ECIES envelope — server stores but doesn't validate crypto
-  const dummyEnvelope = {
+  const envelope = {
     pubkey,
     wrappedKey: 'a'.repeat(64),
     ephemeralPubkey: pubkey,
@@ -535,11 +536,11 @@ export async function createReportViaApi(
     title,
     category: options?.category ?? 'test',
     encryptedContent: 'dGVzdCByZXBvcnQgY29udGVudA==', // base64 "test report content"
-    readerEnvelopes: [dummyEnvelope],
+    readerEnvelopes: [envelope],
   }
   if (options?.reportTypeId) body.reportTypeId = options.reportTypeId
 
-  const { status, data } = await apiPost<ReportRecord>(request, '/reports', body)
+  const { status, data } = await apiPost<ReportRecord>(request, '/reports', body, nsec)
   if (status !== 201 && status !== 200) {
     throw new Error(`Failed to create report: ${status} ${JSON.stringify(data)}`)
   }
@@ -1723,7 +1724,7 @@ export async function createCaseFromReportViaApi(
   const recordId = (record as { id: string }).id
 
   // Link it to the report
-  const { status, data } = await apiPost<{ reportId: string; caseId: string }>(
+  const { status, data } = await apiPost<{ id?: string; reportId?: string; caseId?: string }>(
     request,
     `/reports/${reportId}/records`,
     {
@@ -1734,5 +1735,6 @@ export async function createCaseFromReportViaApi(
     nsec,
   )
   if (status !== 201 && status !== 200) throw new Error(`Failed to link case to report: ${status}`)
-  return { recordId, linkId: (data as Record<string, unknown>).id as string ?? recordId }
+  const linkData = data as Record<string, unknown>
+  return { recordId, linkId: (linkData.id ?? linkData.caseId ?? recordId) as string }
 }

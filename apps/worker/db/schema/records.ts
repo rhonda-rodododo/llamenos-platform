@@ -6,13 +6,13 @@ import { sql } from 'drizzle-orm'
 import {
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
+import { jsonb } from '../bun-jsonb'
 
 // ---------------------------------------------------------------------------
 // notes

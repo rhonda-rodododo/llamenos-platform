@@ -272,7 +272,11 @@ export class NodeNostrPublisher implements NostrPublisher {
       throw new Error('WebSocket not connected — event will be retried by outbox poller')
     }
 
-    const eventId = eventJson.id as string
+    const eventId = eventJson.id as string | undefined
+    if (!eventId || typeof eventId !== 'string') {
+      throw new Error(`Cannot deliver event without valid id (got ${typeof eventJson.id}). Event keys: ${Object.keys(eventJson).join(',')}`)
+    }
+
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingPublishes.delete(eventId)

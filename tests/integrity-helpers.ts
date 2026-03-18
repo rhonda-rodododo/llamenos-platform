@@ -84,12 +84,29 @@ export function assertIsArray(
 // ---------------------------------------------------------------------------
 
 /**
+ * Deterministic JSON serialization with sorted keys.
+ * Matches the server's stableJsonStringify — PostgreSQL JSONB returns keys
+ * sorted alphabetically, so both sides must use sorted-key serialization for
+ * the stored hash to match any recomputation from DB-retrieved data.
+ */
+function stableJsonStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+      )
+    }
+    return val
+  })
+}
+
+/**
  * Compute SHA-256 hash of an audit entry matching the server's algorithm.
  *
- * Format: `${id}:${action}:${actorPubkey}:${createdAt}:${JSON.stringify(details)}:${previousEntryHash ?? ''}`
+ * Format: `${id}:${action}:${actorPubkey}:${createdAt}:${stableJsonStringify(details)}:${previousEntryHash ?? ''}`
  *
- * Matches `computeEntryHash` in `apps/worker/services/audit.ts` and
- * `hashAuditEntry` in `apps/worker/lib/crypto.ts`.
+ * Uses stable (sorted-key) JSON serialization to match PostgreSQL JSONB key ordering.
+ * Matches `computeEntryHash` in `apps/worker/services/audit.ts`.
  */
 export function computeAuditEntryHash(entry: {
   id: string
@@ -99,7 +116,7 @@ export function computeAuditEntryHash(entry: {
   details: unknown
   previousEntryHash: string | null
 }): string {
-  const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details ?? {})}:${entry.previousEntryHash ?? ''}`
+  const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${stableJsonStringify(entry.details ?? {})}:${entry.previousEntryHash ?? ''}`
   return bytesToHex(sha256(utf8ToBytes(content)))
 }
 

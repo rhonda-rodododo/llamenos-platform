@@ -70,6 +70,22 @@ export type AuditEntry = typeof auditLog.$inferSelect
 // Hash computation (matches lib/crypto.ts hashAuditEntry but works on DB row)
 // ---------------------------------------------------------------------------
 
+/**
+ * Deterministic JSON serialization with sorted keys.
+ * PostgreSQL JSONB stores keys sorted — using sorted keys here ensures
+ * the stored hash matches any recomputation from DB-retrieved data.
+ */
+function stableJsonStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+      )
+    }
+    return val
+  })
+}
+
 function computeEntryHash(entry: {
   id: string
   action: string
@@ -78,7 +94,7 @@ function computeEntryHash(entry: {
   details: Record<string, unknown> | null
   previousEntryHash: string | null
 }): string {
-  const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details ?? {})}:${entry.previousEntryHash ?? ''}`
+  const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${stableJsonStringify(entry.details ?? {})}:${entry.previousEntryHash ?? ''}`
   return bytesToHex(sha256(utf8ToBytes(content)))
 }
 
@@ -140,6 +156,7 @@ export class AuditService {
           details,
           previousEntryHash,
           entryHash,
+          createdAt: new Date(createdAt),
         })
         .returning()
 

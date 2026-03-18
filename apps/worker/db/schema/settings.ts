@@ -7,13 +7,13 @@ import { sql } from 'drizzle-orm'
 import {
   boolean,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core'
+import { jsonb } from '../bun-jsonb'
 
 // ---------------------------------------------------------------------------
 // system_settings (singleton, id always = 1)
