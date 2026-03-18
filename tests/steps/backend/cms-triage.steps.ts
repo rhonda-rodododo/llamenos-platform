@@ -40,6 +40,15 @@ Before({ tags: '@backend' }, async () => {
   triage = { reportIds: [] }
 })
 
+/** Parse metadata that may be double-serialized by the JSONB layer */
+function parseMetadata(report: Record<string, unknown>): Record<string, unknown> {
+  let meta = report.metadata
+  if (typeof meta === 'string') {
+    try { meta = JSON.parse(meta) } catch { /* ignore */ }
+  }
+  return (meta as Record<string, unknown>) ?? {}
+}
+
 // ── CMS Report Type Steps ────────────────────────────────────────
 
 Given('a CMS report type with allowCaseConversion enabled exists', async ({ request }) => {
@@ -144,15 +153,17 @@ Then('only reports of the conversion-enabled type should be returned', async ({}
   expect(triage.triageQueue).toBeDefined()
   // All returned reports should have the enabled report type
   for (const report of triage.triageQueue!) {
-    expect(report.reportTypeId).toBe(triage.enabledReportTypeId)
+    const meta = parseMetadata(report)
+    const reportTypeId = meta.reportTypeId as string ?? report.reportTypeId as string
+    expect(reportTypeId).toBe(triage.enabledReportTypeId)
   }
 })
 
 Then('only reports with conversionStatus {string} should be returned', async ({}, expectedStatus: string) => {
   expect(triage.triageQueue).toBeDefined()
   for (const report of triage.triageQueue!) {
-    const status = (report.metadata as Record<string, unknown>)?.conversionStatus as string
-      ?? report.conversionStatus as string
+    const meta = parseMetadata(report)
+    const status = meta.conversionStatus as string ?? report.conversionStatus as string
     expect(status).toBe(expectedStatus)
   }
 })
@@ -173,12 +184,16 @@ When('the admin updates the report conversionStatus to {string}', async ({ reque
 
 Then('the report metadata should include conversionStatus {string}', async ({ request }, expectedStatus: string) => {
   expect(triage.reportId).toBeDefined()
-  const { data } = await apiGet<Record<string, unknown>>(
+  const { data, status } = await apiGet<Record<string, unknown>>(
     request,
     `/reports/${triage.reportId}`,
   )
-  const conversionStatus = (data as Record<string, unknown>)?.conversionStatus as string
-    ?? ((data as Record<string, unknown>)?.metadata as Record<string, unknown>)?.conversionStatus as string
+  expect(status).toBe(200)
+  expect(data).toBeTruthy()
+  const report = data as Record<string, unknown>
+  const meta = parseMetadata(report)
+  const conversionStatus = meta.conversionStatus as string
+    ?? report.conversionStatus as string
   expect(conversionStatus).toBe(expectedStatus)
 })
 
@@ -202,20 +217,31 @@ When('the admin creates a case record from the report', async ({ request }) => {
     const { listEntityTypesViaApi } = await import('../../api-helpers')
     const types = await listEntityTypesViaApi(request)
     const caseType = types.find(t => t.name === 'triage_case_type' || t.category === 'case')
-    if (caseType) triage.entityTypeId = caseType.id
+    if (caseType) triage.entityTypeId = caseType.id as string
   }
+
+  // Step 1: Create the case record with all required fields
+  const kp = generateTestKeypair()
   const { data, status } = await apiPost<{ id?: string; record?: { id: string } }>(
     request,
     '/records',
     {
       entityTypeId: triage.entityTypeId,
-      linkedReportId: triage.reportId,
-      fields: { description: 'Case from triage report' },
+      statusHash: 'open',
+      encryptedSummary: 'triage-case-summary',
+      summaryEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
     },
   )
   if (status < 300) {
     triage.caseRecordId = (data as Record<string, unknown>)?.id as string
       ?? ((data as Record<string, unknown>)?.record as Record<string, unknown>)?.id as string
+  }
+
+  // Step 2: Link the report to the case
+  if (triage.caseRecordId && triage.reportId) {
+    await apiPost(request, `/records/${triage.caseRecordId}/reports`, {
+      reportId: triage.reportId,
+    })
   }
 })
 

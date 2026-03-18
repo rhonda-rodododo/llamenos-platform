@@ -14,6 +14,20 @@ import { publishNostrEvent } from '../lib/nostr-events'
 import { verifyReportAccess, isReport } from '../lib/report-access'
 import { linkCaseToReportBodySchema } from '@protocol/schemas/report-links'
 
+/**
+ * Normalize conversation metadata — Drizzle bun-sql may double-serialize JSONB
+ * objects, storing them as JSON strings. This helper parses the string back to
+ * an object so JavaScript-level property access works correctly.
+ */
+function normalizeMetadata(metadata: unknown): Record<string, unknown> | null {
+  if (!metadata) return null
+  if (typeof metadata === 'string') {
+    try { return JSON.parse(metadata) as Record<string, unknown> } catch { return null }
+  }
+  if (typeof metadata === 'object') return metadata as Record<string, unknown>
+  return null
+}
+
 const reports = new Hono<AppEnv>()
 
 // List reports — reporters see only their own, users with reports:read-all see everything
@@ -57,17 +71,20 @@ reports.get('/',
 
     let data = result
 
-    // Triage queue filtering: only reports whose report type allows case conversion
+    // Triage queue filtering requires reports:read-all (admin feature)
     if (query.conversionEnabled) {
+      if (!canReadAll) {
+        return c.json({ error: 'Forbidden', required: 'reports:read-all' }, 403)
+      }
       const { reportTypes } = await services.settings.getCmsReportTypes()
       const conversionTypeIds = new Set(
         reportTypes.filter(rt => rt.allowCaseConversion).map(rt => rt.id),
       )
       data = {
-        conversations: data.conversations.filter(
-          conv => (conv.metadata as Record<string, unknown> | null)?.reportTypeId &&
-            conversionTypeIds.has((conv.metadata as Record<string, unknown>).reportTypeId as string),
-        ),
+        conversations: data.conversations.filter(conv => {
+          const meta = normalizeMetadata(conv.metadata)
+          return meta?.reportTypeId && conversionTypeIds.has(meta.reportTypeId as string)
+        }),
         total: 0,
       }
       data.total = data.conversations.length
@@ -76,9 +93,10 @@ reports.get('/',
     // Filter by conversion status if specified
     if (query.conversionStatus) {
       data = {
-        conversations: data.conversations.filter(
-          conv => (conv.metadata as Record<string, unknown> | null)?.conversionStatus === query.conversionStatus,
-        ),
+        conversations: data.conversations.filter(conv => {
+          const meta = normalizeMetadata(conv.metadata)
+          return meta?.conversionStatus === query.conversionStatus
+        }),
         total: 0,
       }
       data.total = data.conversations.length

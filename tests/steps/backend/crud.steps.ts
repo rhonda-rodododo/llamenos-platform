@@ -459,23 +459,14 @@ When('the reporter creates a report titled {string}', async ({ request }, title:
     },
     crud.reporterNsec!,
   )
-  console.log('[DEBUG] Create report status:', status, 'data:', JSON.stringify(data).slice(0, 300))
   expect(status).toBeLessThan(300)
   crud.reportId = (data as Record<string, unknown>)?.id as string
     ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.id as string
-  console.log('[DEBUG] crud.reportId:', crud.reportId)
   expect(crud.reportId).toBeTruthy()
 })
 
 Then('the report should appear in the reports list', async ({ request }) => {
-  // Debug: raw API call to /reports
-  const { data: rawList, status: rawListStatus } = await apiGet<Record<string, unknown>>(request, '/reports')
-  console.log('[DEBUG] Raw /reports status:', rawListStatus, 'keys:', rawList ? Object.keys(rawList) : 'null')
-  console.log('[DEBUG] Raw /reports data:', JSON.stringify(rawList).slice(0, 500))
-
-  const result = await listReportsViaApi(request)
-  console.log('[DEBUG] listReportsViaApi result:', JSON.stringify(result).slice(0, 500))
-  const { conversations } = result
+  const { conversations } = await listReportsViaApi(request)
   expect(conversations.length).toBeGreaterThan(0)
 })
 

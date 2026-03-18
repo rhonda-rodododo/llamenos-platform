@@ -136,25 +136,10 @@ export class ConversationsService {
         contactLast4: input.contactLast4,
         assignedTo: input.assignedTo,
         status: input.status ?? 'waiting',
+        metadata: input.metadata ?? null,
         lastMessageAt: new Date(),
       })
       .returning()
-
-    // Drizzle bun-sql double-serializes JSONB objects in insert .values().
-    // Use .update().set() with an explicit ::jsonb SQL cast instead, which
-    // handles parameterized JSONB correctly.
-    if (input.metadata) {
-      console.log('[conversations.create] Fixing metadata for', row.id, JSON.stringify(input.metadata).slice(0, 100))
-      const [updated] = await this.db
-        .update(conversations)
-        .set({
-          metadata: sql`${JSON.stringify(input.metadata)}::jsonb`,
-        })
-        .where(eq(conversations.id, row.id))
-        .returning()
-      console.log('[conversations.create] After update, metadata type:', typeof updated.metadata, 'value:', JSON.stringify(updated.metadata).slice(0, 100))
-      return updated
-    }
 
     return row
   }
@@ -192,13 +177,32 @@ export class ConversationsService {
       conditions.push(eq(conversations.contactIdentifierHash, filters.authorPubkey))
     }
 
-    // Filter by type using metadata JSONB
+    // Filter by type using metadata JSONB.
+    // Drizzle bun-sql double-serializes JSONB objects in insert .values(), storing
+    // them as JSON strings instead of JSONB objects (jsonb_typeof = 'string').
+    // Use a helper that handles both forms: try ->>'type' first (proper JSONB),
+    // then fall back to parsing the string value (double-serialized).
     if (filters.type === 'report') {
-      conditions.push(sql`${conversations.metadata}->>'type' = 'report'`)
+      conditions.push(sql`COALESCE(
+        ${conversations.metadata}->>'type',
+        CASE WHEN jsonb_typeof(${conversations.metadata}) = 'string'
+          THEN (${conversations.metadata} #>> '{}')::jsonb->>'type'
+          ELSE NULL
+        END
+      ) = 'report'`)
     } else if (!filters.type) {
       // Default: exclude reports
       conditions.push(
-        sql`(${conversations.metadata} IS NULL OR ${conversations.metadata}->>'type' IS NULL OR ${conversations.metadata}->>'type' != 'report')`,
+        sql`(
+          ${conversations.metadata} IS NULL
+          OR COALESCE(
+            ${conversations.metadata}->>'type',
+            CASE WHEN jsonb_typeof(${conversations.metadata}) = 'string'
+              THEN (${conversations.metadata} #>> '{}')::jsonb->>'type'
+              ELSE NULL
+            END
+          ) IS DISTINCT FROM 'report'
+        )`,
       )
     }
 

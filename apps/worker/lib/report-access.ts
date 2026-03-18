@@ -28,6 +28,10 @@ export function verifyReportAccess(
 
 /** Verify that a conversation is actually a report. Returns false if not. */
 export function isReport(report: ReportLike): boolean {
-  const meta = report.metadata as { type?: string } | undefined
-  return meta?.type === 'report'
+  let meta = report.metadata as { type?: string } | string | undefined
+  // Drizzle bun-sql may double-serialize JSONB, returning a string
+  if (typeof meta === 'string') {
+    try { meta = JSON.parse(meta) as { type?: string } } catch { return false }
+  }
+  return (meta as { type?: string })?.type === 'report'
 }

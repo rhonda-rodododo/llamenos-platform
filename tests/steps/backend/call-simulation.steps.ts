@@ -215,16 +215,16 @@ Given('a fallback ring group is configured', async ({ request }) => {
 })
 
 Given('no shift is active and no fallback is configured', async ({ request }) => {
-  // Clear all existing shifts so no volunteers are on-shift
-  try {
-    const shifts = await listShiftsViaApi(request)
-    for (const shift of shifts) {
-      await deleteShiftViaApi(request, shift.id)
-    }
-  } catch {
-    // Best effort — shifts may not exist
-  }
-  // Clear fallback ring group so getCurrentVolunteers returns empty
+  // Use test-reset-records to reliably clear all shifts, calls, and records
+  // This is more reliable than manual deletion since it resets at the database level
+  const resetUrl = `${process.env.TEST_HUB_URL || 'http://localhost:3000'}/api/test-reset-records`
+  await request.post(resetUrl, {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Test-Secret': process.env.DEV_RESET_SECRET || 'test-reset-secret',
+    },
+  })
+  // Also clear fallback ring group so getCurrentVolunteers returns empty
   try {
     await apiPut(request, '/shifts/fallback', { volunteerPubkeys: [] })
   } catch {
