@@ -19,29 +19,7 @@ export interface TranscriptionService {
   run(model: string, input: { audio: number[] }): Promise<{ text: string }>
 }
 
-/** Minimal DurableObjectStub — only .fetch() is used */
-export interface DOStub {
-  fetch(request: Request): Promise<Response>
-}
-
-/** Minimal DurableObjectNamespace — only .idFromName() and .get() are used */
-export interface DONamespace {
-  idFromName(name: string): { toString(): string }
-  get(id: { toString(): string }): DOStub
-}
-
 export interface Env {
-  // Durable Object namespaces (CF: DurableObjectNamespace, Node: shim)
-  CALL_ROUTER: DONamespace
-  SHIFT_MANAGER: DONamespace
-  IDENTITY_DO: DONamespace
-  SETTINGS_DO: DONamespace
-  RECORDS_DO: DONamespace
-  CONVERSATION_DO: DONamespace
-  BLAST_DO: DONamespace
-  CONTACT_DIRECTORY: DONamespace
-  CASE_MANAGER: DONamespace
-
   // Transcription (CF: Ai binding, Node: Whisper HTTP client)
   AI: TranscriptionService
 

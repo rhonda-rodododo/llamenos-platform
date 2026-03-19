@@ -10,7 +10,7 @@
  * subset that our DOs actually use (get, put, delete, list, deleteAll,
  * setAlarm, getAlarm).
  */
-import type { Env, DONamespace, DOStub } from '@worker/types'
+import type { Env } from '@worker/types'
 
 /** In-memory storage that mimics DurableObjectStorage. */
 export class MockStorage {
@@ -101,15 +101,6 @@ export function createMockState(): { storage: MockStorage } & Record<string, unk
 /** Create a mock Env with all required bindings. */
 export function createMockEnv(overrides?: Partial<Env>): Env {
   const defaultEnv: Env = {
-    CALL_ROUTER: createMockDONamespace(),
-    SHIFT_MANAGER: createMockDONamespace(),
-    IDENTITY_DO: createMockDONamespace(),
-    SETTINGS_DO: createMockDONamespace(),
-    RECORDS_DO: createMockDONamespace(),
-    CONVERSATION_DO: createMockDONamespace(),
-    BLAST_DO: createMockDONamespace(),
-    CONTACT_DIRECTORY: createMockDONamespace(),
-    CASE_MANAGER: createMockDONamespace(),
     AI: { run: async () => ({}) } as unknown as Env['AI'],
     R2_BUCKET: { put: async () => ({}), get: async () => null, delete: async () => {} } as unknown as Env['R2_BUCKET'],
     TWILIO_ACCOUNT_SID: 'AC-test',
@@ -125,15 +116,6 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
     DEMO_MODE: 'false',
   }
   return { ...defaultEnv, ...overrides }
-}
-
-function createMockDONamespace(): DONamespace {
-  return {
-    idFromName: (name: string) => ({ toString: () => `id:${name}` }),
-    get: () => ({
-      fetch: async () => Response.json({}),
-    }),
-  }
 }
 
 /**
