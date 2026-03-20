@@ -269,6 +269,10 @@ function stripSwiftConvenienceExtensions(lines: string[]): string {
   output = output.replace(/^(enum |\/\/ MARK: - )Operator\b(?! *[A-Z])/gm, '$1FieldOperator')
   output = output.replace(/\bshowWhenOperator: Operator\b/g, 'showWhenOperator: FieldOperator')
 
+  // `CustomFieldDefinition` conflicts with the iOS app's local CustomField.swift model —
+  // rename to ProtocolCustomFieldDefinition. Only match the standalone type declaration.
+  output = output.replace(/^(struct |\/\/ MARK: - )CustomFieldDefinition\b(?![A-Z])/gm, '$1ProtocolCustomFieldDefinition')
+
   // Note: CaseInteraction and EvidenceListResponse are NOT renamed — the iOS app
   // uses the generated types directly (custom duplicates removed from CaseRecord.swift).
 
