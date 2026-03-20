@@ -244,15 +244,21 @@ export const permissionsCatalogResponseSchema = z.object({
   }))),
 })
 
+export const migrationNamespaceSchema = z.object({
+  name: z.string(),
+  status: z.string(),
+  recordCount: z.number().int().optional(),
+})
+
 export const migrationStatusResponseSchema = z.object({
-  namespaces: z.array(z.unknown()),
+  namespaces: z.array(migrationNamespaceSchema),
   note: z.string(),
 })
 
 export const cleanupMetricsResponseSchema = z.object({
-  settings: z.record(z.string(), z.unknown()),
-  identity: z.record(z.string(), z.unknown()),
-  conversation: z.record(z.string(), z.unknown()),
+  settings: z.record(z.string(), z.number()),
+  identity: z.record(z.string(), z.number()),
+  conversation: z.record(z.string(), z.number()),
 })
 
 export const ttlOverridesResponseSchema = z.record(z.string(), z.number())

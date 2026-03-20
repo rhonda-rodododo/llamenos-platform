@@ -50,8 +50,15 @@ export const todayCountResponseSchema = z.object({
   count: z.number(),
 })
 
+export const callerContactSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  caseCount: z.number().int().optional(),
+  entityType: z.string().optional(),
+})
+
 export const callerIdentifyResponseSchema = z.object({
-  contact: z.unknown().nullable(),
+  contact: callerContactSummarySchema.nullable(),
   activeCaseCount: z.number(),
   recentCases: z.array(z.object({
     id: z.string(),

@@ -33,7 +33,10 @@ export const conversionStatusEnum = z.enum(['pending', 'in_progress', 'completed
 // --- List/wrapper response schemas ---
 
 export const reportListResponseSchema = z.object({
-  conversations: z.array(z.unknown()),
+  conversations: z.array(z.object({
+    id: z.string(),
+    createdAt: z.string(),
+  })),
   total: z.number(),
 })
 

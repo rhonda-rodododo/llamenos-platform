@@ -330,11 +330,18 @@ export const templateApplyResponseSchema = z.object({
   entityTypes: z.number(),
   relationshipTypes: z.number(),
   reportTypes: z.number(),
-  suggestedRoles: z.array(z.unknown()).optional(),
+  suggestedRoles: z.array(z.string()).optional(),
+})
+
+export const templateUpdateItemSchema = z.object({
+  entityTypeId: z.string(),
+  field: z.string(),
+  action: z.string(),
+  description: z.string().optional(),
 })
 
 export const templateUpdatesResponseSchema = z.object({
-  updates: z.array(z.unknown()),
+  updates: z.array(templateUpdateItemSchema),
 })
 
 export const rolesFromTemplateResponseSchema = z.object({

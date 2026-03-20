@@ -52,7 +52,12 @@ class FlatSchemaStore extends JSONSchemaStore {
  */
 function stripAdditionalProperties(schema: object): object {
   const s = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>
-  delete s['additionalProperties']
+  // Only strip unconstrained additionalProperties (empty object {} or true from z.looseObject).
+  // Keep typed additionalProperties like { type: "number" } from z.record(z.string(), z.number()).
+  const ap = s['additionalProperties']
+  if (ap === true || (typeof ap === 'object' && ap !== null && Object.keys(ap).length === 0)) {
+    delete s['additionalProperties']
+  }
   if (s['properties'] && typeof s['properties'] === 'object') {
     for (const key of Object.keys(s['properties'] as object)) {
       const prop = (s['properties'] as Record<string, object>)[key]
