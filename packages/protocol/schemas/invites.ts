@@ -6,9 +6,9 @@ import { pubkeySchema } from './common'
 export const inviteResponseSchema = z.object({
   code: z.uuid(),
   name: z.string(),
-  phone: z.string().optional(),
+  phone: z.string(),
   roleIds: z.array(z.string()),
-  createdBy: z.string().optional(),
+  createdBy: z.string(),
   createdAt: z.string(),
   expiresAt: z.string(),
   usedAt: z.string().nullable().optional(),
