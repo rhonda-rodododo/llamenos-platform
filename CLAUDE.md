@@ -76,7 +76,7 @@ apps/
     telephony/        # TelephonyAdapter interface + 5 adapters
     messaging/        # MessagingAdapter interface + SMS, WhatsApp, Signal adapters
     lib/              # Auth, crypto, webauthn utilities
-    wrangler.jsonc    # Marketing site only (Cloudflare Pages)
+    # (no wrangler.jsonc — see site/wrangler.jsonc for marketing site)
   ios/                # Native SwiftUI iOS client
     Sources/          # Swift source (App/, Services/, Views/, ViewModels/)
     Tests/            # XCTest + XCUITest
@@ -157,7 +157,7 @@ docs/
 - Hub key is random bytes, NOT derived from any identity key — see `hub-key-manager.ts`
 - **Tauri-only desktop**: No browser/PWA fallback. `platform.ts` always routes through Tauri IPC. Use `PLAYWRIGHT_TEST=true` for test builds that mock the IPC layer.
 - **packages/crypto path dep**: `apps/desktop/Cargo.toml` references `../../packages/crypto`. No external repo needed.
-- **wrangler.jsonc**: Used for marketing site (Cloudflare Pages) deployment only. Backend is Bun+PostgreSQL, not a Cloudflare Worker.
+- **wrangler.jsonc**: Only exists at `site/wrangler.jsonc` (Cloudflare Pages, marketing site). No wrangler config in `apps/worker/` — the backend is Bun+PostgreSQL, not a Cloudflare Worker.
 - **iOS UniFFI**: Build with `packages/crypto/scripts/build-mobile.sh ios`, copy XCFramework to `apps/ios/`. Stand-in mock types enabled via `#if !canImport(LlamenosCore)`.
 - **Android JNI**: Build with `packages/crypto/scripts/build-mobile.sh android`, place `.so` files in `apps/android/app/src/main/jniLibs/`. Placeholder mock crypto active until native libs are linked.
 - **Zod `.optional().default()` pattern**: Always use `.optional().default(value)` for fields with defaults in `packages/protocol/schemas/`. Never use bare `.default(value)` — it produces wrong JSON Schema output in Zod 4, breaking Kotlin/Swift codegen defaults. The Kotlin post-processor in `codegen.ts` reads `"default"` values from JSON Schema and injects them into generated `@Serializable` data classes.
@@ -251,9 +251,9 @@ bun run version:bump <major|minor|patch> [description]     # Bump version across
 bun run bootstrap-admin                  # Generate admin keypair
 ```
 
-**Deployment rules — NEVER run `wrangler pages deploy` or `wrangler deploy` directly.** Always use the root `package.json` scripts (`bun run deploy`, `bun run deploy:api`, `bun run deploy:site`). Running `wrangler pages deploy dist` from the wrong directory will deploy the Vite app build to Pages instead of the Astro site, breaking the marketing site with 404s.
+**Deployment rules — NEVER run `wrangler pages deploy` or `wrangler deploy` directly.** Always use `bun run deploy` or `bun run deploy:site` from the root. Running wrangler from the wrong directory will deploy the wrong artifact.
 
-**Key config files**: `apps/worker/wrangler.jsonc` (marketing site/CF Pages only), `playwright.config.ts`, `.dev.vars` (Twilio creds + ADMIN_PUBKEY, gitignored)
+**Key config files**: `site/wrangler.jsonc` (Cloudflare Pages, marketing site only), `playwright.config.ts`, `.dev.vars` (Twilio creds + ADMIN_PUBKEY, gitignored)
 
 ## Claude Code Working Style
 
