@@ -181,6 +181,8 @@ export const assignmentSuggestionSchema = z.object({
   maxCases: z.number(),
 })
 
+export type AssignmentSuggestion = z.infer<typeof assignmentSuggestionSchema>
+
 export const suggestAssigneesResponseSchema = z.object({
   suggestions: z.array(assignmentSuggestionSchema),
 })

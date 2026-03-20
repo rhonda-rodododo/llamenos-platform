@@ -13,11 +13,15 @@ export const shiftResponseSchema = z.object({
   createdAt: z.string(),
 })
 
+export type Shift = z.infer<typeof shiftResponseSchema>
+
 export const myStatusResponseSchema = z.object({
   onShift: z.boolean(),
   currentShift: z.object({ name: z.string(), startTime: z.string(), endTime: z.string() }).nullable(),
   nextShift: z.object({ name: z.string(), startTime: z.string(), endTime: z.string(), day: z.number() }).nullable(),
 })
+
+export type ShiftStatus = z.infer<typeof myStatusResponseSchema>
 
 // --- List/wrapper response schemas ---
 

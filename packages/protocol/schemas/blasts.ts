@@ -29,6 +29,8 @@ export const blastResponseSchema = z.object({
   }).optional(),
 })
 
+export type Blast = z.infer<typeof blastResponseSchema>
+
 export const subscriberResponseSchema = z.object({
   id: z.string(),
   identifierHash: z.string(),
@@ -42,6 +44,8 @@ export const subscriberResponseSchema = z.object({
   status: z.enum(['active', 'paused', 'unsubscribed']),
   doubleOptInConfirmed: z.boolean().optional(),
 })
+
+export type Subscriber = z.infer<typeof subscriberResponseSchema>
 
 export const subscriberStatsResponseSchema = z.object({
   total: z.number(),
@@ -57,6 +61,8 @@ export const blastSettingsResponseSchema = z.object({
   doubleOptIn: z.boolean().optional(),
   maxBlastsPerDay: z.number().optional(),
 })
+
+export type BlastSettings = z.infer<typeof blastSettingsResponseSchema>
 
 // --- List/wrapper response schemas ---
 

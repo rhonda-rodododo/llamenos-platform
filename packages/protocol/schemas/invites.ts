@@ -15,6 +15,8 @@ export const inviteResponseSchema = z.object({
   usedBy: z.string().nullable().optional(),
 })
 
+export type InviteCode = z.infer<typeof inviteResponseSchema>
+
 export const inviteValidationResponseSchema = z.object({
   valid: z.boolean(),
   error: z.enum(['not_found', 'already_used', 'expired']).optional(),

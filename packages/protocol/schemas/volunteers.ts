@@ -29,6 +29,8 @@ export const volunteerAdminResponseSchema = volunteerResponseSchema.extend({
   supportedMessagingChannels: z.array(messagingChannelTypeSchema).optional(),
 })
 
+export type Volunteer = z.infer<typeof volunteerAdminResponseSchema>
+
 // --- List/wrapper response schemas ---
 
 export const volunteerListResponseSchema = z.object({

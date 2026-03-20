@@ -18,6 +18,8 @@ export const noteResponseSchema = z.object({
   replyCount: z.number().optional(),
 })
 
+export type EncryptedNote = z.infer<typeof noteResponseSchema>
+
 // --- List/wrapper response schemas ---
 
 export const noteListResponseSchema = z.object({

@@ -28,6 +28,8 @@ export const roleResponseSchema = z.object({
   updatedAt: z.string(),
 })
 
+export type RoleDefinition = z.infer<typeof roleResponseSchema>
+
 export const customFieldResponseSchema = z.object({
   name: z.string(),
   label: z.string(),
@@ -94,10 +96,14 @@ export const spamSettingsSchema = z.looseObject({
   blockDurationMinutes: z.number().int().min(1).max(1440).optional(),
 })
 
+export type SpamSettings = z.infer<typeof spamSettingsSchema>
+
 export const callSettingsSchema = z.looseObject({
   queueTimeoutSeconds: z.number().int().min(30).max(300).optional(),
   voicemailMaxSeconds: z.number().int().min(30).max(300).optional(),
 })
+
+export type CallSettings = z.infer<typeof callSettingsSchema>
 
 export const messagingConfigSchema = z.looseObject({
   enabledChannels: z.array(messagingChannelTypeSchema).optional(),
@@ -147,6 +153,8 @@ export const webauthnSettingsSchema = z.looseObject({
   requireForVolunteers: z.boolean().optional(),
 })
 
+export type WebAuthnSettings = z.infer<typeof webauthnSettingsSchema>
+
 export const transcriptionSettingsSchema = z.looseObject({
   globalEnabled: z.boolean().optional(),
   allowVolunteerOptOut: z.boolean().optional(),
@@ -181,6 +189,8 @@ export const ivrAudioRecordingSchema = z.object({
   size: z.number(),
   uploadedAt: z.string(),
 })
+
+export type IvrAudioRecording = z.infer<typeof ivrAudioRecordingSchema>
 
 export const ivrAudioPromptsResponseSchema = z.object({
   prompts: z.array(z.object({

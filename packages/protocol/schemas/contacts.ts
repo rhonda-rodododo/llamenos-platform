@@ -15,6 +15,8 @@ export const contactTimelineSummarySchema = z.object({
   reportCount: z.number(),
 })
 
+export type ContactTimelineSummary = z.infer<typeof contactTimelineSummarySchema>
+
 export const contactTimelineListResponseSchema = z.object({
   contacts: z.array(contactTimelineSummarySchema),
   total: z.number(),

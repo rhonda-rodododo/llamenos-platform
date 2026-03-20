@@ -27,6 +27,10 @@ export const activeCallResponseSchema = z.object({
   status: z.enum(['ringing', 'in-progress', 'completed', 'unanswered']),
 })
 
+export type CallRecord = z.infer<typeof callRecordResponseSchema>
+export type ActiveCall = z.infer<typeof activeCallResponseSchema>
+export type VolunteerPresence = z.infer<typeof callPresenceResponseSchema>['volunteers'][number]
+
 export const callPresenceResponseSchema = z.object({
   volunteers: z.array(z.object({
     pubkey: z.string(),

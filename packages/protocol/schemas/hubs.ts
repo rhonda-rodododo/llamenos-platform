@@ -14,6 +14,8 @@ export const hubResponseSchema = z.object({
   updatedAt: z.string().optional(),
 })
 
+export type Hub = z.infer<typeof hubResponseSchema>
+
 export const hubMemberResponseSchema = z.object({
   pubkey: pubkeySchema,
   name: z.string(),

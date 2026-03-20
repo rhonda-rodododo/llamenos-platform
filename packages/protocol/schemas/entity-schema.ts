@@ -318,6 +318,8 @@ export const templateSummarySchema = z.object({
   roles: z.array(z.string()).optional().default([]),
 })
 
+export type TemplateSummary = z.infer<typeof templateSummarySchema>
+
 export const templateListResponseSchema = z.object({
   templates: z.array(templateSummarySchema),
   appliedTemplateIds: z.array(z.string()),

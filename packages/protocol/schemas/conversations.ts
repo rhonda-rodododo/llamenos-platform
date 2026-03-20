@@ -26,6 +26,8 @@ export const conversationResponseSchema = z.object({
   }).optional(),
 })
 
+export type Conversation = z.infer<typeof conversationResponseSchema>
+
 export const messageResponseSchema = z.object({
   id: z.string(),
   conversationId: z.string(),
@@ -43,6 +45,8 @@ export const messageResponseSchema = z.object({
   retryCount: z.number().optional(),
   externalId: z.string().optional(),
 })
+
+export type ConversationMessage = z.infer<typeof messageResponseSchema>
 
 // --- List/wrapper response schemas ---
 

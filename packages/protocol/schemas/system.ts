@@ -15,6 +15,8 @@ export const serviceStatusSchema = z.object({
   details: z.string().optional(),
 })
 
+export type ServiceStatus = z.infer<typeof serviceStatusSchema>
+
 export const systemHealthResponseSchema = z.object({
   server: z.object({
     status: z.enum(['ok', 'degraded', 'down']),
@@ -45,3 +47,5 @@ export const systemHealthResponseSchema = z.object({
   }),
   timestamp: z.string(),
 })
+
+export type SystemHealth = z.infer<typeof systemHealthResponseSchema>

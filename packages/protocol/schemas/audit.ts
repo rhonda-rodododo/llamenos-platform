@@ -23,6 +23,8 @@ export const auditEntryResponseSchema = z.object({
   entryHash: z.string().optional(),
 })
 
+export type AuditLogEntry = z.infer<typeof auditEntryResponseSchema>
+
 // --- List response schema ---
 
 export const auditListResponseSchema = z.object({
