@@ -1349,9 +1349,9 @@ export async function seedDemoData() {
   const maria = DEMO_ACCOUNTS.find(a => a.name === 'Maria Santos')!
   const james = DEMO_ACCOUNTS.find(a => a.name === 'James Chen')!
   const shifts = [
-    { name: 'Morning Team', startTime: '08:00', endTime: '16:00', days: [1, 2, 3, 4, 5], volunteerPubkeys: [maria.pubkey, james.pubkey] },
-    { name: 'Evening Team', startTime: '16:00', endTime: '23:59', days: [1, 2, 3, 4, 5], volunteerPubkeys: [maria.pubkey] },
-    { name: 'Weekend Coverage', startTime: '10:00', endTime: '18:00', days: [0, 6], volunteerPubkeys: [james.pubkey] },
+    { name: 'Morning Team', startTime: '08:00', endTime: '16:00', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey, james.pubkey] },
+    { name: 'Evening Team', startTime: '16:00', endTime: '23:59', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey] },
+    { name: 'Weekend Coverage', startTime: '10:00', endTime: '18:00', days: [0, 6], userPubkeys: [james.pubkey] },
   ]
   for (const shift of shifts) {
     try {

@@ -176,18 +176,18 @@ Then('all entries should pass integrity checks', async ({ world }) => {
 When('I query the shift status', async ({ request, world }) => {
   const hubId = getScenarioState(world).hubId
   const path = hubId ? `/hubs/${hubId}/shifts` : '/shifts'
-  const { status, data } = await apiGet<{ shifts: Array<{ volunteerPubkeys: string[] }> }>(request, path)
+  const { status, data } = await apiGet<{ shifts: Array<{ userPubkeys: string[] }> }>(request, path)
   expect(status).toBe(200)
   getScenarioState(world).lastApiResponse = { status, data }
 })
 
 Then('{int} volunteers are reported as on-shift', async ({ world }, count: number) => {
-  const data = getScenarioState(world).lastApiResponse?.data as { shifts: Array<{ volunteerPubkeys: string[] }> }
+  const data = getScenarioState(world).lastApiResponse?.data as { shifts: Array<{ userPubkeys: string[] }> }
   expect(data).toBeTruthy()
   // Count unique volunteer pubkeys across all current shifts
   const uniqueVolunteers = new Set<string>()
   for (const shift of data.shifts) {
-    for (const pk of shift.volunteerPubkeys) {
+    for (const pk of shift.userPubkeys) {
       uniqueVolunteers.add(pk)
     }
   }

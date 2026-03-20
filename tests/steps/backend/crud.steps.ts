@@ -181,7 +181,7 @@ When('an admin creates a shift with the volunteer assigned', async ({ request, w
   const hubId = getScenarioState(world).hubId
   const shift = await createShiftViaApi(request, {
     name: uniqueName('Assigned Shift'),
-    volunteerPubkeys: [getCrudState(world).volunteerPubkey!],
+    userPubkeys: [getCrudState(world).volunteerPubkey!],
     hubId,
   })
   getCrudState(world).shiftId = shift.id
@@ -192,7 +192,7 @@ Then('the shift should include the volunteer in its roster', async ({ request, w
   const shifts = await listShiftsViaApi(request, hubId)
   const shift = shifts.find(s => s.id === getCrudState(world).shiftId)
   expect(shift).toBeDefined()
-  expect(shift!.volunteerPubkeys).toContain(getCrudState(world).volunteerPubkey)
+  expect(shift!.userPubkeys).toContain(getCrudState(world).volunteerPubkey)
 })
 
 // ─── Bans ───────────────────────────────────────────────────────────

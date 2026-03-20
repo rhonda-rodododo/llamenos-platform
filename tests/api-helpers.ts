@@ -336,7 +336,7 @@ export async function createShiftViaApi(
     startTime?: string
     endTime?: string
     days?: number[]
-    volunteerPubkeys?: string[]
+    userPubkeys?: string[]
     hubId?: string
   },
 ): Promise<CreateShiftResult> {
@@ -344,10 +344,10 @@ export async function createShiftViaApi(
   const startTime = options?.startTime ?? '09:00'
   const endTime = options?.endTime ?? '17:00'
   const days = options?.days ?? [1, 2, 3, 4, 5]
-  const volunteerPubkeys = options?.volunteerPubkeys ?? []
+  const userPubkeys = options?.userPubkeys ?? []
 
   const { status, data } = await apiPost<{ id: string }>(request, hubPath('/shifts', options?.hubId), {
-    name, startTime, endTime, days, volunteerPubkeys,
+    name, startTime, endTime, days, userPubkeys,
   })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create shift: ${status}`)
@@ -367,8 +367,8 @@ export async function deleteShiftViaApi(
 export async function listShiftsViaApi(
   request: APIRequestContext,
   hubId?: string,
-): Promise<Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; volunteerPubkeys: string[] }>> {
-  const { status, data } = await apiGet<{ shifts: Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; volunteerPubkeys: string[] }> }>(request, hubPath('/shifts', hubId))
+): Promise<Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }>> {
+  const { status, data } = await apiGet<{ shifts: Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> }>(request, hubPath('/shifts', hubId))
   if (status !== 200) throw new Error(`Failed to list shifts: ${status}`)
   return data.shifts
 }
@@ -376,7 +376,7 @@ export async function listShiftsViaApi(
 export async function updateShiftViaApi(
   request: APIRequestContext,
   id: string,
-  updates: { name?: string; startTime?: string; endTime?: string; days?: number[]; volunteerPubkeys?: string[] },
+  updates: { name?: string; startTime?: string; endTime?: string; days?: number[]; userPubkeys?: string[] },
   hubId?: string,
 ): Promise<void> {
   const { status } = await apiPatch(request, hubPath(`/shifts/${id}`, hubId), updates)
@@ -397,7 +397,7 @@ export async function setFallbackGroupViaApi(
   volunteers: string[],
   hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPut(request, hubPath('/shifts/fallback', hubId), { volunteerPubkeys: volunteers })
+  const { status } = await apiPut(request, hubPath('/shifts/fallback', hubId), { userPubkeys: volunteers })
   if (status !== 200) throw new Error(`Failed to set fallback group: ${status}`)
 }
 

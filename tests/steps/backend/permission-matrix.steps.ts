@@ -198,7 +198,7 @@ When('the {string} user sends {string} to {string} with valid shift body', async
     startTime: '09:00',
     endTime: '17:00',
     days: [1, 2, 3, 4, 5],
-    volunteerPubkeys: [],
+    userPubkeys: [],
   }, user.nsec)
 })
 
@@ -223,7 +223,7 @@ When('the {string} user sends {string} to {string} with fallback body', async ({
   if (!user) throw new Error(`No test user for role "${role}"`)
 
   getSharedState(world).lastResponse = await apiPut(request, '/shifts/fallback', {
-    volunteerPubkeys: [],
+    userPubkeys: [],
   }, user.nsec)
 })
 

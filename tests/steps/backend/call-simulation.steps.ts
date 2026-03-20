@@ -178,7 +178,7 @@ Given('a shift is currently active with {int} volunteers', async ({ request, wor
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: getCallSimState(world).shiftVolunteers.map(v => v.pubkey),
+    userPubkeys: getCallSimState(world).shiftVolunteers.map(v => v.pubkey),
     hubId,
   })
   getScenarioState(world).shiftIds.push(shift.id)
@@ -197,7 +197,7 @@ Given('a shift with {int} volunteers and {int} is on a call', async ({ request, 
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: getCallSimState(world).shiftVolunteers.map(v => v.pubkey),
+    userPubkeys: getCallSimState(world).shiftVolunteers.map(v => v.pubkey),
     hubId,
   })
   getScenarioState(world).shiftIds.push(shift.id)
@@ -230,7 +230,7 @@ Given('no shift is active and no fallback is configured', async ({ request, worl
   const hubId = getScenarioState(world).hubId
   try {
     const path = hubId ? `/hubs/${hubId}/shifts/fallback` : '/shifts/fallback'
-    await apiPut(request, path, { volunteerPubkeys: [] })
+    await apiPut(request, path, { userPubkeys: [] })
   } catch {
     // Best effort — hub may have no fallback configured yet
   }
@@ -252,7 +252,7 @@ Given('two overlapping shifts with different volunteers', async ({ request, worl
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: [vol1.pubkey],
+    userPubkeys: [vol1.pubkey],
     hubId,
   })
   await createShiftViaApi(request, {
@@ -260,7 +260,7 @@ Given('two overlapping shifts with different volunteers', async ({ request, worl
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: [vol2.pubkey],
+    userPubkeys: [vol2.pubkey],
     hubId,
   })
 })
@@ -275,7 +275,7 @@ Given('a shift configured for 9am-5pm in America\\/New_York', async ({ request, 
     startTime: '09:00',
     endTime: '17:00',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: [vol.pubkey],
+    userPubkeys: [vol.pubkey],
     timezone: 'America/New_York',
     hubId,
   })
@@ -354,7 +354,7 @@ Given('an incoming call from {string}', async ({ request, world }, callerNumber:
       startTime: '00:00',
       endTime: '23:59',
       days: [0, 1, 2, 3, 4, 5, 6],
-      volunteerPubkeys: [vol.pubkey],
+      userPubkeys: [vol.pubkey],
       hubId,
     })
   }
@@ -375,7 +375,7 @@ Given('an incoming call from {string} in {string}', async ({ request, world }, c
       startTime: '00:00',
       endTime: '23:59',
       days: [0, 1, 2, 3, 4, 5, 6],
-      volunteerPubkeys: [vol.pubkey],
+      userPubkeys: [vol.pubkey],
       hubId,
     })
   }
@@ -396,7 +396,7 @@ Given('an incoming call from {string} for hub {string}', async ({ request, world
       startTime: '00:00',
       endTime: '23:59',
       days: [0, 1, 2, 3, 4, 5, 6],
-      volunteerPubkeys: [vol.pubkey],
+      userPubkeys: [vol.pubkey],
       hubId: workerHubId,
     })
   }

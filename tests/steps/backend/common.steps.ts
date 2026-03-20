@@ -77,7 +77,7 @@ Given('{int} volunteers are on shift', async ({ request, world }, count: number)
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: pubkeys,
+    userPubkeys: pubkeys,
     hubId: state.hubId,
   })
 

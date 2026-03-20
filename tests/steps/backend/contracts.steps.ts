@@ -101,7 +101,7 @@ When('an admin sends {string} to {string} with invalid day body', async ({ reque
     startTime: '09:00',
     endTime: '17:00',
     days: [0, 1, 7], // 7 is invalid (0-6 only)
-    volunteerPubkeys: [],
+    userPubkeys: [],
   }, ADMIN_NSEC))
 })
 
@@ -111,7 +111,7 @@ When('an admin sends {string} to {string} with negative day body', async ({ requ
     startTime: '09:00',
     endTime: '17:00',
     days: [-1, 0, 1],
-    volunteerPubkeys: [],
+    userPubkeys: [],
   }, ADMIN_NSEC))
 })
 
@@ -142,6 +142,6 @@ When('an admin creates a shift with valid data', async ({ request, world }) => {
     startTime: '09:00',
     endTime: '17:00',
     days: [1, 2, 3, 4, 5],
-    volunteerPubkeys: [],
+    userPubkeys: [],
   }, ADMIN_NSEC))
 })

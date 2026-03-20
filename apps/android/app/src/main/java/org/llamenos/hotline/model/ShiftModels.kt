@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 /**
  * Re-export generated ShiftResponse from protocol package.
  * The generated type includes the full API shape (id, name, startTime, endTime,
- * days as List<Double>, volunteerPubkeys, createdAt).
+ * days as List<Double>, userPubkeys, createdAt).
  */
 typealias ShiftResponse = org.llamenos.protocol.ShiftResponse
 

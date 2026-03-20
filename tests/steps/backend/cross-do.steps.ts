@@ -78,7 +78,7 @@ When('the admin creates a shift including the volunteer', async ({ request, worl
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: [getCrossDoState(world).volunteerPubkey!],
+    userPubkeys: [getCrossDoState(world).volunteerPubkey!],
     hubId,
   })
   getCrossDoState(world).shiftId = shift.id
@@ -288,7 +288,7 @@ When('the admin creates a shift with the new volunteer', async ({ request, world
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: [getCrossDoState(world).newVolunteerPubkey!],
+    userPubkeys: [getCrossDoState(world).newVolunteerPubkey!],
     hubId,
   })
   getCrossDoState(world).shiftId = shift.id
@@ -405,7 +405,7 @@ When('the admin removes the first volunteer from the shift', async ({ request, w
     // Update shift to only include second volunteer
     const secondVol = getScenarioState(world).volunteers[1]
     await apiPatch(request, `/shifts/${getScenarioState(world).shiftIds[0]}`, {
-      volunteerPubkeys: [secondVol.pubkey],
+      userPubkeys: [secondVol.pubkey],
     })
   }
 })

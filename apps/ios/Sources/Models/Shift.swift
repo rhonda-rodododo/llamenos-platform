@@ -38,9 +38,9 @@ extension Shift: Identifiable {
         }
     }
 
-    /// Number of volunteers assigned to this shift.
+    /// Number of users assigned to this shift.
     var volunteerCount: Int {
-        volunteerPubkeys.count
+        userPubkeys.count
     }
 
     /// Whether the current day of the week is one of this shift's days.

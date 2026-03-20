@@ -26,7 +26,7 @@ export async function startParallelRinging(
     // If no one is on shift, use fallback group
     if (onShiftPubkeys.length === 0) {
       const fallback = await services.settings.getFallbackGroup()
-      onShiftPubkeys = fallback.volunteerPubkeys
+      onShiftPubkeys = fallback.userPubkeys
     }
 
     logger.info('Parallel ringing started', { callSid, onShiftCount: onShiftPubkeys.length })

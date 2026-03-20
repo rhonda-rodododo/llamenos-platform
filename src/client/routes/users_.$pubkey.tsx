@@ -82,7 +82,7 @@ function UserProfilePage() {
   }, [pubkey, auditPage, t, toast])
 
   const assignedShifts = useMemo(
-    () => shifts.filter(s => s.volunteerPubkeys.includes(pubkey)),
+    () => shifts.filter(s => s.userPubkeys.includes(pubkey)),
     [shifts, pubkey],
   )
 

@@ -96,7 +96,7 @@ Given('volunteers are available', async ({ request, world }) => {
       startTime: '00:00',
       endTime: '23:59',
       days: [0, 1, 2, 3, 4, 5, 6],
-      volunteerPubkeys: [vol.pubkey],
+      userPubkeys: [vol.pubkey],
       hubId,
     })
   }
@@ -133,7 +133,7 @@ Given(
       startTime: '00:00',
       endTime: '23:59',
       days: [0, 1, 2, 3, 4, 5, 6],
-      volunteerPubkeys: getScenarioState(world).volunteers.map(v => v.pubkey),
+      userPubkeys: getScenarioState(world).volunteers.map(v => v.pubkey),
       hubId,
     })
     expect(getScenarioState(world).volunteers.length).toBeGreaterThanOrEqual(count)

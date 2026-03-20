@@ -234,7 +234,7 @@ data class CreateUserResponse(
 /**
  * Request body for creating/updating a shift.
  * Client-specific shape — the generated CreateShiftBody uses different
- * field names (volunteerPubkeys instead of volunteerIds) and types
+ * field names (userPubkeys instead of volunteerIds) and types
  * (List<Long> instead of List<Int> for days).
  */
 @Serializable
@@ -271,7 +271,7 @@ data class AdminShiftsListResponse(
 /**
  * Request to set the fallback ring group.
  * Client-specific shape — the generated FallbackGroup uses
- * volunteerPubkeys instead of volunteerIds.
+ * userPubkeys instead of volunteerIds.
  */
 @Serializable
 data class FallbackGroupRequest(

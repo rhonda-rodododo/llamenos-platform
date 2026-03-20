@@ -145,7 +145,7 @@ function ShiftsPage() {
                     </div>
                     <p data-testid="shift-volunteer-count" className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" />
-                      {shift.volunteerPubkeys.length} {t('shifts.users').toLowerCase()}
+                      {shift.userPubkeys.length} {t('shifts.users').toLowerCase()}
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -209,14 +209,14 @@ function ShiftForm({ shift, users, onSave, onCancel }: {
   const [startTime, setStartTime] = useState(shift?.startTime || '09:00')
   const [endTime, setEndTime] = useState(shift?.endTime || '17:00')
   const [days, setDays] = useState<number[]>(shift?.days || [1, 2, 3, 4, 5])
-  const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>(shift?.volunteerPubkeys || [])
+  const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>(shift?.userPubkeys || [])
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
-      await onSave({ name, startTime, endTime, days, volunteerPubkeys: selectedVolunteers })
+      await onSave({ name, startTime, endTime, days, userPubkeys: selectedVolunteers })
     } finally {
       setSaving(false)
     }

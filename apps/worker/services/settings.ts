@@ -408,19 +408,19 @@ export class SettingsService {
   // =========================================================================
 
   async getFallbackGroup(): Promise<{
-    volunteerPubkeys: string[]
+    userPubkeys: string[]
   }> {
     const row = await getSettings(this.db)
     const group = row.fallbackGroup ?? []
-    return { volunteerPubkeys: group }
+    return { userPubkeys: group }
   }
 
   async setFallbackGroup(data: {
-    volunteerPubkeys: string[]
+    userPubkeys: string[]
   }): Promise<{ ok: true }> {
     await this.db
       .update(systemSettings)
-      .set({ fallbackGroup: data.volunteerPubkeys })
+      .set({ fallbackGroup: data.userPubkeys })
       .where(eq(systemSettings.id, SINGLETON_ID))
     return { ok: true }
   }
