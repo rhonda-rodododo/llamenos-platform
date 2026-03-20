@@ -153,6 +153,17 @@ async function getSettings(db: Database) {
 }
 
 // ---------------------------------------------------------------------------
+// Module-level TTL cache for roles (30s TTL — roles change rarely, auth runs every request)
+// ---------------------------------------------------------------------------
+
+let _rolesCache: { roles: Role[]; expiresAt: number } | null = null
+const ROLES_CACHE_TTL_MS = 30_000
+
+export function invalidateRolesCache(): void {
+  _rolesCache = null
+}
+
+// ---------------------------------------------------------------------------
 // SettingsService
 // ---------------------------------------------------------------------------
 
@@ -1099,6 +1110,10 @@ export class SettingsService {
   // =========================================================================
 
   async getRoles(): Promise<{ roles: Role[] }> {
+    const now = Date.now()
+    if (_rolesCache && _rolesCache.expiresAt > now) {
+      return { roles: _rolesCache.roles }
+    }
     const rows = await this.db.select().from(rolesTable)
     const rolesList: Role[] = rows.map((r) => ({
       id: r.id,
@@ -1111,6 +1126,7 @@ export class SettingsService {
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }))
+    _rolesCache = { roles: rolesList, expiresAt: now + ROLES_CACHE_TTL_MS }
     return { roles: rolesList }
   }
 
