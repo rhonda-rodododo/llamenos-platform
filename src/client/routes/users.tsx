@@ -3,15 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
 import {
-  listVolunteers,
-  createVolunteer,
-  updateVolunteer,
-  deleteVolunteer,
+  listUsers,
+  createUser,
+  updateUser,
+  deleteUser,
   listInvites,
   createInvite,
   revokeInvite,
   listRoles,
-  type Volunteer,
+  type User,
   type InviteCode,
   type RoleDefinition,
 } from '@/lib/api'
@@ -29,8 +29,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PhoneInput, isValidE164 } from '@/components/phone-input'
 
-export const Route = createFileRoute('/volunteers')({
-  component: VolunteersPage,
+export const Route = createFileRoute('/users')({
+  component: UsersPage,
 })
 
 function maskedPhone(phone: string) {
@@ -38,11 +38,11 @@ function maskedPhone(phone: string) {
   return phone.slice(0, 3) + '\u2022'.repeat(phone.length - 5) + phone.slice(-2)
 }
 
-function VolunteersPage() {
+function UsersPage() {
   const { t } = useTranslation()
   const { isAdmin } = useAuth()
   const { toast } = useToast()
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [invites, setInvites] = useState<InviteCode[]>([])
   const [roles, setRoles] = useState<RoleDefinition[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
@@ -57,8 +57,8 @@ function VolunteersPage() {
 
   async function loadData() {
     try {
-      const [volRes, invRes, rolesRes] = await Promise.all([listVolunteers(), listInvites(), listRoles()])
-      setVolunteers(volRes.volunteers)
+      const [userRes, invRes, rolesRes] = await Promise.all([listUsers(), listInvites(), listRoles()])
+      setUsers(userRes.users)
       setInvites(invRes.invites)
       setRoles(rolesRes.roles)
     } catch {
@@ -162,12 +162,12 @@ function VolunteersPage() {
         />
       )}
 
-      {/* Add volunteer form */}
+      {/* Add user form */}
       {showAddForm && (
-        <AddVolunteerForm
+        <AddUserForm
           roles={roles}
-          onCreated={(vol, nsec) => {
-            setVolunteers(prev => [...prev, vol])
+          onCreated={(user, nsec) => {
+            setUsers(prev => [...prev, user])
             setGeneratedNsec(nsec)
             setShowAddForm(false)
           }}
@@ -217,7 +217,7 @@ function VolunteersPage() {
         </Card>
       )}
 
-      {/* Volunteers list */}
+      {/* Users list */}
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -233,20 +233,20 @@ function VolunteersPage() {
                 </div>
               ))}
             </div>
-          ) : volunteers.length === 0 ? (
+          ) : users.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">{t('common.noData')}</div>
           ) : (
             <div data-testid="volunteer-list" className="divide-y divide-border">
-              {volunteers.map(vol => (
-                <VolunteerRow
-                  key={vol.pubkey}
-                  volunteer={vol}
+              {users.map(user => (
+                <UserRow
+                  key={user.pubkey}
+                  user={user}
                   roles={roles}
                   onUpdate={(updated) => {
-                    setVolunteers(prev => prev.map(v => v.pubkey === updated.pubkey ? updated : v))
+                    setUsers(prev => prev.map(u => u.pubkey === updated.pubkey ? updated : u))
                   }}
                   onDelete={() => {
-                    setVolunteers(prev => prev.filter(v => v.pubkey !== vol.pubkey))
+                    setUsers(prev => prev.filter(u => u.pubkey !== user.pubkey))
                   }}
                 />
               ))}
@@ -345,9 +345,9 @@ function InviteForm({ roles, onCreated, onCancel }: {
   )
 }
 
-function AddVolunteerForm({ roles, onCreated, onCancel }: {
+function AddUserForm({ roles, onCreated, onCancel }: {
   roles: RoleDefinition[]
-  onCreated: (vol: Volunteer, nsec: string) => void
+  onCreated: (user: User, nsec: string) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation()
@@ -366,8 +366,8 @@ function AddVolunteerForm({ roles, onCreated, onCancel }: {
     setSaving(true)
     try {
       const keyPair = await generateKeyPair()
-      const res = await createVolunteer({ name, phone, roleIds: [roleId], pubkey: keyPair.publicKey })
-      onCreated(res.volunteer, keyPair.nsec)
+      const user = await createUser({ name, phone, roleIds: [roleId], pubkey: keyPair.publicKey })
+      onCreated(user, keyPair.nsec)
       toast(t('volunteers.volunteerAdded'), 'success')
     } catch {
       toast(t('common.error'), 'error')
@@ -433,10 +433,10 @@ function AddVolunteerForm({ roles, onCreated, onCancel }: {
   )
 }
 
-function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
-  volunteer: Volunteer
+function UserRow({ user, roles, onUpdate, onDelete }: {
+  user: User
   roles: RoleDefinition[]
-  onUpdate: (vol: Volunteer) => void
+  onUpdate: (user: User) => void
   onDelete: () => void
 }) {
   const { t } = useTranslation()
@@ -445,15 +445,15 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
   const [showPhone, setShowPhone] = useState(false)
   const pinChallenge = usePinChallenge()
 
-  const primaryRoleId = volunteer.roles[0] || 'role-volunteer'
+  const primaryRoleId = user.roles[0] || 'role-volunteer'
   const primaryRole = roles.find(r => r.id === primaryRoleId)
   const isAdminRole = primaryRoleId === 'role-super-admin' || primaryRoleId === 'role-hub-admin'
 
   async function changeRole(newRoleId: string) {
     if (newRoleId === primaryRoleId) return
     try {
-      const res = await updateVolunteer(volunteer.pubkey, { roles: [newRoleId] })
-      onUpdate(res.volunteer)
+      const updated = await updateUser(user.pubkey, { roles: [newRoleId] })
+      onUpdate(updated)
     } catch {
       toast(t('common.error'), 'error')
     }
@@ -461,8 +461,8 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
 
   async function toggleActive() {
     try {
-      const res = await updateVolunteer(volunteer.pubkey, { active: !volunteer.active })
-      onUpdate(res.volunteer)
+      const updated = await updateUser(user.pubkey, { active: !user.active })
+      onUpdate(updated)
     } catch {
       toast(t('common.error'), 'error')
     }
@@ -470,7 +470,7 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
 
   async function handleDelete() {
     try {
-      await deleteVolunteer(volunteer.pubkey)
+      await deleteUser(user.pubkey)
       onDelete()
     } catch {
       toast(t('common.error'), 'error')
@@ -478,16 +478,16 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
   }
 
   return (
-    <div data-testid="volunteer-row" data-volunteer-id={volunteer.pubkey.slice(0, 8)} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
+    <div data-testid="volunteer-row" data-volunteer-id={user.pubkey.slice(0, 8)} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-          {volunteer.name.charAt(0).toUpperCase()}
+          {user.name.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{volunteer.name} <span className="font-mono text-xs text-muted-foreground">({volunteer.pubkey.slice(0, 8)})</span></p>
-          {volunteer.phone && (
+          <p className="text-sm font-medium">{user.name} <span className="font-mono text-xs text-muted-foreground">({user.pubkey.slice(0, 8)})</span></p>
+          {user.phone && (
             <p className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              {showPhone ? volunteer.phone : maskedPhone(volunteer.phone)}
+              {showPhone ? user.phone : maskedPhone(user.phone)}
               <button
                 onClick={async () => {
                   if (showPhone) {
@@ -510,20 +510,20 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
         <Badge variant={isAdminRole ? 'default' : 'secondary'}>
           {isAdminRole && <ShieldCheck className="h-3 w-3" />}
           {primaryRole?.name || primaryRoleId}
-          {volunteer.roles.length > 1 && (
-            <span className="ml-1 text-xs opacity-70">+{volunteer.roles.length - 1}</span>
+          {user.roles.length > 1 && (
+            <span className="ml-1 text-xs opacity-70">+{user.roles.length - 1}</span>
           )}
         </Badge>
-        <button onClick={toggleActive} aria-pressed={volunteer.active}>
+        <button onClick={toggleActive} aria-pressed={user.active}>
           <Badge variant="outline" className={
-            volunteer.active
+            user.active
               ? 'border-green-500/50 text-green-700 dark:text-green-400'
               : 'border-red-500/50 text-red-700 dark:text-red-400'
           }>
-            {volunteer.active ? t('volunteers.active') : t('volunteers.inactive')}
+            {user.active ? t('volunteers.active') : t('volunteers.inactive')}
           </Badge>
         </button>
-        {volunteer.onBreak && (
+        {user.onBreak && (
           <Badge variant="outline" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-400">
             <Coffee className="h-3 w-3" />
             {t('dashboard.onBreak')}
@@ -551,7 +551,7 @@ function VolunteerRow({ volunteer, roles, onUpdate, onDelete }: {
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
         title={t('volunteers.removeVolunteer')}
-        description={`${volunteer.name} (${maskedPhone(volunteer.phone)})`}
+        description={`${user.name} (${maskedPhone(user.phone)})`}
         confirmLabel={t('common.delete')}
         onConfirm={handleDelete}
       />

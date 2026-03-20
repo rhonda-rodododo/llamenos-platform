@@ -130,7 +130,7 @@ export function CommandPalette() {
                   <Clock className="h-4 w-4" />
                   {t('nav.shifts')}
                 </CommandItem>
-                <CommandItem onSelect={() => runCommand(() => navigate({ to: '/volunteers' }))}>
+                <CommandItem onSelect={() => runCommand(() => navigate({ to: '/users' }))}>
                   <Users className="h-4 w-4" />
                   {t('nav.volunteers')}
                 </CommandItem>

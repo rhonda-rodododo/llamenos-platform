@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { getCallHistory, listVolunteers, type CallRecord, type Volunteer } from '@/lib/api'
+import { getCallHistory, listUsers, type CallRecord, type User } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { decryptCallRecord } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
@@ -40,7 +40,7 @@ function CallHistoryPage() {
   const [calls, setCalls] = useState<CallRecord[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [users, setUsers] = useState<User[]>([])
   // Local input state (synced to URL on submit)
   const [searchInput, setSearchInput] = useState(q)
   const [dateFromInput, setDateFromInput] = useState(dateFrom)
@@ -89,14 +89,14 @@ function CallHistoryPage() {
   }, [calls, hasNsec, publicKey])
 
   useEffect(() => {
-    listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => toast(t('common.error'), 'error'))
+    listUsers().then(r => setUsers(r.users)).catch(() => toast(t('common.error'), 'error'))
   }, [t, toast])
 
   const nameMap = useMemo(() => {
     const map = new Map<string, string>()
-    for (const v of volunteers) map.set(v.pubkey, v.name)
+    for (const u of users) map.set(u.pubkey, u.name)
     return map
-  }, [volunteers])
+  }, [users])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()

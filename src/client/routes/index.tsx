@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
 import { useCalls, useCallTimer, useShiftStatus } from '@/lib/hooks'
-import { createNote, banAndHangup, getCallsTodayCount, getUserPresence, listVolunteers, type ActiveCall, type UserPresence, type Volunteer } from '@/lib/api'
+import { createNote, banAndHangup, getCallsTodayCount, getUserPresence, listUsers, type ActiveCall, type UserPresence, type User } from '@/lib/api'
 import { encryptNote } from '@/lib/platform'
 import { useTranscription } from '@/lib/transcription'
 
@@ -44,7 +44,7 @@ function DashboardPage() {
   const { onShift, currentShift, nextShift } = useShiftStatus()
   const [callsToday, setCallsToday] = useState<number | null>(null)
   const [presence, setPresence] = useState<UserPresence[]>([])
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [users, setUsers] = useState<User[]>([])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -76,8 +76,8 @@ function DashboardPage() {
       })
     }
     fetchPresence()
-    listVolunteers().then(r => { if (mounted) setVolunteers(r.volunteers) }).catch(() => {
-      console.error('[dashboard] Failed to fetch volunteer list')
+    listUsers().then(r => { if (mounted) setUsers(r.users) }).catch(() => {
+      console.error('[dashboard] Failed to fetch user list')
     })
     // Poll presence every 15s (replaces WS-based real-time presence)
     const interval = setInterval(fetchPresence, 15_000)
@@ -242,7 +242,7 @@ function DashboardPage() {
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                 {presence.map(vol => {
-                  const volInfo = volunteers.find(v => v.pubkey === vol.pubkey)
+                  const volInfo = users.find(u => u.pubkey === vol.pubkey)
                   return (
                     <div key={vol.pubkey} className="flex items-center gap-2 rounded-lg border border-border p-2">
                       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${
@@ -286,7 +286,7 @@ function DashboardPage() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {call.answeredBy && (() => {
-                          const vol = volunteers.find(v => v.pubkey === call.answeredBy)
+                          const vol = users.find(u => u.pubkey === call.answeredBy)
                           return vol ? vol.name : t('calls.active')
                         })()}
                       </p>

@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { listNotes, createNote, updateNote, listNoteReplies, createNoteReply, getCallHistory, listVolunteers, getCustomFields, type EncryptedNote, type CallRecord, type Volunteer, type ConversationMessage } from '@/lib/api'
+import { listNotes, createNote, updateNote, listNoteReplies, createNoteReply, getCallHistory, listUsers, getCustomFields, type EncryptedNote, type CallRecord, type User, type ConversationMessage } from '@/lib/api'
 import type { CustomFieldDefinition } from '@shared/types'
 import { fieldMatchesContext } from '@shared/types'
 import { encryptNote, encryptMessage, decryptNote, decryptLegacyNote, decryptTranscription, decryptCallRecord, encryptExport } from '@/lib/platform'
@@ -58,14 +58,14 @@ function NotesPage() {
   const [recentCalls, setRecentCalls] = useState<CallRecord[]>([])
   const [searchInput, setSearchInput] = useState(search)
   const [customFields, setCustomFields] = useState<CustomFieldDefinition[]>([])
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const limit = 50
 
   useEffect(() => {
     getCustomFields().then(r => setCustomFields(r.fields)).catch(() => toast(t('common.error'), 'error'))
     if (isAdmin) {
       getCallHistory({ limit: 100 }).then(r => setRecentCalls(r.calls)).catch(() => toast(t('common.error'), 'error'))
-      listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => toast(t('common.error'), 'error'))
+      listUsers().then(r => setUsers(r.users)).catch(() => toast(t('common.error'), 'error'))
     }
   }, [isAdmin, t, toast])
 
@@ -93,9 +93,9 @@ function NotesPage() {
 
   const nameMap = useMemo(() => {
     const map = new Map<string, string>()
-    for (const v of volunteers) map.set(v.pubkey, v.name)
+    for (const u of users) map.set(u.pubkey, u.name)
     return map
-  }, [volunteers])
+  }, [users])
 
   const callInfoMap = useMemo(() => {
     const map = new Map<string, CallRecord>()
@@ -392,7 +392,7 @@ function NotesPage() {
                         {callInfo.status === 'unanswered' ? (
                           <span className="text-destructive">{t('callHistory.unanswered')}</span>
                         ) : volunteerName && isAdmin ? (
-                          <Link to="/volunteers/$pubkey" params={{ pubkey: callInfo.answeredBy! }} className="text-primary hover:underline">
+                          <Link to="/users/$pubkey" params={{ pubkey: callInfo.answeredBy! }} className="text-primary hover:underline">
                             {volunteerName}
                           </Link>
                         ) : volunteerName ? (

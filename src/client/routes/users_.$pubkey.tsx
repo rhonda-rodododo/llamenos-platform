@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useMemo } from 'react'
 import {
-  listVolunteers,
+  listUsers,
   listAuditLog,
   listShifts,
-  updateVolunteer,
-  type Volunteer,
+  updateUser,
+  type User,
   type AuditLogEntry,
   type Shift,
 } from '@/lib/api'
@@ -21,7 +21,7 @@ import {
   Coffee,
   ChevronLeft,
   ChevronRight,
-  User,
+  User as UserIcon,
   Phone,
   Eye,
   EyeOff,
@@ -37,18 +37,18 @@ import { LANGUAGES } from '@shared/languages'
 
 const MESSAGING_CHANNELS = ['sms', 'whatsapp', 'signal', 'rcs', 'web'] as const
 
-export const Route = createFileRoute('/volunteers_/$pubkey')({
-  component: VolunteerProfilePage,
+export const Route = createFileRoute('/users_/$pubkey')({
+  component: UserProfilePage,
 })
 
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 
-function VolunteerProfilePage() {
+function UserProfilePage() {
   const { t } = useTranslation()
   const { isAdmin } = useAuth()
   const { pubkey } = Route.useParams()
   const { toast } = useToast()
-  const [volunteer, setVolunteer] = useState<Volunteer | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [shifts, setShifts] = useState<Shift[]>([])
   const [auditEntries, setAuditEntries] = useState<AuditLogEntry[]>([])
   const [auditTotal, setAuditTotal] = useState(0)
@@ -59,20 +59,20 @@ function VolunteerProfilePage() {
   const [savingChannels, setSavingChannels] = useState(false)
   const auditLimit = 20
 
-  // Load volunteer + shifts
+  // Load user + shifts
   useEffect(() => {
     Promise.all([
-      listVolunteers(),
+      listUsers(),
       listShifts(),
-    ]).then(([volRes, shiftRes]) => {
-      const vol = volRes.volunteers.find(v => v.pubkey === pubkey) || null
-      setVolunteer(vol)
+    ]).then(([userRes, shiftRes]) => {
+      const found = userRes.users.find(u => u.pubkey === pubkey) || null
+      setUser(found)
       setShifts(shiftRes.shifts)
     }).catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
   }, [pubkey, t, toast])
 
-  // Load audit entries for this volunteer
+  // Load audit entries for this user
   useEffect(() => {
     setAuditLoading(true)
     listAuditLog({ page: auditPage, limit: auditLimit, actorPubkey: pubkey })
@@ -100,10 +100,10 @@ function VolunteerProfilePage() {
     )
   }
 
-  if (!volunteer) {
+  if (!user) {
     return (
       <div className="space-y-4">
-        <Link to="/volunteers" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/users" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           {t('nav.volunteers')}
         </Link>
@@ -126,39 +126,39 @@ function VolunteerProfilePage() {
   return (
     <div className="space-y-6">
       {/* Back link */}
-      <Link to="/volunteers" data-testid="back-btn" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/users" data-testid="back-btn" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />
         {t('nav.volunteers')}
       </Link>
 
-      {/* Volunteer Info Card */}
+      {/* User Info Card */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xl font-semibold text-primary">
-              {volunteer.name.charAt(0).toUpperCase()}
+              {user.name.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 space-y-3">
               <div>
-                <h1 data-testid="volunteer-name" className="text-xl font-bold">{volunteer.name}</h1>
-                <code data-testid="volunteer-pubkey" className="text-xs text-muted-foreground">{volunteer.pubkey}</code>
+                <h1 data-testid="volunteer-name" className="text-xl font-bold">{user.name}</h1>
+                <code data-testid="volunteer-pubkey" className="text-xs text-muted-foreground">{user.pubkey}</code>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge data-testid="volunteer-role-badge" variant={volunteer.roles.includes('role-super-admin') || volunteer.roles.includes('role-hub-admin') ? 'default' : 'secondary'}>
-                  {volunteer.roles.includes('role-super-admin') || volunteer.roles.includes('role-hub-admin') ? (
+                <Badge data-testid="volunteer-role-badge" variant={user.roles.includes('role-super-admin') || user.roles.includes('role-hub-admin') ? 'default' : 'secondary'}>
+                  {user.roles.includes('role-super-admin') || user.roles.includes('role-hub-admin') ? (
                     <><ShieldCheck className="h-3 w-3" /> {t('volunteers.roleAdmin')}</>
                   ) : (
                     <><Shield className="h-3 w-3" /> {t('volunteers.roleVolunteer')}</>
                   )}
                 </Badge>
                 <Badge data-testid="volunteer-status-badge" variant="outline" className={
-                  volunteer.active
+                  user.active
                     ? 'border-green-500/50 text-green-700 dark:text-green-400'
                     : 'border-red-500/50 text-red-700 dark:text-red-400'
                 }>
-                  {volunteer.active ? t('volunteers.active') : t('volunteers.inactive')}
+                  {user.active ? t('volunteers.active') : t('volunteers.inactive')}
                 </Badge>
-                {volunteer.onBreak && (
+                {user.onBreak && (
                   <Badge variant="outline" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-400">
                     <Coffee className="h-3 w-3" />
                     {t('dashboard.onBreak')}
@@ -169,15 +169,15 @@ function VolunteerProfilePage() {
                 <span className="flex items-center gap-1.5">
                   <Phone className="h-3.5 w-3.5" />
                   <span className="font-mono text-xs">
-                    {showPhone ? volunteer.phone : maskedPhone(volunteer.phone)}
+                    {showPhone ? user.phone : maskedPhone(user.phone)}
                   </span>
                   <button onClick={() => setShowPhone(!showPhone)} className="text-muted-foreground hover:text-foreground">
                     {showPhone ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                   </button>
                 </span>
                 <span data-testid="volunteer-join-date" className="flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5" />
-                  {t('volunteerProfile.joined')} {new Date(volunteer.createdAt).toLocaleDateString()}
+                  <UserIcon className="h-3.5 w-3.5" />
+                  {t('volunteerProfile.joined')} {new Date(user.createdAt).toLocaleDateString()}
                 </span>
               </div>
             </div>
@@ -222,16 +222,16 @@ function VolunteerProfilePage() {
 
       {/* Messaging Channels Configuration */}
       <MessagingChannelsCard
-        volunteer={volunteer}
+        user={user}
         saving={savingChannels}
         onSave={async (channels, enabled) => {
           setSavingChannels(true)
           try {
-            const res = await updateVolunteer(pubkey, {
+            const updated = await updateUser(pubkey, {
               supportedMessagingChannels: channels,
               messagingEnabled: enabled,
             })
-            setVolunteer(res.volunteer)
+            setUser(updated)
             toast(t('volunteerProfile.channelsSaved'), 'success')
           } catch {
             toast(t('common.error'), 'error')
@@ -316,18 +316,18 @@ function VolunteerProfilePage() {
 }
 
 function MessagingChannelsCard({
-  volunteer,
+  user,
   saving,
   onSave,
 }: {
-  volunteer: Volunteer
+  user: User
   saving: boolean
   onSave: (channels: string[], enabled: boolean) => Promise<void>
 }) {
   const { t } = useTranslation()
-  const [enabled, setEnabled] = useState(volunteer.messagingEnabled !== false)
+  const [enabled, setEnabled] = useState(user.messagingEnabled !== false)
   const [channels, setChannels] = useState<string[]>(
-    volunteer.supportedMessagingChannels || []
+    user.supportedMessagingChannels || []
   )
   const [dirty, setDirty] = useState(false)
 

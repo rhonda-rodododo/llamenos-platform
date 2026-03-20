@@ -354,24 +354,6 @@ export async function deleteUser(pubkey: string) {
   return request<{ ok: true }>(`/users/${pubkey}`, { method: 'DELETE' })
 }
 
-// Backward-compat aliases — client routes still use old names (rename in separate task)
-/** @deprecated Use listUsers() */
-export async function listVolunteers() {
-  const r = await listUsers()
-  return { volunteers: r.users }
-}
-/** @deprecated Use createUser() */
-export async function createVolunteer(data: { name: string; phone: string; roleIds: string[]; pubkey: string }) {
-  const user = await createUser(data)
-  return { volunteer: user }
-}
-/** @deprecated Use updateUser() */
-export async function updateVolunteer(pubkey: string, data: Parameters<typeof updateUser>[1]) {
-  const user = await updateUser(pubkey, data)
-  return { volunteer: user }
-}
-/** @deprecated Use deleteUser() */
-export const deleteVolunteer = deleteUser
 
 // --- Shift Status (all users) ---
 
@@ -747,7 +729,7 @@ export async function redeemInvite(code: string, pubkey: string, secretKeyHex?: 
       const body = await res.text()
       throw new ApiError(res.status, body)
     }
-    return res.json() as Promise<{ volunteer: User }>
+    return res.json() as Promise<{ user: User }>
   } catch (err) {
     if (err instanceof ApiError) throw err
     const e = err instanceof Error ? err : new Error(String(err))
@@ -925,7 +907,7 @@ export async function getMigrationStatus() {
 /** @deprecated Use roles array + permissions */
 export type UserRole = 'volunteer' | 'admin' | 'reporter'
 
-export type { User, User as Volunteer, Shift, BanEntry, EncryptedNote, ActiveCall, AuditLogEntry, UserPresence, InviteCode }
+export type { User, Shift, BanEntry, EncryptedNote, ActiveCall, AuditLogEntry, UserPresence, InviteCode }
 
 export type { CallRecord }
 
@@ -997,7 +979,7 @@ export async function getConversationStats() {
   return request<{ waiting: number; active: number; closed: number; today: number; total: number }>(hp('/conversations/stats'))
 }
 
-export async function getVolunteerLoads() {
+export async function getUserLoads() {
   return request<{ loads: Record<string, number> }>(hp('/conversations/load'))
 }
 
@@ -1325,11 +1307,11 @@ export async function shareFile(fileId: string, data: {
 export async function seedDemoData() {
   const { DEMO_ACCOUNTS } = await import('@shared/demo-accounts')
 
-  // Create demo volunteers (admin is already created via ADMIN_PUBKEY)
+  // Create demo users (admin is already created via ADMIN_PUBKEY)
   const nonAdminAccounts = DEMO_ACCOUNTS.filter(a => !a.roleIds.includes('role-super-admin'))
   for (const account of nonAdminAccounts) {
     try {
-      await createVolunteer({
+      await createUser({
         name: account.name,
         phone: account.phone,
         roleIds: account.roleIds,
@@ -1338,11 +1320,11 @@ export async function seedDemoData() {
     } catch { /* may already exist */ }
   }
 
-  // Deactivate Fatima (inactive volunteer demo)
+  // Deactivate Fatima (inactive user demo)
   const fatima = DEMO_ACCOUNTS.find(a => a.name === 'Fatima Al-Rashid')
   if (fatima) {
     try {
-      await request(`/volunteers/${fatima.pubkey}`, {
+      await request(`/users/${fatima.pubkey}`, {
         method: 'PATCH',
         body: JSON.stringify({ active: false }),
       })
@@ -1352,7 +1334,7 @@ export async function seedDemoData() {
   // Mark all demo profiles as completed and set browser call preference
   for (const account of nonAdminAccounts) {
     try {
-      await request(`/volunteers/${account.pubkey}`, {
+      await request(`/users/${account.pubkey}`, {
         method: 'PATCH',
         body: JSON.stringify({
           profileCompleted: true,

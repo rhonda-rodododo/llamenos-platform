@@ -333,7 +333,7 @@ function AuthenticatedLayout() {
                 {t('nav.admin', { defaultValue: 'Admin' })}
               </p>
               <NavLink to="/shifts" icon={<Clock className="h-4 w-4" />}>{t('nav.shifts')}</NavLink>
-              <NavLink to="/volunteers" icon={<Users className="h-4 w-4" />}>{t('nav.volunteers')}</NavLink>
+              <NavLink to="/users" icon={<Users className="h-4 w-4" />}>{t('nav.volunteers')}</NavLink>
               <NavLink to="/bans" icon={<ShieldBan className="h-4 w-4" />}>{t('nav.banList')}</NavLink>
               {hasPermission('contacts:manage') && (
                 <NavLink to="/contacts" icon={<Contact className="h-4 w-4" />}>{t('nav.contacts', { defaultValue: 'Contacts' })}</NavLink>

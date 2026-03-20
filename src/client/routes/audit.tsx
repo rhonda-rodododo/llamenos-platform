@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { listAuditLog, listVolunteers, type AuditLogEntry, type Volunteer } from '@/lib/api'
+import { listAuditLog, listUsers, type AuditLogEntry, type User } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { ScrollText, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -47,7 +47,7 @@ function AuditPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [searchText, setSearchText] = useState('')
   const [eventType, setEventType] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
@@ -57,7 +57,7 @@ function AuditPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    listVolunteers().then(r => setVolunteers(r.volunteers)).catch(() => toast(t('common.error'), 'error'))
+    listUsers().then(r => setUsers(r.users)).catch(() => toast(t('common.error'), 'error'))
   }, [t, toast])
 
   const fetchEntries = useCallback(() => {
@@ -86,11 +86,11 @@ function AuditPage() {
 
   const nameMap = useMemo(() => {
     const map = new Map<string, string>()
-    for (const v of volunteers) {
-      map.set(v.pubkey, v.name)
+    for (const u of users) {
+      map.set(u.pubkey, u.name)
     }
     return map
-  }, [volunteers])
+  }, [users])
 
   if (!isAdmin) {
     return <div className="text-muted-foreground">{t('common.accessDenied')}</div>
@@ -241,7 +241,7 @@ function ActorDisplay({ pubkey, nameMap }: { pubkey: string; nameMap: Map<string
   if (name) {
     return (
       <Link
-        to="/volunteers/$pubkey"
+        to="/users/$pubkey"
         params={{ pubkey }}
         className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
       >
