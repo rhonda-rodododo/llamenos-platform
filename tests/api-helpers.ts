@@ -387,9 +387,9 @@ export async function getFallbackGroupViaApi(
   request: APIRequestContext,
   hubId?: string,
 ): Promise<{ volunteers: string[] }> {
-  const { status, data } = await apiGet<{ volunteers: string[] }>(request, hubPath('/shifts/fallback', hubId))
+  const { status, data } = await apiGet<{ userPubkeys: string[] }>(request, hubPath('/shifts/fallback', hubId))
   if (status !== 200) throw new Error(`Failed to get fallback group: ${status}`)
-  return data
+  return { volunteers: data.userPubkeys ?? [] }
 }
 
 export async function setFallbackGroupViaApi(
@@ -487,10 +487,11 @@ export interface NoteRecord {
 
 export async function listNotesViaApi(
   request: APIRequestContext,
-  params?: { callId?: string; page?: number; limit?: number; hubId?: string },
+  params?: { callId?: string; conversationId?: string; page?: number; limit?: number; hubId?: string },
 ): Promise<{ notes: NoteRecord[]; total: number }> {
   const qs = new URLSearchParams()
   if (params?.callId) qs.set('callId', params.callId)
+  if (params?.conversationId) qs.set('conversationId', params.conversationId)
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
   const qsStr = qs.toString()

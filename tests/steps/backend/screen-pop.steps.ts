@@ -50,14 +50,15 @@ Before({ tags: '@telephony' }, async ({ world }) => {
 
 async function resolveOrCreateEntityType(
   request: import('@playwright/test').APIRequestContext,
+  world: Record<string, unknown>,
 ): Promise<string> {
-  if (getScreenPopState(world).entityTypeId) return getScreenPopState(world).entityTypeId
+  if (getScreenPopState(world).entityTypeId) return getScreenPopState(world).entityTypeId!
 
   const types = await listEntityTypesViaApi(request)
   const existing = types.find(t => t.name === 'screen_pop_case')
   if (existing) {
     getScreenPopState(world).entityTypeId = existing.id as string
-    return getScreenPopState(world).entityTypeId
+    return getScreenPopState(world).entityTypeId!
   }
 
   const created = await createEntityTypeViaApi(request, {
@@ -65,7 +66,7 @@ async function resolveOrCreateEntityType(
     category: 'case',
   })
   getScreenPopState(world).entityTypeId = created.id as string
-  return getScreenPopState(world).entityTypeId
+  return getScreenPopState(world).entityTypeId!
 }
 
 // ── Given Steps ────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ Given('a screen-pop contact exists with identifier hash {string}', async ({ requ
 })
 
 Given('{int} open records are linked to the contact', async ({ request, world }, count: number) => {
-  const entityTypeId = await resolveOrCreateEntityType(request)
+  const entityTypeId = await resolveOrCreateEntityType(request, world)
   const contactId = getScreenPopState(world).lastContact!.id as string
 
   for (let i = 0; i < count; i++) {
@@ -87,7 +88,7 @@ Given('{int} open records are linked to the contact', async ({ request, world },
 })
 
 Given('{int} closed record is linked to the contact', async ({ request, world }, count: number) => {
-  const entityTypeId = await resolveOrCreateEntityType(request)
+  const entityTypeId = await resolveOrCreateEntityType(request, world)
   const contactId = getScreenPopState(world).lastContact!.id as string
 
   for (let i = 0; i < count; i++) {
@@ -119,7 +120,7 @@ When('the admin lists records for the contact', async ({ request, world }) => {
 
 // ── Then Steps ─────────────────────────────────────────────────────
 
-Then('the contact identification should return the matching contact', async () => {
+Then('the contact identification should return the matching contact', async ({ world }) => {
   expect(getScreenPopState(world).identificationResult).toBeTruthy()
   expect(getScreenPopState(world).identificationResult!.contact).not.toBeNull()
   if (getScreenPopState(world).lastContact) {
@@ -127,13 +128,13 @@ Then('the contact identification should return the matching contact', async () =
   }
 })
 
-Then('the contact identification should return no match', async () => {
+Then('the contact identification should return no match', async ({ world }) => {
   expect(getScreenPopState(world).identificationResult).toBeTruthy()
   expect(getScreenPopState(world).identificationResult!.contact).toBeNull()
   expect(getScreenPopState(world).identificationResult!.activeCaseCount).toBe(0)
 })
 
-Then('the lookup result should include the contact', async () => {
+Then('the lookup result should include the contact', async ({ world }) => {
   expect(getScreenPopState(world).lookupResult).toBeTruthy()
   expect(getScreenPopState(world).lookupResult!.contact).not.toBeNull()
   expect(getScreenPopState(world).lookupResult!.contact!.id).toBe(getScreenPopState(world).lastContact!.id)
@@ -144,7 +145,7 @@ Then('the contact record list should have {int} records', async ({ world }, coun
   expect(getScreenPopState(world).contactRecords!.records.length).toBe(count)
 })
 
-Then('no closed records should be included', async () => {
+Then('no closed records should be included', async ({ world }) => {
   expect(getScreenPopState(world).contactRecords).toBeTruthy()
   for (const record of getScreenPopState(world).contactRecords!.records) {
     expect(record.closedAt).toBeFalsy()

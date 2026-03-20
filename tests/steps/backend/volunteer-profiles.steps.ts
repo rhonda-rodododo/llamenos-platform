@@ -59,6 +59,7 @@ Before({ tags: '@cases' }, async ({ world }) => {
 
 async function resolveEntityTypeId(
   request: import('@playwright/test').APIRequestContext,
+  world: Record<string, unknown>,
   name: string,
 ): Promise<string> {
   const cached = getProfileState(world).entityTypeIds.get(name)
@@ -109,7 +110,7 @@ Given('{int} records of type {string} are assigned to volunteer {string}', async
   const vol = getProfileState(world).volunteers.get(alias)
   expect(vol).toBeTruthy()
 
-  const entityTypeId = await resolveEntityTypeId(request, typeName)
+  const entityTypeId = await resolveEntityTypeId(request, world, typeName)
 
   for (let i = 0; i < count; i++) {
     // Create record with initial assignment (assignedTo set at creation time)
@@ -228,13 +229,13 @@ Then('the total cases handled should be {int}', async ({ world }, count: number)
   expect(getProfileState(world).metricsResult!.totalCasesHandled).toBe(count)
 })
 
-Then('the average resolution days should be a number', async () => {
+Then('the average resolution days should be a number', async ({ world }) => {
   expect(getProfileState(world).metricsResult).toBeTruthy()
   expect(getProfileState(world).metricsResult!.averageResolutionDays).not.toBeNull()
   expect(typeof getProfileState(world).metricsResult!.averageResolutionDays).toBe('number')
 })
 
-Then('the average resolution days should be null', async () => {
+Then('the average resolution days should be null', async ({ world }) => {
   expect(getProfileState(world).metricsResult).toBeTruthy()
   expect(getProfileState(world).metricsResult!.averageResolutionDays).toBeNull()
 })

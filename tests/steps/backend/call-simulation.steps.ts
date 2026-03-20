@@ -225,14 +225,19 @@ Given('a fallback ring group is configured', async ({ request, world }) => {
 })
 
 Given('no shift is active and no fallback is configured', async ({ request, world }) => {
-  // Hub isolation: each worker has a fresh hub with no shifts or fallback.
-  // Ensure the hub's fallback group is empty (belt-and-suspenders).
   const hubId = getScenarioState(world).hubId
+  // Clear fallback group
   try {
     const path = hubId ? `/hubs/${hubId}/shifts/fallback` : '/shifts/fallback'
     await apiPut(request, path, { userPubkeys: [] })
   } catch {
-    // Best effort — hub may have no fallback configured yet
+    // ignore
+  }
+  // Delete all existing shifts — prior scenarios in this worker may have left active shifts
+  // Note: hubId may be undefined (legacy test fixture behavior), so list without hub context
+  const existingShifts = await listShiftsViaApi(request, hubId)
+  for (const shift of existingShifts) {
+    await deleteShiftViaApi(request, shift.id).catch(() => {})
   }
   getCallSimState(world).fallbackConfigured = false
 })
@@ -386,7 +391,9 @@ Given('an incoming call from {string} in {string}', async ({ request, world }, c
   getScenarioState(world).callStatus = result.status
 })
 
-Given('an incoming call from {string} for hub {string}', async ({ request, world }, callerNumber: string, hubId: string) => {
+Given('an incoming call from {string} for hub {string}', async ({ request, world }, callerNumber: string, _hubId: string) => {
+  // Use the worker's real hub (the literal hub string in the feature is a placeholder;
+  // the test validates hub-specific routing, not a specific hub name)
   const workerHubId = getScenarioState(world).hubId
   if (getScenarioState(world).volunteers.length === 0) {
     const vol = await createVolunteerViaApi(request, { name: uniqueName('Hub Vol') })
@@ -400,9 +407,7 @@ Given('an incoming call from {string} for hub {string}', async ({ request, world
       hubId: workerHubId,
     })
   }
-  // Use the explicit hubId param (test-specified hub), falling back to worker hub
-  const effectiveHubId = hubId || workerHubId
-  const result = await simulateIncomingCall(request, { callerNumber, hubId: effectiveHubId })
+  const result = await simulateIncomingCall(request, { callerNumber, hubId: workerHubId })
   getCallSimState(world).callId = result.callId
   getCallSimState(world).callStatus = result.status
   getScenarioState(world).callId = result.callId

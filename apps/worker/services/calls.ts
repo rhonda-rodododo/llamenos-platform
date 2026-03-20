@@ -403,6 +403,17 @@ export class CallsService {
     return row ?? null
   }
 
+  /** Look up an active call by ID without hub filtering — for routes with no hub context. */
+  async getActiveCallByCallId(callId: string): Promise<ActiveCallRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(activeCalls)
+      .where(eq(activeCalls.callId, callId))
+      .limit(1)
+
+    return row ?? null
+  }
+
   /** Mark a call as having a voicemail */
   async markVoicemail(hubId: string, callId: string): Promise<{ ok: true }> {
     await this.db

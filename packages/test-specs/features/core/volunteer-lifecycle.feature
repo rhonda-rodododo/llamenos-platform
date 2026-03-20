@@ -42,7 +42,7 @@ Feature: Volunteer Lifecycle
   Scenario: Volunteer cannot access admin pages via URL
     Given I am logged in as an admin
     And a volunteer is logged in and on the dashboard
-    When they navigate to "/volunteers" via SPA
+    When they navigate to "/users" via SPA
     Then they should see "Access Denied"
 
   @desktop @ios @android

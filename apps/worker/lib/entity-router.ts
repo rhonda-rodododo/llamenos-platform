@@ -239,7 +239,8 @@ export function createEntityRouter<
         args.push(body)
         const result = await (svc[createMethod] as ServiceMethod)(...args)
         if (auditEvents.created) {
-          await audit(services.audit, auditEvents.created, pubkey)
+          const auditHubId = hubScoped ? getHubId(c) || undefined : undefined
+          await audit(services.audit, auditEvents.created, pubkey, {}, undefined, auditHubId)
         }
         return c.json(result as Record<string, unknown>, 201)
       },
@@ -278,7 +279,8 @@ export function createEntityRouter<
         args.push(body)
         const result = await (svc[updateMethod] as ServiceMethod)(...args)
         if (auditEvents.updated) {
-          await audit(services.audit, auditEvents.updated, pubkey, { [`${domain}Id`]: id })
+          const auditHubId = hubScoped ? getHubId(c) || undefined : undefined
+          await audit(services.audit, auditEvents.updated, pubkey, { [`${domain}Id`]: id }, undefined, auditHubId)
         }
         return c.json(result as Record<string, unknown>)
       },
@@ -315,7 +317,8 @@ export function createEntityRouter<
         args.push(id)
         const result = await (svc[deleteMethod] as ServiceMethod)(...args)
         if (auditEvents.deleted) {
-          await audit(services.audit, auditEvents.deleted, pubkey, { [`${domain}Id`]: id })
+          const auditHubId = hubScoped ? getHubId(c) || undefined : undefined
+          await audit(services.audit, auditEvents.deleted, pubkey, { [`${domain}Id`]: id }, undefined, auditHubId)
         }
         return c.json(result as Record<string, unknown>)
       },

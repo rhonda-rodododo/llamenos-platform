@@ -43,7 +43,7 @@ Given(
     const ca = getCallActionsState(world)
     const caller = uniqueCallerNumber()
     ca.lastCallerNumber = caller
-    const { callId } = await simulateIncomingCall(request, { callerNumber: caller })
+    const { callId } = await simulateIncomingCall(request, { callerNumber: caller, hubId: state.hubId })
     state.callId = callId
     // Capture ban count before any ban action for delta verification
     const bans = await listBansViaApi(request, state.hubId)
@@ -132,6 +132,7 @@ When('the same caller tries to call again', async ({ request, world }) => {
   try {
     const result = await simulateIncomingCall(request, {
       callerNumber: ca.lastCallerNumber!,
+      hubId: state.hubId,
     })
     // Call was unexpectedly accepted — store for assertion
     state.callId = result.callId
@@ -201,11 +202,12 @@ Then('the caller should be in the ban list', async ({ request, world }) => {
 Then('the ban reason should be {string}', async ({ request, world }, expectedReason: string) => {
   const ca = getCallActionsState(world)
   const hubId = getScenarioState(world).hubId
-  // Find the most recently added ban and verify its reason
   const bans = await listBansViaApi(request, hubId)
   expect(bans.length).toBeGreaterThan(ca.banCountBefore)
-  const newestBan = bans[bans.length - 1]
-  expect(newestBan.reason).toBe(expectedReason)
+  // New bans appear at the start (ordered newest-first); slice from front
+  const newBans = bans.slice(0, bans.length - ca.banCountBefore)
+  const matchingBan = newBans.find((b) => b.reason === expectedReason)
+  expect(matchingBan).toBeDefined()
 })
 
 Then('a note should exist linked to that call ID', async ({ request, world }) => {

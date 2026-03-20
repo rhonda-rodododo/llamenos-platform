@@ -78,7 +78,7 @@ Feature: Edge Cases and Error Handling
   # ─── CORS Headers ──────────────────────────────────────────────────
 
   Scenario: OPTIONS preflight returns correct CORS headers
-    When a CORS preflight request is sent to "/api/volunteers"
+    When a CORS preflight request is sent to "/api/users"
     Then the response should include CORS headers
 
   # ─── Rate Limiting ────────────────────────────────────────────────

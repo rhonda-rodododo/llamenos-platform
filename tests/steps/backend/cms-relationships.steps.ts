@@ -55,6 +55,7 @@ Before({ tags: '@contacts' }, async ({ world }) => {
 
 async function ensureNamedContact(
   request: import('@playwright/test').APIRequestContext,
+  world: Record<string, unknown>,
   alias: string,
 ): Promise<Record<string, unknown>> {
   const existing = getRelState(world).contacts.get(alias)
@@ -70,8 +71,8 @@ async function ensureNamedContact(
 // RELATIONSHIP STEPS
 // ============================================================
 
-Given('a contact {string} exists', async ({request, world}, alias: string) => {
-  await ensureNamedContact(request, alias)
+Given('a contact {string} exists', async ({ request, world }, alias: string) => {
+  await ensureNamedContact(request, world, alias)
 })
 
 When(
@@ -90,7 +91,7 @@ When(
   },
 )
 
-Then('the relationship should exist', async () => {
+Then('the relationship should exist', async ({ world }) => {
   expect(getRelState(world).lastRelationship).toBeTruthy()
   expect(getRelState(world).lastRelationship!.id).toBeTruthy()
 })
@@ -114,8 +115,8 @@ Then(
 Given(
   'contacts {string} and {string} with a bidirectional {string} relationship',
   async ({ request, world }, aliasA: string, aliasB: string, relType: string) => {
-    const a = await ensureNamedContact(request, aliasA)
-    const b = await ensureNamedContact(request, aliasB)
+    const a = await ensureNamedContact(request, world, aliasA)
+    const b = await ensureNamedContact(request, world, aliasB)
     getRelState(world).lastRelationship = await createRelationshipViaApi(
       request,
       a.id as string,
@@ -147,8 +148,8 @@ Then('{string} should appear in the results', async ({ world }, alias: string) =
 Given(
   'contacts {string} and {string} with a relationship',
   async ({ request, world }, aliasA: string, aliasB: string) => {
-    const a = await ensureNamedContact(request, aliasA)
-    const b = await ensureNamedContact(request, aliasB)
+    const a = await ensureNamedContact(request, world, aliasA)
+    const b = await ensureNamedContact(request, world, aliasB)
     getRelState(world).lastRelationship = await createRelationshipViaApi(
       request,
       a.id as string,
@@ -185,7 +186,7 @@ When(
   'the admin creates an affinity group {string}',
   async ({ request, world }, name: string) => {
     // Groups require at least one member; create a placeholder contact
-    const placeholder = await ensureNamedContact(request, `_group_seed_${Date.now()}`)
+    const placeholder = await ensureNamedContact(request, world, `_group_seed_${Date.now()}`)
     getRelState(world).lastGroup = await createAffinityGroupViaApi(request, name, [
       { contactId: placeholder.id as string },
     ])
@@ -207,7 +208,7 @@ Then(
 )
 
 Given('an affinity group exists', async ({ request, world }) => {
-  const seed = await ensureNamedContact(request, `_group_seed_${Date.now()}`)
+  const seed = await ensureNamedContact(request, world, `_group_seed_${Date.now()}`)
   getRelState(world).lastGroup = await createAffinityGroupViaApi(request, `Test Group ${Date.now()}`, [
     { contactId: seed.id as string },
   ])
@@ -247,7 +248,7 @@ Then(
 Given(
   'an affinity group with member {string} exists',
   async ({ request, world }, alias: string) => {
-    const contact = await ensureNamedContact(request, alias)
+    const contact = await ensureNamedContact(request, world, alias)
     getRelState(world).lastGroup = await createAffinityGroupViaApi(
       request,
       `Group with ${alias} ${Date.now()}`,

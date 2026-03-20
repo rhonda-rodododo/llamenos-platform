@@ -143,7 +143,7 @@ Then('the audit log should have entries for each step', async ({request, world})
   expect(entries.length).toBeGreaterThan(0)
   // Should have volunteer creation and note creation at minimum
   const events = entries.map(e => e.action)
-  expect(events).toContain('volunteerAdded')
+  expect(events).toContain('userAdded')
   expect(events).toContain('noteCreated')
 })
 

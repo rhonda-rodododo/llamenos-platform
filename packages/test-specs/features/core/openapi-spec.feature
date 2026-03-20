@@ -52,8 +52,8 @@ Feature: OpenAPI Specification & Documentation
       | method | path              |
       | get    | /config           |
       | post   | /auth/login       |
-      | get    | /volunteers       |
-      | post   | /volunteers       |
+      | get    | /users            |
+      | post   | /users            |
       | get    | /shifts           |
       | post   | /shifts           |
       | get    | /bans             |

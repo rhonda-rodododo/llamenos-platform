@@ -10,7 +10,7 @@ Feature: Permission Matrix
   # ─── Volunteers Domain ─────────────────────────────────────────────
 
   Scenario Outline: <role> <expected> access to list volunteers
-    When the "<role>" user sends "GET" to "/api/volunteers"
+    When the "<role>" user sends "GET" to "/api/users"
     Then the response status should be <status>
 
     Examples:
@@ -22,7 +22,7 @@ Feature: Permission Matrix
       | reporter     | denied    | 403    |
 
   Scenario Outline: <role> <expected> access to create volunteer
-    When the "<role>" user sends "POST" to "/api/volunteers" with valid volunteer body
+    When the "<role>" user sends "POST" to "/api/users" with valid volunteer body
     Then the response status should be <status>
 
     Examples:
@@ -691,7 +691,7 @@ Feature: Permission Matrix
 
     Examples:
       | method | path                               |
-      | GET    | /api/volunteers                    |
+      | GET    | /api/users                    |
       | GET    | /api/shifts                        |
       | GET    | /api/bans                          |
       | GET    | /api/notes                         |
@@ -705,7 +705,7 @@ Feature: Permission Matrix
       | GET    | /api/reports                       |
       | GET    | /api/conversations                 |
       | GET    | /api/system/health                 |
-      | POST   | /api/volunteers                    |
+      | POST   | /api/users                    |
       | POST   | /api/bans                          |
       | POST   | /api/notes                         |
       | POST   | /api/shifts                        |
@@ -714,4 +714,4 @@ Feature: Permission Matrix
       | POST   | /api/reports                       |
       | PATCH  | /api/settings/spam                 |
       | PATCH  | /api/settings/telephony-provider   |
-      | DELETE | /api/volunteers/fakepubkey          |
+      | DELETE | /api/users/fakepubkey          |

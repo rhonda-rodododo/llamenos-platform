@@ -82,7 +82,7 @@ function doNotesList() {
 }
 
 function doVolunteersList() {
-  const res = http.get(`${BASE_URL}/api/volunteers`, { headers });
+  const res = http.get(`${BASE_URL}/api/users`, { headers });
   const ok = check(res, {
     'volunteers list 200 or 401': (r) => r.status === 200 || r.status === 401,
   });

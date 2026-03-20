@@ -29,6 +29,7 @@ import {
   getCustomFieldsViaApi,
   updateCustomFieldsViaApi,
   uniquePhone,
+  uniqueName,
   type AuditEntry,
 } from '../../api-helpers'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -65,9 +66,9 @@ Given('an empty audit log', async ({ world }) => {
 })
 
 When('the first entry is added', async ({ request, world }) => {
-  // Trigger an audit event by creating a volunteer
-  await createVolunteerViaApi(request, { name: `Audit First ${Date.now()}` })
+  // Trigger a hub-scoped audit event by creating a shift in this test's hub
   const hubId = getScenarioState(world).hubId
+  await createShiftViaApi(request, { name: uniqueName('AuditFirst'), hubId })
   const { entries } = await listAuditLogViaApi(request, { limit: 1, hubId })
   getAdminTestState(world).auditEntries = entries
 })
@@ -86,10 +87,10 @@ Then('the previous entry hash should be null', async ({ world }) => {
 })
 
 Given('an audit log with {int} entry/entries', async ({ request, world }, count: number) => {
-  // Hub isolation: hub starts clean; create the required entries
+  // Hub isolation: hub starts clean; create hub-scoped shifts to generate audit entries
   const hubId = getScenarioState(world).hubId
   for (let i = 0; i < count; i++) {
-    await createVolunteerViaApi(request, { name: `Audit Chain ${Date.now()}-${i}` })
+    await createShiftViaApi(request, { name: uniqueName(`AuditChain${i}`), hubId })
   }
   const { entries } = await listAuditLogViaApi(request, { limit: count + 5, hubId })
   getAdminTestState(world).auditEntries = entries
@@ -98,7 +99,7 @@ Given('an audit log with {int} entry/entries', async ({ request, world }, count:
 
 When('a new entry is added', async ({ request, world }) => {
   const hubId = getScenarioState(world).hubId
-  await createVolunteerViaApi(request, { name: `Audit New ${Date.now()}` })
+  await createShiftViaApi(request, { name: uniqueName('AuditNew'), hubId })
   const { entries } = await listAuditLogViaApi(request, { limit: 20, hubId })
   getAdminTestState(world).auditEntries = entries
 })
@@ -182,13 +183,17 @@ When('I query the shift status', async ({ request, world }) => {
 })
 
 Then('{int} volunteers are reported as on-shift', async ({ world }, count: number) => {
-  const data = getScenarioState(world).lastApiResponse?.data as { shifts: Array<{ userPubkeys: string[] }> }
+  const data = getScenarioState(world).lastApiResponse?.data as { shifts: Array<{ id: string; userPubkeys: string[] }> }
   expect(data).toBeTruthy()
-  // Count unique volunteer pubkeys across all current shifts
+  // Count unique volunteer pubkeys only across THIS scenario's shifts (hub is shared per worker)
+  const state = getScenarioState(world)
+  const scenarioShiftIds = new Set(state.shiftIds)
   const uniqueVolunteers = new Set<string>()
   for (const shift of data.shifts) {
-    for (const pk of shift.userPubkeys) {
-      uniqueVolunteers.add(pk)
+    if (scenarioShiftIds.has(shift.id)) {
+      for (const pk of shift.userPubkeys) {
+        uniqueVolunteers.add(pk)
+      }
     }
   }
   expect(uniqueVolunteers.size).toBe(count)

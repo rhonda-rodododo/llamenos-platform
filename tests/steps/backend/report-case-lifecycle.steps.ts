@@ -60,8 +60,9 @@ Before({ tags: '@lifecycle' }, async ({ world }) => {
 
 async function ensureEntityType(
   request: import('@playwright/test').APIRequestContext,
+  world: Record<string, unknown>,
 ): Promise<string> {
-  if (getLifecycleState(world).entityTypeId) return getLifecycleState(world).entityTypeId
+  if (getLifecycleState(world).entityTypeId) return getLifecycleState(world).entityTypeId!
   await enableCaseManagementViaApi(request, true)
   const et = await createEntityTypeViaApi(request, {
     name: `lifecycle_case_${Date.now()}`,
@@ -94,7 +95,7 @@ Given('a volunteer is assigned to the report', async ({ request, world }) => {
 
 When('the admin converts the report to a case', async ({ request, world }) => {
   expect(getLifecycleState(world).reportId).toBeTruthy()
-  const entityTypeId = await ensureEntityType(request)
+  const entityTypeId = await ensureEntityType(request, world)
 
   const result = await createCaseFromReportViaApi(
     request,
@@ -105,7 +106,7 @@ When('the admin converts the report to a case', async ({ request, world }) => {
   getLifecycleState(world).caseLinkId = result.linkId
 })
 
-Then('a case record should be created', async () => {
+Then('a case record should be created', async ({ world }) => {
   expect(getLifecycleState(world).caseRecordId).toBeTruthy()
 })
 
@@ -286,7 +287,7 @@ Then(
 
 Then(
   'the report metadata should be a proper JSONB object, not a double-serialized string',
-  async () => {
+  async ({ world }) => {
     expect(getLifecycleState(world).lastFetchedReport).toBeTruthy()
     const metadata = (getLifecycleState(world).lastFetchedReport as Record<string, unknown>).metadata
     if (metadata !== null && metadata !== undefined) {

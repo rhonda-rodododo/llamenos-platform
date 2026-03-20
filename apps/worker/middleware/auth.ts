@@ -27,7 +27,7 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     const authPayload = parseAuthHeader(devAuthHeader)
     if (authPayload?.pubkey && validateToken(authPayload)) {
       const user = await services.identity.getUserInternal(authPayload.pubkey)
-      if (user) {
+      if (user && user.active !== false) {
         authResult = { pubkey: authPayload.pubkey, user }
         reqLog.info('Dev-mode signature bypass', { pubkeyPrefix: authPayload.pubkey.slice(0, 8) })
       }

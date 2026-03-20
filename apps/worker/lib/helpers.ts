@@ -4,11 +4,6 @@ export function isValidE164(phone: string): boolean {
   return E164_REGEX.test(phone)
 }
 
-export function extractPathParam(path: string, prefix: string): string | null {
-  const param = path.split(prefix)[1]
-  if (!param || param.includes('/')) return null // Reject path traversal
-  return param
-}
 
 export function json(data: unknown, status = 200): Response {
   return Response.json(data, { status })

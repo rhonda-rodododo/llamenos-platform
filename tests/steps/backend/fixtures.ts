@@ -11,24 +11,20 @@ import { createHubViaApi } from '../../api-helpers'
  * typed local state under a unique key, avoiding module-level `let` variables
  * that would collide under parallel execution.
  *
- * `workerHub` is a worker-scoped hub ID — each Playwright worker gets its own
- * isolated hub for test data isolation.
+ * `workerHub` is a test-scoped hub ID — each scenario gets its own isolated
+ * hub so tests never see state created by other scenarios.
  */
 export const test = base.extend<
-  { world: Record<string, unknown> },
-  { workerHub: string }
+  { world: Record<string, unknown>; workerHub: string }
 >({
   world: async ({}, use) => {
     await use({})
   },
-  workerHub: [async ({ playwright }, use, workerInfo) => {
-    const backendUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
-    const ctx = await playwright.request.newContext({ baseURL: backendUrl })
-    const name = `backend-hub-${workerInfo.workerIndex}-${Date.now()}`
-    const hubId = await createHubViaApi(ctx, name)
-    await ctx.dispose()
+  workerHub: async ({ request }, use) => {
+    const name = `bdd-hub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const hubId = await createHubViaApi(request, name)
     await use(hubId)
-  }, { scope: 'worker' }],
+  },
 })
 
 export const { Given, When, Then, Before, After } = createBdd(test)

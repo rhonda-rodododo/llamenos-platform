@@ -66,6 +66,12 @@ When('the admin enables case management', async ({request, world}) => {
 })
 
 When('the admin creates an entity type named {string} with category {string}', async ({ request, world }, name: string, category: string) => {
+  // Parallel workers may have already created this name — treat as idempotent
+  const existing = (await listEntityTypesViaApi(request)).find((t) => t.name === name)
+  if (existing) {
+    getEntitySchemaState(world).lastEntityType = existing
+    return
+  }
   const result = await createEntityTypeViaApi(request, { name, category })
   getEntitySchemaState(world).lastEntityType = result
 })
@@ -188,7 +194,7 @@ Then('the entity type {string} should exist', async ({ request, world }, name: s
   getEntitySchemaState(world).lastEntityType = found
 })
 
-Then('it should have a generated UUID id', async () => {
+Then('it should have a generated UUID id', async ({ world }) => {
   expect(getEntitySchemaState(world).lastEntityType).toBeTruthy()
   const id = getEntitySchemaState(world).lastEntityType!.id as string
   expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
@@ -221,7 +227,7 @@ Then('entity type {string} should not exist', async ({request, world}, name: str
   expect(types.some(t => t.name === name)).toBe(false)
 })
 
-Then('the relationship type should exist', async () => {
+Then('the relationship type should exist', async ({ world }) => {
   expect(getEntitySchemaState(world).lastRelationshipType).toBeTruthy()
   expect(getEntitySchemaState(world).lastRelationshipType!.id).toBeTruthy()
 })

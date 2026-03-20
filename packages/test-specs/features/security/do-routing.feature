@@ -5,13 +5,13 @@ Feature: Durable Object Routing
   So that each endpoint is served by the right method
 
   Scenario: GET request matches static route
-    Given a route "GET /api/volunteers" is registered
-    When a GET request to "/api/volunteers" arrives
+    Given a route "GET /api/users" is registered
+    When a GET request to "/api/users" arrives
     Then it should dispatch to the registered handler
 
   Scenario: POST request with path parameter
-    Given a route "POST /api/volunteers/:id/role" is registered
-    When a POST request to "/api/volunteers/abc123/role" arrives
+    Given a route "POST /api/users/:id/role" is registered
+    When a POST request to "/api/users/abc123/role" arrives
     Then it should extract "abc123" as the id parameter
 
   Scenario: Unmatched path returns 404

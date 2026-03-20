@@ -326,8 +326,8 @@ calls.post('/:callId/ban',
     const services = c.get('services')
     const hubId = c.get('hubId') ?? ''
 
-    // Get call record to verify ownership and extract caller phone
-    const call = await services.calls.getActiveCallById(hubId, callId)
+    // Look up by callId only — route may lack hub context (not mounted under hubScoped)
+    const call = await services.calls.getActiveCallByCallId(callId)
     if (!call) return c.json({ error: 'Call not found' }, 404)
 
     if (call.answeredBy !== pubkey) {
@@ -343,6 +343,7 @@ calls.post('/:callId/ban',
         phone: call.callerNumber,
         reason: body.reason || 'Banned during active call',
         bannedBy: pubkey,
+        hubId: call.hubId ?? hubId ?? undefined,
       })
       banned = true
     } catch {
@@ -351,7 +352,7 @@ calls.post('/:callId/ban',
 
     // Hang up the call
     try {
-      await services.calls.endCall(hubId, callId)
+      await services.calls.endCall(call.hubId ?? '', callId)
     } catch {
       // End call failed
     }

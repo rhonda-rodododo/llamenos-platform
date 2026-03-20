@@ -6,6 +6,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
@@ -134,9 +135,11 @@ Given('a report of the conversion-enabled type exists with conversionStatus {str
 // ── Triage Queue Listing Steps ───────────────────────────────────
 
 When('the admin lists reports with conversionEnabled true', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const prefix = hubId ? `/hubs/${hubId}` : ''
   const { data } = await apiGet<{ conversations?: Array<Record<string, unknown>>; reports?: Array<Record<string, unknown>> }>(
     request,
-    '/reports?conversionEnabled=true',
+    `${prefix}/reports?conversionEnabled=true`,
   )
   const reports = (data as Record<string, unknown>)?.conversations as Array<Record<string, unknown>>
     ?? (data as Record<string, unknown>)?.reports as Array<Record<string, unknown>>
@@ -145,9 +148,11 @@ When('the admin lists reports with conversionEnabled true', async ({ request, wo
 })
 
 When('the admin lists reports with conversionEnabled true and conversionStatus {string}', async ({ request, world }, conversionStatus: string) => {
+  const hubId = getScenarioState(world).hubId
+  const prefix = hubId ? `/hubs/${hubId}` : ''
   const { data } = await apiGet<{ conversations?: Array<Record<string, unknown>>; reports?: Array<Record<string, unknown>> }>(
     request,
-    `/reports?conversionEnabled=true&conversionStatus=${conversionStatus}`,
+    `${prefix}/reports?conversionEnabled=true&conversionStatus=${conversionStatus}`,
   )
   const reports = (data as Record<string, unknown>)?.conversations as Array<Record<string, unknown>>
     ?? (data as Record<string, unknown>)?.reports as Array<Record<string, unknown>>
@@ -176,7 +181,17 @@ Then('only reports with conversionStatus {string} should be returned', async ({ 
 
 Then('the triage queue should be empty', async ({ world }) => {
   expect(getTriageState(world).triageQueue).toBeDefined()
-  expect(getTriageState(world).triageQueue!.length).toBe(0)
+  // With hub-per-worker isolation, other triage scenarios may have created
+  // conversion-enabled reports in this hub. Scope to this scenario's report type.
+  const enabledId = getTriageState(world).enabledReportTypeId
+  const queue = getTriageState(world).triageQueue!
+  const matching = enabledId
+    ? queue.filter((r) => {
+        const meta = parseMetadata(r)
+        return (meta.reportTypeId ?? r.reportTypeId) === enabledId
+      })
+    : queue
+  expect(matching.length).toBe(0)
 })
 
 // ── Conversion Status Update Steps ───────────────────────────────

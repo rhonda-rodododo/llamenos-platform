@@ -255,7 +255,7 @@ export class RecordsService {
     const [ban] = await this.db
       .insert(bans)
       .values({
-        hubId: input.hubId ?? null,
+        hubId: input.hubId || null,  // normalize empty string to null
         phone: input.phone,
         reason: input.reason,
         bannedBy: input.bannedBy,
@@ -304,7 +304,7 @@ export class RecordsService {
       .insert(bans)
       .values(
         newPhones.map((phone) => ({
-          hubId: hubId ?? null,
+          hubId: hubId || null,  // normalize empty string to null
           phone,
           reason,
           bannedBy,

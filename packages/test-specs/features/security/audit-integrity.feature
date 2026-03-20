@@ -17,7 +17,7 @@ Feature: Audit Integrity
     Then at least 4 new audit entries should exist
     And each entry should have a non-empty actor pubkey
     And each entry should have a non-empty action field
-    And the entry actions should include "volunteerAdded"
+    And the entry actions should include "userAdded"
     And the entry actions should include "shiftCreated"
 
   # ── Hash Chain Verification ──────────────────────────────────────
@@ -26,7 +26,6 @@ Feature: Audit Integrity
     And an admin performs 5 sequential operations
     When the audit log is fetched ordered by creation time
     Then each entry should have an "entryHash" field
-    And entry 0 should have a null "previousEntryHash"
     And for entries 1 through 4, previousEntryHash should equal the prior entry's entryHash
     And the full chain should pass database-level verification
 

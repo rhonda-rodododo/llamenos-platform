@@ -77,7 +77,7 @@ Then('the hub list should contain at least {int} hub', async ({ world }, count: 
   expect(getHubManagementState(world).hubList!.length).toBeGreaterThanOrEqual(count)
 })
 
-Then('each hub should have a name and slug', async () => {
+Then('each hub should have a name and slug', async ({ world }) => {
   expect(getHubManagementState(world).hubList).toBeTruthy()
   for (const hub of getHubManagementState(world).hubList!) {
     expect(hub.name).toBeTruthy()

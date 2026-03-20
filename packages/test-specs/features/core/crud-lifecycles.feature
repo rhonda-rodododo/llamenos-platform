@@ -121,9 +121,9 @@ Feature: CRUD Lifecycles
 
   Scenario: CRUD operations generate audit entries
     When an admin creates a volunteer named "CRUD Audit Test"
-    Then the audit log should contain a "volunteerAdded" entry
+    Then the audit log should contain a "userAdded" entry
     When the admin deactivates the volunteer
-    Then the audit log should contain a "volunteerDeactivated" entry
+    Then the audit log should contain a "userDeactivated" entry
 
   # ─── Spam Settings ────────────────────────────────────────────────
 

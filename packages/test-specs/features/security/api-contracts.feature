@@ -6,21 +6,21 @@ Feature: API Contract Validation
   # ─── Pubkey Format Validation ──────────────────────────────────────
 
   Scenario: Create volunteer rejects invalid pubkey format
-    When an admin sends "POST" to "/api/volunteers" with body:
+    When an admin sends "POST" to "/api/users" with body:
       | pubkey | not-a-hex-string |
       | name   | Test Volunteer   |
       | phone  | +15551234567     |
     Then the response status should be 400
 
   Scenario: Create volunteer rejects short pubkey
-    When an admin sends "POST" to "/api/volunteers" with body:
+    When an admin sends "POST" to "/api/users" with body:
       | pubkey | abcdef |
       | name   | Test   |
       | phone  | +15551234567 |
     Then the response status should be 400
 
   Scenario: Create volunteer rejects uppercase hex pubkey
-    When an admin sends "POST" to "/api/volunteers" with body:
+    When an admin sends "POST" to "/api/users" with body:
       | pubkey | AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA |
       | name   | Test   |
       | phone  | +15551234567 |
@@ -43,13 +43,13 @@ Feature: API Contract Validation
   # ─── Required Fields Missing ───────────────────────────────────────
 
   Scenario: Create volunteer rejects missing name
-    When an admin sends "POST" to "/api/volunteers" with body:
+    When an admin sends "POST" to "/api/users" with body:
       | pubkey | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
       | phone  | +15551234567 |
     Then the response status should be 400
 
   Scenario: Create volunteer rejects missing pubkey
-    When an admin sends "POST" to "/api/volunteers" with body:
+    When an admin sends "POST" to "/api/users" with body:
       | name  | Test Volunteer |
       | phone | +15551234567   |
     Then the response status should be 400
@@ -94,7 +94,7 @@ Feature: API Contract Validation
   # ─── String Length Constraints ─────────────────────────────────────
 
   Scenario: Create volunteer rejects empty name
-    When an admin sends "POST" to "/api/volunteers" with body:
+    When an admin sends "POST" to "/api/users" with body:
       | pubkey | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
       | name   |                                                                |
       | phone  | +15551234567                                                   |

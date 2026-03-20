@@ -163,7 +163,7 @@ Then(
   },
 )
 
-Then('each envelope should be unique per member', async () => {
+Then('each envelope should be unique per member', async ({ world }) => {
   const envelopes = new Set<string>()
   for (const [, result] of getHubKeyState(world).fetchResults) {
     expect(result.envelope).toBeTruthy()

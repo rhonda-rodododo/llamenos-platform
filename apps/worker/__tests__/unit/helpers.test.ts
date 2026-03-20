@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   isValidE164,
-  extractPathParam,
   json,
   error,
   uint8ArrayToBase64URL,
@@ -48,29 +47,6 @@ describe('isValidE164', () => {
 
   it('rejects strings with letters', () => {
     expect(isValidE164('+1555abc1234')).toBe(false)
-  })
-})
-
-describe('extractPathParam', () => {
-  it('extracts parameter after prefix', () => {
-    expect(extractPathParam('/api/volunteer/abc123', '/api/volunteer/')).toBe('abc123')
-  })
-
-  it('returns null when parameter contains slash (path traversal)', () => {
-    expect(extractPathParam('/api/volunteer/abc/def', '/api/volunteer/')).toBeNull()
-  })
-
-  it('returns null when no parameter after prefix', () => {
-    expect(extractPathParam('/api/volunteer/', '/api/volunteer/')).toBeNull()
-  })
-
-  it('returns null when prefix is not found', () => {
-    expect(extractPathParam('/api/notes/123', '/api/volunteer/')).toBeNull()
-  })
-
-  it('extracts hex pubkeys correctly', () => {
-    const pubkey = 'ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228'
-    expect(extractPathParam(`/api/volunteer/${pubkey}`, '/api/volunteer/')).toBe(pubkey)
   })
 })
 

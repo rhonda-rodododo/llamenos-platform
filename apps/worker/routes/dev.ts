@@ -354,10 +354,6 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   let volunteerPubkeys: string[] = []
   try {
     volunteerPubkeys = await services.shifts.getCurrentVolunteers(hubId)
-    // Fall back to default hub if the specified hub has no volunteers
-    if (volunteerPubkeys.length === 0 && hubId) {
-      volunteerPubkeys = await services.shifts.getCurrentVolunteers('')
-    }
   } catch {
     // Shifts not configured — proceed with empty list
   }
@@ -394,8 +390,9 @@ dev.post('/test-simulate/answer-call', async (c) => {
   }
 
   const services = c.get('services')
-  const hubId = c.get('hubId') ?? ''
-  await services.calls.answerCall(hubId, body.callId, body.pubkey)
+  const call = await services.calls.getActiveCallByCallId(body.callId)
+  if (!call) return c.json({ error: 'Call not found' }, 404)
+  await services.calls.answerCall(call.hubId ?? '', body.callId, body.pubkey)
 
   // Publish call update event (mirrors real telephony flow)
   publishNostrEvent(c.env, KIND_CALL_UPDATE, {
@@ -424,8 +421,9 @@ dev.post('/test-simulate/end-call', async (c) => {
   }
 
   const services = c.get('services')
-  const hubId = c.get('hubId') ?? ''
-  await services.calls.endCall(hubId, body.callId)
+  const call = await services.calls.getActiveCallByCallId(body.callId)
+  if (!call) return c.json({ error: 'Call not found' }, 404)
+  await services.calls.endCall(call.hubId ?? '', body.callId)
 
   // Publish call update event (mirrors real telephony flow)
   publishNostrEvent(c.env, KIND_CALL_UPDATE, {
@@ -448,9 +446,10 @@ dev.post('/test-simulate/voicemail', async (c) => {
   }
 
   const services = c.get('services')
-  const hubId = c.get('hubId') ?? ''
+  const call = await services.calls.getActiveCallByCallId(body.callId)
+  if (!call) return c.json({ error: 'Call not found' }, 404)
   // Voicemail = call ends without being answered → status becomes 'unanswered'
-  await services.calls.endCall(hubId, body.callId)
+  await services.calls.endCall(call.hubId ?? '', body.callId)
 
   // Publish voicemail event (mirrors real telephony flow)
   publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {

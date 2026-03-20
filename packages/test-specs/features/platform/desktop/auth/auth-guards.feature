@@ -38,5 +38,5 @@ Feature: Auth Guards
     Then I should be redirected to the login page
 
   Scenario: API returns 401 for unauthenticated requests
-    When I make an unauthenticated API request to "/api/volunteers"
+    When I make an unauthenticated API request to "/api/users"
     Then the response status should be 401

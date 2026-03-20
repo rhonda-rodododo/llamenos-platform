@@ -38,6 +38,8 @@ const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 interface EdgeState {
   noteCount: number
   noteListResult?: { notes: unknown[]; total: number }
+  /** Unique conversationId to scope notes to this scenario */
+  notesConversationId: string
   shiftIds: string[]
   banCount: number
   bulkResult?: { count: number }
@@ -58,6 +60,7 @@ function getEdgeState(world: Record<string, unknown>): EdgeState {
 Before({ tags: '@backend' }, async ({ world }) => {
   const edge = {
     noteCount: 0,
+    notesConversationId: `edge-conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     shiftIds: [],
     banCount: 0,
     roleCreationStatuses: [],
@@ -70,7 +73,8 @@ Before({ tags: '@backend' }, async ({ world }) => {
 // ─── Pagination ─────────────────────────────────────────────────────
 
 When('an admin lists notes', async ({ request, world }) => {
-  getEdgeState(world).noteListResult = await listNotesViaApi(request)
+  const conversationId = getEdgeState(world).notesConversationId
+  getEdgeState(world).noteListResult = await listNotesViaApi(request, { conversationId })
 })
 
 Then('the notes list should be empty with total {int}', async ({ world }, total: number) => {
@@ -80,17 +84,19 @@ Then('the notes list should be empty with total {int}', async ({ world }, total:
 })
 
 Given('{int} notes exist in the system', async ({ request, world }, count: number) => {
+  const conversationId = getEdgeState(world).notesConversationId
   for (let i = 0; i < count; i++) {
     await apiPost(request, '/notes', {
       encryptedContent: `edge-note-${i}`,
-      callId: `edge-call-${Date.now()}-${i}`,
+      conversationId,
     })
   }
   getEdgeState(world).noteCount = count
 })
 
 When('an admin lists notes with page {int} limit {int}', async ({ request, world }, page: number, limit: number) => {
-  getEdgeState(world).noteListResult = await listNotesViaApi(request, { page, limit })
+  const conversationId = getEdgeState(world).notesConversationId
+  getEdgeState(world).noteListResult = await listNotesViaApi(request, { page, limit, conversationId })
 })
 
 Then('{int} notes should be returned with total {int}', async ({ world }, count: number, total: number) => {

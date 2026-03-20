@@ -4,8 +4,30 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { nip19, getPublicKey } from 'nostr-tools'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 
 const BACKEND_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
+
+/**
+ * Load E2E_TEST_SECRET from .dev.vars if not already set in the environment.
+ * This lets the test reset work out-of-the-box for local dev without extra env setup.
+ */
+function loadDevVarsSecret(): string | undefined {
+  // Check process env first (CI sets E2E_TEST_SECRET or DEV_RESET_SECRET)
+  if (process.env.E2E_TEST_SECRET) return process.env.E2E_TEST_SECRET
+  if (process.env.DEV_RESET_SECRET) return process.env.DEV_RESET_SECRET
+  // Fall back to reading from .dev.vars (local dev — dev-bun.sh sets DEV_RESET_SECRET)
+  try {
+    const devVarsPath = resolve(process.cwd(), '.dev.vars')
+    const content = readFileSync(devVarsPath, 'utf-8')
+    const match = content.match(/^(?:E2E_TEST_SECRET|DEV_RESET_SECRET)=(.+)$/m)
+    return match?.[1]?.trim()
+  } catch {
+    return undefined
+  }
+}
+
 const AUTH_PREFIX = 'llamenos:auth:'
 const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
 
@@ -19,6 +41,25 @@ function makeBootstrapToken(nsec: string, method: string, path: string) {
   const messageHash = sha256(utf8ToBytes(message))
   const sig = schnorr.sign(messageHash, hexToBytes(bytesToHex(skBytes)))
   return { pubkey, timestamp, token: bytesToHex(sig) }
+}
+
+/**
+ * Reset all server state (test databases only).
+ * Requires E2E_TEST_SECRET in .dev.vars (server side) and readable from .dev.vars or env.
+ */
+async function resetTestState(baseUrl: string): Promise<void> {
+  const secret = loadDevVarsSecret()
+  if (!secret) return // No secret configured — skip reset
+  const res = await fetch(`${baseUrl}/api/test-reset`, {
+    method: 'POST',
+    headers: { 'X-Test-Secret': secret },
+  })
+  // 403 = server not configured with secret (skip gracefully)
+  if (res.status === 403 || res.status === 404) return
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Test reset failed: ${res.status} ${text}`)
+  }
 }
 
 /**
@@ -42,13 +83,14 @@ async function bootstrapAdmin(baseUrl: string): Promise<void> {
 
 /**
  * Global setup: verify backend is reachable before running tests,
- * then bootstrap the admin user if not already created.
+ * reset state (if E2E_TEST_SECRET is set), then bootstrap the admin user.
  */
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   for (let i = 0; i < 10; i++) {
     try {
       const res = await fetch(`${BACKEND_URL}/api/config`)
       if (res.ok) {
+        await resetTestState(BACKEND_URL)
         await bootstrapAdmin(BACKEND_URL)
         return
       }

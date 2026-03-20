@@ -103,7 +103,7 @@ Then('at least {int} new audit entries should exist', async ({ world }, count: n
   expect(newEntries).toBeGreaterThanOrEqual(count)
 })
 
-Then('each entry should have a non-empty actor pubkey', async () => {
+Then('each entry should have a non-empty actor pubkey', async ({ world }) => {
   for (const entry of getAuditTestState(world).entries) {
     expect(entry.actorPubkey).toBeTruthy()
     expect(typeof entry.actorPubkey).toBe('string')
@@ -111,7 +111,7 @@ Then('each entry should have a non-empty actor pubkey', async () => {
   }
 })
 
-Then('each entry should have a non-empty action field', async () => {
+Then('each entry should have a non-empty action field', async ({ world }) => {
   for (const entry of getAuditTestState(world).entries) {
     expect(entry.action).toBeTruthy()
     expect(typeof entry.action).toBe('string')
@@ -131,9 +131,11 @@ Given('an admin performs {int} sequential operations', async ({ request, world }
   const existing = await listAuditLogViaApi(request, { hubId })
   getAuditTestState(world).entriesBefore = existing.total
 
+  // Use hub-scoped shift creation so entries appear in hub-scoped audit queries
   for (let i = 0; i < count; i++) {
-    await createVolunteerViaApi(request, {
-      name: `Chain Vol ${Date.now()}-${i}`,
+    await createShiftViaApi(request, {
+      name: `Chain Shift ${Date.now()}-${i}`,
+      hubId,
     })
   }
 })
@@ -206,7 +208,7 @@ When('the latest audit entry is fetched', async ({ request, world }) => {
 
 Then(
   'recomputing the hash with computeAuditEntryHash should match the stored entryHash',
-  async () => {
+  async ({ world }) => {
     expect(getAuditTestState(world).latestEntry).toBeTruthy()
     const entry = getAuditTestState(world).latestEntry!
     getAuditTestState(world).recomputedHash = computeAuditEntryHash({
@@ -221,7 +223,7 @@ Then(
   },
 )
 
-Then('modifying the action field should produce a different hash', async () => {
+Then('modifying the action field should produce a different hash', async ({ world }) => {
   expect(getAuditTestState(world).latestEntry).toBeTruthy()
   const entry = getAuditTestState(world).latestEntry!
   const tamperedHash = computeAuditEntryHash({
@@ -235,7 +237,7 @@ Then('modifying the action field should produce a different hash', async () => {
   expect(tamperedHash).not.toBe(entry.entryHash)
 })
 
-Then('modifying the actor pubkey should produce a different hash', async () => {
+Then('modifying the actor pubkey should produce a different hash', async ({ world }) => {
   expect(getAuditTestState(world).latestEntry).toBeTruthy()
   const entry = getAuditTestState(world).latestEntry!
   const tamperedHash = computeAuditEntryHash({
