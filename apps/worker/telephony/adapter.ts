@@ -173,8 +173,8 @@ export interface CallAnsweredParams {
   parentCallSid: string
   /** Origin URL for recording status callbacks */
   callbackUrl: string
-  /** Volunteer pubkey for recording callback routing */
-  volunteerPubkey: string
+  /** User pubkey for recording callback routing */
+  userPubkey: string
   /** Hub ID for multi-hub routing — appended to callback URLs as &hub= */
   hubId?: string
 }

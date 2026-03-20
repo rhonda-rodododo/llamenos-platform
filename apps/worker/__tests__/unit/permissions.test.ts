@@ -121,8 +121,8 @@ describe('hasPermission', () => {
   })
 
   it('hub-admin has domain wildcards', () => {
-    expect(hasPermission(['role-hub-admin'], allRoles, 'volunteers:create')).toBe(true)
-    expect(hasPermission(['role-hub-admin'], allRoles, 'volunteers:delete')).toBe(true)
+    expect(hasPermission(['role-hub-admin'], allRoles, 'users:create')).toBe(true)
+    expect(hasPermission(['role-hub-admin'], allRoles, 'users:delete')).toBe(true)
     expect(hasPermission(['role-hub-admin'], allRoles, 'shifts:create')).toBe(true)
   })
 
@@ -186,7 +186,7 @@ describe('getPermissionsByDomain', () => {
     const grouped = getPermissionsByDomain()
     expect(grouped).toHaveProperty('calls')
     expect(grouped).toHaveProperty('notes')
-    expect(grouped).toHaveProperty('volunteers')
+    expect(grouped).toHaveProperty('users')
     expect(grouped).toHaveProperty('shifts')
     expect(grouped).toHaveProperty('bans')
     expect(grouped).toHaveProperty('settings')
@@ -253,7 +253,7 @@ describe('hasHubPermission', () => {
       [],
       allRoles,
       'hub-123',
-      'volunteers:create',
+      'users:create',
     )).toBe(true)
   })
 })
@@ -416,7 +416,7 @@ describe('PERMISSION_CATALOG', () => {
     expect(domains.has('calls')).toBe(true)
     expect(domains.has('notes')).toBe(true)
     expect(domains.has('conversations')).toBe(true)
-    expect(domains.has('volunteers')).toBe(true)
+    expect(domains.has('users')).toBe(true)
     expect(domains.has('shifts')).toBe(true)
     expect(domains.has('bans')).toBe(true)
     expect(domains.has('settings')).toBe(true)

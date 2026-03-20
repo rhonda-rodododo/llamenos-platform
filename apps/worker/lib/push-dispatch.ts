@@ -17,10 +17,10 @@ const APNS_BUNDLE_ID = 'org.llamenos.mobile'
 
 export interface PushDispatcher {
   /**
-   * Send push notification to a specific volunteer's registered devices.
+   * Send push notification to a specific user's registered devices.
    */
   sendToVolunteer(
-    volunteerPubkey: string,
+    userPubkey: string,
     wakePayload: WakePayload,
     fullPayload: FullPushPayload,
   ): Promise<void>
@@ -77,18 +77,18 @@ class ServicePushDispatcher implements PushDispatcher {
   }
 
   async sendToVolunteer(
-    volunteerPubkey: string,
+    userPubkey: string,
     wakePayload: WakePayload,
     fullPayload: FullPushPayload,
   ): Promise<void> {
-    const { devices: deviceList } = await this.identityService.getDevices(volunteerPubkey)
+    const { devices: deviceList } = await this.identityService.getDevices(userPubkey)
     if (deviceList.length === 0) return
 
     const staleTokens: string[] = []
 
     for (const device of deviceList) {
       const encryptedWake = encryptWakePayload(wakePayload, device.wakeKeyPublic)
-      const encryptedFull = encryptFullPayload(fullPayload, volunteerPubkey)
+      const encryptedFull = encryptFullPayload(fullPayload, userPubkey)
 
       const success = await this.sendToDevice(device, encryptedWake, encryptedFull, wakePayload)
       if (!success) {
@@ -97,7 +97,7 @@ class ServicePushDispatcher implements PushDispatcher {
     }
 
     if (staleTokens.length > 0) {
-      await this.identityService.cleanupDevices(volunteerPubkey, staleTokens)
+      await this.identityService.cleanupDevices(userPubkey, staleTokens)
     }
   }
 

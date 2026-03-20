@@ -58,9 +58,9 @@ export function encryptWakePayload(payload: WakePayload, deviceWakeKeyPublic: st
 }
 
 /**
- * Encrypt full-tier push payload for a volunteer's Nostr identity.
- * Requires the volunteer's nsec (PIN unlock) to decrypt.
+ * Encrypt full-tier push payload for a user's Nostr identity.
+ * Requires the user's nsec (PIN unlock) to decrypt.
  */
-export function encryptFullPayload(payload: FullPushPayload, volunteerPubkey: string): string {
-  return eciesEncrypt(JSON.stringify(payload), volunteerPubkey, LABEL_PUSH_FULL)
+export function encryptFullPayload(payload: FullPushPayload, userPubkey: string): string {
+  return eciesEncrypt(JSON.stringify(payload), userPubkey, LABEL_PUSH_FULL)
 }

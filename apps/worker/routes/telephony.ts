@@ -184,8 +184,8 @@ telephony.post('/captcha', async (c) => {
   return telephonyResponse(response)
 })
 
-// --- Step 4: Volunteer answered -> bridge via queue ---
-telephony.post('/volunteer-answer', async (c) => {
+// --- Step 4: User answered -> bridge via queue ---
+telephony.post('/user-answer', async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
@@ -217,7 +217,7 @@ telephony.post('/volunteer-answer', async (c) => {
   })
 
   const origin = new URL(c.req.url).origin
-  const response = await adapter.handleCallAnswered({ parentCallSid, callbackUrl: origin, volunteerPubkey: pubkey, hubId })
+  const response = await adapter.handleCallAnswered({ parentCallSid, callbackUrl: origin, userPubkey: pubkey, hubId })
   return telephonyResponse(response)
 })
 

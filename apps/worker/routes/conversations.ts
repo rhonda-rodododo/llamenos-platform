@@ -20,18 +20,18 @@ import type { Services } from '../services'
 
 const conversations = new Hono<AppEnv>()
 
-/** Dispatch push notification to a specific volunteer (Epic 86) */
-function dispatchPushToVolunteer(
+/** Dispatch push notification to a specific user (Epic 86) */
+function dispatchPushToUser(
   env: AppEnv['Bindings'],
   services: Services,
-  volunteerPubkey: string,
+  userPubkey: string,
   wake: WakePayload,
   full: FullPushPayload,
 ): void {
   try {
     const dispatcher = createPushDispatcherFromService(env, services.identity, services.shifts)
-    dispatcher.sendToVolunteer(volunteerPubkey, wake, full).catch((e) => {
-      console.error('[conversations] Push dispatch to volunteer failed:', e)
+    dispatcher.sendToVolunteer(userPubkey, wake, full).catch((e) => {
+      console.error('[conversations] Push dispatch to user failed:', e)
     })
   } catch {
     // Push not configured
@@ -518,8 +518,8 @@ conversations.post('/:id/claim',
       assignedTo: pubkey,
     }).catch((e) => { console.error('[conversations] Failed to publish event:', e) })
 
-    // Push notification to assigned volunteer (Epic 86)
-    dispatchPushToVolunteer(c.env, services, pubkey, {
+    // Push notification to assigned user (Epic 86)
+    dispatchPushToUser(c.env, services, pubkey, {
       type: 'assignment',
       conversationId: id,
       channelType: conv.channelType,

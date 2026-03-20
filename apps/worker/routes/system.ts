@@ -43,7 +43,7 @@ export interface SystemHealth {
     backupSize: string
     lastVerify: string | null
   }
-  volunteers: {
+  users: {
     totalActive: number
     onlineNow: number
     onShift: number
@@ -111,7 +111,7 @@ async function fetchCallMetrics(services: Services, hubId: string): Promise<Syst
   }
 }
 
-async function fetchVolunteerInfo(services: Services, hubId: string): Promise<SystemHealth['volunteers']> {
+async function fetchUserInfo(services: Services, hubId: string): Promise<SystemHealth['users']> {
   try {
     const [volResult, presenceResult, onShiftPubkeys] = await Promise.all([
       services.identity.getUsers(),
@@ -140,7 +140,7 @@ systemRoutes.get('/health',
     summary: 'Aggregated system health dashboard for admins',
     responses: {
       200: {
-        description: 'System health including server, services, calls, storage, and volunteers',
+        description: 'System health including server, services, calls, storage, and users',
         content: {
           'application/json': {
             schema: resolver(systemHealthResponseSchema),
@@ -155,11 +155,11 @@ systemRoutes.get('/health',
   const services = c.get('services')
   const hubId = c.get('hubId') ?? ''
 
-  const [serverResult, servicesResult, callsResult, volunteersResult] = await Promise.allSettled([
+  const [serverResult, servicesResult, callsResult, usersResult] = await Promise.allSettled([
     fetchServerHealth(),
     fetchServices(env),
     fetchCallMetrics(services, hubId),
-    fetchVolunteerInfo(services, hubId),
+    fetchUserInfo(services, hubId),
   ])
 
   const server = serverResult.status === 'fulfilled'
@@ -174,8 +174,8 @@ systemRoutes.get('/health',
     ? callsResult.value
     : { today: 0, active: 0, avgResponseSeconds: 0, missed: 0 }
 
-  const volunteers = volunteersResult.status === 'fulfilled'
-    ? volunteersResult.value
+  const users = usersResult.status === 'fulfilled'
+    ? usersResult.value
     : { totalActive: 0, onlineNow: 0, onShift: 0, shiftCoverage: 0 }
 
   // Derive overall server status from services
@@ -197,7 +197,7 @@ systemRoutes.get('/health',
       backupSize: 'N/A',
       lastVerify: null,
     },
-    volunteers,
+    users,
     timestamp: new Date().toISOString(),
   }
 

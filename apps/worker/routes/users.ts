@@ -8,7 +8,7 @@ import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 
 const users = new Hono<AppEnv>()
-users.use('*', requirePermission('volunteers:read'))
+users.use('*', requirePermission('users:read'))
 
 users.get('/',
   describeRoute({
@@ -74,7 +74,7 @@ users.post('/',
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:create'),
+  requirePermission('users:create'),
   validator('json', createUserBodySchema),
   async (c) => {
     const services = c.get('services')
@@ -116,7 +116,7 @@ users.patch('/:targetPubkey',
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:update'),
+  requirePermission('users:update'),
   validator('json', adminUpdateUserBodySchema),
   async (c) => {
     const services = c.get('services')
@@ -153,7 +153,7 @@ users.delete('/:targetPubkey',
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:delete'),
+  requirePermission('users:delete'),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
@@ -186,7 +186,7 @@ users.get('/:targetPubkey/cases',
       ...notFoundError,
     },
   }),
-  requirePermission('volunteers:read-cases'),
+  requirePermission('users:read-cases'),
   async (c) => {
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')
@@ -233,7 +233,7 @@ users.get('/:targetPubkey/metrics',
       ...notFoundError,
     },
   }),
-  requirePermission('volunteers:read-metrics'),
+  requirePermission('users:read-metrics'),
   async (c) => {
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')

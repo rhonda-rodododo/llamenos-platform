@@ -39,7 +39,7 @@ export const systemHealthResponseSchema = z.object({
     backupSize: z.string(),
     lastVerify: z.string().nullable(),
   }),
-  volunteers: z.object({
+  users: z.object({
     totalActive: z.number(),
     onlineNow: z.number(),
     onShift: z.number(),
