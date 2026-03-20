@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { paginationSchema, paginatedMeta } from './common'
+import { paginationSchema, paginatedMeta, recipientEnvelopeSchema } from './common'
 
 // --- Response schemas ---
 
@@ -10,10 +10,21 @@ export const callRecordResponseSchema = z.object({
   startedAt: z.string(),
   endedAt: z.string().optional(),
   duration: z.number().optional(),
-  status: z.string(),
+  status: z.enum(['ringing', 'in-progress', 'completed', 'unanswered']).optional(),
   hasTranscription: z.boolean().optional(),
   hasVoicemail: z.boolean().optional(),
   hasRecording: z.boolean().optional(),
+  recordingSid: z.string().optional(),
+  encryptedContent: z.string().optional(),
+  adminEnvelopes: z.array(recipientEnvelopeSchema).optional(),
+})
+
+export const activeCallResponseSchema = z.object({
+  id: z.string(),
+  callerNumber: z.string(),
+  answeredBy: z.string().nullable().optional(),
+  startedAt: z.string(),
+  status: z.enum(['ringing', 'in-progress', 'completed', 'unanswered']),
 })
 
 export const callPresenceResponseSchema = z.object({
