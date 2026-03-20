@@ -195,7 +195,7 @@ describe('verifyAuthToken', () => {
   it('rejects bound token used against wrong endpoint', async () => {
     const timestamp = Date.now()
     const token = createSignedToken(timestamp, 'GET', '/api/notes')
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'DELETE', '/api/volunteers/abc')
+    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'DELETE', '/api/users/abc')
     expect(result).toBe(false)
   })
 
