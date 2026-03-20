@@ -89,37 +89,8 @@ export interface EncryptedFileMetadata {
 }
 
 // FileKeyEnvelope is re-exported from @protocol/schemas/common above
-
-export interface FileRecord {
-  id: string
-  conversationId: string
-  messageId?: string
-  uploadedBy: string         // pubkey of uploader
-  recipientEnvelopes: FileKeyEnvelope[]
-  encryptedMetadata: Array<{
-    pubkey: string
-    encryptedContent: string
-    ephemeralPubkey: string
-  }>
-  totalSize: number          // encrypted size in bytes
-  totalChunks: number
-  status: 'uploading' | 'complete' | 'failed'
-  completedChunks: number
-  createdAt: string
-  completedAt?: string
-}
-
-export interface UploadInit {
-  totalSize: number
-  totalChunks: number
-  conversationId: string
-  recipientEnvelopes: FileKeyEnvelope[]
-  encryptedMetadata: Array<{
-    pubkey: string
-    encryptedContent: string
-    ephemeralPubkey: string
-  }>
-}
+// FileRecord and UploadInit canonical types are in @protocol/schemas/files
+export type { FileRecord, UploadInit } from '@protocol/schemas/files'
 
 /** What gets encrypted before storage — replaces plain text */
 export interface NotePayload {
