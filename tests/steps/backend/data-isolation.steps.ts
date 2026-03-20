@@ -85,7 +85,7 @@ Given(
 
     // Assign the right role
     if (role === 'reporter') {
-      await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: ['reporter'] })
+      await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['reporter'] })
     } else if (role === 'volunteer') {
       // Default role is volunteer — no change needed
     }
@@ -299,7 +299,7 @@ Given('a volunteer with role {string}', async ({ request }, role: string) => {
     name: `Role Change Vol ${Date.now()}`,
   })
   // Set the initial role
-  await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: [role] })
+  await apiPatch(request, `/users/${vol.pubkey}`, { roles: [role] })
   iso.volunteer = { ...vol, roles: [role] }
 })
 
@@ -307,7 +307,7 @@ When(
   "an admin changes the volunteer's role to {string}",
   async ({ request }, newRole: string) => {
     expect(iso.volunteer).toBeTruthy()
-    await apiPatch(request, `/volunteers/${iso.volunteer!.pubkey}`, {
+    await apiPatch(request, `/users/${iso.volunteer!.pubkey}`, {
       roles: [newRole],
     })
     iso.volunteer!.roles = [newRole]
@@ -320,9 +320,9 @@ When(
     expect(iso.volunteer).toBeTruthy()
     // hub-admin can list volunteers; volunteer cannot
     // Use an endpoint that the old role had access to
-    let endpoint = '/volunteers'
+    let endpoint = '/users'
     if (oldRole === 'hub-admin') {
-      endpoint = '/volunteers'
+      endpoint = '/users'
     } else if (oldRole === 'reviewer') {
       endpoint = '/notes' // reviewers can list notes
     }
@@ -369,7 +369,7 @@ Given('an active volunteer with notes and shift access', async ({ request }) => 
 
 When('an admin deactivates the volunteer', async ({ request }) => {
   expect(iso.deactivatedVol).toBeTruthy()
-  await apiPatch(request, `/volunteers/${iso.deactivatedVol!.pubkey}`, {
+  await apiPatch(request, `/users/${iso.deactivatedVol!.pubkey}`, {
     active: false,
   })
 })

@@ -17,7 +17,7 @@ import {
   TestIds,
   Timeouts,
   navigateAfterLogin,
-  createVolunteerAndGetNsec,
+  createUserAndGetNsec,
   dismissNsecCard,
   uniquePhone,
 } from './helpers'
@@ -30,7 +30,7 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from './simulation-helpers'
-import { createVolunteerViaApi, createShiftViaApi } from './api-helpers'
+import { createUserViaApi, createShiftViaApi } from './api-helpers'
 
 test.describe('Call Simulation', () => {
   test.beforeEach(async ({ page }) => {
@@ -67,7 +67,7 @@ test.describe('Call Simulation', () => {
     const callerNumber = uniqueCallerNumber()
 
     // Create a volunteer to answer the call
-    const volunteer = await createVolunteerViaApi(request, {
+    const volunteer = await createUserViaApi(request, {
       name: `SimVol ${Date.now()}`,
     })
 

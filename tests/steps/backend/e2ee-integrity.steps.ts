@@ -81,7 +81,7 @@ Given('a volunteer {string} with a real keypair', async ({ request }, name: stri
   const kp = generateTestKeypair()
   s.keypairs.set(name, kp)
   // Register volunteer with our known keypair so we can do ECIES operations
-  const { status } = await apiPost(request, '/volunteers', {
+  const { status } = await apiPost(request, '/users', {
     name: `E2EE ${name} ${Date.now()}`,
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],

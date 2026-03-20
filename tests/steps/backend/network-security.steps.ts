@@ -121,7 +121,7 @@ When('the update is processed', async ({ request }) => {
   // Volunteer tries to self-update with admin roles
   const res = await apiPatch(
     request,
-    `/volunteers/${secNet.volunteerPubkey}`,
+    `/users/${secNet.volunteerPubkey}`,
     { roles: ['role-super-admin'] },
     secNet.volunteerNsec!,
   )

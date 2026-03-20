@@ -177,7 +177,7 @@ Given('a user with the {string} role', async ({ request }, roleName: string) => 
 Then('they should pass permission checks for any action', async ({ request }) => {
   expect(authState.volunteerNsec).toBeDefined()
   // Super Admin should access admin-only endpoints
-  const status = await testEndpointAccess(request, 'GET', '/volunteers', authState.volunteerNsec!)
+  const status = await testEndpointAccess(request, 'GET', '/users', authState.volunteerNsec!)
   expect(status).toBe(200)
 })
 

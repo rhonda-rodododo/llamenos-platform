@@ -170,72 +170,90 @@ export function generateTestKeypair(): { nsec: string; pubkey: string; skHex: st
   return { nsec, pubkey, skHex }
 }
 
-// ── Volunteer CRUD ────────────────────────────────────────────────
+// ── User CRUD ─────────────────────────────────────────────────────
 
-export interface CreateVolunteerResult {
+export interface CreateUserResult {
   pubkey: string
   nsec: string
   name: string
   phone: string
 }
 
-export async function createVolunteerViaApi(
+/** @deprecated Use CreateUserResult instead */
+export type CreateVolunteerResult = CreateUserResult
+
+export async function createUserViaApi(
   request: APIRequestContext,
   options?: { name?: string; phone?: string; roleIds?: string[] },
-): Promise<CreateVolunteerResult> {
-  const name = options?.name ?? uniqueName('TestVol')
+): Promise<CreateUserResult> {
+  const name = options?.name ?? uniqueName('TestUser')
   const phone = options?.phone ?? uniquePhone()
   const roleIds = options?.roleIds ?? ['role-volunteer']
 
   const { nsec, pubkey } = generateTestKeypair()
 
-  const { status, data } = await apiPost(request, '/volunteers', {
+  const { status, data } = await apiPost(request, '/users', {
     name, phone, roleIds, pubkey,
   })
 
   if (status !== 200 && status !== 201) {
-    throw new Error(`Failed to create volunteer: ${status}`)
+    throw new Error(`Failed to create user: ${status}`)
   }
 
   return { pubkey, nsec, name, phone }
 }
 
-export async function deleteVolunteerViaApi(
+/** @deprecated Use createUserViaApi instead */
+export const createVolunteerViaApi = createUserViaApi
+
+export async function deleteUserViaApi(
   request: APIRequestContext,
   pubkey: string,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/volunteers/${pubkey}`)
+  const { status } = await apiDelete(request, `/users/${pubkey}`)
   if (status !== 200) {
-    throw new Error(`Failed to delete volunteer: ${status}`)
+    throw new Error(`Failed to delete user: ${status}`)
   }
 }
 
-export async function listVolunteersViaApi(
+/** @deprecated Use deleteUserViaApi instead */
+export const deleteVolunteerViaApi = deleteUserViaApi
+
+export async function listUsersViaApi(
   request: APIRequestContext,
 ): Promise<Array<{ pubkey: string; name: string; phone: string; roles: string[]; active: boolean }>> {
-  const { status, data } = await apiGet<{ volunteers: Array<{ pubkey: string; name: string; phone: string; roles: string[]; active: boolean }> }>(request, '/volunteers')
-  if (status !== 200) throw new Error(`Failed to list volunteers: ${status}`)
-  return data.volunteers
+  const { status, data } = await apiGet<{ users: Array<{ pubkey: string; name: string; phone: string; roles: string[]; active: boolean }> }>(request, '/users')
+  if (status !== 200) throw new Error(`Failed to list users: ${status}`)
+  return data.users
 }
 
-export async function getVolunteerViaApi(
+/** @deprecated Use listUsersViaApi instead */
+export const listVolunteersViaApi = listUsersViaApi
+
+export async function getUserViaApi(
   request: APIRequestContext,
   pubkey: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/volunteers/${pubkey}`, nsec)
-  if (status !== 200) throw new Error(`Failed to get volunteer: ${status}`)
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/users/${pubkey}`, nsec)
+  if (status !== 200) throw new Error(`Failed to get user: ${status}`)
   return data
 }
 
-export async function updateVolunteerViaApi(
+/** @deprecated Use getUserViaApi instead */
+export const getVolunteerViaApi = getUserViaApi
+
+export async function updateUserViaApi(
   request: APIRequestContext,
   pubkey: string,
   updates: Record<string, unknown>,
 ): Promise<void> {
-  const { status } = await apiPatch(request, `/volunteers/${pubkey}`, updates)
-  if (status !== 200) throw new Error(`Failed to update volunteer: ${status}`)
+  const { status } = await apiPatch(request, `/users/${pubkey}`, updates)
+  if (status !== 200) throw new Error(`Failed to update user: ${status}`)
 }
+
+/** @deprecated Use updateUserViaApi instead */
+export const updateVolunteerViaApi = updateUserViaApi
 
 // ── Ban CRUD ──────────────────────────────────────────────────────
 
@@ -662,6 +680,8 @@ export async function testEndpointAccess(
 export async function cleanupTestData(
   request: APIRequestContext,
   data: {
+    userPubkeys?: string[]
+    /** @deprecated Use userPubkeys instead */
     volunteerPubkeys?: string[]
     banPhones?: string[]
     shiftIds?: string[]
@@ -670,8 +690,8 @@ export async function cleanupTestData(
 ): Promise<void> {
   const errors: string[] = []
 
-  for (const pubkey of data.volunteerPubkeys ?? []) {
-    try { await deleteVolunteerViaApi(request, pubkey) } catch (e) { errors.push(String(e)) }
+  for (const pubkey of [...(data.userPubkeys ?? []), ...(data.volunteerPubkeys ?? [])]) {
+    try { await deleteUserViaApi(request, pubkey) } catch (e) { errors.push(String(e)) }
   }
   for (const phone of data.banPhones ?? []) {
     try { await removeBanViaApi(request, phone) } catch (e) { errors.push(String(e)) }

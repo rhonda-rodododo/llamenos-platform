@@ -165,7 +165,7 @@ When('the admin fetches volunteer {string} metrics', async ({ request }, alias: 
     activeCaseCount: number
     totalCasesHandled: number
     averageResolutionDays: number | null
-  }>(request, `/volunteers/${vol!.pubkey}/metrics`)
+  }>(request, `/users/${vol!.pubkey}/metrics`)
   expect(status).toBe(200)
   state.metricsResult = data
 })
@@ -177,7 +177,7 @@ When('the admin lists cases for volunteer {string}', async ({ request }, alias: 
   const { status, data } = await apiGet<{
     records: Record<string, unknown>[]
     total: number
-  }>(request, `/volunteers/${vol!.pubkey}/cases`)
+  }>(request, `/users/${vol!.pubkey}/cases`)
   expect(status).toBe(200)
   state.casesResult = data
 })

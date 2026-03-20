@@ -156,7 +156,7 @@ When('the {string} user sends {string} to {string} with valid volunteer body', a
   if (!user) throw new Error(`No test user for role "${role}"`)
 
   const kp = generateTestKeypair()
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  shared.lastResponse = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name: uniqueName('PM Vol'),
     phone: uniquePhone(),
@@ -168,7 +168,7 @@ When('the {string} user sends {string} to the test volunteer endpoint with updat
   const user = pm.roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, `/volunteers/${pm.testVolunteerPubkey}`, {
+  shared.lastResponse = await apiPatch(request, `/users/${pm.testVolunteerPubkey}`, {
     name: uniqueName('PM Updated'),
   }, user.nsec)
 })
@@ -177,7 +177,7 @@ When('the {string} user sends {string} to the deletable volunteer endpoint', asy
   const user = pm.roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiDelete(request, `/volunteers/${pm.deletableVolunteerPubkey}`, user.nsec)
+  shared.lastResponse = await apiDelete(request, `/users/${pm.deletableVolunteerPubkey}`, user.nsec)
 })
 
 When('the {string} user sends {string} to {string} with valid shift body', async ({ request }, role: string, _method: string, _path: string) => {

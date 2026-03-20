@@ -48,7 +48,7 @@ Given('I am logged in as a reporter', async ({ page, request }) => {
 
 When('I attempt to access an admin endpoint', async ({ request }) => {
   // Use the volunteer's nsec to test API access — should get 403
-  const status = await testEndpointAccess(request, 'GET', '/volunteers', volunteerNsec)
+  const status = await testEndpointAccess(request, 'GET', '/users', volunteerNsec)
   ;(globalThis as Record<string, unknown>).__test_endpoint_status = status
 })
 
@@ -66,7 +66,7 @@ Then('I should receive a 403 forbidden response', async () => {
 
 Then('I should have access to all API endpoints', async ({ request }) => {
   // Admin should have access to all endpoints
-  const status = await testEndpointAccess(request, 'GET', '/volunteers', ADMIN_NSEC)
+  const status = await testEndpointAccess(request, 'GET', '/users', ADMIN_NSEC)
   expect(status).toBe(200)
 })
 
@@ -122,12 +122,12 @@ Then('they should only see endpoints allowed by that role', async ({ request }) 
   const callsStatus = await testEndpointAccess(request, 'GET', '/calls/history', volunteerNsec)
   // Calls read should work (200 or similar)
   // Admin endpoints should be denied
-  const volunteersStatus = await testEndpointAccess(request, 'GET', '/volunteers', volunteerNsec)
+  const volunteersStatus = await testEndpointAccess(request, 'GET', '/users', volunteerNsec)
   expect(volunteersStatus).toBe(403)
 })
 
 When('the volunteer attempts to access an unauthorized endpoint', async ({ request }) => {
-  const status = await testEndpointAccess(request, 'GET', '/volunteers', volunteerNsec)
+  const status = await testEndpointAccess(request, 'GET', '/users', volunteerNsec)
   ;(globalThis as Record<string, unknown>).__test_endpoint_status = status
 })
 

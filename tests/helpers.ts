@@ -217,7 +217,7 @@ export async function loginAsAdmin(page: Page) {
 }
 
 /**
- * Login as volunteer: uses the app's own platform layer to encrypt/store the key,
+ * Login as user (volunteer): uses the app's own platform layer to encrypt/store the key,
  * then enters PIN to unlock. Both encrypt and decrypt happen in the same browser
  * context, avoiding any Node.js-vs-browser crypto mismatch.
  */
@@ -241,7 +241,7 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await page.evaluate(async ({ nsec, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
     const kp = await platform.keyPairFromNsec(nsec)
-    if (!kp) throw new Error('Failed to parse volunteer nsec')
+    if (!kp) throw new Error('Failed to parse user nsec')
     await platform.encryptWithPin(nsec, pin, kp.publicKey)
     await platform.lockCrypto()
   }, { nsec, pin: TEST_PIN })
@@ -252,7 +252,7 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await enterPin(page, TEST_PIN)
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
 
-  // New volunteers land on /profile-setup — complete it to get to the main app
+  // New users land on /profile-setup — complete it to get to the main app
   if (page.url().includes('profile-setup')) {
     await completeProfileSetup(page)
   }
@@ -279,7 +279,7 @@ export async function logout(page: Page) {
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
 }
 
-export async function createVolunteerAndGetNsec(page: Page, name: string, phone: string): Promise<string> {
+export async function createUserAndGetNsec(page: Page, name: string, phone: string): Promise<string> {
   await page.getByTestId(TestIds.NAV_VOLUNTEERS).click()
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible()
 
@@ -295,6 +295,9 @@ export async function createVolunteerAndGetNsec(page: Page, name: string, phone:
   if (!nsec) throw new Error('Failed to get nsec')
   return nsec
 }
+
+/** @deprecated Use createUserAndGetNsec instead */
+export const createVolunteerAndGetNsec = createUserAndGetNsec
 
 /** Dismiss the nsec card shown after volunteer creation. */
 export async function dismissNsecCard(page: Page): Promise<void> {

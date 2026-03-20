@@ -76,7 +76,7 @@ Given(
       } else if (operation === 'update volunteer') {
         // Deactivate the previously created volunteer
         if (audit.latestEntry?.id) {
-          await apiPatch(request, `/volunteers/${audit.latestEntry.id}`, { active: false })
+          await apiPatch(request, `/users/${audit.latestEntry.id}`, { active: false })
         }
       }
     }

@@ -128,7 +128,7 @@ When('an admin sends {string} to {string} with valid twilio body', async ({ requ
 
 When('an admin creates a volunteer with valid data', async ({ request }) => {
   const kp = generateTestKeypair()
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  shared.lastResponse = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name: uniqueName('Contract Vol'),
     phone: uniquePhone(),

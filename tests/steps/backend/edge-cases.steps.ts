@@ -185,7 +185,7 @@ Then('the second role creation should return {int}', async ({}, _status: number)
 When('an admin creates a volunteer with a {int}-character name', async ({ request }, length: number) => {
   const kp = generateTestKeypair()
   const name = 'A'.repeat(length)
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  shared.lastResponse = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name,
     phone: uniquePhone(),
@@ -214,7 +214,7 @@ Then('the ban should be created successfully', async ({}) => {
 
 When('an admin creates a volunteer with no optional fields', async ({ request }) => {
   const kp = generateTestKeypair()
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  shared.lastResponse = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name: uniqueName('Edge NoOpt'),
     phone: uniquePhone(),
@@ -225,7 +225,7 @@ When('an admin creates a volunteer with no optional fields', async ({ request })
 // ─── Error Response Consistency ─────────────────────────────────────
 
 When('an admin requests volunteer {string}', async ({ request }, pubkey: string) => {
-  shared.lastResponse = await apiPatch(request, `/volunteers/${pubkey}`, { name: 'test' })
+  shared.lastResponse = await apiPatch(request, `/users/${pubkey}`, { name: 'test' })
 })
 
 When('an admin deletes shift {string}', async ({ request }, id: string) => {

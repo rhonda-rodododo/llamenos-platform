@@ -145,7 +145,7 @@ Given(
     const vol = await createVolunteerViaApi(request, {
       name: `Reporter ${reporterName} ${Date.now()}`,
     })
-    await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: ['role-reporter'] })
+    await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['role-reporter'] })
 
     // Create the report authenticated as the reporter so the server records their pubkey
     // as the contact/author — required for the reporter-isolation filter in GET /reports

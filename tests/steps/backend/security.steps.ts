@@ -264,7 +264,7 @@ Given('a volunteer with an active session', async ({ request }) => {
 
 When("an admin changes the volunteer's role", async ({ request }) => {
   expect(secState.volunteerKeypair).toBeDefined()
-  await apiPatch(request, `/volunteers/${secState.volunteerKeypair!.pubkey}`, {
+  await apiPatch(request, `/users/${secState.volunteerKeypair!.pubkey}`, {
     roles: ['role-reviewer'],
   })
 })
@@ -288,7 +288,7 @@ Then('the volunteer must re-authenticate', async ({ request }) => {
 
 When('the volunteer is deactivated by an admin', async ({ request }) => {
   expect(secState.volunteerKeypair).toBeDefined()
-  await apiPatch(request, `/volunteers/${secState.volunteerKeypair!.pubkey}`, {
+  await apiPatch(request, `/users/${secState.volunteerKeypair!.pubkey}`, {
     active: false,
   })
 })
@@ -420,7 +420,7 @@ Given('a route with {string} parameter', async ({}, _param: string) => {
 
 When('the URL contains URL-encoded characters', async ({ request }) => {
   // Test with a URL-encoded path parameter (authenticated)
-  const result = await apiGet(request, '/volunteers/test%20encoded')
+  const result = await apiGet(request, '/users/test%20encoded')
   secState.routerResult = { status: result.status, data: result.data }
 })
 

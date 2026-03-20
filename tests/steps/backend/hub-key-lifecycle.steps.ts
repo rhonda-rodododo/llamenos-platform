@@ -174,7 +174,7 @@ When('{string} is removed from the hub', async ({}, name: string) => {
   // Hub membership is modelled by envelope presence: a replace-all PUT that
   // excludes this member's entry causes setHubKeyEnvelopes to delete their row,
   // so their subsequent GET returns 404 ("No key envelope for this user").
-  // Do NOT call DELETE /volunteers/:pubkey — that permanently deletes the account,
+  // Do NOT call DELETE /users/:pubkey — that permanently deletes the account,
   // causing subsequent Schnorr auth to return 401 rather than 404 on GET /hubs/:id/key.
   hkState.currentEnvelopes.delete(name)
 })

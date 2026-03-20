@@ -73,7 +73,7 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
       // Create a real volunteer first with a known keypair
       const volKp = generateTestKeypair()
       s.volunteerKp = volKp
-      const regResult = await apiPost(request, '/volunteers', {
+      const regResult = await apiPost(request, '/users', {
         name: `StorageVol ${Date.now()}`,
         phone: uniquePhone(),
         roleIds: ['role-volunteer'],
@@ -200,7 +200,7 @@ Given('the {string} settings are updated via the API with structured data', asyn
 Given('a registered volunteer {string} with a known keypair', async ({ request }, name: string) => {
   const kp = generateTestKeypair()
   s.volunteerKp = kp
-  const { status } = await apiPost(request, '/volunteers', {
+  const { status } = await apiPost(request, '/users', {
     name: `StorageEnv ${name} ${Date.now()}`,
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
