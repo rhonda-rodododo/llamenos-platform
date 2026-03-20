@@ -2,132 +2,100 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { createVolunteerBodySchema, adminUpdateVolunteerBodySchema, volunteerResponseSchema, volunteerListResponseSchema, volunteerMetricsResponseSchema } from '@protocol/schemas/volunteers'
+import { createUserBodySchema, adminUpdateUserBodySchema, userResponseSchema, userListResponseSchema, userMetricsResponseSchema } from '@protocol/schemas/users'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
+import { createEntityRouter } from '../lib/entity-router'
 
-const volunteers = new Hono<AppEnv>()
-volunteers.use('*', requirePermission('volunteers:read'))
+const users = new Hono<AppEnv>()
 
-volunteers.get('/',
-  describeRoute({
-    tags: ['Volunteers'],
-    summary: 'List all volunteers',
-    responses: {
-      200: {
-        description: 'List of volunteers',
-        content: {
-          'application/json': {
-            schema: resolver(volunteerListResponseSchema),
-          },
-        },
-      },
-      ...authErrors,
-    },
-  }),
-  async (c) => {
-    const services = c.get('services')
-    const result = await services.identity.getVolunteers()
-    return c.json(result)
+// GET / and GET /:targetPubkey via factory
+const userReadRouter = createEntityRouter({
+  tag: 'Users',
+  domain: 'users',
+  service: 'identity',
+  listResponseSchema: userListResponseSchema,
+  itemResponseSchema: userResponseSchema,
+  disableDelete: true,
+  idParam: 'targetPubkey',
+  methods: {
+    list: 'getUsers',
+    get: 'getUser',
   },
-)
+})
+users.route('/', userReadRouter)
 
-volunteers.get('/:targetPubkey',
+users.post('/',
   describeRoute({
-    tags: ['Volunteers'],
-    summary: 'Get a single volunteer by pubkey',
-    responses: {
-      200: {
-        description: 'Volunteer details',
-        content: {
-          'application/json': {
-            schema: resolver(volunteerResponseSchema),
-          },
-        },
-      },
-      ...authErrors,
-      ...notFoundError,
-    },
-  }),
-  async (c) => {
-    const services = c.get('services')
-    const targetPubkey = c.req.param('targetPubkey')
-    const volunteer = await services.identity.getVolunteer(targetPubkey)
-    return c.json(volunteer)
-  },
-)
-
-volunteers.post('/',
-  describeRoute({
-    tags: ['Volunteers'],
-    summary: 'Create a new volunteer',
+    tags: ['Users'],
+    summary: 'Create a new user',
     responses: {
       201: {
-        description: 'Volunteer created',
+        description: 'User created',
         content: {
           'application/json': {
-            schema: resolver(volunteerResponseSchema),
+            schema: resolver(userResponseSchema),
           },
         },
       },
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:create'),
-  validator('json', createVolunteerBodySchema),
+  requirePermission('users:create'),
+  validator('json', createUserBodySchema),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
 
-    const result = await services.identity.createVolunteer({
+    const result = await services.identity.createUser({
       pubkey: body.pubkey,
       name: body.name,
       phone: body.phone,
       roleIds: body.roleIds || body.roles || ['role-volunteer'],
       encryptedSecretKey: body.encryptedSecretKey || '',
-      // Epic 340: Volunteer profile extensions
+      // Epic 340: User profile extensions
       ...(body.specializations && { specializations: body.specializations }),
       ...(body.maxCaseAssignments !== undefined && { maxCaseAssignments: body.maxCaseAssignments }),
       ...(body.teamId && { teamId: body.teamId }),
       ...(body.supervisorPubkey && { supervisorPubkey: body.supervisorPubkey }),
     })
 
-    await audit(services.audit, 'volunteerAdded', pubkey, { target: body.pubkey, roles: body.roleIds || body.roles })
+    await audit(services.audit, 'userAdded', pubkey, { target: body.pubkey, roles: body.roleIds || body.roles })
 
     return c.json(result, 201)
   },
 )
 
-volunteers.patch('/:targetPubkey',
+users.patch('/:targetPubkey',
   describeRoute({
-    tags: ['Volunteers'],
-    summary: 'Update a volunteer (admin)',
+    tags: ['Users'],
+    summary: 'Update a user (admin)',
     responses: {
       200: {
-        description: 'Volunteer updated',
+        description: 'User updated',
         content: {
           'application/json': {
-            schema: resolver(volunteerResponseSchema),
+            schema: resolver(userResponseSchema),
           },
         },
       },
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:update'),
-  validator('json', adminUpdateVolunteerBodySchema),
+  requirePermission('users:update'),
+  validator('json', adminUpdateUserBodySchema),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const targetPubkey = c.req.param('targetPubkey')
     const body = c.req.valid('json')
 
-    const result = await services.identity.updateVolunteer(targetPubkey, body, true)
+    const result = await services.identity.updateUser(targetPubkey, body, true)
 
     if (body.roles) await audit(services.audit, 'rolesChanged', pubkey, { target: targetPubkey, roles: body.roles })
-    if (body.active === false) await audit(services.audit, 'volunteerDeactivated', pubkey, { target: targetPubkey })
+    if (body.active === false) await audit(services.audit, 'userDeactivated', pubkey, { target: targetPubkey })
     // Revoke all sessions when deactivating or changing roles
     if (body.active === false || body.roles) {
       await services.identity.revokeAllSessions(targetPubkey)
@@ -137,13 +105,13 @@ volunteers.patch('/:targetPubkey',
   },
 )
 
-volunteers.delete('/:targetPubkey',
+users.delete('/:targetPubkey',
   describeRoute({
-    tags: ['Volunteers'],
-    summary: 'Delete a volunteer',
+    tags: ['Users'],
+    summary: 'Delete a user',
     responses: {
       200: {
-        description: 'Volunteer deleted',
+        description: 'User deleted',
         content: {
           'application/json': {
             schema: resolver(okResponseSchema),
@@ -153,7 +121,7 @@ volunteers.delete('/:targetPubkey',
       ...authErrors,
     },
   }),
-  requirePermission('volunteers:delete'),
+  requirePermission('users:delete'),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
@@ -161,38 +129,38 @@ volunteers.delete('/:targetPubkey',
     // Revoke all sessions before deletion — proceed even if this fails
     // (orphaned sessions will expire naturally via TTL)
     await services.identity.revokeAllSessions(targetPubkey).catch(() => {})
-    await services.identity.deleteVolunteer(targetPubkey)
-    await audit(services.audit, 'volunteerRemoved', pubkey, { target: targetPubkey })
+    await services.identity.deleteUser(targetPubkey)
+    await audit(services.audit, 'userRemoved', pubkey, { target: targetPubkey })
     return c.json({ ok: true })
   },
 )
 
 // ============================================================
-// Volunteer Case Endpoints (Epic 340)
+// User Case Endpoints (Epic 340)
 // ============================================================
 
 /**
- * GET /volunteers/:pubkey/cases
+ * GET /users/:pubkey/cases
  *
- * List case records assigned to a volunteer via CasesService.
+ * List case records assigned to a user via CasesService.
  */
-volunteers.get('/:targetPubkey/cases',
+users.get('/:targetPubkey/cases',
   describeRoute({
-    tags: ['Volunteers'],
-    summary: 'List case records assigned to a volunteer',
+    tags: ['Users'],
+    summary: 'List case records assigned to a user',
     responses: {
       200: { description: 'Assigned records' },
       ...authErrors,
       ...notFoundError,
     },
   }),
-  requirePermission('volunteers:read-cases'),
+  requirePermission('users:read-cases'),
   async (c) => {
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')
 
-    // Verify volunteer exists (throws 404 if not found)
-    await services.identity.getVolunteer(targetPubkey)
+    // Verify user exists (throws 404 if not found)
+    await services.identity.getUser(targetPubkey)
 
     const page = parseInt(c.req.query('page') ?? '1', 10)
     const limit = parseInt(c.req.query('limit') ?? '20', 10)
@@ -211,21 +179,21 @@ volunteers.get('/:targetPubkey/cases',
 )
 
 /**
- * GET /volunteers/:pubkey/metrics
+ * GET /users/:pubkey/metrics
  *
- * Volunteer workload metrics: active case count, total cases handled,
+ * User workload metrics: active case count, total cases handled,
  * and average resolution days.
  */
-volunteers.get('/:targetPubkey/metrics',
+users.get('/:targetPubkey/metrics',
   describeRoute({
-    tags: ['Volunteers'],
-    summary: 'Get volunteer workload metrics',
+    tags: ['Users'],
+    summary: 'Get user workload metrics',
     responses: {
       200: {
-        description: 'Volunteer metrics',
+        description: 'User metrics',
         content: {
           'application/json': {
-            schema: resolver(volunteerMetricsResponseSchema),
+            schema: resolver(userMetricsResponseSchema),
           },
         },
       },
@@ -233,15 +201,15 @@ volunteers.get('/:targetPubkey/metrics',
       ...notFoundError,
     },
   }),
-  requirePermission('volunteers:read-metrics'),
+  requirePermission('users:read-metrics'),
   async (c) => {
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')
 
-    // Verify volunteer exists (throws 404 if not found)
-    await services.identity.getVolunteer(targetPubkey)
+    // Verify user exists (throws 404 if not found)
+    await services.identity.getUser(targetPubkey)
 
-    // Get all records assigned to this volunteer
+    // Get all records assigned to this user
     const result = await services.cases.list({
       hubId: '',
       page: 1,
@@ -275,4 +243,4 @@ volunteers.get('/:targetPubkey/metrics',
   },
 )
 
-export default volunteers
+export default users

@@ -28,7 +28,6 @@ Given('I have an open conversation', async ({ page }) => {
   const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasConvo) {
     await item.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -46,7 +45,6 @@ Given('an open conversation exists', async ({ page }) => {
   const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasConvo) {
     await item.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -76,7 +74,6 @@ When('I click on a conversation', async ({ page }) => {
   const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasConvo) {
     await item.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -111,7 +108,6 @@ When('I search for a phone number', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="search" i], input[type="search"]').first()
   await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   await searchInput.fill('+1555')
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 // --- Conversation assertions ---

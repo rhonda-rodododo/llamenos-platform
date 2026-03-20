@@ -3,9 +3,6 @@ Feature: Telephony-CRM Screen Pop & Auto-Link
   When calls come in, the system identifies known contacts and enables
   automatic linking of notes to contacts and cases.
 
-  Background:
-    Given the server is reset
-
   Scenario: Identify known caller by phone hash
     Given case management is enabled
     And a screen-pop contact exists with identifier hash "phonehash_5551234"

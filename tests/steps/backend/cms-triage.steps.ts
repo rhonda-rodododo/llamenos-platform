@@ -5,8 +5,8 @@
  * and case creation from reports.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
-import { shared } from './shared-state'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,
@@ -34,10 +34,16 @@ interface TriageState {
   volunteerNsec?: string
 }
 
-let triage: TriageState
+const CMS_TRIAGE_KEY = 'cms_triage'
 
-Before({ tags: '@backend' }, async () => {
-  triage = { reportIds: [] }
+function getTriageState(world: Record<string, unknown>): TriageState {
+  return getState<TriageState>(world, CMS_TRIAGE_KEY)
+}
+
+
+Before({ tags: '@backend' }, async ({ world }) => {
+  const triage = { reportIds: [] }
+  setState(world, CMS_TRIAGE_KEY, triage)
 })
 
 /** Parse metadata that may be double-serialized by the JSONB layer */
@@ -51,27 +57,27 @@ function parseMetadata(report: Record<string, unknown>): Record<string, unknown>
 
 // ── CMS Report Type Steps ────────────────────────────────────────
 
-Given('a CMS report type with allowCaseConversion enabled exists', async ({ request }) => {
+Given('a CMS report type with allowCaseConversion enabled exists', async ({ request, world }) => {
   const rt = await createCmsReportTypeViaApi(request, {
     name: `triage_enabled_${Date.now()}`,
     allowCaseConversion: true,
   })
-  triage.enabledReportTypeId = rt.id as string
-  triage.enabledReportTypeName = rt.name as string
+  getTriageState(world).enabledReportTypeId = rt.id as string
+  getTriageState(world).enabledReportTypeName = rt.name as string
 })
 
-Given('a CMS report type with allowCaseConversion disabled exists', async ({ request }) => {
+Given('a CMS report type with allowCaseConversion disabled exists', async ({ request, world }) => {
   const rt = await createCmsReportTypeViaApi(request, {
     name: `triage_disabled_${Date.now()}`,
     allowCaseConversion: false,
   })
-  triage.disabledReportTypeId = rt.id as string
-  triage.disabledReportTypeName = rt.name as string
+  getTriageState(world).disabledReportTypeId = rt.id as string
+  getTriageState(world).disabledReportTypeName = rt.name as string
 })
 
 // ── Report Creation Steps ────────────────────────────────────────
 
-Given('a report of the conversion-enabled type exists', async ({ request }) => {
+Given('a report of the conversion-enabled type exists', async ({ request, world }) => {
   const kp = generateTestKeypair()
   const { data, status } = await apiPost<{ id?: string; report?: { id: string } }>(
     request,
@@ -79,18 +85,18 @@ Given('a report of the conversion-enabled type exists', async ({ request }) => {
     {
       title: uniqueName('Triage Report'),
       category: 'general',
-      reportTypeId: triage.enabledReportTypeId,
+      reportTypeId: getTriageState(world).enabledReportTypeId,
       encryptedContent: 'triage-report-content',
       readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
     },
   )
   const id = (data as Record<string, unknown>)?.id as string
     ?? ((data as Record<string, unknown>)?.report as Record<string, unknown>)?.id as string
-  triage.reportId = id
-  triage.reportIds.push(id)
+  getTriageState(world).reportId = id
+  getTriageState(world).reportIds.push(id)
 })
 
-Given('a report of the conversion-disabled type exists', async ({ request }) => {
+Given('a report of the conversion-disabled type exists', async ({ request, world }) => {
   const kp = generateTestKeypair()
   await apiPost(
     request,
@@ -98,14 +104,14 @@ Given('a report of the conversion-disabled type exists', async ({ request }) => 
     {
       title: uniqueName('Disabled Report'),
       category: 'general',
-      reportTypeId: triage.disabledReportTypeId,
+      reportTypeId: getTriageState(world).disabledReportTypeId,
       encryptedContent: 'disabled-report-content',
       readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
     },
   )
 })
 
-Given('a report of the conversion-enabled type exists with conversionStatus {string}', async ({ request }, conversionStatus: string) => {
+Given('a report of the conversion-enabled type exists with conversionStatus {string}', async ({ request, world }, conversionStatus: string) => {
   const kp = generateTestKeypair()
   const { data } = await apiPost<{ id?: string; report?: { id: string } }>(
     request,
@@ -113,7 +119,7 @@ Given('a report of the conversion-enabled type exists with conversionStatus {str
     {
       title: uniqueName('Triage Status Report'),
       category: 'general',
-      reportTypeId: triage.enabledReportTypeId,
+      reportTypeId: getTriageState(world).enabledReportTypeId,
       encryptedContent: 'triage-status-report',
       conversionStatus,
       readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
@@ -121,13 +127,13 @@ Given('a report of the conversion-enabled type exists with conversionStatus {str
   )
   const id = (data as Record<string, unknown>)?.id as string
     ?? ((data as Record<string, unknown>)?.report as Record<string, unknown>)?.id as string
-  if (!triage.reportId) triage.reportId = id
-  triage.reportIds.push(id)
+  if (!getTriageState(world).reportId) getTriageState(world).reportId = id
+  getTriageState(world).reportIds.push(id)
 })
 
 // ── Triage Queue Listing Steps ───────────────────────────────────
 
-When('the admin lists reports with conversionEnabled true', async ({ request }) => {
+When('the admin lists reports with conversionEnabled true', async ({ request, world }) => {
   const { data } = await apiGet<{ conversations?: Array<Record<string, unknown>>; reports?: Array<Record<string, unknown>> }>(
     request,
     '/reports?conversionEnabled=true',
@@ -135,10 +141,10 @@ When('the admin lists reports with conversionEnabled true', async ({ request }) 
   const reports = (data as Record<string, unknown>)?.conversations as Array<Record<string, unknown>>
     ?? (data as Record<string, unknown>)?.reports as Array<Record<string, unknown>>
     ?? []
-  triage.triageQueue = reports
+  getTriageState(world).triageQueue = reports
 })
 
-When('the admin lists reports with conversionEnabled true and conversionStatus {string}', async ({ request }, conversionStatus: string) => {
+When('the admin lists reports with conversionEnabled true and conversionStatus {string}', async ({ request, world }, conversionStatus: string) => {
   const { data } = await apiGet<{ conversations?: Array<Record<string, unknown>>; reports?: Array<Record<string, unknown>> }>(
     request,
     `/reports?conversionEnabled=true&conversionStatus=${conversionStatus}`,
@@ -146,47 +152,47 @@ When('the admin lists reports with conversionEnabled true and conversionStatus {
   const reports = (data as Record<string, unknown>)?.conversations as Array<Record<string, unknown>>
     ?? (data as Record<string, unknown>)?.reports as Array<Record<string, unknown>>
     ?? []
-  triage.triageQueue = reports
+  getTriageState(world).triageQueue = reports
 })
 
-Then('only reports of the conversion-enabled type should be returned', async ({}) => {
-  expect(triage.triageQueue).toBeDefined()
+Then('only reports of the conversion-enabled type should be returned', async ({ world }) => {
+  expect(getTriageState(world).triageQueue).toBeDefined()
   // All returned reports should have the enabled report type
-  for (const report of triage.triageQueue!) {
+  for (const report of getTriageState(world).triageQueue!) {
     const meta = parseMetadata(report)
     const reportTypeId = meta.reportTypeId as string ?? report.reportTypeId as string
-    expect(reportTypeId).toBe(triage.enabledReportTypeId)
+    expect(reportTypeId).toBe(getTriageState(world).enabledReportTypeId)
   }
 })
 
-Then('only reports with conversionStatus {string} should be returned', async ({}, expectedStatus: string) => {
-  expect(triage.triageQueue).toBeDefined()
-  for (const report of triage.triageQueue!) {
+Then('only reports with conversionStatus {string} should be returned', async ({ world }, expectedStatus: string) => {
+  expect(getTriageState(world).triageQueue).toBeDefined()
+  for (const report of getTriageState(world).triageQueue!) {
     const meta = parseMetadata(report)
     const status = meta.conversionStatus as string ?? report.conversionStatus as string
     expect(status).toBe(expectedStatus)
   }
 })
 
-Then('the triage queue should be empty', async ({}) => {
-  expect(triage.triageQueue).toBeDefined()
-  expect(triage.triageQueue!.length).toBe(0)
+Then('the triage queue should be empty', async ({ world }) => {
+  expect(getTriageState(world).triageQueue).toBeDefined()
+  expect(getTriageState(world).triageQueue!.length).toBe(0)
 })
 
 // ── Conversion Status Update Steps ───────────────────────────────
 
-When('the admin updates the report conversionStatus to {string}', async ({ request }, conversionStatus: string) => {
-  expect(triage.reportId).toBeDefined()
-  await apiPatch(request, `/reports/${triage.reportId}`, {
+When('the admin updates the report conversionStatus to {string}', async ({ request, world }, conversionStatus: string) => {
+  expect(getTriageState(world).reportId).toBeDefined()
+  await apiPatch(request, `/reports/${getTriageState(world).reportId}`, {
     conversionStatus,
   })
 })
 
-Then('the report metadata should include conversionStatus {string}', async ({ request }, expectedStatus: string) => {
-  expect(triage.reportId).toBeDefined()
+Then('the report metadata should include conversionStatus {string}', async ({ request, world }, expectedStatus: string) => {
+  expect(getTriageState(world).reportId).toBeDefined()
   const { data, status } = await apiGet<Record<string, unknown>>(
     request,
-    `/reports/${triage.reportId}`,
+    `/reports/${getTriageState(world).reportId}`,
   )
   expect(status).toBe(200)
   expect(data).toBeTruthy()
@@ -197,27 +203,27 @@ Then('the report metadata should include conversionStatus {string}', async ({ re
   expect(conversionStatus).toBe(expectedStatus)
 })
 
-When('the admin fetches the report', async ({ request }) => {
-  expect(triage.reportId).toBeDefined()
+When('the admin fetches the report', async ({ request, world }) => {
+  expect(getTriageState(world).reportId).toBeDefined()
   const { data } = await apiGet<Record<string, unknown>>(
     request,
-    `/reports/${triage.reportId}`,
+    `/reports/${getTriageState(world).reportId}`,
   )
-  shared.lastResponse = { status: 200, data }
+  setLastResponse(world, { status: 200, data })
 })
 
 // ── Case Creation from Report Steps ──────────────────────────────
 
 // 'an entity type {string} exists' is defined in entity-schema.steps.ts
 
-When('the admin creates a case record from the report', async ({ request }) => {
-  expect(triage.reportId).toBeDefined()
+When('the admin creates a case record from the report', async ({ request, world }) => {
+  expect(getTriageState(world).reportId).toBeDefined()
   // Look up entity type by name if not already set
-  if (!triage.entityTypeId) {
+  if (!getTriageState(world).entityTypeId) {
     const { listEntityTypesViaApi } = await import('../../api-helpers')
     const types = await listEntityTypesViaApi(request)
     const caseType = types.find(t => t.name === 'triage_case_type' || t.category === 'case')
-    if (caseType) triage.entityTypeId = caseType.id as string
+    if (caseType) getTriageState(world).entityTypeId = caseType.id as string
   }
 
   // Step 1: Create the case record with all required fields
@@ -226,30 +232,30 @@ When('the admin creates a case record from the report', async ({ request }) => {
     request,
     '/records',
     {
-      entityTypeId: triage.entityTypeId,
+      entityTypeId: getTriageState(world).entityTypeId,
       statusHash: 'open',
       encryptedSummary: 'triage-case-summary',
       summaryEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
     },
   )
   if (status < 300) {
-    triage.caseRecordId = (data as Record<string, unknown>)?.id as string
+    getTriageState(world).caseRecordId = (data as Record<string, unknown>)?.id as string
       ?? ((data as Record<string, unknown>)?.record as Record<string, unknown>)?.id as string
   }
 
   // Step 2: Link the report to the case
-  if (triage.caseRecordId && triage.reportId) {
-    await apiPost(request, `/records/${triage.caseRecordId}/reports`, {
-      reportId: triage.reportId,
+  if (getTriageState(world).caseRecordId && getTriageState(world).reportId) {
+    await apiPost(request, `/records/${getTriageState(world).caseRecordId}/reports`, {
+      reportId: getTriageState(world).reportId,
     })
   }
 })
 
-Then('the report should have {int} linked case record', async ({ request }, count: number) => {
-  expect(triage.reportId).toBeDefined()
+Then('the report should have {int} linked case record', async ({ request, world }, count: number) => {
+  expect(getTriageState(world).reportId).toBeDefined()
   const { data } = await apiGet<Record<string, unknown>>(
     request,
-    `/reports/${triage.reportId}`,
+    `/reports/${getTriageState(world).reportId}`,
   )
   const linked = (data as Record<string, unknown>)?.linkedRecords as unknown[]
     ?? (data as Record<string, unknown>)?.linkedCaseRecords as unknown[]
@@ -257,31 +263,31 @@ Then('the report should have {int} linked case record', async ({ request }, coun
     expect(linked.length).toBe(count)
   } else {
     // If the API doesn't return linked records inline, verify the case was created
-    expect(triage.caseRecordId).toBeTruthy()
+    expect(getTriageState(world).caseRecordId).toBeTruthy()
   }
 })
 
 // ── Permission Steps ─────────────────────────────────────────────
 
-Given('a volunteer exists with cases:create permission only', async ({ request }) => {
+Given('a volunteer exists with cases:create permission only', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, {
     name: uniqueName('Triage Limited Vol'),
     roleIds: ['role-volunteer'],
   })
-  triage.volunteerNsec = vol.nsec
+  getTriageState(world).volunteerNsec = vol.nsec
 })
 
-When('the volunteer lists reports with conversionEnabled true', async ({ request }) => {
+When('the volunteer lists reports with conversionEnabled true', async ({ request, world }) => {
   const res = await apiGet<{ conversations?: unknown[]; reports?: unknown[] }>(
     request,
     '/reports?conversionEnabled=true',
-    triage.volunteerNsec!,
+    getTriageState(world).volunteerNsec!,
   )
-  shared.lastResponse = res
-  triage.triageQueue = []
+  setLastResponse(world, res)
+  getTriageState(world).triageQueue = []
 })
 
-Then('the request should be forbidden', async ({}) => {
-  expect(shared.lastResponse).toBeDefined()
-  expect(shared.lastResponse!.status).toBe(403)
+Then('the request should be forbidden', async ({ world }) => {
+  expect(getSharedState(world).lastResponse).toBeDefined()
+  expect(getSharedState(world).lastResponse!.status).toBe(403)
 })

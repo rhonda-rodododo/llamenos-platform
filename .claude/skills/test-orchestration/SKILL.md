@@ -69,7 +69,7 @@ All scripts support: `--verbose`, `--no-codegen`, `--json`, `--timeout <seconds>
 
 ### Prerequisites
 - Playwright browsers installed: `bunx playwright install`
-- Backend (for full E2E): dev compose + `bun run dev:node` (see "Local Backend Setup" below)
+- Backend (for full E2E): dev compose + `bun run dev:server` (see "Local Backend Setup" below)
 - OR: Mock IPC layer (default for `bun run test:desktop`)
 
 ### Environment
@@ -104,19 +104,19 @@ bun run test:build && bunx playwright test --config playwright.docker.config.ts
 
 ## Platform: Backend BDD
 
-Backend BDD runs shared Gherkin specs tagged `@backend` against a local Node.js backend.
+Backend BDD runs shared Gherkin specs tagged `@backend` against a local backend.
 No browser needed -- tests hit the API directly via Playwright's APIRequestContext.
 
 ### Prerequisites — Dev Compose + Local App
 
-**Always use dev compose (backing services) + `bun run dev:node` (app with file watching):**
+**Always use dev compose (backing services) + `bun run dev:server` (app with file watching):**
 
 ```bash
 # 1. Start backing services (PostgreSQL, MinIO, strfry)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # 2. Start app locally (auto-reloads on code changes via --watch)
-bun run dev:node
+bun run dev:server
 
 # 3. Health check
 curl http://localhost:3000/api/health
@@ -289,11 +289,11 @@ cd apps/android && ./gradlew connectedDebugAndroidTest
 bun run test:worker    # Full pipeline (codegen → typecheck → integration tests)
 ```
 
-Worker tests use Vitest and don't require external services (Durable Object stubs).
+Worker tests use Vitest and don't require external services.
 
 ### Debugging
-- `wrangler dev` can take a while to start — "Broken pipe" errors are transient noise
-- Use `--config apps/worker/wrangler.jsonc` for all wrangler commands
+
+Worker integration tests run directly via Vitest — no wrangler needed.
 
 ## Platform: Crypto (Rust)
 
@@ -315,26 +315,26 @@ bun run crypto:fmt          # Format check
 
 ### For Development and Testing (PREFERRED)
 
-Use dev compose for backing services + local Node.js app with file watching:
+Use dev compose for backing services + local app with file watching:
 
 ```bash
 # Start backing services
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # Start app with live reload
-bun run dev:node
+bun run dev:server
 
 # Health check
 curl http://localhost:3000/api/health
 
-# Stop app: Ctrl+C (or bun run dev:node:stop)
+# Stop app: Ctrl+C
 # Stop services:
 docker compose -f deploy/docker/docker-compose.dev.yml down    # keep data
 docker compose -f deploy/docker/docker-compose.dev.yml down -v  # wipe data
 ```
 
 The dev compose exposes PostgreSQL (5432), MinIO (9000/9001), and strfry (7777) directly.
-`bun run dev:node` sets `ENVIRONMENT=development` automatically, enabling `/api/test-reset`.
+`bun run dev:server` sets `ENVIRONMENT=development` automatically, enabling `/api/test-reset`.
 
 ### For CI Only
 

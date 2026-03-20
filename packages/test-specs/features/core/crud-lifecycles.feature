@@ -3,9 +3,6 @@ Feature: CRUD Lifecycles
   Complete create-read-update-delete cycles for each entity type.
   Verifies that all CRUD operations work correctly end-to-end.
 
-  Background:
-    Given the server is reset
-
   # ─── Volunteers ────────────────────────────────────────────────────
 
   Scenario: Full volunteer lifecycle

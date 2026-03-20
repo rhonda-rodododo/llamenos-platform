@@ -5,8 +5,8 @@
  * that server-published events arrive within the expected timeframe.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, After } from './fixtures'
-import { state } from './common.steps'
+import { Given, When, Then, After, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import { RelayCapture, type CapturedEvent } from '../../helpers/relay-capture'
 import {
   simulateIncomingCall,
@@ -29,47 +29,67 @@ const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 // Default dev secret from scripts/dev-node.sh — used for event decryption in tests
 const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000001'
 
-let lastCapturedEvent: CapturedEvent | undefined
-let serverPubkey: string | undefined
+const RELAY_KEY = 'relay'
+
+interface RelayStepState {
+  lastCapturedEvent?: CapturedEvent
+  serverPubkey?: string
+}
+
+function getRelayState(world: Record<string, unknown>): RelayStepState {
+  let s = getState<RelayStepState | undefined>(world, RELAY_KEY)
+  if (!s) {
+    s = {}
+    setState(world, RELAY_KEY, s)
+  }
+  return s
+}
 
 // --- Relay Setup ---
 
-Given('the test relay is connected and capturing events', async () => {
+Given('the test relay is connected and capturing events', async ({ world }) => {
+  const state = getScenarioState(world)
   if (state.relayCapture) {
     state.relayCapture.close()
   }
   state.relayCapture = await RelayCapture.connect(RELAY_URL)
 })
 
-After(async () => {
+After(async ({ world }) => {
+  const state = getScenarioState(world)
   if (state.relayCapture) {
     state.relayCapture.close()
     state.relayCapture = undefined
   }
-  lastCapturedEvent = undefined
+  const rs = getRelayState(world)
+  rs.lastCapturedEvent = undefined
 })
 
 // --- Call Triggers ---
 
-When('an incoming call arrives from a unique number', async ({ request }) => {
+When('an incoming call arrives from a unique number', async ({ request, world }) => {
+  const state = getScenarioState(world)
   const caller = uniqueCallerNumber()
   const result = await simulateIncomingCall(request, { callerNumber: caller })
   state.callId = result.callId
 })
 
-Given('an incoming call is ringing', async ({ request }) => {
+Given('an incoming call is ringing', async ({ request, world }) => {
+  const state = getScenarioState(world)
   const caller = uniqueCallerNumber()
   const result = await simulateIncomingCall(request, { callerNumber: caller })
   state.callId = result.callId
 })
 
-When('the first volunteer answers the call', async ({ request }) => {
+When('the first volunteer answers the call', async ({ request, world }) => {
+  const state = getScenarioState(world)
   expect(state.callId).toBeTruthy()
   expect(state.volunteers.length).toBeGreaterThan(0)
   await simulateAnswerCall(request, state.callId!, state.volunteers[0].pubkey)
 })
 
-When('the active call is ended', async ({ request }) => {
+When('the active call is ended', async ({ request, world }) => {
+  const state = getScenarioState(world)
   expect(state.callId).toBeTruthy()
   await simulateEndCall(request, state.callId!)
 })
@@ -78,7 +98,8 @@ When('the active call is ended', async ({ request }) => {
 
 // --- Messaging Triggers ---
 
-When('an inbound SMS message arrives from a unique number', async ({ request }) => {
+When('an inbound SMS message arrives from a unique number', async ({ request, world }) => {
+  const state = getScenarioState(world)
   const sender = uniqueCallerNumber()
   const result = await simulateIncomingMessage(request, {
     senderNumber: sender,
@@ -91,7 +112,8 @@ When('an inbound SMS message arrives from a unique number', async ({ request }) 
 
 // --- Relay Capture Utilities ---
 
-Given('the relay captured events are cleared', async () => {
+Given('the relay captured events are cleared', async ({ world }) => {
+  const state = getScenarioState(world)
   expect(state.relayCapture).toBeTruthy()
   // Wait for in-flight events to settle (publishing is fire-and-forget async)
   await new Promise(resolve => setTimeout(resolve, 1000))
@@ -102,7 +124,9 @@ Given('the relay captured events are cleared', async () => {
 
 Then(
   'the relay should receive a kind {int} event within {int} seconds',
-  async ({}, kind: number, seconds: number) => {
+  async ({ world }, kind: number, seconds: number) => {
+    const state = getScenarioState(world)
+    const rs = getRelayState(world)
     expect(state.relayCapture).toBeTruthy()
     const events = await state.relayCapture!.waitForEvents({
       kind,
@@ -110,39 +134,43 @@ Then(
       timeoutMs: seconds * 1000,
     })
     expect(events.length).toBeGreaterThanOrEqual(1)
-    lastCapturedEvent = events[0]
+    rs.lastCapturedEvent = events[0]
   },
 )
 
-Then('the decrypted event content type should be {string}', async ({}, expectedType: string) => {
-  expect(lastCapturedEvent).toBeTruthy()
-  const content = decryptEventContent(lastCapturedEvent!)
+Then('the decrypted event content type should be {string}', async ({ world }, expectedType: string) => {
+  const rs = getRelayState(world)
+  expect(rs.lastCapturedEvent).toBeTruthy()
+  const content = decryptEventContent(rs.lastCapturedEvent!)
   expect(content).toBeTruthy()
   expect(content!.type).toBe(expectedType)
 })
 
-Then('the event should contain a {string} field', async ({}, fieldName: string) => {
-  expect(lastCapturedEvent).toBeTruthy()
-  const content = decryptEventContent(lastCapturedEvent!)
+Then('the event should contain a {string} field', async ({ world }, fieldName: string) => {
+  const rs = getRelayState(world)
+  expect(rs.lastCapturedEvent).toBeTruthy()
+  const content = decryptEventContent(rs.lastCapturedEvent!)
   expect(content).toBeTruthy()
   expect(content![fieldName]).toBeDefined()
 })
 
 Then(
   'the event content {string} should be {string}',
-  async ({}, fieldName: string, expectedValue: string) => {
-    expect(lastCapturedEvent).toBeTruthy()
-    const content = decryptEventContent(lastCapturedEvent!)
+  async ({ world }, fieldName: string, expectedValue: string) => {
+    const rs = getRelayState(world)
+    expect(rs.lastCapturedEvent).toBeTruthy()
+    const content = decryptEventContent(rs.lastCapturedEvent!)
     expect(content).toBeTruthy()
     expect(content![fieldName]).toBe(expectedValue)
   },
 )
 
-Then('the raw event content should NOT be valid JSON', async () => {
-  expect(lastCapturedEvent).toBeTruthy()
+Then('the raw event content should NOT be valid JSON', async ({ world }) => {
+  const rs = getRelayState(world)
+  expect(rs.lastCapturedEvent).toBeTruthy()
   let isJson = false
   try {
-    JSON.parse(lastCapturedEvent!.content)
+    JSON.parse(rs.lastCapturedEvent!.content)
     isJson = true
   } catch {
     isJson = false
@@ -150,37 +178,41 @@ Then('the raw event content should NOT be valid JSON', async () => {
   expect(isJson).toBe(false)
 })
 
-Then('the decrypted event content should be valid JSON', async () => {
-  expect(lastCapturedEvent).toBeTruthy()
-  const content = decryptEventContent(lastCapturedEvent!)
+Then('the decrypted event content should be valid JSON', async ({ world }) => {
+  const rs = getRelayState(world)
+  expect(rs.lastCapturedEvent).toBeTruthy()
+  const content = decryptEventContent(rs.lastCapturedEvent!)
   expect(content).toBeTruthy()
 })
 
 Then(
   'the event should have tag {string} with value {string}',
-  async ({}, tagName: string, tagValue: string) => {
-    expect(lastCapturedEvent).toBeTruthy()
-    const tag = lastCapturedEvent!.tags.find((t) => t[0] === tagName && t[1] === tagValue)
+  async ({ world }, tagName: string, tagValue: string) => {
+    const rs = getRelayState(world)
+    expect(rs.lastCapturedEvent).toBeTruthy()
+    const tag = rs.lastCapturedEvent!.tags.find((t) => t[0] === tagName && t[1] === tagValue)
     expect(tag).toBeTruthy()
   },
 )
 
-Then('the event signature should be valid', async () => {
-  expect(lastCapturedEvent).toBeTruthy()
+Then('the event signature should be valid', async ({ world }) => {
+  const rs = getRelayState(world)
+  expect(rs.lastCapturedEvent).toBeTruthy()
   // verifyEvent checks id, sig, and pubkey
-  const valid = verifyEvent(lastCapturedEvent as Parameters<typeof verifyEvent>[0])
+  const valid = verifyEvent(rs.lastCapturedEvent as Parameters<typeof verifyEvent>[0])
   expect(valid).toBe(true)
 })
 
-Then("the event pubkey should match the server's configured pubkey", async ({ request }) => {
-  expect(lastCapturedEvent).toBeTruthy()
-  if (!serverPubkey) {
+Then("the event pubkey should match the server's configured pubkey", async ({ request, world }) => {
+  const rs = getRelayState(world)
+  expect(rs.lastCapturedEvent).toBeTruthy()
+  if (!rs.serverPubkey) {
     const res = await request.get(`${BASE_URL}/api/config`)
     const config = (await res.json()) as { serverPubkey?: string }
-    serverPubkey = config.serverPubkey
+    rs.serverPubkey = config.serverPubkey
   }
-  if (serverPubkey) {
-    expect(lastCapturedEvent!.pubkey).toBe(serverPubkey)
+  if (rs.serverPubkey) {
+    expect(rs.lastCapturedEvent!.pubkey).toBe(rs.serverPubkey)
   }
 })
 

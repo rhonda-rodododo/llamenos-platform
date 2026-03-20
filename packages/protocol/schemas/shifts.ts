@@ -9,15 +9,19 @@ export const shiftResponseSchema = z.object({
   startTime: z.string(),
   endTime: z.string(),
   days: z.array(z.number()),
-  volunteerPubkeys: z.array(z.string()),
+  userPubkeys: z.array(z.string()),
   createdAt: z.string(),
 })
+
+export type Shift = z.infer<typeof shiftResponseSchema>
 
 export const myStatusResponseSchema = z.object({
   onShift: z.boolean(),
   currentShift: z.object({ name: z.string(), startTime: z.string(), endTime: z.string() }).nullable(),
   nextShift: z.object({ name: z.string(), startTime: z.string(), endTime: z.string(), day: z.number() }).nullable(),
 })
+
+export type ShiftStatus = z.infer<typeof myStatusResponseSchema>
 
 // --- List/wrapper response schemas ---
 
@@ -32,7 +36,7 @@ export const createShiftBodySchema = z.looseObject({
   startTime: z.string(),
   endTime: z.string(),
   days: z.array(z.number().int().min(0).max(6)),
-  volunteerPubkeys: z.array(pubkeySchema),
+  userPubkeys: z.array(pubkeySchema),
 })
 
 export const updateShiftBodySchema = z.looseObject({
@@ -40,9 +44,9 @@ export const updateShiftBodySchema = z.looseObject({
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   days: z.array(z.number().int().min(0).max(6)).optional(),
-  volunteerPubkeys: z.array(pubkeySchema).optional(),
+  userPubkeys: z.array(pubkeySchema).optional(),
 })
 
 export const fallbackGroupSchema = z.looseObject({
-  volunteerPubkeys: z.array(pubkeySchema),
+  userPubkeys: z.array(pubkeySchema),
 })

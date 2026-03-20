@@ -2,9 +2,6 @@
   "name": "@llamenos/protocol",
   "private": true,
   "type": "module",
-  "exports": {
-    "./generated/typescript/*": "./generated/typescript/*"
-  },
   "devDependencies": {
     "quicktype-core": "^23.2.6"
   }

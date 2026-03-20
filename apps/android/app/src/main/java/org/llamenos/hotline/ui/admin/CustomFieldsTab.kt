@@ -353,12 +353,12 @@ private fun CustomFieldDialog(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.field_visible_to_volunteers), modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.field_visible_to_users), modifier = Modifier.weight(1f))
                     Switch(checked = visibleToVolunteers, onCheckedChange = { visibleToVolunteers = it })
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.field_editable_by_volunteers), modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.field_editable_by_users), modifier = Modifier.weight(1f))
                     Switch(checked = editableByVolunteers, onCheckedChange = { editableByVolunteers = it })
                 }
 

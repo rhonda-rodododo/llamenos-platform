@@ -4,9 +4,6 @@ Feature: Data Isolation
   I want to ensure strict data isolation between users and hubs
   So that no user can access another user's resources without authorization
 
-  Background:
-    Given the server is reset
-
   # ── Per-User Resource Isolation ──────────────────────────────────
 
   Scenario Outline: <role> can only see their own <resource>

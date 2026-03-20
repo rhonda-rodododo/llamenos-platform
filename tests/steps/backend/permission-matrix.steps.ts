@@ -5,9 +5,10 @@
  * across all API endpoints. Creates one user per default role and
  * verifies expected HTTP status codes for each endpoint.
  */
-import { Given, When, Before } from './fixtures'
+import { Given, When, Before, getState, setState } from './fixtures'
 // Status assertions (Then) are in assertions.steps.ts
-import { shared, resetSharedState } from './shared-state'
+import { getSharedState, setLastResponse } from './shared-state'
+import { getScenarioState } from './common.steps'
 import {
   apiGet,
   apiPost,
@@ -45,11 +46,16 @@ interface PermMatrixState {
   testNoteId?: string
 }
 
-let pm: PermMatrixState
+const PERMISSION_MATRIX_KEY = 'permission_matrix'
 
-Before({ tags: '@backend' }, async () => {
-  pm = { roleUsers: {} }
-  resetSharedState()
+function getPermMatrixState(world: Record<string, unknown>): PermMatrixState {
+  return getState<PermMatrixState>(world, PERMISSION_MATRIX_KEY)
+}
+
+
+Before({ tags: '@backend' }, async ({ world }) => {
+  const pm = { roleUsers: {} }
+  setState(world, PERMISSION_MATRIX_KEY, pm)
 })
 
 // ── Role slug mapping ───────────────────────────────────────────────
@@ -67,51 +73,54 @@ function roleIdFromName(roleName: string): string {
 
 // ── Background: create test users ───────────────────────────────────
 
-Given('test users exist for all default roles', async ({ request }) => {
+Given('test users exist for all default roles', async ({ request, world }) => {
   const roles = ['super-admin', 'hub-admin', 'reviewer', 'volunteer', 'reporter']
   for (const role of roles) {
     const vol = await createVolunteerViaApi(request, {
       name: `PM ${role} ${Date.now()}`,
       roleIds: [roleIdFromName(role)],
     })
-    pm.roleUsers[role] = { nsec: vol.nsec, pubkey: vol.pubkey, name: vol.name }
+    getPermMatrixState(world).roleUsers[role] = { nsec: vol.nsec, pubkey: vol.pubkey, name: vol.name }
   }
 })
 
 // ── Resource creation Given steps ───────────────────────────────────
 
-Given('a test volunteer exists', async ({ request }) => {
-  if (!pm.testVolunteerPubkey) {
+Given('a test volunteer exists', async ({ request, world }) => {
+  if (!getPermMatrixState(world).testVolunteerPubkey) {
     const vol = await createVolunteerViaApi(request, { name: `PM Target ${Date.now()}` })
-    pm.testVolunteerPubkey = vol.pubkey
+    getPermMatrixState(world).testVolunteerPubkey = vol.pubkey
   }
 })
 
-Given('a deletable test volunteer exists', async ({ request }) => {
+Given('a deletable test volunteer exists', async ({ request, world }) => {
   // Create a fresh volunteer each time (will be deleted by the test)
   const vol = await createVolunteerViaApi(request, { name: `PM Deletable ${Date.now()}` })
-  pm.deletableVolunteerPubkey = vol.pubkey
+  getPermMatrixState(world).deletableVolunteerPubkey = vol.pubkey
 })
 
-Given('a test shift exists', async ({ request }) => {
-  if (!pm.testShiftId) {
-    const shift = await createShiftViaApi(request, { name: `PM Shift ${Date.now()}` })
-    pm.testShiftId = shift.id
+Given('a test shift exists', async ({ request, world }) => {
+  if (!getPermMatrixState(world).testShiftId) {
+    const hubId = getScenarioState(world).hubId
+    const shift = await createShiftViaApi(request, { name: `PM Shift ${Date.now()}`, hubId })
+    getPermMatrixState(world).testShiftId = shift.id
   }
 })
 
-Given('a deletable test shift exists', async ({ request }) => {
-  const shift = await createShiftViaApi(request, { name: `PM Del Shift ${Date.now()}` })
-  pm.deletableShiftId = shift.id
+Given('a deletable test shift exists', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const shift = await createShiftViaApi(request, { name: `PM Del Shift ${Date.now()}`, hubId })
+  getPermMatrixState(world).deletableShiftId = shift.id
 })
 
-Given('a test ban exists', async ({ request }) => {
+Given('a test ban exists', async ({ request, world }) => {
   // Create a fresh ban each time (will be deleted by the test)
-  const ban = await createBanViaApi(request, { phone: uniquePhone(), reason: 'PM test' })
-  pm.testBanPhone = ban.phone
+  const hubId = getScenarioState(world).hubId
+  const ban = await createBanViaApi(request, { phone: uniquePhone(), reason: 'PM test', hubId })
+  getPermMatrixState(world).testBanPhone = ban.phone
 })
 
-Given('a test invite exists', async ({ request }) => {
+Given('a test invite exists', async ({ request, world }) => {
   // Create a fresh invite each time (will be revoked by the test)
   const { data } = await apiPost<{ code: string }>(request, '/invites', {
     name: `PM Invite ${Date.now()}`,
@@ -119,12 +128,12 @@ Given('a test invite exists', async ({ request }) => {
     roleIds: ['role-volunteer'],
   })
   const d = data as Record<string, unknown> | null
-  pm.testInviteCode = d?.code as string
+  getPermMatrixState(world).testInviteCode = d?.code as string
     ?? (d?.invite as Record<string, unknown>)?.code as string
 })
 
-Given('a test note exists', async ({ request }) => {
-  if (!pm.testNoteId) {
+Given('a test note exists', async ({ request, world }) => {
+  if (!getPermMatrixState(world).testNoteId) {
     // Create a note as admin (super-admin has notes:* via wildcard)
     const keypair = generateTestKeypair()
     const { data, status } = await apiPost<{ note: { id: string } }>(request, '/notes', {
@@ -136,7 +145,7 @@ Given('a test note exists', async ({ request }) => {
       },
     })
     if (status === 200 || status === 201) {
-      pm.testNoteId = (data as Record<string, unknown>)?.id as string
+      getPermMatrixState(world).testNoteId = (data as Record<string, unknown>)?.id as string
         ?? ((data as Record<string, unknown>)?.note as Record<string, unknown>)?.id as string
     }
   }
@@ -144,19 +153,19 @@ Given('a test note exists', async ({ request }) => {
 
 // ── Generic request steps ───────────────────────────────────────────
 
-When('the {string} user sends {string} to {string}', async ({ request }, role: string, method: string, path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string}', async ({ request, world }, role: string, method: string, path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await sendRequest(request, method, path, user.nsec)
+  getSharedState(world).lastResponse = await sendRequest(request, method, path, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid volunteer body', async ({ request }, role: string, method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid volunteer body', async ({ request, world }, role: string, method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
   const kp = generateTestKeypair()
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  getSharedState(world).lastResponse = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name: uniqueName('PM Vol'),
     phone: uniquePhone(),
@@ -164,96 +173,96 @@ When('the {string} user sends {string} to {string} with valid volunteer body', a
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to the test volunteer endpoint with update body', async ({ request }, role: string, _method: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to the test volunteer endpoint with update body', async ({ request, world }, role: string, _method: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, `/volunteers/${pm.testVolunteerPubkey}`, {
+  getSharedState(world).lastResponse = await apiPatch(request, `/users/${getPermMatrixState(world).testVolunteerPubkey}`, {
     name: uniqueName('PM Updated'),
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to the deletable volunteer endpoint', async ({ request }, role: string, _method: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to the deletable volunteer endpoint', async ({ request, world }, role: string, _method: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiDelete(request, `/volunteers/${pm.deletableVolunteerPubkey}`, user.nsec)
+  getSharedState(world).lastResponse = await apiDelete(request, `/users/${getPermMatrixState(world).deletableVolunteerPubkey}`, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid shift body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid shift body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/shifts', {
+  getSharedState(world).lastResponse = await apiPost(request, '/shifts', {
     name: uniqueName('PM Shift'),
     startTime: '09:00',
     endTime: '17:00',
     days: [1, 2, 3, 4, 5],
-    volunteerPubkeys: [],
+    userPubkeys: [],
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to the test shift endpoint with shift update body', async ({ request }, role: string, _method: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to the test shift endpoint with shift update body', async ({ request, world }, role: string, _method: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, `/shifts/${pm.testShiftId}`, {
+  getSharedState(world).lastResponse = await apiPatch(request, `/shifts/${getPermMatrixState(world).testShiftId}`, {
     name: uniqueName('PM Shift Updated'),
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to the deletable shift endpoint', async ({ request }, role: string, _method: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to the deletable shift endpoint', async ({ request, world }, role: string, _method: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiDelete(request, `/shifts/${pm.deletableShiftId}`, user.nsec)
+  getSharedState(world).lastResponse = await apiDelete(request, `/shifts/${getPermMatrixState(world).deletableShiftId}`, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with fallback body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with fallback body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPut(request, '/shifts/fallback', {
-    volunteerPubkeys: [],
+  getSharedState(world).lastResponse = await apiPut(request, '/shifts/fallback', {
+    userPubkeys: [],
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid ban body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid ban body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/bans', {
+  getSharedState(world).lastResponse = await apiPost(request, '/bans', {
     phone: uniquePhone(),
     reason: 'PM test ban',
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid bulk ban body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid bulk ban body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/bans/bulk', {
+  getSharedState(world).lastResponse = await apiPost(request, '/bans/bulk', {
     phones: [uniquePhone()],
     reason: 'PM bulk test',
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to the test ban endpoint', async ({ request }, role: string, _method: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to the test ban endpoint', async ({ request, world }, role: string, _method: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiDelete(
+  getSharedState(world).lastResponse = await apiDelete(
     request,
-    `/bans/${encodeURIComponent(pm.testBanPhone!)}`,
+    `/bans/${encodeURIComponent(getPermMatrixState(world).testBanPhone!)}`,
     user.nsec,
   )
 })
 
-When('the {string} user sends {string} to {string} with valid note body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid note body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/notes', {
+  getSharedState(world).lastResponse = await apiPost(request, '/notes', {
     encryptedContent: 'pm-test-encrypted',
     callId: `pm-note-${Date.now()}`,
     authorEnvelope: {
@@ -263,11 +272,11 @@ When('the {string} user sends {string} to {string} with valid note body', async 
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to the test note reply endpoint with reply body', async ({ request }, role: string, _method: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to the test note reply endpoint with reply body', async ({ request, world }, role: string, _method: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, `/notes/${pm.testNoteId}/replies`, {
+  getSharedState(world).lastResponse = await apiPost(request, `/notes/${getPermMatrixState(world).testNoteId}/replies`, {
     encryptedContent: 'pm-test-reply',
     readerEnvelopes: [{
       pubkey: user.pubkey,
@@ -277,38 +286,38 @@ When('the {string} user sends {string} to the test note reply endpoint with repl
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid invite body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid invite body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/invites', {
+  getSharedState(world).lastResponse = await apiPost(request, '/invites', {
     name: uniqueName('PM Invite'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to the test invite endpoint', async ({ request }, role: string, _method: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to the test invite endpoint', async ({ request, world }, role: string, _method: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiDelete(request, `/invites/${pm.testInviteCode}`, user.nsec)
+  getSharedState(world).lastResponse = await apiDelete(request, `/invites/${getPermMatrixState(world).testInviteCode}`, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with spam settings body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with spam settings body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/spam', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/spam', {
     voiceCaptchaEnabled: false,
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with telephony body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with telephony body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/telephony-provider', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/telephony-provider', {
     type: 'twilio',
     accountSid: 'AC_test',
     authToken: 'test_token',
@@ -316,83 +325,83 @@ When('the {string} user sends {string} to {string} with telephony body', async (
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with messaging body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with messaging body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/messaging', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/messaging', {
     smsEnabled: false,
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with IVR body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with IVR body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/ivr-languages', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/ivr-languages', {
     enabledLanguages: ['en'],
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with transcription body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with transcription body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/transcription', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/transcription', {
     globalEnabled: false,
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with custom fields body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with custom fields body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPut(request, '/settings/custom-fields', {
+  getSharedState(world).lastResponse = await apiPut(request, '/settings/custom-fields', {
     fields: [],
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with call settings body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with call settings body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/call', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/call', {
     queueTimeoutSeconds: 120,
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with webauthn body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with webauthn body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/webauthn', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/webauthn', {
     requireForAdmins: false,
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with TTL body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with TTL body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPatch(request, '/settings/ttl', {
+  getSharedState(world).lastResponse = await apiPatch(request, '/settings/ttl', {
     captchaChallenge: 600000,
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with report type body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with report type body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/settings/report-types', {
+  getSharedState(world).lastResponse = await apiPost(request, '/settings/report-types', {
     name: uniqueName('PM ReportType'),
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid role body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid role body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/settings/roles', {
+  getSharedState(world).lastResponse = await apiPost(request, '/settings/roles', {
     name: uniqueName('PM Role'),
     slug: `pm-role-${Date.now()}`,
     permissions: ['notes:read-own'],
@@ -400,32 +409,32 @@ When('the {string} user sends {string} to {string} with valid role body', async 
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with share body', async ({ request }, role: string, _method: string, path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with share body', async ({ request, world }, role: string, _method: string, path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
   // Extract file ID from path, send share request
-  shared.lastResponse = await apiPost(request, '/files/test-file-id/share', {
+  getSharedState(world).lastResponse = await apiPost(request, '/files/test-file-id/share', {
     envelope: { pubkey: user.pubkey, encryptedFileKey: 'test', ephemeralPubkey: user.pubkey },
     encryptedMetadata: { pubkey: user.pubkey, encryptedContent: 'test', ephemeralPubkey: user.pubkey },
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid hub body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid hub body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/hubs', {
+  getSharedState(world).lastResponse = await apiPost(request, '/hubs', {
     name: uniqueName('PM Hub'),
     description: 'PM test hub',
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid report body', async ({ request }, role: string, _method: string, _path: string) => {
-  const user = pm.roleUsers[role]
+When('the {string} user sends {string} to {string} with valid report body', async ({ request, world }, role: string, _method: string, _path: string) => {
+  const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  shared.lastResponse = await apiPost(request, '/reports', {
+  getSharedState(world).lastResponse = await apiPost(request, '/reports', {
     title: uniqueName('PM Report'),
     category: 'general',
     encryptedContent: 'pm-test-encrypted-report',
@@ -439,7 +448,7 @@ When('the {string} user sends {string} to {string} with valid report body', asyn
 
 // ── Unauthenticated request step ────────────────────────────────────
 
-When('an unauthenticated request is sent to {string} {string}', async ({ request }, method: string, path: string) => {
+When('an unauthenticated request is sent to {string} {string}', async ({request, world}, method: string, path: string) => {
   const url = `${BASE_URL}${path}`
   let res
   switch (method) {
@@ -470,7 +479,7 @@ When('an unauthenticated request is sent to {string} {string}', async ({ request
     default:
       throw new Error(`Unknown method: ${method}`)
   }
-  shared.lastResponse = { status: res.status(), data: null }
+  setLastResponse(world, { status: res.status(), data: null })
 })
 
 // Status assertions are in assertions.steps.ts (shared across all features)

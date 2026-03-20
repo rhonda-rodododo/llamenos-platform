@@ -32,6 +32,7 @@ import {
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
+import { invalidateRolesCache } from '../services/settings'
 import { validateExternalUrl } from '../lib/ssrf-guard'
 
 const settings = new Hono<AppEnv>()
@@ -830,6 +831,7 @@ settings.post('/roles',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.createRole(body)
+    invalidateRolesCache()
     await audit(services.audit, 'roleCreated', pubkey, { name: body.name })
     return c.json(result, 201)
   },
@@ -859,6 +861,7 @@ settings.patch('/roles/:id',
     const body = c.req.valid('json')
     const services = c.get('services')
     const result = await services.settings.updateRole(id, body)
+    invalidateRolesCache()
     await audit(services.audit, 'roleUpdated', pubkey, { roleId: id })
     return c.json(result)
   },
@@ -886,6 +889,7 @@ settings.delete('/roles/:id',
     const id = c.req.param('id')
     const services = c.get('services')
     const result = await services.settings.deleteRole(id)
+    invalidateRolesCache()
     await audit(services.audit, 'roleDeleted', pubkey, { roleId: id })
     return c.json(result)
   },

@@ -20,43 +20,40 @@ import {
   createCaseFromReportViaApi,
 } from '../../api-helpers'
 
-// --- Module-level state shared between steps ---
-
-let triageReportTypeId = ''
-let triageReportId = ''
+// State is now in casesWorld fixture (casesWorld.triageReportTypeId, casesWorld.triageReportId)
 
 // --- Given steps for triage data setup ---
 
-Given('a CMS report type with case conversion exists', async ({ backendRequest: request }) => {
+Given('a CMS report type with case conversion exists', async ({ backendRequest: request, casesWorld }) => {
   const rt = await createCmsReportTypeViaApi(request, {
     name: `triage_type_${Date.now()}`,
     label: 'Triage Report',
     labelPlural: 'Triage Reports',
     allowCaseConversion: true,
   })
-  triageReportTypeId = (rt as { id: string }).id
+  casesWorld.triageReportTypeId = (rt as { id: string }).id
 })
 
-Given('a triage-eligible report exists', async ({ backendRequest: request }) => {
+Given('a triage-eligible report exists', async ({ backendRequest: request, casesWorld }) => {
   const report = await createReportViaApi(request, {
     title: `Triage Report ${Date.now()}`,
-    reportTypeId: triageReportTypeId,
+    reportTypeId: casesWorld.triageReportTypeId,
   })
-  triageReportId = report.id
+  casesWorld.triageReportId = report.id
 })
 
-Given('a triage-eligible report with a linked case exists', async ({ backendRequest: request }) => {
+Given('a triage-eligible report with a linked case exists', async ({ backendRequest: request, casesWorld }) => {
   const report = await createReportViaApi(request, {
     title: `Triage Linked ${Date.now()}`,
-    reportTypeId: triageReportTypeId,
+    reportTypeId: casesWorld.triageReportTypeId,
   })
-  triageReportId = report.id
+  casesWorld.triageReportId = report.id
 
   // Create and link a case
   const entityTypes = await listEntityTypesViaApi(request)
   if (entityTypes.length > 0) {
     const etId = (entityTypes[0] as { id: string }).id
-    await createCaseFromReportViaApi(request, triageReportId, etId)
+    await createCaseFromReportViaApi(request, casesWorld.triageReportId, etId)
   }
 })
 
@@ -66,7 +63,6 @@ When('I click the first triage report card', async ({ page }) => {
   const card = page.getByTestId('triage-report-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I click the {string} status tab', async ({ page }, tabLabel: string) => {
@@ -78,7 +74,6 @@ When('I click the {string} status tab', async ({ page }, tabLabel: string) => {
   }
   const key = keyMap[tabLabel] ?? tabLabel.toLowerCase().replace(/ /g, '_')
   await page.getByTestId(`triage-status-tab-${key}`).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I fill in the triage case title', async ({ page }) => {
@@ -89,17 +84,14 @@ When('I fill in the triage case title', async ({ page }) => {
 
 When('I click the triage create case button', async ({ page }) => {
   await page.getByTestId('triage-create-case-btn').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I click the mark in progress button', async ({ page }) => {
   await page.getByTestId('triage-mark-in-progress').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I click the mark completed button', async ({ page }) => {
   await page.getByTestId('triage-mark-completed').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I look at the navigation sidebar', async ({ page }) => {

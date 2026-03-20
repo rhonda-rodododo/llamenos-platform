@@ -22,7 +22,7 @@ Running `wrangler pages deploy dist` from wrong directory deploys Vite app to Pa
 | Service | Image | Purpose | Network |
 |---------|-------|---------|---------|
 | app | llamenos/app | Node.js server | web + internal |
-| postgres | postgres:16 | DO storage (kv_store + alarms) | internal |
+| postgres | postgres:16 | Primary database (Drizzle ORM, Bun SQL) | internal |
 | caddy | caddy:2 | Reverse proxy, auto-TLS | web |
 | minio | minio/minio | Blob storage (R2 equivalent) | internal |
 | strfry | strfry | Nostr relay (real-time events) | internal |

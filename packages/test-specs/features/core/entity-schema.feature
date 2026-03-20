@@ -3,9 +3,6 @@ Feature: Entity Schema Management
   Admins configure entity types and relationship types that define
   the hub's case management structure.
 
-  Background:
-    Given the server is reset
-
   @cases
   Scenario: Enable case management for a hub
     When the admin enables case management

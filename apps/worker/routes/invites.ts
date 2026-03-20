@@ -12,6 +12,7 @@ import { publicErrors, authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { permissionGranted } from '@shared/permissions'
 import type { Role } from '@shared/permissions'
+import { createEntityRouter } from '../lib/entity-router'
 
 const invites = new Hono<AppEnv>()
 
@@ -87,28 +88,20 @@ invites.post('/redeem',
 invites.use('/', authMiddleware, requirePermission('invites:read'))
 invites.use('/:code', authMiddleware, requirePermission('invites:read'))
 
-invites.get('/',
-  describeRoute({
-    tags: ['Invites'],
-    summary: 'List all invites',
-    responses: {
-      200: {
-        description: 'List of invites',
-        content: {
-          'application/json': {
-            schema: resolver(inviteListResponseSchema),
-          },
-        },
-      },
-      ...authErrors,
-    },
-  }),
-  async (c) => {
-    const services = c.get('services')
-    const result = await services.identity.getInvites()
-    return c.json(result)
+// GET / via factory
+const inviteListRouter = createEntityRouter({
+  tag: 'Invites',
+  domain: 'invites',
+  service: 'identity',
+  listResponseSchema: inviteListResponseSchema,
+  itemResponseSchema: inviteResponseSchema,
+  disableGet: true,
+  disableDelete: true,
+  methods: {
+    list: 'getInvites',
   },
-)
+})
+invites.route('/', inviteListRouter)
 
 invites.post('/',
   describeRoute({

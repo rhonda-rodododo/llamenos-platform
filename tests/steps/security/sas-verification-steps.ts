@@ -24,7 +24,6 @@ Given('the ephemeral key exchange completes', async ({ page }) => {
     prov.keyExchangeComplete = true
     ;(window as any).__test_provisioning = prov
   })
-  await page.waitForTimeout(500)
 })
 
 Then('I should see a {int}-digit SAS code displayed', async ({ page }, digits: number) => {

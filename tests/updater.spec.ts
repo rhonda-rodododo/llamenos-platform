@@ -41,7 +41,6 @@ test.describe('Auto-Update (Epic 289)', () => {
   test('no update banner shown when no update available', async ({ page }) => {
     // By default, __MOCK_UPDATE is not set, so no update
     // Wait a bit to ensure the checker has run (startup delay is 5s, but in tests it should be fast)
-    await page.waitForTimeout(1000)
     await expect(page.locator('[data-testid="update-banner"]')).not.toBeVisible()
   })
 

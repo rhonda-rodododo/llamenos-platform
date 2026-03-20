@@ -22,11 +22,11 @@ enum UserRole: String, Codable, Sendable, CaseIterable {
     }
 }
 
-// MARK: - ClientVolunteerStatus
+// MARK: - ClientUserStatus
 
-/// Volunteer account status (client-side enum with UI properties).
-/// Named `ClientVolunteerStatus` to avoid conflict with generated `VolunteerStatus`.
-enum ClientVolunteerStatus: String, Codable, Sendable, CaseIterable {
+/// User account status (client-side enum with UI properties).
+/// Named `ClientUserStatus` to avoid conflict with generated `UserStatus`.
+enum ClientUserStatus: String, Codable, Sendable, CaseIterable {
     case active
     case inactive
     case suspended
@@ -40,11 +40,11 @@ enum ClientVolunteerStatus: String, Codable, Sendable, CaseIterable {
     }
 }
 
-// MARK: - ClientVolunteer
+// MARK: - ClientUser
 
-/// A volunteer/admin member from the API (client-side model with UI properties).
-/// Named `ClientVolunteer` to avoid conflict with generated `Volunteer`.
-struct ClientVolunteer: Codable, Identifiable, Sendable {
+/// A user/admin member from the API (client-side model with UI properties).
+/// Named `ClientUser` to avoid conflict with generated `User`.
+struct ClientUser: Codable, Identifiable, Sendable {
     let id: String
     let pubkey: String
     let displayName: String?
@@ -58,8 +58,8 @@ struct ClientVolunteer: Codable, Identifiable, Sendable {
     }
 
     /// Parsed status enum.
-    var volunteerStatus: ClientVolunteerStatus {
-        ClientVolunteerStatus(rawValue: status) ?? .active
+    var userStatus: ClientUserStatus {
+        ClientUserStatus(rawValue: status) ?? .active
     }
 
     /// Display name or truncated pubkey.
@@ -216,9 +216,9 @@ struct AppInvite: Codable, Identifiable, Sendable {
 
 // MARK: - API Response Types
 
-/// API response for the volunteers list.
-struct VolunteersListResponse: Codable, Sendable {
-    let members: [ClientVolunteer]
+/// API response for the users list.
+struct UsersListResponse: Codable, Sendable {
+    let members: [ClientUser]
 }
 
 /// API response for the ban list (client-side).

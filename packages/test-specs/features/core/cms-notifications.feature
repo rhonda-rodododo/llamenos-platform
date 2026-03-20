@@ -6,7 +6,6 @@ Feature: Support Contact Notifications
   and dispatches them via the appropriate MessagingAdapter.
 
   Background:
-    Given the server is reset
     And case management is enabled
 
   Scenario: Notify support contacts dispatches per recipient

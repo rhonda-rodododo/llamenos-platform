@@ -63,7 +63,7 @@ class BaseUITest: XCTestCase {
 
     /// Launch the app connected to the live Docker API as a volunteer.
     /// Uses a separate volunteer keypair. The admin is bootstrapped first,
-    /// then the volunteer is created via POST /api/volunteers.
+    /// then the user is created via POST /api/users.
     func launchAsVolunteerWithAPI() {
         app.launchArguments.append(contentsOf: [
             "--reset-keychain",

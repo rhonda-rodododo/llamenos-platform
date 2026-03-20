@@ -15,7 +15,6 @@ When('I expand the language section', async ({ page }) => {
   const section = page.getByText(/language/i).first()
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
   await section.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see the language options', async ({ page }) => {
@@ -54,14 +53,12 @@ When('I tap a language chip', async ({ page }) => {
   const isChip = await chip.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isChip) {
     await chip.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
     return
   }
   // Try any language option
   const anyChip = page.locator('[data-testid="language-option"], [role="option"], [role="radio"]').first()
   await expect(anyChip).toBeVisible({ timeout: Timeouts.ELEMENT })
   await anyChip.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the language chip should be selected', async ({ page }) => {
@@ -79,7 +76,6 @@ When('I expand the profile section', async ({ page }) => {
   const section = page.getByText(/profile/i).first()
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
   await section.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see the spoken languages chips', async ({ page }) => {
@@ -100,7 +96,6 @@ When('I tap a spoken language chip', async ({ page }) => {
   ).filter({ hasText: /english|español|中文/i }).first()
   await expect(chip).toBeVisible({ timeout: Timeouts.ELEMENT })
   await chip.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the spoken language chip should be selected', async ({ page }) => {

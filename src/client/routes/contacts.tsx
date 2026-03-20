@@ -180,7 +180,7 @@ function ContactsPage() {
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {conv.messageCount} {t('contacts.messages', { defaultValue: 'messages' })} &middot; {new Date(conv.lastMessageAt).toLocaleString()}
+                          {conv.messageCount} {t('contacts.messages', { defaultValue: 'messages' })} &middot; {new Date(conv.lastMessageAt ?? conv.updatedAt).toLocaleString()}
                         </p>
                       </div>
                       {conv.metadata?.reportTitle && (

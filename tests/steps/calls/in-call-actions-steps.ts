@@ -15,7 +15,6 @@ Given('I have an active call', async ({ page }) => {
   // The test environment must simulate an active call state.
   // This is typically done via the mock WebSocket / call state provider.
   // For now, we verify the panel appears when the app reports an active call.
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 // ── When ───────────────────────────────────────────────────────────
@@ -25,7 +24,6 @@ When('I view the dashboard', async ({ page }) => {
   const isVisible = await dashboardNav.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isVisible) {
     await dashboardNav.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -51,7 +49,6 @@ When('I confirm the ban', async ({ page }) => {
 When('the call ends', async ({ page }) => {
   // Simulate call end — the mock call state provider should clear the active call.
   // This step depends on the test harness providing a way to end calls programmatically.
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // ── Then ───────────────────────────────────────────────────────────

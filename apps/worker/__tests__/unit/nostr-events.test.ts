@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock dependencies before importing the module under test
-vi.mock('@worker/lib/do-access', () => ({
+vi.mock('@worker/lib/service-factories', () => ({
   getNostrPublisher: vi.fn(),
 }))
 
@@ -11,7 +11,7 @@ vi.mock('@worker/lib/hub-event-crypto', () => ({
 }))
 
 import { publishNostrEvent } from '@worker/lib/nostr-events'
-import { getNostrPublisher } from '@worker/lib/do-access'
+import { getNostrPublisher } from '@worker/lib/service-factories'
 import { deriveServerEventKey, encryptHubEvent } from '@worker/lib/hub-event-crypto'
 
 const mockGetNostrPublisher = vi.mocked(getNostrPublisher)

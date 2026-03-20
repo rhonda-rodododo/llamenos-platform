@@ -12,27 +12,27 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import type { Volunteer } from '@/lib/api'
+import type { User } from '@/lib/api'
 
-interface VolunteerMultiSelectProps {
-  volunteers: Volunteer[]
+interface UserMultiSelectProps {
+  users: User[]
   selected: string[]
   onSelectionChange: (pubkeys: string[]) => void
   placeholder?: string
   className?: string
 }
 
-export function VolunteerMultiSelect({
-  volunteers,
+export function UserMultiSelect({
+  users,
   selected,
   onSelectionChange,
   placeholder,
   className,
-}: VolunteerMultiSelectProps) {
+}: UserMultiSelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
-  const selectedVolunteers = volunteers.filter(v => selected.includes(v.pubkey))
+  const selectedUsers = users.filter(u => selected.includes(u.pubkey))
 
   function toggle(pubkey: string) {
     onSelectionChange(
@@ -60,24 +60,24 @@ export function VolunteerMultiSelect({
             className
           )}
         >
-          {selectedVolunteers.length > 0 ? (
-            selectedVolunteers.map(vol => (
+          {selectedUsers.length > 0 ? (
+            selectedUsers.map(u => (
               <Badge
-                key={vol.pubkey}
+                key={u.pubkey}
                 variant="secondary"
                 className="max-w-[150px] gap-0.5 pr-0.5"
               >
-                <span className="truncate" title={vol.name}>{vol.name}</span>
+                <span className="truncate" title={u.name}>{u.name}</span>
                 <span
                   role="button"
                   tabIndex={0}
-                  aria-label={t('shifts.removeVolunteer', { name: vol.name })}
+                  aria-label={t('shifts.removeUser', { name: u.name })}
                   className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-                  onClick={(e) => remove(vol.pubkey, e)}
+                  onClick={(e) => remove(u.pubkey, e)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      remove(vol.pubkey, e)
+                      remove(u.pubkey, e)
                     }
                   }}
                 >
@@ -87,7 +87,7 @@ export function VolunteerMultiSelect({
             ))
           ) : (
             <span className="text-muted-foreground">
-              {placeholder || t('shifts.searchVolunteers')}
+              {placeholder || t('shifts.searchUsers')}
             </span>
           )}
           <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
@@ -95,30 +95,30 @@ export function VolunteerMultiSelect({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command filter={(value, search) => {
-          const vol = volunteers.find(v => v.pubkey === value)
-          if (!vol) return 0
-          const haystack = `${vol.name} ${vol.phone} ${vol.pubkey}`.toLowerCase()
+          const u = users.find(u => u.pubkey === value)
+          if (!u) return 0
+          const haystack = `${u.name} ${u.phone} ${u.pubkey}`.toLowerCase()
           return haystack.includes(search.toLowerCase()) ? 1 : 0
         }}>
-          <CommandInput placeholder={t('shifts.searchVolunteers')} />
+          <CommandInput placeholder={t('shifts.searchUsers')} />
           <CommandList className="max-h-[200px]">
-            <CommandEmpty>{t('shifts.noVolunteersFound')}</CommandEmpty>
+            <CommandEmpty>{t('shifts.noUsersFound')}</CommandEmpty>
             <CommandGroup>
-              {volunteers.map(vol => (
+              {users.map(u => (
                 <CommandItem
-                  key={vol.pubkey}
-                  value={vol.pubkey}
-                  onSelect={() => toggle(vol.pubkey)}
+                  key={u.pubkey}
+                  value={u.pubkey}
+                  onSelect={() => toggle(u.pubkey)}
                 >
                   <Check
                     className={cn(
                       'h-4 w-4',
-                      selected.includes(vol.pubkey) ? 'opacity-100' : 'opacity-0'
+                      selected.includes(u.pubkey) ? 'opacity-100' : 'opacity-0'
                     )}
                   />
-                  <span className="truncate">{vol.name}</span>
+                  <span className="truncate">{u.name}</span>
                   <span className="ml-auto font-mono text-xs text-muted-foreground">
-                    {vol.pubkey.slice(0, 8)}…
+                    {u.pubkey.slice(0, 8)}…
                   </span>
                 </CommandItem>
               ))}

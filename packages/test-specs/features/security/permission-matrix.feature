@@ -5,7 +5,6 @@ Feature: Permission Matrix
   Each Scenario Outline row asserts the expected HTTP status for each role.
 
   Background:
-    Given the server is reset
     And test users exist for all default roles
 
   # ─── Volunteers Domain ─────────────────────────────────────────────

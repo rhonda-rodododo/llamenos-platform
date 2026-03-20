@@ -5,7 +5,6 @@ Feature: Report-to-Case Lifecycle
   So that incidents are properly tracked, assigned, and linked
 
   Background:
-    Given the server is reset
     And case management is enabled
 
   # ── Full Lifecycle ───────────────────────────────────────────────

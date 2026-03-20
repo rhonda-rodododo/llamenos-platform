@@ -4,9 +4,6 @@ Feature: Cross-DO Integration Workflows
   ensuring consistent state across IdentityDO, ShiftManagerDO,
   CallRouterDO, RecordsDO, and ConversationDO.
 
-  Background:
-    Given the server is reset
-
   # ─── Volunteer Onboarding → Call → Note ────────────────────────────
 
   Scenario: Complete volunteer onboarding through call completion

@@ -12,8 +12,7 @@ import {
   listRecordsViaApi,
 } from '../../api-helpers'
 
-// --- Module-level state ---
-let lastRecordId = ''
+// State is now in casesWorld fixture (casesWorld.lastRecordId)
 
 // --- Preconditions ---
 
@@ -21,13 +20,13 @@ Given('volunteers with different profiles exist', async () => {
   // Volunteers are seeded by the test environment; accept current state
 })
 
-Given('an unassigned arrest case exists', async ({ backendRequest: request }) => {
+Given('an unassigned arrest case exists', async ({ backendRequest: request, casesWorld }) => {
   const entityTypes = await listEntityTypesViaApi(request)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
   const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-  lastRecordId = (record as { id: string }).id
+  casesWorld.lastRecordId = (record as { id: string }).id
 })
 
 Given('on-shift volunteers with capacity exist', async () => {
@@ -42,13 +41,13 @@ Given('a volunteer has reached their max case assignments', async () => {
   // Accept current state — would need to assign max cases to a volunteer
 })
 
-Given('an arrest case with a Spanish-speaking contact exists', async ({ backendRequest: request }) => {
+Given('an arrest case with a Spanish-speaking contact exists', async ({ backendRequest: request, casesWorld }) => {
   const entityTypes = await listEntityTypesViaApi(request)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
   const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-  lastRecordId = (record as { id: string }).id
+  casesWorld.lastRecordId = (record as { id: string }).id
 })
 
 Given('a volunteer speaks Spanish', async () => {
@@ -63,7 +62,7 @@ Given('volunteer B has {int} active cases', async () => {
   // Accept current state
 })
 
-Given('a case assigned to a volunteer exists', async ({ backendRequest: request }) => {
+Given('a case assigned to a volunteer exists', async ({ backendRequest: request, casesWorld }) => {
   const { assignRecordViaApi } = await import('../../api-helpers')
   const entityTypes = await listEntityTypesViaApi(request)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
@@ -75,9 +74,9 @@ Given('a case assigned to a volunteer exists', async ({ backendRequest: request 
     statusHash: 'reported',
     assignedTo: [adminPubkey],
   })
-  lastRecordId = (record as { id: string }).id
+  casesWorld.lastRecordId = (record as { id: string }).id
   // Also assign via the explicit endpoint to be sure
-  await assignRecordViaApi(request, lastRecordId, [adminPubkey]).catch(() => {})
+  await assignRecordViaApi(request, casesWorld.lastRecordId, [adminPubkey]).catch(() => {})
 })
 
 Given('auto-assignment is enabled', async () => {
@@ -86,7 +85,7 @@ Given('auto-assignment is enabled', async () => {
 
 // --- Suggest assignees API ---
 
-When('I request assignment suggestions for the case', async ({ backendRequest: request }) => {
+When('I request assignment suggestions for the case', async ({ backendRequest: request, casesWorld }) => {
   // API test — would call GET /records/:id/suggest-assignees
   void request
 })
@@ -146,12 +145,10 @@ When('I open the assignment dialog for the case', async ({ page }) => {
   const card = page.getByTestId('case-card').first()
   if (await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
     await card.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
   const assignBtn = page.getByTestId('case-assign-dialog-btn')
   if (await assignBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await assignBtn.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -173,7 +170,6 @@ When('I click assign on the first suggested volunteer', async ({ page }) => {
   const btn = page.getByTestId('assign-volunteer-btn').first()
   if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await btn.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -196,7 +192,6 @@ When('I toggle the auto-assignment switch', async ({ page }) => {
   const toggle = page.getByTestId('auto-assignment-toggle')
   if (await toggle.isVisible({ timeout: 3000 }).catch(() => false)) {
     await toggle.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -208,13 +203,13 @@ Then('the auto-assignment indicator should be visible', async ({ page }) => {
   }
 })
 
-When('a new arrest case is created via API', async ({ backendRequest: request }) => {
+When('a new arrest case is created via API', async ({ backendRequest: request, casesWorld }) => {
   const entityTypes = await listEntityTypesViaApi(request)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
   const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-  lastRecordId = (record as { id: string }).id
+  casesWorld.lastRecordId = (record as { id: string }).id
 })
 
 Then('the new case should have an assignee', async ({ page }) => {

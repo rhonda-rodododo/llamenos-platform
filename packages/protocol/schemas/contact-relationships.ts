@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { recipientEnvelopeSchema } from './common'
+import { directoryContactTypeSchema } from './contacts-v2'
 
 // --- Contact Relationship ---
 
@@ -118,6 +119,33 @@ export const GROUP_MEMBER_ROLES = [
   'coordinator',        // Group coordinator
   'custom',             // Free-form role
 ] as const
+
+// --- Client-side display response schemas ---
+
+/** Decrypted/resolved contact relationship for UI rendering (differs from storage model) */
+export const contactRelationshipResponseSchema = z.object({
+  id: z.string(),
+  sourceContactId: z.string(),
+  targetContactId: z.string(),
+  relationshipType: z.string(),
+  direction: z.enum(['outgoing', 'incoming']),
+  targetDisplayName: z.string(),
+  targetContactType: directoryContactTypeSchema,
+  createdAt: z.string(),
+})
+
+export type ContactRelationshipResponse = z.infer<typeof contactRelationshipResponseSchema>
+
+/** Decrypted affinity group for UI rendering (differs from encrypted storage model) */
+export const contactGroupResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  role: z.string().optional(),
+  memberCount: z.number(),
+})
+
+export type ContactGroupResponse = z.infer<typeof contactGroupResponseSchema>
 
 // --- Response schemas for OpenAPI ---
 

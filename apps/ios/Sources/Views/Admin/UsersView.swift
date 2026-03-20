@@ -1,60 +1,60 @@
 import SwiftUI
 
-// MARK: - VolunteersView
+// MARK: - UsersView
 
-/// Admin view for managing volunteers. Shows a searchable list of all members
+/// Admin view for managing users. Shows a searchable list of all members
 /// with role badges and allows role updates.
-struct VolunteersView: View {
+struct UsersView: View {
     @Bindable var viewModel: AdminViewModel
 
     var body: some View {
         ZStack {
-            if viewModel.isLoadingVolunteers && viewModel.volunteers.isEmpty {
+            if viewModel.isLoadingUsers && viewModel.users.isEmpty {
                 loadingState
-            } else if viewModel.filteredVolunteers.isEmpty {
+            } else if viewModel.filteredUsers.isEmpty {
                 emptyState
             } else {
-                volunteersList
+                usersList
             }
         }
         .searchable(
-            text: $viewModel.volunteerSearchText,
+            text: $viewModel.userSearchText,
             placement: .navigationBarDrawer(displayMode: .automatic),
-            prompt: NSLocalizedString("admin_search_volunteers", comment: "Search volunteers...")
+            prompt: NSLocalizedString("admin_search_users", comment: "Search volunteers...")
         )
         .refreshable {
-            viewModel.isLoadingVolunteers = false
-            await viewModel.loadVolunteers()
+            viewModel.isLoadingUsers = false
+            await viewModel.loadUsers()
         }
         .task {
-            await viewModel.loadVolunteers()
+            await viewModel.loadUsers()
         }
     }
 
-    // MARK: - Volunteers List
+    // MARK: - Users List
 
-    private var volunteersList: some View {
+    private var usersList: some View {
         List {
             // Stats header
             Section {
                 HStack {
                     StatCard(
                         title: NSLocalizedString("admin_total_members", comment: "Total"),
-                        value: "\(viewModel.volunteers.count)",
+                        value: "\(viewModel.users.count)",
                         icon: "person.3.fill",
                         color: Color.brandPrimary
                     )
 
                     StatCard(
                         title: NSLocalizedString("admin_admin_count", comment: "Admins"),
-                        value: "\(viewModel.volunteers.filter { $0.userRole == .admin }.count)",
+                        value: "\(viewModel.users.filter { $0.userRole == .admin }.count)",
                         icon: "shield.fill",
                         color: Color.brandDarkTeal
                     )
 
                     StatCard(
                         title: NSLocalizedString("admin_active_count", comment: "Active"),
-                        value: "\(viewModel.volunteers.filter { $0.volunteerStatus == .active }.count)",
+                        value: "\(viewModel.users.filter { $0.userStatus == .active }.count)",
                         icon: "checkmark.circle.fill",
                         color: Color.statusActive
                     )
@@ -65,25 +65,25 @@ struct VolunteersView: View {
 
             // Members list
             Section {
-                ForEach(viewModel.filteredVolunteers) { volunteer in
-                    VolunteerRowView(
-                        volunteer: volunteer,
+                ForEach(viewModel.filteredUsers) { user in
+                    UserRowView(
+                        user: user,
                         onRoleChange: { newRole in
                             Task {
-                                await viewModel.updateVolunteerRole(
-                                    pubkey: volunteer.pubkey,
+                                await viewModel.updateUserRole(
+                                    pubkey: user.pubkey,
                                     newRole: newRole
                                 )
                             }
                         }
                     )
-                    .accessibilityIdentifier("volunteer-row-\(volunteer.id)")
+                    .accessibilityIdentifier("volunteer-row-\(user.id)")
                 }
             } header: {
                 Text(String(format: NSLocalizedString(
                     "admin_members_header",
                     comment: "Members (%d)"
-                ), viewModel.filteredVolunteers.count))
+                ), viewModel.filteredUsers.count))
             }
         }
         .listStyle(.insetGrouped)
@@ -95,13 +95,13 @@ struct VolunteersView: View {
     private var emptyState: some View {
         ContentUnavailableView {
             Label(
-                NSLocalizedString("admin_no_volunteers", comment: "No Volunteers"),
+                NSLocalizedString("admin_no_users", comment: "No Volunteers"),
                 systemImage: "person.3"
             )
         } description: {
-            if viewModel.volunteerSearchText.isEmpty {
+            if viewModel.userSearchText.isEmpty {
                 Text(NSLocalizedString(
-                    "admin_no_volunteers_message",
+                    "admin_no_users_message",
                     comment: "No members have joined yet."
                 ))
             } else {
@@ -121,7 +121,7 @@ struct VolunteersView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
-            Text(NSLocalizedString("admin_loading_volunteers", comment: "Loading members..."))
+            Text(NSLocalizedString("admin_loading_users", comment: "Loading members..."))
                 .font(.brand(.subheadline))
                 .foregroundStyle(Color.brandMutedForeground)
         }
@@ -130,38 +130,38 @@ struct VolunteersView: View {
     }
 }
 
-// MARK: - VolunteerRowView
+// MARK: - UserRowView
 
-/// A single volunteer row showing display name, pubkey, role badge, and status.
-struct VolunteerRowView: View {
-    let volunteer: ClientVolunteer
+/// A single user row showing display name, pubkey, role badge, and status.
+struct UserRowView: View {
+    let user: ClientUser
     let onRoleChange: (UserRole) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             // Avatar
-            Image(systemName: volunteer.userRole == .admin ? "shield.fill" : "person.fill")
+            Image(systemName: user.userRole == .admin ? "shield.fill" : "person.fill")
                 .font(.title3)
-                .foregroundStyle(volunteer.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
+                .foregroundStyle(user.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
                 .frame(width: 36, height: 36)
                 .background(
                     Circle()
                         .fill(
-                            (volunteer.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
+                            (user.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
                                 .opacity(0.12)
                         )
                 )
 
             // Info
             VStack(alignment: .leading, spacing: 4) {
-                Text(volunteer.displayLabel)
+                Text(user.displayLabel)
                     .font(.brand(.body))
                     .fontWeight(.medium)
                     .foregroundStyle(Color.brandForeground)
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    Text(volunteer.truncatedPubkey)
+                    Text(user.truncatedPubkey)
                         .font(.brandMono(.caption))
                         .foregroundStyle(Color.brandMutedForeground)
                         .lineLimit(1)
@@ -176,13 +176,13 @@ struct VolunteerRowView: View {
             Menu {
                 ForEach(UserRole.allCases, id: \.self) { role in
                     Button {
-                        if role != volunteer.userRole {
+                        if role != user.userRole {
                             onRoleChange(role)
                         }
                     } label: {
                         HStack {
                             Text(role.displayName)
-                            if role == volunteer.userRole {
+                            if role == user.userRole {
                                 Image(systemName: "checkmark")
                             }
                         }
@@ -191,23 +191,23 @@ struct VolunteerRowView: View {
             } label: {
                 roleBadge
             }
-            .accessibilityIdentifier("role-menu-\(volunteer.id)")
+            .accessibilityIdentifier("role-menu-\(user.id)")
         }
     }
 
     // MARK: - Badges
 
     private var roleBadge: some View {
-        Text(volunteer.userRole.displayName)
+        Text(user.userRole.displayName)
             .font(.brand(.caption2))
             .fontWeight(.semibold)
-            .foregroundStyle(volunteer.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
+            .foregroundStyle(user.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
                 Capsule()
                     .fill(
-                        (volunteer.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
+                        (user.userRole == .admin ? Color.brandDarkTeal : Color.brandPrimary)
                             .opacity(0.12)
                     )
             )
@@ -218,14 +218,14 @@ struct VolunteerRowView: View {
             Circle()
                 .fill(statusColor)
                 .frame(width: 6, height: 6)
-            Text(volunteer.volunteerStatus.displayName)
+            Text(user.userStatus.displayName)
                 .font(.brand(.caption2))
                 .foregroundStyle(.secondary)
         }
     }
 
     private var statusColor: Color {
-        switch volunteer.volunteerStatus {
+        switch user.userStatus {
         case .active: return Color.statusActive
         case .inactive: return .secondary
         case .suspended: return Color.brandDestructive
@@ -235,7 +235,7 @@ struct VolunteerRowView: View {
 
 // MARK: - StatCard
 
-/// A compact stat display card used in the volunteers header.
+/// A compact stat display card used in the users header.
 struct StatCard: View {
     let title: String
     let value: String

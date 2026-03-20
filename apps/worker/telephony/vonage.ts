@@ -232,7 +232,7 @@ export class VonageAdapter implements TelephonyAdapter {
         startOnEnter: true,
         endOnExit: true,
         record: true,
-        eventUrl: [`${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&pubkey=${params.volunteerPubkey}${hp}`],
+        eventUrl: [`${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&pubkey=${params.userPubkey}${hp}`],
         eventMethod: 'POST',
       },
     ])
@@ -293,7 +293,7 @@ export class VonageAdapter implements TelephonyAdapter {
         const body = {
           to: [{ type: 'phone', number: vol.phone.replace('+', '') }],
           from: { type: 'phone', number: this.phoneNumber.replace('+', '') },
-          answer_url: [`${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`],
+          answer_url: [`${params.callbackUrl}/api/telephony/user-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`],
           answer_method: 'POST',
           event_url: [`${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`],
           event_method: 'POST',

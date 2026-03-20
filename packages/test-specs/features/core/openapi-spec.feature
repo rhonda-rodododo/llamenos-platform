@@ -6,20 +6,17 @@ Feature: OpenAPI Specification & Documentation
 
   @backend
   Scenario: OpenAPI spec is served at /api/openapi.json
-    Given the server is reset
     When I fetch the OpenAPI spec
     Then the OpenAPI spec should be valid
     And the spec info title should be "Llamenos API"
 
   @backend
   Scenario: Scalar docs UI is served at /api/docs
-    Given the server is reset
     When I fetch the Scalar docs page
     Then the Scalar docs page should be HTML
 
   @backend
   Scenario: OpenAPI spec includes all authenticated route tags
-    Given the server is reset
     When I fetch the OpenAPI spec
     Then the spec should include tags:
       | tag           |
@@ -45,13 +42,11 @@ Feature: OpenAPI Specification & Documentation
 
   @backend
   Scenario: OpenAPI spec documents bearer auth security scheme
-    Given the server is reset
     When I fetch the OpenAPI spec
     Then the spec should define a "bearerAuth" security scheme of type "http"
 
   @backend
   Scenario: OpenAPI spec documents key CRUD endpoints
-    Given the server is reset
     When I fetch the OpenAPI spec
     Then the spec should document these paths:
       | method | path              |

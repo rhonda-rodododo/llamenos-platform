@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import type { AppEnv, Volunteer } from '../types'
-import { getMessagingAdapterFromService } from '../lib/do-access'
+import type { AppEnv, User } from '../types'
+import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import {
   createRecordBodySchema,
@@ -52,10 +52,10 @@ async function resolveHubMembers(services: Services): Promise<HubMemberInfo[]> {
   // Get all role definitions
   const { roles: roleDefs } = await services.settings.getRoles()
 
-  // Get all volunteers (hub members)
-  const { volunteers } = await services.identity.getVolunteers()
+  // Get all users (hub members)
+  const { users: allUsers } = await services.identity.getUsers()
 
-  return volunteers
+  return allUsers
     .filter(v => v.active)
     .map(v => {
       const resolvedPerms = resolvePermissions(v.roles, roleDefs as import('@shared/permissions').Role[])
@@ -652,8 +652,8 @@ records.get('/:id/suggest-assignees',
     // 2. Get on-shift volunteers
     const onShiftPubkeys = await services.shifts.getCurrentVolunteers(hubId)
 
-    // 3. Get all volunteer profiles
-    const { volunteers } = await services.identity.getVolunteers()
+    // 3. Get all user profiles
+    const { users: allUsers } = await services.identity.getUsers()
 
     const onShiftSet = new Set(onShiftPubkeys)
     const alreadyAssigned = new Set(record.assignedTo)
@@ -667,7 +667,7 @@ records.get('/:id/suggest-assignees',
       maxCases: number
     }> = []
 
-    for (const vol of volunteers) {
+    for (const vol of allUsers) {
       if (!vol.active) continue
       if (vol.onBreak) continue
       if (!onShiftSet.has(vol.pubkey)) continue

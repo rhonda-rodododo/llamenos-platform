@@ -51,7 +51,7 @@ export function TriageReportContent({ report, reportType }: TriageReportContentP
           decrypted.push({
             id: msg.id,
             content: plaintext ?? t('triage.decryptFailed', { defaultValue: '[Unable to decrypt]' }),
-            authorPubkey: msg.authorPubkey,
+            authorPubkey: msg.authorPubkey ?? '',
             createdAt: msg.createdAt,
             hasAttachments: (msg.attachmentIds?.length ?? 0) > 0,
           })

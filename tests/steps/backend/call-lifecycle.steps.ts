@@ -8,8 +8,8 @@
  * and cross-do step files. Only defines steps unique to call-lifecycle.feature.
  */
 import { expect } from '@playwright/test'
-import { When, Then, Before } from './fixtures'
-import { state } from './common.steps'
+import { When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import {
   apiPost,
   apiGet,
@@ -29,33 +29,39 @@ interface LifecycleState {
   callerNumber?: string
 }
 
-let lc: LifecycleState
+const CALL_LIFECYCLE_KEY = 'call_lifecycle'
 
-Before({ tags: '@lifecycle' }, async () => {
-  lc = {}
+function getLifecycleState(world: Record<string, unknown>): LifecycleState {
+  return getState<LifecycleState>(world, CALL_LIFECYCLE_KEY)
+}
+
+
+Before({ tags: '@lifecycle' }, async ({ world }) => {
+  const lc = {}
+  setState(world, CALL_LIFECYCLE_KEY, lc)
 })
 
 // ── Call from unique caller ──────────────────────────────────────
 
-When('a call arrives from a unique caller', async ({ request }) => {
+When('a call arrives from a unique caller', async ({ request, world }) => {
   const caller = uniqueCallerNumber()
-  lc.callerNumber = caller
+  getLifecycleState(world).callerNumber = caller
   try {
     const result = await simulateIncomingCall(request, { callerNumber: caller })
-    state.callId = result.callId
-    state.callStatus = result.status
+    getScenarioState(world).callId = result.callId
+    getScenarioState(world).callStatus = result.status
   } catch {
-    state.callStatus = 'rejected'
+    getScenarioState(world).callStatus = 'rejected'
   }
 })
 
 // ── Note creation by answering volunteer ─────────────────────────
 
-When('the answering volunteer creates a note for the call', async ({ request }) => {
-  expect(state.callId).toBeTruthy()
+When('the answering volunteer creates a note for the call', async ({ request, world }) => {
+  expect(getScenarioState(world).callId).toBeTruthy()
   // volunteer 1 answered (1-indexed), which is index 0 in the array
-  const volIndex = (lc.answeringVolunteerIndex ?? 1) - 1
-  const vol = state.volunteers[volIndex]
+  const volIndex = (getLifecycleState(world).answeringVolunteerIndex ?? 1) - 1
+  const vol = getScenarioState(world).volunteers[volIndex]
   expect(vol).toBeDefined()
 
   const kp = generateTestKeypair()
@@ -64,7 +70,7 @@ When('the answering volunteer creates a note for the call', async ({ request }) 
     '/notes',
     {
       encryptedContent: 'lifecycle-test-note',
-      callId: state.callId,
+      callId: getScenarioState(world).callId,
       readerEnvelopes: [
         { pubkey: vol.pubkey, wrappedKey: 'key-vol', ephemeralPubkey: kp.pubkey },
       ],
@@ -72,9 +78,9 @@ When('the answering volunteer creates a note for the call', async ({ request }) 
     vol.nsec,
   )
   expect(status).toBeLessThan(300)
-  lc.noteId = (data as Record<string, unknown>)?.id as string
+  getLifecycleState(world).noteId = (data as Record<string, unknown>)?.id as string
     ?? ((data as Record<string, unknown>)?.note as Record<string, unknown>)?.id as string
-  lc.answeringVolunteerIndex = lc.answeringVolunteerIndex ?? 1
+  getLifecycleState(world).answeringVolunteerIndex = getLifecycleState(world).answeringVolunteerIndex ?? 1
 })
 
 // ── Note visibility assertions ───────────────────────────────────
@@ -94,32 +100,32 @@ async function listNotesAs(
   return data
 }
 
-Then('the answering volunteer can see the note', async ({ request }) => {
-  const volIndex = (lc.answeringVolunteerIndex ?? 1) - 1
-  const vol = state.volunteers[volIndex]
+Then('the answering volunteer can see the note', async ({ request, world }) => {
+  const volIndex = (getLifecycleState(world).answeringVolunteerIndex ?? 1) - 1
+  const vol = getScenarioState(world).volunteers[volIndex]
   expect(vol).toBeDefined()
 
-  const { notes } = await listNotesAs(request, state.callId, vol.nsec)
+  const { notes } = await listNotesAs(request, getScenarioState(world).callId, vol.nsec)
   expect(notes.length).toBeGreaterThan(0)
 })
 
-Then('the admin can see the note', async ({ request }) => {
-  const { notes } = await listNotesAs(request, state.callId, ADMIN_NSEC)
+Then('the admin can see the note', async ({ request, world }) => {
+  const { notes } = await listNotesAs(request, getScenarioState(world).callId, ADMIN_NSEC)
   expect(notes.length).toBeGreaterThan(0)
 })
 
-Then('the other volunteer cannot see the note', async ({ request }) => {
-  const answeringIndex = (lc.answeringVolunteerIndex ?? 1) - 1
+Then('the other volunteer cannot see the note', async ({ request, world }) => {
+  const answeringIndex = (getLifecycleState(world).answeringVolunteerIndex ?? 1) - 1
   const otherIndex = answeringIndex === 0 ? 1 : 0
-  if (state.volunteers.length <= otherIndex) {
+  if (getScenarioState(world).volunteers.length <= otherIndex) {
     // Only one volunteer — skip
     return
   }
-  const otherVol = state.volunteers[otherIndex]
+  const otherVol = getScenarioState(world).volunteers[otherIndex]
 
   // Notes are E2EE — only the author + admins can decrypt.
   // The API may return the note metadata but content is unreadable.
   // This assertion documents the expected access boundary.
-  const { notes } = await listNotesAs(request, state.callId, otherVol.nsec)
+  const { notes } = await listNotesAs(request, getScenarioState(world).callId, otherVol.nsec)
   expect(notes).toBeDefined()
 })

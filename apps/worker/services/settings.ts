@@ -153,6 +153,17 @@ async function getSettings(db: Database) {
 }
 
 // ---------------------------------------------------------------------------
+// Module-level TTL cache for roles (30s TTL — roles change rarely, auth runs every request)
+// ---------------------------------------------------------------------------
+
+let _rolesCache: { roles: Role[]; expiresAt: number } | null = null
+const ROLES_CACHE_TTL_MS = 30_000
+
+export function invalidateRolesCache(): void {
+  _rolesCache = null
+}
+
+// ---------------------------------------------------------------------------
 // SettingsService
 // ---------------------------------------------------------------------------
 
@@ -296,24 +307,24 @@ export class SettingsService {
 
   async getTranscriptionSettings(): Promise<{
     globalEnabled: boolean
-    allowVolunteerOptOut: boolean
+    allowUserOptOut: boolean
   }> {
     const row = await getSettings(this.db)
     return {
       globalEnabled: row.transcriptionEnabled ?? true,
-      allowVolunteerOptOut: row.allowVolunteerTranscriptionOptOut ?? false,
+      allowUserOptOut: row.allowUserTranscriptionOptOut ?? false,
     }
   }
 
   async updateTranscriptionSettings(data: {
     globalEnabled?: boolean
-    allowVolunteerOptOut?: boolean
-  }): Promise<{ globalEnabled: boolean; allowVolunteerOptOut: boolean }> {
+    allowUserOptOut?: boolean
+  }): Promise<{ globalEnabled: boolean; allowUserOptOut: boolean }> {
     const updates: Record<string, unknown> = {}
     if (data.globalEnabled !== undefined)
       updates.transcriptionEnabled = data.globalEnabled
-    if (data.allowVolunteerOptOut !== undefined)
-      updates.allowVolunteerTranscriptionOptOut = data.allowVolunteerOptOut
+    if (data.allowUserOptOut !== undefined)
+      updates.allowUserTranscriptionOptOut = data.allowUserOptOut
 
     if (Object.keys(updates).length > 0) {
       await this.db
@@ -397,20 +408,19 @@ export class SettingsService {
   // =========================================================================
 
   async getFallbackGroup(): Promise<{
-    volunteerPubkeys: string[]
-    volunteers: string[]
+    userPubkeys: string[]
   }> {
     const row = await getSettings(this.db)
     const group = row.fallbackGroup ?? []
-    return { volunteerPubkeys: group, volunteers: group }
+    return { userPubkeys: group }
   }
 
   async setFallbackGroup(data: {
-    volunteerPubkeys: string[]
+    userPubkeys: string[]
   }): Promise<{ ok: true }> {
     await this.db
       .update(systemSettings)
-      .set({ fallbackGroup: data.volunteerPubkeys })
+      .set({ fallbackGroup: data.userPubkeys })
       .where(eq(systemSettings.id, SINGLETON_ID))
     return { ok: true }
   }
@@ -476,7 +486,7 @@ export class SettingsService {
       .orderBy(customFieldDefinitions.sortOrder)
 
     if (role !== 'admin') {
-      rows = rows.filter((r) => r.visibleToVolunteers)
+      rows = rows.filter((r) => r.visibleToUsers)
     }
 
     // Map DB rows to CustomFieldDefinition shape
@@ -488,8 +498,8 @@ export class SettingsService {
       required: r.required ?? false,
       options: r.options ?? undefined,
       validation: r.validation as CustomFieldDefinition['validation'],
-      visibleToVolunteers: r.visibleToVolunteers ?? true,
-      editableByVolunteers: r.editableByVolunteers ?? true,
+      visibleToUsers: r.visibleToUsers ?? true,
+      editableByUsers: r.editableByUsers ?? true,
       context: r.context as CustomFieldDefinition['context'],
       maxFileSize: r.maxFileSize ?? undefined,
       allowedMimeTypes: r.allowedMimeTypes ?? undefined,
@@ -612,8 +622,8 @@ export class SettingsService {
           required: f.required ?? false,
           options: f.options,
           validation: f.validation,
-          visibleToVolunteers: f.visibleToVolunteers ?? true,
-          editableByVolunteers: f.editableByVolunteers ?? true,
+          visibleToUsers: f.visibleToUsers ?? true,
+          editableByUsers: f.editableByUsers ?? true,
           context: f.context ?? 'all',
           maxFileSize: f.maxFileSize,
           allowedMimeTypes: f.allowedMimeTypes,
@@ -651,8 +661,8 @@ export class SettingsService {
       )
     }
     if (
-      updated.maxConcurrentPerVolunteer < 1 ||
-      updated.maxConcurrentPerVolunteer > 20
+      updated.maxConcurrentPerUser < 1 ||
+      updated.maxConcurrentPerUser > 20
     ) {
       throw new ServiceError(
         400,
@@ -1099,6 +1109,10 @@ export class SettingsService {
   // =========================================================================
 
   async getRoles(): Promise<{ roles: Role[] }> {
+    const now = Date.now()
+    if (_rolesCache && _rolesCache.expiresAt > now) {
+      return { roles: _rolesCache.roles }
+    }
     const rows = await this.db.select().from(rolesTable)
     const rolesList: Role[] = rows.map((r) => ({
       id: r.id,
@@ -1111,6 +1125,7 @@ export class SettingsService {
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }))
+    _rolesCache = { roles: rolesList, expiresAt: now + ROLES_CACHE_TTL_MS }
     return { roles: rolesList }
   }
 

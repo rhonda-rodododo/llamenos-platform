@@ -14,10 +14,10 @@ struct AdminTabView: View {
 
         List {
             NavigationLink {
-                VolunteersView(viewModel: vm)
+                UsersView(viewModel: vm)
             } label: {
                 Label(
-                    NSLocalizedString("admin_tab_volunteers", comment: "Volunteers"),
+                    NSLocalizedString("admin_tab_users", comment: "Volunteers"),
                     systemImage: "person.3.fill"
                 )
             }

@@ -20,7 +20,7 @@ enum AdminTab: String, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .volunteers: return NSLocalizedString("admin_tab_volunteers", comment: "Volunteers")
+        case .volunteers: return NSLocalizedString("admin_tab_users", comment: "Volunteers")
         case .bans: return NSLocalizedString("admin_tab_bans", comment: "Ban List")
         case .auditLog: return NSLocalizedString("admin_tab_audit", comment: "Audit Log")
         case .invites: return NSLocalizedString("admin_tab_invites", comment: "Invites")
@@ -62,29 +62,29 @@ final class AdminViewModel {
     private let apiService: APIService
     private let cryptoService: CryptoService
 
-    // MARK: - Volunteers State
+    // MARK: - Users State
 
-    /// All volunteers/members from the server.
-    var volunteers: [ClientVolunteer] = []
+    /// All users/members from the server.
+    var users: [ClientUser] = []
 
-    /// Filtered volunteers based on search text.
-    var filteredVolunteers: [ClientVolunteer] {
-        if volunteerSearchText.isEmpty {
-            return volunteers
+    /// Filtered users based on search text.
+    var filteredUsers: [ClientUser] {
+        if userSearchText.isEmpty {
+            return users
         }
-        let query = volunteerSearchText.lowercased()
-        return volunteers.filter { vol in
-            (vol.displayName?.lowercased().contains(query) ?? false)
-                || vol.pubkey.lowercased().contains(query)
-                || vol.role.lowercased().contains(query)
+        let query = userSearchText.lowercased()
+        return users.filter { user in
+            (user.displayName?.lowercased().contains(query) ?? false)
+                || user.pubkey.lowercased().contains(query)
+                || user.role.lowercased().contains(query)
         }
     }
 
-    /// Search text for volunteer filtering.
-    var volunteerSearchText: String = ""
+    /// Search text for user filtering.
+    var userSearchText: String = ""
 
-    /// Whether volunteers are loading.
-    var isLoadingVolunteers: Bool = false
+    /// Whether users are loading.
+    var isLoadingUsers: Bool = false
 
     // MARK: - Ban List State
 
@@ -261,20 +261,20 @@ final class AdminViewModel {
         self.cryptoService = cryptoService
     }
 
-    // MARK: - Volunteers
+    // MARK: - Users
 
-    /// Load all volunteers from the API.
-    func loadVolunteers() async {
-        guard !isLoadingVolunteers else { return }
-        isLoadingVolunteers = true
+    /// Load all users from the API.
+    func loadUsers() async {
+        guard !isLoadingUsers else { return }
+        isLoadingUsers = true
         errorMessage = nil
 
         do {
-            let response: VolunteersListResponse = try await apiService.request(
+            let response: UsersListResponse = try await apiService.request(
                 method: "GET",
                 path: "/api/identity/members"
             )
-            volunteers = response.members.sorted { lhs, rhs in
+            users = response.members.sorted { lhs, rhs in
                 // Admins first, then by display name
                 if lhs.role != rhs.role {
                     return lhs.userRole == .admin
@@ -285,11 +285,11 @@ final class AdminViewModel {
             errorMessage = error.localizedDescription
         }
 
-        isLoadingVolunteers = false
+        isLoadingUsers = false
     }
 
-    /// Update a volunteer's role.
-    func updateVolunteerRole(pubkey: String, newRole: UserRole) async {
+    /// Update a user's role.
+    func updateUserRole(pubkey: String, newRole: UserRole) async {
         errorMessage = nil
         successMessage = nil
 
@@ -305,7 +305,7 @@ final class AdminViewModel {
             generator.notificationOccurred(.success)
 
             successMessage = NSLocalizedString("admin_role_updated", comment: "Role updated successfully")
-            await loadVolunteers()
+            await loadUsers()
         } catch {
             errorMessage = error.localizedDescription
         }

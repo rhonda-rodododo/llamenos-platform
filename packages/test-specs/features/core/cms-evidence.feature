@@ -3,9 +3,6 @@ Feature: CMS Evidence
   Evidence files are tracked with chain-of-custody metadata
   and cryptographic integrity verification.
 
-  Background:
-    Given the server is reset
-
   @evidence
   Scenario: Upload evidence to case
     Given case management is enabled

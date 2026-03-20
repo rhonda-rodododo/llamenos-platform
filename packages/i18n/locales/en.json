@@ -73,7 +73,6 @@
     "healthServices": "Services",
     "healthStorage": "Storage",
     "healthUnavailable": "Health Unavailable",
-    "healthVolunteers": "Volunteers",
     "inviteActive": "Active",
     "inviteClaimed": "Claimed",
     "inviteCreated": "Invite code created",
@@ -90,7 +89,6 @@
     "loadingBans": "Loading ban list…",
     "loadingCategories": "Loading categories…",
     "loadingInvites": "Loading invites…",
-    "loadingVolunteers": "Loading volunteers…",
     "minutesUnit": "{{value}} min",
     "newBanHeader": "New Ban Entry",
     "newCategoryTitle": "New Category",
@@ -98,7 +96,6 @@
     "noBans": "No Bans",
     "noCategories": "No report categories defined",
     "noInvites": "No Invites",
-    "noVolunteers": "No Volunteers",
     "recordingLoadFailed": "Failed to load recording",
     "recordingPause": "Pause",
     "recordingPlay": "Play Recording",
@@ -115,7 +112,6 @@
     "reportCategoryName": "Category Name",
     "roleUpdated": "Role updated successfully",
     "save": "Save",
-    "searchVolunteers": "Search volunteers…",
     "secondsUnit": "{{value}}s",
     "settingsSection": "Settings",
     "spamBypassHeader": "Exemptions",
@@ -156,14 +152,13 @@
       "totalActive": "Total Active",
       "uptime": "Uptime",
       "version": "Version",
-      "volunteers": "Volunteers"
+      "users": "Volunteers"
     },
     "systemHealth": "System Health",
     "tabAudit": "Audit Log",
     "tabBans": "Ban List",
     "tabFields": "Fields",
     "tabInvites": "Invites",
-    "tabVolunteers": "Volunteers",
     "telephonyAccountSid": "Account SID",
     "telephonyAccountSidPlaceholder": "Enter account SID",
     "telephonyAuthToken": "Auth Token",
@@ -186,7 +181,12 @@
     "transcriptionSaved": "Transcription settings saved",
     "transcriptionSettings": "Transcription",
     "transcriptionVolunteerHeader": "Volunteer Opt-Out",
-    "volunteers": "Volunteers"
+    "healthUsers": "Volunteers",
+    "loadingUsers": "Loading volunteers…",
+    "noUsers": "No Volunteers",
+    "searchUsers": "Search volunteers…",
+    "tabUsers": "Volunteers",
+    "users": "Volunteers"
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -220,10 +220,10 @@
       "telephonyProviderChanged": "Telephony Provider Changed",
       "transcriptionToggled": "Transcription Setting Changed",
       "voicemailReceived": "Voicemail Received",
-      "volunteerAdded": "Volunteer Added",
-      "volunteerAvailable": "Volunteer Available",
-      "volunteerOnBreak": "Volunteer On Break",
-      "volunteerRemoved": "Volunteer Removed"
+      "userAdded": "Volunteer Added",
+      "userAvailable": "Volunteer Available",
+      "userOnBreak": "Volunteer On Break",
+      "userRemoved": "Volunteer Removed"
     },
     "noEntries": "No audit log entries",
     "search": "Search audit log...",
@@ -1060,15 +1060,12 @@
     "hoursAgo": "{{count}}h ago",
     "justNow": "Just now",
     "loadError": "Failed to load messages",
-    "loadVolunteersError": "Failed to load volunteers",
     "loading": "Loading conversations...",
     "minutesAgo": "{{count}}m ago",
     "noChannels": "No messaging channels enabled",
     "noChannelsDescription": "Enable SMS, WhatsApp, Signal, or Reports in Hub Settings to start receiving messages.",
     "noConversations": "No conversations",
     "noMessages": "No messages yet",
-    "noVolunteers": "No volunteers available",
-    "noVolunteersAvailable": "No volunteers available",
     "reassign": "Reassign",
     "reassignDescription": "Select a volunteer to reassign this conversation to",
     "reassignError": "Failed to reassign conversation",
@@ -1088,7 +1085,10 @@
     "unknownContact": "Unknown",
     "waiting": "waiting",
     "waitingSection": "Waiting",
-    "whatsapp": "WhatsApp"
+    "whatsapp": "WhatsApp",
+    "loadUsersError": "Failed to load volunteers",
+    "noUsers": "No volunteers available",
+    "noUsersAvailable": "No volunteers available"
   },
   "copied": {
     "toClipboard": "Copied to clipboard"
@@ -1126,7 +1126,6 @@
     "context": "Context",
     "deleteConfirm": "Delete this field? Existing notes with this field will keep their data.",
     "description": "Define additional fields that appear on the note form",
-    "editableByVolunteers": "Editable by volunteers",
     "empty": "No custom fields defined",
     "fieldLabel": "Field Label",
     "fieldName": "Field Name",
@@ -1156,7 +1155,8 @@
       "min": "Min",
       "minLength": "Min Length"
     },
-    "visibleToVolunteers": "Visible to volunteers"
+    "visibleToUsers": "Visible to volunteers",
+    "editableByUsers": "Editable by volunteers"
   },
   "dashboard": {
     "activeCalls": "Active Calls",
@@ -1186,7 +1186,6 @@
     "noNotes": "No notes yet",
     "noRecentNotes": "No Recent Notes",
     "noShift": "No shift scheduled",
-    "noVolunteersOnline": "No volunteers online",
     "notes": "Notes",
     "offShift": "Off Shift",
     "offline": "Offline",
@@ -1201,7 +1200,8 @@
     "title": "Dashboard",
     "viewAllNotes": "View All Notes",
     "viewCalls": "View Calls",
-    "volunteerStatus": "Volunteer Status"
+    "noUsersOnline": "No volunteers online",
+    "userStatus": "Volunteer Status"
   },
   "decryptingKeys": "Decrypting keys...",
   "delete": "Delete",
@@ -1354,8 +1354,6 @@
     "edit": "Edit Field",
     "editAction": "Edit",
     "editTitle": "Edit Field",
-    "editableByVolunteers": "Editable by volunteers",
-    "editableVolunteers": "Editable by volunteers",
     "label": "Field Label",
     "labelPlaceholder": "Field label",
     "newOption": "New option",
@@ -1371,8 +1369,10 @@
     "typeSelect": "Select",
     "typeText": "Text",
     "typeTextarea": "Text Area",
-    "visibleToVolunteers": "Visible to volunteers",
-    "visibleVolunteers": "Visible to volunteers"
+    "visibleToUsers": "Visible to volunteers",
+    "editableByUsers": "Editable by volunteers",
+    "visibleUsers": "Visible to volunteers",
+    "editableUsers": "Editable by volunteers"
   },
   "fieldValidation": {
     "minLength": "Must be at least %@ characters",
@@ -1667,7 +1667,7 @@
     "settings": "Settings",
     "shifts": "Shifts",
     "triage": "Triage",
-    "volunteers": "Volunteers"
+    "users": "Volunteers"
   },
   "navigation": {
     "back": "Back"
@@ -2148,7 +2148,6 @@
     "template": "Template"
   },
   "searchConversations": "Search conversations...",
-  "searchVolunteers": "Search volunteers...",
   "select": {
     "placeholder": "Select..."
   },
@@ -2391,7 +2390,6 @@
   },
   "shifts": {
     "activeCalls": "%d active call(s)",
-    "assignVolunteers": "Assign Volunteers",
     "assigned": "Assigned",
     "available": "Available",
     "clockIn": "Clock In",
@@ -2432,7 +2430,6 @@
     "nextShift": "Next shift",
     "noShifts": "No shifts scheduled. Create a shift to start routing calls.",
     "noShiftsAssigned": "No shifts assigned",
-    "noVolunteersFound": "No volunteers found",
     "noneScheduled": "No shifts scheduled",
     "notFound": "Shift not found",
     "offShift": "Off Shift",
@@ -2440,10 +2437,8 @@
     "recurring": "Recurring",
     "reminder": "Shift Reminder",
     "reminderBody": "Your shift is starting soon",
-    "removeVolunteer": "Remove {{name}}",
     "saveAssignments": "Save Assignments",
     "schedule": "Schedule",
-    "searchVolunteers": "Search volunteers...",
     "selectedCount": "{{count}} selected",
     "shiftName": "Shift Name",
     "signUp": "Sign Up",
@@ -2455,8 +2450,12 @@
     "title": "Shift Schedule",
     "today": "Today",
     "until": "until",
-    "volunteers": "Volunteers",
-    "weeklySchedule": "Weekly Schedule"
+    "weeklySchedule": "Weekly Schedule",
+    "assignUsers": "Assign Volunteers",
+    "noUsersFound": "No volunteers found",
+    "removeUser": "Remove {{name}}",
+    "searchUsers": "Search volunteers...",
+    "users": "Volunteers"
   },
   "shortcuts": {
     "answerCall": "Answer call",
@@ -2692,7 +2691,42 @@
     "versionChange": "{{current}} → {{new}}"
   },
   "useBiometric": "Use Biometric",
-  "volunteerProfile": {
+  "webauthn": {
+    "browserNotSupported": "Your browser doesn't support passkeys.",
+    "deleteKey": "Delete",
+    "description": "Use your device biometrics or PIN to sign in without your secret key.",
+    "label": "Passkey name (e.g. \"My Phone\")",
+    "lastUsed": "Last used",
+    "noKeys": "No passkeys registered yet.",
+    "notRequired": "Not required",
+    "policy": "Passkey Policy",
+    "policyDescription": "Require passkeys for user groups. Users without passkeys will be prompted to set one up.",
+    "registerKey": "Add passkey",
+    "registerSuccess": "Passkey registered!",
+    "requireForAdmins": "Require for admins",
+    "requiredAdmins": "Required for admins",
+    "requiredAll": "Required for all",
+    "signInError": "Passkey login failed",
+    "signInWithPasskey": "Sign in with passkey",
+    "signingIn": "Signing in...",
+    "singleDevice": "This device",
+    "syncedPasskey": "Synced",
+    "title": "Passkeys",
+    "requireForUsers": "Require for volunteers",
+    "requiredUsers": "Required for volunteers"
+  },
+  "ws": {
+    "connected": "Connected",
+    "connecting": "Connecting...",
+    "disconnected": "Disconnected",
+    "reconnecting": "Reconnecting (%d)..."
+  },
+  "yes": "Yes",
+  "yourIdentity": "Your Identity",
+  "yourPrivateKey": "Your Private Key",
+  "yourPublicKey": "Your Public Key",
+  "searchUsers": "Search volunteers...",
+  "userProfile": {
     "activity": "Activity",
     "allChannels": "All Channels",
     "assignedShifts": "Assigned Shifts",
@@ -2712,7 +2746,7 @@
     "noShifts": "Not assigned to any shifts",
     "selectChannels": "Select channels"
   },
-  "volunteers": {
+  "users": {
     "active": "Active",
     "add": "Add Volunteer",
     "addVolunteer": "Add Volunteer",
@@ -2753,40 +2787,6 @@
     "secretKeyWarning": "This key will only be shown once. Share it securely with the volunteer.",
     "title": "Volunteers",
     "unnamed": "Unnamed Volunteer",
-    "volunteerAdded": "Volunteer added successfully"
-  },
-  "webauthn": {
-    "browserNotSupported": "Your browser doesn't support passkeys.",
-    "deleteKey": "Delete",
-    "description": "Use your device biometrics or PIN to sign in without your secret key.",
-    "label": "Passkey name (e.g. \"My Phone\")",
-    "lastUsed": "Last used",
-    "noKeys": "No passkeys registered yet.",
-    "notRequired": "Not required",
-    "policy": "Passkey Policy",
-    "policyDescription": "Require passkeys for user groups. Users without passkeys will be prompted to set one up.",
-    "registerKey": "Add passkey",
-    "registerSuccess": "Passkey registered!",
-    "requireForAdmins": "Require for admins",
-    "requireForVolunteers": "Require for volunteers",
-    "requiredAdmins": "Required for admins",
-    "requiredAll": "Required for all",
-    "requiredVolunteers": "Required for volunteers",
-    "signInError": "Passkey login failed",
-    "signInWithPasskey": "Sign in with passkey",
-    "signingIn": "Signing in...",
-    "singleDevice": "This device",
-    "syncedPasskey": "Synced",
-    "title": "Passkeys"
-  },
-  "ws": {
-    "connected": "Connected",
-    "connecting": "Connecting...",
-    "disconnected": "Disconnected",
-    "reconnecting": "Reconnecting (%d)..."
-  },
-  "yes": "Yes",
-  "yourIdentity": "Your Identity",
-  "yourPrivateKey": "Your Private Key",
-  "yourPublicKey": "Your Public Key"
+    "userAdded": "Volunteer added successfully"
+  }
 }

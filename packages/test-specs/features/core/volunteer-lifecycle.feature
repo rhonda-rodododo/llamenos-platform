@@ -302,7 +302,6 @@ Feature: Volunteer Lifecycle
 
   @backend @desktop
   Scenario: Dashboard shows correct on-shift volunteer count
-    Given the server is reset
     And 3 volunteers are on shift
     When I query the shift status
     Then 3 volunteers are reported as on-shift

@@ -1,5 +1,5 @@
 /**
- * Volunteer CRUD & invite onboarding step definitions.
+ * User CRUD & invite onboarding step definitions.
  * Matches steps from:
  *   - packages/test-specs/features/auth/volunteer-crud.feature
  *   - packages/test-specs/features/auth/invite-onboarding.feature
@@ -10,7 +10,7 @@ import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import {
   Timeouts,
-  createVolunteerAndGetNsec,
+  createUserAndGetNsec,
   dismissNsecCard,
   loginAsVolunteer,
   loginAsAdmin,
@@ -24,7 +24,7 @@ Given('an admin has created a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  const nsec = await createVolunteerAndGetNsec(page, name, phone)
+  const nsec = await createUserAndGetNsec(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_vol_nsec = n
   }, nsec)
@@ -40,7 +40,7 @@ Given('a volunteer has logged in', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  const nsec = await createVolunteerAndGetNsec(page, name, phone)
+  const nsec = await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   await loginAsVolunteer(page, nsec)
 })
@@ -54,10 +54,9 @@ Given('a volunteer is logged in and on the dashboard', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  const nsec = await createVolunteerAndGetNsec(page, name, phone)
+  const nsec = await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   await loginAsVolunteer(page, nsec)
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Given('a volunteer is logged in', async ({ page }) => {
@@ -65,7 +64,7 @@ Given('a volunteer is logged in', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  const nsec = await createVolunteerAndGetNsec(page, name, phone)
+  const nsec = await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   await loginAsVolunteer(page, nsec)
 })
@@ -74,7 +73,7 @@ Given('a volunteer exists', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  const nsec = await createVolunteerAndGetNsec(page, name, phone)
+  const nsec = await createUserAndGetNsec(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_vol_nsec = n
   }, nsec)
@@ -206,7 +205,7 @@ Given('I have created a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `AuditVol ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  await createVolunteerAndGetNsec(page, name, phone)
+  await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
 })
 
@@ -214,7 +213,7 @@ Given('I have created and then deleted a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `DeleteVol ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  await createVolunteerAndGetNsec(page, name, phone)
+  await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   // Delete the volunteer
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: name })
@@ -238,7 +237,7 @@ Given('a reporter has been invited and onboarded', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `Reporter ${Date.now()}`
   const phone = `+1555${Date.now().toString().slice(-7)}`
-  const nsec = await createVolunteerAndGetNsec(page, name, phone)
+  const nsec = await createUserAndGetNsec(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_reporter_nsec = n
   }, nsec)
@@ -261,7 +260,6 @@ When('they create a new report', async ({ page }) => {
   const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
   await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await newBtn.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
   // Reports use a chat-style interface — find textarea and submit button
   const textarea = page.locator('textarea').first()
   await expect(textarea).toBeVisible({ timeout: Timeouts.ELEMENT })

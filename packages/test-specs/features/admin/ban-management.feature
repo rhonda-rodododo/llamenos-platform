@@ -94,14 +94,12 @@ Feature: Ban Management
 
     @backend
     Scenario: Incoming call from banned number is rejected via API
-      Given the server is reset
       And "+15559999999" is on the ban list
       When a call arrives from "+15559999999"
       Then the call is rejected
 
     @backend
     Scenario: Incoming call from non-banned number proceeds via API
-      Given the server is reset
       And 1 volunteers are on shift
       When a call arrives from "+15550001111"
       Then the call status is "ringing"

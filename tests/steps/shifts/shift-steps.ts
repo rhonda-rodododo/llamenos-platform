@@ -39,7 +39,6 @@ Then('I should see either the shifts list, empty state, or loading indicator', a
 
 Then('the clock status should update', async ({ page }) => {
   // Wait for status to change
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the button should change to {string}', async ({ page }, buttonText: string) => {

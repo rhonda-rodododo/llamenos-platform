@@ -9,11 +9,13 @@ export const systemStatusResponseSchema = z.object({
   environment: z.string().optional(),
 })
 
-const serviceStatusSchema = z.object({
+export const serviceStatusSchema = z.object({
   name: z.string(),
   status: z.enum(['ok', 'degraded', 'down']),
   details: z.string().optional(),
 })
+
+export type ServiceStatus = z.infer<typeof serviceStatusSchema>
 
 export const systemHealthResponseSchema = z.object({
   server: z.object({
@@ -37,7 +39,7 @@ export const systemHealthResponseSchema = z.object({
     backupSize: z.string(),
     lastVerify: z.string().nullable(),
   }),
-  volunteers: z.object({
+  users: z.object({
     totalActive: z.number(),
     onlineNow: z.number(),
     onShift: z.number(),
@@ -45,3 +47,5 @@ export const systemHealthResponseSchema = z.object({
   }),
   timestamp: z.string(),
 })
+
+export type SystemHealth = z.infer<typeof systemHealthResponseSchema>

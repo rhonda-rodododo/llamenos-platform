@@ -473,6 +473,7 @@ function LoginPage() {
                   </Label>
                   <Input
                     id="nsec"
+                    data-testid="nsec-input"
                     type="password"
                     value={nsec}
                     onChange={(e) => setNsec(e.target.value)}

@@ -48,7 +48,7 @@ function ConversationCard({
   // Relative time formatting
   const relativeTime = (() => {
     const now = Date.now()
-    const then = new Date(conversation.lastMessageAt).getTime()
+    const then = new Date(conversation.lastMessageAt ?? conversation.updatedAt).getTime()
     const diffMs = now - then
 
     if (diffMs < 0) return t('conversations.justNow', 'just now')
@@ -122,7 +122,7 @@ export function ConversationList({ conversations, onSelect, selectedId }: Conver
 
     // Sort each group by most recent message first
     const byLastMessage = (a: Conversation, b: Conversation) =>
-      new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+      new Date(b.lastMessageAt ?? b.updatedAt).getTime() - new Date(a.lastMessageAt ?? a.updatedAt).getTime()
 
     waitingList.sort(byLastMessage)
     activeList.sort(byLastMessage)

@@ -10,7 +10,7 @@
  * the similar CMS contact steps in cms.steps.ts.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
 import {
   createContactViaApi,
   createRecordViaApi,
@@ -34,10 +34,16 @@ interface ScreenPopState {
   entityTypeId?: string
 }
 
-let sp: ScreenPopState
+const SCREEN_POP_KEY = 'screen_pop'
 
-Before({ tags: '@telephony' }, async () => {
-  sp = {}
+function getScreenPopState(world: Record<string, unknown>): ScreenPopState {
+  return getState<ScreenPopState>(world, SCREEN_POP_KEY)
+}
+
+
+Before({ tags: '@telephony' }, async ({ world }) => {
+  const sp = {}
+  setState(world, SCREEN_POP_KEY, sp)
 })
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -45,32 +51,32 @@ Before({ tags: '@telephony' }, async () => {
 async function resolveOrCreateEntityType(
   request: import('@playwright/test').APIRequestContext,
 ): Promise<string> {
-  if (sp.entityTypeId) return sp.entityTypeId
+  if (getScreenPopState(world).entityTypeId) return getScreenPopState(world).entityTypeId
 
   const types = await listEntityTypesViaApi(request)
   const existing = types.find(t => t.name === 'screen_pop_case')
   if (existing) {
-    sp.entityTypeId = existing.id as string
-    return sp.entityTypeId
+    getScreenPopState(world).entityTypeId = existing.id as string
+    return getScreenPopState(world).entityTypeId
   }
 
   const created = await createEntityTypeViaApi(request, {
     name: 'screen_pop_case',
     category: 'case',
   })
-  sp.entityTypeId = created.id as string
-  return sp.entityTypeId
+  getScreenPopState(world).entityTypeId = created.id as string
+  return getScreenPopState(world).entityTypeId
 }
 
 // ── Given Steps ────────────────────────────────────────────────────
 
-Given('a screen-pop contact exists with identifier hash {string}', async ({ request }, hash: string) => {
-  sp.lastContact = await createContactViaApi(request, { identifierHashes: [hash] })
+Given('a screen-pop contact exists with identifier hash {string}', async ({ request, world }, hash: string) => {
+  getScreenPopState(world).lastContact = await createContactViaApi(request, { identifierHashes: [hash] })
 })
 
-Given('{int} open records are linked to the contact', async ({ request }, count: number) => {
+Given('{int} open records are linked to the contact', async ({ request, world }, count: number) => {
   const entityTypeId = await resolveOrCreateEntityType(request)
-  const contactId = sp.lastContact!.id as string
+  const contactId = getScreenPopState(world).lastContact!.id as string
 
   for (let i = 0; i < count; i++) {
     const record = await createRecordViaApi(request, entityTypeId, {
@@ -80,9 +86,9 @@ Given('{int} open records are linked to the contact', async ({ request }, count:
   }
 })
 
-Given('{int} closed record is linked to the contact', async ({ request }, count: number) => {
+Given('{int} closed record is linked to the contact', async ({ request, world }, count: number) => {
   const entityTypeId = await resolveOrCreateEntityType(request)
-  const contactId = sp.lastContact!.id as string
+  const contactId = getScreenPopState(world).lastContact!.id as string
 
   for (let i = 0; i < count; i++) {
     const record = await createRecordViaApi(request, entityTypeId, {
@@ -98,56 +104,56 @@ Given('{int} closed record is linked to the contact', async ({ request }, count:
 
 // ── When Steps ─────────────────────────────────────────────────────
 
-When('a call arrives from identifier hash {string}', async ({ request }, hash: string) => {
-  sp.identificationResult = await identifyCallerViaApi(request, hash)
+When('a call arrives from identifier hash {string}', async ({ request, world }, hash: string) => {
+  getScreenPopState(world).identificationResult = await identifyCallerViaApi(request, hash)
 })
 
-When('the admin looks up identifier hash {string}', async ({ request }, hash: string) => {
-  sp.lookupResult = await lookupContactViaApi(request, hash)
+When('the admin looks up identifier hash {string}', async ({ request, world }, hash: string) => {
+  getScreenPopState(world).lookupResult = await lookupContactViaApi(request, hash)
 })
 
-When('the admin lists records for the contact', async ({ request }) => {
-  const contactId = sp.lastContact!.id as string
-  sp.contactRecords = await listRecordsByContactViaApi(request, contactId)
+When('the admin lists records for the contact', async ({ request, world }) => {
+  const contactId = getScreenPopState(world).lastContact!.id as string
+  getScreenPopState(world).contactRecords = await listRecordsByContactViaApi(request, contactId)
 })
 
 // ── Then Steps ─────────────────────────────────────────────────────
 
 Then('the contact identification should return the matching contact', async () => {
-  expect(sp.identificationResult).toBeTruthy()
-  expect(sp.identificationResult!.contact).not.toBeNull()
-  if (sp.lastContact) {
-    expect(sp.identificationResult!.contact!.id).toBe(sp.lastContact.id)
+  expect(getScreenPopState(world).identificationResult).toBeTruthy()
+  expect(getScreenPopState(world).identificationResult!.contact).not.toBeNull()
+  if (getScreenPopState(world).lastContact) {
+    expect(getScreenPopState(world).identificationResult!.contact!.id).toBe(getScreenPopState(world).lastContact.id)
   }
 })
 
 Then('the contact identification should return no match', async () => {
-  expect(sp.identificationResult).toBeTruthy()
-  expect(sp.identificationResult!.contact).toBeNull()
-  expect(sp.identificationResult!.activeCaseCount).toBe(0)
+  expect(getScreenPopState(world).identificationResult).toBeTruthy()
+  expect(getScreenPopState(world).identificationResult!.contact).toBeNull()
+  expect(getScreenPopState(world).identificationResult!.activeCaseCount).toBe(0)
 })
 
 Then('the lookup result should include the contact', async () => {
-  expect(sp.lookupResult).toBeTruthy()
-  expect(sp.lookupResult!.contact).not.toBeNull()
-  expect(sp.lookupResult!.contact!.id).toBe(sp.lastContact!.id)
+  expect(getScreenPopState(world).lookupResult).toBeTruthy()
+  expect(getScreenPopState(world).lookupResult!.contact).not.toBeNull()
+  expect(getScreenPopState(world).lookupResult!.contact!.id).toBe(getScreenPopState(world).lastContact!.id)
 })
 
-Then('the contact record list should have {int} records', async ({}, count: number) => {
-  expect(sp.contactRecords).toBeTruthy()
-  expect(sp.contactRecords!.records.length).toBe(count)
+Then('the contact record list should have {int} records', async ({ world }, count: number) => {
+  expect(getScreenPopState(world).contactRecords).toBeTruthy()
+  expect(getScreenPopState(world).contactRecords!.records.length).toBe(count)
 })
 
 Then('no closed records should be included', async () => {
-  expect(sp.contactRecords).toBeTruthy()
-  for (const record of sp.contactRecords!.records) {
+  expect(getScreenPopState(world).contactRecords).toBeTruthy()
+  for (const record of getScreenPopState(world).contactRecords!.records) {
     expect(record.closedAt).toBeFalsy()
   }
 })
 
-Then('the contact interactionCount should be {int}', async ({ request }, count: number) => {
+Then('the contact interactionCount should be {int}', async ({ request, world }, count: number) => {
   // Re-fetch the contact via its identifier hash to get updated interaction count
-  const identifierHashes = sp.lastContact!.identifierHashes as string[] | undefined
+  const identifierHashes = getScreenPopState(world).lastContact!.identifierHashes as string[] | undefined
   if (!identifierHashes || identifierHashes.length === 0) {
     throw new Error('No identifier hashes on contact')
   }

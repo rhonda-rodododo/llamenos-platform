@@ -6,7 +6,7 @@
  * Status assertions are in assertions.steps.ts (shared).
  */
 import { When, Before } from './fixtures'
-import { shared, resetSharedState } from './shared-state'
+import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,
@@ -19,13 +19,13 @@ import {
 } from '../../api-helpers'
 
 Before({ tags: '@backend' }, async () => {
-  resetSharedState()
+  // shared state reset handled by fixture
 })
 
 // ── Generic admin request with DataTable body ───────────────────────
 
 When('an admin sends {string} to {string} with body:', async (
-  { request },
+  { request, world },
   method: string,
   path: string,
   dataTable: { raw: () => string[][] },
@@ -44,16 +44,16 @@ When('an admin sends {string} to {string} with body:', async (
 
   switch (method) {
     case 'GET':
-      shared.lastResponse = await apiGet(request, apiPath, ADMIN_NSEC)
+      setLastResponse(world, await apiGet(request, apiPath, ADMIN_NSEC))
       break
     case 'POST':
-      shared.lastResponse = await apiPost(request, apiPath, body, ADMIN_NSEC)
+      setLastResponse(world, await apiPost(request, apiPath, body, ADMIN_NSEC))
       break
     case 'PATCH':
-      shared.lastResponse = await apiPatch(request, apiPath, body, ADMIN_NSEC)
+      setLastResponse(world, await apiPatch(request, apiPath, body, ADMIN_NSEC))
       break
     case 'PUT':
-      shared.lastResponse = await apiPut(request, apiPath, body, ADMIN_NSEC)
+      setLastResponse(world, await apiPut(request, apiPath, body, ADMIN_NSEC))
       break
     default:
       throw new Error(`Unknown method: ${method}`)
@@ -62,17 +62,17 @@ When('an admin sends {string} to {string} with body:', async (
 
 // ── Generic admin GET/POST/PATCH (no body) ──────────────────────────
 
-When('an admin sends {string} to {string}', async ({ request }, method: string, path: string) => {
+When('an admin sends {string} to {string}', async ({ request, world }, method: string, path: string) => {
   const apiPath = path.startsWith('/api') ? path.slice(4) : path
   switch (method) {
     case 'GET':
-      shared.lastResponse = await apiGet(request, apiPath, ADMIN_NSEC)
+      setLastResponse(world, await apiGet(request, apiPath, ADMIN_NSEC))
       break
     case 'POST':
-      shared.lastResponse = await apiPost(request, apiPath, {}, ADMIN_NSEC)
+      setLastResponse(world, await apiPost(request, apiPath, {}, ADMIN_NSEC))
       break
     case 'PATCH':
-      shared.lastResponse = await apiPatch(request, apiPath, {}, ADMIN_NSEC)
+      setLastResponse(world, await apiPatch(request, apiPath, {}, ADMIN_NSEC))
       break
     default:
       throw new Error(`Unknown method: ${method}`)
@@ -81,67 +81,67 @@ When('an admin sends {string} to {string}', async ({ request }, method: string, 
 
 // ── Specific invalid body steps ─────────────────────────────────────
 
-When('an admin sends {string} to {string} with empty encrypted content', async ({ request }, _method: string, _path: string) => {
-  shared.lastResponse = await apiPost(request, '/notes', {
+When('an admin sends {string} to {string} with empty encrypted content', async ({ request, world }, _method: string, _path: string) => {
+  setLastResponse(world, await apiPost(request, '/notes', {
     encryptedContent: '',
     callId: 'test-call-id',
-  }, ADMIN_NSEC)
+  }, ADMIN_NSEC))
 })
 
-When('an admin sends {string} to {string} with missing title', async ({ request }, _method: string, _path: string) => {
-  shared.lastResponse = await apiPost(request, '/reports', {
+When('an admin sends {string} to {string} with missing title', async ({ request, world }, _method: string, _path: string) => {
+  setLastResponse(world, await apiPost(request, '/reports', {
     encryptedContent: 'test-content',
     readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key', ephemeralPubkey: 'b'.repeat(64) }],
-  }, ADMIN_NSEC)
+  }, ADMIN_NSEC))
 })
 
-When('an admin sends {string} to {string} with invalid day body', async ({ request }, _method: string, _path: string) => {
-  shared.lastResponse = await apiPost(request, '/shifts', {
+When('an admin sends {string} to {string} with invalid day body', async ({ request, world }, _method: string, _path: string) => {
+  setLastResponse(world, await apiPost(request, '/shifts', {
     name: 'Bad Shift',
     startTime: '09:00',
     endTime: '17:00',
     days: [0, 1, 7], // 7 is invalid (0-6 only)
-    volunteerPubkeys: [],
-  }, ADMIN_NSEC)
+    userPubkeys: [],
+  }, ADMIN_NSEC))
 })
 
-When('an admin sends {string} to {string} with negative day body', async ({ request }, _method: string, _path: string) => {
-  shared.lastResponse = await apiPost(request, '/shifts', {
+When('an admin sends {string} to {string} with negative day body', async ({ request, world }, _method: string, _path: string) => {
+  setLastResponse(world, await apiPost(request, '/shifts', {
     name: 'Bad Shift',
     startTime: '09:00',
     endTime: '17:00',
     days: [-1, 0, 1],
-    volunteerPubkeys: [],
-  }, ADMIN_NSEC)
+    userPubkeys: [],
+  }, ADMIN_NSEC))
 })
 
-When('an admin sends {string} to {string} with valid twilio body', async ({ request }, _method: string, _path: string) => {
-  shared.lastResponse = await apiPatch(request, '/settings/telephony-provider', {
+When('an admin sends {string} to {string} with valid twilio body', async ({ request, world }, _method: string, _path: string) => {
+  setLastResponse(world, await apiPatch(request, '/settings/telephony-provider', {
     type: 'twilio',
     accountSid: 'ACtest123456789012345678901234',
     authToken: 'test_auth_token_value',
     phoneNumber: '+15551234567',
-  }, ADMIN_NSEC)
+  }, ADMIN_NSEC))
 })
 
 // ── Valid request steps ─────────────────────────────────────────────
 
-When('an admin creates a volunteer with valid data', async ({ request }) => {
+When('an admin creates a volunteer with valid data', async ({ request, world }) => {
   const kp = generateTestKeypair()
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  setLastResponse(world, await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name: uniqueName('Contract Vol'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
-  }, ADMIN_NSEC)
+  }, ADMIN_NSEC))
 })
 
-When('an admin creates a shift with valid data', async ({ request }) => {
-  shared.lastResponse = await apiPost(request, '/shifts', {
+When('an admin creates a shift with valid data', async ({ request, world }) => {
+  setLastResponse(world, await apiPost(request, '/shifts', {
     name: uniqueName('Contract Shift'),
     startTime: '09:00',
     endTime: '17:00',
     days: [1, 2, 3, 4, 5],
-    volunteerPubkeys: [],
-  }, ADMIN_NSEC)
+    userPubkeys: [],
+  }, ADMIN_NSEC))
 })

@@ -23,7 +23,7 @@ Missing a step means type mismatches, runtime crashes, or crypto failures on one
 
 ```
 packages/protocol/
-  schemas/              # 30+ Zod schema files (SOURCE OF TRUTH)
+  schemas/              # 80+ Zod schema files (SOURCE OF TRUTH)
     common.ts           # Pagination, errors, envelopes, crypto types
     auth.ts             # Login, bootstrap, profile, session types
     notes.ts            # Note CRUD, replies, custom fields
@@ -53,11 +53,9 @@ packages/protocol/
     system.ts           # Health, system status
     index.ts            # Barrel export of all schemas
   tools/
-    codegen.ts          # Zod → toJSONSchema() → quicktype-core → TS/Swift/Kotlin
+    codegen.ts          # Zod → toJSONSchema() → quicktype-core → Swift/Kotlin
     schema-registry.ts  # Maps 85+ Zod schemas to named PascalCase types for codegen
   generated/            # GITIGNORED — regenerated on every `bun run codegen`
-    typescript/types.ts        # ~78 KB TypeScript interfaces
-    typescript/crypto-labels.ts
     swift/Types.swift          # ~122 KB Swift Codable structs (with Sendable)
     swift/CryptoLabels.swift
     kotlin/Types.kt            # ~103 KB Kotlin @Serializable data classes
@@ -142,10 +140,6 @@ Handles a quicktype limitation: quicktype doesn't emit Kotlin default values fro
    - `KeyEnvelope` → `ProtocolKeyEnvelope` (avoids UniFFI collision)
    - See `codegen.ts` lines 124-251 for full list
 
-### TypeScript Post-Processor
-
-Minimal — adds header comment. quicktype's `just-types: 'true'` mode generates clean interfaces.
-
 ## Schema Change Workflow
 
 ### Step 1: Modify the Zod Schema
@@ -186,11 +180,9 @@ bun run codegen
 
 ### Step 5: Update Platform Consumers
 
-**Worker (TypeScript)** — imports from `@protocol/schemas`:
-- Update route handlers, DO storage, Nostr event payloads
-
-**Desktop (TypeScript)** — imports generated types or Zod schemas:
-- Update components, hooks, platform.ts crypto operations
+**Desktop/Worker (TypeScript)** — uses `z.infer<typeof Schema>` directly from `@protocol/schemas`:
+- Update route handlers, components, hooks, platform.ts crypto operations
+- No generated TypeScript types — import Zod schemas and infer types at compile time
 
 **iOS (Swift)** — generated types in `packages/protocol/generated/swift/Types.swift`:
 - Copy to `apps/ios/Sources/Generated/` if not auto-synced

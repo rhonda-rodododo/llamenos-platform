@@ -19,7 +19,6 @@ import {
 } from '../../api-helpers'
 
 Then('I should see shifts or the {string} message', async ({ page }, emptyMsg: string) => {
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD)
   const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
   const fallback = page.getByTestId(TestIds.FALLBACK_GROUP_CARD)

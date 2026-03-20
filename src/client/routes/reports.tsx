@@ -327,7 +327,7 @@ function ReportCard({ report, isSelected, onSelect, reportTypes }: {
       ? <span className="inline-block h-2.5 w-2.5 rounded-full bg-yellow-500" />
       : <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" />
 
-  const relativeTime = formatRelativeTime(report.lastMessageAt, t)
+  const relativeTime = formatRelativeTime(report.lastMessageAt ?? report.updatedAt, t)
 
   // Resolve report type name: prefer the typed system, fall back to category string
   const reportTypeName = report.metadata?.reportTypeId
@@ -405,7 +405,7 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
             {(report.metadata?.reportCategory || report.metadata?.reportTypeId) && (
               <>
                 <span className="mx-1">·</span>
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge data-testid="report-type-badge" variant="secondary" className="text-[10px]">
                   {report.metadata.reportCategory || report.metadata.reportTypeId}
                 </Badge>
               </>
@@ -425,7 +425,7 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
               {t('reports.closeReport', { defaultValue: 'Close' })}
             </Button>
           )}
-          <ReportStatusBadge status={report.status} />
+          <ReportStatusBadge status={report.status ?? 'active'} />
         </div>
       </div>
 

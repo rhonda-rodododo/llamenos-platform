@@ -3,9 +3,6 @@ Feature: Call Lifecycle Workflows
   Verify the complete lifecycle of calls from ring through completion,
   including note creation, history tracking, and multi-volunteer interactions.
 
-  Background:
-    Given the server is reset
-
   # ─── Full Lifecycle ──────────────────────────────────────────────────
 
   Scenario: Full call lifecycle — ring, answer, note, end, history

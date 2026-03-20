@@ -4,9 +4,6 @@ Feature: Template-Defined Report Types
   and configuration. Report types are stored as CMS definitions
   alongside entity types. Admins can CRUD report types via the API.
 
-  Background:
-    Given the server is reset
-
   @cms @templates
   Scenario: Apply template with report types
     Given case management is enabled

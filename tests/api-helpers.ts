@@ -149,6 +149,18 @@ export async function apiDelete<T = unknown>(
   return { status: res.status(), data: data as T }
 }
 
+export async function createHubViaApi(
+  request: APIRequestContext,
+  name: string,
+): Promise<string> {
+  const slug = name.toLowerCase().replace(/\s+/g, '-')
+  const { status, data } = await apiPost<{ id: string }>(request, '/hubs', { name, slug })
+  if (status !== 200 && status !== 201) {
+    throw new Error(`Failed to create hub: ${status}`)
+  }
+  return (data as { id: string }).id
+}
+
 // ── Unique Test Data Generators ───────────────────────────────────
 
 export function uniquePhone(): string {
@@ -170,72 +182,90 @@ export function generateTestKeypair(): { nsec: string; pubkey: string; skHex: st
   return { nsec, pubkey, skHex }
 }
 
-// ── Volunteer CRUD ────────────────────────────────────────────────
+// ── User CRUD ─────────────────────────────────────────────────────
 
-export interface CreateVolunteerResult {
+export interface CreateUserResult {
   pubkey: string
   nsec: string
   name: string
   phone: string
 }
 
-export async function createVolunteerViaApi(
+/** @deprecated Use CreateUserResult instead */
+export type CreateVolunteerResult = CreateUserResult
+
+export async function createUserViaApi(
   request: APIRequestContext,
   options?: { name?: string; phone?: string; roleIds?: string[] },
-): Promise<CreateVolunteerResult> {
-  const name = options?.name ?? uniqueName('TestVol')
+): Promise<CreateUserResult> {
+  const name = options?.name ?? uniqueName('TestUser')
   const phone = options?.phone ?? uniquePhone()
   const roleIds = options?.roleIds ?? ['role-volunteer']
 
   const { nsec, pubkey } = generateTestKeypair()
 
-  const { status, data } = await apiPost(request, '/volunteers', {
+  const { status, data } = await apiPost(request, '/users', {
     name, phone, roleIds, pubkey,
   })
 
   if (status !== 200 && status !== 201) {
-    throw new Error(`Failed to create volunteer: ${status}`)
+    throw new Error(`Failed to create user: ${status}`)
   }
 
   return { pubkey, nsec, name, phone }
 }
 
-export async function deleteVolunteerViaApi(
+/** @deprecated Use createUserViaApi instead */
+export const createVolunteerViaApi = createUserViaApi
+
+export async function deleteUserViaApi(
   request: APIRequestContext,
   pubkey: string,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/volunteers/${pubkey}`)
+  const { status } = await apiDelete(request, `/users/${pubkey}`)
   if (status !== 200) {
-    throw new Error(`Failed to delete volunteer: ${status}`)
+    throw new Error(`Failed to delete user: ${status}`)
   }
 }
 
-export async function listVolunteersViaApi(
+/** @deprecated Use deleteUserViaApi instead */
+export const deleteVolunteerViaApi = deleteUserViaApi
+
+export async function listUsersViaApi(
   request: APIRequestContext,
 ): Promise<Array<{ pubkey: string; name: string; phone: string; roles: string[]; active: boolean }>> {
-  const { status, data } = await apiGet<{ volunteers: Array<{ pubkey: string; name: string; phone: string; roles: string[]; active: boolean }> }>(request, '/volunteers')
-  if (status !== 200) throw new Error(`Failed to list volunteers: ${status}`)
-  return data.volunteers
+  const { status, data } = await apiGet<{ users: Array<{ pubkey: string; name: string; phone: string; roles: string[]; active: boolean }> }>(request, '/users')
+  if (status !== 200) throw new Error(`Failed to list users: ${status}`)
+  return data.users
 }
 
-export async function getVolunteerViaApi(
+/** @deprecated Use listUsersViaApi instead */
+export const listVolunteersViaApi = listUsersViaApi
+
+export async function getUserViaApi(
   request: APIRequestContext,
   pubkey: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/volunteers/${pubkey}`, nsec)
-  if (status !== 200) throw new Error(`Failed to get volunteer: ${status}`)
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/users/${pubkey}`, nsec)
+  if (status !== 200) throw new Error(`Failed to get user: ${status}`)
   return data
 }
 
-export async function updateVolunteerViaApi(
+/** @deprecated Use getUserViaApi instead */
+export const getVolunteerViaApi = getUserViaApi
+
+export async function updateUserViaApi(
   request: APIRequestContext,
   pubkey: string,
   updates: Record<string, unknown>,
 ): Promise<void> {
-  const { status } = await apiPatch(request, `/volunteers/${pubkey}`, updates)
-  if (status !== 200) throw new Error(`Failed to update volunteer: ${status}`)
+  const { status } = await apiPatch(request, `/users/${pubkey}`, updates)
+  if (status !== 200) throw new Error(`Failed to update user: ${status}`)
 }
+
+/** @deprecated Use updateUserViaApi instead */
+export const updateVolunteerViaApi = updateUserViaApi
 
 // ── Ban CRUD ──────────────────────────────────────────────────────
 
@@ -246,12 +276,12 @@ export interface CreateBanResult {
 
 export async function createBanViaApi(
   request: APIRequestContext,
-  options?: { phone?: string; reason?: string },
+  options?: { phone?: string; reason?: string; hubId?: string },
 ): Promise<CreateBanResult> {
   const phone = options?.phone ?? uniquePhone()
   const reason = options?.reason ?? 'E2E test ban'
 
-  const { status } = await apiPost(request, '/bans', { phone, reason })
+  const { status } = await apiPost(request, hubPath('/bans', options?.hubId), { phone, reason })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create ban: ${status}`)
   }
@@ -261,15 +291,17 @@ export async function createBanViaApi(
 export async function removeBanViaApi(
   request: APIRequestContext,
   phone: string,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/bans/${encodeURIComponent(phone)}`)
+  const { status } = await apiDelete(request, hubPath(`/bans/${encodeURIComponent(phone)}`, hubId))
   if (status !== 200) throw new Error(`Failed to remove ban: ${status}`)
 }
 
 export async function listBansViaApi(
   request: APIRequestContext,
+  hubId?: string,
 ): Promise<Array<{ phone: string; reason: string; bannedBy: string; bannedAt: string }>> {
-  const { status, data } = await apiGet<{ bans: Array<{ phone: string; reason: string; bannedBy: string; bannedAt: string }> }>(request, '/bans')
+  const { status, data } = await apiGet<{ bans: Array<{ phone: string; reason: string; bannedBy: string; bannedAt: string }> }>(request, hubPath('/bans', hubId))
   if (status !== 200) throw new Error(`Failed to list bans: ${status}`)
   return data.bans
 }
@@ -278,8 +310,9 @@ export async function bulkAddBansViaApi(
   request: APIRequestContext,
   phones: string[],
   reason: string,
+  hubId?: string,
 ): Promise<{ count: number }> {
-  const { status, data } = await apiPost<{ count: number }>(request, '/bans/bulk', { phones, reason })
+  const { status, data } = await apiPost<{ count: number }>(request, hubPath('/bans/bulk', hubId), { phones, reason })
   if (status !== 200) throw new Error(`Failed to bulk add bans: ${status}`)
   return data
 }
@@ -291,6 +324,11 @@ export interface CreateShiftResult {
   name: string
 }
 
+/** Resolve hub-scoped path prefix. Hub-scoped resources live at /hubs/:id/resource. */
+function hubPath(base: string, hubId?: string): string {
+  return hubId ? `/hubs/${hubId}${base}` : base
+}
+
 export async function createShiftViaApi(
   request: APIRequestContext,
   options?: {
@@ -298,36 +336,39 @@ export async function createShiftViaApi(
     startTime?: string
     endTime?: string
     days?: number[]
-    volunteerPubkeys?: string[]
+    userPubkeys?: string[]
+    hubId?: string
   },
 ): Promise<CreateShiftResult> {
   const name = options?.name ?? uniqueName('TestShift')
   const startTime = options?.startTime ?? '09:00'
   const endTime = options?.endTime ?? '17:00'
   const days = options?.days ?? [1, 2, 3, 4, 5]
-  const volunteerPubkeys = options?.volunteerPubkeys ?? []
+  const userPubkeys = options?.userPubkeys ?? []
 
-  const { status, data } = await apiPost<{ shift: { id: string } }>(request, '/shifts', {
-    name, startTime, endTime, days, volunteerPubkeys,
+  const { status, data } = await apiPost<{ id: string }>(request, hubPath('/shifts', options?.hubId), {
+    name, startTime, endTime, days, userPubkeys,
   })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create shift: ${status}`)
   }
-  return { id: data.shift.id, name }
+  return { id: data.id, name }
 }
 
 export async function deleteShiftViaApi(
   request: APIRequestContext,
   id: string,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/shifts/${id}`)
+  const { status } = await apiDelete(request, hubPath(`/shifts/${id}`, hubId))
   if (status !== 200) throw new Error(`Failed to delete shift: ${status}`)
 }
 
 export async function listShiftsViaApi(
   request: APIRequestContext,
-): Promise<Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; volunteerPubkeys: string[] }>> {
-  const { status, data } = await apiGet<{ shifts: Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; volunteerPubkeys: string[] }> }>(request, '/shifts')
+  hubId?: string,
+): Promise<Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }>> {
+  const { status, data } = await apiGet<{ shifts: Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> }>(request, hubPath('/shifts', hubId))
   if (status !== 200) throw new Error(`Failed to list shifts: ${status}`)
   return data.shifts
 }
@@ -335,16 +376,18 @@ export async function listShiftsViaApi(
 export async function updateShiftViaApi(
   request: APIRequestContext,
   id: string,
-  updates: { name?: string; startTime?: string; endTime?: string; days?: number[]; volunteerPubkeys?: string[] },
+  updates: { name?: string; startTime?: string; endTime?: string; days?: number[]; userPubkeys?: string[] },
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPatch(request, `/shifts/${id}`, updates)
+  const { status } = await apiPatch(request, hubPath(`/shifts/${id}`, hubId), updates)
   if (status !== 200) throw new Error(`Failed to update shift: ${status}`)
 }
 
 export async function getFallbackGroupViaApi(
   request: APIRequestContext,
+  hubId?: string,
 ): Promise<{ volunteers: string[] }> {
-  const { status, data } = await apiGet<{ volunteers: string[] }>(request, '/shifts/fallback')
+  const { status, data } = await apiGet<{ volunteers: string[] }>(request, hubPath('/shifts/fallback', hubId))
   if (status !== 200) throw new Error(`Failed to get fallback group: ${status}`)
   return data
 }
@@ -352,8 +395,9 @@ export async function getFallbackGroupViaApi(
 export async function setFallbackGroupViaApi(
   request: APIRequestContext,
   volunteers: string[],
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPut(request, '/shifts/fallback', { volunteerPubkeys: volunteers })
+  const { status } = await apiPut(request, hubPath('/shifts/fallback', hubId), { userPubkeys: volunteers })
   if (status !== 200) throw new Error(`Failed to set fallback group: ${status}`)
 }
 
@@ -443,14 +487,15 @@ export interface NoteRecord {
 
 export async function listNotesViaApi(
   request: APIRequestContext,
-  params?: { callId?: string; page?: number; limit?: number },
+  params?: { callId?: string; page?: number; limit?: number; hubId?: string },
 ): Promise<{ notes: NoteRecord[]; total: number }> {
   const qs = new URLSearchParams()
   if (params?.callId) qs.set('callId', params.callId)
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
   const qsStr = qs.toString()
-  const path = `/notes${qsStr ? `?${qsStr}` : ''}`
+  const base = `/notes${qsStr ? `?${qsStr}` : ''}`
+  const path = params?.hubId ? hubPath(base.split('?')[0], params.hubId) + (qsStr ? `?${qsStr}` : '') : base
   const { status, data } = await apiGet<{ notes: NoteRecord[]; total: number }>(request, path)
   if (status !== 200) throw new Error(`Failed to list notes: ${status}`)
   return data
@@ -470,7 +515,7 @@ export interface AuditEntry {
 
 export async function listAuditLogViaApi(
   request: APIRequestContext,
-  params?: { eventType?: string; search?: string; page?: number; limit?: number },
+  params?: { eventType?: string; search?: string; page?: number; limit?: number; hubId?: string },
 ): Promise<{ entries: AuditEntry[]; total: number }> {
   const qs = new URLSearchParams()
   if (params?.eventType) qs.set('eventType', params.eventType)
@@ -478,7 +523,7 @@ export async function listAuditLogViaApi(
   if (params?.page) qs.set('page', String(params.page))
   if (params?.limit) qs.set('limit', String(params.limit))
   const qsStr = qs.toString()
-  const path = `/audit${qsStr ? `?${qsStr}` : ''}`
+  const path = hubPath('/audit', params?.hubId) + (qsStr ? `?${qsStr}` : '')
   const { status, data } = await apiGet<{ entries: AuditEntry[]; total: number }>(request, path)
   if (status !== 200) throw new Error(`Failed to list audit log: ${status}`)
   return data
@@ -617,10 +662,10 @@ export async function getSpamSettingsViaApi(
 
 export async function getTranscriptionSettingsViaApi(
   request: APIRequestContext,
-): Promise<{ globalEnabled: boolean; allowVolunteerOptOut: boolean }> {
+): Promise<{ globalEnabled: boolean; allowUserOptOut: boolean }> {
   const { status, data } = await apiGet(request, '/settings/transcription')
   if (status !== 200) throw new Error(`Failed to get transcription settings: ${status}`)
-  return data as { globalEnabled: boolean; allowVolunteerOptOut: boolean }
+  return data as { globalEnabled: boolean; allowUserOptOut: boolean }
 }
 
 // ── Auth Verification ─────────────────────────────────────────────
@@ -662,6 +707,8 @@ export async function testEndpointAccess(
 export async function cleanupTestData(
   request: APIRequestContext,
   data: {
+    userPubkeys?: string[]
+    /** @deprecated Use userPubkeys instead */
     volunteerPubkeys?: string[]
     banPhones?: string[]
     shiftIds?: string[]
@@ -670,8 +717,8 @@ export async function cleanupTestData(
 ): Promise<void> {
   const errors: string[] = []
 
-  for (const pubkey of data.volunteerPubkeys ?? []) {
-    try { await deleteVolunteerViaApi(request, pubkey) } catch (e) { errors.push(String(e)) }
+  for (const pubkey of [...(data.userPubkeys ?? []), ...(data.volunteerPubkeys ?? [])]) {
+    try { await deleteUserViaApi(request, pubkey) } catch (e) { errors.push(String(e)) }
   }
   for (const phone of data.banPhones ?? []) {
     try { await removeBanViaApi(request, phone) } catch (e) { errors.push(String(e)) }
@@ -747,8 +794,8 @@ export async function createEntityTypeViaApi(
         indexable: false,
         indexType: 'none',
         accessLevel: 'all',
-        visibleToVolunteers: true,
-        editableByVolunteers: true,
+        visibleToUsers: true,
+        editableByUsers: true,
         hubEditable: true,
       })),
       numberPrefix: options?.numberPrefix,
@@ -930,8 +977,8 @@ export async function createCmsReportTypeViaApi(
         indexable: false,
         indexType: 'none',
         accessLevel: 'all',
-        visibleToVolunteers: true,
-        editableByVolunteers: true,
+        visibleToUsers: true,
+        editableByUsers: true,
         hubEditable: true,
         supportAudioInput: f.supportAudioInput ?? false,
       })),

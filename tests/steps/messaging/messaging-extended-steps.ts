@@ -76,7 +76,6 @@ Given('I have an active conversation', async ({ page }) => {
   const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasConvo) {
     await item.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -99,7 +98,6 @@ Given('I sent a message in a conversation', async ({ page }) => {
   const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasConvo) {
     await item.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -123,7 +121,6 @@ Given('I have an unassigned conversation', async ({ page }) => {
   const hasConvo = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasConvo) {
     await item.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 

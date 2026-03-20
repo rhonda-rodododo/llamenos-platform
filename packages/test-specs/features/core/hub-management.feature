@@ -7,7 +7,6 @@ Feature: Hub Management
 
   @backend
   Scenario: Create and list hubs via API
-    Given the server is reset
     And the admin creates a hub via API
     When the admin lists all hubs
     Then the hub list should contain at least 1 hub
@@ -15,7 +14,6 @@ Feature: Hub Management
 
   @backend
   Scenario: Create hub returns correct data
-    Given the server is reset
     When the admin creates a hub with name "Test Hub" and slug "test-hub"
     Then the response status should be 200
     And the created hub should have name "Test Hub"

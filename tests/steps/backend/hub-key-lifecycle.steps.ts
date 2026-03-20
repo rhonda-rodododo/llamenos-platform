@@ -5,7 +5,7 @@
  * and key rotation when members depart.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
 import {
   apiGet,
   apiPut,
@@ -40,15 +40,21 @@ interface HubKeyState {
   lastEnvelopeCount?: number
 }
 
-let hkState: HubKeyState
+const HUB_KEY_LIFECYCLE_KEY = 'hub_key_lifecycle'
 
-Before({ tags: '@crypto' }, async () => {
-  hkState = {
+function getHubKeyState(world: Record<string, unknown>): HubKeyState {
+  return getState<HubKeyState>(world, HUB_KEY_LIFECYCLE_KEY)
+}
+
+
+Before({ tags: '@crypto' }, async ({ world }) => {
+  const hkState = {
     members: new Map(),
     originalEnvelopes: new Map(),
     currentEnvelopes: new Map(),
     fetchResults: new Map(),
   }
+  setState(world, HUB_KEY_LIFECYCLE_KEY, hkState)
 })
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -75,16 +81,16 @@ async function createHub(request: import('@playwright/test').APIRequestContext):
 
 Given(
   'a hub with {int} members: {string}, {string}, and {string}',
-  async ({ request }, count: number, name1: string, name2: string, name3: string) => {
+  async ({ request, world }, count: number, name1: string, name2: string, name3: string) => {
     // Create the hub
-    hkState.hubId = await createHub(request)
+    getHubKeyState(world).hubId = await createHub(request)
 
     // Create 3 volunteer members
     for (const name of [name1, name2, name3]) {
       const vol = await createVolunteerViaApi(request, {
         name: `${name} ${Date.now()}`,
       })
-      hkState.members.set(name, {
+      getHubKeyState(world).members.set(name, {
         name,
         nsec: vol.nsec,
         pubkey: vol.pubkey,
@@ -97,40 +103,40 @@ Given(
 
 When(
   'the admin sets hub key envelopes for all {int} members',
-  async ({ request }, count: number) => {
-    expect(hkState.hubId).toBeTruthy()
+  async ({ request, world }, count: number) => {
+    expect(getHubKeyState(world).hubId).toBeTruthy()
 
     const envelopes: EnvelopeEntry[] = []
-    for (const [name, member] of hkState.members) {
+    for (const [name, member] of getHubKeyState(world).members) {
       const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
       envelopes.push(entry)
-      hkState.originalEnvelopes.set(name, entry.wrappedKey)
-      hkState.currentEnvelopes.set(name, entry.wrappedKey)
+      getHubKeyState(world).originalEnvelopes.set(name, entry.wrappedKey)
+      getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
     }
 
     const res = await apiPut(
       request,
-      `/hubs/${hkState.hubId}/key`,
+      `/hubs/${getHubKeyState(world).hubId}/key`,
       { envelopes },
     )
     expect(res.status).toBe(200)
   },
 )
 
-Given('hub key envelopes are set for all {int} members', async ({ request }, count: number) => {
-  expect(hkState.hubId).toBeTruthy()
+Given('hub key envelopes are set for all {int} members', async ({ request, world }, count: number) => {
+  expect(getHubKeyState(world).hubId).toBeTruthy()
 
   const envelopes: EnvelopeEntry[] = []
-  for (const [name, member] of hkState.members) {
+  for (const [name, member] of getHubKeyState(world).members) {
     const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
     envelopes.push(entry)
-    hkState.originalEnvelopes.set(name, entry.wrappedKey)
-    hkState.currentEnvelopes.set(name, entry.wrappedKey)
+    getHubKeyState(world).originalEnvelopes.set(name, entry.wrappedKey)
+    getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
   }
 
   const res = await apiPut(
     request,
-    `/hubs/${hkState.hubId}/key`,
+    `/hubs/${getHubKeyState(world).hubId}/key`,
     { envelopes },
   )
   expect(res.status).toBe(200)
@@ -140,66 +146,66 @@ Given('hub key envelopes are set for all {int} members', async ({ request }, cou
 
 Then(
   '{string} should be able to fetch their hub key envelope',
-  async ({ request }, name: string) => {
-    expect(hkState.hubId).toBeTruthy()
-    const member = hkState.members.get(name)
+  async ({ request, world }, name: string) => {
+    expect(getHubKeyState(world).hubId).toBeTruthy()
+    const member = getHubKeyState(world).members.get(name)
     expect(member).toBeTruthy()
 
     const res = await apiGet<{ envelope: { pubkey: string; wrappedKey: string; ephemeralPubkey: string } }>(
       request,
-      `/hubs/${hkState.hubId}/key`,
+      `/hubs/${getHubKeyState(world).hubId}/key`,
       member!.nsec,
     )
     expect(res.status).toBe(200)
     expect(res.data.envelope).toBeTruthy()
     expect(res.data.envelope.wrappedKey).toBeTruthy()
-    hkState.fetchResults.set(name, { status: res.status, envelope: res.data.envelope.wrappedKey })
+    getHubKeyState(world).fetchResults.set(name, { status: res.status, envelope: res.data.envelope.wrappedKey })
   },
 )
 
 Then('each envelope should be unique per member', async () => {
   const envelopes = new Set<string>()
-  for (const [, result] of hkState.fetchResults) {
+  for (const [, result] of getHubKeyState(world).fetchResults) {
     expect(result.envelope).toBeTruthy()
     envelopes.add(result.envelope!)
   }
   // All envelopes should be unique
-  expect(envelopes.size).toBe(hkState.fetchResults.size)
+  expect(envelopes.size).toBe(getHubKeyState(world).fetchResults.size)
 })
 
 // ── When: Remove member ───────────────────────────────────────────
 
-When('{string} is removed from the hub', async ({}, name: string) => {
+When('{string} is removed from the hub', async ({ world }, name: string) => {
   // Mark as removed in local state — omit from subsequent key PUTs.
   // Hub membership is modelled by envelope presence: a replace-all PUT that
   // excludes this member's entry causes setHubKeyEnvelopes to delete their row,
   // so their subsequent GET returns 404 ("No key envelope for this user").
-  // Do NOT call DELETE /volunteers/:pubkey — that permanently deletes the account,
+  // Do NOT call DELETE /users/:pubkey — that permanently deletes the account,
   // causing subsequent Schnorr auth to return 401 rather than 404 on GET /hubs/:id/key.
-  hkState.currentEnvelopes.delete(name)
+  getHubKeyState(world).currentEnvelopes.delete(name)
 })
 
 When(
   'the admin updates hub key envelopes for {string} and {string} only',
-  async ({ request }, name1: string, name2: string) => {
-    expect(hkState.hubId).toBeTruthy()
+  async ({ request, world }, name1: string, name2: string) => {
+    expect(getHubKeyState(world).hubId).toBeTruthy()
 
     const envelopes: EnvelopeEntry[] = []
     for (const name of [name1, name2]) {
-      const member = hkState.members.get(name)
+      const member = getHubKeyState(world).members.get(name)
       expect(member).toBeTruthy()
       const entry = generateMockEnvelopeEntry(member!.pubkey, 'rotated')
       envelopes.push(entry)
-      hkState.currentEnvelopes.set(name, entry.wrappedKey)
+      getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
     }
 
     const res = await apiPut(
       request,
-      `/hubs/${hkState.hubId}/key`,
+      `/hubs/${getHubKeyState(world).hubId}/key`,
       { envelopes },
     )
     expect(res.status).toBe(200)
-    hkState.lastEnvelopeCount = envelopes.length
+    getHubKeyState(world).lastEnvelopeCount = envelopes.length
   },
 )
 
@@ -207,18 +213,18 @@ When(
 
 Then(
   '{string} should receive {int} when fetching their hub key envelope',
-  async ({ request }, name: string, expectedStatus: number) => {
-    expect(hkState.hubId).toBeTruthy()
-    const member = hkState.members.get(name)
+  async ({ request, world }, name: string, expectedStatus: number) => {
+    expect(getHubKeyState(world).hubId).toBeTruthy()
+    const member = getHubKeyState(world).members.get(name)
     expect(member).toBeTruthy()
 
     const res = await apiGet(
       request,
-      `/hubs/${hkState.hubId}/key`,
+      `/hubs/${getHubKeyState(world).hubId}/key`,
       member!.nsec,
     )
     expect(res.status).toBe(expectedStatus)
-    hkState.fetchResults.set(name, { status: res.status })
+    getHubKeyState(world).fetchResults.set(name, { status: res.status })
   },
 )
 
@@ -226,34 +232,34 @@ Then(
 
 When(
   'a new hub key is generated and wrapped for remaining members only',
-  async ({ request }) => {
-    expect(hkState.hubId).toBeTruthy()
+  async ({ request, world }) => {
+    expect(getHubKeyState(world).hubId).toBeTruthy()
 
     const envelopes: EnvelopeEntry[] = []
-    for (const [name, member] of hkState.members) {
+    for (const [name, member] of getHubKeyState(world).members) {
       // Only wrap for members still tracked in currentEnvelopes (non-removed)
-      if (hkState.currentEnvelopes.has(name)) {
+      if (getHubKeyState(world).currentEnvelopes.has(name)) {
         const entry = generateMockEnvelopeEntry(member.pubkey, 'new-key')
         envelopes.push(entry)
-        hkState.currentEnvelopes.set(name, entry.wrappedKey)
+        getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
       }
     }
 
     const res = await apiPut(
       request,
-      `/hubs/${hkState.hubId}/key`,
+      `/hubs/${getHubKeyState(world).hubId}/key`,
       { envelopes },
     )
     expect(res.status).toBe(200)
-    hkState.lastEnvelopeCount = envelopes.length
+    getHubKeyState(world).lastEnvelopeCount = envelopes.length
   },
 )
 
 Then(
   "{string}'s new envelope should differ from the original",
-  async ({}, name: string) => {
-    const original = hkState.originalEnvelopes.get(name)
-    const current = hkState.currentEnvelopes.get(name)
+  async ({ world }, name: string) => {
+    const original = getHubKeyState(world).originalEnvelopes.get(name)
+    const current = getHubKeyState(world).currentEnvelopes.get(name)
     expect(original).toBeTruthy()
     expect(current).toBeTruthy()
     expect(current).not.toBe(original)
@@ -262,7 +268,7 @@ Then(
 
 Then(
   'the new envelopes should contain exactly {int} entries',
-  async ({}, count: number) => {
-    expect(hkState.lastEnvelopeCount).toBe(count)
+  async ({ world }, count: number) => {
+    expect(getHubKeyState(world).lastEnvelopeCount).toBe(count)
   },
 )

@@ -3,9 +3,6 @@ Feature: CMS Triage Queue
   Admins filter reports eligible for case conversion, track conversion
   status, and create cases linked to reports through the triage workflow.
 
-  Background:
-    Given the server is reset
-
   @triage
   Scenario: List triage queue returns only conversion-enabled report types
     Given case management is enabled

@@ -3,9 +3,6 @@ Feature: API Contract Validation
   Verify that all API endpoints validate request bodies against their Zod schemas
   and return proper error responses for invalid input.
 
-  Background:
-    Given the server is reset
-
   # ─── Pubkey Format Validation ──────────────────────────────────────
 
   Scenario: Create volunteer rejects invalid pubkey format

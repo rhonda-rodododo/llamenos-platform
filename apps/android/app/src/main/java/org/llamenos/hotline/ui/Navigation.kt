@@ -26,7 +26,7 @@ import org.llamenos.hotline.service.OfflineQueue
 import org.llamenos.hotline.ui.admin.AdminScreen
 import org.llamenos.hotline.ui.admin.SchemaBrowserScreen
 import org.llamenos.hotline.ui.admin.ShiftDetailScreen
-import org.llamenos.hotline.ui.admin.VolunteerDetailScreen
+import org.llamenos.hotline.ui.admin.UserDetailScreen
 import org.llamenos.hotline.ui.auth.AuthViewModel
 import org.llamenos.hotline.ui.calls.CallHistoryScreen
 import org.llamenos.hotline.ui.calls.CallHistoryViewModel
@@ -584,7 +584,7 @@ fun LlamenosNavigation(
 
         composable(LlamenosRoute.VolunteerDetail.ROUTE_PATTERN) { backStackEntry ->
             val pubkey = backStackEntry.arguments?.getString("pubkey") ?: ""
-            VolunteerDetailScreen(
+            UserDetailScreen(
                 pubkey = pubkey,
                 onNavigateBack = { navController.popBackStack() },
             )

@@ -3,9 +3,6 @@ Feature: CMS Contacts
   Admins and volunteers manage encrypted contact profiles
   in the contact directory with blind-index lookups.
 
-  Background:
-    Given the server is reset
-
   @contacts
   Scenario: Create contact with encrypted profile
     Given case management is enabled

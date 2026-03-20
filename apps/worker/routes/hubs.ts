@@ -9,6 +9,12 @@ import type { Hub } from '@shared/types'
 
 const routes = new Hono<AppEnv>()
 
+// Hub routes are not migrated to the entity-router factory — access control
+// and hub construction logic cannot be expressed in factory config. Hub
+// creation uses inline crypto.randomUUID() + slug generation; GET / and
+// GET /:hubId have non-standard access control checks (isSuperAdmin OR
+// hasHubAccess) that cannot be expressed via the factory's single domain prefix.
+
 // List hubs (filtered by user's membership, super admin sees all)
 routes.get('/',
   describeRoute({
@@ -29,7 +35,7 @@ routes.get('/',
   requirePermission('hubs:read'),
   async (c) => {
     const services = c.get('services')
-    const volunteer = c.get('volunteer')
+    const user = c.get('user')
     const permissions = c.get('permissions')
 
     const { hubs } = await services.settings.getHubs()
@@ -40,7 +46,7 @@ routes.get('/',
     }
 
     // Others see only their hubs
-    const userHubIds = new Set((volunteer.hubRoles || []).map(hr => hr.hubId))
+    const userHubIds = new Set((user.hubRoles || []).map(hr => hr.hubId))
     return c.json({ hubs: hubs.filter(h => h.status === 'active' && userHubIds.has(h.id)) })
   },
 )
@@ -114,7 +120,7 @@ routes.get('/:hubId',
   async (c) => {
     const hubId = c.req.param('hubId')
     const services = c.get('services')
-    const volunteer = c.get('volunteer')
+    const user = c.get('user')
     const permissions = c.get('permissions')
 
     try {
@@ -122,7 +128,7 @@ routes.get('/:hubId',
 
       // Check access
       const isSuperAdmin = checkPermission(permissions, '*')
-      const hasHubAccess = (volunteer.hubRoles || []).some(hr => hr.hubId === hubId)
+      const hasHubAccess = (user.hubRoles || []).some(hr => hr.hubId === hubId)
       if (!isSuperAdmin && !hasHubAccess) {
         return c.json({ error: 'Access denied' }, 403)
       }

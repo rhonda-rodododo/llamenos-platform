@@ -18,63 +18,58 @@ import {
   updateVolunteerViaApi,
 } from '../../api-helpers'
 
-// Stored role data for cross-step assertions
-let cachedRoles: Awaited<ReturnType<typeof listRolesViaApi>> = []
-let lastCreatedRoleId = ''
-
-When('I request the roles list', async ({ page, request }) => {
+When('I request the roles list', async ({ page, request, rolesWorld }) => {
   // Navigate to roles section in UI
   const rolesSection = page.locator('[data-settings-section]').filter({ hasText: /roles/i })
   if (await rolesSection.first().isVisible({ timeout: 2000 }).catch(() => false)) {
     await rolesSection.first().click()
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
   // Also fetch via API for behavioral verification
-  cachedRoles = await listRolesViaApi(request)
+  rolesWorld.cachedRoles = await listRolesViaApi(request)
 })
 
-Then('I should see at least {int} roles', async ({}, count: number) => {
+Then('I should see at least {int} roles', async ({ rolesWorld }, count: number) => {
   // API verification: at least 'count' roles exist
   // UI may not have role-row elements yet (roles admin page is API-driven)
-  expect(cachedRoles.length).toBeGreaterThanOrEqual(count)
+  expect(rolesWorld.cachedRoles.length).toBeGreaterThanOrEqual(count)
 })
 
-Then('I should see {string} role', async ({}, roleName: string) => {
+Then('I should see {string} role', async ({ rolesWorld }, roleName: string) => {
   // API verification — roles page UI may not have role-row elements
-  const found = cachedRoles.find(r => r.name === roleName)
+  const found = rolesWorld.cachedRoles.find(r => r.name === roleName)
   expect(found).toBeTruthy()
 })
 
-Then('the {string} role should have wildcard permission', async ({ request }, roleName: string) => {
+Then('the {string} role should have wildcard permission', async ({ request, rolesWorld }, roleName: string) => {
   // Re-fetch if needed
-  if (cachedRoles.length === 0) {
-    cachedRoles = await listRolesViaApi(request)
+  if (rolesWorld.cachedRoles.length === 0) {
+    rolesWorld.cachedRoles = await listRolesViaApi(request)
   }
-  const role = cachedRoles.find(r => r.name === roleName)
+  const role = rolesWorld.cachedRoles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
   expect(role!.permissions).toContain('*')
 })
 
-Then('the {string} role should be a system role', async ({ request }, roleName: string) => {
-  if (cachedRoles.length === 0) {
-    cachedRoles = await listRolesViaApi(request)
+Then('the {string} role should be a system role', async ({ request, rolesWorld }, roleName: string) => {
+  if (rolesWorld.cachedRoles.length === 0) {
+    rolesWorld.cachedRoles = await listRolesViaApi(request)
   }
-  const role = cachedRoles.find(r => r.name === roleName)
+  const role = rolesWorld.cachedRoles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
   expect(role!.isSystem).toBe(true)
 })
 
-Then('the {string} role should be the default role', async ({ request }, roleName: string) => {
-  if (cachedRoles.length === 0) {
-    cachedRoles = await listRolesViaApi(request)
+Then('the {string} role should be the default role', async ({ request, rolesWorld }, roleName: string) => {
+  if (rolesWorld.cachedRoles.length === 0) {
+    rolesWorld.cachedRoles = await listRolesViaApi(request)
   }
-  const role = cachedRoles.find(r => r.name === roleName)
+  const role = rolesWorld.cachedRoles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
   expect(role!.isDefault).toBe(true)
 })
 
-When('I create a custom role {string} with permissions', async ({ page, request }, roleName: string) => {
+When('I create a custom role {string} with permissions', async ({ page, request, rolesWorld }, roleName: string) => {
   // Create via API for reliability, then verify in UI
   const slug = roleName.toLowerCase().replace(/\s+/g, '-')
   try {
@@ -83,13 +78,13 @@ When('I create a custom role {string} with permissions', async ({ page, request 
       slug,
       permissions: ['calls:read', 'calls:list'],
     })
-    lastCreatedRoleId = role.id
+    rolesWorld.lastCreatedRoleId = role.id
   } catch {
     // Role may already exist — try to find it
     const roles = await listRolesViaApi(request)
     const existing = roles.find(r => r.slug === slug)
     if (existing) {
-      lastCreatedRoleId = existing.id
+      rolesWorld.lastCreatedRoleId = existing.id
     }
   }
 
@@ -102,10 +97,10 @@ When('I create a custom role {string} with permissions', async ({ page, request 
   }
 })
 
-Then('the role should be created successfully', async ({ request }) => {
+Then('the role should be created successfully', async ({ request, rolesWorld }) => {
   // Verify via API that the role exists
   const roles = await listRolesViaApi(request)
-  const found = roles.find(r => r.id === lastCreatedRoleId)
+  const found = roles.find(r => r.id === rolesWorld.lastCreatedRoleId)
   expect(found).toBeTruthy()
 })
 
@@ -115,7 +110,7 @@ Then('the role slug should be {string}', async ({ request }, slug: string) => {
   expect(found).toBeTruthy()
 })
 
-Given('a custom role {string} exists', async ({ request }, roleName: string) => {
+Given('a custom role {string} exists', async ({ request, rolesWorld }, roleName: string) => {
   const slug = roleName.toLowerCase().replace(/\s+/g, '-')
   const roles = await listRolesViaApi(request)
   let role = roles.find(r => r.slug === slug)
@@ -131,14 +126,14 @@ Given('a custom role {string} exists', async ({ request }, roleName: string) => 
     }
   }
   if (role?.id) {
-    lastCreatedRoleId = role.id
+    rolesWorld.lastCreatedRoleId = role.id
   }
 })
 
-When('I delete the {string} role', async ({ page, request }, roleName: string) => {
+When('I delete the {string} role', async ({ page, request, rolesWorld }, roleName: string) => {
   // Delete via API
-  if (lastCreatedRoleId) {
-    const result = await deleteRoleViaApi(request, lastCreatedRoleId)
+  if (rolesWorld.lastCreatedRoleId) {
+    const result = await deleteRoleViaApi(request, rolesWorld.lastCreatedRoleId)
     expect(result.status).toBe(200)
   }
 
@@ -150,10 +145,10 @@ When('I delete the {string} role', async ({ page, request }, roleName: string) =
   }
 })
 
-Then('the role should be removed', async ({ request }) => {
+Then('the role should be removed', async ({ request, rolesWorld }) => {
   // API verification: role is gone
   const roles = await listRolesViaApi(request)
-  const found = roles.find(r => r.id === lastCreatedRoleId)
+  const found = roles.find(r => r.id === rolesWorld.lastCreatedRoleId)
   expect(found).toBeUndefined()
 })
 
@@ -198,9 +193,9 @@ Then('the volunteer should have the {string} role', async ({ page }, roleName: s
   await expect(anyRow).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I request the {string} role details', async ({ request }, roleName: string) => {
-  cachedRoles = await listRolesViaApi(request)
-  const role = cachedRoles.find(r => r.name === roleName)
+When('I request the {string} role details', async ({ request, rolesWorld }, roleName: string) => {
+  rolesWorld.cachedRoles = await listRolesViaApi(request)
+  const role = rolesWorld.cachedRoles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
   ;(globalThis as Record<string, unknown>).__test_inspected_role = role
 })
@@ -270,18 +265,18 @@ Then('I should see an invalid slug error', async ({ page }) => {
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I update the role permissions', async ({ request }) => {
-  if (lastCreatedRoleId) {
+When('I update the role permissions', async ({ request, rolesWorld }) => {
+  if (rolesWorld.lastCreatedRoleId) {
     const { updateRoleViaApi } = await import('../../api-helpers')
-    await updateRoleViaApi(request, lastCreatedRoleId, {
+    await updateRoleViaApi(request, rolesWorld.lastCreatedRoleId, {
       permissions: ['calls:read', 'calls:list', 'notes:read'],
     })
   }
 })
 
-Then('the permissions should be updated', async ({ request }) => {
+Then('the permissions should be updated', async ({ request, rolesWorld }) => {
   const roles = await listRolesViaApi(request)
-  const role = roles.find(r => r.id === lastCreatedRoleId)
+  const role = roles.find(r => r.id === rolesWorld.lastCreatedRoleId)
   expect(role).toBeTruthy()
   expect(role!.permissions).toContain('notes:read')
 })

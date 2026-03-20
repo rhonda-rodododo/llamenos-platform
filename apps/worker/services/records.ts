@@ -265,18 +265,18 @@ export class RecordsService {
     return ban
   }
 
-  async listBans(hubId?: string): Promise<BanRow[]> {
-    if (hubId) {
-      return this.db
-        .select()
-        .from(bans)
-        .where(eq(bans.hubId, hubId))
-        .orderBy(desc(bans.bannedAt))
-    }
-    return this.db
-      .select()
-      .from(bans)
-      .orderBy(desc(bans.bannedAt))
+  async listBans(hubId?: string): Promise<{ bans: BanRow[] }> {
+    const rows = hubId
+      ? await this.db
+          .select()
+          .from(bans)
+          .where(eq(bans.hubId, hubId))
+          .orderBy(desc(bans.bannedAt))
+      : await this.db
+          .select()
+          .from(bans)
+          .orderBy(desc(bans.bannedAt))
+    return { bans: rows }
   }
 
   async bulkAddBans(

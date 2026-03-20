@@ -66,7 +66,7 @@ export function ConversationThread({ conversationId, messages, isLoading, compac
     }
   }
 
-  function StatusIcon({ status }: { status?: MessageDeliveryStatus }) {
+  function StatusIcon({ status }: { status?: string }) {
     switch (status) {
       case 'pending':
         return <Clock className="h-3 w-3" />

@@ -1,11 +1,24 @@
+// Infrastructure types — worker-internal only, never sent to client as wire format.
+//
+// Entity types that match @protocol/schemas exactly are re-exported below.
+// Types with extra storage-only fields (encryptedSecretKey, callerNumber, etc.)
+// are defined here as server-internal storage types.
+
 import type { MessagingChannelType, RecipientEnvelope, KeyEnvelope } from '@shared/types'
 
-/**
- * Environment bindings.
- *
- * These are the shared interfaces for blob storage, transcription, and other
- * platform services. Structural typing — only the methods we actually call.
- */
+// ---------------------------------------------------------------------------
+// Re-exports of entity types whose schema matches storage shape exactly
+// ---------------------------------------------------------------------------
+export type { Shift } from '@protocol/schemas/shifts'
+export type { BanEntry } from '@protocol/schemas/bans'
+export type { AuditLogEntry } from '@protocol/schemas/audit'
+export type { EncryptedNote } from '@protocol/schemas/notes'
+export type { InviteCode } from '@protocol/schemas/invites'
+export type { WebAuthnSettings } from '@protocol/schemas/settings'
+
+// ---------------------------------------------------------------------------
+// Platform service interfaces (structural typing)
+// ---------------------------------------------------------------------------
 
 /** Blob storage interface (MinIO/S3). */
 export interface BlobStorage {
@@ -19,29 +32,7 @@ export interface TranscriptionService {
   run(model: string, input: { audio: number[] }): Promise<{ text: string }>
 }
 
-/** Minimal DurableObjectStub — only .fetch() is used */
-export interface DOStub {
-  fetch(request: Request): Promise<Response>
-}
-
-/** Minimal DurableObjectNamespace — only .idFromName() and .get() are used */
-export interface DONamespace {
-  idFromName(name: string): { toString(): string }
-  get(id: { toString(): string }): DOStub
-}
-
 export interface Env {
-  // Durable Object namespaces (CF: DurableObjectNamespace, Node: shim)
-  CALL_ROUTER: DONamespace
-  SHIFT_MANAGER: DONamespace
-  IDENTITY_DO: DONamespace
-  SETTINGS_DO: DONamespace
-  RECORDS_DO: DONamespace
-  CONVERSATION_DO: DONamespace
-  BLAST_DO: DONamespace
-  CONTACT_DIRECTORY: DONamespace
-  CASE_MANAGER: DONamespace
-
   // Transcription (CF: Ai binding, Node: Whisper HTTP client)
   AI: TranscriptionService
 
@@ -88,10 +79,12 @@ export interface Env {
   FCM_SERVICE_ACCOUNT_KEY?: string  // Google Cloud service account JSON
 
   // Pre-configured NostrPublisher (self-hosted only — set by createBunEnv with outbox wired)
-  NOSTR_PUBLISHER?: import('./lib/nostr-publisher').NostrPublisher
+  NOSTR_PUBLISHER?: import('../lib/nostr-publisher').NostrPublisher
 }
 
-// --- Push Notification Types (Epic 86) ---
+// ---------------------------------------------------------------------------
+// Push Notification Types (Epic 86)
+// ---------------------------------------------------------------------------
 
 export interface DeviceRecord {
   platform: 'ios' | 'android'
@@ -123,10 +116,16 @@ export interface FullPushPayload extends WakePayload {
   role?: string
 }
 
-/** @deprecated Use roles array + permission system instead */
-export type UserRole = 'volunteer' | 'admin' | 'reporter'
+// ---------------------------------------------------------------------------
+// Storage-level entity types (extra fields beyond API response schemas)
+// ---------------------------------------------------------------------------
 
-export interface Volunteer {
+/**
+ * Server-internal User record — includes storage-only fields
+ * (encryptedSecretKey, hubRoles) not present in the API response schema.
+ * See @protocol/schemas/users for the API response type.
+ */
+export interface User {
   pubkey: string
   name: string
   phone: string
@@ -151,23 +150,11 @@ export interface Volunteer {
   supervisorPubkey?: string         // Who reviews this volunteer's cases
 }
 
-export interface Shift {
-  id: string
-  name: string
-  startTime: string
-  endTime: string
-  days: number[]
-  volunteerPubkeys: string[]
-  createdAt: string
-}
-
-export interface BanEntry {
-  phone: string
-  reason: string
-  bannedBy: string
-  bannedAt: string
-}
-
+/**
+ * Server-internal CallRecord — callerNumber is required (routing data).
+ * The API response schema (callRecordResponseSchema) has callerNumber optional
+ * because it's added client-side after decryption.
+ */
 export interface CallRecord {
   id: string
   callerNumber: string
@@ -182,6 +169,58 @@ export interface CallRecord {
   recordingSid?: string
   hasRecording?: boolean
 }
+
+/**
+ * Server-internal SpamSettings — all fields required (stored state).
+ * The schema (spamSettingsSchema) uses optional fields for partial updates.
+ */
+export interface SpamSettings {
+  voiceCaptchaEnabled: boolean
+  rateLimitEnabled: boolean
+  maxCallsPerMinute: number
+  blockDurationMinutes: number
+}
+
+/**
+ * Server-internal CallSettings — all fields required (stored state).
+ * The schema (callSettingsSchema) uses optional fields for partial updates.
+ */
+export interface CallSettings {
+  queueTimeoutSeconds: number   // 30-300, default 90
+  voicemailMaxSeconds: number   // 30-300, default 120
+}
+
+/**
+ * Server-internal WebAuthnCredential — full storage record.
+ * The API response schema strips some fields.
+ */
+export interface WebAuthnCredential {
+  id: string              // Base64URL credential ID
+  publicKey: string       // Base64URL public key bytes
+  counter: number         // Signature counter (clone detection)
+  transports: string[]    // ['internal', 'hybrid', etc.]
+  backedUp: boolean       // Cloud-synced passkey
+  label: string           // User-assigned name ("My Phone")
+  createdAt: string
+  lastUsedAt: string
+}
+
+export interface ServerSession {
+  token: string           // Random 256-bit hex
+  pubkey: string          // Which user
+  createdAt: string
+  expiresAt: string       // 8-hour expiry
+}
+
+export interface AuthPayload {
+  pubkey: string
+  timestamp: number
+  token: string
+}
+
+// ---------------------------------------------------------------------------
+// Encrypted call record history (Epic 77) — server-internal only
+// ---------------------------------------------------------------------------
 
 /**
  * Encrypted call record for history storage (Epic 77).
@@ -219,90 +258,16 @@ export interface CallRecordMetadata {
   callerNumber: string           // HMAC-hashed phone number
 }
 
-export interface EncryptedNote {
-  id: string
-  callId?: string              // links to a voice call
-  conversationId?: string      // links to a conversation (NEW: Epic 123)
-  contactHash?: string         // links to a contact for contact-level view (NEW: Epic 123)
-  authorPubkey: string
-  encryptedContent: string
-  createdAt: string
-  updatedAt: string
-  ephemeralPubkey?: string // hex-encoded, present for server-encrypted transcriptions (ECIES)
-  // V2 per-note ECIES envelopes (forward secrecy)
-  authorEnvelope?: KeyEnvelope
-  adminEnvelopes?: RecipientEnvelope[]
-  replyCount?: number          // cached count of replies (NEW: Epic 123)
-}
-
-export interface AuditLogEntry {
-  id: string
-  event: string
-  actorPubkey: string
-  details: Record<string, unknown>
-  createdAt: string
-  // Tamper detection (Epic 77)
-  previousEntryHash?: string     // SHA-256 of previous entry (chain link)
-  entryHash?: string             // SHA-256 of this entry's content (for chain verification)
-}
-
-export interface SpamSettings {
-  voiceCaptchaEnabled: boolean
-  rateLimitEnabled: boolean
-  maxCallsPerMinute: number
-  blockDurationMinutes: number
-}
-
-export interface CallSettings {
-  queueTimeoutSeconds: number   // 30-300, default 90
-  voicemailMaxSeconds: number   // 30-300, default 120
-}
-
-export interface InviteCode {
-  code: string
-  name: string
-  phone: string
-  roleIds: string[]          // Role IDs to assign on redemption
-  createdBy: string
-  createdAt: string
-  expiresAt: string
-  usedAt?: string
-  usedBy?: string
-}
-
-export interface WebAuthnCredential {
-  id: string              // Base64URL credential ID
-  publicKey: string       // Base64URL public key bytes
-  counter: number         // Signature counter (clone detection)
-  transports: string[]    // ['internal', 'hybrid', etc.]
-  backedUp: boolean       // Cloud-synced passkey
-  label: string           // User-assigned name ("My Phone")
-  createdAt: string
-  lastUsedAt: string
-}
-
-export interface WebAuthnSettings {
-  requireForAdmins: boolean
-  requireForVolunteers: boolean
-}
-
-export interface ServerSession {
-  token: string           // Random 256-bit hex
-  pubkey: string          // Which user
-  createdAt: string
-  expiresAt: string       // 8-hour expiry
-}
-
-export interface AuthPayload {
-  pubkey: string
-  timestamp: number
-  token: string
-}
-
-// --- Conversation / Messaging Types ---
+// ---------------------------------------------------------------------------
+// Conversation / Messaging — server-internal storage types
+// ---------------------------------------------------------------------------
 
 export type ConversationStatus = 'active' | 'waiting' | 'closed'
 
+/**
+ * Server-internal Conversation record — lastMessageAt required, metadata has
+ * customFieldValues. The API schema has some fields optional.
+ */
 export interface Conversation {
   id: string
   channelType: MessagingChannelType | 'web'
@@ -356,7 +321,9 @@ export interface EncryptedMessage {
 /** @deprecated Use RecipientEnvelope from @shared/types instead. */
 export type MessageKeyEnvelope = RecipientEnvelope
 
-// --- Blast Queue ---
+// ---------------------------------------------------------------------------
+// Blast Queue — server-internal delivery tracking
+// ---------------------------------------------------------------------------
 
 export interface BlastQueueItem {
   subscriberId: string
@@ -374,12 +341,15 @@ export interface BlastDeliveryQueue {
   totalCount: number
 }
 
+// ---------------------------------------------------------------------------
 // Hono typed context
+// ---------------------------------------------------------------------------
+
 export type AppEnv = {
   Bindings: Env
   Variables: {
     pubkey: string
-    volunteer: Volunteer
+    user: User
     /** Effective permissions resolved from all roles */
     permissions: string[]
     /** All role definitions (loaded once per request) */
@@ -391,6 +361,6 @@ export type AppEnv = {
     /** Unique request ID for correlation (set by request-id middleware) */
     requestId: string
     /** Service registry — replaces DO stubs */
-    services: import('./services').Services
+    services: import('../services').Services
   }
 }

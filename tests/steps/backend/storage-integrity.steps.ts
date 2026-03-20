@@ -6,7 +6,7 @@
  * to catch double-serialization bugs.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
 import {
   apiGet,
   apiPost,
@@ -47,9 +47,14 @@ interface StorageIntegrityState {
   adminPubkey?: string
 }
 
-let s: StorageIntegrityState
+const STORAGE_INTEGRITY_KEY = 'storage_integrity'
 
-Before(async ({}) => {
+function getStorageIntegrityState(world: Record<string, unknown>): StorageIntegrityState {
+  return getState<StorageIntegrityState>(world, STORAGE_INTEGRITY_KEY)
+}
+
+
+Before(async ({ world }) => {
   s = {
     entityIds: new Map(),
     apiResponses: new Map(),
@@ -67,13 +72,13 @@ function nsecToSkHex(nsec: string): string {
 
 // ── Given: Entity creation ──────────────────────────────────────────
 
-Given('a {string} entity is created via the API with structured JSONB data', async ({ request }, entityType: string) => {
+Given('a {string} entity is created via the API with structured JSONB data', async ({ request, world }, entityType: string) => {
   switch (entityType) {
     case 'note with envelopes': {
       // Create a real volunteer first with a known keypair
       const volKp = generateTestKeypair()
-      s.volunteerKp = volKp
-      const regResult = await apiPost(request, '/volunteers', {
+      getStorageIntegrityState(world).volunteerKp = volKp
+      const regResult = await apiPost(request, '/users', {
         name: `StorageVol ${Date.now()}`,
         phone: uniquePhone(),
         roleIds: ['role-volunteer'],
@@ -101,8 +106,8 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
         volKp.nsec,
       )
       expect([200, 201]).toContain(status)
-      s.entityIds.set(entityType, data.note.id as string)
-      s.apiResponses.set(entityType, data.note)
+      getStorageIntegrityState(world).entityIds.set(entityType, data.note.id as string)
+      getStorageIntegrityState(world).apiResponses.set(entityType, data.note)
       break
     }
 
@@ -123,8 +128,8 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
       if (status === 200 || status === 201) {
         const record = (data as Record<string, unknown>).record ?? data
         const id = (record as Record<string, unknown>).id as string
-        s.entityIds.set(entityType, id)
-        s.apiResponses.set(entityType, record as Record<string, unknown>)
+        getStorageIntegrityState(world).entityIds.set(entityType, id)
+        getStorageIntegrityState(world).apiResponses.set(entityType, record as Record<string, unknown>)
       } else {
         // If cases endpoint needs different structure, try alternate
         expect([200, 201]).toContain(status)
@@ -141,7 +146,7 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
         body: 'Storage test message',
         channel: 'sms',
       })
-      s.entityIds.set(entityType, result.conversationId)
+      getStorageIntegrityState(world).entityIds.set(entityType, result.conversationId)
 
       // Fetch it to get the full record
       const { status, data } = await apiGet<Record<string, unknown>>(
@@ -149,7 +154,7 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
         `/conversations/${result.conversationId}`,
       )
       expect(status).toBe(200)
-      s.apiResponses.set(entityType, data)
+      getStorageIntegrityState(world).apiResponses.set(entityType, data)
       break
     }
   }
@@ -197,10 +202,10 @@ Given('the {string} settings are updated via the API with structured data', asyn
   expect([200, 204]).toContain(status)
 })
 
-Given('a registered volunteer {string} with a known keypair', async ({ request }, name: string) => {
+Given('a registered volunteer {string} with a known keypair', async ({ request, world }, name: string) => {
   const kp = generateTestKeypair()
-  s.volunteerKp = kp
-  const { status } = await apiPost(request, '/volunteers', {
+  getStorageIntegrityState(world).volunteerKp = kp
+  const { status } = await apiPost(request, '/users', {
     name: `StorageEnv ${name} ${Date.now()}`,
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
@@ -209,22 +214,22 @@ Given('a registered volunteer {string} with a known keypair', async ({ request }
   expect([200, 201]).toContain(status)
 })
 
-Given('the admin keypair is known for envelope verification', async ({}) => {
+Given('the admin keypair is known for envelope verification', async ({ world }) => {
   const adminSkHex = nsecToSkHex(ADMIN_NSEC)
   const adminPubkey = getPublicKey(hexToBytes(adminSkHex))
-  s.adminSkHex = adminSkHex
-  s.adminPubkey = adminPubkey
+  getStorageIntegrityState(world).adminSkHex = adminSkHex
+  getStorageIntegrityState(world).adminPubkey = adminPubkey
 })
 
 // ── When: Fetch ─────────────────────────────────────────────────────
 
-When('the {string} is fetched via the API', async ({ request }, entityType: string) => {
-  const id = s.entityIds.get(entityType)
+When('the {string} is fetched via the API', async ({ request, world }, entityType: string) => {
+  const id = getStorageIntegrityState(world).entityIds.get(entityType)
   expect(id).toBeDefined()
 
   switch (entityType) {
     case 'note with envelopes': {
-      const volKp = s.volunteerKp
+      const volKp = getStorageIntegrityState(world).volunteerKp
       const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
         request,
         '/notes',
@@ -232,7 +237,7 @@ When('the {string} is fetched via the API', async ({ request }, entityType: stri
       )
       expect(status).toBe(200)
       const note = data.notes.find(n => n.id === id)
-      if (note) s.apiResponses.set(entityType, note)
+      if (note) getStorageIntegrityState(world).apiResponses.set(entityType, note)
       break
     }
 
@@ -243,7 +248,7 @@ When('the {string} is fetched via the API', async ({ request }, entityType: stri
       )
       expect(status).toBe(200)
       const record = (data as Record<string, unknown>).record ?? data
-      s.apiResponses.set(entityType, record as Record<string, unknown>)
+      getStorageIntegrityState(world).apiResponses.set(entityType, record as Record<string, unknown>)
       break
     }
 
@@ -253,14 +258,14 @@ When('the {string} is fetched via the API', async ({ request }, entityType: stri
         `/conversations/${id}`,
       )
       expect(status).toBe(200)
-      s.apiResponses.set(entityType, data)
+      getStorageIntegrityState(world).apiResponses.set(entityType, data)
       break
     }
   }
 })
 
-When('the {string} row is fetched directly from the database', async ({}, entityType: string) => {
-  const id = s.entityIds.get(entityType)
+When('the {string} row is fetched directly from the database', async ({ world }, entityType: string) => {
+  const id = getStorageIntegrityState(world).entityIds.get(entityType)
   expect(id).toBeDefined()
 
   let tableName: string
@@ -280,16 +285,16 @@ When('the {string} row is fetched directly from the database', async ({}, entity
 
   const row = await TestDB.getRow(tableName, id!)
   expect(row).not.toBeNull()
-  s.dbRows.set(entityType, row!)
+  getStorageIntegrityState(world).dbRows.set(entityType, row!)
 })
 
-When('the settings are fetched via the API', async ({ request }) => {
+When('the settings are fetched via the API', async ({ request, world }) => {
   const { status, data } = await apiGet<Record<string, unknown>>(request, '/settings')
   expect(status).toBe(200)
-  s.apiResponses.set('settings', data)
+  getStorageIntegrityState(world).apiResponses.set('settings', data)
 })
 
-When('the system_settings row is fetched directly from the database', async ({}) => {
+When('the system_settings row is fetched directly from the database', async ({ world }) => {
   // system_settings has integer PK = 1
   const rows = await TestDB.getRow('system_settings', '1')
   // system_settings may use integer id, try alternate fetch
@@ -298,21 +303,21 @@ When('the system_settings row is fetched directly from the database', async ({})
     // getRow expects text id but system_settings has integer id
     // Store a placeholder — the jsonb assertion will use assertJsonbField which handles this
   }
-  s.dbRows.set('settings', rows ?? {})
+  getStorageIntegrityState(world).dbRows.set('settings', rows ?? {})
 })
 
-When('the volunteer creates a note with real ECIES envelopes', async ({ request }) => {
-  expect(s.volunteerKp).toBeDefined()
-  expect(s.adminPubkey).toBeDefined()
+When('the volunteer creates a note with real ECIES envelopes', async ({ request, world }) => {
+  expect(getStorageIntegrityState(world).volunteerKp).toBeDefined()
+  expect(getStorageIntegrityState(world).adminPubkey).toBeDefined()
 
   const contentKey = generateContentKey()
   const ciphertextHex = encryptContent('Envelope accuracy test', contentKey, LABEL_NOTE_KEY)
 
-  const authorEnv = wrapKeyForRecipient(contentKey, s.volunteerKp!.pubkey, s.volunteerKp!.skHex, LABEL_NOTE_KEY)
-  const adminEnv = wrapKeyForRecipient(contentKey, s.adminPubkey!, s.adminSkHex!, LABEL_NOTE_KEY)
+  const authorEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).volunteerKp!.pubkey, getStorageIntegrityState(world).volunteerKp!.skHex, LABEL_NOTE_KEY)
+  const adminEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).adminPubkey!, getStorageIntegrityState(world).adminSkHex!, LABEL_NOTE_KEY)
 
-  s.submittedAuthorEnvelope = authorEnv
-  s.submittedEnvelopes = [{ pubkey: s.adminPubkey!, ...adminEnv }]
+  getStorageIntegrityState(world).submittedAuthorEnvelope = authorEnv
+  getStorageIntegrityState(world).submittedEnvelopes = [{ pubkey: getStorageIntegrityState(world).adminPubkey!, ...adminEnv }]
 
   const { status, data } = await apiPost<{ note: Record<string, unknown> }>(
     request,
@@ -321,44 +326,44 @@ When('the volunteer creates a note with real ECIES envelopes', async ({ request 
       encryptedContent: ciphertextHex,
       callId: `envelope-accuracy-${Date.now()}`,
       authorEnvelope: authorEnv,
-      adminEnvelopes: s.submittedEnvelopes,
+      adminEnvelopes: getStorageIntegrityState(world).submittedEnvelopes,
     },
-    s.volunteerKp!.nsec,
+    getStorageIntegrityState(world).volunteerKp!.nsec,
   )
   expect([200, 201]).toContain(status)
-  s.entityIds.set('envelope-note', data.note.id as string)
-  s.apiResponses.set('envelope-note', data.note)
+  getStorageIntegrityState(world).entityIds.set('envelope-note', data.note.id as string)
+  getStorageIntegrityState(world).apiResponses.set('envelope-note', data.note)
 })
 
-When('the note is fetched via the API', async ({ request }) => {
-  const id = s.entityIds.get('envelope-note')
+When('the note is fetched via the API', async ({ request, world }) => {
+  const id = getStorageIntegrityState(world).entityIds.get('envelope-note')
   expect(id).toBeDefined()
 
   const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
     request,
     '/notes',
-    s.volunteerKp?.nsec,
+    getStorageIntegrityState(world).volunteerKp?.nsec,
   )
   expect(status).toBe(200)
   const note = data.notes.find(n => n.id === id)
-  if (note) s.apiResponses.set('envelope-note', note)
+  if (note) getStorageIntegrityState(world).apiResponses.set('envelope-note', note)
 })
 
-When('the envelope note row is fetched directly from the database', async ({}) => {
-  const id = s.entityIds.get('envelope-note')
+When('the envelope note row is fetched directly from the database', async ({ world }) => {
+  const id = getStorageIntegrityState(world).entityIds.get('envelope-note')
   expect(id).toBeDefined()
 
   const row = await TestDB.getRow('notes', id!)
   expect(row).not.toBeNull()
-  s.dbRows.set('envelope-note', row!)
+  getStorageIntegrityState(world).dbRows.set('envelope-note', row!)
 })
 
 // ── Then: API response assertions ───────────────────────────────────
 
-Then('the API response {word} should be a proper {word}', async ({}, jsonbField: string, expectedType: string) => {
+Then('the API response {word} should be a proper {word}', async ({ world }, jsonbField: string, expectedType: string) => {
   // Find the latest API response that has the field
   let value: unknown
-  for (const resp of s.apiResponses.values()) {
+  for (const resp of getStorageIntegrityState(world).apiResponses.values()) {
     if (jsonbField in resp) {
       value = resp[jsonbField]
       break
@@ -384,10 +389,10 @@ Then('the API response {word} should be a proper {word}', async ({}, jsonbField:
 
 Then(
   'the DB {word} should have jsonb_typeof equal to {string}',
-  async ({}, dbColumn: string, expectedPgType: string) => {
+  async ({ world }, dbColumn: string, expectedPgType: string) => {
     // Find the entity type that has this column
-    for (const [entityType] of s.entityIds.entries()) {
-      const id = s.entityIds.get(entityType)
+    for (const [entityType] of getStorageIntegrityState(world).entityIds.entries()) {
+      const id = getStorageIntegrityState(world).entityIds.get(entityType)
       if (!id) continue
 
       let tableName: string
@@ -426,10 +431,10 @@ Then(
   },
 )
 
-Then('the DB {word} should not be double-serialized', async ({}, dbColumn: string) => {
+Then('the DB {word} should not be double-serialized', async ({ world }, dbColumn: string) => {
   // Find the entity type that has this column
-  for (const [entityType] of s.entityIds.entries()) {
-    const id = s.entityIds.get(entityType)
+  for (const [entityType] of getStorageIntegrityState(world).entityIds.entries()) {
+    const id = getStorageIntegrityState(world).entityIds.get(entityType)
     if (!id) continue
 
     let tableName: string
@@ -467,44 +472,44 @@ Then('the DB {word} should not be double-serialized', async ({}, dbColumn: strin
 
 // ── Then: Envelope byte-accuracy assertions ─────────────────────────
 
-Then('the API envelope wrappedKey should match the submitted wrappedKey exactly', async ({}) => {
-  const apiNote = s.apiResponses.get('envelope-note')
+Then('the API envelope wrappedKey should match the submitted wrappedKey exactly', async ({ world }) => {
+  const apiNote = getStorageIntegrityState(world).apiResponses.get('envelope-note')
   expect(apiNote).toBeDefined()
-  expect(s.submittedEnvelopes).toBeDefined()
+  expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
   const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ wrappedKey: string }> | undefined
   expect(apiAdminEnvelopes).toBeDefined()
   expect(apiAdminEnvelopes!.length).toBeGreaterThan(0)
-  expect(apiAdminEnvelopes![0].wrappedKey).toBe(s.submittedEnvelopes![0].wrappedKey)
+  expect(apiAdminEnvelopes![0].wrappedKey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].wrappedKey)
 })
 
-Then('the API envelope ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({}) => {
-  const apiNote = s.apiResponses.get('envelope-note')
+Then('the API envelope ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({ world }) => {
+  const apiNote = getStorageIntegrityState(world).apiResponses.get('envelope-note')
   expect(apiNote).toBeDefined()
-  expect(s.submittedEnvelopes).toBeDefined()
+  expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
   const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ ephemeralPubkey: string }> | undefined
   expect(apiAdminEnvelopes).toBeDefined()
-  expect(apiAdminEnvelopes![0].ephemeralPubkey).toBe(s.submittedEnvelopes![0].ephemeralPubkey)
+  expect(apiAdminEnvelopes![0].ephemeralPubkey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ephemeralPubkey)
 })
 
-Then('the DB admin_envelopes wrappedKey should match the submitted wrappedKey exactly', async ({}) => {
-  const dbRow = s.dbRows.get('envelope-note')
+Then('the DB admin_envelopes wrappedKey should match the submitted wrappedKey exactly', async ({ world }) => {
+  const dbRow = getStorageIntegrityState(world).dbRows.get('envelope-note')
   expect(dbRow).toBeDefined()
-  expect(s.submittedEnvelopes).toBeDefined()
+  expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
   const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ wrappedKey: string }>
   assertIsArray(dbAdminEnvelopes, 'DB admin_envelopes')
   expect(dbAdminEnvelopes.length).toBeGreaterThan(0)
-  expect(dbAdminEnvelopes[0].wrappedKey).toBe(s.submittedEnvelopes![0].wrappedKey)
+  expect(dbAdminEnvelopes[0].wrappedKey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].wrappedKey)
 })
 
-Then('the DB admin_envelopes ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({}) => {
-  const dbRow = s.dbRows.get('envelope-note')
+Then('the DB admin_envelopes ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({ world }) => {
+  const dbRow = getStorageIntegrityState(world).dbRows.get('envelope-note')
   expect(dbRow).toBeDefined()
-  expect(s.submittedEnvelopes).toBeDefined()
+  expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
   const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ ephemeralPubkey: string }>
   assertIsArray(dbAdminEnvelopes, 'DB admin_envelopes')
-  expect(dbAdminEnvelopes[0].ephemeralPubkey).toBe(s.submittedEnvelopes![0].ephemeralPubkey)
+  expect(dbAdminEnvelopes[0].ephemeralPubkey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ephemeralPubkey)
 })

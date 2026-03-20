@@ -8,9 +8,9 @@
  * so ban list verification uses count-based assertions rather than raw phone matching.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from './fixtures'
-import { state } from './common.steps'
-import { shared } from './shared-state'
+import { Given, When, Then, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
+import { getSharedState, setLastResponse } from './shared-state'
 import { apiPost, apiGet, listBansViaApi, listNotesViaApi } from '../../api-helpers'
 import {
   simulateIncomingCall,
@@ -18,24 +18,36 @@ import {
   uniqueCallerNumber,
 } from '../../simulation-helpers'
 
-/** Raw caller number — needed for the "same caller tries again" scenario. */
-let lastCallerNumber: string | undefined
+const CALL_ACTIONS_KEY = 'callActions'
 
-/** Ban count before the ban action — used for count-based verification. */
-let banCountBefore = 0
+interface CallActionsState {
+  lastCallerNumber?: string
+  banCountBefore: number
+}
+
+function getCallActionsState(world: Record<string, unknown>): CallActionsState {
+  let s = getState<CallActionsState | undefined>(world, CALL_ACTIONS_KEY)
+  if (!s) {
+    s = { banCountBefore: 0 }
+    setState(world, CALL_ACTIONS_KEY, s)
+  }
+  return s
+}
 
 // ── Setup ────────────────────────────────────────────────────────
 
 Given(
   'volunteer {int} is on an active call with a unique caller',
-  async ({ request }, volIndex: number) => {
+  async ({ request, world }, volIndex: number) => {
+    const state = getScenarioState(world)
+    const ca = getCallActionsState(world)
     const caller = uniqueCallerNumber()
-    lastCallerNumber = caller
+    ca.lastCallerNumber = caller
     const { callId } = await simulateIncomingCall(request, { callerNumber: caller })
     state.callId = callId
     // Capture ban count before any ban action for delta verification
-    const bans = await listBansViaApi(request)
-    banCountBefore = bans.length
+    const bans = await listBansViaApi(request, state.hubId)
+    ca.banCountBefore = bans.length
     await simulateAnswerCall(request, callId, state.volunteers[volIndex].pubkey)
   },
 )
@@ -44,7 +56,8 @@ Given(
 
 When(
   'volunteer {int} bans and hangs up the call',
-  async ({ request }, volIndex: number) => {
+  async ({ request, world }, volIndex: number) => {
+    const state = getScenarioState(world)
     expect(state.callId).toBeTruthy()
     const res = await apiPost(
       request,
@@ -53,13 +66,14 @@ When(
       state.volunteers[volIndex].nsec,
     )
     state.lastApiResponse = res
-    shared.lastResponse = res
+    setLastResponse(world, res)
   },
 )
 
 When(
   'volunteer {int} bans and hangs up with reason {string}',
-  async ({ request }, volIndex: number, reason: string) => {
+  async ({ request, world }, volIndex: number, reason: string) => {
+    const state = getScenarioState(world)
     expect(state.callId).toBeTruthy()
     const res = await apiPost(
       request,
@@ -68,13 +82,14 @@ When(
       state.volunteers[volIndex].nsec,
     )
     state.lastApiResponse = res
-    shared.lastResponse = res
+    setLastResponse(world, res)
   },
 )
 
 When(
   'volunteer {int} tries to ban and hang up that call',
-  async ({ request }, volIndex: number) => {
+  async ({ request, world }, volIndex: number) => {
+    const state = getScenarioState(world)
     expect(state.callId).toBeTruthy()
     const res = await apiPost(
       request,
@@ -83,7 +98,7 @@ When(
       state.volunteers[volIndex].nsec,
     )
     state.lastApiResponse = res
-    shared.lastResponse = res
+    setLastResponse(world, res)
   },
 )
 
@@ -91,7 +106,8 @@ When(
 
 When(
   'volunteer {int} creates a note for the active call',
-  async ({ request }, volIndex: number) => {
+  async ({ request, world }, volIndex: number) => {
+    const state = getScenarioState(world)
     expect(state.callId).toBeTruthy()
     const res = await apiPost(
       request,
@@ -103,40 +119,44 @@ When(
       state.volunteers[volIndex].nsec,
     )
     state.lastApiResponse = res
-    shared.lastResponse = res
+    setLastResponse(world, res)
   },
 )
 
 // ── Ban Callback ─────────────────────────────────────────────────
 
-When('the same caller tries to call again', async ({ request }) => {
-  expect(lastCallerNumber).toBeTruthy()
+When('the same caller tries to call again', async ({ request, world }) => {
+  const state = getScenarioState(world)
+  const ca = getCallActionsState(world)
+  expect(ca.lastCallerNumber).toBeTruthy()
   try {
     const result = await simulateIncomingCall(request, {
-      callerNumber: lastCallerNumber!,
+      callerNumber: ca.lastCallerNumber!,
     })
     // Call was unexpectedly accepted — store for assertion
     state.callId = result.callId
     state.callStatus = result.status
     state.lastApiResponse = { status: 200, data: result }
-    shared.lastResponse = { status: 200, data: result }
+    setLastResponse(world, { status: 200, data: result })
   } catch {
     // Call was rejected at the telephony layer — expected for banned callers
     state.lastApiResponse = { status: 403, data: { error: 'banned' } }
-    shared.lastResponse = { status: 403, data: { error: 'banned' } }
+    setLastResponse(world, { status: 403, data: { error: 'banned' } })
   }
 })
 
 // ── Assertions ───────────────────────────────────────────────────
 
-Then('the response should indicate the caller was banned', async () => {
+Then('the response should indicate the caller was banned', async ({ world }) => {
+  const state = getScenarioState(world)
   expect(state.lastApiResponse).toBeTruthy()
   const data = state.lastApiResponse!.data as { banned?: boolean; hungUp?: boolean }
   expect(data.banned).toBe(true)
   expect(data.hungUp).toBe(true)
 })
 
-Then('the call status should be {string}', async ({ request }, expectedStatus: string) => {
+Then('the call status should be {string}', async ({ request, world }, expectedStatus: string) => {
+  const state = getScenarioState(world)
   expect(state.callId).toBeTruthy()
 
   // Check call history first (completed/unanswered calls)
@@ -165,37 +185,39 @@ Then('the call status should be {string}', async ({ request }, expectedStatus: s
     }
   }
 
-  // Call not found in history or active calls — this can happen when:
-  // 1. The call was created with a non-default hubId (API filters by auth user's hub)
-  // 2. The call is in a different hub than the querying admin
-  // 3. Auth returned 401 on the API calls (intermittent issue)
   // Fall back to checking state.callStatus set by the simulation step
   expect(state.callStatus).toBe(expectedStatus)
 })
 
-Then('the caller should be in the ban list', async ({ request }) => {
+Then('the caller should be in the ban list', async ({ request, world }) => {
+  const ca = getCallActionsState(world)
+  const hubId = getScenarioState(world).hubId
   // Phone numbers are HMAC-hashed by CallRouterDO before storage,
   // so we verify by checking the ban count increased after the action
-  const bans = await listBansViaApi(request)
-  expect(bans.length).toBeGreaterThan(banCountBefore)
+  const bans = await listBansViaApi(request, hubId)
+  expect(bans.length).toBeGreaterThan(ca.banCountBefore)
 })
 
-Then('the ban reason should be {string}', async ({ request }, expectedReason: string) => {
+Then('the ban reason should be {string}', async ({ request, world }, expectedReason: string) => {
+  const ca = getCallActionsState(world)
+  const hubId = getScenarioState(world).hubId
   // Find the most recently added ban and verify its reason
-  const bans = await listBansViaApi(request)
-  expect(bans.length).toBeGreaterThan(banCountBefore)
+  const bans = await listBansViaApi(request, hubId)
+  expect(bans.length).toBeGreaterThan(ca.banCountBefore)
   const newestBan = bans[bans.length - 1]
   expect(newestBan.reason).toBe(expectedReason)
 })
 
-Then('a note should exist linked to that call ID', async ({ request }) => {
+Then('a note should exist linked to that call ID', async ({ request, world }) => {
+  const state = getScenarioState(world)
   expect(state.callId).toBeTruthy()
   const { notes } = await listNotesViaApi(request, { callId: state.callId })
   expect(notes.length).toBeGreaterThan(0)
   expect(notes[0].callId).toBe(state.callId)
 })
 
-Then('the call should be rejected', async () => {
+Then('the call should be rejected', async ({ world }) => {
+  const state = getScenarioState(world)
   expect(state.lastApiResponse).toBeTruthy()
   expect(state.lastApiResponse!.status).not.toBe(200)
 })

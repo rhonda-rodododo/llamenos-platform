@@ -73,7 +73,7 @@ fun BlastsScreen(
 
     if (uiState.showCreateDialog) {
         CreateBlastDialog(
-            volunteers = uiState.volunteers,
+            volunteers = uiState.users,
             onDismiss = { viewModel.dismissCreateDialog() },
             onSend = { message, recipientIds, scheduled ->
                 viewModel.sendBlast(message, recipientIds, scheduled)
@@ -280,7 +280,7 @@ private fun BlastCard(
 
 @Composable
 private fun CreateBlastDialog(
-    volunteers: List<BlastVolunteer>,
+    volunteers: List<BlastUser>,
     onDismiss: () -> Unit,
     onSend: (message: String, recipientIds: List<String>, scheduled: Boolean) -> Unit,
 ) {

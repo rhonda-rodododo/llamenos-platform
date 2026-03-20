@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env, Volunteer } from '../types'
+import type { AppEnv, Env, User } from '../types'
 import type { MessagingChannelType, MessagingConfig, WhatsAppConfig } from '@shared/types'
 import type { MessagingAdapter, IncomingMessage, MessageStatusUpdate } from './adapter'
-import { getMessagingAdapterFromService } from '../lib/do-access'
+import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { audit } from '../services/audit'
 import { canClaimChannel } from '@shared/permissions'
 import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/nostr-events'
@@ -221,15 +221,15 @@ async function tryAutoAssign(
     const messagingConfig = await services.settings.getMessagingConfig()
     if (!messagingConfig?.autoAssign) return
 
-    const maxConcurrent = messagingConfig.maxConcurrentPerVolunteer || 3
+    const maxConcurrent = messagingConfig.maxConcurrentPerUser || 3
 
     // 2. Get current on-shift volunteers
     const onShiftPubkeys = await services.shifts.getCurrentVolunteers('')
     if (onShiftPubkeys.length === 0) return
 
-    // 3. Get volunteer details to filter by channel capability
-    const { volunteers } = await services.identity.getVolunteers()
-    const onShiftVolunteers = volunteers.filter(v =>
+    // 3. Get user details to filter by channel capability
+    const { users: allUsers } = await services.identity.getUsers()
+    const onShiftVolunteers = allUsers.filter(v =>
       onShiftPubkeys.includes(v.pubkey) &&
       v.active &&
       !v.onBreak &&

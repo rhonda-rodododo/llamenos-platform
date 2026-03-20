@@ -3,9 +3,6 @@ Feature: Edge Cases and Error Handling
   Verify pagination boundaries, error response consistency,
   concurrent operations, and input boundary values.
 
-  Background:
-    Given the server is reset
-
   # ─── Pagination ────────────────────────────────────────────────────
 
   Scenario: Empty list returns zero total

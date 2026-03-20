@@ -221,7 +221,7 @@ function SchemaFieldRenderer({
 
   const label = field.label + (field.required ? ' *' : '')
   const fieldId = `field-${field.name}`
-  const isEditable = !readOnly && field.editableByVolunteers
+  const isEditable = !readOnly && field.editableByUsers
 
   return (
     <div

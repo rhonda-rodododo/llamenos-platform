@@ -92,7 +92,7 @@ struct SystemHealthView: View {
             HealthCardView(
                 status: health.volunteers,
                 icon: "person.3.fill",
-                label: NSLocalizedString("admin_health_volunteers", comment: "Volunteers")
+                label: NSLocalizedString("admin_health_users", comment: "Volunteers")
             )
             .accessibilityIdentifier("health-card-volunteers")
         }

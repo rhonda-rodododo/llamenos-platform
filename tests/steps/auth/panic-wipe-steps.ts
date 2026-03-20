@@ -30,7 +30,6 @@ Then('all session storage should be cleared', async ({ page }) => {
 When('I press Escape twice then wait over one second', async ({ page }) => {
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(1200)
 })
 
 When('I press Escape once more', async ({ page }) => {

@@ -12,14 +12,6 @@ export default defineConfig({
       { find: /^@shared\/(.*)/, replacement: path.resolve(__dirname, "packages/shared/$1") },
       { find: /^@worker\/(.*)/, replacement: path.resolve(__dirname, "apps/worker/$1") },
       { find: /^@\/(.*)/, replacement: path.resolve(__dirname, "src/client/$1") },
-      // Mock cloudflare:workers for DurableObject base class
-      {
-        find: "cloudflare:workers",
-        replacement: path.resolve(
-          __dirname,
-          "apps/worker/__tests__/integration/cloudflare-workers-mock.ts"
-        ),
-      },
     ],
   },
 });

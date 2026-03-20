@@ -7,26 +7,8 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { TestIds } from '../../test-ids'
+import { TestIds, sectionTestIdMap } from '../../test-ids'
 import { Timeouts } from '../../helpers'
-
-/**
- * Map from human-readable section names to their data-testid values.
- * SettingsSection components render with data-testid={id} where id is the section slug.
- */
-const sectionTestIdMap: Record<string, string> = {
-  'Identity': 'profile',
-  'Profile': 'profile',
-  'Key Backup': 'key-backup',
-  'Hub Connection': 'hub-connection',
-  'Linked Devices': 'linked-devices',
-  'Device Link': 'linked-devices',
-  'Passkeys': 'passkeys',
-  'Transcription': 'transcription',
-  'Call Preference': 'call-preference',
-  'Notifications': 'notifications',
-  'Spam': 'spam-section',
-}
 
 // --- Settings display steps ---
 
@@ -91,7 +73,9 @@ Then('I should see the logout confirmation dialog', async ({ page }) => {
   // Accept either a confirm dialog or redirect to login as valid behavior.
   const confirmDialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
   if (await confirmDialog.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  const loginPage = page.locator('#nsec, [data-testid="login-submit-btn"], input[type="password"]')
+  const loginPage = page.getByTestId(TestIds.NSEC_INPUT)
+    .or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
+    .or(page.locator('input[type="password"]'))
   await expect(loginPage.first()).toBeVisible({ timeout: 2000 })
 })
 
@@ -196,7 +180,6 @@ When('a QR code with invalid format is scanned', async ({ page }) => {
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('qr-scanned', { detail: { data: 'invalid-qr-data' } }))
   })
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Profile settings steps ---
@@ -282,12 +265,14 @@ Then('the profile section should expand', async ({ page }) => {
 When('I click the {string} header', async ({ page }, headerText: string) => {
   const testId = sectionTestIdMap[headerText]
   if (testId) {
-    // Click the CardHeader (trigger) within the section
-    const section = page.getByTestId(testId)
-    await section.locator('.cursor-pointer').first().click().catch(async () => {
+    // Click the trigger element within the section
+    const trigger = page.getByTestId(`${testId}-trigger`)
+    if (await trigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await trigger.click()
+    } else {
       // Fallback: click the card title directly
-      await section.locator('h3, [class*="CardTitle"]').first().click()
-    })
+      await page.getByTestId(testId).locator('h3, [class*="CardTitle"]').first().click()
+    }
   } else {
     // Fallback for unmapped section names
     const header = page.getByRole('heading', { name: headerText }).first()
@@ -298,10 +283,12 @@ When('I click the {string} header', async ({ page }, headerText: string) => {
 When('I click the {string} header again', async ({ page }, headerText: string) => {
   const testId = sectionTestIdMap[headerText]
   if (testId) {
-    const section = page.getByTestId(testId)
-    await section.locator('[role="button"], [data-state]').first().click().catch(async () => {
-      await section.locator('h3, [class*="CardTitle"]').first().click()
-    })
+    const trigger = page.getByTestId(`${testId}-trigger`)
+    if (await trigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await trigger.click()
+    } else {
+      await page.getByTestId(testId).locator('h3, [class*="CardTitle"]').first().click()
+    }
   } else {
     const header = page.getByRole('heading', { name: headerText }).first()
     await header.click()

@@ -10,6 +10,8 @@ export const banResponseSchema = z.object({
   bannedAt: z.string(),
 })
 
+export type BanEntry = z.infer<typeof banResponseSchema>
+
 // --- List/wrapper response schemas ---
 
 export const banListResponseSchema = z.object({

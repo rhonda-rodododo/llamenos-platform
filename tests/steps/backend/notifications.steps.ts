@@ -11,8 +11,8 @@
  * - assertions.steps.ts: "the response status should be {int}"
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
-import { shared } from './shared-state'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
   createContactViaApi,
@@ -35,12 +35,18 @@ interface NotificationState {
   volunteerNsec?: string
 }
 
-let notif: NotificationState
+const NOTIFICATIONS_KEY = 'notifications'
 
-Before({ tags: '@cases' }, async () => {
-  notif = {
+function getNotificationState(world: Record<string, unknown>): NotificationState {
+  return getState<NotificationState>(world, NOTIFICATIONS_KEY)
+}
+
+
+Before({ tags: '@cases' }, async ({ world }) => {
+  const notif = {
     contacts: [],
   }
+  setState(world, NOTIFICATIONS_KEY, notif)
 })
 
 /**
@@ -62,17 +68,17 @@ async function getLatestRecordId(
 
 // ── Given ──────────────────────────────────────────────────────────
 
-Given('a contact with role {string} is linked to the record', async ({ request }, role: string) => {
+Given('a contact with role {string} is linked to the record', async ({ request, world }, role: string) => {
   const recordId = await getLatestRecordId(request)
 
   const phone = uniquePhone()
   const contact = await createContactViaApi(request)
   const contactId = contact.id as string
   await linkContactToRecordViaApi(request, recordId, contactId, role)
-  notif.contacts.push({ contactId, role, phone })
+  getNotificationState(world).contacts.push({ contactId, role, phone })
 })
 
-Given('{int} contacts with role {string} are linked to the record', async ({ request }, count: number, role: string) => {
+Given('{int} contacts with role {string} are linked to the record', async ({ request, world }, count: number, role: string) => {
   const recordId = await getLatestRecordId(request)
 
   for (let i = 0; i < count; i++) {
@@ -80,11 +86,11 @@ Given('{int} contacts with role {string} are linked to the record', async ({ req
     const contact = await createContactViaApi(request)
     const contactId = contact.id as string
     await linkContactToRecordViaApi(request, recordId, contactId, role)
-    notif.contacts.push({ contactId, role, phone })
+    getNotificationState(world).contacts.push({ contactId, role, phone })
   }
 })
 
-Given('a volunteer exists without cases:update permission', async ({ request }) => {
+Given('a volunteer exists without cases:update permission', async ({ request, world }) => {
   const role = await createRoleViaApi(request, {
     name: `ReadOnly ${Date.now()}`,
     slug: `readonly-${Date.now()}`,
@@ -95,15 +101,15 @@ Given('a volunteer exists without cases:update permission', async ({ request }) 
     name: `vol-readonly-${Date.now()}`,
     roleIds: [role.id],
   })
-  notif.volunteerNsec = vol.nsec
+  getNotificationState(world).volunteerNsec = vol.nsec
 })
 
 // ── When ──────────────────────────────────────────────────────────
 
-When('the admin triggers notifications for the record with recipients', async ({ request }) => {
+When('the admin triggers notifications for the record with recipients', async ({ request, world }) => {
   const recordId = await getLatestRecordId(request)
 
-  const recipients = notif.contacts
+  const recipients = getNotificationState(world).contacts
     .filter(c => c.role === 'support_contact')
     .map(c => ({
       identifier: c.phone,
@@ -116,14 +122,14 @@ When('the admin triggers notifications for the record with recipients', async ({
     recordId,
     recipients,
   )
-  notif.notifyStatus = status
-  notif.notifyResult = data
+  getNotificationState(world).notifyStatus = status
+  getNotificationState(world).notifyResult = data
 })
 
-When('the admin triggers notifications for the record with all support contact recipients', async ({ request }) => {
+When('the admin triggers notifications for the record with all support contact recipients', async ({ request, world }) => {
   const recordId = await getLatestRecordId(request)
 
-  const recipients = notif.contacts
+  const recipients = getNotificationState(world).contacts
     .filter(c => c.role === 'support_contact')
     .map(c => ({
       identifier: c.phone,
@@ -136,11 +142,11 @@ When('the admin triggers notifications for the record with all support contact r
     recordId,
     recipients,
   )
-  notif.notifyStatus = status
-  notif.notifyResult = data
+  getNotificationState(world).notifyStatus = status
+  getNotificationState(world).notifyResult = data
 })
 
-When('the admin triggers notifications with no recipients', async ({ request }) => {
+When('the admin triggers notifications with no recipients', async ({ request, world }) => {
   const recordId = await getLatestRecordId(request)
 
   const { status, data } = await notifyContactsRawViaApi(
@@ -151,13 +157,13 @@ When('the admin triggers notifications with no recipients', async ({ request }) 
       recipients: [],
     },
   )
-  notif.notifyStatus = status
-  shared.lastResponse = { status, data }
+  getNotificationState(world).notifyStatus = status
+  setLastResponse(world, { status, data })
 })
 
-When('the volunteer tries to send notifications for the record', async ({ request }) => {
+When('the volunteer tries to send notifications for the record', async ({ request, world }) => {
   const recordId = await getLatestRecordId(request)
-  expect(notif.volunteerNsec).toBeTruthy()
+  expect(getNotificationState(world).volunteerNsec).toBeTruthy()
 
   const { status, data } = await notifyContactsRawViaApi(
     request,
@@ -170,17 +176,17 @@ When('the volunteer tries to send notifications for the record', async ({ reques
         message: 'Test notification',
       }],
     },
-    notif.volunteerNsec!,
+    getNotificationState(world).volunteerNsec!,
   )
-  notif.notifyStatus = status
-  shared.lastResponse = { status, data }
+  getNotificationState(world).notifyStatus = status
+  setLastResponse(world, { status, data })
 })
 
-When('the admin lists contacts linked to the record', async ({ request }) => {
+When('the admin lists contacts linked to the record', async ({ request, world }) => {
   const recordId = await getLatestRecordId(request)
 
   const result = await listRecordContactsViaApi(request, recordId)
-  notif.contacts = result.contacts.map(c => ({
+  getNotificationState(world).contacts = result.contacts.map(c => ({
     contactId: c.contactId as string,
     role: c.role as string,
     phone: '',
@@ -196,18 +202,18 @@ When('the admin lists contacts linked to the record', async ({ request }) => {
  * fail -- but the endpoint itself succeeds and reports per-recipient
  * results (notified + skipped = total recipients).
  */
-Then('the notify response should include {int} recipient result', async ({}, expectedCount: number) => {
-  expect(notif.notifyStatus).toBe(200)
-  expect(notif.notifyResult).toBeTruthy()
-  expect(notif.notifyResult!.recordId).toBeTruthy()
-  const totalDispatched = notif.notifyResult!.notified + notif.notifyResult!.skipped
+Then('the notify response should include {int} recipient result', async ({ world }, expectedCount: number) => {
+  expect(getNotificationState(world).notifyStatus).toBe(200)
+  expect(getNotificationState(world).notifyResult).toBeTruthy()
+  expect(getNotificationState(world).notifyResult!.recordId).toBeTruthy()
+  const totalDispatched = getNotificationState(world).notifyResult!.notified + getNotificationState(world).notifyResult!.skipped
   expect(totalDispatched).toBe(expectedCount)
 })
 
-Then('the notify response should include {int} recipient results', async ({}, expectedCount: number) => {
-  expect(notif.notifyStatus).toBe(200)
-  expect(notif.notifyResult).toBeTruthy()
-  expect(notif.notifyResult!.recordId).toBeTruthy()
-  const totalDispatched = notif.notifyResult!.notified + notif.notifyResult!.skipped
+Then('the notify response should include {int} recipient results', async ({ world }, expectedCount: number) => {
+  expect(getNotificationState(world).notifyStatus).toBe(200)
+  expect(getNotificationState(world).notifyResult).toBeTruthy()
+  expect(getNotificationState(world).notifyResult!.recordId).toBeTruthy()
+  const totalDispatched = getNotificationState(world).notifyResult!.notified + getNotificationState(world).notifyResult!.skipped
   expect(totalDispatched).toBe(expectedCount)
 })

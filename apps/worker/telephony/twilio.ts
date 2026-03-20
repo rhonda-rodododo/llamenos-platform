@@ -194,7 +194,7 @@ export class TwilioAdapter implements TelephonyAdapter {
     const hp = hubXmlParam(params.hubId)
     return this.twiml(`
       <Response>
-        <Dial record="record-from-answer" recordingStatusCallback="${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.volunteerPubkey}${hp}" recordingStatusCallbackEvent="completed">
+        <Dial record="record-from-answer" recordingStatusCallback="${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.userPubkey}${hp}" recordingStatusCallbackEvent="completed">
           <Queue>${params.parentCallSid}</Queue>
         </Dial>
       </Response>
@@ -249,7 +249,7 @@ export class TwilioAdapter implements TelephonyAdapter {
         const body = new URLSearchParams({
           To: vol.phone,
           From: this.phoneNumber,
-          Url: `${params.callbackUrl}/api/telephony/volunteer-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
+          Url: `${params.callbackUrl}/api/telephony/user-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
           StatusCallback: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
           Timeout: '30',
           MachineDetection: 'Enable',

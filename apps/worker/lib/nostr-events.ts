@@ -1,5 +1,5 @@
 import type { AppEnv } from '../types'
-import { getNostrPublisher } from './do-access'
+import { getNostrPublisher } from './service-factories'
 import { deriveServerEventKey, encryptHubEvent } from './hub-event-crypto'
 
 /** Cached event key — derived once per isolate lifetime */

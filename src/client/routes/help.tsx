@@ -152,7 +152,7 @@ function HelpPage() {
             <NavQuickLink to="/settings" icon={<Settings className="h-3.5 w-3.5" />} label={t('nav.settings')} />
             {isAdmin && (
               <>
-                <NavQuickLink to="/volunteers" icon={<Users className="h-3.5 w-3.5" />} label={t('nav.volunteers')} />
+                <NavQuickLink to="/users" icon={<Users className="h-3.5 w-3.5" />} label={t('nav.users')} />
                 <NavQuickLink to="/shifts" icon={<Clock className="h-3.5 w-3.5" />} label={t('nav.shifts')} />
                 <NavQuickLink to="/bans" icon={<ShieldBan className="h-3.5 w-3.5" />} label={t('nav.banList')} />
                 <NavQuickLink to="/admin/settings" icon={<Settings className="h-3.5 w-3.5" />} label={t('nav.hubSettings', { defaultValue: 'Hub Settings' })} />

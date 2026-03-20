@@ -27,15 +27,11 @@ import {
   listEventReportsViaApi,
 } from '../../api-helpers'
 
-// --- Module-level state ---
-
-let eventEntityTypeId = ''
-let lastEventId = ''
-let lastEventName = ''
+// State is now in casesWorld fixture (casesWorld.eventEntityTypeId, casesWorld.lastEventId, casesWorld.lastEventName)
 
 // --- Background: event entity type exists ---
 
-Given('an event entity type exists', async ({ backendRequest: request }) => {
+Given('an event entity type exists', async ({ backendRequest: request, casesWorld }) => {
   const types = await listEntityTypesViaApi(request)
   const eventType = types.find(et => {
     const cat = (et as { category?: string }).category
@@ -43,7 +39,7 @@ Given('an event entity type exists', async ({ backendRequest: request }) => {
     return cat === 'event' || name === 'event' || name === 'protest'
   })
   if (eventType) {
-    eventEntityTypeId = (eventType as { id: string }).id
+    casesWorld.eventEntityTypeId = (eventType as { id: string }).id
   } else {
     const created = await createEntityTypeViaApi(request, 'event', {
       category: 'event',
@@ -52,7 +48,7 @@ Given('an event entity type exists', async ({ backendRequest: request }) => {
         { value: 'concluded', label: 'Concluded', color: '#22c55e', order: 1, isClosed: true },
       ],
     })
-    eventEntityTypeId = (created as { id: string }).id
+    casesWorld.eventEntityTypeId = (created as { id: string }).id
   }
 })
 
@@ -65,21 +61,21 @@ Then('the new event button should be visible', async ({ page }) => {
   await expect(btn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('no events have been created', async ({ backendRequest: request }) => {
-  if (!eventEntityTypeId) return
-  const records = await listRecordsViaApi(request, { entityTypeId: eventEntityTypeId })
+Given('no events have been created', async ({ backendRequest: request, casesWorld }) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId })
   // Accept current state — we just need the empty state to be possible
   void records
 })
 
-Given('events exist', async ({ backendRequest: request }) => {
-  if (!eventEntityTypeId) return
-  const records = await listRecordsViaApi(request, { entityTypeId: eventEntityTypeId })
+Given('events exist', async ({ backendRequest: request, casesWorld }) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId })
   if (records.records.length === 0) {
-    const event = await createRecordViaApi(request, eventEntityTypeId, { statusHash: 'active' })
-    lastEventId = (event as { id: string }).id
+    const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+    casesWorld.lastEventId = (event as { id: string }).id
   } else {
-    lastEventId = (records.records[0] as { id: string }).id
+    casesWorld.lastEventId = (records.records[0] as { id: string }).id
   }
 })
 
@@ -109,14 +105,13 @@ When('I click the new event button', async ({ page }) => {
   const btn = page.getByTestId('case-new-btn')
     .or(page.getByRole('button', { name: /new event/i }))
   await btn.first().click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
-When('I fill in the event name with a unique name', async ({ page }) => {
-  lastEventName = `Test Event ${Date.now()}`
+When('I fill in the event name with a unique name', async ({ page, casesWorld }) => {
+  casesWorld.lastEventName = `Test Event ${Date.now()}`
   const titleInput = page.getByTestId('case-title-input')
   if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await titleInput.fill(lastEventName)
+    await titleInput.fill(casesWorld.lastEventName)
   }
 })
 
@@ -132,7 +127,6 @@ When('I fill in the event start date', async ({ page }) => {
 When('I submit the event creation form', async ({ page }) => {
   const submitBtn = page.getByTestId('case-create-submit')
   await submitBtn.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the new event should appear in the event list', async ({ page }) => {
@@ -143,11 +137,11 @@ Then('the new event should appear in the event list', async ({ page }) => {
 
 // --- Event detail ---
 
-Given('an event {string} exists', async ({ backendRequest: request }, eventName: string) => {
-  if (!eventEntityTypeId) return
-  const event = await createRecordViaApi(request, eventEntityTypeId, { statusHash: 'active' })
-  lastEventId = (event as { id: string }).id
-  lastEventName = eventName
+Given('an event {string} exists', async ({ backendRequest: request, casesWorld },eventName: string) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+  casesWorld.lastEventId = (event as { id: string }).id
+  casesWorld.lastEventName = eventName
 })
 
 When('I click on the {string} event card', async ({ page }, eventName: string) => {
@@ -155,7 +149,6 @@ When('I click on the {string} event card', async ({ page }, eventName: string) =
   const card = page.getByTestId('case-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the event detail should be visible', async ({ page }) => {
@@ -171,13 +164,13 @@ Then('the event start date should be displayed', async ({ page }) => {
   await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('an event with linked cases exists', async ({ backendRequest: request }) => {
-  if (!eventEntityTypeId) return
-  const event = await createEventViaApi(request, eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
+Given('an event with linked cases exists', async ({ backendRequest: request, casesWorld }) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const event = await createEventViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
     // Fallback: create as a record
-    return createRecordViaApi(request, eventEntityTypeId, { statusHash: 'active' })
+    return createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
   })
-  lastEventId = (event as { id: string }).id
+  casesWorld.lastEventId = (event as { id: string }).id
 
   // Create and link a case
   const entityTypes = await listEntityTypesViaApi(request)
@@ -185,16 +178,16 @@ Given('an event with linked cases exists', async ({ backendRequest: request }) =
   if (arrestType) {
     const etId = (arrestType as { id: string }).id
     const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-    await linkRecordToEventViaApi(request, lastEventId, (record as { id: string }).id).catch(() => {})
+    await linkRecordToEventViaApi(request, casesWorld.lastEventId, (record as { id: string }).id).catch(() => {})
   }
 })
 
-Given('an event with {int} linked cases exists', async ({ backendRequest: request }, count: number) => {
-  if (!eventEntityTypeId) return
-  const event = await createEventViaApi(request, eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
-    return createRecordViaApi(request, eventEntityTypeId, { statusHash: 'active' })
+Given('an event with {int} linked cases exists', async ({ backendRequest: request, casesWorld },count: number) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const event = await createEventViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
+    return createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
   })
-  lastEventId = (event as { id: string }).id
+  casesWorld.lastEventId = (event as { id: string }).id
 
   const entityTypes = await listEntityTypesViaApi(request)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
@@ -202,29 +195,28 @@ Given('an event with {int} linked cases exists', async ({ backendRequest: reques
     const etId = (arrestType as { id: string }).id
     for (let i = 0; i < count; i++) {
       const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-      await linkRecordToEventViaApi(request, lastEventId, (record as { id: string }).id).catch(() => {})
+      await linkRecordToEventViaApi(request, casesWorld.lastEventId, (record as { id: string }).id).catch(() => {})
     }
   }
 })
 
-Given('an event with linked reports exists', async ({ backendRequest: request }) => {
-  if (!eventEntityTypeId) return
-  const event = await createEventViaApi(request, eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
-    return createRecordViaApi(request, eventEntityTypeId, { statusHash: 'active' })
+Given('an event with linked reports exists', async ({ backendRequest: request, casesWorld }) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const event = await createEventViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
+    return createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
   })
-  lastEventId = (event as { id: string }).id
+  casesWorld.lastEventId = (event as { id: string }).id
 
   const report = await createReportViaApi(request, { title: `Event Report ${Date.now()}` })
-  await linkReportToEventViaApi(request, lastEventId, (report as { id: string }).id).catch(() => {})
+  await linkReportToEventViaApi(request, casesWorld.lastEventId, (report as { id: string }).id).catch(() => {})
 })
 
-When('I view the event detail', async ({ page, backendRequest: request }) => {
+When('I view the event detail', async ({ page, backendRequest: request, casesWorld }) => {
   await navigateAfterLogin(page, '/events')
   // Click first case card (event) to open detail
   const card = page.getByTestId('case-card').first()
   if (await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
     await card.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -234,7 +226,6 @@ Then('linked case records should be visible', async ({ page }) => {
     .or(page.getByTestId('case-related-tab'))
   if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
     await tab.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -264,14 +255,14 @@ Then('linked reports should be visible', async ({ page }) => {
 
 // --- Link cases to events ---
 
-Given('an event exists', async ({ backendRequest: request }) => {
-  if (!eventEntityTypeId) return
-  const records = await listRecordsViaApi(request, { entityTypeId: eventEntityTypeId })
+Given('an event exists', async ({ backendRequest: request, casesWorld }) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId })
   if (records.records.length === 0) {
-    const event = await createRecordViaApi(request, eventEntityTypeId, { statusHash: 'active' })
-    lastEventId = (event as { id: string }).id
+    const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+    casesWorld.lastEventId = (event as { id: string }).id
   } else {
-    lastEventId = (records.records[0] as { id: string }).id
+    casesWorld.lastEventId = (records.records[0] as { id: string }).id
   }
 })
 
@@ -284,14 +275,12 @@ When('I search for a case by number', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="search" i], input[type="search"]').first()
   if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     await searchInput.fill('case')
-    await page.waitForTimeout(500)
   }
 })
 
 When('I select the case from the search results', async ({ page }) => {
   // Close the link dialog (the linking is done via API in the Given steps)
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   const overlay = page.locator('[data-slot="dialog-overlay"]')
   await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 })
@@ -303,7 +292,6 @@ Then('the case should appear in the event\'s linked cases', async ({ page }) => 
 When('I select the report', async ({ page }) => {
   // Close the link dialog (the linking is done via API in the Given steps)
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   const overlay = page.locator('[data-slot="dialog-overlay"]')
   await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 })
@@ -314,23 +302,21 @@ Then('the report should appear in the event\'s linked reports', async ({ page })
 
 // --- Event status ---
 
-Given('an event with status {string} exists', async ({ backendRequest: request }, status: string) => {
-  if (!eventEntityTypeId) return
-  const event = await createRecordViaApi(request, eventEntityTypeId, { statusHash: status })
-  lastEventId = (event as { id: string }).id
+Given('an event with status {string} exists', async ({ backendRequest: request, casesWorld },status: string) => {
+  if (!casesWorld.eventEntityTypeId) return
+  const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: status })
+  casesWorld.lastEventId = (event as { id: string }).id
 })
 
 When('I change the event status to {string}', async ({ page }, newStatus: string) => {
   const pill = page.getByTestId('case-status-pill')
   await expect(pill).toBeVisible({ timeout: Timeouts.ELEMENT })
   await pill.click()
-  await page.waitForTimeout(300)
 
   const dropdown = page.getByTestId('case-status-dropdown')
   const option = dropdown.locator('[role="option"]').filter({ hasText: new RegExp(newStatus, 'i') })
   if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
     await option.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -339,7 +325,6 @@ Then('the event status should reflect {string}', async ({ page }, status: string
   await expect(pill).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // Wait for API round-trip + React re-render
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
   // Check pill text OR toast confirmation
   const pillText = await pill.textContent() ?? ''
@@ -352,6 +337,5 @@ Then('the event status should reflect {string}', async ({ page }, status: string
   if (toastVisible) return
 
   // Final wait and accept pill being visible
-  await page.waitForTimeout(2000)
   await expect(pill).toBeVisible()
 })

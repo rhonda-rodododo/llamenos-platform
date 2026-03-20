@@ -109,7 +109,7 @@ describe('MessagingAdapter types', () => {
         rcs: null,
         autoAssign: true,
         inactivityTimeout: 60,
-        maxConcurrentPerVolunteer: 3,
+        maxConcurrentPerUser: 3,
       }
       expect(config.enabledChannels).toContain('sms')
       expect(config.enabledChannels).toContain('whatsapp')

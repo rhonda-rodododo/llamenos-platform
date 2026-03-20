@@ -85,7 +85,7 @@ function SettingsPage() {
   useEffect(() => {
     const promises: Promise<void>[] = [
       getTranscriptionSettings().then(r => {
-        setCanOptOut(r.allowVolunteerOptOut)
+        setCanOptOut(r.allowUserOptOut)
       }).catch(() => toast(t('common.error'), 'error')),
       getWebRtcStatus().then(r => {
         setWebrtcAvailable(r.available)

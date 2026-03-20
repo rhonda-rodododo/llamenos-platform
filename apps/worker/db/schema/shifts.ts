@@ -26,7 +26,7 @@ export const shifts = pgTable('shifts', {
     .array()
     .notNull()
     .default(sql`'{}'::int[]`),
-  volunteerPubkeys: text('volunteer_pubkeys')
+  userPubkeys: text('user_pubkeys')
     .array()
     .notNull()
     .default(sql`'{}'::text[]`),

@@ -1,6 +1,6 @@
 import type { Env } from '../types'
 import type { Services } from '../services'
-import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/do-access'
+import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/service-factories'
 import { dispatchVoipPushFromService } from '../lib/voip-push'
 import { publishNostrEvent } from '../lib/nostr-events'
 import { KIND_CALL_RING } from '@shared/nostr-events'
@@ -26,7 +26,7 @@ export async function startParallelRinging(
     // If no one is on shift, use fallback group
     if (onShiftPubkeys.length === 0) {
       const fallback = await services.settings.getFallbackGroup()
-      onShiftPubkeys = fallback.volunteers
+      onShiftPubkeys = fallback.userPubkeys
     }
 
     logger.info('Parallel ringing started', { callSid, onShiftCount: onShiftPubkeys.length })
@@ -36,11 +36,11 @@ export async function startParallelRinging(
       return
     }
 
-    // Get volunteer details (including call preference)
-    const { volunteers: allVolunteers } = await services.identity.getVolunteers()
+    // Get user details (including call preference)
+    const { users: allUsers } = await services.identity.getUsers()
 
-    // All available on-shift volunteers (for Nostr relay notification)
-    const available = allVolunteers
+    // All available on-shift users (for Nostr relay notification)
+    const available = allUsers
       .filter(v => onShiftPubkeys.includes(v.pubkey) && v.active && !v.onBreak)
 
     // Only ring phones for volunteers with phone or both preference (and who have a phone number)

@@ -5,9 +5,9 @@
  * RecordsDO, and ConversationDO.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
-import { shared } from './shared-state'
-import { state } from './common.steps'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getSharedState, setLastResponse } from './shared-state'
+import { getScenarioState } from './common.steps'
 import {
   apiGet,
   apiPost,
@@ -51,86 +51,95 @@ interface CrossDoState {
   reviewerPubkey?: string
 }
 
-let xdo: CrossDoState
+const CROSS_DO_KEY = 'cross_do'
 
-Before({ tags: '@backend' }, async () => {
-  xdo = { conversationIds: [] }
+function getCrossDoState(world: Record<string, unknown>): CrossDoState {
+  return getState<CrossDoState>(world, CROSS_DO_KEY)
+}
+
+
+Before({ tags: '@backend' }, async ({ world }) => {
+  const xdo = { conversationIds: [] }
+  setState(world, CROSS_DO_KEY, xdo)
 })
 
 // ─── Volunteer Onboarding → Call → Note ─────────────────────────────
 
-When('an admin creates a volunteer', async ({ request }) => {
+When('an admin creates a volunteer', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, { name: uniqueName('XDO Vol') })
-  xdo.volunteerPubkey = vol.pubkey
-  xdo.volunteerNsec = vol.nsec
+  getCrossDoState(world).volunteerPubkey = vol.pubkey
+  getCrossDoState(world).volunteerNsec = vol.nsec
 })
 
-When('the admin creates a shift including the volunteer', async ({ request }) => {
+When('the admin creates a shift including the volunteer', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
   const shift = await createShiftViaApi(request, {
     name: uniqueName('XDO Shift'),
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: [xdo.volunteerPubkey!],
+    userPubkeys: [getCrossDoState(world).volunteerPubkey!],
+    hubId,
   })
-  xdo.shiftId = shift.id
+  getCrossDoState(world).shiftId = shift.id
 })
 
-When('an incoming call arrives', async ({ request }) => {
+When('an incoming call arrives', async ({ request, world }) => {
   const caller = uniqueCallerNumber()
   const result = await simulateIncomingCall(request, { callerNumber: caller })
-  xdo.callId = result.callId
-  xdo.callStatus = result.status
+  getCrossDoState(world).callId = result.callId
+  getCrossDoState(world).callStatus = result.status
 })
 
-When('the volunteer answers the call', async ({ request }) => {
+When('the volunteer answers the call', async ({ request, world }) => {
   // Use xdo state if available (cross-DO workflow), fall back to shared state
   // (simulation scenarios that use "Given an incoming call from ..." steps)
-  const callId = xdo.callId ?? state.callId
-  const pubkey = xdo.volunteerPubkey ?? state.volunteers[0]?.pubkey
+  const callId = getCrossDoState(world).callId ?? getScenarioState(world).callId
+  const pubkey = getCrossDoState(world).volunteerPubkey ?? getScenarioState(world).volunteers[0]?.pubkey
   expect(callId).toBeTruthy()
   expect(pubkey).toBeTruthy()
   const result = await simulateAnswerCall(request, callId!, pubkey!)
-  xdo.callStatus = result.status
-  state.callStatus = result.status
+  getCrossDoState(world).callStatus = result.status
+  getScenarioState(world).callStatus = result.status
 })
 
-When('the volunteer writes a note for the call', async ({ request }) => {
+When('the volunteer writes a note for the call', async ({ request, world }) => {
   const { data, status } = await apiPost<{ id?: string; note?: { id: string } }>(
     request,
     '/notes',
     {
       encryptedContent: 'xdo-test-note',
-      callId: xdo.callId,
+      callId: getCrossDoState(world).callId,
       readerEnvelopes: [],
     },
-    xdo.volunteerNsec!,
+    getCrossDoState(world).volunteerNsec!,
   )
   if (status < 300) {
-    xdo.noteId = (data as Record<string, unknown>)?.id as string
+    getCrossDoState(world).noteId = (data as Record<string, unknown>)?.id as string
       ?? ((data as Record<string, unknown>)?.note as Record<string, unknown>)?.id as string
   }
 })
 
-Then('the call history should show a completed call', async ({ request }) => {
+Then('the call history should show a completed call', async ({ request, world }) => {
   // End the call first
-  if (xdo.callStatus === 'in-progress') {
-    await simulateEndCall(request, xdo.callId!)
+  if (getCrossDoState(world).callStatus === 'in-progress') {
+    await simulateEndCall(request, getCrossDoState(world).callId!)
   }
   const { data } = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(request, '/calls/history')
   const calls = (data as { calls: Array<{ callId: string; status: string }> }).calls
-  const call = calls.find(c => c.callId === xdo.callId)
+  const call = calls.find(c => c.callId === getCrossDoState(world).callId)
   expect(call).toBeDefined()
   expect(call!.status).toBe('completed')
 })
 
-Then('the notes list should contain the volunteer\'s note', async ({ request }) => {
+Then('the notes list should contain the volunteer\'s note', async ({request, world}) => {
   const { notes } = await listNotesViaApi(request)
   expect(notes.length).toBeGreaterThan(0)
 })
 
-Then('the audit log should have entries for each step', async ({ request }) => {
-  const { entries } = await listAuditLogViaApi(request)
+Then('the audit log should have entries for each step', async ({request, world}) => {
+  const hubId = getScenarioState(world).hubId
+  const { entries } = await listAuditLogViaApi(request, { hubId })
   expect(entries.length).toBeGreaterThan(0)
   // Should have volunteer creation and note creation at minimum
   const events = entries.map(e => e.action)
@@ -140,80 +149,81 @@ Then('the audit log should have entries for each step', async ({ request }) => {
 
 // ─── Ban Lifecycle with Call Integration ────────────────────────────
 
-When('an admin bans {string}', async ({ request }, phone: string) => {
-  await createBanViaApi(request, { phone, reason: 'XDO ban test' })
+When('an admin bans {string}', async ({request, world}, phone: string) => {
+  const hubId = getScenarioState(world).hubId
+  await createBanViaApi(request, { phone, reason: 'XDO ban test', hubId })
 })
 
-When('an incoming call arrives from {string}', async ({ request }, phone: string) => {
+When('an incoming call arrives from {string}', async ({ request, world }, phone: string) => {
   try {
     const result = await simulateIncomingCall(request, { callerNumber: phone })
-    xdo.callId = result.callId
-    xdo.callStatus = result.status
+    getCrossDoState(world).callId = result.callId
+    getCrossDoState(world).callStatus = result.status
   } catch (e) {
     // Banned callers get a 403 — record as 'rejected' instead of throwing
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes('banned') || msg.includes('403')) {
-      xdo.callStatus = 'rejected'
+      getCrossDoState(world).callStatus = 'rejected'
     } else {
       throw e
     }
   }
 })
 
-Then('the banned call should be rejected', async ({}) => {
+Then('the banned call should be rejected', async ({ world }) => {
   // The incoming-call step catches the 403 and sets status to 'rejected'
-  expect(xdo.callStatus).toBe('rejected')
+  expect(getCrossDoState(world).callStatus).toBe('rejected')
 })
 
-Then('the call should be ringing', async ({}) => {
-  expect(xdo.callStatus).toBe('ringing')
+Then('the call should be ringing', async ({ world }) => {
+  expect(getCrossDoState(world).callStatus).toBe('ringing')
 })
 
 // 'the admin removes the ban for {string}' is defined in crud.steps.ts
 
 // ─── Conversation Lifecycle ─────────────────────────────────────────
 
-When('an SMS arrives from {string} with body {string}', async ({ request }, phone: string, body: string) => {
+When('an SMS arrives from {string} with body {string}', async ({ request, world }, phone: string, body: string) => {
   const result = await simulateIncomingMessage(request, {
     senderNumber: phone,
     body,
     channel: 'sms',
   })
-  xdo.conversationId = result.conversationId
-  xdo.conversationIds.push(result.conversationId)
+  getCrossDoState(world).conversationId = result.conversationId
+  getCrossDoState(world).conversationIds.push(result.conversationId)
 })
 
-When('a WhatsApp message arrives from {string} with body {string}', async ({ request }, phone: string, body: string) => {
+When('a WhatsApp message arrives from {string} with body {string}', async ({ request, world }, phone: string, body: string) => {
   const result = await simulateIncomingMessage(request, {
     senderNumber: phone,
     body,
     channel: 'whatsapp',
   })
-  xdo.conversationIds.push(result.conversationId)
+  getCrossDoState(world).conversationIds.push(result.conversationId)
 })
 
 // 'a new conversation should be created' is defined in messaging.steps.ts
 // Cross-DO uses a local assertion instead:
-Then('a conversation should have been created', async ({}) => {
-  expect(xdo.conversationId).toBeDefined()
-  expect(xdo.conversationId!.length).toBeGreaterThan(0)
+Then('a conversation should have been created', async ({ world }) => {
+  expect(getCrossDoState(world).conversationId).toBeDefined()
+  expect(getCrossDoState(world).conversationId!.length).toBeGreaterThan(0)
 })
 
-When('the volunteer claims the conversation', async ({ request }) => {
-  const volPubkey = state.volunteers[0]?.pubkey ?? xdo.volunteerPubkey
-  if (volPubkey && xdo.conversationId) {
-    const volNsec = state.volunteers[0]?.nsec ?? xdo.volunteerNsec
-    await apiPost(request, `/conversations/${xdo.conversationId}/claim`, {
+When('the volunteer claims the conversation', async ({ request, world }) => {
+  const volPubkey = getScenarioState(world).volunteers[0]?.pubkey ?? getCrossDoState(world).volunteerPubkey
+  if (volPubkey && getCrossDoState(world).conversationId) {
+    const volNsec = getScenarioState(world).volunteers[0]?.nsec ?? getCrossDoState(world).volunteerNsec
+    await apiPost(request, `/conversations/${getCrossDoState(world).conversationId}/claim`, {
       pubkey: volPubkey,
     }, volNsec!)
   }
 })
 
-Then('the conversation status should be {string}', async ({ request }, expectedStatus: string) => {
-  if (xdo.conversationId) {
+Then('the conversation status should be {string}', async ({ request, world }, expectedStatus: string) => {
+  if (getCrossDoState(world).conversationId) {
     const { data } = await apiGet<{ status?: string; conversation?: { status: string } }>(
       request,
-      `/conversations/${xdo.conversationId}`,
+      `/conversations/${getCrossDoState(world).conversationId}`,
     )
     const actual = (data as Record<string, unknown>)?.status as string
       ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.status as string
@@ -221,13 +231,13 @@ Then('the conversation status should be {string}', async ({ request }, expectedS
   }
 })
 
-When('the admin closes the conversation', async ({ request }) => {
-  if (xdo.conversationId) {
-    await apiPatch(request, `/conversations/${xdo.conversationId}`, { status: 'closed' })
+When('the admin closes the conversation', async ({ request, world }) => {
+  if (getCrossDoState(world).conversationId) {
+    await apiPatch(request, `/conversations/${getCrossDoState(world).conversationId}`, { status: 'closed' })
   }
 })
 
-When('another SMS arrives from {string} with body {string}', async ({ request }, phone: string, body: string) => {
+When('another SMS arrives from {string} with body {string}', async ({request, world}, phone: string, body: string) => {
   await simulateIncomingMessage(request, {
     senderNumber: phone,
     body,
@@ -235,11 +245,11 @@ When('another SMS arrives from {string} with body {string}', async ({ request },
   })
 })
 
-Then('the conversation should be reopened', async ({ request }) => {
-  if (xdo.conversationId) {
+Then('the conversation should be reopened', async ({ request, world }) => {
+  if (getCrossDoState(world).conversationId) {
     const { data } = await apiGet<{ status?: string; conversation?: { status: string } }>(
       request,
-      `/conversations/${xdo.conversationId}`,
+      `/conversations/${getCrossDoState(world).conversationId}`,
     )
     const actual = (data as Record<string, unknown>)?.status as string
       ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.status as string
@@ -250,81 +260,83 @@ Then('the conversation should be reopened', async ({ request }) => {
 
 // ─── Invite → Registration → Call Handling ──────────────────────────
 
-When('an admin creates an invite', async ({ request }) => {
+When('an admin creates an invite', async ({ request, world }) => {
   const { data } = await apiPost<{ code?: string; invite?: { code: string } }>(request, '/invites', {
     name: uniqueName('XDO Invitee'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
   })
-  xdo.inviteCode = (data as Record<string, unknown>)?.code as string
+  getCrossDoState(world).inviteCode = (data as Record<string, unknown>)?.code as string
     ?? ((data as Record<string, unknown>)?.invite as Record<string, unknown>)?.code as string
 })
 
-When('the invite is redeemed by a new user', async ({ request }) => {
+When('the invite is redeemed by a new user', async ({ request, world }) => {
   // Simulate invite redemption by creating a volunteer directly
   // (Real redemption involves Schnorr signing which the redeem endpoint handles)
   const vol = await createVolunteerViaApi(request, {
     name: uniqueName('XDO Redeemed'),
     roleIds: ['role-volunteer'],
   })
-  xdo.newVolunteerPubkey = vol.pubkey
-  xdo.newVolunteerNsec = vol.nsec
+  getCrossDoState(world).newVolunteerPubkey = vol.pubkey
+  getCrossDoState(world).newVolunteerNsec = vol.nsec
 })
 
-When('the admin creates a shift with the new volunteer', async ({ request }) => {
+When('the admin creates a shift with the new volunteer', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
   const shift = await createShiftViaApi(request, {
     name: uniqueName('XDO New Vol Shift'),
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: [xdo.newVolunteerPubkey!],
+    userPubkeys: [getCrossDoState(world).newVolunteerPubkey!],
+    hubId,
   })
-  xdo.shiftId = shift.id
+  getCrossDoState(world).shiftId = shift.id
 })
 
-Then('the new volunteer should be rung', async ({}) => {
+Then('the new volunteer should be rung', async ({ world }) => {
   // The call was created and volunteers on shift should be rung
-  expect(xdo.callId).toBeDefined()
-  expect(xdo.callStatus).toBe('ringing')
+  expect(getCrossDoState(world).callId).toBeDefined()
+  expect(getCrossDoState(world).callStatus).toBe('ringing')
 })
 
 // ─── Multi-Channel Isolation ────────────────────────────────────────
 
-Then('{int} separate conversations should exist', async ({}, count: number) => {
-  expect(xdo.conversationIds.length).toBe(count)
+Then('{int} separate conversations should exist', async ({ world }, count: number) => {
+  expect(getCrossDoState(world).conversationIds.length).toBe(count)
   // All conversation IDs should be unique
-  const unique = new Set(xdo.conversationIds)
+  const unique = new Set(getCrossDoState(world).conversationIds)
   expect(unique.size).toBe(count)
 })
 
-Then('each conversation should have its own channel type', async ({ request }) => {
+Then('each conversation should have its own channel type', async ({ request, world }) => {
   const channels = new Set<string>()
-  for (const id of xdo.conversationIds) {
+  for (const id of getCrossDoState(world).conversationIds) {
     const { data } = await apiGet<{ channelType?: string; conversation?: { channelType: string } }>(request, `/conversations/${id}`)
     const channel = (data as Record<string, unknown>)?.channelType as string
       ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.channelType as string
     if (channel) channels.add(channel)
   }
-  expect(channels.size).toBe(xdo.conversationIds.length)
+  expect(channels.size).toBe(getCrossDoState(world).conversationIds.length)
 })
 
 // ─── Report Workflow ────────────────────────────────────────────────
 
-Given('a reporter and reviewer exist', async ({ request }) => {
+Given('a reporter and reviewer exist', async ({ request, world }) => {
   const reporter = await createVolunteerViaApi(request, {
     name: uniqueName('XDO Reporter'),
     roleIds: ['role-reporter'],
   })
-  xdo.reporterNsec = reporter.nsec
+  getCrossDoState(world).reporterNsec = reporter.nsec
 
   const reviewer = await createVolunteerViaApi(request, {
     name: uniqueName('XDO Reviewer'),
     roleIds: ['role-reviewer'],
   })
-  xdo.reviewerPubkey = reviewer.pubkey
+  getCrossDoState(world).reviewerPubkey = reviewer.pubkey
 })
 
-When('the reporter creates a report', async ({ request }) => {
+When('the reporter creates a report', async ({ request, world }) => {
   const kp = generateTestKeypair()
   const { data, status } = await apiPost<{ id?: string; conversation?: { id: string } }>(
     request,
@@ -335,103 +347,104 @@ When('the reporter creates a report', async ({ request }) => {
       encryptedContent: 'xdo-report-content',
       readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
     },
-    xdo.reporterNsec!,
+    getCrossDoState(world).reporterNsec!,
   )
-  xdo.reportId = (data as Record<string, unknown>)?.id as string
+  getCrossDoState(world).reportId = (data as Record<string, unknown>)?.id as string
     ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.id as string
 })
 
-When('the admin assigns the report to the reviewer', async ({ request }) => {
-  if (xdo.reportId && xdo.reviewerPubkey) {
-    await apiPost(request, `/reports/${xdo.reportId}/assign`, { assignedTo: xdo.reviewerPubkey })
+When('the admin assigns the report to the reviewer', async ({ request, world }) => {
+  if (getCrossDoState(world).reportId && getCrossDoState(world).reviewerPubkey) {
+    await apiPost(request, `/reports/${getCrossDoState(world).reportId}/assign`, { assignedTo: getCrossDoState(world).reviewerPubkey })
   }
 })
 
-Then('the report should show the reviewer as assignee', async ({ request }) => {
-  if (xdo.reportId) {
+Then('the report should show the reviewer as assignee', async ({ request, world }) => {
+  if (getCrossDoState(world).reportId) {
     const { data } = await apiGet<{ assignedTo?: string; conversation?: { assignedTo: string } }>(
       request,
-      `/reports/${xdo.reportId}`,
+      `/reports/${getCrossDoState(world).reportId}`,
     )
     const assignee = (data as Record<string, unknown>)?.assignedTo as string
       ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.assignedTo as string
-    expect(assignee).toBe(xdo.reviewerPubkey)
+    expect(assignee).toBe(getCrossDoState(world).reviewerPubkey)
   }
 })
 
-Then('the audit log should contain report assignment entries', async ({ request }) => {
-  const { entries } = await listAuditLogViaApi(request)
+Then('the audit log should contain report assignment entries', async ({request, world}) => {
+  const hubId = getScenarioState(world).hubId
+  const { entries } = await listAuditLogViaApi(request, { hubId })
   // Look for report-related audit entries
   expect(entries.length).toBeGreaterThan(0)
 })
 
 // ─── Voicemail Fallback ─────────────────────────────────────────────
 
-When('no volunteer answers within the timeout', async ({ request }) => {
+When('no volunteer answers within the timeout', async ({ request, world }) => {
   // Simulate voicemail (call goes unanswered)
-  await simulateVoicemail(request, xdo.callId!)
-  xdo.callStatus = 'unanswered'
+  await simulateVoicemail(request, getCrossDoState(world).callId!)
+  getCrossDoState(world).callStatus = 'unanswered'
 })
 
-Then('the call should go to voicemail', async ({}) => {
-  expect(xdo.callStatus).toBe('unanswered')
+Then('the call should go to voicemail', async ({ world }) => {
+  expect(getCrossDoState(world).callStatus).toBe('unanswered')
 })
 
-Then('the call history should show an unanswered call', async ({ request }) => {
+Then('the call history should show an unanswered call', async ({ request, world }) => {
   const { data } = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(request, '/calls/history')
   const calls = (data as { calls: Array<{ callId: string; status: string }> }).calls
-  const call = calls.find(c => c.callId === xdo.callId)
+  const call = calls.find(c => c.callId === getCrossDoState(world).callId)
   expect(call).toBeDefined()
   expect(call!.status).toBe('unanswered')
 })
 
 // ─── Shift Changes Affect Routing ───────────────────────────────────
 
-When('the admin removes the first volunteer from the shift', async ({ request }) => {
-  if (state.shiftIds.length > 0 && state.volunteers.length > 1) {
+When('the admin removes the first volunteer from the shift', async ({ request, world }) => {
+  if (getScenarioState(world).shiftIds.length > 0 && getScenarioState(world).volunteers.length > 1) {
     // Update shift to only include second volunteer
-    const secondVol = state.volunteers[1]
-    await apiPatch(request, `/shifts/${state.shiftIds[0]}`, {
-      volunteerPubkeys: [secondVol.pubkey],
+    const secondVol = getScenarioState(world).volunteers[1]
+    await apiPatch(request, `/shifts/${getScenarioState(world).shiftIds[0]}`, {
+      userPubkeys: [secondVol.pubkey],
     })
   }
 })
 
-Then('only the second volunteer should be rung', async ({}) => {
-  // callId is set by call-lifecycle.steps.ts via state.callId;
-  // xdo.callId is set by cross-do-internal call steps. Accept either.
-  const callId = xdo.callId ?? state.callId
+Then('only the second volunteer should be rung', async ({ world }) => {
+  // callId is set by call-lifecycle.steps.ts via getScenarioState(world).callId;
+  // getCrossDoState(world).callId is set by cross-do-internal call steps. Accept either.
+  const callId = getCrossDoState(world).callId ?? getScenarioState(world).callId
   expect(callId).toBeDefined()
 })
 
 // ─── Conversation Notes ─────────────────────────────────────────────
 
-When('the volunteer writes a note for the conversation', async ({ request }) => {
-  const volNsec = state.volunteers[0]?.nsec ?? xdo.volunteerNsec
-  if (volNsec && xdo.conversationId) {
+When('the volunteer writes a note for the conversation', async ({ request, world }) => {
+  const volNsec = getScenarioState(world).volunteers[0]?.nsec ?? getCrossDoState(world).volunteerNsec
+  if (volNsec && getCrossDoState(world).conversationId) {
     const { data, status } = await apiPost<{ id?: string; note?: { id: string } }>(
       request,
       '/notes',
       {
         encryptedContent: 'xdo-conv-note',
-        conversationId: xdo.conversationId,
+        conversationId: getCrossDoState(world).conversationId,
         readerEnvelopes: [],
       },
       volNsec,
     )
     if (status < 300) {
-      xdo.noteId = (data as Record<string, unknown>)?.id as string
+      getCrossDoState(world).noteId = (data as Record<string, unknown>)?.id as string
         ?? ((data as Record<string, unknown>)?.note as Record<string, unknown>)?.id as string
     }
   }
 })
 
-Then('the note should be linked to the conversation', async ({}) => {
-  expect(xdo.noteId).toBeDefined()
+Then('the note should be linked to the conversation', async ({ world }) => {
+  expect(getCrossDoState(world).noteId).toBeDefined()
 })
 
-Then('listing notes by conversation returns the correct note', async ({ request }) => {
-  if (xdo.conversationId) {
+Then('listing notes by conversation returns the correct note', async ({ request, world }) => {
+  if (getCrossDoState(world).conversationId) {
     const { notes } = await listNotesViaApi(request, { callId: undefined })
     // At least one note exists
     expect(notes.length).toBeGreaterThan(0)

@@ -108,6 +108,50 @@ export const contactPIISchema = z.object({
 
 export type ContactPII = z.infer<typeof contactPIISchema>
 
+// --- Directory contact schemas ---
+
+export const directoryContactTypeSchema = z.enum(['individual', 'organization', 'legal_resource', 'service_provider'])
+export type DirectoryContactType = z.infer<typeof directoryContactTypeSchema>
+
+export const identifierTypeSchema = z.enum(['phone', 'email', 'signal'])
+export type IdentifierType = z.infer<typeof identifierTypeSchema>
+
+export const contactIdentifierSchema = z.object({
+  id: z.string(),
+  type: identifierTypeSchema,
+  value: z.string(),
+  isPrimary: z.boolean(),
+})
+export type ContactIdentifier = z.infer<typeof contactIdentifierSchema>
+
+export const directoryContactSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  contactType: directoryContactTypeSchema,
+  tags: z.array(z.string()),
+  caseCount: z.number(),
+  lastInteractionAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  canDecrypt: z.boolean(),
+  demographics: z.string().optional(),
+  emergencyContacts: z.string().optional(),
+  communicationPrefs: z.string().optional(),
+  notes: z.string().optional(),
+  identifiers: z.array(contactIdentifierSchema).optional(),
+})
+export type DirectoryContact = z.infer<typeof directoryContactSchema>
+
+export const contactCaseLinkSchema = z.object({
+  recordId: z.string(),
+  caseNumber: z.string().optional(),
+  entityTypeLabel: z.string(),
+  role: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+})
+export type ContactCaseLink = z.infer<typeof contactCaseLinkSchema>
+
 // --- Response schemas for OpenAPI ---
 
 export const contactListResponseSchema = z.object({

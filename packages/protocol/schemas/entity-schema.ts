@@ -65,8 +65,8 @@ export const entityFieldDefinitionSchema = z.object({
   accessRoles: z.array(z.string()).optional(),
 
   // Visibility rules
-  visibleToVolunteers: z.boolean().optional().default(true),
-  editableByVolunteers: z.boolean().optional().default(true),
+  visibleToUsers: z.boolean().optional().default(true),
+  editableByUsers: z.boolean().optional().default(true),
 
   // Conditional display
   showWhen: showWhenSchema.optional(),
@@ -309,8 +309,23 @@ export const caseNumberResponseSchema = z.object({
   prefix: z.string(),
 })
 
+export const templateSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  icon: z.string().optional(),
+  version: z.string(),
+  entityTypeCount: z.number(),
+  totalFieldCount: z.number(),
+  suggestedRoleCount: z.number(),
+  tags: z.array(z.string()),
+  comingSoon: z.boolean().optional(),
+})
+
+export type TemplateSummary = z.infer<typeof templateSummarySchema>
+
 export const templateListResponseSchema = z.object({
-  templates: z.array(z.unknown()),
+  templates: z.array(templateSummarySchema),
   appliedTemplateIds: z.array(z.string()),
 })
 
@@ -319,11 +334,18 @@ export const templateApplyResponseSchema = z.object({
   entityTypes: z.number(),
   relationshipTypes: z.number(),
   reportTypes: z.number(),
-  suggestedRoles: z.array(z.unknown()).optional(),
+  suggestedRoles: z.array(z.string()).optional(),
+})
+
+export const templateUpdateItemSchema = z.object({
+  entityTypeId: z.string(),
+  field: z.string(),
+  action: z.string(),
+  description: z.string().optional(),
 })
 
 export const templateUpdatesResponseSchema = z.object({
-  updates: z.array(z.unknown()),
+  updates: z.array(templateUpdateItemSchema),
 })
 
 export const rolesFromTemplateResponseSchema = z.object({

@@ -27,7 +27,7 @@ data class SystemHealth(
     val calls: CallMetrics,
     val storage: StorageInfo,
     val backup: BackupInfo,
-    val volunteers: VolunteerInfo,
+    val volunteers: UserInfo,
     val timestamp: String,
 )
 
@@ -67,7 +67,7 @@ data class BackupInfo(
 )
 
 @Serializable
-data class VolunteerInfo(
+data class UserInfo(
     val totalActive: Int,
     val onlineNow: Int,
     val onShift: Int,
@@ -77,16 +77,16 @@ data class VolunteerInfo(
 // ---- Client-specific types ----
 
 /**
- * A volunteer registered in the system.
+ * A user registered in the system.
  *
- * Client-specific type for admin views. The generated VolunteerResponse
- * (org.llamenos.protocol.VolunteerResponse) has a different shape optimized
+ * Client-specific type for admin views. The generated UserResponse
+ * (org.llamenos.protocol.UserResponse) has a different shape optimized
  * for the API response (uses pubkey-based identity, roles as List<String>,
  * has callPreference/spokenLanguages/etc.). This type uses UI-friendly
  * field names (id, displayName, role as singular String, status).
  */
 @Serializable
-data class Volunteer(
+data class User(
     val id: String,
     val pubkey: String,
     val displayName: String? = null,
@@ -96,11 +96,11 @@ data class Volunteer(
 )
 
 /**
- * Paginated response from GET /api/admin/volunteers.
+ * Paginated response from GET /api/users.
  */
 @Serializable
-data class VolunteersListResponse(
-    val volunteers: List<Volunteer>,
+data class UsersListResponse(
+    val users: List<User>,
     val total: Int,
 )
 
@@ -204,28 +204,28 @@ data class CreateInviteRequest(
     val role: String,
 )
 
-// ---- Volunteer CRUD ----
+// ---- User CRUD ----
 
 /**
- * Request body for creating a volunteer via POST /api/admin/volunteers.
- * Client-specific shape — the generated CreateVolunteerBody has many more
+ * Request body for creating a user via POST /api/users.
+ * Client-specific shape — the generated CreateUserBody has many more
  * fields (pubkey, encryptedSecretKey, specializations, etc.).
  */
 @Serializable
-data class CreateVolunteerRequest(
+data class CreateUserRequest(
     val name: String,
     val phone: String,
     val role: String = "role-volunteer",
 )
 
 /**
- * Response from creating a volunteer. Contains the volunteer data
- * and a one-time nsec that must be given to the volunteer.
+ * Response from creating a user. Contains the user data
+ * and a one-time nsec that must be given to the user.
  * Client-only type — no generated equivalent.
  */
 @Serializable
-data class CreateVolunteerResponse(
-    val volunteer: Volunteer,
+data class CreateUserResponse(
+    val user: User,
     val nsec: String,
 )
 
@@ -234,7 +234,7 @@ data class CreateVolunteerResponse(
 /**
  * Request body for creating/updating a shift.
  * Client-specific shape — the generated CreateShiftBody uses different
- * field names (volunteerPubkeys instead of volunteerIds) and types
+ * field names (userPubkeys instead of volunteerIds) and types
  * (List<Long> instead of List<Int> for days).
  */
 @Serializable
@@ -256,7 +256,7 @@ data class AdminShiftDetail(
     val startTime: String,
     val endTime: String,
     val days: List<Int> = emptyList(),
-    val volunteers: List<Volunteer> = emptyList(),
+    val volunteers: List<User> = emptyList(),
     val volunteerCount: Int = 0,
 )
 
@@ -271,7 +271,7 @@ data class AdminShiftsListResponse(
 /**
  * Request to set the fallback ring group.
  * Client-specific shape — the generated FallbackGroup uses
- * volunteerPubkeys instead of volunteerIds.
+ * userPubkeys instead of volunteerIds.
  */
 @Serializable
 data class FallbackGroupRequest(

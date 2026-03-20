@@ -18,7 +18,6 @@ Given('I am on the call history screen', async ({ page }) => {
 
 When('I tap the view call history button', async ({ page }) => {
   await page.getByTestId(TestIds.NAV_CALLS).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the call history screen', async ({ page }) => {
@@ -124,7 +123,6 @@ Given('a date range is selected', async ({ page }) => {
   const dateInputs = page.locator('input[type="date"]')
   await dateInputs.first().fill('2024-01-01')
   await dateInputs.nth(1).fill('2024-12-31')
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see the date range clear button', async ({ page }) => {

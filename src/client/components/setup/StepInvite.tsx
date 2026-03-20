@@ -69,7 +69,7 @@ export function StepInvite({ headingRef }: Props = {}) {
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="invite-name">{t('volunteers.name')}</Label>
+            <Label htmlFor="invite-name">{t('users.name')}</Label>
             <Input
               id="invite-name"
               value={name}
@@ -78,7 +78,7 @@ export function StepInvite({ headingRef }: Props = {}) {
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="invite-phone">{t('volunteers.phone')}</Label>
+            <Label htmlFor="invite-phone">{t('users.phone')}</Label>
             <Input
               id="invite-phone"
               value={phone}
@@ -89,14 +89,14 @@ export function StepInvite({ headingRef }: Props = {}) {
         </div>
 
         <div className="space-y-1">
-          <Label>{t('volunteers.role')}</Label>
+          <Label>{t('users.role')}</Label>
           <Select value={roleId} onValueChange={setRoleId}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="role-volunteer">{t('volunteers.roleVolunteer')}</SelectItem>
-              <SelectItem value="role-super-admin">{t('volunteers.roleAdmin')}</SelectItem>
+              <SelectItem value="role-volunteer">{t('users.roleVolunteer')}</SelectItem>
+              <SelectItem value="role-super-admin">{t('users.roleAdmin')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -126,7 +126,7 @@ export function StepInvite({ headingRef }: Props = {}) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{invite.name}</span>
                     <Badge variant="outline" className="text-[10px]">
-                      {invite.roleIds?.includes('role-super-admin') ? t('volunteers.roleAdmin') : t('volunteers.roleVolunteer')}
+                      {invite.roleIds?.includes('role-super-admin') ? t('users.roleAdmin') : t('users.roleVolunteer')}
                     </Badge>
                   </div>
                   <p className="font-mono text-xs text-muted-foreground">{invite.code}</p>

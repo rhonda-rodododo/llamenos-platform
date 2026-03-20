@@ -18,19 +18,19 @@ import { When, Then } from '../fixtures'
 import { TestIds, Timeouts } from '../../helpers'
 
 Then('I should see the nsec import input field', async ({ page }) => {
-  await expect(page.locator('#nsec')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.NSEC_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I enter {string} in the nsec field', async ({ page }, nsec: string) => {
-  await page.locator('#nsec').fill(nsec)
+  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
 })
 
 When('I enter {string} in the nsec input', async ({ page }, nsec: string) => {
-  await page.locator('#nsec').fill(nsec)
+  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
 })
 
 Then('the nsec field should be a password field', async ({ page }) => {
-  const nsecInput = page.locator('#nsec')
+  const nsecInput = page.getByTestId(TestIds.NSEC_INPUT)
   await expect(nsecInput).toHaveAttribute('type', 'password')
 })
 
@@ -38,7 +38,7 @@ When('I enter a valid 63-character nsec', async ({ page }) => {
   const { generateSecretKey, nip19 } = await import('nostr-tools')
   const sk = generateSecretKey()
   const nsec = nip19.nsecEncode(sk)
-  await page.locator('#nsec').fill(nsec)
+  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
 })
 
 // 'I start typing in the nsec field' is defined in key-import-steps.ts (shared)
@@ -46,8 +46,8 @@ When('I enter a valid 63-character nsec', async ({ page }) => {
 
 When('I see the error {string}', async ({ page }, _text: string) => {
   // Wait for any error to appear
-  const error = page.locator('.text-destructive')
-    .or(page.getByTestId(TestIds.ERROR_MESSAGE))
+  const error = page.getByTestId(TestIds.ERROR_MESSAGE)
+    .or(page.locator('[role="alert"]'))
   await expect(error.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 

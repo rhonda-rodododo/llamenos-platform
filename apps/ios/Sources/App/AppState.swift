@@ -152,7 +152,7 @@ final class AppState {
         if args.contains("--test-register") && cryptoService.isUnlocked {
             if args.contains("--test-volunteer-identity") {
                 // Volunteer identity — register via admin API, not bootstrap
-                registerVolunteerIdentity()
+                registerUserIdentity()
             } else {
                 // Admin identity — use the bootstrap endpoint
                 bootstrapTestIdentity()
@@ -166,7 +166,7 @@ final class AppState {
 
     /// Register the test identity as admin on the server via POST /api/auth/bootstrap.
     /// Blocks the main thread briefly (max 5s) — acceptable for test setup only.
-    /// The bootstrap endpoint creates the admin volunteer with role-super-admin.
+    /// The bootstrap endpoint creates the admin user with role-super-admin.
     /// If admin already exists (403), this is a no-op.
     private func bootstrapTestIdentity() {
         guard let hubURL = authService.hubURL,
@@ -196,20 +196,20 @@ final class AppState {
         _ = sem.wait(timeout: .now() + 5)
     }
 
-    /// Register the test volunteer identity on the server.
-    /// First ensures admin is bootstrapped (using the admin key), then creates a volunteer
-    /// using the admin's auth via POST /api/volunteers.
-    private func registerVolunteerIdentity() {
+    /// Register the test user (volunteer) identity on the server.
+    /// First ensures admin is bootstrapped (using the admin key), then creates a user
+    /// using the admin's auth via POST /api/users.
+    private func registerUserIdentity() {
         guard let hubURL = authService.hubURL,
               let baseURL = URL(string: hubURL) else { return }
-        guard let volunteerPubkey = cryptoService.pubkey else { return }
+        guard let userPubkey = cryptoService.pubkey else { return }
 
         // Step 1: Bootstrap admin (admin key is hardcoded — same as setMockIdentity)
         let adminSecretHex = "f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb"
         bootstrapAdmin(baseURL: baseURL, adminSecretHex: adminSecretHex)
 
-        // Step 2: Create volunteer using admin auth
-        createVolunteer(baseURL: baseURL, adminSecretHex: adminSecretHex, volunteerPubkey: volunteerPubkey)
+        // Step 2: Create user using admin auth
+        createUser(baseURL: baseURL, adminSecretHex: adminSecretHex, userPubkey: userPubkey)
     }
 
     private func bootstrapAdmin(baseURL: URL, adminSecretHex: String) {
@@ -235,12 +235,12 @@ final class AppState {
         _ = sem.wait(timeout: .now() + 5)
     }
 
-    private func createVolunteer(baseURL: URL, adminSecretHex: String, volunteerPubkey: String) {
+    private func createUser(baseURL: URL, adminSecretHex: String, userPubkey: String) {
         guard let adminToken = try? CryptoService.createAuthTokenStatic(
-            secretHex: adminSecretHex, method: "POST", path: "/api/volunteers"
+            secretHex: adminSecretHex, method: "POST", path: "/api/users"
         ) else { return }
 
-        let url = baseURL.appendingPathComponent("api/volunteers")
+        let url = baseURL.appendingPathComponent("api/users")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -252,7 +252,7 @@ final class AppState {
         request.timeoutInterval = 5
 
         let body: [String: Any] = [
-            "pubkey": volunteerPubkey,
+            "pubkey": userPubkey,
             "name": "Test Volunteer",
             "roles": ["role-volunteer"],
         ]

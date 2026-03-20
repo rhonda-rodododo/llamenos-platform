@@ -5,8 +5,8 @@
  * permission enforcement, and case management feature toggle.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
-import { shared } from './shared-state'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getSharedState, setLastResponse } from './shared-state'
 import {
   enableCaseManagementViaApi,
   getCaseManagementEnabledViaApi,
@@ -30,41 +30,47 @@ interface EntitySchemaState {
   caseNumbers: string[]
 }
 
-let state: EntitySchemaState
+const ENTITY_SCHEMA_KEY = 'entity_schema'
 
-Before({ tags: '@cases or @contacts or @events or @evidence or @templates or @reports or @triage' }, async () => {
-  state = { caseNumbers: [] }
+function getEntitySchemaState(world: Record<string, unknown>): EntitySchemaState {
+  return getState<EntitySchemaState>(world, ENTITY_SCHEMA_KEY)
+}
+
+
+Before({ tags: '@cases or @contacts or @events or @evidence or @templates or @reports or @triage' }, async ({ world }) => {
+  const state = { caseNumbers: [] }
+  setState(world, ENTITY_SCHEMA_KEY, state)
 })
 
 // ── Given ───────────────────────────────────────────────────────────
 
-Given('case management is enabled', async ({ request }) => {
+Given('case management is enabled', async ({request, world}) => {
   await enableCaseManagementViaApi(request, true)
 })
 
-Given('an entity type {string} exists', async ({ request }, name: string) => {
+Given('an entity type {string} exists', async ({ request, world }, name: string) => {
   const types = await listEntityTypesViaApi(request)
   const existing = types.find(t => t.name === name)
   if (existing) {
-    state.lastEntityType = existing
+    getEntitySchemaState(world).lastEntityType = existing
     return
   }
   const created = await createEntityTypeViaApi(request, { name, category: 'case' })
-  state.lastEntityType = created
+  getEntitySchemaState(world).lastEntityType = created
 })
 
 // ── When ────────────────────────────────────────────────────────────
 
-When('the admin enables case management', async ({ request }) => {
+When('the admin enables case management', async ({request, world}) => {
   await enableCaseManagementViaApi(request, true)
 })
 
-When('the admin creates an entity type named {string} with category {string}', async ({ request }, name: string, category: string) => {
+When('the admin creates an entity type named {string} with category {string}', async ({ request, world }, name: string, category: string) => {
   const result = await createEntityTypeViaApi(request, { name, category })
-  state.lastEntityType = result
+  getEntitySchemaState(world).lastEntityType = result
 })
 
-When('the admin creates an entity type with statuses {string} and fields {string}', async ({ request }, statusesStr: string, fieldsStr: string) => {
+When('the admin creates an entity type with statuses {string} and fields {string}', async ({ request, world }, statusesStr: string, fieldsStr: string) => {
   const statuses = statusesStr.split(',').map((v, i) => ({
     value: v.trim(),
     label: v.trim().charAt(0).toUpperCase() + v.trim().slice(1),
@@ -80,10 +86,10 @@ When('the admin creates an entity type with statuses {string} and fields {string
     statuses,
     fields,
   })
-  state.lastEntityType = result
+  getEntitySchemaState(world).lastEntityType = result
 })
 
-When('the admin adds a field {string} of type {string} to entity type {string}', async ({ request }, fieldName: string, fieldType: string, entityTypeName: string) => {
+When('the admin adds a field {string} of type {string} to entity type {string}', async ({ request, world }, fieldName: string, fieldType: string, entityTypeName: string) => {
   const types = await listEntityTypesViaApi(request)
   const entityType = types.find(t => t.name === entityTypeName)
   expect(entityType).toBeTruthy()
@@ -98,36 +104,36 @@ When('the admin adds a field {string} of type {string} to entity type {string}',
     indexable: false,
     indexType: 'none',
     accessLevel: 'all',
-    visibleToVolunteers: true,
-    editableByVolunteers: true,
+    visibleToUsers: true,
+    editableByUsers: true,
     hubEditable: true,
   }
 
   const result = await updateEntityTypeViaApi(request, entityType!.id as string, {
     fields: [...existingFields, newField],
   })
-  state.lastEntityType = result
+  getEntitySchemaState(world).lastEntityType = result
 })
 
-When('the admin deletes entity type {string}', async ({ request }, name: string) => {
+When('the admin deletes entity type {string}', async ({request, world}, name: string) => {
   const types = await listEntityTypesViaApi(request)
   const entityType = types.find(t => t.name === name)
   expect(entityType).toBeTruthy()
   await deleteEntityTypeViaApi(request, entityType!.id as string)
 })
 
-When('the admin tries to create an entity type named {string}', async ({ request }, name: string) => {
+When('the admin tries to create an entity type named {string}', async ({request, world}, name: string) => {
   try {
     await createEntityTypeViaApi(request, { name, category: 'case' })
-    shared.lastResponse = { status: 201, data: null }
+    setLastResponse(world, { status: 201, data: null })
   } catch (e: unknown) {
     const msg = (e as Error).message
     const match = msg.match(/(\d{3})/)
-    shared.lastResponse = { status: match ? parseInt(match[1]) : 500, data: null }
+    setLastResponse(world, { status: match ? parseInt(match[1]) : 500, data: null })
   }
 })
 
-When('the admin creates a relationship type from {string} to {string} with cardinality {string}', async ({ request }, source: string, target: string, cardinality: string) => {
+When('the admin creates a relationship type from {string} to {string} with cardinality {string}', async ({ request, world }, source: string, target: string, cardinality: string) => {
   const types = await listEntityTypesViaApi(request)
   const sourceId = source === 'contact' ? 'contact' : (types.find(t => t.name === source)?.id as string)
   const targetId = target === 'contact' ? 'contact' : (types.find(t => t.name === target)?.id as string)
@@ -139,29 +145,29 @@ When('the admin creates a relationship type from {string} to {string} with cardi
     targetEntityTypeId: targetId,
     cardinality,
   })
-  state.lastRelationshipType = result
+  getEntitySchemaState(world).lastRelationshipType = result
 })
 
-When('a volunteer tries to create an entity type', async ({ request }) => {
+When('a volunteer tries to create an entity type', async ({request, world}) => {
   const vol = await createVolunteerViaApi(request, { name: `vol-schema-${Date.now()}` })
   try {
     await createEntityTypeViaApi(request, { name: `forbidden_${Date.now()}` }, vol.nsec)
-    shared.lastResponse = { status: 201, data: null }
+    setLastResponse(world, { status: 201, data: null })
   } catch (e: unknown) {
     const msg = (e as Error).message
     const match = msg.match(/(\d{3})/)
-    shared.lastResponse = { status: match ? parseInt(match[1]) : 500, data: null }
+    setLastResponse(world, { status: match ? parseInt(match[1]) : 500, data: null })
   }
 })
 
-When('a case number is generated with prefix {string}', async ({ request }, prefix: string) => {
+When('a case number is generated with prefix {string}', async ({ request, world }, prefix: string) => {
   const result = await generateCaseNumberViaApi(request, prefix)
-  state.caseNumbers.push(result.number)
+  getEntitySchemaState(world).caseNumbers.push(result.number)
 })
 
-When('another case number is generated with prefix {string}', async ({ request }, prefix: string) => {
+When('another case number is generated with prefix {string}', async ({ request, world }, prefix: string) => {
   const result = await generateCaseNumberViaApi(request, prefix)
-  state.caseNumbers.push(result.number)
+  getEntitySchemaState(world).caseNumbers.push(result.number)
 })
 
 When('the admin lists all roles', async () => {
@@ -170,39 +176,39 @@ When('the admin lists all roles', async () => {
 
 // ── Then ────────────────────────────────────────────────────────────
 
-Then('case management should be enabled', async ({ request }) => {
+Then('case management should be enabled', async ({request, world}) => {
   const result = await getCaseManagementEnabledViaApi(request)
   expect(result.enabled).toBe(true)
 })
 
-Then('the entity type {string} should exist', async ({ request }, name: string) => {
+Then('the entity type {string} should exist', async ({ request, world }, name: string) => {
   const types = await listEntityTypesViaApi(request)
   const found = types.find(t => t.name === name)
   expect(found).toBeTruthy()
-  state.lastEntityType = found
+  getEntitySchemaState(world).lastEntityType = found
 })
 
 Then('it should have a generated UUID id', async () => {
-  expect(state.lastEntityType).toBeTruthy()
-  const id = state.lastEntityType!.id as string
+  expect(getEntitySchemaState(world).lastEntityType).toBeTruthy()
+  const id = getEntitySchemaState(world).lastEntityType!.id as string
   expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
 })
 
-Then('it should have category {string}', async ({}, category: string) => {
-  expect(state.lastEntityType!.category).toBe(category)
+Then('it should have category {string}', async ({ world }, category: string) => {
+  expect(getEntitySchemaState(world).lastEntityType!.category).toBe(category)
 })
 
-Then('the created entity type should have {int} statuses', async ({}, count: number) => {
-  const statuses = state.lastEntityType!.statuses as unknown[]
+Then('the created entity type should have {int} statuses', async ({ world }, count: number) => {
+  const statuses = getEntitySchemaState(world).lastEntityType!.statuses as unknown[]
   expect(statuses.length).toBe(count)
 })
 
-Then('the created entity type should have {int} fields', async ({}, count: number) => {
-  const fields = state.lastEntityType!.fields as unknown[]
+Then('the created entity type should have {int} fields', async ({ world }, count: number) => {
+  const fields = getEntitySchemaState(world).lastEntityType!.fields as unknown[]
   expect(fields.length).toBe(count)
 })
 
-Then('entity type {string} should have the field {string}', async ({ request }, entityTypeName: string, fieldName: string) => {
+Then('entity type {string} should have the field {string}', async ({request, world}, entityTypeName: string, fieldName: string) => {
   const types = await listEntityTypesViaApi(request)
   const entityType = types.find(t => t.name === entityTypeName)
   expect(entityType).toBeTruthy()
@@ -210,26 +216,26 @@ Then('entity type {string} should have the field {string}', async ({ request }, 
   expect(fields.some(f => f.name === fieldName)).toBe(true)
 })
 
-Then('entity type {string} should not exist', async ({ request }, name: string) => {
+Then('entity type {string} should not exist', async ({request, world}, name: string) => {
   const types = await listEntityTypesViaApi(request)
   expect(types.some(t => t.name === name)).toBe(false)
 })
 
 Then('the relationship type should exist', async () => {
-  expect(state.lastRelationshipType).toBeTruthy()
-  expect(state.lastRelationshipType!.id).toBeTruthy()
+  expect(getEntitySchemaState(world).lastRelationshipType).toBeTruthy()
+  expect(getEntitySchemaState(world).lastRelationshipType!.id).toBeTruthy()
 })
 
-Then('the first case number should match {string}', async ({}, pattern: string) => {
+Then('the first case number should match {string}', async ({ world }, pattern: string) => {
   const year = new Date().getFullYear()
   const expected = pattern.replace('{year}', String(year))
-  expect(state.caseNumbers[0]).toBe(expected)
+  expect(getEntitySchemaState(world).caseNumbers[0]).toBe(expected)
 })
 
-Then('the second case number should match {string}', async ({}, pattern: string) => {
+Then('the second case number should match {string}', async ({ world }, pattern: string) => {
   const year = new Date().getFullYear()
   const expected = pattern.replace('{year}', String(year))
-  expect(state.caseNumbers[1]).toBe(expected)
+  expect(getEntitySchemaState(world).caseNumbers[1]).toBe(expected)
 })
 
 Then('the hub-admin role should include permission {string}', async ({ request }, permission: string) => {

@@ -4,9 +4,6 @@ Feature: Storage Integrity
   I want JSONB fields to be stored and retrieved with full fidelity
   So that no double-serialization bugs corrupt structured data
 
-  Background:
-    Given the server is reset
-
   Scenario Outline: JSONB round-trip for <entityType>
     Given a <entityType> entity is created via the API with structured JSONB data
     When the <entityType> is fetched via the API

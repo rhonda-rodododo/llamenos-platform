@@ -4,9 +4,6 @@ Feature: Volunteer Profiles & Case Workload
   and supervisor assignment. Admins can query volunteer workload metrics
   and list cases assigned to a volunteer.
 
-  Background:
-    Given the server is reset
-
   @cases
   Scenario: Volunteer specializations can be set during creation
     Given case management is enabled

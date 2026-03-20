@@ -5,8 +5,9 @@
  * CORS, rate limiting, and concurrent state.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
-import { shared } from './shared-state'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
+import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,
@@ -47,10 +48,15 @@ interface EdgeState {
   rateLimit429Count: number
 }
 
-let edge: EdgeState
+const EDGE_CASES_KEY = 'edge_cases'
 
-Before({ tags: '@backend' }, async () => {
-  edge = {
+function getEdgeState(world: Record<string, unknown>): EdgeState {
+  return getState<EdgeState>(world, EDGE_CASES_KEY)
+}
+
+
+Before({ tags: '@backend' }, async ({ world }) => {
+  const edge = {
     noteCount: 0,
     shiftIds: [],
     banCount: 0,
@@ -58,107 +64,113 @@ Before({ tags: '@backend' }, async () => {
     createdSuccessfully: false,
     rateLimit429Count: 0,
   }
+  setState(world, EDGE_CASES_KEY, edge)
 })
 
 // ─── Pagination ─────────────────────────────────────────────────────
 
-When('an admin lists notes', async ({ request }) => {
-  edge.noteListResult = await listNotesViaApi(request)
+When('an admin lists notes', async ({ request, world }) => {
+  getEdgeState(world).noteListResult = await listNotesViaApi(request)
 })
 
-Then('the notes list should be empty with total {int}', async ({}, total: number) => {
-  expect(edge.noteListResult).toBeDefined()
-  expect(edge.noteListResult!.notes.length).toBe(0)
-  expect(edge.noteListResult!.total).toBe(total)
+Then('the notes list should be empty with total {int}', async ({ world }, total: number) => {
+  expect(getEdgeState(world).noteListResult).toBeDefined()
+  expect(getEdgeState(world).noteListResult!.notes.length).toBe(0)
+  expect(getEdgeState(world).noteListResult!.total).toBe(total)
 })
 
-Given('{int} notes exist in the system', async ({ request }, count: number) => {
+Given('{int} notes exist in the system', async ({ request, world }, count: number) => {
   for (let i = 0; i < count; i++) {
     await apiPost(request, '/notes', {
       encryptedContent: `edge-note-${i}`,
       callId: `edge-call-${Date.now()}-${i}`,
     })
   }
-  edge.noteCount = count
+  getEdgeState(world).noteCount = count
 })
 
-When('an admin lists notes with page {int} limit {int}', async ({ request }, page: number, limit: number) => {
-  edge.noteListResult = await listNotesViaApi(request, { page, limit })
+When('an admin lists notes with page {int} limit {int}', async ({ request, world }, page: number, limit: number) => {
+  getEdgeState(world).noteListResult = await listNotesViaApi(request, { page, limit })
 })
 
-Then('{int} notes should be returned with total {int}', async ({}, count: number, total: number) => {
-  expect(edge.noteListResult).toBeDefined()
-  expect(edge.noteListResult!.notes.length).toBe(count)
-  expect(edge.noteListResult!.total).toBe(total)
+Then('{int} notes should be returned with total {int}', async ({ world }, count: number, total: number) => {
+  expect(getEdgeState(world).noteListResult).toBeDefined()
+  expect(getEdgeState(world).noteListResult!.notes.length).toBe(count)
+  expect(getEdgeState(world).noteListResult!.total).toBe(total)
 })
 
-Then('{int} notes should be returned', async ({}, count: number) => {
-  expect(edge.noteListResult).toBeDefined()
-  expect(edge.noteListResult!.notes.length).toBe(count)
+Then('{int} notes should be returned', async ({ world }, count: number) => {
+  expect(getEdgeState(world).noteListResult).toBeDefined()
+  expect(getEdgeState(world).noteListResult!.notes.length).toBe(count)
 })
 
-Then('the notes list should be empty', async ({}) => {
-  expect(edge.noteListResult).toBeDefined()
-  expect(edge.noteListResult!.notes.length).toBe(0)
+Then('the notes list should be empty', async ({ world }) => {
+  expect(getEdgeState(world).noteListResult).toBeDefined()
+  expect(getEdgeState(world).noteListResult!.notes.length).toBe(0)
 })
 
-Given('{int} shifts exist', async ({ request }, count: number) => {
+Given('{int} shifts exist', async ({ request, world }, count: number) => {
+  const hubId = getScenarioState(world).hubId
   for (let i = 0; i < count; i++) {
-    const shift = await createShiftViaApi(request, { name: `Edge Shift ${Date.now()}-${i}` })
-    edge.shiftIds.push(shift.id)
+    const shift = await createShiftViaApi(request, { name: `Edge Shift ${Date.now()}-${i}`, hubId })
+    getEdgeState(world).shiftIds.push(shift.id)
   }
 })
 
-When('an admin lists shifts', async ({ request }) => {
-  const shifts = await listShiftsViaApi(request)
-  shared.lastResponse = { status: 200, data: { shifts } }
+When('an admin lists shifts', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const shifts = await listShiftsViaApi(request, hubId)
+  setLastResponse(world, { status: 200, data: { shifts } })
 })
 
-Then('{int} shifts should be returned', async ({}, count: number) => {
-  const data = shared.lastResponse?.data as { shifts: unknown[] }
+Then('{int} shifts should be returned', async ({ world }, count: number) => {
+  const data = getSharedState(world).lastResponse?.data as { shifts: unknown[] }
   expect(data.shifts.length).toBeGreaterThanOrEqual(count)
 })
 
-Given('{int} bans exist', async ({ request }, count: number) => {
+Given('{int} bans exist', async ({ request, world }, count: number) => {
+  const hubId = getScenarioState(world).hubId
   for (let i = 0; i < count; i++) {
-    await createBanViaApi(request, { phone: uniquePhone(), reason: 'edge test' })
+    await createBanViaApi(request, { phone: uniquePhone(), reason: 'edge test', hubId })
   }
-  edge.banCount = count
+  getEdgeState(world).banCount = count
 })
 
-When('an admin lists bans', async ({ request }) => {
-  const bans = await listBansViaApi(request)
-  shared.lastResponse = { status: 200, data: { bans } }
+When('an admin lists bans', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const bans = await listBansViaApi(request, hubId)
+  setLastResponse(world, { status: 200, data: { bans } })
 })
 
-Then('{int} bans should be returned', async ({}, count: number) => {
-  const data = shared.lastResponse?.data as { bans: unknown[] }
+Then('{int} bans should be returned', async ({ world }, count: number) => {
+  const data = getSharedState(world).lastResponse?.data as { bans: unknown[] }
   expect(data.bans.length).toBeGreaterThanOrEqual(count)
 })
 
 // ─── Duplicate Prevention ───────────────────────────────────────────
 
-When('an admin bans phone {string} again', async ({ request }, phone: string) => {
-  shared.lastResponse = await apiPost(request, '/bans', { phone, reason: 'duplicate test' })
+When('an admin bans phone {string} again', async ({ request, world }, phone: string) => {
+  getSharedState(world).lastResponse = await apiPost(request, '/bans', { phone, reason: 'duplicate test' })
 })
 
-Then('the ban list should contain exactly {int} entry for {string}', async ({ request }, count: number, phone: string) => {
-  const bans = await listBansViaApi(request)
+Then('the ban list should contain exactly {int} entry for {string}', async ({request, world}, count: number, phone: string) => {
+  const hubId = getScenarioState(world).hubId
+  const bans = await listBansViaApi(request, hubId)
   const matches = bans.filter(b => b.phone === phone)
   expect(matches.length).toBe(count)
 })
 
-When('an admin creates a role with slug {string}', async ({ request }, slug: string) => {
+When('an admin creates a role with slug {string}', async ({ request, world }, slug: string) => {
   const result = await createRoleViaApi(request, {
     name: uniqueName('Edge Role'),
     slug,
     permissions: ['notes:read-own'],
     description: 'edge test',
   })
-  edge.roleCreationStatuses.push(200)
+  getEdgeState(world).roleCreationStatuses.push(200)
 })
 
-When('an admin creates another role with slug {string}', async ({ request }, slug: string) => {
+When('an admin creates another role with slug {string}', async ({ request, world }, slug: string) => {
   try {
     await createRoleViaApi(request, {
       name: uniqueName('Edge Role 2'),
@@ -166,14 +178,14 @@ When('an admin creates another role with slug {string}', async ({ request }, slu
       permissions: ['bans:read'],
       description: 'edge duplicate test',
     })
-    edge.roleCreationStatuses.push(200)
+    getEdgeState(world).roleCreationStatuses.push(200)
   } catch (e) {
     // createRoleViaApi handles 409 internally, but let's track the status
-    edge.roleCreationStatuses.push(409)
+    getEdgeState(world).roleCreationStatuses.push(409)
   }
 })
 
-Then('the second role creation should return {int}', async ({}, _status: number) => {
+Then('the second role creation should return {int}', async ({ world }, _status: number) => {
   // createRoleViaApi handles 409 by returning the existing role,
   // so we verify there's only one role with that slug
   // This is tested implicitly by the slug uniqueness constraint
@@ -182,63 +194,63 @@ Then('the second role creation should return {int}', async ({}, _status: number)
 
 // ─── Input Boundary Values ──────────────────────────────────────────
 
-When('an admin creates a volunteer with a {int}-character name', async ({ request }, length: number) => {
+When('an admin creates a volunteer with a {int}-character name', async ({ request, world }, length: number) => {
   const kp = generateTestKeypair()
   const name = 'A'.repeat(length)
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  getSharedState(world).lastResponse = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name,
     phone: uniquePhone(),
   })
-  edge.createdSuccessfully = shared.lastResponse.status < 300
+  getEdgeState(world).createdSuccessfully = getSharedState(world).lastResponse.status < 300
 })
 
-Then('the volunteer should be created successfully', async ({}) => {
-  expect(edge.createdSuccessfully || (shared.lastResponse && shared.lastResponse.status < 300)).toBeTruthy()
+Then('the volunteer should be created successfully', async ({ world }) => {
+  expect(getEdgeState(world).createdSuccessfully || (getSharedState(world).lastResponse && getSharedState(world).lastResponse.status < 300)).toBeTruthy()
 })
 
 // 'an admin creates a volunteer named {string}' is defined in crud.steps.ts
 // 'the volunteer list should contain {string}' is defined in crud.steps.ts
 
-When('an admin creates a ban with reason {string}', async ({ request }, reason: string) => {
-  shared.lastResponse = await apiPost(request, '/bans', {
+When('an admin creates a ban with reason {string}', async ({ request, world }, reason: string) => {
+  getSharedState(world).lastResponse = await apiPost(request, '/bans', {
     phone: uniquePhone(),
     reason,
   })
-  edge.createdSuccessfully = shared.lastResponse.status < 300
+  getEdgeState(world).createdSuccessfully = getSharedState(world).lastResponse.status < 300
 })
 
-Then('the ban should be created successfully', async ({}) => {
-  expect(edge.createdSuccessfully).toBeTruthy()
+Then('the ban should be created successfully', async ({ world }) => {
+  expect(getEdgeState(world).createdSuccessfully).toBeTruthy()
 })
 
-When('an admin creates a volunteer with no optional fields', async ({ request }) => {
+When('an admin creates a volunteer with no optional fields', async ({ request, world }) => {
   const kp = generateTestKeypair()
-  shared.lastResponse = await apiPost(request, '/volunteers', {
+  getSharedState(world).lastResponse = await apiPost(request, '/users', {
     pubkey: kp.pubkey,
     name: uniqueName('Edge NoOpt'),
     phone: uniquePhone(),
   })
-  edge.createdSuccessfully = shared.lastResponse.status < 300
+  getEdgeState(world).createdSuccessfully = getSharedState(world).lastResponse.status < 300
 })
 
 // ─── Error Response Consistency ─────────────────────────────────────
 
-When('an admin requests volunteer {string}', async ({ request }, pubkey: string) => {
-  shared.lastResponse = await apiPatch(request, `/volunteers/${pubkey}`, { name: 'test' })
+When('an admin requests volunteer {string}', async ({ request, world }, pubkey: string) => {
+  getSharedState(world).lastResponse = await apiPatch(request, `/users/${pubkey}`, { name: 'test' })
 })
 
-When('an admin deletes shift {string}', async ({ request }, id: string) => {
-  shared.lastResponse = await apiDelete(request, `/shifts/${id}`)
+When('an admin deletes shift {string}', async ({ request, world }, id: string) => {
+  getSharedState(world).lastResponse = await apiDelete(request, `/shifts/${id}`)
 })
 
-When('an admin requests note replies for {string}', async ({ request }, noteId: string) => {
-  shared.lastResponse = await apiGet(request, `/notes/${noteId}/replies`)
+When('an admin requests note replies for {string}', async ({ request, world }, noteId: string) => {
+  getSharedState(world).lastResponse = await apiGet(request, `/notes/${noteId}/replies`)
 })
 
 // ─── CORS ───────────────────────────────────────────────────────────
 
-When('a CORS preflight request is sent to {string}', async ({ request }, path: string) => {
+When('a CORS preflight request is sent to {string}', async ({ request, world }, path: string) => {
   const res = await request.fetch(`${BASE_URL}${path}`, {
     method: 'OPTIONS',
     headers: {
@@ -246,113 +258,121 @@ When('a CORS preflight request is sent to {string}', async ({ request }, path: s
       'Access-Control-Request-Method': 'GET',
     },
   })
-  shared.lastResponse = { status: res.status(), data: null }
+  setLastResponse(world, { status: res.status(), data: null })
   // Store headers for assertion
   const headers: Record<string, string> = {}
   const rawHeaders = res.headers()
   for (const [key, value] of Object.entries(rawHeaders)) {
     headers[key.toLowerCase()] = value
   }
-  shared.lastResponse.data = headers
+  getSharedState(world).lastResponse.data = headers
 })
 
-Then('the response should include CORS headers', async ({}) => {
-  const headers = shared.lastResponse?.data as Record<string, string>
+Then('the response should include CORS headers', async ({ world }) => {
+  const headers = getSharedState(world).lastResponse?.data as Record<string, string>
   // CORS should return Access-Control-Allow-Origin or similar
   // The exact header depends on the CORS config
-  expect(shared.lastResponse).toBeDefined()
+  expect(getSharedState(world).lastResponse).toBeDefined()
   // Either 200 or 204 for preflight
-  expect([200, 204]).toContain(shared.lastResponse!.status)
+  expect([200, 204]).toContain(getSharedState(world).lastResponse!.status)
 })
 
 // ─── Rate Limiting ──────────────────────────────────────────────────
 
-When('{int} invite validation requests are sent rapidly', async ({ request }, count: number) => {
-  edge.rateLimit429Count = 0
+When('{int} invite validation requests are sent rapidly', async ({ request, world }, count: number) => {
+  getEdgeState(world).rateLimit429Count = 0
   for (let i = 0; i < count; i++) {
     const res = await request.get(`${BASE_URL}/api/invites/validate/fake-code-${i}`, {
       headers: { 'Content-Type': 'application/json' },
     })
     if (res.status() === 429) {
-      edge.rateLimit429Count++
+      getEdgeState(world).rateLimit429Count++
     }
   }
 })
 
-Then('at least one should return {int}', async ({}, status: number) => {
-  expect(edge.rateLimit429Count).toBeGreaterThan(0)
+Then('at least one should return {int}', async ({ world }, status: number) => {
+  expect(getEdgeState(world).rateLimit429Count).toBeGreaterThan(0)
 })
 
 // ─── Large Batch ────────────────────────────────────────────────────
 
-When('an admin bulk imports {int} banned phones', async ({ request }, count: number) => {
+When('an admin bulk imports {int} banned phones', async ({ request, world }, count: number) => {
+  const hubId = getScenarioState(world).hubId
   const phones: string[] = []
   for (let i = 0; i < count; i++) {
     phones.push(uniquePhone())
   }
-  edge.bulkResult = await bulkAddBansViaApi(request, phones, 'bulk edge test')
+  getEdgeState(world).bulkResult = await bulkAddBansViaApi(request, phones, 'bulk edge test', hubId)
 })
 
-Then('the bulk import should succeed with count {int}', async ({}, count: number) => {
-  expect(edge.bulkResult).toBeDefined()
-  expect(edge.bulkResult!.count).toBe(count)
+Then('the bulk import should succeed with count {int}', async ({ world }, count: number) => {
+  expect(getEdgeState(world).bulkResult).toBeDefined()
+  expect(getEdgeState(world).bulkResult!.count).toBe(count)
 })
 
-When('an admin creates {int} shifts for the same time slot', async ({ request }, count: number) => {
-  edge.shiftIds = []
+When('an admin creates {int} shifts for the same time slot', async ({ request, world }, count: number) => {
+  const hubId = getScenarioState(world).hubId
+  getEdgeState(world).shiftIds = []
   for (let i = 0; i < count; i++) {
     const shift = await createShiftViaApi(request, {
       name: `Overlap Shift ${Date.now()}-${i}`,
       startTime: '09:00',
       endTime: '17:00',
       days: [1, 2, 3],
+      hubId,
     })
-    edge.shiftIds.push(shift.id)
+    getEdgeState(world).shiftIds.push(shift.id)
   }
 })
 
-Then('all {int} shifts should exist independently', async ({ request }, count: number) => {
-  const shifts = await listShiftsViaApi(request)
-  for (const id of edge.shiftIds) {
+Then('all {int} shifts should exist independently', async ({ request, world }, count: number) => {
+  const hubId = getScenarioState(world).hubId
+  const shifts = await listShiftsViaApi(request, hubId)
+  for (const id of getEdgeState(world).shiftIds) {
     expect(shifts.some(s => s.id === id)).toBeTruthy()
   }
-  expect(edge.shiftIds.length).toBe(count)
+  expect(getEdgeState(world).shiftIds.length).toBe(count)
 })
 
 // ─── Concurrent State ───────────────────────────────────────────────
 
-Given('a volunteer exists', async ({ request }) => {
+Given('a volunteer exists', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, { name: uniqueName('Edge Vol') })
-  edge.volunteerPubkey = vol.pubkey
+  getEdgeState(world).volunteerPubkey = vol.pubkey
 })
 
-When('an admin adds the volunteer to a shift', async ({ request }) => {
+When('an admin adds the volunteer to a shift', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
   const shift = await createShiftViaApi(request, {
     name: uniqueName('Edge Shift'),
-    volunteerPubkeys: [edge.volunteerPubkey!],
+    userPubkeys: [getEdgeState(world).volunteerPubkey!],
+    hubId,
   })
-  edge.shiftId = shift.id
+  getEdgeState(world).shiftId = shift.id
 })
 
-When('the admin adds the volunteer to the fallback group', async ({ request }) => {
-  await setFallbackGroupViaApi(request, [edge.volunteerPubkey!])
+When('the admin adds the volunteer to the fallback group', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  await setFallbackGroupViaApi(request, [getEdgeState(world).volunteerPubkey!], hubId)
 })
 
-Then('the volunteer appears in both the shift and fallback group', async ({ request }) => {
-  const shifts = await listShiftsViaApi(request)
-  const shift = shifts.find(s => s.id === edge.shiftId)
+Then('the volunteer appears in both the shift and fallback group', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const shifts = await listShiftsViaApi(request, hubId)
+  const shift = shifts.find(s => s.id === getEdgeState(world).shiftId)
   expect(shift).toBeDefined()
-  expect(shift!.volunteerPubkeys).toContain(edge.volunteerPubkey)
+  expect(shift!.userPubkeys).toContain(getEdgeState(world).volunteerPubkey)
 
-  const fg = await getFallbackGroupViaApi(request)
-  expect(fg.volunteers).toContain(edge.volunteerPubkey)
+  const fg = await getFallbackGroupViaApi(request, hubId)
+  expect(fg.volunteers).toContain(getEdgeState(world).volunteerPubkey)
 })
 
-When('the admin removes the volunteer from the shift', async ({ request }) => {
-  await updateShiftViaApi(request, edge.shiftId!, { volunteerPubkeys: [] })
+When('the admin removes the volunteer from the shift', async ({ request, world }) => {
+  await updateShiftViaApi(request, getEdgeState(world).shiftId!, { userPubkeys: [] })
 })
 
-Then('the volunteer still appears in the fallback group', async ({ request }) => {
+Then('the volunteer still appears in the fallback group', async ({ request, world }) => {
   const fg = await getFallbackGroupViaApi(request)
-  expect(fg.volunteers).toContain(edge.volunteerPubkey)
+  expect(fg.volunteers).toContain(getEdgeState(world).volunteerPubkey)
 })

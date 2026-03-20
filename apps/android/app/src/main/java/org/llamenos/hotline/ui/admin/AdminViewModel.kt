@@ -20,8 +20,8 @@ import org.llamenos.hotline.model.CallSettingsResponse
 import org.llamenos.hotline.model.CreateInviteRequest
 import org.llamenos.hotline.model.CreateReportCategoryRequest
 import org.llamenos.hotline.model.CreateShiftRequest
-import org.llamenos.hotline.model.CreateVolunteerRequest
-import org.llamenos.hotline.model.CreateVolunteerResponse
+import org.llamenos.hotline.model.CreateUserRequest
+import org.llamenos.hotline.model.CreateUserResponse
 import org.llamenos.hotline.model.CustomFieldDefinition
 import org.llamenos.hotline.model.CustomFieldsResponse
 import org.llamenos.hotline.model.FallbackGroupRequest
@@ -39,8 +39,8 @@ import org.llamenos.hotline.model.SystemHealth
 import org.llamenos.hotline.model.TelephonySettingsRequest
 import org.llamenos.hotline.model.TelephonySettingsResponse
 import org.llamenos.hotline.model.UpdateCustomFieldsRequest
-import org.llamenos.hotline.model.Volunteer
-import org.llamenos.hotline.model.VolunteersListResponse
+import org.llamenos.hotline.model.User
+import org.llamenos.hotline.model.UsersListResponse
 import javax.inject.Inject
 
 /**
@@ -61,14 +61,14 @@ enum class AdminTab {
 data class AdminUiState(
     val selectedTab: AdminTab = AdminTab.VOLUNTEERS,
 
-    // Volunteers
-    val volunteers: List<Volunteer> = emptyList(),
+    // Users
+    val volunteers: List<User> = emptyList(),
     val isLoadingVolunteers: Boolean = false,
     val volunteersError: String? = null,
     val volunteerSearchQuery: String = "",
     val showAddVolunteerDialog: Boolean = false,
     val createdVolunteerNsec: String? = null,
-    val showDeleteVolunteerDialog: String? = null, // volunteer ID to delete
+    val showDeleteVolunteerDialog: String? = null, // user ID to delete
 
     // Ban list
     val bans: List<BanEntry> = emptyList(),
@@ -156,7 +156,7 @@ data class AdminUiState(
 /**
  * ViewModel for the Admin panel.
  *
- * Provides CRUD operations for volunteers, ban lists, audit logs, and invites.
+ * Provides CRUD operations for users, ban lists, audit logs, and invites.
  * Only accessible to users with admin role. Data is fetched on tab selection
  * to avoid unnecessary API calls.
  */
@@ -190,7 +190,7 @@ class AdminViewModel @Inject constructor(
         }
     }
 
-    // ---- Volunteers ----
+    // ---- Users ----
 
     fun loadVolunteers() {
         viewModelScope.launch {
@@ -199,13 +199,13 @@ class AdminViewModel @Inject constructor(
             }
 
             try {
-                val response = apiService.request<VolunteersListResponse>(
+                val response = apiService.request<UsersListResponse>(
                     "GET",
-                    "/api/admin/volunteers",
+                    "/api/users",
                 )
                 _uiState.update {
                     it.copy(
-                        volunteers = response.volunteers,
+                        volunteers = response.users,
                         isLoadingVolunteers = false,
                     )
                 }
@@ -213,7 +213,7 @@ class AdminViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoadingVolunteers = false,
-                        volunteersError = e.message ?: "Failed to load volunteers",
+                        volunteersError = e.message ?: "Failed to load users",
                     )
                 }
             }
@@ -225,15 +225,15 @@ class AdminViewModel @Inject constructor(
     }
 
     /**
-     * Filter volunteers by search query (matches display name or pubkey prefix).
+     * Filter users by search query (matches display name or pubkey prefix).
      */
-    fun filteredVolunteers(): List<Volunteer> {
+    fun filteredVolunteers(): List<User> {
         val query = _uiState.value.volunteerSearchQuery.lowercase()
         if (query.isBlank()) return _uiState.value.volunteers
 
-        return _uiState.value.volunteers.filter { volunteer ->
-            (volunteer.displayName?.lowercase()?.contains(query) == true) ||
-                    volunteer.pubkey.lowercase().contains(query)
+        return _uiState.value.volunteers.filter { user ->
+            (user.displayName?.lowercase()?.contains(query) == true) ||
+                    user.pubkey.lowercase().contains(query)
         }
     }
 
@@ -415,7 +415,7 @@ class AdminViewModel @Inject constructor(
         _uiState.update { it.copy(createdInviteCode = null) }
     }
 
-    // ---- Volunteer CRUD ----
+    // ---- User CRUD ----
 
     fun showAddVolunteerDialog() {
         _uiState.update { it.copy(showAddVolunteerDialog = true, createdVolunteerNsec = null) }
@@ -433,15 +433,15 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(showAddVolunteerDialog = false, volunteersError = null) }
             try {
-                val request = CreateVolunteerRequest(name = name, phone = phone, role = role)
-                val response = apiService.request<CreateVolunteerResponse>(
-                    "POST", "/api/admin/volunteers", request,
+                val request = CreateUserRequest(name = name, phone = phone, role = role)
+                val response = apiService.request<CreateUserResponse>(
+                    "POST", "/api/users", request,
                 )
                 _uiState.update { it.copy(createdVolunteerNsec = response.nsec) }
                 loadVolunteers()
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(volunteersError = e.message ?: "Failed to create volunteer")
+                    it.copy(volunteersError = e.message ?: "Failed to create user")
                 }
             }
         }
@@ -459,11 +459,11 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(showDeleteVolunteerDialog = null, volunteersError = null) }
             try {
-                apiService.requestNoContent("DELETE", "/api/admin/volunteers/$volunteerId")
+                apiService.requestNoContent("DELETE", "/api/users/$volunteerId")
                 loadVolunteers()
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(volunteersError = e.message ?: "Failed to delete volunteer")
+                    it.copy(volunteersError = e.message ?: "Failed to delete user")
                 }
             }
         }

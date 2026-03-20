@@ -4,9 +4,6 @@ Feature: E2EE Note Integrity
   I want real ECIES encrypt-decrypt round-trips for notes
   So that note confidentiality is cryptographically verified end-to-end
 
-  Background:
-    Given the server is reset
-
   Scenario: Real ECIES encrypt-decrypt round-trip for notes
     Given a volunteer "IntegrityVol" with a real keypair
     And the admin keypair is known

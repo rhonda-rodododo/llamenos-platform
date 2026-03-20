@@ -3,9 +3,6 @@ Feature: Cross-Hub Case Visibility
   Hub admins can opt-in to share case summaries with super-admins
   for cross-organization coordination.
 
-  Background:
-    Given the server is reset
-
   Scenario: Enable cross-hub sharing for a hub
     Given case management is enabled
     When the admin enables cross-hub sharing

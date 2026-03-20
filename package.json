@@ -13,10 +13,8 @@
     "dev": "bunx tauri dev apps/desktop",
     "dev:vite": "vite",
     "build": "vite build",
-    "deploy": "bun run deploy:api && bun run deploy:site",
-    "deploy:api": "bunx wrangler deploy --config apps/worker/wrangler.jsonc",
+    "deploy": "bun run deploy:site",
     "deploy:site": "cd site && bun run deploy",
-    "dev:worker": "bunx wrangler dev --config apps/worker/wrangler.jsonc",
     "dev:tunnel": "bash scripts/dev-tunnel.sh",
     "build:server": "bun build src/server/index.ts --target=bun --outdir=dist/server",
     "build:docker": "bun run build:server",
@@ -57,6 +55,7 @@
     "i18n:validate:desktop": "bun run packages/i18n/tools/validate-strings.ts desktop",
     "i18n:validate:all": "bun run packages/i18n/tools/validate-strings.ts all",
     "codegen": "bun run packages/protocol/tools/codegen.ts",
+    "codegen:check": "bun run packages/protocol/tools/codegen.ts --check",
     "test-specs:validate": "bun packages/test-specs/tools/validate-coverage.ts",
     "ios:status": "bash scripts/ios-build.sh status",
     "ios:setup": "bash scripts/ios-build.sh setup",
@@ -141,8 +140,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@cloudflare/workers-types": "^4.20260312.1",
     "@eslint/js": "^10.0.1",
     "@evilmartians/lefthook": "^2.1.4",
     "@playwright/test": "^1.58.2",

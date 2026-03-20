@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
 import { useCalls, useCallTimer, useShiftStatus } from '@/lib/hooks'
-import { createNote, banAndHangup, getCallsTodayCount, getVolunteerPresence, listVolunteers, type ActiveCall, type VolunteerPresence, type Volunteer } from '@/lib/api'
+import { createNote, banAndHangup, getCallsTodayCount, getUserPresence, listUsers, type ActiveCall, type UserPresence, type User } from '@/lib/api'
 import { encryptNote } from '@/lib/platform'
 import { useTranscription } from '@/lib/transcription'
 
@@ -43,8 +43,8 @@ function DashboardPage() {
   const { calls, currentCall, answerCall, hangupCall, reportSpam, ringingCalls, activeCalls } = useCalls()
   const { onShift, currentShift, nextShift } = useShiftStatus()
   const [callsToday, setCallsToday] = useState<number | null>(null)
-  const [presence, setPresence] = useState<VolunteerPresence[]>([])
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [presence, setPresence] = useState<UserPresence[]>([])
+  const [users, setUsers] = useState<User[]>([])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -71,13 +71,13 @@ function DashboardPage() {
     if (!isAuthenticated || !isAdmin) return
     let mounted = true
     const fetchPresence = () => {
-      getVolunteerPresence().then(r => { if (mounted) setPresence(r.volunteers) }).catch(() => {
-        console.error('[dashboard] Failed to fetch volunteer presence')
+      getUserPresence().then(r => { if (mounted) setPresence(r.users) }).catch(() => {
+        console.error('[dashboard] Failed to fetch user presence')
       })
     }
     fetchPresence()
-    listVolunteers().then(r => { if (mounted) setVolunteers(r.volunteers) }).catch(() => {
-      console.error('[dashboard] Failed to fetch volunteer list')
+    listUsers().then(r => { if (mounted) setUsers(r.users) }).catch(() => {
+      console.error('[dashboard] Failed to fetch user list')
     })
     // Poll presence every 15s (replaces WS-based real-time presence)
     const interval = setInterval(fetchPresence, 15_000)
@@ -233,16 +233,16 @@ function DashboardPage() {
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4 text-primary" />
-              {t('dashboard.volunteerStatus')}
+              {t('dashboard.userStatus')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {presence.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">{t('dashboard.noVolunteersOnline')}</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">{t('dashboard.noUsersOnline')}</p>
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                 {presence.map(vol => {
-                  const volInfo = volunteers.find(v => v.pubkey === vol.pubkey)
+                  const volInfo = users.find(u => u.pubkey === vol.pubkey)
                   return (
                     <div key={vol.pubkey} className="flex items-center gap-2 rounded-lg border border-border p-2">
                       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${
@@ -286,7 +286,7 @@ function DashboardPage() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {call.answeredBy && (() => {
-                          const vol = volunteers.find(v => v.pubkey === call.answeredBy)
+                          const vol = users.find(u => u.pubkey === call.answeredBy)
                           return vol ? vol.name : t('calls.active')
                         })()}
                       </p>

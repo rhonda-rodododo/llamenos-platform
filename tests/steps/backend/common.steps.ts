@@ -1,8 +1,8 @@
 /**
- * Common backend step definitions — server reset, volunteer/shift/ban setup.
+ * Common backend step definitions — volunteer/shift/ban setup.
+ * Hub isolation via workerHub fixture replaces server resets.
  */
-import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, Before, getState, setState } from './fixtures'
 import {
   createVolunteerViaApi,
   createShiftViaApi,
@@ -17,8 +17,7 @@ import {
   uniqueCallerNumber,
 } from '../../simulation-helpers'
 
-const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
-const TEST_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
+const STATE_KEY = 'common'
 
 /** Shared scenario state — reset before each scenario via Before hook. */
 export interface ScenarioState {
@@ -31,33 +30,37 @@ export interface ScenarioState {
   lastApiResponse?: { status: number; data: unknown }
   banPhones: string[]
   relayCapture?: RelayCapture
+  hubId: string
 }
 
-export let state: ScenarioState
+/** Get the common ScenarioState from the world fixture. */
+export function getScenarioState(world: Record<string, unknown>): ScenarioState {
+  return getState<ScenarioState>(world, STATE_KEY)
+}
 
-Before(async () => {
-  state = {
+Before(async ({ world, workerHub }) => {
+  const s: ScenarioState = {
     volunteers: [],
     shiftIds: [],
     banPhones: [],
+    hubId: workerHub,
   }
+  setState(world, STATE_KEY, s)
 })
 
-// ── Server Reset ───────────────────────────────────────────────────
+// ── Server Reset (no-op) ───────────────────────────────────────────
+// Hub isolation via workerHub fixture replaces server resets.
+// This step is kept as a no-op so any remaining references compile.
 
-Given('the server is reset', async ({ request }) => {
-  const res = await request.post(`${BASE_URL}/api/test-reset`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Test-Secret': TEST_SECRET,
-    },
-  })
-  expect(res.ok()).toBeTruthy()
+Given('the server is reset', async () => {
+  // No-op: each Playwright worker uses an isolated hub (workerHub fixture).
+  // Data created in one worker never affects another.
 })
 
 // ── Volunteer Setup ────────────────────────────────────────────────
 
-Given('{int} volunteers are on shift', async ({ request }, count: number) => {
+Given('{int} volunteers are on shift', async ({ request, world }, count: number) => {
+  const state = getScenarioState(world)
   const volunteers: Array<CreateVolunteerResult & { onShift?: boolean }> = []
 
   for (let i = 0; i < count; i++) {
@@ -67,14 +70,15 @@ Given('{int} volunteers are on shift', async ({ request }, count: number) => {
     volunteers.push({ ...vol, onShift: true })
   }
 
-  // Create a shift with all volunteers assigned and covering now
+  // Create a hub-scoped shift with all volunteers assigned and covering now
   const pubkeys = volunteers.map(v => v.pubkey)
   const shift = await createShiftViaApi(request, {
     name: `BDD Shift ${Date.now()}`,
     startTime: '00:00',
     endTime: '23:59',
     days: [0, 1, 2, 3, 4, 5, 6],
-    volunteerPubkeys: pubkeys,
+    userPubkeys: pubkeys,
+    hubId: state.hubId,
   })
 
   state.volunteers = volunteers
@@ -83,17 +87,19 @@ Given('{int} volunteers are on shift', async ({ request }, count: number) => {
 
 // ── Ban Setup ──────────────────────────────────────────────────────
 
-Given('{string} is on the ban list', async ({ request }, phone: string) => {
-  await createBanViaApi(request, { phone, reason: 'BDD test ban' })
+Given('{string} is on the ban list', async ({ request, world }, phone: string) => {
+  const state = getScenarioState(world)
+  await createBanViaApi(request, { phone, reason: 'BDD test ban', hubId: state.hubId })
   state.banPhones.push(phone)
 })
 
 // ── Call Completion Setup ──────────────────────────────────────────
 
-Given('{int} calls were completed today', async ({ request }, count: number) => {
+Given('{int} calls were completed today', async ({ request, world }, count: number) => {
+  const state = getScenarioState(world)
   for (let i = 0; i < count; i++) {
     const caller = uniqueCallerNumber()
-    const { callId } = await simulateIncomingCall(request, { callerNumber: caller })
+    const { callId } = await simulateIncomingCall(request, { callerNumber: caller, hubId: state.hubId })
     if (state.volunteers.length > 0) {
       await simulateAnswerCall(request, callId, state.volunteers[0].pubkey)
       await simulateEndCall(request, callId)
@@ -101,11 +107,12 @@ Given('{int} calls were completed today', async ({ request }, count: number) => 
   }
 })
 
-Given('{int} call went to voicemail today', async ({ request }, count: number) => {
+Given('{int} call went to voicemail today', async ({ request, world }, count: number) => {
+  const state = getScenarioState(world)
   const { simulateVoicemail } = await import('../../simulation-helpers')
   for (let i = 0; i < count; i++) {
     const caller = uniqueCallerNumber()
-    const { callId } = await simulateIncomingCall(request, { callerNumber: caller })
+    const { callId } = await simulateIncomingCall(request, { callerNumber: caller, hubId: state.hubId })
     await simulateVoicemail(request, callId)
   }
 })

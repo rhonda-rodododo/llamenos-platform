@@ -8,7 +8,7 @@
  * step files. Only defines steps unique to state-transitions.feature.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
 import {
   apiPost,
   apiGet,
@@ -29,26 +29,32 @@ interface TransitionState {
   convertCount: number
 }
 
-let ts: TransitionState
+const STATE_TRANSITIONS_KEY = 'state_transitions'
 
-Before({ tags: '@lifecycle' }, async () => {
-  ts = { convertCount: 0 }
+function getTransitionState(world: Record<string, unknown>): TransitionState {
+  return getState<TransitionState>(world, STATE_TRANSITIONS_KEY)
+}
+
+
+Before({ tags: '@lifecycle' }, async ({ world }) => {
+  const ts = { convertCount: 0 }
+  setState(world, STATE_TRANSITIONS_KEY, ts)
 })
 
 // ── Reporter setup for conversion testing ────────────────────────
 
-Given('a reporter exists for conversion testing', async ({ request }) => {
+Given('a reporter exists for conversion testing', async ({ request, world }) => {
   const reporter = await createVolunteerViaApi(request, {
     name: uniqueName('Conversion Reporter'),
     roleIds: ['role-reporter'],
   })
-  ts.reporterNsec = reporter.nsec
+  getTransitionState(world).reporterNsec = reporter.nsec
 })
 
 // ── Report creation for conversion ──────────────────────────────
 
-When('the reporter submits a report for conversion', async ({ request }) => {
-  expect(ts.reporterNsec).toBeDefined()
+When('the reporter submits a report for conversion', async ({ request, world }) => {
+  expect(getTransitionState(world).reporterNsec).toBeDefined()
   const kp = generateTestKeypair()
   const { data, status } = await apiPost<{ id?: string; conversation?: { id: string } }>(
     request,
@@ -59,26 +65,26 @@ When('the reporter submits a report for conversion', async ({ request }) => {
       encryptedContent: 'conversion-report-content',
       readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
     },
-    ts.reporterNsec!,
+    getTransitionState(world).reporterNsec!,
   )
   expect(status).toBeLessThan(300)
-  ts.reportId = (data as Record<string, unknown>)?.id as string
+  getTransitionState(world).reportId = (data as Record<string, unknown>)?.id as string
     ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.id as string
-  expect(ts.reportId).toBeTruthy()
+  expect(getTransitionState(world).reportId).toBeTruthy()
 })
 
 // ── Report-to-case conversion ────────────────────────────────────
 
-When('the admin converts the submitted report to a case', async ({ request }) => {
-  expect(ts.reportId).toBeDefined()
+When('the admin converts the submitted report to a case', async ({ request, world }) => {
+  expect(getTransitionState(world).reportId).toBeDefined()
 
   // Ensure an entity type exists for case records
-  if (!ts.entityTypeId) {
+  if (!getTransitionState(world).entityTypeId) {
     await enableCaseManagementViaApi(request, true)
     const et = await createEntityTypeViaApi(request, {
       name: `case_type_${Date.now()}`,
     })
-    ts.entityTypeId = et.id as string
+    getTransitionState(world).entityTypeId = et.id as string
   }
 
   // Create case record
@@ -87,7 +93,7 @@ When('the admin converts the submitted report to a case', async ({ request }) =>
     request,
     '/records',
     {
-      entityTypeId: ts.entityTypeId,
+      entityTypeId: getTransitionState(world).entityTypeId,
       statusHash: 'open',
       encryptedSummary: 'transition-case-summary',
       summaryEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
@@ -99,35 +105,35 @@ When('the admin converts the submitted report to a case', async ({ request }) =>
       ?? ((data as Record<string, unknown>)?.record as Record<string, unknown>)?.id as string
 
     // Link report to case
-    if (caseId && ts.reportId) {
+    if (caseId && getTransitionState(world).reportId) {
       await apiPost(request, `/records/${caseId}/reports`, {
-        reportId: ts.reportId,
+        reportId: getTransitionState(world).reportId,
       })
-      ts.caseRecordId = caseId
+      getTransitionState(world).caseRecordId = caseId
     }
   }
-  ts.convertCount++
+  getTransitionState(world).convertCount++
 })
 
-When('the admin converts the submitted report to a case again', async ({ request }) => {
-  expect(ts.reportId).toBeDefined()
-  expect(ts.caseRecordId).toBeDefined()
+When('the admin converts the submitted report to a case again', async ({ request, world }) => {
+  expect(getTransitionState(world).reportId).toBeDefined()
+  expect(getTransitionState(world).caseRecordId).toBeDefined()
 
   // Attempt to link the same report to the same case again — should be idempotent
-  const { status } = await apiPost(request, `/records/${ts.caseRecordId}/reports`, {
-    reportId: ts.reportId,
+  const { status } = await apiPost(request, `/records/${getTransitionState(world).caseRecordId}/reports`, {
+    reportId: getTransitionState(world).reportId,
   })
   // Either succeeds silently (idempotent) or returns conflict — both acceptable
   expect(status).toBeLessThan(500)
-  ts.convertCount++
+  getTransitionState(world).convertCount++
 })
 
-Then('the submitted report should still have exactly one linked case', async ({ request }) => {
-  expect(ts.reportId).toBeDefined()
+Then('the submitted report should still have exactly one linked case', async ({ request, world }) => {
+  expect(getTransitionState(world).reportId).toBeDefined()
 
   const { data } = await apiGet<Record<string, unknown>>(
     request,
-    `/reports/${ts.reportId}`,
+    `/reports/${getTransitionState(world).reportId}`,
   )
   const linked = (data as Record<string, unknown>)?.linkedRecords as unknown[]
     ?? (data as Record<string, unknown>)?.linkedCaseRecords as unknown[]
@@ -135,7 +141,7 @@ Then('the submitted report should still have exactly one linked case', async ({ 
     expect(linked.length).toBe(1)
   } else {
     // Fallback: verify case was created and double-conversion attempted
-    expect(ts.caseRecordId).toBeTruthy()
-    expect(ts.convertCount).toBeGreaterThanOrEqual(2)
+    expect(getTransitionState(world).caseRecordId).toBeTruthy()
+    expect(getTransitionState(world).convertCount).toBeGreaterThanOrEqual(2)
   }
 })

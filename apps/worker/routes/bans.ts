@@ -7,8 +7,25 @@ import { okResponseSchema } from '@protocol/schemas/common'
 import { createBanBodySchema, bulkBanBodySchema, banListResponseSchema, bulkBanResponseSchema } from '@protocol/schemas/bans'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
+import { createEntityRouter } from '../lib/entity-router'
 
 const bans = new Hono<AppEnv>()
+
+// GET / via factory
+const banListRouter = createEntityRouter({
+  tag: 'Bans',
+  domain: 'bans',
+  service: 'records',
+  listResponseSchema: banListResponseSchema,
+  itemResponseSchema: banListResponseSchema,
+  hubScoped: true,
+  disableGet: true,
+  disableDelete: true,
+  methods: {
+    list: 'listBans',
+  },
+})
+bans.route('/', banListRouter)
 
 // Any authenticated user with bans:report can report/ban
 bans.post('/',
@@ -45,31 +62,6 @@ bans.post('/',
     })
     await audit(services.audit, 'numberBanned', pubkey, { phone: body.phone })
     return c.json({ ok: true })
-  },
-)
-
-bans.get('/',
-  describeRoute({
-    tags: ['Bans'],
-    summary: 'List all banned numbers',
-    responses: {
-      200: {
-        description: 'List of banned numbers',
-        content: {
-          'application/json': {
-            schema: resolver(banListResponseSchema),
-          },
-        },
-      },
-      ...authErrors,
-    },
-  }),
-  requirePermission('bans:read'),
-  async (c) => {
-    const services = c.get('services')
-    const hubId = c.get('hubId')
-    const result = await services.records.listBans(hubId)
-    return c.json({ bans: result })
   },
 )
 

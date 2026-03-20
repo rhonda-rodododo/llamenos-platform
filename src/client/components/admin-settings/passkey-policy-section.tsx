@@ -49,11 +49,11 @@ export function PasskeyPolicySection({ settings, onChange, expanded, onToggle, s
       </div>
       <div className="flex items-center justify-between rounded-lg border border-border p-4">
         <div className="space-y-0.5">
-          <Label>{t('webauthn.requireForVolunteers')}</Label>
+          <Label>{t('webauthn.requireForUsers')}</Label>
         </div>
         <Switch
-          checked={settings.requireForVolunteers}
-          onCheckedChange={(checked) => handleToggle('requireForVolunteers', checked)}
+          checked={settings.requireForUsers}
+          onCheckedChange={(checked) => handleToggle('requireForUsers', checked)}
         />
       </div>
     </SettingsSection>

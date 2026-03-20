@@ -17,11 +17,13 @@ export const auditEntryResponseSchema = z.object({
   id: z.string(),
   event: z.string(),
   actorPubkey: z.string(),
-  details: z.record(z.string(), z.unknown()).optional(),
+  details: z.record(z.string(), z.unknown()),
   createdAt: z.string(),
   previousEntryHash: z.string().optional(),
   entryHash: z.string().optional(),
 })
+
+export type AuditLogEntry = z.infer<typeof auditEntryResponseSchema>
 
 // --- List response schema ---
 

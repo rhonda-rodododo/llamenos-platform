@@ -49,7 +49,7 @@ import org.llamenos.hotline.model.ServerHealth
 import org.llamenos.hotline.model.ServiceStatus
 import org.llamenos.hotline.model.StorageInfo
 import org.llamenos.hotline.model.SystemHealth
-import org.llamenos.hotline.model.VolunteerInfo
+import org.llamenos.hotline.model.UserInfo
 
 /**
  * System health dashboard tab showing server status, services, call metrics,
@@ -344,12 +344,12 @@ private fun BackupCard(
 
 @Composable
 private fun VolunteerActivityCard(
-    volunteers: VolunteerInfo,
+    volunteers: UserInfo,
     modifier: Modifier = Modifier,
 ) {
     HealthCard(
         icon = Icons.Filled.Group,
-        title = stringResource(R.string.admin_system_volunteers),
+        title = stringResource(R.string.admin_system_users),
         testTag = "health-volunteers-card",
         modifier = modifier,
     ) {

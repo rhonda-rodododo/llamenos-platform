@@ -12,53 +12,13 @@ import { Given, When, Then } from '../fixtures'
 import { TestIds, navTestIdMap } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
-/** Map known button/action text to test IDs for deterministic selection. */
-const buttonTestIdMap: Record<string, string> = {
-  'Save': TestIds.FORM_SAVE_BTN,
-  'Cancel': TestIds.FORM_CANCEL_BTN,
-  'Submit': TestIds.FORM_SUBMIT_BTN,
-  'OK': TestIds.CONFIRM_DIALOG_OK,
-  'Confirm': TestIds.CONFIRM_DIALOG_OK,
-  'Add Volunteer': TestIds.VOLUNTEER_ADD_BTN,
-  'Create Shift': TestIds.SHIFT_CREATE_BTN,
-  'Add Ban': TestIds.BAN_ADD_BTN,
-  'Import': TestIds.BAN_IMPORT_BTN,
-  'Import Ban List': TestIds.BAN_IMPORT_BTN,
-  'Ban Number': TestIds.BAN_ADD_BTN,
-  'New Note': TestIds.NOTE_NEW_BTN,
-  'New Report': TestIds.REPORT_NEW_BTN,
-  'New Blast': TestIds.BLAST_NEW_BTN,
-  'Log Out': TestIds.LOGOUT_BTN,
-  'Logout': TestIds.LOGOUT_BTN,
-  'Log In': TestIds.LOGIN_SUBMIT_BTN,
-  'Log in': TestIds.LOGIN_SUBMIT_BTN,
-  'Recovery Options': TestIds.RECOVERY_OPTIONS_BTN,
-  'Recovery options': TestIds.RECOVERY_OPTIONS_BTN,
-  'Clock In': TestIds.BREAK_TOGGLE_BTN,
-  'Clock Out': TestIds.BREAK_TOGGLE_BTN,
-  'Go to Dashboard': 'setup-complete-btn',
-  'Add Field': TestIds.CUSTOM_FIELD_ADD_BTN,
-  'Add Option': TestIds.CUSTOM_FIELD_ADD_OPTION_BTN,
-  'Submit Report': TestIds.REPORT_SUBMIT_BTN,
-  'Submit report': TestIds.REPORT_SUBMIT_BTN,
-  'Assign': 'case-assign-dialog-btn',
-  'Unassign': 'case-unassign-btn',
-}
-
 /**
- * Try to click an element by test ID map, then nav test ID, then role, then text.
+ * Try to click an element by nav test ID, then role-based lookup, then text.
+ * No static button map — uses Playwright's role-based selectors which are
+ * resilient to text changes and automatically match accessible names.
  */
 async function clickByTextOrTestId(page: import('@playwright/test').Page, text: string): Promise<void> {
-  // 1. Check button test ID map — deterministic, wait longer
-  const btnTestId = buttonTestIdMap[text]
-  if (btnTestId) {
-    const el = page.getByTestId(btnTestId)
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-      await el.click()
-      return
-    }
-  }
-  // 2. Check nav test ID map — deterministic, wait longer
+  // 1. Check nav test ID map — deterministic, wait longer
   const navTestId = navTestIdMap[text]
   if (navTestId) {
     const el = page.getByTestId(navTestId)
@@ -67,7 +27,7 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
       return
     }
   }
-  // 3. Fallback: button role, link role, tab role, then text
+  // 2. Fallback: button role, link role, tab role, then text
   const button = page.getByRole('button', { name: text }).first()
   if (await button.isVisible({ timeout: 2000 }).catch(() => false)) {
     // Wait for the button to be enabled before clicking
@@ -95,12 +55,7 @@ When('I tap {string}', async ({ page }, text: string) => {
 })
 
 When('I tap {string} without entering an nsec', async ({ page }, buttonText: string) => {
-  const testId = buttonTestIdMap[buttonText]
-  if (testId) {
-    await page.getByTestId(testId).click()
-  } else {
-    await page.getByRole('button', { name: buttonText }).click()
-  }
+  await page.getByRole('button', { name: buttonText }).click()
 })
 
 When('I click {string}', async ({ page }, text: string) => {
@@ -108,12 +63,7 @@ When('I click {string}', async ({ page }, text: string) => {
 })
 
 When('I click the {string} button', async ({ page }, text: string) => {
-  const testId = buttonTestIdMap[text]
-  if (testId) {
-    await page.getByTestId(testId).click()
-  } else {
-    await page.getByRole('button', { name: text }).click()
-  }
+  await page.getByRole('button', { name: text }).click()
 })
 
 When('I click the {string} link', async ({ page }, name: string) => {
@@ -179,25 +129,23 @@ When('I fill in the reason with {string}', async ({ page }, reason: string) => {
 
 // --- Section expand/collapse ---
 
-/** Map human-readable section names to their data-testid values. */
-const sectionTestIdMap: Record<string, string> = {
-  'Custom Note Fields': 'custom-fields',
-  'Custom Fields': 'custom-fields',
-  'Telephony': 'telephony',
-  'Transcription': 'transcription',
-  'Spam Mitigation': 'spam-section',
-  'Key Backup': 'key-backup',
-  'Linked Devices': 'linked-devices',
-  'Advanced Settings': 'advanced',
-  'Profile': 'profile',
-  'Theme': 'theme',
-  'Language': 'language',
-  'Notifications': 'notifications',
-  'Passkeys': 'passkeys',
-}
-
 When('I expand the {string} section', async ({ page }, sectionName: string) => {
-  const testId = sectionTestIdMap[sectionName]
+  const sectionTestIds: Record<string, string> = {
+    'Custom Note Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
+    'Custom Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
+    'Telephony': TestIds.SETTINGS_TELEPHONY,
+    'Transcription': TestIds.SETTINGS_TRANSCRIPTION,
+    'Spam': TestIds.SETTINGS_SPAM,
+    'Key Backup': TestIds.SETTINGS_KEY_BACKUP,
+    'Linked Devices': TestIds.SETTINGS_LINKED_DEVICES,
+    'Advanced': TestIds.SETTINGS_ADVANCED,
+    'Profile': TestIds.SETTINGS_PROFILE,
+    'Theme': TestIds.SETTINGS_THEME,
+    'Language': TestIds.SETTINGS_LANGUAGE,
+    'Notifications': TestIds.SETTINGS_NOTIFICATIONS,
+    'Passkeys': TestIds.SETTINGS_PASSKEYS,
+  }
+  const testId = sectionTestIds[sectionName]
   const slug = sectionName.toLowerCase().replace(/\s+/g, '-')
   const section = testId
     ? page.getByTestId(testId)
@@ -209,8 +157,15 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
     // Check if already expanded
     const isExpanded = await el.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
     if (!isExpanded) {
-      await el.locator('.cursor-pointer').first().click()
-      await page.waitForTimeout(300)
+      // Click the trigger element (CardHeader with data-testid="{id}-trigger")
+      const triggerId = testId || slug
+      const trigger = el.locator(`[data-testid="${triggerId}-trigger"]`)
+      if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await trigger.click()
+      } else {
+        // Fallback: click the first heading/title
+        await el.locator('h3, [class*="CardTitle"]').first().click()
+      }
     }
   } else {
     // Last resort: find by text
@@ -235,42 +190,22 @@ When('I log out', async ({ page }) => {
 // --- Button state patterns ---
 
 Then('the {string} button should be disabled', async ({ page }, name: string) => {
-  const testId = buttonTestIdMap[name]
-  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name })
-  const isVisible = await btn.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    const isDisabled = await btn.first().isDisabled().catch(() => false)
-    if (!isDisabled && testId === TestIds.FORM_SAVE_BTN) {
-      // Parallel test may have pre-filled a phone field — clear it so the button becomes disabled
-      const phoneInput = page.locator('#provider-phone, input[type="tel"]').first()
-      const phoneValue = await phoneInput.inputValue().catch(() => '')
-      if (phoneValue) {
-        await phoneInput.clear()
-        await phoneInput.blur()
-        await page.waitForTimeout(300)
-      }
-    }
-    await expect(btn.first()).toBeDisabled({ timeout: 3000 })
-  } else {
-    await expect(btn.first()).toBeDisabled()
-  }
+  const btn = page.getByRole('button', { name })
+  await expect(btn.first()).toBeDisabled({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the {string} button should be enabled', async ({ page }, name: string) => {
-  const testId = buttonTestIdMap[name]
-  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name })
+  const btn = page.getByRole('button', { name })
   await expect(btn).toBeEnabled()
 })
 
 Then('the {string} button should be visible', async ({ page }, name: string) => {
-  const testId = buttonTestIdMap[name]
-  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name })
+  const btn = page.getByRole('button', { name })
   await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the {string} button should not be visible', async ({ page }, name: string) => {
-  const testId = buttonTestIdMap[name]
-  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name })
+  const btn = page.getByRole('button', { name })
   await expect(btn).not.toBeVisible({ timeout: 3000 })
 })
 
@@ -296,8 +231,8 @@ Then('I should see {string}', async ({ page }, text: string) => {
   const toastVisible = await toastEl.isVisible({ timeout: 5000 }).catch(() => false)
   if (toastVisible) return
 
-  // Check for text in any error/destructive element (inline validation)
-  const errorEl = page.locator('.text-destructive, [data-testid="error-message"], [role="alert"]')
+  // Check for text in any error element (inline validation)
+  const errorEl = page.locator('[data-testid="error-message"], [role="alert"]')
     .filter({ hasText: new RegExp(text, 'i') }).first()
   const errorVisible = await errorEl.isVisible({ timeout: 2000 }).catch(() => false)
   if (errorVisible) return
@@ -313,14 +248,12 @@ Then('I should see the {string} heading', async ({ page }, heading: string) => {
 })
 
 Then('I should see a {string} button', async ({ page }, text: string) => {
-  const testId = buttonTestIdMap[text]
-  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name: text })
+  const btn = page.getByRole('button', { name: text })
   await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see an {string} button', async ({ page }, text: string) => {
-  const testId = buttonTestIdMap[text]
-  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name: text })
+  const btn = page.getByRole('button', { name: text })
   await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -450,7 +383,6 @@ When('they navigate to the {string} page', async ({ page }, pageName: string) =>
   } else {
     await page.getByTestId(TestIds.NAV_SIDEBAR).getByText(pageName, { exact: true }).click()
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('they navigate to {string} via SPA', async ({ page }, path: string) => {

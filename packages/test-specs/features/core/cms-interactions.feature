@@ -3,9 +3,6 @@ Feature: CMS Interactions
   Case timelines track inline comments, status changes,
   and linked entities as chronological interactions.
 
-  Background:
-    Given the server is reset
-
   @cases
   Scenario: Create inline comment on case timeline
     Given case management is enabled

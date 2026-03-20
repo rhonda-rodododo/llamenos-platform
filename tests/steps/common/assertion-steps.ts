@@ -7,29 +7,6 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 Then('I should see the {string} button', async ({ page }, buttonText: string) => {
-  // Map known button text to test IDs for deterministic selection
-  const buttonTestIdMap: Record<string, string> = {
-    'Lock App': TestIds.LOGOUT_BTN,
-    'Log Out': TestIds.LOGOUT_BTN,
-    'Log out': TestIds.LOGOUT_BTN,
-    'Logout': TestIds.LOGOUT_BTN,
-    'Log In': TestIds.LOGIN_SUBMIT_BTN,
-    'Log in': TestIds.LOGIN_SUBMIT_BTN,
-    'Recovery Options': TestIds.RECOVERY_OPTIONS_BTN,
-    'Recovery options': TestIds.RECOVERY_OPTIONS_BTN,
-    'Clock In': TestIds.BREAK_TOGGLE_BTN,
-    'Clock Out': TestIds.BREAK_TOGGLE_BTN,
-    'Save': TestIds.FORM_SAVE_BTN,
-    'Cancel': TestIds.FORM_CANCEL_BTN,
-    'Add Volunteer': TestIds.VOLUNTEER_ADD_BTN,
-    'New Note': TestIds.NOTE_NEW_BTN,
-    'New Report': TestIds.REPORT_NEW_BTN,
-  }
-  const testId = buttonTestIdMap[buttonText]
-  if (testId) {
-    await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
-    return
-  }
   await expect(page.getByRole('button', { name: buttonText })).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -39,26 +16,23 @@ Then('I should see the error {string}', async ({ page }, errorText: string) => {
   if (errorVisible) {
     await expect(errorMsg).toContainText(errorText)
   } else {
-    // Fallback: look for error text in role="alert" or destructive elements
+    // Fallback: look for error text in role="alert" elements
     const alert = page.locator('[role="alert"]').filter({ hasText: errorText })
-    if (await alert.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-    const destructive = page.locator('.text-destructive').filter({ hasText: errorText })
-    await expect(destructive.first()).toBeVisible({ timeout: 2000 })
+    await expect(alert.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 })
 
 Then('I should see a PIN error message', async ({ page }) => {
-  // PIN error is shown as text-destructive text within the PIN unlock form
-  const pinError = page.locator('.text-destructive').first()
-  await expect(pinError).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // PIN error is shown with role="alert" within the PIN unlock form
+  const pinError = page.getByTestId(TestIds.PIN_CHALLENGE_ERROR)
+    .or(page.locator('[role="alert"]').first())
+  await expect(pinError.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see an error message', async ({ page }) => {
   // Check each error indicator sequentially to avoid strict mode violations
   const checks = [
     () => page.getByTestId(TestIds.ERROR_MESSAGE),
-    () => page.locator('[role="alert"]').first(),
-    () => page.locator('.text-destructive').first(),
     () => page.locator('[role="alert"]').first(),
     () => page.getByText(/error|invalid|required|failed/i).first(),
   ]
@@ -73,8 +47,10 @@ Then('I should see an error message', async ({ page }) => {
   const isTitle = await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)
   if (isTitle) return
   // May be on login page (which has no page-title) — that's acceptable for cascading failures
-  const loginForm = page.locator('#nsec, [data-testid="login-submit-btn"], input[aria-label="PIN digit 1"]').first()
-  await expect(loginForm).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const loginForm = page.getByTestId(TestIds.NSEC_INPUT)
+    .or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
+    .or(page.locator('input[aria-label="PIN digit 1"]'))
+  await expect(loginForm.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should remain on the login screen', async ({ page }) => {
@@ -144,7 +120,7 @@ Then('I should see {string} and {string} buttons', async ({ page }, btn1: string
       const byRole = page.getByRole('button', { name: btnText })
       if (await byRole.isVisible({ timeout: 2000 }).catch(() => false)) continue
       // May be on login page (cascading failure)
-      const loginIndicator = page.locator('#nsec, [data-testid="login-submit-btn"]')
+      const loginIndicator = page.getByTestId(TestIds.NSEC_INPUT).or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
       await expect(loginIndicator.first()).toBeVisible({ timeout: 2000 })
     } else {
       await expect(page.getByRole('button', { name: btnText })).toBeVisible({ timeout: Timeouts.ELEMENT })

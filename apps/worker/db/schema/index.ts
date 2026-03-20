@@ -1,4 +1,4 @@
-export * from './volunteers'
+export * from './users'
 export * from './settings'
 export * from './records'
 export * from './shifts'

@@ -4,9 +4,6 @@ Feature: Audit Integrity
   I want audit log entries to be immutable and hash-chained
   So that tampering with the audit trail is detectable
 
-  Background:
-    Given the server is reset
-
   # ── Comprehensive Audit Capture ──────────────────────────────────
 
   Scenario: Audit log captures all state-changing operations
@@ -26,7 +23,6 @@ Feature: Audit Integrity
   # ── Hash Chain Verification ──────────────────────────────────────
 
   Scenario: Audit hash chain is verifiable
-    Given the server is reset
     And an admin performs 5 sequential operations
     When the audit log is fetched ordered by creation time
     Then each entry should have an "entryHash" field
@@ -37,7 +33,6 @@ Feature: Audit Integrity
   # ── Tamper Detection ─────────────────────────────────────────────
 
   Scenario: Audit entries are tamper-detectable
-    Given the server is reset
     And an admin creates a volunteer to generate an audit entry
     When the latest audit entry is fetched
     Then recomputing the hash with computeAuditEntryHash should match the stored entryHash

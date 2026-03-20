@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
-import { loginAsAdmin } from './helpers'
+import { loginAsAdmin, TestIds } from './helpers'
+import { listCmsReportTypesViaApi, createReportViaApi } from './api-helpers'
 
 async function navigateToAdminSettings(page: Page): Promise<void> {
   await page.getByTestId('nav-admin-settings').click()
@@ -19,7 +20,7 @@ test.describe('Report Types', () => {
     await navigateToAdminSettings(page)
 
     // Find and expand the Report Types section
-    const section = page.locator('#report-types')
+    const section = page.getByTestId('report-types')
     await expect(section).toBeVisible({ timeout: 10000 })
   })
 
@@ -28,7 +29,7 @@ test.describe('Report Types', () => {
     await navigateToAdminSettings(page)
 
     // Expand the report types section by clicking on it
-    await page.locator('#report-types').click()
+    await page.getByTestId('report-types').click()
 
     // Wait for report type rows to appear (default types seeded on first load)
     await expect(page.getByTestId('report-type-row').first()).toBeVisible({ timeout: 10000 })
@@ -43,7 +44,7 @@ test.describe('Report Types', () => {
     await navigateToAdminSettings(page)
 
     // Expand the report types section
-    await page.locator('#report-types').click()
+    await page.getByTestId('report-types').click()
     await expect(page.getByTestId('report-type-row').first()).toBeVisible({ timeout: 10000 })
 
     // Click "Add Report Type"
@@ -98,19 +99,25 @@ test.describe('Report Types', () => {
   })
 
   test('report card shows report type badge', async ({ page }) => {
+    // Seed own report with a report type — do not rely on prior test side-effects
+    const reportTypes = await listCmsReportTypesViaApi(page.request)
+    const reportType = reportTypes[0] as { id: string } | undefined
+    if (!reportType) throw new Error('No report types available — seeding failed in earlier tests')
+
+    await createReportViaApi(page.request, {
+      title: `Badge Test Report ${Date.now()}`,
+      reportTypeId: reportType.id,
+    })
+
     await loginAsAdmin(page)
     await navigateToReports(page)
 
-    // Wait for reports to load
-    await page.waitForTimeout(2000)
+    // The report we just created must show a type badge
+    const badge = page.getByTestId(TestIds.REPORT_TYPE_BADGE).first()
+    await expect(badge).toBeVisible({ timeout: 10000 })
 
-    // At least one report should have a type badge visible in the list
-    // The badge comes from the reportCategory set from the report type name
-    const badges = page.locator('button[type="button"]').first().locator('.text-\\[10px\\]')
-    // If there's a report with a type, the badge should show the type name
-    if (await badges.count() > 0) {
-      const badgeText = await badges.first().textContent()
-      expect(badgeText?.trim().length).toBeGreaterThan(0)
-    }
+    // Badge should contain the type name (non-empty text)
+    const badgeText = await badge.textContent()
+    expect(badgeText?.trim().length).toBeGreaterThan(0)
   })
 })

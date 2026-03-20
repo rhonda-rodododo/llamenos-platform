@@ -1,5 +1,5 @@
 /**
- * Identity domain tables: volunteers, sessions, invite codes,
+ * Identity domain tables: users, sessions, invite codes,
  * WebAuthn credentials/challenges, devices, provision rooms.
  */
 import { relations, sql } from 'drizzle-orm'
@@ -14,15 +14,15 @@ import {
 import { jsonb } from '../bun-jsonb'
 
 // ---------------------------------------------------------------------------
-// volunteers
+// users
 // ---------------------------------------------------------------------------
 
-export const volunteers = pgTable('volunteers', {
+export const users = pgTable('users', {
   pubkey: text('pubkey').primaryKey(),
   roles: text('roles')
     .array()
     .notNull()
-    .default(sql`'{"volunteer"}'::text[]`),
+    .default(sql`'{"role-volunteer"}'::text[]`),
   displayName: text('display_name'),
   phone: text('phone'),
   status: text('status').notNull().default('active'),
@@ -64,7 +64,7 @@ export const sessions = pgTable(
     token: text('token').primaryKey(),
     pubkey: text('pubkey')
       .notNull()
-      .references(() => volunteers.pubkey, { onDelete: 'cascade' }),
+      .references(() => users.pubkey, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -109,7 +109,7 @@ export const webauthnCredentials = pgTable(
     credentialId: text('credential_id').primaryKey(),
     pubkey: text('pubkey')
       .notNull()
-      .references(() => volunteers.pubkey, { onDelete: 'cascade' }),
+      .references(() => users.pubkey, { onDelete: 'cascade' }),
     publicKey: text('public_key').notNull(),
     counter: integer('counter').notNull().default(0),
     transports: text('transports').array(),
@@ -147,7 +147,7 @@ export const devices = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     pubkey: text('pubkey')
       .notNull()
-      .references(() => volunteers.pubkey, { onDelete: 'cascade' }),
+      .references(() => users.pubkey, { onDelete: 'cascade' }),
     platform: text('platform').notNull(),
     pushToken: text('push_token'),
     voipToken: text('voip_token'),
@@ -181,32 +181,32 @@ export const provisionRooms = pgTable('provision_rooms', {
 // Relations
 // ---------------------------------------------------------------------------
 
-export const volunteersRelations = relations(volunteers, ({ many }) => ({
+export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   webauthnCredentials: many(webauthnCredentials),
   devices: many(devices),
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
-  volunteer: one(volunteers, {
+  user: one(users, {
     fields: [sessions.pubkey],
-    references: [volunteers.pubkey],
+    references: [users.pubkey],
   }),
 }))
 
 export const webauthnCredentialsRelations = relations(
   webauthnCredentials,
   ({ one }) => ({
-    volunteer: one(volunteers, {
+    user: one(users, {
       fields: [webauthnCredentials.pubkey],
-      references: [volunteers.pubkey],
+      references: [users.pubkey],
     }),
   }),
 )
 
 export const devicesRelations = relations(devices, ({ one }) => ({
-  volunteer: one(volunteers, {
+  user: one(users, {
     fields: [devices.pubkey],
-    references: [volunteers.pubkey],
+    references: [users.pubkey],
   }),
 }))

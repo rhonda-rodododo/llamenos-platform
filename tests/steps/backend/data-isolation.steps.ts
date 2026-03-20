@@ -6,7 +6,7 @@
  * take immediate effect.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
 import {
   apiGet,
   apiPost,
@@ -50,26 +50,32 @@ interface IsolationState {
   deactivationResponses: Map<string, number>
 }
 
-let iso: IsolationState
+const DATA_ISOLATION_KEY = 'data_isolation'
 
-Before({ tags: '@security or @permissions' }, async () => {
-  iso = {
+function getIsolationState(world: Record<string, unknown>): IsolationState {
+  return getState<IsolationState>(world, DATA_ISOLATION_KEY)
+}
+
+
+Before({ tags: '@security or @permissions' }, async ({ world }) => {
+  const iso = {
     users: new Map(),
     listResults: new Map(),
     deactivationResponses: new Map(),
   }
+  setState(world, DATA_ISOLATION_KEY, iso)
 })
 
 // ── Helpers ────────────────────────────────────────────────────────
 
 async function ensureEntityType(request: import('@playwright/test').APIRequestContext): Promise<string> {
-  if (iso.entityTypeId) return iso.entityTypeId
+  if (getIsolationState(world).entityTypeId) return getIsolationState(world).entityTypeId
   await enableCaseManagementViaApi(request, true)
   const et = await createEntityTypeViaApi(request, {
     name: `Isolation Case ${Date.now()}`,
     slug: `isolation-case-${Date.now()}`,
   })
-  iso.entityTypeId = et.id
+  getIsolationState(world).entityTypeId = et.id
   return et.id
 }
 
@@ -77,7 +83,7 @@ async function ensureEntityType(request: import('@playwright/test').APIRequestCo
 
 Given(
   'a {string} user {string} with resources',
-  async ({ request }, role: string, name: string) => {
+  async ({ request, world }, role: string, name: string) => {
     // Create volunteer with given role
     const vol = await createVolunteerViaApi(request, {
       name: `${name} ${Date.now()}`,
@@ -85,7 +91,7 @@ Given(
 
     // Assign the right role
     if (role === 'reporter') {
-      await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: ['reporter'] })
+      await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['reporter'] })
     } else if (role === 'volunteer') {
       // Default role is volunteer — no change needed
     }
@@ -135,12 +141,12 @@ Given(
       user.reportIds.push(report.id)
     }
 
-    iso.users.set(name, user)
+    getIsolationState(world).users.set(name, user)
   },
 )
 
-When('{string} lists their {word}', async ({ request }, name: string, resource: string) => {
-  const user = iso.users.get(name)
+When('{string} lists their {word}', async ({ request, world }, name: string, resource: string) => {
+  const user = getIsolationState(world).users.get(name)
   expect(user).toBeTruthy()
 
   const results: { notes?: string[]; reports?: string[]; records?: string[] } = {}
@@ -172,13 +178,13 @@ When('{string} lists their {word}', async ({ request }, name: string, resource: 
     }
   }
 
-  iso.listResults.set(name, results)
+  getIsolationState(world).listResults.set(name, results)
 })
 
-Then('{string} should only see resources they created', async ({}, name: string) => {
-  const user = iso.users.get(name)
+Then('{string} should only see resources they created', async ({ world }, name: string) => {
+  const user = getIsolationState(world).users.get(name)
   expect(user).toBeTruthy()
-  const results = iso.listResults.get(name)
+  const results = getIsolationState(world).listResults.get(name)
   expect(results).toBeTruthy()
 
   // Every returned ID should belong to the user
@@ -201,10 +207,10 @@ Then('{string} should only see resources they created', async ({}, name: string)
 
 Then(
   "{string}'s {word} should not be visible to {string}",
-  async ({}, otherName: string, resource: string, viewerName: string) => {
-    const other = iso.users.get(otherName)
+  async ({ world }, otherName: string, resource: string, viewerName: string) => {
+    const other = getIsolationState(world).users.get(otherName)
     expect(other).toBeTruthy()
-    const results = iso.listResults.get(viewerName)
+    const results = getIsolationState(world).listResults.get(viewerName)
     expect(results).toBeTruthy()
 
     if (resource === 'note' || resource === 'notes') {
@@ -229,11 +235,11 @@ Then(
 
 Given(
   'hub {string} with a volunteer {string}',
-  async ({ request }, _hubName: string, volName: string) => {
+  async ({ request, world }, _hubName: string, volName: string) => {
     const vol = await createVolunteerViaApi(request, {
       name: `${volName} ${Date.now()}`,
     })
-    iso.users.set(volName, {
+    getIsolationState(world).users.set(volName, {
       name: volName,
       nsec: vol.nsec,
       pubkey: vol.pubkey,
@@ -246,8 +252,8 @@ Given(
 
 When(
   '{string} creates a note in hub {string}',
-  async ({ request }, volName: string, _hubName: string) => {
-    const user = iso.users.get(volName)
+  async ({ request, world }, volName: string, _hubName: string) => {
+    const user = getIsolationState(world).users.get(volName)
     expect(user).toBeTruthy()
     const res = await apiPost<{ note: { id: string } }>(
       request,
@@ -266,8 +272,8 @@ When(
 
 Then(
   '{string} should not see notes from hub {string}',
-  async ({ request }, viewerName: string, _hubName: string) => {
-    const viewer = iso.users.get(viewerName)
+  async ({ request, world }, viewerName: string, _hubName: string) => {
+    const viewer = getIsolationState(world).users.get(viewerName)
     expect(viewer).toBeTruthy()
 
     const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
@@ -279,7 +285,7 @@ Then(
 
     // Get all note IDs belonging to OTHER users
     const otherNoteIds: string[] = []
-    for (const [name, user] of iso.users) {
+    for (const [name, user] of getIsolationState(world).users) {
       if (name !== viewerName) {
         otherNoteIds.push(...user.noteIds)
       }
@@ -294,63 +300,63 @@ Then(
 
 // ── Role Change Enforcement ───────────────────────────────────────
 
-Given('a volunteer with role {string}', async ({ request }, role: string) => {
+Given('a volunteer with role {string}', async ({ request, world }, role: string) => {
   const vol = await createVolunteerViaApi(request, {
     name: `Role Change Vol ${Date.now()}`,
   })
   // Set the initial role
-  await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: [role] })
-  iso.volunteer = { ...vol, roles: [role] }
+  await apiPatch(request, `/users/${vol.pubkey}`, { roles: [role] })
+  getIsolationState(world).volunteer = { ...vol, roles: [role] }
 })
 
 When(
   "an admin changes the volunteer's role to {string}",
-  async ({ request }, newRole: string) => {
-    expect(iso.volunteer).toBeTruthy()
-    await apiPatch(request, `/volunteers/${iso.volunteer!.pubkey}`, {
+  async ({ request, world }, newRole: string) => {
+    expect(getIsolationState(world).volunteer).toBeTruthy()
+    await apiPatch(request, `/users/${getIsolationState(world).volunteer!.pubkey}`, {
       roles: [newRole],
     })
-    iso.volunteer!.roles = [newRole]
+    getIsolationState(world).volunteer!.roles = [newRole]
   },
 )
 
 When(
   'the volunteer makes a request requiring {string} permissions',
-  async ({ request }, oldRole: string) => {
-    expect(iso.volunteer).toBeTruthy()
+  async ({ request, world }, oldRole: string) => {
+    expect(getIsolationState(world).volunteer).toBeTruthy()
     // hub-admin can list volunteers; volunteer cannot
     // Use an endpoint that the old role had access to
-    let endpoint = '/volunteers'
+    let endpoint = '/users'
     if (oldRole === 'hub-admin') {
-      endpoint = '/volunteers'
+      endpoint = '/users'
     } else if (oldRole === 'reviewer') {
       endpoint = '/notes' // reviewers can list notes
     }
-    iso.roleChangeResponse = await testEndpointAccess(
+    getIsolationState(world).roleChangeResponse = await testEndpointAccess(
       request,
       'GET',
       endpoint,
-      iso.volunteer!.nsec,
+      getIsolationState(world).volunteer!.nsec,
     )
   },
 )
 
 Then(
   'the response status should reflect the {string} role permissions',
-  async ({}, newRole: string) => {
-    expect(iso.roleChangeResponse).toBeDefined()
+  async ({ world }, newRole: string) => {
+    expect(getIsolationState(world).roleChangeResponse).toBeDefined()
     if (newRole === 'volunteer' || newRole === 'reporter') {
       // Volunteers and reporters cannot list volunteers (requires admin perm)
-      expect(iso.roleChangeResponse).toBe(403)
+      expect(getIsolationState(world).roleChangeResponse).toBe(403)
     } else {
-      expect(iso.roleChangeResponse).toBe(200)
+      expect(getIsolationState(world).roleChangeResponse).toBe(200)
     }
   },
 )
 
 // ── Deactivation Enforcement ──────────────────────────────────────
 
-Given('an active volunteer with notes and shift access', async ({ request }) => {
+Given('an active volunteer with notes and shift access', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, {
     name: `Deactivation Vol ${Date.now()}`,
   })
@@ -364,25 +370,25 @@ Given('an active volunteer with notes and shift access', async ({ request }) => 
     },
     vol.nsec,
   )
-  iso.deactivatedVol = vol
+  getIsolationState(world).deactivatedVol = vol
 })
 
-When('an admin deactivates the volunteer', async ({ request }) => {
-  expect(iso.deactivatedVol).toBeTruthy()
-  await apiPatch(request, `/volunteers/${iso.deactivatedVol!.pubkey}`, {
+When('an admin deactivates the volunteer', async ({ request, world }) => {
+  expect(getIsolationState(world).deactivatedVol).toBeTruthy()
+  await apiPatch(request, `/users/${getIsolationState(world).deactivatedVol!.pubkey}`, {
     active: false,
   })
 })
 
 Then(
   'the volunteer should receive {int} when listing notes',
-  async ({ request }, expectedStatus: number) => {
-    expect(iso.deactivatedVol).toBeTruthy()
+  async ({ request, world }, expectedStatus: number) => {
+    expect(getIsolationState(world).deactivatedVol).toBeTruthy()
     const status = await testEndpointAccess(
       request,
       'GET',
       '/notes',
-      iso.deactivatedVol!.nsec,
+      getIsolationState(world).deactivatedVol!.nsec,
     )
     expect(status).toBe(expectedStatus)
   },
@@ -390,13 +396,13 @@ Then(
 
 Then(
   'the volunteer should receive {int} when listing shifts',
-  async ({ request }, expectedStatus: number) => {
-    expect(iso.deactivatedVol).toBeTruthy()
+  async ({ request, world }, expectedStatus: number) => {
+    expect(getIsolationState(world).deactivatedVol).toBeTruthy()
     const status = await testEndpointAccess(
       request,
       'GET',
       '/shifts',
-      iso.deactivatedVol!.nsec,
+      getIsolationState(world).deactivatedVol!.nsec,
     )
     expect(status).toBe(expectedStatus)
   },
@@ -404,13 +410,13 @@ Then(
 
 Then(
   'the volunteer should receive {int} when accessing their profile',
-  async ({ request }, expectedStatus: number) => {
-    expect(iso.deactivatedVol).toBeTruthy()
+  async ({ request, world }, expectedStatus: number) => {
+    expect(getIsolationState(world).deactivatedVol).toBeTruthy()
     const status = await testEndpointAccess(
       request,
       'GET',
       '/auth/me',
-      iso.deactivatedVol!.nsec,
+      getIsolationState(world).deactivatedVol!.nsec,
     )
     expect(status).toBe(expectedStatus)
   },

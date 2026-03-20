@@ -3,9 +3,6 @@ Feature: Contact Relationships & Affinity Groups
   Admins manage relationships between encrypted contacts
   and organize contacts into affinity groups with roles.
 
-  Background:
-    Given the server is reset
-
   Scenario: Create a relationship between contacts
     Given case management is enabled
     And a contact "contact_a" exists

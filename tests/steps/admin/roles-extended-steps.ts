@@ -20,41 +20,39 @@ import {
   ADMIN_NSEC,
 } from '../../api-helpers'
 
-// Store per-test role data
-let volunteerNsec = ''
-let reporterNsec = ''
+// State is now in rolesWorld fixture (rolesWorld.volunteerNsec, rolesWorld.reporterNsec)
 
 // --- Role enforcement steps ---
 
-Given('I am logged in as a volunteer', async ({ page, request }) => {
+Given('I am logged in as a volunteer', async ({ page, request, rolesWorld }) => {
   // Create a real volunteer via API with proper auth, then login
   const vol = await createVolunteerViaApi(request, {
     name: `RoleVol ${Date.now()}`,
     roleIds: ['role-volunteer'],
   })
-  volunteerNsec = vol.nsec
+  rolesWorld.volunteerNsec = vol.nsec
   await loginAsVolunteer(page, vol.nsec)
 })
 
-Given('I am logged in as a reporter', async ({ page, request }) => {
+Given('I am logged in as a reporter', async ({ page, request, rolesWorld }) => {
   // Create a volunteer with reporter role
   const vol = await createVolunteerViaApi(request, {
     name: `Reporter ${Date.now()}`,
     roleIds: ['role-reporter'],
   })
-  reporterNsec = vol.nsec
+  rolesWorld.reporterNsec = vol.nsec
   await loginAsVolunteer(page, vol.nsec)
 })
 
-When('I attempt to access an admin endpoint', async ({ request }) => {
+When('I attempt to access an admin endpoint', async ({ request, rolesWorld }) => {
   // Use the volunteer's nsec to test API access — should get 403
-  const status = await testEndpointAccess(request, 'GET', '/volunteers', volunteerNsec)
+  const status = await testEndpointAccess(request, 'GET', '/users', rolesWorld.volunteerNsec)
   ;(globalThis as Record<string, unknown>).__test_endpoint_status = status
 })
 
-When('I attempt to access call-related endpoints', async ({ request }) => {
+When('I attempt to access call-related endpoints', async ({ request, rolesWorld }) => {
   // Use the reporter's nsec — reporters can't access calls
-  const nsec = reporterNsec || volunteerNsec
+  const nsec = rolesWorld.reporterNsec || rolesWorld.volunteerNsec
   const status = await testEndpointAccess(request, 'GET', '/calls/history', nsec)
   ;(globalThis as Record<string, unknown>).__test_endpoint_status = status
 })
@@ -66,13 +64,13 @@ Then('I should receive a 403 forbidden response', async () => {
 
 Then('I should have access to all API endpoints', async ({ request }) => {
   // Admin should have access to all endpoints
-  const status = await testEndpointAccess(request, 'GET', '/volunteers', ADMIN_NSEC)
+  const status = await testEndpointAccess(request, 'GET', '/users', ADMIN_NSEC)
   expect(status).toBe(200)
 })
 
 // --- Multi-role steps ---
 
-Given('a volunteer has both {string} and {string} roles', async ({ page, request }, role1: string, role2: string) => {
+Given('a volunteer has both {string} and {string} roles', async ({ page, request, rolesWorld }, role1: string, role2: string) => {
   const roles = await listRolesViaApi(request)
   const roleId1 = roles.find(r => r.name === role1)?.id
   const roleId2 = roles.find(r => r.name === role2)?.id
@@ -83,7 +81,7 @@ Given('a volunteer has both {string} and {string} roles', async ({ page, request
     name: `MultiRole ${Date.now()}`,
     roleIds: [roleId1!, roleId2!],
   })
-  volunteerNsec = vol.nsec
+  rolesWorld.volunteerNsec = vol.nsec
 
   // Verify permissions are the union of both roles via API
   const me = await getMeViaApi(request, vol.nsec)
@@ -91,14 +89,14 @@ Given('a volunteer has both {string} and {string} roles', async ({ page, request
   expect(me.data).toBeTruthy()
 })
 
-Then('they should have permissions from both roles', async ({ request }) => {
+Then('they should have permissions from both roles', async ({ request, rolesWorld }) => {
   // Verify via /auth/me that the user has permissions from both roles
-  const me = await getMeViaApi(request, volunteerNsec)
+  const me = await getMeViaApi(request, rolesWorld.volunteerNsec)
   expect(me.status).toBe(200)
   expect(me.data!.permissions.length).toBeGreaterThan(0)
 })
 
-Given('a volunteer has only a custom {string} role', async ({ request }, roleName: string) => {
+Given('a volunteer has only a custom {string} role', async ({ request, rolesWorld }, roleName: string) => {
   const roles = await listRolesViaApi(request)
   let role = roles.find(r => r.name === roleName)
   if (!role) {
@@ -114,26 +112,26 @@ Given('a volunteer has only a custom {string} role', async ({ request }, roleNam
     name: `Custom ${Date.now()}`,
     roleIds: [role.id],
   })
-  volunteerNsec = vol.nsec
+  rolesWorld.volunteerNsec = vol.nsec
 })
 
-Then('they should only see endpoints allowed by that role', async ({ request }) => {
+Then('they should only see endpoints allowed by that role', async ({ request, rolesWorld }) => {
   // Verify the volunteer can access calls but not admin endpoints
-  const callsStatus = await testEndpointAccess(request, 'GET', '/calls/history', volunteerNsec)
+  const callsStatus = await testEndpointAccess(request, 'GET', '/calls/history', rolesWorld.volunteerNsec)
   // Calls read should work (200 or similar)
   // Admin endpoints should be denied
-  const volunteersStatus = await testEndpointAccess(request, 'GET', '/volunteers', volunteerNsec)
+  const volunteersStatus = await testEndpointAccess(request, 'GET', '/users', rolesWorld.volunteerNsec)
   expect(volunteersStatus).toBe(403)
 })
 
-When('the volunteer attempts to access an unauthorized endpoint', async ({ request }) => {
-  const status = await testEndpointAccess(request, 'GET', '/volunteers', volunteerNsec)
+When('the volunteer attempts to access an unauthorized endpoint', async ({ request, rolesWorld }) => {
+  const status = await testEndpointAccess(request, 'GET', '/users', rolesWorld.volunteerNsec)
   ;(globalThis as Record<string, unknown>).__test_endpoint_status = status
 })
 
-When('the volunteer logs in', async ({ page }) => {
-  if (volunteerNsec) {
-    await loginAsVolunteer(page, volunteerNsec)
+When('the volunteer logs in', async ({ page, rolesWorld }) => {
+  if (rolesWorld.volunteerNsec) {
+    await loginAsVolunteer(page, rolesWorld.volunteerNsec)
   }
 })
 
@@ -161,7 +159,7 @@ Then('I should see all navigation items including admin', async ({ page }) => {
 
 // --- Wildcard domain steps ---
 
-Given('a role with {string} wildcard permission', async ({ request }, permission: string) => {
+Given('a role with {string} wildcard permission', async ({ request, rolesWorld }, permission: string) => {
   const slug = `wildcard-test-${Date.now()}`
   const role = await createRoleViaApi(request, {
     name: `Wildcard Test ${Date.now()}`,
@@ -172,17 +170,17 @@ Given('a role with {string} wildcard permission', async ({ request }, permission
     name: `WC ${Date.now()}`,
     roleIds: [role.id],
   })
-  volunteerNsec = vol.nsec
+  rolesWorld.volunteerNsec = vol.nsec
 })
 
-When('the user with that role logs in', async ({ page }) => {
-  if (volunteerNsec) {
-    await loginAsVolunteer(page, volunteerNsec)
+When('the user with that role logs in', async ({ page, rolesWorld }) => {
+  if (rolesWorld.volunteerNsec) {
+    await loginAsVolunteer(page, rolesWorld.volunteerNsec)
   }
 })
 
-Then('they should have all notes-related permissions', async ({ request }) => {
-  const me = await getMeViaApi(request, volunteerNsec)
+Then('they should have all notes-related permissions', async ({ request, rolesWorld }) => {
+  const me = await getMeViaApi(request, rolesWorld.volunteerNsec)
   expect(me.status).toBe(200)
   // notes:* should grant all notes permissions
   const perms = me.data!.permissions
@@ -204,7 +202,7 @@ Then('the role dropdown should show all default roles', async ({ page }) => {
   await expect(roleSelector).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('a volunteer with {string} role', async ({ page, request }, roleName: string) => {
+Given('a volunteer with {string} role', async ({ page, request, rolesWorld }, roleName: string) => {
   const roles = await listRolesViaApi(request)
   const role = roles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
@@ -213,7 +211,7 @@ Given('a volunteer with {string} role', async ({ page, request }, roleName: stri
     name: `RoleTest ${Date.now()}`,
     roleIds: [role!.id],
   })
-  volunteerNsec = vol.nsec
+  rolesWorld.volunteerNsec = vol.nsec
   await page.evaluate((name) => {
     (window as Record<string, unknown>).__test_vol_name = name
   }, vol.name)
@@ -306,7 +304,7 @@ Then('I should see all available roles in the form', async ({ page }) => {
 
 // --- Reviewer login ---
 
-Given('a volunteer with the {string} role exists', async ({ request }, roleName: string) => {
+Given('a volunteer with the {string} role exists', async ({ request, rolesWorld }, roleName: string) => {
   const roles = await listRolesViaApi(request)
   const role = roles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
@@ -315,9 +313,9 @@ Given('a volunteer with the {string} role exists', async ({ request }, roleName:
     name: `${roleName}Vol ${Date.now()}`,
     roleIds: [role!.id],
   })
-  volunteerNsec = vol.nsec
+  rolesWorld.volunteerNsec = vol.nsec
 })
 
-When('the reviewer logs in', async ({ page }) => {
-  await loginAsVolunteer(page, volunteerNsec)
+When('the reviewer logs in', async ({ page, rolesWorld }) => {
+  await loginAsVolunteer(page, rolesWorld.volunteerNsec)
 })

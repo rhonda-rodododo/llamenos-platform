@@ -12,13 +12,13 @@ import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.model.AdminShiftDetail
 import org.llamenos.hotline.model.AdminShiftsListResponse
 import org.llamenos.hotline.model.CreateShiftRequest
-import org.llamenos.hotline.model.Volunteer
-import org.llamenos.hotline.model.VolunteersListResponse
+import org.llamenos.hotline.model.User
+import org.llamenos.hotline.model.UsersListResponse
 import javax.inject.Inject
 
 data class ShiftDetailUiState(
     val shift: AdminShiftDetail? = null,
-    val allVolunteers: List<Volunteer> = emptyList(),
+    val allVolunteers: List<User> = emptyList(),
     val assignedPubkeys: Set<String> = emptySet(),
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -43,8 +43,8 @@ class ShiftDetailViewModel @Inject constructor(
                 )
                 val shift = shiftsResponse.shifts.find { it.id == shiftId }
 
-                val volResponse = apiService.request<VolunteersListResponse>(
-                    "GET", "/api/admin/volunteers",
+                val volResponse = apiService.request<UsersListResponse>(
+                    "GET", "/api/users",
                 )
 
                 val assignedPubkeys = shift?.volunteers?.map { it.pubkey }?.toSet() ?: emptySet()
@@ -52,7 +52,7 @@ class ShiftDetailViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         shift = shift,
-                        allVolunteers = volResponse.volunteers,
+                        allVolunteers = volResponse.users,
                         assignedPubkeys = assignedPubkeys,
                         isLoading = false,
                     )

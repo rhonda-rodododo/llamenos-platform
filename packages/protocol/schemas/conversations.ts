@@ -9,23 +9,44 @@ export const conversationResponseSchema = z.object({
   contactIdentifierHash: z.string(),
   contactLast4: z.string().optional(),
   assignedTo: z.string().optional(),
-  status: z.string(),
+  status: z.enum(['active', 'waiting', 'closed']).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   lastMessageAt: z.string().optional(),
   messageCount: z.number(),
+  metadata: z.object({
+    linkedCallId: z.string().optional(),
+    reportId: z.string().optional(),
+    type: z.literal('report').optional(),
+    reportTitle: z.string().optional(),
+    reportCategory: z.string().optional(),
+    reportTypeId: z.string().optional(),
+    customFieldValues: z.string().optional(),
+    conversionStatus: z.enum(['pending', 'in_progress', 'completed']).optional(),
+  }).optional(),
 })
+
+export type Conversation = z.infer<typeof conversationResponseSchema>
 
 export const messageResponseSchema = z.object({
   id: z.string(),
   conversationId: z.string(),
-  direction: z.string(),
+  direction: z.enum(['inbound', 'outbound']).optional(),
   authorPubkey: z.string().optional(),
   encryptedContent: z.string(),
   readerEnvelopes: z.array(recipientEnvelopeSchema),
   createdAt: z.string(),
   status: z.string().optional(),
+  hasAttachments: z.boolean().optional(),
+  attachmentIds: z.array(z.string()).optional(),
+  deliveredAt: z.string().optional(),
+  readAt: z.string().optional(),
+  failureReason: z.string().optional(),
+  retryCount: z.number().optional(),
+  externalId: z.string().optional(),
 })
+
+export type ConversationMessage = z.infer<typeof messageResponseSchema>
 
 // --- List/wrapper response schemas ---
 

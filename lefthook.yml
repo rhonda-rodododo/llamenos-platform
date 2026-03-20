@@ -7,3 +7,8 @@ pre-commit:
     codegen-freshness:
       glob: "packages/protocol/schemas/*.ts"
       run: bun run codegen && git diff --exit-code packages/protocol/generated/
+
+pre-push:
+  commands:
+    check-codegen-drift:
+      run: bun run codegen:check

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
 import { useConfig } from '@/lib/config'
-import { listVolunteers, listShifts } from '@/lib/api'
+import { listUsers, listShifts } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,8 +39,8 @@ export function GettingStartedChecklist() {
       let hasShifts = false
 
       try {
-        const [volRes, shiftRes] = await Promise.all([listVolunteers(), listShifts()])
-        hasVolunteers = volRes.volunteers.length > 1 // > 1 because admin counts as a volunteer
+        const [userRes, shiftRes] = await Promise.all([listUsers(), listShifts()])
+        hasVolunteers = userRes.users.length > 1 // > 1 because admin counts as a user
         hasShifts = shiftRes.shifts.length > 0
       } catch {
         // API might fail if not authed yet
@@ -59,7 +59,7 @@ export function GettingStartedChecklist() {
           label: t('gettingStarted.inviteVolunteers', { defaultValue: 'Invite volunteers' }),
           description: t('gettingStarted.inviteVolunteersDesc', { defaultValue: 'Add team members who will answer calls and respond to reports.' }),
           done: hasVolunteers,
-          href: '/volunteers',
+          href: '/users',
         },
         {
           id: 'shifts',

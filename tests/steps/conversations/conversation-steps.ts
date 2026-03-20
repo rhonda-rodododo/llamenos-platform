@@ -22,7 +22,6 @@ Given('I open a conversation', async ({ page }) => {
   const conversationItem = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
   await expect(conversationItem).toBeVisible({ timeout: Timeouts.ELEMENT })
   await conversationItem.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the filter chips should be visible', async ({ page }) => {
@@ -64,7 +63,6 @@ Given('I have selected the {string} filter', async ({ page }, filterName: string
   const sectionHeader = page.getByTestId(TestIds.CONV_SECTION_HEADER).filter({ hasText: new RegExp(filterName, 'i') })
   await expect(sectionHeader.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   await sectionHeader.first().click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then(

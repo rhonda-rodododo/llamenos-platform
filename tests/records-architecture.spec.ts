@@ -8,7 +8,7 @@
  * - Custom field context filtering (call-notes, conversation-notes, reports)
  */
 import { test, expect, type Page } from '@playwright/test'
-import { loginAsAdmin, loginAsVolunteer, createVolunteerAndGetNsec, dismissNsecCard, navigateAfterLogin, TestIds, Navigation, uniquePhone } from './helpers'
+import { loginAsAdmin, loginAsVolunteer, createUserAndGetNsec, dismissNsecCard, navigateAfterLogin, TestIds, Navigation, uniquePhone } from './helpers'
 
 /**
  * Fill the call-id field in the new note form.
@@ -92,7 +92,6 @@ test.describe('Records Architecture', () => {
 
     // After sending, the reply count should update
     // Wait for the reply to be sent
-    await page.waitForTimeout(1500)
 
     // The reply button text should now show "1 replies"
     const replyBtn = page.getByTestId(TestIds.NOTE_REPLY_BTN).first()
@@ -118,7 +117,6 @@ test.describe('Records Architecture', () => {
     await expect(replyTextarea).toBeVisible({ timeout: 5000 })
     await replyTextarea.fill('Reply to collapse test')
     await page.getByTestId(TestIds.NOTE_REPLY_SEND).click()
-    await page.waitForTimeout(1000)
 
     // Collapse thread
     await page.getByTestId(TestIds.NOTE_REPLY_BTN).first().click()
@@ -152,7 +150,6 @@ test.describe('Records Architecture', () => {
   test('contacts page shows empty state when no contacts exist', async ({ page }) => {
     await Navigation.goToContacts(page)
     // Wait for loading to finish
-    await page.waitForTimeout(2000)
     // Should show either contacts or empty state
     const hasContacts = await page.getByTestId(TestIds.CONTACT_ROW).first().isVisible().catch(() => false)
     if (!hasContacts) {
@@ -162,7 +159,7 @@ test.describe('Records Architecture', () => {
 
   test('volunteer cannot see contacts nav link', async ({ page }) => {
     // Create a volunteer first
-    volunteerNsec = await createVolunteerAndGetNsec(page, `Vol-${Date.now()}`, uniquePhone())
+    volunteerNsec = await createUserAndGetNsec(page, `Vol-${Date.now()}`, uniquePhone())
     await dismissNsecCard(page)
 
     // Login as volunteer
@@ -178,7 +175,6 @@ test.describe('Records Architecture', () => {
     await loginAsVolunteer(page, volunteerNsec)
 
     // Wait for the app to fully load
-    await page.waitForTimeout(2000)
 
     // The contacts nav link should not be visible for a default volunteer role
     const contactsLink = page.getByRole('link', { name: 'Contacts' })
@@ -247,26 +243,31 @@ test.describe('Records Architecture', () => {
 
   // ============ Report Isolation ============
 
-  test('reports page only shows reports, not conversations', async ({ page }) => {
+  test('reports page shows reports and new-report button, not conversation cards', async ({ page }) => {
+    // Seed a report via API so the page has content
+    const { createReportViaApi } = await import('./api-helpers')
+    await createReportViaApi(page.request, { title: `Isolation Report ${Date.now()}` })
+
     await Navigation.goToReports(page)
 
-    // Reports page should render
-    const heading = page.locator('h1', { hasText: /reports/i })
-    await expect(heading).toBeVisible()
+    // The report list or a report card should be visible
+    const reportContent = page.getByTestId(TestIds.REPORT_CARD).first()
+      .or(page.getByTestId(TestIds.REPORT_NEW_BTN))
+    await expect(reportContent).toBeVisible({ timeout: 10000 })
 
-    // Verify the page renders (report cards, empty state, or new report button)
-    // The page is considered valid if the h1 heading is present (asserted above)
+    // Conversation list element must NOT appear on the reports page
+    await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).not.toBeVisible()
   })
 
-  test('conversations page only shows conversations, not reports', async ({ page }) => {
+  test('conversations page does not show report cards', async ({ page }) => {
     // Navigate directly (Conversations link may not be in nav if channels are not configured)
     await navigateAfterLogin(page, '/conversations')
 
-    // Conversations page should render
+    // Page should render — either conversation list, empty state, or no-channels notice
     const heading = page.locator('h1', { hasText: /conversations/i })
-    await expect(heading).toBeVisible()
+    await expect(heading).toBeVisible({ timeout: 10000 })
 
-    // Should show either conversation list or empty/no-channels state
-    await page.waitForTimeout(1000)
+    // Report cards must NOT appear on the conversations page
+    await expect(page.getByTestId(TestIds.REPORT_CARD).first()).not.toBeVisible()
   })
 })

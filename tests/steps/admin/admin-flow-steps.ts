@@ -15,20 +15,14 @@ import {
   listBansViaApi,
 } from '../../api-helpers'
 
-// --- State for cross-step data ---
-let lastVolunteerName = ''
-let lastVolunteerPubkey = ''
-let lastShiftName = ''
-let lastPhone = ''
-
 // --- Volunteer CRUD ---
 
-When('I add a new volunteer with a unique name and phone', async ({ page }) => {
+When('I add a new volunteer with a unique name and phone', async ({ page, adminWorld }) => {
   const phone = uniquePhone()
-  lastVolunteerName = `Vol ${Date.now()}`
-  lastPhone = phone
+  adminWorld.lastUserName = `Vol ${Date.now()}`
+  adminWorld.lastPhone = phone
   await page.getByTestId(TestIds.VOLUNTEER_ADD_BTN).click()
-  await page.getByLabel('Name').fill(lastVolunteerName)
+  await page.getByLabel('Name').fill(adminWorld.lastUserName)
   await page.getByLabel('Phone Number').fill(phone)
   await page.getByLabel('Phone Number').blur()
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
@@ -48,134 +42,134 @@ When('I close the nsec card', async ({ page }) => {
   await expect(page.getByTestId(TestIds.DISMISS_NSEC)).not.toBeVisible({ timeout: 5000 })
 })
 
-Then('the volunteer should appear in the list', async ({ page, request }) => {
+Then('the volunteer should appear in the list', async ({ page, request, adminWorld }) => {
   // UI verification
-  const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: lastVolunteerName })
+  const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: adminWorld.lastUserName })
   await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: volunteer exists in backend
   const volunteers = await listVolunteersViaApi(request)
-  const found = volunteers.find(v => v.name === lastVolunteerName)
+  const found = volunteers.find(v => v.name === adminWorld.lastUserName)
   expect(found).toBeTruthy()
-  lastVolunteerPubkey = found!.pubkey
+  adminWorld.lastUserPubkey = found!.pubkey
 })
 
-When('I delete the volunteer', async ({ page }) => {
-  const volRow = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: lastVolunteerName })
+When('I delete the volunteer', async ({ page, adminWorld }) => {
+  const volRow = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: adminWorld.lastUserName })
   await volRow.getByTestId(TestIds.VOLUNTEER_DELETE_BTN).click()
   await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
   await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 })
 })
 
-Then('the volunteer should be removed from the list', async ({ page, request }) => {
+Then('the volunteer should be removed from the list', async ({ page, request, adminWorld }) => {
   // UI verification
-  const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: lastVolunteerName })
+  const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: adminWorld.lastUserName })
   await expect(row).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: volunteer is gone
   const volunteers = await listVolunteersViaApi(request)
-  const found = volunteers.find(v => v.name === lastVolunteerName)
+  const found = volunteers.find(v => v.name === adminWorld.lastUserName)
   expect(found).toBeUndefined()
 })
 
 // --- Shift CRUD ---
 
-When('I create a new shift with a unique name', async ({ page, request }) => {
-  lastShiftName = `Shift ${Date.now()}`
+When('I create a new shift with a unique name', async ({ page, request, adminWorld }) => {
+  adminWorld.lastShiftName = `Shift ${Date.now()}`
   await page.getByTestId(TestIds.SHIFT_CREATE_BTN).click()
-  await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(lastShiftName)
+  await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(adminWorld.lastShiftName)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 
   // Wait for UI confirmation
-  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
+  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: shift was created in backend
   const shifts = await listShiftsViaApi(request)
-  const found = shifts.find(s => s.name === lastShiftName)
+  const found = shifts.find(s => s.name === adminWorld.lastShiftName)
   expect(found).toBeTruthy()
 })
 
-Then('the shift should appear in the list', async ({ page }) => {
-  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
+Then('the shift should appear in the list', async ({ page, adminWorld }) => {
+  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I edit the shift with a new name', async ({ page }) => {
+When('I edit the shift with a new name', async ({ page, adminWorld }) => {
   const updatedName = `Updated ${Date.now()}`
-  const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
+  const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await shiftCard.getByTestId(TestIds.SHIFT_EDIT_BTN).click()
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).clear()
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(updatedName)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-  lastShiftName = updatedName
+  adminWorld.lastShiftName = updatedName
 })
 
-Then('the updated shift name should appear', async ({ page, request }) => {
+Then('the updated shift name should appear', async ({ page, request, adminWorld }) => {
   // UI verification
-  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
+  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: updated name persisted
   const shifts = await listShiftsViaApi(request)
-  const found = shifts.find(s => s.name === lastShiftName)
+  const found = shifts.find(s => s.name === adminWorld.lastShiftName)
   expect(found).toBeTruthy()
 })
 
-When('I delete the shift', async ({ page }) => {
-  const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
+When('I delete the shift', async ({ page, adminWorld }) => {
+  const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await shiftCard.getByTestId(TestIds.SHIFT_DELETE_BTN).click()
 })
 
-Then('the shift should no longer appear', async ({ page, request }) => {
+Then('the shift should no longer appear', async ({ page, request, adminWorld }) => {
   // UI verification
-  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: lastShiftName })
+  const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await expect(card).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: shift is gone
   const shifts = await listShiftsViaApi(request)
-  const found = shifts.find(s => s.name === lastShiftName)
+  const found = shifts.find(s => s.name === adminWorld.lastShiftName)
   expect(found).toBeUndefined()
 })
 
 // --- Ban management ---
 
-When('I ban a unique phone number with reason {string}', async ({ page }, reason: string) => {
-  lastPhone = uniquePhone()
+When('I ban a unique phone number with reason {string}', async ({ page, adminWorld }, reason: string) => {
+  adminWorld.lastPhone = uniquePhone()
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()
-  await page.getByLabel('Phone Number').fill(lastPhone)
+  await page.getByLabel('Phone Number').fill(adminWorld.lastPhone)
   await page.getByLabel('Phone Number').blur()
   await page.getByLabel('Reason').fill(reason)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 })
 
-Then('the banned phone number should appear', async ({ page, request }) => {
+Then('the banned phone number should appear', async ({ page, request, adminWorld }) => {
   // UI verification
-  const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: lastPhone })
+  const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: adminWorld.lastPhone })
   await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification
   const bans = await listBansViaApi(request)
-  const found = bans.find(b => b.phone === lastPhone)
+  const found = bans.find(b => b.phone === adminWorld.lastPhone)
   expect(found).toBeTruthy()
 })
 
-When('I remove the ban for that phone number', async ({ page }) => {
-  const banRow = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: lastPhone })
+When('I remove the ban for that phone number', async ({ page, adminWorld }) => {
+  const banRow = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: adminWorld.lastPhone })
   await expect(banRow.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   await banRow.getByTestId(TestIds.BAN_REMOVE_BTN).click()
   await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
   await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 })
 })
 
-Then('the phone number should no longer appear', async ({ page, request }) => {
+Then('the phone number should no longer appear', async ({ page, request, adminWorld }) => {
   // UI verification
-  const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: lastPhone })
+  const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: adminWorld.lastPhone })
   await expect(row).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification
   const bans = await listBansViaApi(request)
-  const found = bans.find(b => b.phone === lastPhone)
+  const found = bans.find(b => b.phone === adminWorld.lastPhone)
   expect(found).toBeUndefined()
 })
 
@@ -222,11 +216,13 @@ Then('I should see at least one toggle switch', async ({ page }) => {
     const section = sections.nth(i)
     const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
     if (!isExpanded) {
-      await section.locator('.cursor-pointer').first().click().catch(() => {})
-      await page.waitForTimeout(300)
+      // Click the trigger element using data-testid pattern "{id}-trigger"
+      const sectionTestId = await section.getAttribute('data-testid')
+      if (sectionTestId) {
+        await section.getByTestId(`${sectionTestId}-trigger`).click().catch(() => {})
+      }
     }
   }
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
   const switches = page.getByRole('switch')
   await expect(switches.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   const count = await switches.count()
@@ -238,13 +234,11 @@ Then('I should see at least one toggle switch', async ({ page }) => {
 When('I switch the language to Espanol', async ({ page }) => {
   await page.getByRole('combobox', { name: /switch to/i }).click()
   await page.getByRole('option', { name: /español/i }).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I switch the language back to English', async ({ page }) => {
   await page.getByRole('combobox', { name: /cambiar a/i }).click()
   await page.getByRole('option', { name: /english/i }).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Settings summaries ---

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/do-access'
+import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/service-factories'
 import type { TelephonyAdapter } from '../telephony/adapter'
 import type { Services } from '../services'
 import type { Env } from '../types'
@@ -184,8 +184,8 @@ telephony.post('/captcha', async (c) => {
   return telephonyResponse(response)
 })
 
-// --- Step 4: Volunteer answered -> bridge via queue ---
-telephony.post('/volunteer-answer', async (c) => {
+// --- Step 4: User answered -> bridge via queue ---
+telephony.post('/user-answer', async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
@@ -208,7 +208,7 @@ telephony.post('/volunteer-answer', async (c) => {
   }).catch((e) => { console.error('[telephony] Failed to publish presence update:', e) })
 
   const [volInfo, activeCalls] = await Promise.all([
-    services.identity.getVolunteer(pubkey).catch(() => ({} as { name?: string })),
+    services.identity.getUser(pubkey).catch(() => ({} as { name?: string })),
     services.calls.getActiveCalls(hubId ?? ''),
   ])
   const callRecord = activeCalls.find(call => call.callId === parentCallSid)
@@ -217,7 +217,7 @@ telephony.post('/volunteer-answer', async (c) => {
   })
 
   const origin = new URL(c.req.url).origin
-  const response = await adapter.handleCallAnswered({ parentCallSid, callbackUrl: origin, volunteerPubkey: pubkey, hubId })
+  const response = await adapter.handleCallAnswered({ parentCallSid, callbackUrl: origin, userPubkey: pubkey, hubId })
   return telephonyResponse(response)
 })
 

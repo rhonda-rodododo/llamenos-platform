@@ -55,7 +55,6 @@ When('I filter by {string} event type', async ({ page }, eventType: string) => {
   await trigger.click()
   const option = page.getByRole('option', { name: new RegExp(eventType, 'i') })
   await option.first().click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('only {string} events should be visible', async ({ page, request }, eventType: string) => {
@@ -77,7 +76,6 @@ When('I search for {string}', async ({ page }, query: string) => {
   const searchInput = page.getByTestId(TestIds.AUDIT_SEARCH)
   await searchInput.fill(query)
   await searchInput.press('Enter')
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I type {string} in the search input', async ({ page }, text: string) => {

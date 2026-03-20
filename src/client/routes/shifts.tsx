@@ -7,11 +7,11 @@ import {
   createShift,
   updateShift,
   deleteShift,
-  listVolunteers,
+  listUsers,
   getFallbackGroup,
   setFallbackGroup,
   type Shift,
-  type Volunteer,
+  type User,
 } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy } from 'lucide-react'
@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { VolunteerMultiSelect } from '@/components/volunteer-multi-select'
+import { UserMultiSelect } from '@/components/user-multi-select'
 
 export const Route = createFileRoute('/shifts')({
   component: ShiftsPage,
@@ -33,7 +33,7 @@ function ShiftsPage() {
   const { isAdmin } = useAuth()
   const { toast } = useToast()
   const [shifts, setShifts] = useState<Shift[]>([])
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [fallback, setFallback] = useState<string[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingShift, setEditingShift] = useState<Shift | null>(null)
@@ -42,7 +42,7 @@ function ShiftsPage() {
   useEffect(() => {
     Promise.all([
       listShifts().then(r => setShifts(r.shifts)),
-      listVolunteers().then(r => setVolunteers(r.volunteers)),
+      listUsers().then(r => setUsers(r.users)),
       getFallbackGroup().then(r => setFallback(r.volunteers)),
     ]).catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
@@ -77,15 +77,15 @@ function ShiftsPage() {
       {(showForm || editingShift) && (
         <ShiftForm
           shift={editingShift}
-          volunteers={volunteers}
+          users={users}
           onSave={async (data) => {
             try {
               if (editingShift) {
                 const res = await updateShift(editingShift.id, data)
-                setShifts(prev => prev.map(s => s.id === editingShift.id ? res.shift : s))
+                setShifts(prev => prev.map(s => s.id === editingShift.id ? res : s))
               } else {
                 const res = await createShift(data as Omit<Shift, 'id'>)
-                setShifts(prev => [...prev, res.shift])
+                setShifts(prev => [...prev, res])
               }
               setShowForm(false)
               setEditingShift(null)
@@ -145,7 +145,7 @@ function ShiftsPage() {
                     </div>
                     <p data-testid="shift-volunteer-count" className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" />
-                      {shift.volunteerPubkeys.length} {t('shifts.volunteers').toLowerCase()}
+                      {shift.userPubkeys.length} {t('shifts.users').toLowerCase()}
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -187,8 +187,8 @@ function ShiftsPage() {
           <CardDescription>{t('shifts.fallbackDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <VolunteerMultiSelect
-            volunteers={volunteers.filter(v => v.active)}
+          <UserMultiSelect
+            users={users.filter(u => u.active)}
             selected={fallback}
             onSelectionChange={handleSaveFallback}
           />
@@ -198,9 +198,9 @@ function ShiftsPage() {
   )
 }
 
-function ShiftForm({ shift, volunteers, onSave, onCancel }: {
+function ShiftForm({ shift, users, onSave, onCancel }: {
   shift: Shift | null
-  volunteers: Volunteer[]
+  users: User[]
   onSave: (data: Partial<Shift>) => Promise<void>
   onCancel: () => void
 }) {
@@ -209,14 +209,14 @@ function ShiftForm({ shift, volunteers, onSave, onCancel }: {
   const [startTime, setStartTime] = useState(shift?.startTime || '09:00')
   const [endTime, setEndTime] = useState(shift?.endTime || '17:00')
   const [days, setDays] = useState<number[]>(shift?.days || [1, 2, 3, 4, 5])
-  const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>(shift?.volunteerPubkeys || [])
+  const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>(shift?.userPubkeys || [])
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     try {
-      await onSave({ name, startTime, endTime, days, volunteerPubkeys: selectedVolunteers })
+      await onSave({ name, startTime, endTime, days, userPubkeys: selectedVolunteers })
     } finally {
       setSaving(false)
     }
@@ -282,12 +282,12 @@ function ShiftForm({ shift, volunteers, onSave, onCancel }: {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>{t('shifts.assignVolunteers')}</Label>
-            <VolunteerMultiSelect
-              volunteers={volunteers.filter(v => v.active)}
+            <Label>{t('shifts.assignUsers')}</Label>
+            <UserMultiSelect
+              users={users.filter(u => u.active)}
               selected={selectedVolunteers}
               onSelectionChange={setSelectedVolunteers}
-              placeholder={t('shifts.searchVolunteers')}
+              placeholder={t('shifts.searchUsers')}
             />
           </div>
           <div className="flex gap-2">

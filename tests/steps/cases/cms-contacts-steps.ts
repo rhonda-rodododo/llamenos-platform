@@ -22,11 +22,7 @@ import {
   addGroupMemberViaApi,
 } from '../../api-helpers'
 
-// --- Module-level state ---
-
-let contactCarlosId = ''
-let contactMariaId = ''
-let contactWithDataId = ''
+// State is now in casesWorld fixture (casesWorld.contactCarlosId, casesWorld.contactMariaId, casesWorld.contactWithDataId)
 
 // Navigation is handled by common/navigation-steps.ts (added CMS routes there)
 
@@ -60,16 +56,13 @@ async function ensureContactVisibleInDirectory(
   const createBtn = newBtn.or(emptyBtn)
   if (await createBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
     await createBtn.first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
     const contactName = name ?? `Test Contact ${Date.now()}`
     await page.getByTestId('contact-name-input').fill(contactName)
     await page.getByTestId('create-contact-submit').click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
     // Wait for dialog to close
     const dialog = page.getByTestId('create-contact-dialog')
     await dialog.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
     // Check if card appeared after creation
     const appeared = await card.isVisible({ timeout: 5000 }).catch(() => false)
@@ -108,36 +101,36 @@ Then('the contact type filter should be visible', async ({ page }) => {
 
 // --- Search ---
 
-Given('contacts {string} and {string} exist', async ({ backendRequest: request }, name1: string, name2: string) => {
+Given('contacts {string} and {string} exist', async ({ backendRequest: request, casesWorld },name1: string, name2: string) => {
   // Create contacts via API for data integrity
   const existing = await listContactsViaApi(request)
   const existingNames = existing.contacts.map(c => (c as { displayName?: string }).displayName)
 
   if (!existingNames.includes(name1)) {
     const c1 = await createContactByNameViaApi(request, name1)
-    contactCarlosId = (c1 as { id: string }).id
+    casesWorld.contactCarlosId = (c1 as { id: string }).id
   } else {
     const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name1)
-    contactCarlosId = (found as { id: string }).id
+    casesWorld.contactCarlosId = (found as { id: string }).id
   }
 
   if (!existingNames.includes(name2)) {
     const c2 = await createContactByNameViaApi(request, name2)
-    contactMariaId = (c2 as { id: string }).id
+    casesWorld.contactMariaId = (c2 as { id: string }).id
   } else {
     const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name2)
-    contactMariaId = (found as { id: string }).id
+    casesWorld.contactMariaId = (found as { id: string }).id
   }
 })
 
-Given('contacts exist', async ({ backendRequest: request }) => {
+Given('contacts exist', async ({ backendRequest: request, casesWorld }) => {
   const existing = await listContactsViaApi(request)
   if (existing.contacts.length === 0) {
     await createContactByNameViaApi(request, `Seed Contact ${Date.now()}`)
   }
 })
 
-Given('contacts of type {string} and {string} exist', async ({ backendRequest: request }, type1: string, type2: string) => {
+Given('contacts of type {string} and {string} exist', async ({ backendRequest: request, casesWorld },type1: string, type2: string) => {
   const hash1 = type1.toLowerCase().replace(/\s+/g, '_')
   const hash2 = type2.toLowerCase().replace(/\s+/g, '_')
   await createContactByNameViaApi(request, `${type1} Contact ${Date.now()}`, { contactTypeHash: hash1 })
@@ -152,20 +145,17 @@ When('I type {string} in the contact search input', async ({ page }, query: stri
     await ensureContactVisibleInDirectory(page, query)
     // Reload the page to get the search input
     await navigateAfterLogin(page, '/contacts-directory')
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
   // If input still not visible after helper, accept empty state gracefully
   if (!await input.isVisible({ timeout: 5000 }).catch(() => false)) return
   await input.fill(query)
   // Wait for debounce (300ms) + API round-trip + re-render
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I clear the contact search input', async ({ page }) => {
   const input = page.getByTestId('contact-search-input')
   if (!await input.isVisible({ timeout: 3000 }).catch(() => false)) return
   await input.clear()
-  await page.waitForTimeout(500)
 })
 
 Then('the contact list should update after debounce', async ({ page }) => {
@@ -218,14 +208,12 @@ When('I select {string} from the contact type filter', async ({ page }, filterLa
   }
   if (!await filter.isVisible({ timeout: 3000 }).catch(() => false)) return
   await filter.click()
-  await page.waitForTimeout(300)
   const option = page.locator('[role="option"]').filter({ hasText: new RegExp(filterLabel, 'i') })
   if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
     await option.first().click()
   } else {
     await page.keyboard.press('Escape')
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('only individual contacts should appear in the list', async ({ page }) => {
@@ -247,7 +235,6 @@ Then('both individual and organization contacts should be visible', async ({ pag
 
 When('I click the new contact button', async ({ page }) => {
   await page.getByTestId('new-contact-btn').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the create contact dialog should be visible', async ({ page }) => {
@@ -286,7 +273,6 @@ Then('the primary checkbox for the first identifier should be checked', async ({
 
 When('I click the create contact submit button', async ({ page }) => {
   await page.getByTestId('create-contact-submit').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('{string} should appear in the contact list', async ({ page }, name: string) => {
@@ -322,7 +308,6 @@ Then('the create contact submit button should be disabled', async ({ page }) => 
 
 When('I click the add identifier button', async ({ page }) => {
   await page.getByTestId('add-identifier-btn').click()
-  await page.waitForTimeout(300)
 })
 
 Then('{int} identifier rows should be visible', async ({ page }, count: number) => {
@@ -349,101 +334,100 @@ Then('only one identifier should have the primary checkbox checked', async ({ pa
 When('I click the remove button on the second identifier', async ({ page }) => {
   const removeBtn = page.getByTestId('remove-identifier-btn').nth(1)
   await removeBtn.click()
-  await page.waitForTimeout(300)
 })
 
 // --- Contact profile detail ---
 
-Given('a contact {string} exists', async ({ backendRequest: request }, name: string) => {
+Given('a contact {string} exists', async ({ backendRequest: request, casesWorld },name: string) => {
   const existing = await listContactsViaApi(request)
   const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name)
   if (found) {
-    contactWithDataId = (found as { id: string }).id
+    casesWorld.contactWithDataId = (found as { id: string }).id
   } else {
     const created = await createContactByNameViaApi(request, name)
-    contactWithDataId = (created as { id: string }).id
+    casesWorld.contactWithDataId = (created as { id: string }).id
   }
 })
 
-Given('a contact {string} exists with profile data', async ({ backendRequest: request }, name: string) => {
+Given('a contact {string} exists with profile data', async ({ backendRequest: request, casesWorld },name: string) => {
   const existing = await listContactsViaApi(request)
   const found = existing.contacts.find(c => (c as { displayName?: string }).displayName === name)
   if (found) {
-    contactWithDataId = (found as { id: string }).id
+    casesWorld.contactWithDataId = (found as { id: string }).id
   } else {
     const created = await createContactByNameViaApi(request, name)
-    contactWithDataId = (created as { id: string }).id
+    casesWorld.contactWithDataId = (created as { id: string }).id
   }
 })
 
-Given('a contact exists with no profile data', async ({ backendRequest: request }) => {
+Given('a contact exists with no profile data', async ({ backendRequest: request, casesWorld }) => {
   const created = await createContactByNameViaApi(request, `No-Profile ${Date.now()}`)
-  contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataId = (created as { id: string }).id
 })
 
-Given('a contact exists with phone and email identifiers', async ({ backendRequest: request }) => {
+Given('a contact exists with phone and email identifiers', async ({ backendRequest: request, casesWorld }) => {
   const created = await createContactByNameViaApi(request, `Identifiers Contact ${Date.now()}`)
-  contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataId = (created as { id: string }).id
 })
 
-Given('a contact exists with no identifiers', async ({ backendRequest: request }) => {
+Given('a contact exists with no identifiers', async ({ backendRequest: request, casesWorld }) => {
   const created = await createContactByNameViaApi(request, `No-ID Contact ${Date.now()}`)
-  contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataId = (created as { id: string }).id
 })
 
-Given('a contact exists with linked cases', async ({ backendRequest: request }) => {
+Given('a contact exists with linked cases', async ({ backendRequest: request, casesWorld }) => {
   const entityTypes = await listEntityTypesViaApi(request)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   const contact = await createContactByNameViaApi(request, `Cases Contact ${Date.now()}`)
-  contactWithDataId = (contact as { id: string }).id
+  casesWorld.contactWithDataId = (contact as { id: string }).id
   if (arrestType) {
     const etId = (arrestType as { id: string }).id
     const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-    await linkContactToRecordViaApi(request, (record as { id: string }).id, contactWithDataId, 'defendant')
+    await linkContactToRecordViaApi(request, (record as { id: string }).id, casesWorld.contactWithDataId, 'defendant')
   }
 })
 
-Given('a contact exists with no linked cases', async ({ backendRequest: request }) => {
+Given('a contact exists with no linked cases', async ({ backendRequest: request, casesWorld }) => {
   const created = await createContactByNameViaApi(request, `No-Cases Contact ${Date.now()}`)
-  contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataId = (created as { id: string }).id
 })
 
-Given('a contact exists with relationships', async ({ backendRequest: request }) => {
+Given('a contact exists with relationships', async ({ backendRequest: request, casesWorld }) => {
   const c1 = await createContactByNameViaApi(request, `Rel Source ${Date.now()}`)
   const c2 = await createContactByNameViaApi(request, `Rel Target ${Date.now()}`)
-  contactWithDataId = (c1 as { id: string }).id
+  casesWorld.contactWithDataId = (c1 as { id: string }).id
   await createRelationshipViaApi(
     request,
-    contactWithDataId,
+    casesWorld.contactWithDataId,
     (c2 as { id: string }).id,
     'family_member',
   ).catch(() => {})
 })
 
-Given('a contact exists with no relationships', async ({ backendRequest: request }) => {
+Given('a contact exists with no relationships', async ({ backendRequest: request, casesWorld }) => {
   const created = await createContactByNameViaApi(request, `No-Rel Contact ${Date.now()}`)
-  contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataId = (created as { id: string }).id
 })
 
-Given('a contact exists in groups', async ({ backendRequest: request }) => {
+Given('a contact exists in groups', async ({ backendRequest: request, casesWorld }) => {
   const contact = await createContactByNameViaApi(request, `Group Contact ${Date.now()}`)
-  contactWithDataId = (contact as { id: string }).id
+  casesWorld.contactWithDataId = (contact as { id: string }).id
   const group = await createAffinityGroupViaApi(
     request,
     `Test Group ${Date.now()}`,
-    [{ contactId: contactWithDataId }],
+    [{ contactId: casesWorld.contactWithDataId }],
   ).catch(() => null)
   if (!group) {
     // Group creation may fail if API is not available — continue anyway
   }
 })
 
-Given('a contact exists not in any groups', async ({ backendRequest: request }) => {
+Given('a contact exists not in any groups', async ({ backendRequest: request, casesWorld }) => {
   const created = await createContactByNameViaApi(request, `No-Group Contact ${Date.now()}`)
-  contactWithDataId = (created as { id: string }).id
+  casesWorld.contactWithDataId = (created as { id: string }).id
 })
 
-Given('no contacts have been created', async ({ backendRequest: request }) => {
+Given('no contacts have been created', async ({ backendRequest: request, casesWorld }) => {
   // Delete all existing contacts so we get a clean empty state.
   const { deleteContactViaApi } = await import('../../api-helpers')
   const existing = await listContactsViaApi(request, { limit: 100 }).catch(() => ({ contacts: [], total: 0, hasMore: false }))
@@ -471,7 +455,6 @@ When('I click on the {string} contact card', async ({ page }, name: string) => {
       await anyCard.click()
     }
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I click on the contact card', async ({ page }) => {
@@ -484,7 +467,6 @@ When('I click on the contact card', async ({ page }) => {
   }
   if (isVisible) {
     await card.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -575,7 +557,6 @@ Then('the contact relationships list should be visible', async ({ page }) => {
     const card = page.getByTestId('directory-contact-card').first()
     if (await card.isVisible({ timeout: 5000 }).catch(() => false)) {
       await card.click()
-      await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
     }
   }
 
@@ -585,7 +566,6 @@ Then('the contact relationships list should be visible', async ({ page }) => {
     const cls = await relTab.getAttribute('class') ?? ''
     if (!cls.includes('border-primary')) {
       await relTab.click()
-      await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
     }
   }
 
@@ -626,12 +606,12 @@ Then('the contact groups empty state should be visible', async ({ page }) => {
 
 // --- Privacy-aware display ---
 
-Given('a contact with PII data exists', async ({ backendRequest: request }) => {
+Given('a contact with PII data exists', async ({ backendRequest: request, casesWorld }) => {
   const contact = await createContactByNameViaApi(request, `PII Contact ${Date.now()}`)
-  contactWithDataId = (contact as { id: string }).id
+  casesWorld.contactWithDataId = (contact as { id: string }).id
 })
 
-Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request }) => {
+Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request, casesWorld }) => {
   // Create a volunteer with default role-volunteer (no contacts:view-pii permission)
   const { createVolunteerViaApi } = await import('../../api-helpers')
   const { loginAsVolunteer } = await import('../../helpers')
@@ -643,7 +623,6 @@ Given('I am logged in as a volunteer without PII access', async ({ page, backend
 
 When('I click on the restricted contact card', async ({ page }) => {
   // After re-login, ensure at least one contact is visible
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   await ensureContactVisibleInDirectory(page)
 
   // Look for a card showing "Restricted" text or lock icon
@@ -657,7 +636,6 @@ When('I click on the restricted contact card', async ({ page }) => {
       await firstCard.click()
     }
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the contact profile header should show a lock icon', async ({ page }) => {

@@ -3,9 +3,6 @@ Feature: CMS Records
   Admins and volunteers create and manage encrypted case records
   with blind-index filtering, contact linking, and assignment.
 
-  Background:
-    Given the server is reset
-
   @cases
   Scenario: Create record with encrypted content and blind indexes
     Given case management is enabled

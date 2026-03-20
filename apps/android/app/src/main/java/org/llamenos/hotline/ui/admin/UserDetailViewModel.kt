@@ -12,8 +12,8 @@ import kotlinx.serialization.Serializable
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.model.AuditEntry
 import org.llamenos.hotline.model.AuditLogResponse
-import org.llamenos.hotline.model.Volunteer
-import org.llamenos.hotline.model.VolunteersListResponse
+import org.llamenos.hotline.model.User
+import org.llamenos.hotline.model.UsersListResponse
 import javax.inject.Inject
 
 @Serializable
@@ -31,7 +31,7 @@ data class VolunteerShiftInfo(
 )
 
 data class VolunteerDetailUiState(
-    val volunteer: Volunteer? = null,
+    val volunteer: User? = null,
     val shifts: List<VolunteerShiftInfo> = emptyList(),
     val auditEntries: List<AuditEntry> = emptyList(),
     val isLoading: Boolean = false,
@@ -40,21 +40,21 @@ data class VolunteerDetailUiState(
 )
 
 @HiltViewModel
-class VolunteerDetailViewModel @Inject constructor(
+class UserDetailViewModel @Inject constructor(
     private val apiService: ApiService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(VolunteerDetailUiState())
     val uiState: StateFlow<VolunteerDetailUiState> = _uiState.asStateFlow()
 
-    fun loadVolunteer(pubkey: String) {
+    fun loadUser(pubkey: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                val volResponse = apiService.request<VolunteersListResponse>(
-                    "GET", "/api/admin/volunteers",
+                val volResponse = apiService.request<UsersListResponse>(
+                    "GET", "/api/users",
                 )
-                val volunteer = volResponse.volunteers.find { it.pubkey == pubkey }
+                val volunteer = volResponse.users.find { it.pubkey == pubkey }
                 _uiState.update {
                     it.copy(volunteer = volunteer, isLoading = false)
                 }
@@ -64,7 +64,7 @@ class VolunteerDetailViewModel @Inject constructor(
                 loadAuditEntries(pubkey)
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isLoading = false, error = e.message ?: "Failed to load volunteer")
+                    it.copy(isLoading = false, error = e.message ?: "Failed to load user")
                 }
             }
         }

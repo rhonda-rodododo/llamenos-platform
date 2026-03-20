@@ -73,33 +73,9 @@ export const PROVIDER_REQUIRED_FIELDS: Record<TelephonyProviderType, (keyof Tele
 }
 
 // --- Custom Fields ---
-
-export type CustomFieldContext = 'call-notes' | 'conversation-notes' | 'reports' | 'all'
-
-/** Custom field definition — stored as config in SessionManager DO */
-export interface CustomFieldDefinition {
-  id: string               // unique UUID
-  name: string             // internal key (machine-readable, e.g. "severity")
-  label: string            // display label (e.g. "Severity Rating")
-  type: 'text' | 'number' | 'select' | 'checkbox' | 'textarea' | 'file'
-  required: boolean
-  options?: string[]        // for 'select' type only
-  validation?: {
-    minLength?: number      // text/textarea
-    maxLength?: number      // text/textarea
-    min?: number            // number
-    max?: number            // number
-  }
-  visibleToVolunteers: boolean
-  editableByVolunteers: boolean
-  context: CustomFieldContext  // where this field appears
-  // File field type options
-  maxFileSize?: number        // bytes, for file type
-  allowedMimeTypes?: string[] // e.g., ['image/*', 'application/pdf']
-  maxFiles?: number           // for multi-file fields (default: 1)
-  order: number
-  createdAt: string
-}
+// Canonical type is inferred from Zod schema in @protocol/schemas/settings
+export type { CustomFieldContext, CustomFieldDefinition } from '@protocol/schemas/settings'
+import type { CustomFieldContext, CustomFieldDefinition } from '@protocol/schemas/settings'
 
 // --- Encrypted File Upload Types ---
 
@@ -113,38 +89,10 @@ export interface EncryptedFileMetadata {
 }
 
 // FileKeyEnvelope is re-exported from @protocol/schemas/common above
+// FileRecord and UploadInit canonical types are in @protocol/schemas/files
+export type { FileRecord, UploadInit } from '@protocol/schemas/files'
 
-export interface FileRecord {
-  id: string
-  conversationId: string
-  messageId?: string
-  uploadedBy: string         // pubkey of uploader
-  recipientEnvelopes: FileKeyEnvelope[]
-  encryptedMetadata: Array<{
-    pubkey: string
-    encryptedContent: string
-    ephemeralPubkey: string
-  }>
-  totalSize: number          // encrypted size in bytes
-  totalChunks: number
-  status: 'uploading' | 'complete' | 'failed'
-  completedChunks: number
-  createdAt: string
-  completedAt?: string
-}
-
-export interface UploadInit {
-  totalSize: number
-  totalChunks: number
-  conversationId: string
-  recipientEnvelopes: FileKeyEnvelope[]
-  encryptedMetadata: Array<{
-    pubkey: string
-    encryptedContent: string
-    ephemeralPubkey: string
-  }>
-}
-
+// Client-side plaintext payload — not a wire format
 /** What gets encrypted before storage — replaces plain text */
 export interface NotePayload {
   text: string
@@ -242,9 +190,9 @@ export interface MessagingConfig {
   whatsapp: WhatsAppConfig | null
   signal: SignalConfig | null
   rcs: RCSConfig | null
-  autoAssign: boolean               // auto-assign to on-shift volunteers
+  autoAssign: boolean               // auto-assign to on-shift users
   inactivityTimeout: number         // minutes before auto-close
-  maxConcurrentPerVolunteer: number  // conversation limit per volunteer
+  maxConcurrentPerUser: number  // conversation limit per user
 }
 
 export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
@@ -255,10 +203,12 @@ export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
   rcs: null,
   autoAssign: true,
   inactivityTimeout: 60,
-  maxConcurrentPerVolunteer: 3,
+  maxConcurrentPerUser: 3,
 }
 
 // --- Message Blasts ---
+// These are storage-level types with more fields than API response schemas in @protocol/schemas/blasts.
+// API response types: Blast, Subscriber, BlastSettings from @protocol/schemas/blasts
 
 export interface Subscriber {
   id: string
@@ -364,6 +314,7 @@ export interface EnabledChannels {
 }
 
 // --- Report Types ---
+// Storage type with fields: CustomFieldDefinition[] — richer than the API response schema in @protocol/schemas/settings
 
 export interface ReportType {
   id: string               // UUID
@@ -426,18 +377,8 @@ export const ENTITY_CATEGORY_LABELS: Record<string, string> = {
 }
 
 // --- Hub Types ---
-
-export interface Hub {
-  id: string              // UUID
-  name: string            // Display name (e.g., "NYC Hotline")
-  slug: string            // URL-safe identifier
-  description?: string
-  status: 'active' | 'suspended' | 'archived'
-  phoneNumber?: string    // Primary hotline number (for routing)
-  createdBy: string       // Super admin pubkey
-  createdAt: string
-  updatedAt: string
-}
+// Canonical Hub type is in @protocol/schemas/hubs
+export type { Hub } from '@protocol/schemas/hubs'
 
 export interface HubRoleAssignment {
   hubId: string

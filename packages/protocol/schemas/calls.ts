@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { paginationSchema, paginatedMeta } from './common'
+import { paginationSchema, paginatedMeta, recipientEnvelopeSchema } from './common'
 
 // --- Response schemas ---
 
@@ -10,14 +10,31 @@ export const callRecordResponseSchema = z.object({
   startedAt: z.string(),
   endedAt: z.string().optional(),
   duration: z.number().optional(),
-  status: z.string(),
+  status: z.enum(['ringing', 'in-progress', 'completed', 'unanswered']).optional(),
   hasTranscription: z.boolean().optional(),
   hasVoicemail: z.boolean().optional(),
   hasRecording: z.boolean().optional(),
+  recordingSid: z.string().optional(),
+  encryptedContent: z.string().optional(),
+  adminEnvelopes: z.array(recipientEnvelopeSchema).optional(),
+  // Client-side decrypted field (populated after envelope decryption)
+  callerNumber: z.string().optional(),
 })
 
+export const activeCallResponseSchema = z.object({
+  id: z.string(),
+  callerNumber: z.string(),
+  answeredBy: z.string().nullable().optional(),
+  startedAt: z.string(),
+  status: z.enum(['ringing', 'in-progress', 'completed', 'unanswered']),
+})
+
+export type CallRecord = z.infer<typeof callRecordResponseSchema>
+export type ActiveCall = z.infer<typeof activeCallResponseSchema>
+export type UserPresence = z.infer<typeof callPresenceResponseSchema>['users'][number]
+
 export const callPresenceResponseSchema = z.object({
-  volunteers: z.array(z.object({
+  users: z.array(z.object({
     pubkey: z.string(),
     status: z.enum(['available', 'on-call', 'online']),
   })),
@@ -33,8 +50,15 @@ export const todayCountResponseSchema = z.object({
   count: z.number(),
 })
 
+export const callerContactSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  caseCount: z.number().int().optional(),
+  entityType: z.string().optional(),
+})
+
 export const callerIdentifyResponseSchema = z.object({
-  contact: z.unknown().nullable(),
+  contact: callerContactSummarySchema.nullable(),
   activeCaseCount: z.number(),
   recentCases: z.array(z.object({
     id: z.string(),

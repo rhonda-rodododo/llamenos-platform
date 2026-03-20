@@ -230,25 +230,25 @@ function SystemHealthPage() {
 
         {/* Volunteers */}
         <StatusCard
-          title={t('admin.system.volunteers')}
+          title={t('admin.system.users')}
           icon={<Users className="h-4 w-4" />}
           testId="system-card-volunteers"
         >
           <StatusRow
             label={t('admin.system.totalActive')}
-            value={String(health?.volunteers.totalActive ?? 0)}
+            value={String(health?.users.totalActive ?? 0)}
           />
           <StatusRow
             label={t('admin.system.onlineNow')}
-            value={String(health?.volunteers.onlineNow ?? 0)}
+            value={String(health?.users.onlineNow ?? 0)}
           />
           <StatusRow
             label={t('admin.system.onShift')}
-            value={String(health?.volunteers.onShift ?? 0)}
+            value={String(health?.users.onShift ?? 0)}
           />
           <StatusRow
             label={t('admin.system.shiftCoverage')}
-            value={`${health?.volunteers.shiftCoverage ?? 0}%`}
+            value={`${health?.users.shiftCoverage ?? 0}%`}
           />
         </StatusCard>
       </div>

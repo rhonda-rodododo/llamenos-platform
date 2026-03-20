@@ -29,7 +29,7 @@ class ModelTest {
 
     @Test
     fun `ShiftResponse deserializes from JSON`() {
-        val input = """{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0,3.0,5.0],"volunteerPubkeys":[],"createdAt":"2026-03-01"}"""
+        val input = """{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0,3.0,5.0],"userPubkeys":[],"createdAt":"2026-03-01"}"""
         val shift = json.decodeFromString<ShiftResponse>(input)
 
         assertEquals("s1", shift.id)
@@ -37,15 +37,15 @@ class ModelTest {
         assertEquals("09:00", shift.startTime)
         assertEquals("17:00", shift.endTime)
         assertEquals(listOf(1.0, 3.0, 5.0), shift.days)
-        assertTrue(shift.volunteerPubkeys.isEmpty())
+        assertTrue(shift.userPubkeys.isEmpty())
     }
 
     @Test
-    fun `ShiftResponse deserializes with volunteerPubkeys`() {
-        val input = """{"id":"s2","name":"Evening","startTime":"18:00","endTime":"02:00","days":[0.0],"volunteerPubkeys":["pk1","pk2"],"createdAt":"2026-03-01"}"""
+    fun `ShiftResponse deserializes with userPubkeys`() {
+        val input = """{"id":"s2","name":"Evening","startTime":"18:00","endTime":"02:00","days":[0.0],"userPubkeys":["pk1","pk2"],"createdAt":"2026-03-01"}"""
         val shift = json.decodeFromString<ShiftResponse>(input)
 
-        assertEquals(listOf("pk1", "pk2"), shift.volunteerPubkeys)
+        assertEquals(listOf("pk1", "pk2"), shift.userPubkeys)
     }
 
     @Test
@@ -80,7 +80,7 @@ class ModelTest {
 
     @Test
     fun `ShiftsListResponse deserializes with total count`() {
-        val input = """{"shifts":[{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0],"volunteerPubkeys":[],"createdAt":"2026-03-01"}],"total":42}"""
+        val input = """{"shifts":[{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0],"userPubkeys":[],"createdAt":"2026-03-01"}],"total":42}"""
         val response = json.decodeFromString<ShiftsListResponse>(input)
 
         assertEquals(1, response.shifts.size)

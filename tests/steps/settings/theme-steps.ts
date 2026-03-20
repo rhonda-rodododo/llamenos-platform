@@ -14,17 +14,14 @@ import { Timeouts } from '../../helpers'
 
 When('I click the dark theme button', async ({ page }) => {
   await page.getByTestId(TestIds.THEME_DARK).click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I click the light theme button', async ({ page }) => {
   await page.getByTestId(TestIds.THEME_LIGHT).click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I click the system theme button', async ({ page }) => {
   await page.getByTestId(TestIds.THEME_SYSTEM).click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 // --- Theme assertions on login page ---

@@ -3,9 +3,6 @@ Feature: State Transition Validation
   Verify that real-time state changes (bans, shifts, conversation status)
   take effect immediately and produce correct routing and status outcomes.
 
-  Background:
-    Given the server is reset
-
   # ─── Ban/Unban Affects Routing ───────────────────────────────────────
 
   Scenario Outline: Ban and unban affect call routing in real-time

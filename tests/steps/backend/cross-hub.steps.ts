@@ -6,7 +6,7 @@
  * steps from entity-schema.steps.ts and common.steps.ts respectively.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
 import {
   enableCrossHubSharingViaApi,
   getCrossHubSharingViaApi,
@@ -18,29 +18,35 @@ interface CrossHubState {
   crossHubEnabled?: boolean
 }
 
-let crossHub: CrossHubState
+const CROSS_HUB_KEY = 'cross_hub'
 
-Before({ tags: '@cases' }, async () => {
-  crossHub = {}
+function getCrossHubState(world: Record<string, unknown>): CrossHubState {
+  return getState<CrossHubState>(world, CROSS_HUB_KEY)
+}
+
+
+Before({ tags: '@cases' }, async ({ world }) => {
+  const crossHub = {}
+  setState(world, CROSS_HUB_KEY, crossHub)
 })
 
 // ── Given ──────────────────────────────────────────────────────────
 
-Given('cross-hub sharing is enabled', async ({ request }) => {
+Given('cross-hub sharing is enabled', async ({ request, world }) => {
   const result = await enableCrossHubSharingViaApi(request, true)
-  crossHub.crossHubEnabled = result.enabled
+  getCrossHubState(world).crossHubEnabled = result.enabled
 })
 
 // ── When ───────────────────────────────────────────────────────────
 
-When('the admin enables cross-hub sharing', async ({ request }) => {
+When('the admin enables cross-hub sharing', async ({ request, world }) => {
   const result = await enableCrossHubSharingViaApi(request, true)
-  crossHub.crossHubEnabled = result.enabled
+  getCrossHubState(world).crossHubEnabled = result.enabled
 })
 
-When('the admin disables cross-hub sharing', async ({ request }) => {
+When('the admin disables cross-hub sharing', async ({ request, world }) => {
   const result = await enableCrossHubSharingViaApi(request, false)
-  crossHub.crossHubEnabled = result.enabled
+  getCrossHubState(world).crossHubEnabled = result.enabled
 })
 
 // ── Then ───────────────────────────────────────────────────────────

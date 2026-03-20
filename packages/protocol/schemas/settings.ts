@@ -14,6 +14,35 @@ export type MessagingChannelType = z.infer<typeof messagingChannelTypeSchema>
 export const channelTypeSchema = z.enum(['voice', 'sms', 'whatsapp', 'signal', 'rcs', 'reports'])
 export type ChannelType = z.infer<typeof channelTypeSchema>
 
+// --- Custom Field Definition (canonical storage type) ---
+
+export const customFieldContextSchema = z.enum(['call-notes', 'conversation-notes', 'reports', 'all'])
+export type CustomFieldContext = z.infer<typeof customFieldContextSchema>
+
+export const customFieldDefinitionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  label: z.string(),
+  type: z.enum(['text', 'number', 'select', 'checkbox', 'textarea', 'file']),
+  required: z.boolean(),
+  options: z.array(z.string()).optional(),
+  validation: z.object({
+    minLength: z.number().optional(),
+    maxLength: z.number().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+  }).optional(),
+  visibleToUsers: z.boolean(),
+  editableByUsers: z.boolean(),
+  context: customFieldContextSchema,
+  maxFileSize: z.number().optional(),
+  allowedMimeTypes: z.array(z.string()).optional(),
+  maxFiles: z.number().optional(),
+  order: z.number(),
+  createdAt: z.string(),
+})
+export type CustomFieldDefinition = z.infer<typeof customFieldDefinitionSchema>
+
 // --- Response schemas ---
 
 export const roleResponseSchema = z.object({
@@ -21,12 +50,14 @@ export const roleResponseSchema = z.object({
   name: z.string(),
   slug: z.string(),
   permissions: z.array(z.string()),
-  isDefault: z.boolean().optional(),
-  isSystem: z.boolean().optional(),
+  isDefault: z.boolean(),
+  isSystem: z.boolean(),
   description: z.string(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 })
+
+export type RoleDefinition = z.infer<typeof roleResponseSchema>
 
 export const customFieldResponseSchema = z.object({
   name: z.string(),
@@ -36,7 +67,7 @@ export const customFieldResponseSchema = z.object({
   options: z.array(z.string()).optional(),
   order: z.number().optional(),
   context: z.string().optional(),
-  visibleToVolunteers: z.boolean().optional(),
+  visibleToUsers: z.boolean().optional(),
 })
 
 export const reportTypeResponseSchema = z.object({
@@ -62,7 +93,7 @@ export const customFieldsBodySchema = z.looseObject({
     options: z.array(z.string().max(200)).optional(),
     order: z.number().int().optional(),
     context: z.string().optional(),
-    visibleToVolunteers: z.boolean().optional(),
+    visibleToUsers: z.boolean().optional(),
   })),
 })
 
@@ -94,15 +125,19 @@ export const spamSettingsSchema = z.looseObject({
   blockDurationMinutes: z.number().int().min(1).max(1440).optional(),
 })
 
+export type SpamSettings = z.infer<typeof spamSettingsSchema>
+
 export const callSettingsSchema = z.looseObject({
   queueTimeoutSeconds: z.number().int().min(30).max(300).optional(),
   voicemailMaxSeconds: z.number().int().min(30).max(300).optional(),
 })
 
+export type CallSettings = z.infer<typeof callSettingsSchema>
+
 export const messagingConfigSchema = z.looseObject({
   enabledChannels: z.array(messagingChannelTypeSchema).optional(),
   autoAssignEnabled: z.boolean().optional(),
-  maxConcurrentPerVolunteer: z.number().int().min(1).max(20).optional(),
+  maxConcurrentPerUser: z.number().int().min(1).max(20).optional(),
   inactivityTimeout: z.number().int().min(5).max(1440).optional(),
   welcomeMessage: z.string().max(500).optional(),
   awayMessage: z.string().max(500).optional(),
@@ -144,12 +179,14 @@ export const updateRoleSchema = z.looseObject({
 
 export const webauthnSettingsSchema = z.looseObject({
   requireForAdmins: z.boolean().optional(),
-  requireForVolunteers: z.boolean().optional(),
+  requireForUsers: z.boolean().optional(),
 })
+
+export type WebAuthnSettings = z.infer<typeof webauthnSettingsSchema>
 
 export const transcriptionSettingsSchema = z.looseObject({
   globalEnabled: z.boolean().optional(),
-  allowVolunteerOptOut: z.boolean().optional(),
+  allowUserOptOut: z.boolean().optional(),
 })
 
 export const ivrLanguagesSchema = z.looseObject({
@@ -175,6 +212,15 @@ export const reportTypeListResponseSchema = z.object({
   reportTypes: z.array(reportTypeResponseSchema),
 })
 
+export const ivrAudioRecordingSchema = z.object({
+  promptType: z.string(),
+  language: z.string(),
+  size: z.number(),
+  uploadedAt: z.string(),
+})
+
+export type IvrAudioRecording = z.infer<typeof ivrAudioRecordingSchema>
+
 export const ivrAudioPromptsResponseSchema = z.object({
   prompts: z.array(z.object({
     type: z.string(),
@@ -198,15 +244,21 @@ export const permissionsCatalogResponseSchema = z.object({
   }))),
 })
 
+export const migrationNamespaceSchema = z.object({
+  name: z.string(),
+  status: z.string(),
+  recordCount: z.number().int().optional(),
+})
+
 export const migrationStatusResponseSchema = z.object({
-  namespaces: z.array(z.unknown()),
+  namespaces: z.array(migrationNamespaceSchema),
   note: z.string(),
 })
 
 export const cleanupMetricsResponseSchema = z.object({
-  settings: z.record(z.string(), z.unknown()),
-  identity: z.record(z.string(), z.unknown()),
-  conversation: z.record(z.string(), z.unknown()),
+  settings: z.record(z.string(), z.number()),
+  identity: z.record(z.string(), z.number()),
+  conversation: z.record(z.string(), z.number()),
 })
 
 export const ttlOverridesResponseSchema = z.record(z.string(), z.number())

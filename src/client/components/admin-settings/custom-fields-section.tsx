@@ -65,8 +65,8 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
           required: editing.required ?? false,
           options: editing.options,
           validation: editing.validation,
-          visibleToVolunteers: editing.visibleToVolunteers ?? true,
-          editableByVolunteers: editing.editableByVolunteers ?? true,
+          visibleToUsers: editing.visibleToUsers ?? true,
+          editableByUsers: editing.editableByUsers ?? true,
           context: editing.context ?? 'all',
           order: fields.length,
           createdAt: new Date().toISOString(),
@@ -115,7 +115,7 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
                   <Badge variant="outline" className="text-[10px]">{t(`customFields.types.${field.type}`)}</Badge>
                   <Badge variant="outline" className="text-[10px]">{CUSTOM_FIELD_CONTEXT_LABELS[field.context as CustomFieldContext] || field.context}</Badge>
                   {field.required && <Badge variant="secondary" className="text-[10px]">{t('customFields.required')}</Badge>}
-                  {!field.visibleToVolunteers && <Badge variant="secondary" className="text-[10px]">{t('customFields.adminOnly')}</Badge>}
+                  {!field.visibleToUsers && <Badge variant="secondary" className="text-[10px]">{t('customFields.adminOnly')}</Badge>}
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setEditing({ ...field })}>
@@ -299,17 +299,17 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
               <Switch
-                checked={editing.visibleToVolunteers ?? true}
-                onCheckedChange={checked => setEditing(prev => ({ ...prev!, visibleToVolunteers: checked }))}
+                checked={editing.visibleToUsers ?? true}
+                onCheckedChange={checked => setEditing(prev => ({ ...prev!, visibleToUsers: checked }))}
               />
-              <Label className="text-sm">{t('customFields.visibleToVolunteers')}</Label>
+              <Label className="text-sm">{t('customFields.visibleToUsers')}</Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
-                checked={editing.editableByVolunteers ?? true}
-                onCheckedChange={checked => setEditing(prev => ({ ...prev!, editableByVolunteers: checked }))}
+                checked={editing.editableByUsers ?? true}
+                onCheckedChange={checked => setEditing(prev => ({ ...prev!, editableByUsers: checked }))}
               />
-              <Label className="text-sm">{t('customFields.editableByVolunteers')}</Label>
+              <Label className="text-sm">{t('customFields.editableByUsers')}</Label>
             </div>
           </div>
 
@@ -331,8 +331,8 @@ export function CustomFieldsSection({ fields, onChange, expanded, onToggle, stat
             onClick={() => setEditing({
               type: 'text',
               required: false,
-              visibleToVolunteers: true,
-              editableByVolunteers: true,
+              visibleToUsers: true,
+              editableByUsers: true,
             })}
           >
             <Plus className="h-4 w-4" />

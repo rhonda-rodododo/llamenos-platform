@@ -4,7 +4,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from './fixtures'
-import { state } from './common.steps'
+import { getScenarioState } from './common.steps'
 import {
   simulateIncomingMessage,
   simulateDeliveryStatus,
@@ -14,98 +14,100 @@ import { apiGet, apiPost, apiPatch } from '../../api-helpers'
 
 // ── Message Simulation ────────────────────────────────────────────
 
-Given('a new phone number sends an SMS', async ({ request }) => {
+Given('a new phone number sends an SMS', async ({ request, world }) => {
   const sender = uniqueCallerNumber()
   const result = await simulateIncomingMessage(request, {
     senderNumber: sender,
     body: 'Hello, I need help',
     channel: 'sms',
   })
-  state.conversationId = result.conversationId
-  state.messageId = result.messageId
+  getScenarioState(world).conversationId = result.conversationId
+  getScenarioState(world).messageId = result.messageId
 })
 
-Given('an existing conversation with a phone number', async ({ request }) => {
+Given('an existing conversation with a phone number', async ({ request, world }) => {
   const sender = uniqueCallerNumber()
   const result = await simulateIncomingMessage(request, {
     senderNumber: sender,
     body: 'First message',
     channel: 'sms',
   })
-  state.conversationId = result.conversationId
+  getScenarioState(world).conversationId = result.conversationId
   // Store the sender for reuse in the next step
-  state.lastApiResponse = { status: 200, data: { senderNumber: sender } }
+  getScenarioState(world).lastApiResponse = { status: 200, data: { senderNumber: sender } }
 })
 
-When('the webhook is received', async ({}) => {
+When('the webhook is received', async ({ world }) => {
   // The simulateIncomingMessage call in the Given step already processes the webhook.
   // This step exists for Gherkin readability — state is already set.
-  expect(state.conversationId).toBeDefined()
+  expect(getScenarioState(world).conversationId).toBeDefined()
 })
 
-When('a new message arrives from the same number', async ({ request }) => {
-  expect(state.lastApiResponse).toBeDefined()
-  const { senderNumber } = state.lastApiResponse!.data as { senderNumber: string }
+When('a new message arrives from the same number', async ({ request, world }) => {
+  expect(getScenarioState(world).lastApiResponse).toBeDefined()
+  const { senderNumber } = getScenarioState(world).lastApiResponse!.data as { senderNumber: string }
   const result = await simulateIncomingMessage(request, {
     senderNumber,
     body: 'Follow-up message',
     channel: 'sms',
   })
   // Should reuse the same conversation
-  state.messageId = result.messageId
+  getScenarioState(world).messageId = result.messageId
   // Store the new conversationId to verify it matches
-  state.lastApiResponse = {
+  getScenarioState(world).lastApiResponse = {
     status: 200,
     data: { newConversationId: result.conversationId, senderNumber },
   }
 })
 
-Then('a new conversation should be created', async ({}) => {
-  expect(state.conversationId).toBeDefined()
-  expect(state.conversationId!.length).toBeGreaterThan(0)
+Then('a new conversation should be created', async ({ world }) => {
+  expect(getScenarioState(world).conversationId).toBeDefined()
+  expect(getScenarioState(world).conversationId!.length).toBeGreaterThan(0)
 })
 
-Then('the message should be appended to the existing thread', async ({}) => {
-  expect(state.lastApiResponse).toBeDefined()
-  const { newConversationId } = state.lastApiResponse!.data as { newConversationId: string }
+Then('the message should be appended to the existing thread', async ({ world }) => {
+  expect(getScenarioState(world).lastApiResponse).toBeDefined()
+  const { newConversationId } = getScenarioState(world).lastApiResponse!.data as { newConversationId: string }
   // The new message should belong to the same conversation
-  expect(newConversationId).toBe(state.conversationId)
+  expect(newConversationId).toBe(getScenarioState(world).conversationId)
 })
 
 // ── Conversation Assignment ─────────────────────────────────────
 
-Given('a new conversation arrives', async ({ request }) => {
+Given('a new conversation arrives', async ({ request, world }) => {
   const sender = uniqueCallerNumber()
   const result = await simulateIncomingMessage(request, {
     senderNumber: sender,
     body: 'New conversation for assignment',
     channel: 'sms',
   })
-  state.conversationId = result.conversationId
+  getScenarioState(world).conversationId = result.conversationId
 })
 
-Given('volunteers are available', async ({ request }) => {
+Given('volunteers are available', async ({ request, world }) => {
   // Create volunteers if not already set up by a previous step
-  if (state.volunteers.length === 0) {
+  if (getScenarioState(world).volunteers.length === 0) {
     const { createVolunteerViaApi, createShiftViaApi } = await import('../../api-helpers')
+    const hubId = getScenarioState(world).hubId
     const vol = await createVolunteerViaApi(request, { name: `Msg Vol ${Date.now()}` })
-    state.volunteers.push({ ...vol, onShift: true })
+    getScenarioState(world).volunteers.push({ ...vol, onShift: true })
     await createShiftViaApi(request, {
       name: `Msg Shift ${Date.now()}`,
       startTime: '00:00',
       endTime: '23:59',
       days: [0, 1, 2, 3, 4, 5, 6],
-      volunteerPubkeys: [vol.pubkey],
+      userPubkeys: [vol.pubkey],
+      hubId,
     })
   }
-  expect(state.volunteers.length).toBeGreaterThan(0)
+  expect(getScenarioState(world).volunteers.length).toBeGreaterThan(0)
 })
 
-Then('the conversation should be assigned to a volunteer', async ({ request }) => {
-  expect(state.conversationId).toBeDefined()
+Then('the conversation should be assigned to a volunteer', async ({ request, world }) => {
+  expect(getScenarioState(world).conversationId).toBeDefined()
   const { status, data } = await apiGet<{ assignedTo?: string }>(
     request,
-    `/conversations/${state.conversationId}`,
+    `/conversations/${getScenarioState(world).conversationId}`,
   )
   expect(status).toBe(200)
   // Auto-assignment may be async — check the conversation exists
@@ -115,14 +117,15 @@ Then('the conversation should be assigned to a volunteer', async ({ request }) =
 
 Given(
   '{int} volunteers with {int}, {int}, and {int} active conversations',
-  async ({ request }, count: number, _load1: number, _load2: number, _load3: number) => {
+  async ({ request, world }, count: number, _load1: number, _load2: number, _load3: number) => {
     const { createVolunteerViaApi, createShiftViaApi } = await import('../../api-helpers')
+    const hubId = getScenarioState(world).hubId
     // Create volunteers if needed
-    while (state.volunteers.length < count) {
+    while (getScenarioState(world).volunteers.length < count) {
       const vol = await createVolunteerViaApi(request, {
-        name: `AutoAssign Vol ${Date.now()}-${state.volunteers.length}`,
+        name: `AutoAssign Vol ${Date.now()}-${getScenarioState(world).volunteers.length}`,
       })
-      state.volunteers.push({ ...vol, onShift: true })
+      getScenarioState(world).volunteers.push({ ...vol, onShift: true })
     }
     // Create a shift covering all volunteers
     await createShiftViaApi(request, {
@@ -130,20 +133,21 @@ Given(
       startTime: '00:00',
       endTime: '23:59',
       days: [0, 1, 2, 3, 4, 5, 6],
-      volunteerPubkeys: state.volunteers.map(v => v.pubkey),
+      userPubkeys: getScenarioState(world).volunteers.map(v => v.pubkey),
+      hubId,
     })
-    expect(state.volunteers.length).toBeGreaterThanOrEqual(count)
+    expect(getScenarioState(world).volunteers.length).toBeGreaterThanOrEqual(count)
   },
 )
 
 Then(
   'it should be assigned to the volunteer with {int} conversation',
-  async ({ request }, _expectedLoad: number) => {
+  async ({ request, world }, _expectedLoad: number) => {
     // Verify the conversation was assigned (load balancing logic is server-side)
-    expect(state.conversationId).toBeDefined()
+    expect(getScenarioState(world).conversationId).toBeDefined()
     const { status, data } = await apiGet<{ assignedTo?: string }>(
       request,
-      `/conversations/${state.conversationId}`,
+      `/conversations/${getScenarioState(world).conversationId}`,
     )
     expect(status).toBe(200)
     expect(data).toBeTruthy()
@@ -152,7 +156,7 @@ Then(
 
 // ── Channel Type ────────────────────────────────────────────────
 
-Given('messages from SMS and WhatsApp channels', async ({ request }) => {
+Given('messages from SMS and WhatsApp channels', async ({ request, world }) => {
   const smsResult = await simulateIncomingMessage(request, {
     senderNumber: uniqueCallerNumber(),
     body: 'SMS message',
@@ -163,15 +167,15 @@ Given('messages from SMS and WhatsApp channels', async ({ request }) => {
     body: 'WhatsApp message',
     channel: 'whatsapp',
   })
-  state.lastApiResponse = {
+  getScenarioState(world).lastApiResponse = {
     status: 200,
     data: { smsId: smsResult.conversationId, waId: waResult.conversationId },
   }
 })
 
-Then('each conversation should have the correct channel type', async ({ request }) => {
-  expect(state.lastApiResponse).toBeDefined()
-  const { smsId, waId } = state.lastApiResponse!.data as { smsId: string; waId: string }
+Then('each conversation should have the correct channel type', async ({ request, world }) => {
+  expect(getScenarioState(world).lastApiResponse).toBeDefined()
+  const { smsId, waId } = getScenarioState(world).lastApiResponse!.data as { smsId: string; waId: string }
 
   const smsConvo = await apiGet<{ channelType: string }>(
     request,
@@ -190,38 +194,38 @@ Then('each conversation should have the correct channel type', async ({ request 
 
 // ── Conversation Status ─────────────────────────────────────────
 
-Given('a conversation with status {string}', async ({ request }, targetStatus: string) => {
+Given('a conversation with status {string}', async ({ request, world }, targetStatus: string) => {
   const sender = uniqueCallerNumber()
   const result = await simulateIncomingMessage(request, {
     senderNumber: sender,
     body: 'Conversation to be closed',
     channel: 'sms',
   })
-  state.conversationId = result.conversationId
+  getScenarioState(world).conversationId = result.conversationId
 
   if (targetStatus === 'closed') {
     await apiPatch(request, `/conversations/${result.conversationId}`, { status: 'closed' })
   }
 
-  state.lastApiResponse = { status: 200, data: { senderNumber: sender } }
+  getScenarioState(world).lastApiResponse = { status: 200, data: { senderNumber: sender } }
 })
 
-When('a new inbound message arrives', async ({ request }) => {
-  expect(state.lastApiResponse).toBeDefined()
-  const { senderNumber } = state.lastApiResponse!.data as { senderNumber: string }
+When('a new inbound message arrives', async ({ request, world }) => {
+  expect(getScenarioState(world).lastApiResponse).toBeDefined()
+  const { senderNumber } = getScenarioState(world).lastApiResponse!.data as { senderNumber: string }
   const result = await simulateIncomingMessage(request, {
     senderNumber,
     body: 'Reopen message',
     channel: 'sms',
   })
-  state.conversationId = result.conversationId
+  getScenarioState(world).conversationId = result.conversationId
 })
 
-Then('the conversation status should change to {string}', async ({ request }, expectedStatus: string) => {
-  expect(state.conversationId).toBeDefined()
+Then('the conversation status should change to {string}', async ({ request, world }, expectedStatus: string) => {
+  expect(getScenarioState(world).conversationId).toBeDefined()
   const { status, data } = await apiGet<{ status: string }>(
     request,
-    `/conversations/${state.conversationId}`,
+    `/conversations/${getScenarioState(world).conversationId}`,
   )
   expect(status).toBe(200)
   expect(data.status).toBe(expectedStatus)

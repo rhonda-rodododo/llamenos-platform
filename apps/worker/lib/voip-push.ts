@@ -12,8 +12,7 @@
  * 4. Regular push goes through two-tier ECIES encryption
  */
 
-import type { Env, DOStub } from '../types'
-import type { DurableObjects } from '../lib/do-access'
+import type { Env } from '../types'
 import type { IdentityService } from '../services/identity'
 import { FcmClient } from './fcm-client'
 
@@ -22,68 +21,6 @@ const APNS_BUNDLE_ID = 'org.llamenos.mobile'
 interface VoipDeviceRecord {
   platform: 'ios' | 'android'
   voipToken: string
-}
-
-/**
- * Dispatch VoIP push to all mobile devices of the given volunteers.
- * Best-effort — failures are logged but don't block the call flow.
- */
-export async function dispatchVoipPush(
-  volunteerPubkeys: string[],
-  callId: string,
-  callerDisplay: string,
-  env: Env,
-  dos: DurableObjects,
-): Promise<void> {
-  if (volunteerPubkeys.length === 0) return
-
-  const hasApns = !!(env.APNS_KEY_P8 && env.APNS_KEY_ID && env.APNS_TEAM_ID)
-  const hasFcm = !!env.FCM_SERVICE_ACCOUNT_KEY
-  if (!hasApns && !hasFcm) return
-
-  // Fetch VoIP tokens for all volunteers in one batch
-  const tokensRes = await dos.identity.fetch(
-    new Request('http://do/devices/voip-tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pubkeys: volunteerPubkeys }),
-    }),
-  )
-
-  if (!tokensRes.ok) {
-    console.warn('[voip-push] Failed to fetch VoIP tokens')
-    return
-  }
-
-  const { devices } = await tokensRes.json() as {
-    devices: Array<{ pubkey: string } & VoipDeviceRecord>
-  }
-
-  if (devices.length === 0) return
-
-  console.debug(`[voip-push] Dispatching to ${devices.length} devices for call ${callId}`)
-
-  const promises: Promise<void>[] = []
-
-  for (const device of devices) {
-    if (device.platform === 'ios' && hasApns) {
-      promises.push(sendApnsVoipPush(
-        device.voipToken,
-        callId,
-        callerDisplay,
-        env,
-      ))
-    } else if (device.platform === 'android' && hasFcm) {
-      promises.push(sendFcmVoipPush(
-        device.voipToken,
-        callId,
-        callerDisplay,
-        env,
-      ))
-    }
-  }
-
-  await Promise.allSettled(promises)
 }
 
 /**

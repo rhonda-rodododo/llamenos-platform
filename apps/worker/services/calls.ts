@@ -128,7 +128,7 @@ export class CallsService {
   async getPresence(hubId: string): Promise<{
     activeCalls: number
     availableVolunteers: number
-    volunteers: Array<{ pubkey: string; status: 'available' | 'on-call' }>
+    users: Array<{ pubkey: string; status: 'available' | 'on-call' }>
   }> {
     const active = await this.getActiveCalls(hubId)
 
@@ -143,7 +143,7 @@ export class CallsService {
       onShiftPubkeys = await this.shiftsService.getCurrentVolunteers(hubId)
     }
 
-    const volunteers = onShiftPubkeys.map(pubkey => ({
+    const presenceUsers = onShiftPubkeys.map(pubkey => ({
       pubkey,
       status: onCallPubkeys.has(pubkey) ? 'on-call' as const : 'available' as const,
     }))
@@ -153,7 +153,7 @@ export class CallsService {
     return {
       activeCalls: active.length,
       availableVolunteers: available,
-      volunteers,
+      users: presenceUsers,
     }
   }
 

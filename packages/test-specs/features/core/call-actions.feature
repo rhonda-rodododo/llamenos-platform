@@ -6,7 +6,6 @@ Feature: In-Call Quick Actions
 
   @backend @calls @bans
   Scenario: Ban and hang up during active call
-    Given the server is reset
     And 2 volunteers are on shift
     And volunteer 0 is on an active call with a unique caller
     When volunteer 0 bans and hangs up the call
@@ -16,7 +15,6 @@ Feature: In-Call Quick Actions
 
   @backend @calls @bans
   Scenario: Ban and hang up with custom reason
-    Given the server is reset
     And 2 volunteers are on shift
     And volunteer 0 is on an active call with a unique caller
     When volunteer 0 bans and hangs up with reason "Threatening language"
@@ -25,7 +23,6 @@ Feature: In-Call Quick Actions
 
   @backend @calls @bans
   Scenario: Cannot ban another volunteer's call
-    Given the server is reset
     And 2 volunteers are on shift
     And volunteer 0 is on an active call with a unique caller
     When volunteer 1 tries to ban and hang up that call
@@ -33,7 +30,6 @@ Feature: In-Call Quick Actions
 
   @backend @calls @notes
   Scenario: Create note during active call
-    Given the server is reset
     And 2 volunteers are on shift
     And volunteer 0 is on an active call with a unique caller
     When volunteer 0 creates a note for the active call
@@ -41,7 +37,6 @@ Feature: In-Call Quick Actions
 
   @backend @calls @bans
   Scenario: Banned caller cannot call back
-    Given the server is reset
     And 2 volunteers are on shift
     And volunteer 0 is on an active call with a unique caller
     And volunteer 0 bans and hangs up the call

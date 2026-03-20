@@ -1,59 +1,19 @@
 ---
 name: bdd-feature-development
 description: >
-  Guide BDD-driven feature development in the Llamenos monorepo. Use this skill when
-  implementing features using the phased workflow (API+specs -> parallel clients -> integration),
-  writing shared Gherkin specs, creating backend BDD step definitions, debugging test failures
-  in the BDD pipeline, or when the user mentions "BDD", "feature file", "Gherkin", "step
-  definition", "shared spec", "backend BDD", "test:backend:bdd", "phased implementation",
-  "behavioral test", or describes wanting to write tests before implementation. Also use
-  when tests fail after feature implementation -- this replaces multi-platform-test-recovery
-  with a proactive, test-first approach. Use when the user says "tests broke", "fix tests",
-  "write tests first", "add test coverage", or "E2E testing".
+  Guide BDD test writing for the Llamenos monorepo. Use this skill when writing Gherkin
+  feature files, creating backend or desktop step definitions, debugging test failures,
+  or when the user mentions "BDD", "feature file", "Gherkin", "step definition",
+  "backend BDD", "test:backend:bdd", "behavioral test", "write tests first",
+  "add test coverage", "tests broke", "fix tests", or "E2E testing". This skill
+  supplements superpowers brainstorming and plan execution — it does not replace them.
+  Use it for BDD-specific implementation detail, not as a workflow entry point.
 ---
 
 # BDD-Driven Feature Development for Llamenos
 
-Features are developed in 3 phases. Shared BDD specs are the behavioral contract
-between phases. Tests are written BEFORE implementation, not after.
-
-## The 3-Phase Workflow
-
-### Phase 1: API + Locales + Shared BDD Specs (single agent)
-
-**Touches:** `apps/worker/`, `packages/i18n/`, `packages/protocol/`, `packages/test-specs/`, `tests/steps/backend/`
-**Does NOT touch:** `src/client/`, `apps/ios/`, `apps/android/`
-
-Every feature MUST include ALL of these in Phase 1 — they are NOT afterthoughts:
-
-1. **Define/update protocol schemas** (`packages/protocol/schemas/`) — Zod schemas are the API contract. Add new schemas or update existing ones for new request/response shapes. Run `bun run codegen` to generate TS/Swift/Kotlin types.
-2. **Add API validation** — Use `validator('json', schema)` on every route that accepts input. Response shapes must match the declared schema.
-3. **Add/update permissions** — Every new endpoint MUST have a `requirePermission()` guard with a specific, purpose-built permission (not a reused one). Add new permissions to `PERMISSION_CATALOG` in `packages/shared/permissions.ts`. Update default roles.
-4. **Add i18n strings** — Add to `packages/i18n/locales/en.json` (source of truth), then to all 13 locales. Run `bun run i18n:codegen` to generate iOS .strings + Android strings.xml + Kotlin I18n.kt. NEVER add strings directly to platform files.
-5. **Implement backend routes/service methods** — Drizzle ORM service classes in `apps/worker/services/`.
-6. **Write shared .feature files** in `packages/test-specs/features/` — Include permission matrix scenarios for new endpoints.
-7. **Write backend step definitions** in `tests/steps/backend/`
-8. **Gate**: `bun run test:backend:bdd` passes
-
-### Phase 2: Client Implementation (parallel agents)
-
-**Each agent touches ONLY its platform directory:**
-- Desktop: `src/client/`, `tests/steps/` (NOT `tests/steps/backend/`)
-- iOS: `apps/ios/`
-- Android: `apps/android/`
-
-Each agent:
-1. Implements UI to support the feature
-2. Writes platform step definitions for the shared .feature scenarios
-3. **Gate**: Platform BDD passes
-
-### Phase 3: Integration Gate
-
-```bash
-bun run test:all
-```
-
-All green -> merge. Red -> fix in the failing platform only.
+Features are developed using the superpowers workflow. BDD specs are the behavioral contract
+between implementation and verification. Tests are written BEFORE implementation, not after.
 
 ## Writing Shared BDD Specs
 
@@ -233,21 +193,9 @@ bun run crypto:clippy       # Linting
 
 ## When Tests Fail
 
-### During Phase 1 (backend BDD)
-- The API implementation is wrong -> fix the backend code
-- The test scenario is wrong -> fix the scenario (update AC in epic too)
-
-### During Phase 2 (client implementation)
-- Step definition has wrong selector -> update the selector
-- UI doesn't support the scenario -> implement the missing UI behavior
-- Scenario is platform-incompatible -> add platform-specific tag
-
-### After Merge (regression)
-1. Identify which phase the failure belongs to (backend vs client)
-2. Check if the scenario is still valid (does the AC still apply?)
-3. If scenario valid -> fix implementation or step definition
-4. If scenario obsolete -> update scenario AND the AC it maps to
-5. NEVER delete a scenario without updating the corresponding AC
+1. **Backend BDD failures** — the API implementation is wrong → fix the backend code. If the scenario itself is wrong → fix the scenario.
+2. **Desktop step failures** — wrong selector → update selector. UI doesn't reflect behavior → implement the missing behavior.
+3. **After merge (regression)** — check if the scenario is still valid. If yes → fix the implementation. If obsolete → update the scenario AND the AC it maps to. NEVER delete a scenario without updating the corresponding AC.
 
 ## General Recovery Workflow
 

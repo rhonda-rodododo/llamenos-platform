@@ -15,7 +15,7 @@ Monorepo containing all platforms, shared crypto, and protocol definitions:
 | Directory | Purpose |
 |-----------|---------|
 | `apps/desktop/` | Tauri v2 desktop shell (Rust) |
-| `apps/worker/` | Cloudflare Worker backend |
+| `apps/worker/` | Bun HTTP server (Hono + PostgreSQL; directory name retained — rename is separate epic) |
 | `apps/ios/` | Native SwiftUI iOS client |
 | `apps/android/` | Native Kotlin/Compose Android client |
 | `packages/crypto/` | Shared Rust crypto crate (native + WASM + UniFFI) |
@@ -37,7 +37,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 - **Telephony**: Twilio via a `TelephonyAdapter` interface (designed for future provider swaps, e.g. SIP trunks)
 - **Auth**: Nostr keypairs (BIP-340 Schnorr signatures) + WebAuthn session tokens for multi-device support
 - **i18n**: `packages/i18n/` — 13 locales + codegen for iOS `.strings` and Android `strings.xml`
-- **Deployment**: Cloudflare (Workers, DOs, Tunnels), billed to EU/GDPR-compatible account
+- **Deployment**: Docker Compose / Helm (VPS self-hosted), Cloudflare Tunnels for ingress. EU/GDPR-compatible.
 - **Testing**: E2E via Playwright (desktop), XCUITest (iOS), Compose UI tests (Android); Rust tests via `cargo test`
 - **Desktop Security**: Tauri Stronghold (encrypted vault), isolation pattern, CSP, single-instance
 
@@ -46,7 +46,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 | Role | Can See | Can Do |
 |------|---------|--------|
 | **Caller** | Nothing (GSM phone) | Call the hotline number |
-| **Volunteer** | Own notes only | Answer calls, write notes during shift |
+| **User with Volunteer role** | Own notes only | Answer calls, write notes during shift |
 | **Admin** | All notes, audit logs, active calls, billing data | Manage volunteers, shifts, ban lists, spam mitigation settings |
 
 ## Security Requirements
@@ -54,7 +54,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 These are non-negotiable architectural constraints, not guidelines:
 
 - **E2EE / zero-knowledge**: The server should not be able to read call notes, transcripts, or PII. Encrypt at rest minimum; E2EE where feasible.
-- **Volunteer identity protection**: Personal info (name, phone) visible only to admins, never to other volunteers or callers.
+- **User identity protection**: Personal info (name, phone) visible only to admins, never to other users or callers.
 - **Call spam mitigation**: Real-time ban lists, optional CAPTCHA-like voice bot detection (randomized digit input), network-level rate limiting. Admins toggle these in real-time.
 - **Audit logging**: Every call answered, every note created — visible to admins only.
 - **GDPR compliance**: EU parent org, data handling must comply.
@@ -69,12 +69,14 @@ apps/
     Cargo.toml        # Dependencies including packages/crypto path dep
     tauri.conf.json   # Tauri config (CSP, window, bundle, plugins)
     capabilities/     # Tauri capability permissions
-  worker/             # Cloudflare Worker backend
-    durable-objects/  # 7 DOs: IdentityDO, SettingsDO, RecordsDO, ShiftManagerDO, CallRouterDO, ConversationDO, BlastDO
+  worker/             # Bun HTTP server (Hono + PostgreSQL; directory name retained — rename is separate epic)
+    routes/           # Hono route handlers
+    db/               # Drizzle ORM schemas + migrations (bun-jsonb custom type)
+    services/         # Business logic service classes
     telephony/        # TelephonyAdapter interface + 5 adapters
     messaging/        # MessagingAdapter interface + SMS, WhatsApp, Signal adapters
-    lib/              # Server utilities (auth, crypto, webauthn, do-router)
-    wrangler.jsonc    # Worker + DO bindings config
+    lib/              # Auth, crypto, webauthn utilities
+    # (no wrangler.jsonc — see site/wrangler.jsonc for marketing site)
   ios/                # Native SwiftUI iOS client
     Sources/          # Swift source (App/, Services/, Views/, ViewModels/)
     Tests/            # XCTest + XCUITest
@@ -91,7 +93,7 @@ packages/
     types.ts          # Shared types (CustomFieldDefinition, NotePayload, etc.)
     crypto-labels.ts  # Domain separation constants (re-exported from protocol)
   protocol/           # Cross-platform type codegen (Zod → quicktype)
-    schemas/          # 30+ Zod schema files (source of truth for all types)
+    schemas/          # 80+ Zod schema files (source of truth for all types)
     tools/codegen.ts  # Zod → toJSONSchema() → quicktype → TS/Swift/Kotlin (with Kotlin default injection + Swift renaming)
     tools/schema-registry.ts  # Maps 85+ Zod schemas to named JSON Schemas
     openapi-snapshot.json     # OpenAPI spec snapshot (written by dev server on startup)
@@ -125,16 +127,15 @@ docs/
 ## Key Technical Patterns
 
 - **TelephonyAdapter**: Abstract interface for 5 voice providers (Twilio, SignalWire, Vonage, Plivo, Asterisk). All telephony logic goes through this adapter — never call provider APIs directly from business logic.
-- **MessagingAdapter**: Abstract interface for text messaging channels (SMS, WhatsApp, Signal). Inbound webhooks route to ConversationDO.
+- **MessagingAdapter**: Abstract interface for text messaging channels (SMS, WhatsApp, Signal). Inbound webhooks route to the conversation service.
 - **Parallel ringing**: All on-shift, non-busy volunteers ring simultaneously. First pickup terminates other calls.
 - **Shift routing**: Automated, recurring schedule with ring groups. Fallback group if no schedule is defined.
-- **Durable Objects**: Seven singletons accessed via `idFromName()` — IdentityDO, SettingsDO, RecordsDO, ShiftManagerDO, CallRouterDO, ConversationDO, BlastDO. Routed via `DORouter` (lightweight method+path router).
-- **BlastDO**: Handles message broadcast queues and delivery tracking. Manages batched delivery of bulk messages (SMS/WhatsApp/Signal) with per-recipient status tracking and retry logic.
+- **Blast service**: Handles message broadcast queues and delivery tracking. Manages batched delivery of bulk messages (SMS/WhatsApp/Signal) with per-recipient status tracking and retry logic (PostgreSQL-backed).
 - **E2EE notes**: Per-note forward secrecy — unique random key per note, wrapped via ECIES for each reader. Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
 - **E2EE messaging**: Per-message envelope encryption — random symmetric key, ECIES-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
 - **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. The nsec NEVER enters the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.
 - **packages/crypto**: Shared Rust crypto crate (formerly separate `llamenos-core` repo). All crypto operations (ECIES, Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305) implemented once in Rust, compiled to native (Tauri), WASM (browser), and UniFFI (mobile). Desktop links via `apps/desktop/Cargo.toml` path dep to `../../packages/crypto`.
-- **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates TypeScript interfaces, Swift Codable structs, and Kotlin @Serializable data classes from Zod schemas (via `toJSONSchema()` + quicktype). Also generates crypto label constants from `crypto-labels.json`. Zod schemas in `packages/protocol/schemas/` are the single source of truth (moved from `apps/worker/schemas/`). Schema registry in `packages/protocol/tools/schema-registry.ts` maps 85+ Zod schemas to named types. Kotlin post-processor injects `@Serializable` defaults for `.optional().default()` fields. Swift post-processor strips convenience extensions, adds `Sendable`, renames 15 types that shadow builtins. Run `bun run codegen` after schema changes. Generated output is gitignored — codegen runs as a build prerequisite.
+- **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates Swift Codable structs and Kotlin @Serializable data classes from Zod schemas (via `toJSONSchema()` + quicktype). Also generates crypto label constants from `crypto-labels.json`. Zod schemas in `packages/protocol/schemas/` are the single source of truth (moved from `apps/worker/schemas/`). Schema registry in `packages/protocol/tools/schema-registry.ts` maps 85+ Zod schemas to named types. Kotlin post-processor injects `@Serializable` defaults for `.optional().default()` fields. Swift post-processor strips convenience extensions, adds `Sendable`, renames 15 types that shadow builtins. Run `bun run codegen` after schema changes. Generated output is gitignored — codegen runs as a build prerequisite.
 - **Key management**: PIN-encrypted keys stored in Tauri Store (desktop), iOS Keychain, or Android Keystore (EncryptedSharedPreferences). Rust CryptoState holds the nsec; UI only sees pubkey. Device linking via ephemeral ECDH provisioning rooms.
 - **Tauri IPC mock for tests**: Playwright tests run in a regular browser. `PLAYWRIGHT_TEST=true` triggers Vite aliases that route `@tauri-apps/api/core` and `@tauri-apps/plugin-store` to JS mock implementations in `tests/mocks/`. The mock maintains a CryptoState that mirrors the Rust side.
 - **Mobile crypto**: iOS uses UniFFI XCFramework from `packages/crypto/`, Android uses JNI `.so` files. Both wrap CryptoService as a singleton — `nsecHex` is private and never leaves the service layer.
@@ -156,7 +157,7 @@ docs/
 - Hub key is random bytes, NOT derived from any identity key — see `hub-key-manager.ts`
 - **Tauri-only desktop**: No browser/PWA fallback. `platform.ts` always routes through Tauri IPC. Use `PLAYWRIGHT_TEST=true` for test builds that mock the IPC layer.
 - **packages/crypto path dep**: `apps/desktop/Cargo.toml` references `../../packages/crypto`. No external repo needed.
-- **Worker config**: `wrangler.jsonc` lives at `apps/worker/wrangler.jsonc`. All wrangler commands use `--config apps/worker/wrangler.jsonc`.
+- **wrangler.jsonc**: Only exists at `site/wrangler.jsonc` (Cloudflare Pages, marketing site). No wrangler config in `apps/worker/` — the backend is Bun+PostgreSQL, not a Cloudflare Worker.
 - **iOS UniFFI**: Build with `packages/crypto/scripts/build-mobile.sh ios`, copy XCFramework to `apps/ios/`. Stand-in mock types enabled via `#if !canImport(LlamenosCore)`.
 - **Android JNI**: Build with `packages/crypto/scripts/build-mobile.sh android`, place `.so` files in `apps/android/app/src/main/jniLibs/`. Placeholder mock crypto active until native libs are linked.
 - **Zod `.optional().default()` pattern**: Always use `.optional().default(value)` for fields with defaults in `packages/protocol/schemas/`. Never use bare `.default(value)` — it produces wrong JSON Schema output in Zod 4, breaking Kotlin/Swift codegen defaults. The Kotlin post-processor in `codegen.ts` reads `"default"` values from JSON Schema and injects them into generated `@Serializable` data classes.
@@ -181,12 +182,6 @@ bun run test:backend:bdd
 
 **NEVER use the production compose** (`deploy/docker/docker-compose.yml`) for local development or testing. It bundles the app into a Docker image that won't reflect code changes until rebuilt. The `docker-compose.test.yml` overlay is for CI only.
 
-### Multi-Machine Workflow
-
-**Mac M4** is now fully self-contained for all platforms (iOS, Android, Desktop, Workers, Crypto).
-**Linux** (192.168.50.95) is available as a secondary build machine.
-Coordinate via git push/pull on the `desktop` branch.
-
 ```bash
 # iOS (runs locally on Mac M4)
 bun run ios:status                       # Check Xcode, Rust, xcodegen status
@@ -205,7 +200,7 @@ bun run tauri:build                      # Tauri desktop release build
 bun run dev                              # Vite dev server (test builds only — no Rust backend)
 
 # Backend (runs on Linux machine)
-bun run dev:worker                       # Wrangler dev server (Worker + DOs)
+bun run dev:server                       # Bun HTTP server with file watching
 
 # Build & Test (runs on Linux machine)
 bun run build                            # Vite build → dist/client/
@@ -256,53 +251,34 @@ bun run version:bump <major|minor|patch> [description]     # Bump version across
 bun run bootstrap-admin                  # Generate admin keypair
 ```
 
-**Deployment rules — NEVER run `wrangler pages deploy` or `wrangler deploy` directly.** Always use the root `package.json` scripts (`bun run deploy`, `bun run deploy:api`, `bun run deploy:site`). Running `wrangler pages deploy dist` from the wrong directory will deploy the Vite app build to Pages instead of the Astro site, breaking the marketing site with 404s.
+**Deployment rules — NEVER run `wrangler pages deploy` or `wrangler deploy` directly.** Always use `bun run deploy` or `bun run deploy:site` from the root. Running wrangler from the wrong directory will deploy the wrong artifact.
 
-**Key config files**: `apps/worker/wrangler.jsonc` (Worker + DO bindings), `playwright.config.ts`, `.dev.vars` (Twilio creds + ADMIN_PUBKEY, gitignored)
+**Key config files**: `site/wrangler.jsonc` (Cloudflare Pages, marketing site only), `playwright.config.ts`, `.dev.vars` (Twilio creds + ADMIN_PUBKEY, gitignored)
 
 ## Claude Code Working Style
 
-### Feature Development: 3-Phase BDD Workflow
+### Development Workflow
 
-**Every feature follows this sequence. No exceptions.**
+- **New feature**: `superpowers:brainstorming` → spec → `superpowers:writing-plans` → plan → `superpowers:executing-plans`
+- **Bug fix**: `superpowers:systematic-debugging`
+- **Code complete**: `superpowers:verification-before-completion` + `superpowers:requesting-code-review`
 
-1. **Epic authoring** — with BDD scenarios mapped 1:1 to acceptance criteria
-2. **Phase 1: API + Locales + Shared BDD Specs** (single agent)
-   - Backend routes/DO methods (`apps/worker/`)
-   - i18n strings (`packages/i18n/locales/`)
-   - Shared `.feature` files (`packages/test-specs/features/`)
-   - Backend step definitions (`tests/steps/backend/`)
-   - **Gate**: `bun run test:backend:bdd` passes
-3. **Phase 2: Client Implementation** (parallel agents, non-overlapping dirs)
-   - Agent 1: Desktop (`src/client/`, `tests/steps/`)
-   - Agent 2: iOS (`apps/ios/`)
-   - Agent 3: Android (`apps/android/`)
-   - Each implements UI + step definitions to pass shared BDD scenarios
-4. **Phase 3: Integration Gate** — `bun run test:all`
+Domain skills (e.g. `bdd-feature-development`, `protocol-schema-change`) are **reference material** used during plan execution — not primary workflow entry points.
+
+`docs/epics/` contains historical planning documents for reference. New planning uses superpowers specs (`docs/superpowers/specs/`) and plans (`docs/superpowers/plans/`).
 
 ### Test Philosophy
 
-- **Tests are the spec.** BDD scenarios define what the feature does. Implementation makes them pass.
-- **Behavior, not UI.** Every scenario tests state changes, API responses, data persistence — never "element exists."
-- **Backend BDD is the minimum bar.** If backend BDD passes, the API is correct. Client tests verify the UI reflects it.
-- If a design change breaks a scenario that's still valid → update the step implementation (selectors, navigation)
-- If a scenario is obsolete → update the scenario AND the AC it maps to
-
-### Pre-Commit Verification
-
-```bash
-bun run test:changed   # Fast: only affected platforms
-bun run test:all       # Thorough: all platforms including backend BDD
-```
+1. Tests assert **behavior** (state changes, API responses, data persistence) — never assert UI element existence
+2. Every test is **isolated** — per-test PostgreSQL schema, no shared state between tests
+3. Tests must **pass immediately** — no `waitForTimeout()`, use DOM-native or Playwright `waitFor` only
 
 ### General Rules
 
 - Implement features completely — no stubs, no shortcuts, no TODOs
-- **Every feature includes tests.** Written in Phase 1 (specs) and Phase 2 (step definitions)
 - Edit files in place; never create copies. Git history is the backup
 - Keep the file tree lean. Commit frequently
 - No legacy fallbacks until the app is in production
-- Use `docs/epics/` for planning. Track in `docs/NEXT_BACKLOG.md` / `docs/COMPLETED_BACKLOG.md`
 - Use context7 MCP for library documentation lookups
 - Clean up unused files when pivoting. Refactor proactively
 - NEVER delete or regress functionality to fix type issues or get tests passing

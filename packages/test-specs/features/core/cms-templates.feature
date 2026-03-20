@@ -3,9 +3,6 @@ Feature: CMS Templates
   Admins can browse, inspect, and apply bundled case management
   templates that pre-configure entity types and relationships.
 
-  Background:
-    Given the server is reset
-
   @cases
   Scenario: List available templates
     Given case management is enabled

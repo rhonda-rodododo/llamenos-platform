@@ -20,8 +20,8 @@ import org.llamenos.hotline.model.DecryptedMessage
 import org.llamenos.hotline.model.LlamenosEvent
 import org.llamenos.hotline.model.MessagesListResponse
 import org.llamenos.hotline.model.SendMessageRequest
-import org.llamenos.hotline.model.Volunteer
-import org.llamenos.hotline.model.VolunteersListResponse
+import org.llamenos.hotline.model.User
+import org.llamenos.hotline.model.UsersListResponse
 import javax.inject.Inject
 
 /**
@@ -58,7 +58,7 @@ data class ConversationsUiState(
 
     // Actions
     val showAssignDialog: Boolean = false,
-    val assignableVolunteers: List<Volunteer> = emptyList(),
+    val assignableVolunteers: List<User> = emptyList(),
     val isLoadingVolunteers: Boolean = false,
 )
 
@@ -428,24 +428,24 @@ class ConversationsViewModel @Inject constructor(
 
     fun showAssignDialog() {
         _uiState.update { it.copy(showAssignDialog = true) }
-        loadVolunteersForAssign()
+        loadUsersForAssign()
     }
 
     fun dismissAssignDialog() {
         _uiState.update { it.copy(showAssignDialog = false) }
     }
 
-    private fun loadVolunteersForAssign() {
+    private fun loadUsersForAssign() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingVolunteers = true) }
             try {
-                val response = apiService.request<VolunteersListResponse>(
+                val response = apiService.request<UsersListResponse>(
                     "GET",
-                    "/api/admin/volunteers?limit=100",
+                    "/api/users?limit=100",
                 )
                 _uiState.update {
                     it.copy(
-                        assignableVolunteers = response.volunteers.filter { v -> v.status == "active" },
+                        assignableVolunteers = response.users.filter { v -> v.status == "active" },
                         isLoadingVolunteers = false,
                     )
                 }

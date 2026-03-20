@@ -1,12 +1,12 @@
 import type { Env } from '../types'
 import type { Services } from '../services'
-import { getTelephonyFromService } from '../lib/do-access'
+import { getTelephonyFromService } from '../lib/service-factories'
 import { encryptMessageForStorage } from '../lib/crypto'
 
 export async function maybeTranscribe(
   parentCallSid: string,
   recordingSid: string,
-  volunteerPubkey: string,
+  userPubkey: string,
   env: Env,
   services: Services,
 ) {
@@ -14,9 +14,9 @@ export async function maybeTranscribe(
   const { globalEnabled } = await services.settings.getTranscriptionSettings()
   if (!globalEnabled) return
 
-  // Check if volunteer has transcription enabled
+  // Check if user has transcription enabled
   try {
-    const volunteer = await services.identity.getVolunteer(volunteerPubkey)
+    const volunteer = await services.identity.getUser(userPubkey)
     if (!volunteer.transcriptionEnabled) return
   } catch {
     return
@@ -35,10 +35,10 @@ export async function maybeTranscribe(
     })
 
     if (result.text) {
-      // Envelope encryption: single ciphertext, wrapped key for volunteer + admin
+      // Envelope encryption: single ciphertext, wrapped key for user + admin
       const adminPubkey = env.ADMIN_DECRYPTION_PUBKEY || env.ADMIN_PUBKEY
-      const readerPubkeys = [volunteerPubkey]
-      if (adminPubkey !== volunteerPubkey) readerPubkeys.push(adminPubkey)
+      const readerPubkeys = [userPubkey]
+      if (adminPubkey !== userPubkey) readerPubkeys.push(adminPubkey)
 
       const { encryptedContent, readerEnvelopes } = encryptMessageForStorage(result.text, readerPubkeys)
       await services.records.createNote({

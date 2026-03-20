@@ -9,7 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VolunteersRouteImport } from './routes/volunteers'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as TriageRouteImport } from './routes/triage'
 import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as SetupRouteImport } from './routes/setup'
@@ -32,15 +32,15 @@ import { Route as BlastsRouteImport } from './routes/blasts'
 import { Route as BansRouteImport } from './routes/bans'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as VolunteersPubkeyRouteImport } from './routes/volunteers_.$pubkey'
+import { Route as UsersPubkeyRouteImport } from './routes/users_.$pubkey'
 import { Route as AdminSystemRouteImport } from './routes/admin/system'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminHubsRouteImport } from './routes/admin/hubs'
 import { Route as AdminCaseManagementRouteImport } from './routes/admin/case-management'
 
-const VolunteersRoute = VolunteersRouteImport.update({
-  id: '/volunteers',
-  path: '/volunteers',
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TriageRoute = TriageRouteImport.update({
@@ -153,9 +153,9 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VolunteersPubkeyRoute = VolunteersPubkeyRouteImport.update({
-  id: '/volunteers_/$pubkey',
-  path: '/volunteers/$pubkey',
+const UsersPubkeyRoute = UsersPubkeyRouteImport.update({
+  id: '/users_/$pubkey',
+  path: '/users/$pubkey',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminSystemRoute = AdminSystemRouteImport.update({
@@ -202,12 +202,12 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
   '/triage': typeof TriageRoute
-  '/volunteers': typeof VolunteersRoute
+  '/users': typeof UsersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
-  '/volunteers/$pubkey': typeof VolunteersPubkeyRoute
+  '/users/$pubkey': typeof UsersPubkeyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -232,12 +232,12 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
   '/triage': typeof TriageRoute
-  '/volunteers': typeof VolunteersRoute
+  '/users': typeof UsersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
-  '/volunteers/$pubkey': typeof VolunteersPubkeyRoute
+  '/users/$pubkey': typeof UsersPubkeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -263,12 +263,12 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/shifts': typeof ShiftsRoute
   '/triage': typeof TriageRoute
-  '/volunteers': typeof VolunteersRoute
+  '/users': typeof UsersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
-  '/volunteers_/$pubkey': typeof VolunteersPubkeyRoute
+  '/users_/$pubkey': typeof UsersPubkeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -295,12 +295,12 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shifts'
     | '/triage'
-    | '/volunteers'
+    | '/users'
     | '/admin/case-management'
     | '/admin/hubs'
     | '/admin/settings'
     | '/admin/system'
-    | '/volunteers/$pubkey'
+    | '/users/$pubkey'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -325,12 +325,12 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shifts'
     | '/triage'
-    | '/volunteers'
+    | '/users'
     | '/admin/case-management'
     | '/admin/hubs'
     | '/admin/settings'
     | '/admin/system'
-    | '/volunteers/$pubkey'
+    | '/users/$pubkey'
   id:
     | '__root__'
     | '/'
@@ -355,12 +355,12 @@ export interface FileRouteTypes {
     | '/setup'
     | '/shifts'
     | '/triage'
-    | '/volunteers'
+    | '/users'
     | '/admin/case-management'
     | '/admin/hubs'
     | '/admin/settings'
     | '/admin/system'
-    | '/volunteers_/$pubkey'
+    | '/users_/$pubkey'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -386,21 +386,21 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   ShiftsRoute: typeof ShiftsRoute
   TriageRoute: typeof TriageRoute
-  VolunteersRoute: typeof VolunteersRoute
+  UsersRoute: typeof UsersRoute
   AdminCaseManagementRoute: typeof AdminCaseManagementRoute
   AdminHubsRoute: typeof AdminHubsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSystemRoute: typeof AdminSystemRoute
-  VolunteersPubkeyRoute: typeof VolunteersPubkeyRoute
+  UsersPubkeyRoute: typeof UsersPubkeyRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/volunteers': {
-      id: '/volunteers'
-      path: '/volunteers'
-      fullPath: '/volunteers'
-      preLoaderRoute: typeof VolunteersRouteImport
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/triage': {
@@ -557,11 +557,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/volunteers_/$pubkey': {
-      id: '/volunteers_/$pubkey'
-      path: '/volunteers/$pubkey'
-      fullPath: '/volunteers/$pubkey'
-      preLoaderRoute: typeof VolunteersPubkeyRouteImport
+    '/users_/$pubkey': {
+      id: '/users_/$pubkey'
+      path: '/users/$pubkey'
+      fullPath: '/users/$pubkey'
+      preLoaderRoute: typeof UsersPubkeyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/system': {
@@ -618,12 +618,12 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   ShiftsRoute: ShiftsRoute,
   TriageRoute: TriageRoute,
-  VolunteersRoute: VolunteersRoute,
+  UsersRoute: UsersRoute,
   AdminCaseManagementRoute: AdminCaseManagementRoute,
   AdminHubsRoute: AdminHubsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSystemRoute: AdminSystemRoute,
-  VolunteersPubkeyRoute: VolunteersPubkeyRoute,
+  UsersPubkeyRoute: UsersPubkeyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

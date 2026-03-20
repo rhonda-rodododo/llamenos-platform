@@ -7,7 +7,7 @@ import configRoutes from './routes/config'
 import devRoutes from './routes/dev'
 import authRoutes from './routes/auth'
 import webauthnRoutes from './routes/webauthn'
-import volunteersRoutes from './routes/volunteers'
+import usersRoutes from './routes/users'
 import invitesRoutes from './routes/invites'
 import shiftsRoutes from './routes/shifts'
 import bansRoutes from './routes/bans'
@@ -138,7 +138,7 @@ api.get('/ivr-audio/:promptType/:language', async (c) => {
 // Authenticated routes
 const authenticated = new Hono<AppEnv>()
 authenticated.use('*', auth)
-authenticated.route('/volunteers', volunteersRoutes)
+authenticated.route('/users', usersRoutes)
 authenticated.route('/shifts', shiftsRoutes)
 authenticated.route('/bans', bansRoutes)
 authenticated.route('/notes', notesRoutes)

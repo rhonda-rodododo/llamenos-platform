@@ -4,9 +4,6 @@ Feature: Hub Key Lifecycle
   I want hub keys to be securely distributed and rotated
   So that only current members can decrypt hub-encrypted data
 
-  Background:
-    Given the server is reset
-
   # ── Key Distribution ─────────────────────────────────────────────
 
   Scenario: Hub key distributed to all members

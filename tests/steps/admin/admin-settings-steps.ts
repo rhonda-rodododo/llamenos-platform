@@ -25,8 +25,7 @@ Then('I should see the transcription enabled toggle', async ({ page }) => {
   // SettingsSection uses CardHeader with cursor-pointer as the CollapsibleTrigger
   const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
   if (!isExpanded) {
-    await section.locator('.cursor-pointer').first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
+    await section.getByTestId('transcription-trigger').click()
   }
   const toggle = section.locator('[role="switch"], input[type="checkbox"]').first()
   await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -40,11 +39,10 @@ Then('I should see the transcription opt-out toggle', async ({ page }) => {
 When('I toggle transcription on', async ({ page }) => {
   const section = page.getByTestId(TestIds.TRANSCRIPTION_SECTION)
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Expand the section if collapsed — CardHeader has cursor-pointer class
+  // Expand the section if collapsed
   const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
   if (!isExpanded) {
-    await section.locator('.cursor-pointer').first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
+    await section.getByTestId('transcription-trigger').click()
   }
   const toggle = section.locator('[role="switch"], input[type="checkbox"]').first()
   await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })

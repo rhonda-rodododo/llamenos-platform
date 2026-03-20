@@ -82,6 +82,8 @@ export function StepChannels({ data, onChange, headingRef }: Props) {
               role="button"
               tabIndex={0}
               aria-pressed={selected}
+              data-testid={`channel-card-${channel.type}`}
+              data-selected={selected}
               onClick={() => toggleChannel(channel.type)}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleChannel(channel.type) } }}
               className={`cursor-pointer p-4 transition-all ${

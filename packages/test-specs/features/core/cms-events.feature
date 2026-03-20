@@ -3,9 +3,6 @@ Feature: CMS Events
   Admins create events (protests, mass arrests) and link
   case records and reports to them.
 
-  Background:
-    Given the server is reset
-
   @events
   Scenario: Create event record
     Given case management is enabled

@@ -5,7 +5,7 @@
  * reporter data isolation, and JSONB metadata persistence.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
 import {
   apiGet,
   apiPost,
@@ -42,12 +42,18 @@ interface LifecycleState {
   lastFetchedReport?: Record<string, unknown>
 }
 
-let lc: LifecycleState
+const REPORT_CASE_LIFECYCLE_KEY = 'report_case_lifecycle'
 
-Before({ tags: '@lifecycle' }, async () => {
-  lc = {
+function getLifecycleState(world: Record<string, unknown>): LifecycleState {
+  return getState<LifecycleState>(world, REPORT_CASE_LIFECYCLE_KEY)
+}
+
+
+Before({ tags: '@lifecycle' }, async ({ world }) => {
+  const lc = {
     reporters: new Map(),
   }
+  setState(world, REPORT_CASE_LIFECYCLE_KEY, lc)
 })
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -55,12 +61,12 @@ Before({ tags: '@lifecycle' }, async () => {
 async function ensureEntityType(
   request: import('@playwright/test').APIRequestContext,
 ): Promise<string> {
-  if (lc.entityTypeId) return lc.entityTypeId
+  if (getLifecycleState(world).entityTypeId) return getLifecycleState(world).entityTypeId
   await enableCaseManagementViaApi(request, true)
   const et = await createEntityTypeViaApi(request, {
     name: `lifecycle_case_${Date.now()}`,
   })
-  lc.entityTypeId = et.id
+  getLifecycleState(world).entityTypeId = et.id
   return et.id
 }
 
@@ -68,69 +74,69 @@ async function ensureEntityType(
 
 Given(
   'a reporter submits a report with title {string}',
-  async ({ request }, title: string) => {
+  async ({ request, world }, title: string) => {
     const report = await createReportViaApi(request, { title })
-    lc.reportId = report.id
-    lc.reportTitle = title
+    getLifecycleState(world).reportId = report.id
+    getLifecycleState(world).reportTitle = title
   },
 )
 
-Given('a volunteer is assigned to the report', async ({ request }) => {
-  expect(lc.reportId).toBeTruthy()
+Given('a volunteer is assigned to the report', async ({ request, world }) => {
+  expect(getLifecycleState(world).reportId).toBeTruthy()
   const vol = await createVolunteerViaApi(request, {
     name: `Lifecycle Vol ${Date.now()}`,
   })
-  lc.volunteerPubkey = vol.pubkey
-  lc.volunteerNsec = vol.nsec
+  getLifecycleState(world).volunteerPubkey = vol.pubkey
+  getLifecycleState(world).volunteerNsec = vol.nsec
 
-  await assignReportViaApi(request, lc.reportId!, vol.pubkey)
+  await assignReportViaApi(request, getLifecycleState(world).reportId!, vol.pubkey)
 })
 
-When('the admin converts the report to a case', async ({ request }) => {
-  expect(lc.reportId).toBeTruthy()
+When('the admin converts the report to a case', async ({ request, world }) => {
+  expect(getLifecycleState(world).reportId).toBeTruthy()
   const entityTypeId = await ensureEntityType(request)
 
   const result = await createCaseFromReportViaApi(
     request,
-    lc.reportId!,
+    getLifecycleState(world).reportId!,
     entityTypeId,
   )
-  lc.caseRecordId = result.recordId
-  lc.caseLinkId = result.linkId
+  getLifecycleState(world).caseRecordId = result.recordId
+  getLifecycleState(world).caseLinkId = result.linkId
 })
 
 Then('a case record should be created', async () => {
-  expect(lc.caseRecordId).toBeTruthy()
+  expect(getLifecycleState(world).caseRecordId).toBeTruthy()
 })
 
-Then('the case should be linked to the original report', async ({ request }) => {
-  expect(lc.caseRecordId).toBeTruthy()
-  expect(lc.reportId).toBeTruthy()
+Then('the case should be linked to the original report', async ({ request, world }) => {
+  expect(getLifecycleState(world).caseRecordId).toBeTruthy()
+  expect(getLifecycleState(world).reportId).toBeTruthy()
   // The link was created by createCaseFromReportViaApi
-  expect(lc.caseLinkId).toBeTruthy()
+  expect(getLifecycleState(world).caseLinkId).toBeTruthy()
 })
 
-Then('listing the report should show the linked case ID', async ({ request }) => {
-  expect(lc.reportId).toBeTruthy()
-  expect(lc.caseRecordId).toBeTruthy()
+Then('listing the report should show the linked case ID', async ({ request, world }) => {
+  expect(getLifecycleState(world).reportId).toBeTruthy()
+  expect(getLifecycleState(world).caseRecordId).toBeTruthy()
 
   // Fetch the report's linked records
   const res = await apiGet<{ records: Array<{ caseId: string }> }>(
     request,
-    `/reports/${lc.reportId}/records`,
+    `/reports/${getLifecycleState(world).reportId}/records`,
   )
   // The report should have a linked case
   if (res.status === 200 && res.data.records) {
     const linkedIds = res.data.records.map((r: { caseId: string }) => r.caseId)
-    expect(linkedIds).toContain(lc.caseRecordId)
+    expect(linkedIds).toContain(getLifecycleState(world).caseRecordId)
   }
 })
 
-Then('listing the case should show the linked report ID', async ({ request }) => {
-  expect(lc.caseRecordId).toBeTruthy()
+Then('listing the case should show the linked report ID', async ({ request, world }) => {
+  expect(getLifecycleState(world).caseRecordId).toBeTruthy()
 
   // Get the case record — it should reference the report
-  const record = await getRecordViaApi(request, lc.caseRecordId!)
+  const record = await getRecordViaApi(request, getLifecycleState(world).caseRecordId!)
   // The record was linked via the report-records endpoint,
   // so the link exists in the join table
   expect(record).toBeTruthy()
@@ -140,12 +146,12 @@ Then('listing the case should show the linked report ID', async ({ request }) =>
 
 Given(
   'reporter {string} creates a report with title {string}',
-  async ({ request }, reporterName: string, title: string) => {
+  async ({ request, world }, reporterName: string, title: string) => {
     // Create a volunteer with reporter role
     const vol = await createVolunteerViaApi(request, {
       name: `Reporter ${reporterName} ${Date.now()}`,
     })
-    await apiPatch(request, `/volunteers/${vol.pubkey}`, { roles: ['role-reporter'] })
+    await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['role-reporter'] })
 
     // Create the report authenticated as the reporter so the server records their pubkey
     // as the contact/author — required for the reporter-isolation filter in GET /reports
@@ -154,21 +160,21 @@ Given(
       nsec: vol.nsec,
     })
 
-    if (!lc.reporters.has(reporterName)) {
-      lc.reporters.set(reporterName, {
+    if (!getLifecycleState(world).reporters.has(reporterName)) {
+      getLifecycleState(world).reporters.set(reporterName, {
         nsec: vol.nsec,
         pubkey: vol.pubkey,
         reportIds: [],
         reportTitles: [],
       })
     }
-    lc.reporters.get(reporterName)!.reportIds.push(report.id)
-    lc.reporters.get(reporterName)!.reportTitles.push(title)
+    getLifecycleState(world).reporters.get(reporterName)!.reportIds.push(report.id)
+    getLifecycleState(world).reporters.get(reporterName)!.reportTitles.push(title)
   },
 )
 
-When('{string} lists their own reports', async ({ request }, reporterName: string) => {
-  const reporter = lc.reporters.get(reporterName)
+When('{string} lists their own reports', async ({ request, world }, reporterName: string) => {
+  const reporter = getLifecycleState(world).reporters.get(reporterName)
   expect(reporter).toBeTruthy()
 
   // List reports as the reporter
@@ -178,16 +184,16 @@ When('{string} lists their own reports', async ({ request }, reporterName: strin
     reporter!.nsec,
   )
   // Store for assertion
-  lc.lastFetchedReport = { conversations: data?.conversations ?? [], reporterName }
+  getLifecycleState(world).lastFetchedReport = { conversations: data?.conversations ?? [], reporterName }
 })
 
-Then('{string} should see {string}', async ({}, reporterName: string, title: string) => {
-  const reporter = lc.reporters.get(reporterName)
+Then('{string} should see {string}', async ({ world }, reporterName: string, title: string) => {
+  const reporter = getLifecycleState(world).reporters.get(reporterName)
   expect(reporter).toBeTruthy()
 
   // The reporter's own reports should be visible
   // Since we're checking by title in the metadata
-  const conversations = (lc.lastFetchedReport as Record<string, unknown>)?.conversations as Array<{
+  const conversations = (getLifecycleState(world).lastFetchedReport as Record<string, unknown>)?.conversations as Array<{
     id: string
     metadata?: { reportTitle?: string }
   }>
@@ -198,19 +204,19 @@ Then('{string} should see {string}', async ({}, reporterName: string, title: str
   expect(found).toBe(true)
 })
 
-Then('{string} should not see {string}', async ({}, reporterName: string, title: string) => {
-  const reporter = lc.reporters.get(reporterName)
+Then('{string} should not see {string}', async ({ world }, reporterName: string, title: string) => {
+  const reporter = getLifecycleState(world).reporters.get(reporterName)
   expect(reporter).toBeTruthy()
 
   // Get the other reporter's IDs
   const otherReportIds: string[] = []
-  for (const [name, r] of lc.reporters) {
+  for (const [name, r] of getLifecycleState(world).reporters) {
     if (name !== reporterName) {
       otherReportIds.push(...r.reportIds)
     }
   }
 
-  const conversations = (lc.lastFetchedReport as Record<string, unknown>)?.conversations as Array<{
+  const conversations = (getLifecycleState(world).lastFetchedReport as Record<string, unknown>)?.conversations as Array<{
     id: string
   }>
 
@@ -225,52 +231,52 @@ Then('{string} should not see {string}', async ({}, reporterName: string, title:
 
 Given(
   'a report exists with metadata category {string} and title {string}',
-  async ({ request }, category: string, title: string) => {
+  async ({ request, world }, category: string, title: string) => {
     const report = await createReportViaApi(request, { title, category })
-    lc.reportId = report.id
-    lc.reportCategory = category
-    lc.reportTitle = title
+    getLifecycleState(world).reportId = report.id
+    getLifecycleState(world).reportCategory = category
+    getLifecycleState(world).reportTitle = title
   },
 )
 
 When(
   'the admin updates the lifecycle report status to {string}',
-  async ({ request }, newStatus: string) => {
-    expect(lc.reportId).toBeTruthy()
+  async ({ request, world }, newStatus: string) => {
+    expect(getLifecycleState(world).reportId).toBeTruthy()
     if (newStatus === 'active') {
       // Need to assign first
       const vol = await createVolunteerViaApi(request, {
         name: `Metadata Vol ${Date.now()}`,
       })
-      await assignReportViaApi(request, lc.reportId!, vol.pubkey)
+      await assignReportViaApi(request, getLifecycleState(world).reportId!, vol.pubkey)
     } else {
-      await updateReportStatusViaApi(request, lc.reportId!, newStatus)
+      await updateReportStatusViaApi(request, getLifecycleState(world).reportId!, newStatus)
     }
   },
 )
 
-When('the report is fetched again', async ({ request }) => {
-  expect(lc.reportId).toBeTruthy()
+When('the report is fetched again', async ({ request, world }) => {
+  expect(getLifecycleState(world).reportId).toBeTruthy()
   const { status, data } = await apiGet<Record<string, unknown>>(
     request,
-    `/reports/${lc.reportId}`,
+    `/reports/${getLifecycleState(world).reportId}`,
   )
   // If individual report GET is not available, list and find
   if (status === 200) {
-    lc.lastFetchedReport = data
+    getLifecycleState(world).lastFetchedReport = data
   } else {
     // Fallback: list reports and find by ID
     const list = await listReportsViaApi(request)
-    const found = list.conversations.find(c => c.id === lc.reportId)
-    lc.lastFetchedReport = found as unknown as Record<string, unknown>
+    const found = list.conversations.find(c => c.id === getLifecycleState(world).reportId)
+    getLifecycleState(world).lastFetchedReport = found as unknown as Record<string, unknown>
   }
 })
 
 Then(
   'the report metadata should still contain category {string}',
-  async ({}, category: string) => {
-    expect(lc.lastFetchedReport).toBeTruthy()
-    const metadata = (lc.lastFetchedReport as Record<string, unknown>).metadata as Record<string, unknown> | undefined
+  async ({ world }, category: string) => {
+    expect(getLifecycleState(world).lastFetchedReport).toBeTruthy()
+    const metadata = (getLifecycleState(world).lastFetchedReport as Record<string, unknown>).metadata as Record<string, unknown> | undefined
     // The category should persist through status updates
     if (metadata) {
       expect(metadata.reportCategory ?? metadata.category).toBe(category)
@@ -281,8 +287,8 @@ Then(
 Then(
   'the report metadata should be a proper JSONB object, not a double-serialized string',
   async () => {
-    expect(lc.lastFetchedReport).toBeTruthy()
-    const metadata = (lc.lastFetchedReport as Record<string, unknown>).metadata
+    expect(getLifecycleState(world).lastFetchedReport).toBeTruthy()
+    const metadata = (getLifecycleState(world).lastFetchedReport as Record<string, unknown>).metadata
     if (metadata !== null && metadata !== undefined) {
       // Use the integrity helper to detect double-serialization
       assertIsObject(metadata, 'report.metadata')

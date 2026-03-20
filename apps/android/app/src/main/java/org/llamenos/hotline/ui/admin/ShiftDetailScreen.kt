@@ -45,7 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.Volunteer
+import org.llamenos.hotline.model.User
 import org.llamenos.hotline.util.DateFormatUtils
 
 /**
@@ -217,7 +217,7 @@ fun ShiftDetailScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = stringResource(R.string.shifts_assign_volunteers),
+                                text = stringResource(R.string.shifts_assign_users),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Spacer(Modifier.weight(1f))
@@ -286,7 +286,7 @@ fun ShiftDetailScreen(
  */
 @Composable
 private fun VolunteerAssignmentCard(
-    volunteer: Volunteer,
+    volunteer: User,
     isAssigned: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
@@ -325,7 +325,7 @@ private fun VolunteerAssignmentCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = volunteer.displayName ?: stringResource(R.string.volunteers_unnamed),
+                    text = volunteer.displayName ?: stringResource(R.string.users_unnamed),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isAssigned) FontWeight.Medium else FontWeight.Normal,
                     maxLines = 1,

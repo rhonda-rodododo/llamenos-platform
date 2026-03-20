@@ -24,8 +24,8 @@ export const systemSettings = pgTable('system_settings', {
   spamSettings: jsonb('spam_settings').notNull().default({}),
   callSettings: jsonb('call_settings').notNull().default({}),
   transcriptionEnabled: boolean('transcription_enabled').default(true),
-  allowVolunteerTranscriptionOptOut: boolean(
-    'allow_volunteer_transcription_opt_out',
+  allowUserTranscriptionOptOut: boolean(
+    'allow_user_transcription_opt_out',
   ).default(false),
   ivrLanguages: text('ivr_languages')
     .array()
@@ -141,8 +141,8 @@ export const customFieldDefinitions = pgTable('custom_field_definitions', {
   required: boolean('required').default(false),
   options: text('options').array(),
   validation: jsonb('validation'),
-  visibleToVolunteers: boolean('visible_to_volunteers').default(true),
-  editableByVolunteers: boolean('editable_by_volunteers').default(true),
+  visibleToUsers: boolean('visible_to_users').default(true),
+  editableByUsers: boolean('editable_by_users').default(true),
   context: text('context').notNull().default('all'),
   maxFileSize: integer('max_file_size'),
   allowedMimeTypes: text('allowed_mime_types').array(),

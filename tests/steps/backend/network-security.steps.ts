@@ -6,8 +6,8 @@
  * security headers, SSRF protection, HMAC hashing, config exposure, and more.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before } from './fixtures'
-import { shared, resetSharedState } from './shared-state'
+import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,
@@ -56,90 +56,95 @@ interface NetworkSecState {
   schnorrToken?: string
 }
 
-let secNet: NetworkSecState = {}
+const NETWORK_SECURITY_KEY = 'network_security'
 
-Before({ tags: '@backend' }, async () => {
-  secNet = {}
-  resetSharedState()
+function getNetworkSecState(world: Record<string, unknown>): NetworkSecState {
+  return getState<NetworkSecState>(world, NETWORK_SECURITY_KEY)
+}
+
+
+Before({ tags: '@backend' }, async ({ world }) => {
+  const secNet = {}
+  setState(world, NETWORK_SECURITY_KEY, secNet)
 })
 
 // ── Vonage Webhook Steps ─────────────────────────────────────────
 
-Given('a Vonage webhook request without a signature parameter', async ({}) => {
-  secNet.webhookRequest = { type: 'vonage', missingSignature: true }
+Given('a Vonage webhook request without a signature parameter', async ({ world }) => {
+  getNetworkSecState(world).webhookRequest = { type: 'vonage', missingSignature: true }
 })
 
-Given('a Vonage webhook request with a timestamp older than 5 minutes', async ({}) => {
-  secNet.webhookRequest = {
+Given('a Vonage webhook request with a timestamp older than 5 minutes', async ({ world }) => {
+  getNetworkSecState(world).webhookRequest = {
     type: 'vonage',
     timestamp: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
   }
 })
 
-When('the webhook validation runs', async ({ request }) => {
+When('the webhook validation runs', async ({ request, world }) => {
   // Test the webhook endpoint with invalid/expired credentials
   // The server should reject these requests
-  if (secNet.webhookRequest?.missingSignature) {
+  if (getNetworkSecState(world).webhookRequest?.missingSignature) {
     const res = await request.post(`${BASE_URL}/api/webhooks/vonage/voice`, {
       headers: { 'Content-Type': 'application/json' },
       data: { type: 'transfer', conversation_uuid: 'test' },
     })
-    secNet.webhookResult = { status: res.status(), data: null }
-  } else if (secNet.webhookRequest?.timestamp) {
+    getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
+  } else if (getNetworkSecState(world).webhookRequest?.timestamp) {
     const res = await request.post(`${BASE_URL}/api/webhooks/vonage/voice`, {
       headers: { 'Content-Type': 'application/json' },
       data: {
         type: 'transfer',
-        timestamp: secNet.webhookRequest.timestamp,
+        timestamp: getNetworkSecState(world).webhookRequest.timestamp,
         sig: 'invalid-signature',
       },
     })
-    secNet.webhookResult = { status: res.status(), data: null }
+    getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
   }
 })
 
-Then('the request should be rejected', async ({}) => {
-  expect(secNet.webhookResult).toBeDefined()
+Then('the request should be rejected', async ({ world }) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
   // Rejected = 400, 401, 403, or 404
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
-Then('the request should be rejected as replay', async ({}) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('the request should be rejected as replay', async ({ world }) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── Role Escalation Steps ────────────────────────────────────────
 
-Given('a volunteer PATCH request with {string} set to admin', async ({ request }, field: string) => {
+Given('a volunteer PATCH request with {string} set to admin', async ({ request, world }, field: string) => {
   const vol = await createVolunteerViaApi(request, { name: uniqueName('RoleEsc Vol') })
-  secNet.volunteerNsec = vol.nsec
-  secNet.volunteerPubkey = vol.pubkey
+  getNetworkSecState(world).volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerPubkey = vol.pubkey
 })
 
-When('the update is processed', async ({ request }) => {
+When('the update is processed', async ({ request, world }) => {
   // Volunteer tries to self-update with admin roles
   const res = await apiPatch(
     request,
-    `/volunteers/${secNet.volunteerPubkey}`,
+    `/users/${getNetworkSecState(world).volunteerPubkey}`,
     { roles: ['role-super-admin'] },
-    secNet.volunteerNsec!,
+    getNetworkSecState(world).volunteerNsec!,
   )
-  secNet.patchResult = res
+  getNetworkSecState(world).patchResult = res
 })
 
-Then('the {string} field should be stripped from the update', async ({}, _field: string) => {
+Then('the {string} field should be stripped from the update', async ({ world }, _field: string) => {
   // The server should either reject the request or strip the field
-  expect(secNet.patchResult).toBeDefined()
+  expect(getNetworkSecState(world).patchResult).toBeDefined()
   // If the server accepts but strips the field, status would be 200
   // If it rejects, status would be 403
   // Either way, the volunteer should NOT have super-admin role
-  expect(secNet.patchResult!.status).toBeDefined()
+  expect(getNetworkSecState(world).patchResult!.status).toBeDefined()
 })
 
 // ── Security Headers Steps ───────────────────────────────────────
 
-When('a client makes any API request', async ({ request }) => {
+When('a client makes any API request', async ({ request, world }) => {
   const res = await request.get(`${BASE_URL}/api/config`, {
     headers: { 'Content-Type': 'application/json' },
   })
@@ -147,12 +152,12 @@ When('a client makes any API request', async ({ request }) => {
   for (const entry of res.headersArray()) {
     headers[entry.name.toLowerCase()] = entry.value
   }
-  secNet.apiResponse = { status: res.status(), headers, data: null }
+  getNetworkSecState(world).apiResponse = { status: res.status(), headers, data: null }
 })
 
-Then('the response should include COOP, Referrer-Policy, and X-Content-Type-Options headers', async ({}) => {
-  expect(secNet.apiResponse).toBeDefined()
-  const headers = secNet.apiResponse!.headers
+Then('the response should include COOP, Referrer-Policy, and X-Content-Type-Options headers', async ({ world }) => {
+  expect(getNetworkSecState(world).apiResponse).toBeDefined()
+  const headers = getNetworkSecState(world).apiResponse!.headers
   // Check for security headers (may be lowercase)
   const hasCoopOrCors = headers['cross-origin-opener-policy'] !== undefined
     || headers['access-control-allow-origin'] !== undefined
@@ -164,77 +169,77 @@ Then('the response should include COOP, Referrer-Policy, and X-Content-Type-Opti
 
 // ── Login Validation Steps ───────────────────────────────────────
 
-Given('a login request with a valid pubkey but no Schnorr signature', async ({}) => {
+Given('a login request with a valid pubkey but no Schnorr signature', async ({ world }) => {
   const kp = generateTestKeypair()
-  secNet.volunteerPubkey = kp.pubkey
+  getNetworkSecState(world).volunteerPubkey = kp.pubkey
 })
 
-When('the login is processed', async ({ request }) => {
+When('the login is processed', async ({ request, world }) => {
   // Send a request without proper Schnorr auth
   const res = await request.get(`${BASE_URL}/api/auth/me`, {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${JSON.stringify({ pubkey: secNet.volunteerPubkey, timestamp: Date.now(), token: '' })}`,
+      'Authorization': `Bearer ${JSON.stringify({ pubkey: getNetworkSecState(world).volunteerPubkey, timestamp: Date.now(), token: '' })}`,
     },
   })
-  secNet.webhookResult = { status: res.status(), data: null }
+  getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
 })
 
-Then('the server should reject the request', async ({}) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('the server should reject the request', async ({ world }) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── CAPTCHA Steps ────────────────────────────────────────────────
 
-Given('a CAPTCHA challenge is generated', async ({}) => {
+Given('a CAPTCHA challenge is generated', async ({ world }) => {
   // CAPTCHA is generated server-side during call routing
   // The digits are stored server-side only
 })
 
-Then('the expected digits should not appear in any URL or response body', async ({}) => {
+Then('the expected digits should not appear in any URL or response body', async ({ world }) => {
   // CAPTCHA digits are never exposed — this is a design constraint
   // Verified by the architecture: digits stored in DO state only
   expect(true).toBeTruthy()
 })
 
-Then('the digits should be stored server-side only', async ({}) => {
+Then('the digits should be stored server-side only', async ({ world }) => {
   // CAPTCHA digits are stored in CallRouterDO state, never sent to clients
   expect(true).toBeTruthy()
 })
 
 // ── Invite Redemption Steps ─────────────────────────────────────
 
-Given('an invite code exists', async ({ request }) => {
+Given('an invite code exists', async ({ request, world }) => {
   const { data } = await apiPost<{ code?: string; invite?: { code: string } }>(request, '/invites', {
     name: uniqueName('Sec Invite'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
   })
-  secNet.inviteCode = (data as Record<string, unknown>)?.code as string
+  getNetworkSecState(world).inviteCode = (data as Record<string, unknown>)?.code as string
     ?? ((data as Record<string, unknown>)?.invite as Record<string, unknown>)?.code as string
 })
 
-When('someone tries to redeem it without a Schnorr signature', async ({ request }) => {
+When('someone tries to redeem it without a Schnorr signature', async ({ request, world }) => {
   // Try to redeem without auth — should fail
-  const res = await request.post(`${BASE_URL}/api/invites/${secNet.inviteCode}/redeem`, {
+  const res = await request.post(`${BASE_URL}/api/invites/${getNetworkSecState(world).inviteCode}/redeem`, {
     headers: { 'Content-Type': 'application/json' },
     data: { pubkey: generateTestKeypair().pubkey },
   })
-  secNet.webhookResult = { status: res.status(), data: null }
+  getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
 })
 
-Then('the redemption should fail with {int}', async ({}, expectedStatus: number) => {
-  expect(secNet.webhookResult).toBeDefined()
+Then('the redemption should fail with {int}', async ({ world }, expectedStatus: number) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
   // Should fail with 400 or 401
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── Upload Ownership Steps ──────────────────────────────────────
 
-Given('volunteer A uploads a file chunk', async ({ request }) => {
+Given('volunteer A uploads a file chunk', async ({ request, world }) => {
   const volA = await createVolunteerViaApi(request, { name: uniqueName('Upload A') })
-  secNet.volANsec = volA.nsec
+  getNetworkSecState(world).volANsec = volA.nsec
   // Simulate a file upload start
   const { data } = await apiPost<{ uploadId?: string }>(
     request,
@@ -242,38 +247,38 @@ Given('volunteer A uploads a file chunk', async ({ request }) => {
     { filename: 'test.txt', contentType: 'text/plain', totalSize: 1024 },
     volA.nsec,
   )
-  secNet.uploadChunkIdA = (data as Record<string, unknown>)?.uploadId as string ?? 'test-upload-id'
+  getNetworkSecState(world).uploadChunkIdA = (data as Record<string, unknown>)?.uploadId as string ?? 'test-upload-id'
 })
 
-When("volunteer B tries to access volunteer A's upload status", async ({ request }) => {
+When("volunteer B tries to access volunteer A's upload status", async ({ request, world }) => {
   const volB = await createVolunteerViaApi(request, { name: uniqueName('Upload B') })
-  secNet.volBNsec = volB.nsec
+  getNetworkSecState(world).volBNsec = volB.nsec
   // Try to access volA's upload from volB's session
   const res = await apiGet(
     request,
-    `/uploads/${secNet.uploadChunkIdA}/status`,
-    secNet.volBNsec,
+    `/uploads/${getNetworkSecState(world).uploadChunkIdA}/status`,
+    getNetworkSecState(world).volBNsec,
   )
-  secNet.webhookResult = { status: res.status, data: null }
+  getNetworkSecState(world).webhookResult = { status: res.status, data: null }
 })
 
-Then('the request should be rejected with {int}', async ({}, expectedStatus: number) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('the request should be rejected with {int}', async ({ world }, expectedStatus: number) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── Reporter Role Steps ─────────────────────────────────────────
 
-Given('a user with reporter role', async ({ request }) => {
+Given('a user with reporter role', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, {
     name: uniqueName('Reporter Sec'),
     roleIds: ['role-reporter'],
   })
-  secNet.volunteerNsec = vol.nsec
-  secNet.volunteerPubkey = vol.pubkey
+  getNetworkSecState(world).volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerPubkey = vol.pubkey
 })
 
-When('they attempt to create a call note', async ({ request }) => {
+When('they attempt to create a call note', async ({ request, world }) => {
   const res = await apiPost(
     request,
     '/notes',
@@ -281,129 +286,129 @@ When('they attempt to create a call note', async ({ request }) => {
       encryptedContent: 'reporter-note-attempt',
       callId: `test-call-${Date.now()}`,
     },
-    secNet.volunteerNsec!,
+    getNetworkSecState(world).volunteerNsec!,
   )
-  shared.lastResponse = res
-  secNet.webhookResult = res
+  setLastResponse(world, res)
+  getNetworkSecState(world).webhookResult = res
 })
 
 // ── Dev Reset Steps ─────────────────────────────────────────────
 
-Given('the DEV_RESET_SECRET environment variable is set', async ({}) => {
+Given('the DEV_RESET_SECRET environment variable is set', async ({ world }) => {
   // The test environment has DEV_RESET_SECRET configured
   // This is a precondition that's always true in test mode
 })
 
-When('a reset request is made without the X-Test-Secret header', async ({ request }) => {
+When('a reset request is made without the X-Test-Secret header', async ({ request, world }) => {
   const res = await request.post(`${BASE_URL}/api/test-reset`, {
     headers: { 'Content-Type': 'application/json' },
     // Deliberately omit X-Test-Secret header
   })
-  secNet.webhookResult = { status: res.status(), data: null }
+  getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
 })
 
-Then('the reset should be rejected', async ({}) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('the reset should be rejected', async ({ world }) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── SSRF Steps ──────────────────────────────────────────────────
 
-Given('a provider test URL of {string}', async ({}, url: string) => {
-  secNet.ssrfUrl = url
+Given('a provider test URL of {string}', async ({ world }, url: string) => {
+  getNetworkSecState(world).ssrfUrl = url
 })
 
-When('the SSRF guard evaluates the URL', async ({ request }) => {
+When('the SSRF guard evaluates the URL', async ({ request, world }) => {
   // Try to set a telephony provider with a private URL
   const res = await apiPatch(
     request,
     '/settings/telephony-provider',
     {
       type: 'custom',
-      baseUrl: secNet.ssrfUrl,
+      baseUrl: getNetworkSecState(world).ssrfUrl,
     },
   )
-  secNet.webhookResult = { status: res.status, data: null }
+  getNetworkSecState(world).webhookResult = { status: res.status, data: null }
 })
 
-Then('it should be blocked as an internal address', async ({}) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('it should be blocked as an internal address', async ({ world }) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── Phone Hashing Steps ─────────────────────────────────────────
 
-Given('a phone number {string}', async ({}, phone: string) => {
-  secNet.phoneNumber = phone
+Given('a phone number {string}', async ({ world }, phone: string) => {
+  getNetworkSecState(world).phoneNumber = phone
 })
 
-When('it is hashed with two different HMAC secrets', async ({}) => {
-  const phone = secNet.phoneNumber!
-  secNet.hmacHash1 = crypto.createHmac('sha256', 'secret-1').update(phone).digest('hex')
-  secNet.hmacHash2 = crypto.createHmac('sha256', 'secret-2').update(phone).digest('hex')
+When('it is hashed with two different HMAC secrets', async ({ world }) => {
+  const phone = getNetworkSecState(world).phoneNumber!
+  getNetworkSecState(world).hmacHash1 = crypto.createHmac('sha256', 'secret-1').update(phone).digest('hex')
+  getNetworkSecState(world).hmacHash2 = crypto.createHmac('sha256', 'secret-2').update(phone).digest('hex')
 })
 
-Then('the hashes should be different', async ({}) => {
-  expect(secNet.hmacHash1).toBeDefined()
-  expect(secNet.hmacHash2).toBeDefined()
-  expect(secNet.hmacHash1).not.toBe(secNet.hmacHash2)
+Then('the hashes should be different', async ({ world }) => {
+  expect(getNetworkSecState(world).hmacHash1).toBeDefined()
+  expect(getNetworkSecState(world).hmacHash2).toBeDefined()
+  expect(getNetworkSecState(world).hmacHash1).not.toBe(getNetworkSecState(world).hmacHash2)
 })
 
 // ── Config Exposure Steps ────────────────────────────────────────
 
-When('the public \\/api\\/config endpoint is queried', async ({ request }) => {
+When('the public \\/api\\/config endpoint is queried', async ({ request, world }) => {
   const res = await request.get(`${BASE_URL}/api/config`, {
     headers: { 'Content-Type': 'application/json' },
   })
-  secNet.configData = await res.json() as Record<string, unknown>
+  getNetworkSecState(world).configData = await res.json() as Record<string, unknown>
 })
 
-Then('the response should not contain adminPubkey', async ({}) => {
-  expect(secNet.configData).toBeDefined()
-  expect(secNet.configData!.adminPubkey).toBeUndefined()
+Then('the response should not contain adminPubkey', async ({ world }) => {
+  expect(getNetworkSecState(world).configData).toBeDefined()
+  expect(getNetworkSecState(world).configData!.adminPubkey).toBeUndefined()
 })
 
-When('the unauthenticated \\/api\\/config endpoint is queried', async ({ request }) => {
+When('the unauthenticated \\/api\\/config endpoint is queried', async ({ request, world }) => {
   const res = await request.get(`${BASE_URL}/api/config`, {
     headers: { 'Content-Type': 'application/json' },
   })
-  secNet.configData = await res.json() as Record<string, unknown>
+  getNetworkSecState(world).configData = await res.json() as Record<string, unknown>
 })
 
-Then('the response should not contain serverEventKeyHex', async ({}) => {
-  expect(secNet.configData).toBeDefined()
-  expect(secNet.configData!.serverEventKeyHex).toBeUndefined()
+Then('the response should not contain serverEventKeyHex', async ({ world }) => {
+  expect(getNetworkSecState(world).configData).toBeDefined()
+  expect(getNetworkSecState(world).configData!.serverEventKeyHex).toBeUndefined()
 })
 
-Given('an authenticated user', async ({ request }) => {
+Given('an authenticated user', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, { name: uniqueName('Auth User') })
-  secNet.volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerNsec = vol.nsec
 })
 
-When('they query \\/api\\/auth\\/me', async ({ request }) => {
-  const result = await getMeViaApi(request, secNet.volunteerNsec!)
-  secNet.meData = result.data as Record<string, unknown>
-  secNet.webhookResult = { status: result.status, data: result.data }
+When('they query \\/api\\/auth\\/me', async ({ request, world }) => {
+  const result = await getMeViaApi(request, getNetworkSecState(world).volunteerNsec!)
+  getNetworkSecState(world).meData = result.data as Record<string, unknown>
+  getNetworkSecState(world).webhookResult = { status: result.status, data: result.data }
 })
 
-Then('the response should contain serverEventKeyHex', async ({}) => {
+Then('the response should contain serverEventKeyHex', async ({ world }) => {
   // The /me endpoint may or may not include serverEventKeyHex
   // depending on the user's role. Verify the request succeeded.
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBe(200)
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBe(200)
 })
 
 // ── Invite Privilege Escalation Steps ────────────────────────────
 
-Given('a volunteer-permissioned user', async ({ request }) => {
+Given('a volunteer-permissioned user', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, {
     name: uniqueName('Priv Esc Vol'),
     roleIds: ['role-volunteer'],
   })
-  secNet.volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerNsec = vol.nsec
 })
 
-When('they try to create an invite with admin role', async ({ request }) => {
+When('they try to create an invite with admin role', async ({ request, world }) => {
   const res = await apiPost(
     request,
     '/invites',
@@ -412,30 +417,30 @@ When('they try to create an invite with admin role', async ({ request }) => {
       phone: uniquePhone(),
       roleIds: ['role-super-admin'],
     },
-    secNet.volunteerNsec!,
+    getNetworkSecState(world).volunteerNsec!,
   )
-  secNet.webhookResult = res
-  shared.lastResponse = res
+  getNetworkSecState(world).webhookResult = res
+  setLastResponse(world, res)
 })
 
-Then('the server should reject with {int} citing missing permissions', async ({}, expectedStatus: number) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBe(expectedStatus)
+Then('the server should reject with {int} citing missing permissions', async ({ world }, expectedStatus: number) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBe(expectedStatus)
 })
 
 // ── Nostr Relay Events Steps ─────────────────────────────────────
 
-Given('a hub with SERVER_NOSTR_SECRET configured', async ({}) => {
+Given('a hub with SERVER_NOSTR_SECRET configured', async ({ world }) => {
   // The test server has SERVER_NOSTR_SECRET configured
   // This is a precondition verified by the server starting
 })
 
-When('the server publishes a Nostr event', async ({}) => {
+When('the server publishes a Nostr event', async ({ world }) => {
   // Nostr events are published internally by the server
   // This step verifies the architecture ensures encryption
 })
 
-Then('the event content should be encrypted with the derived event key', async ({}) => {
+Then('the event content should be encrypted with the derived event key', async ({ world }) => {
   // The server uses HKDF-derived event key for Nostr event encryption
   // This is an architectural constraint verified by code review
   expect(true).toBeTruthy()
@@ -443,67 +448,67 @@ Then('the event content should be encrypted with the derived event key', async (
 
 // ── Auth Token Binding Steps ─────────────────────────────────────
 
-Given('a Schnorr token signed without method and path', async ({}) => {
+Given('a Schnorr token signed without method and path', async ({ world }) => {
   const kp = generateTestKeypair()
   // Create a token without method+path binding (old format)
   const timestamp = Date.now()
   const message = `${AUTH_PREFIX}${kp.pubkey}:${timestamp}`
   const messageHash = sha256(utf8ToBytes(message))
   const sig = schnorr.sign(messageHash, hexToBytes(kp.skHex))
-  secNet.schnorrToken = JSON.stringify({
+  getNetworkSecState(world).schnorrToken = JSON.stringify({
     pubkey: kp.pubkey,
     timestamp,
     token: bytesToHex(sig),
   })
 })
 
-When('it is presented to an API endpoint', async ({ request }) => {
+When('it is presented to an API endpoint', async ({ request, world }) => {
   const res = await request.get(`${BASE_URL}/api/auth/me`, {
     headers: {
-      'Authorization': `Bearer ${secNet.schnorrToken}`,
+      'Authorization': `Bearer ${getNetworkSecState(world).schnorrToken}`,
       'Content-Type': 'application/json',
     },
   })
-  secNet.webhookResult = { status: res.status(), data: null }
-  shared.lastResponse = { status: res.status(), data: null }
+  getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
+  setLastResponse(world, { status: res.status(), data: null })
 })
 
 // ── Contact Encryption Steps ─────────────────────────────────────
 
-Given('a new conversation with phone {string}', async ({ request }, phone: string) => {
+Given('a new conversation with phone {string}', async ({ request, world }, phone: string) => {
   const result = await simulateIncomingMessage(request, {
     senderNumber: phone,
     body: 'Encryption test message',
     channel: 'sms',
   })
-  secNet.conversationId = result.conversationId
+  getNetworkSecState(world).conversationId = result.conversationId
 })
 
-When('the conversation is stored', async ({}) => {
+When('the conversation is stored', async ({ world }) => {
   // The conversation was stored by the simulateIncomingMessage call
-  expect(secNet.conversationId).toBeDefined()
+  expect(getNetworkSecState(world).conversationId).toBeDefined()
 })
 
-Then('the stored phone value should start with {string}', async ({}, prefix: string) => {
+Then('the stored phone value should start with {string}', async ({ world }, prefix: string) => {
   // The phone is encrypted at rest by ConversationDO
   // We can't directly verify the stored value via API (it's decrypted on read)
   // This is an architectural constraint verified by the DO implementation
-  expect(secNet.conversationId).toBeTruthy()
+  expect(getNetworkSecState(world).conversationId).toBeTruthy()
 })
 
 // ── BlastDO HMAC Steps ──────────────────────────────────────────
 
-Given('HMAC_SECRET is set to a unique value', async ({}) => {
+Given('HMAC_SECRET is set to a unique value', async ({ world }) => {
   // The test environment has HMAC_SECRET configured
   // This is a precondition
 })
 
-When('a subscriber phone is hashed for the blast list', async ({}) => {
+When('a subscriber phone is hashed for the blast list', async ({ world }) => {
   // BlastDO hashes subscriber phones using HMAC_SECRET
   // This is an internal implementation detail
 })
 
-Then('the hash should depend on HMAC_SECRET, not a public constant', async ({}) => {
+Then('the hash should depend on HMAC_SECRET, not a public constant', async ({ world }) => {
   // Verified by the HMAC approach — different secrets produce different hashes
   // Same as the phone hashing test above
   expect(true).toBeTruthy()
@@ -511,12 +516,12 @@ Then('the hash should depend on HMAC_SECRET, not a public constant', async ({}) 
 
 // ── DEMO_MODE Steps ─────────────────────────────────────────────
 
-Given('DEMO_MODE is set to {string}', async ({}, value: string) => {
+Given('DEMO_MODE is set to {string}', async ({ world }, value: string) => {
   // DEMO_MODE is an environment variable
   // In test mode, DEMO_MODE is typically not set or set to a dev value
 })
 
-When('a reset request is sent to any Durable Object', async ({ request }) => {
+When('a reset request is sent to any Durable Object', async ({ request, world }) => {
   // In production (DEMO_MODE=false), reset should be rejected
   // In test mode, reset is allowed with the correct secret
   // We test the production guard by sending without the secret
@@ -524,46 +529,46 @@ When('a reset request is sent to any Durable Object', async ({ request }) => {
     headers: { 'Content-Type': 'application/json' },
     // No X-Test-Secret header
   })
-  secNet.webhookResult = { status: res.status(), data: null }
+  getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
 })
 
 // ── Hub Slug Validation Steps ────────────────────────────────────
 
-When('creating a hub with slug {string}', async ({ request }, slug: string) => {
+When('creating a hub with slug {string}', async ({ request, world }, slug: string) => {
   const res = await apiPost(request, '/hubs', {
     name: 'Test Hub',
     slug,
   })
-  shared.lastResponse = res
-  secNet.webhookResult = res
+  setLastResponse(world, res)
+  getNetworkSecState(world).webhookResult = res
 })
 
-Then('the server should reject with a validation error', async ({}) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('the server should reject with a validation error', async ({ world }) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── Blast HTTPS Steps ────────────────────────────────────────────
 
-When('creating a blast with mediaUrl {string}', async ({ request }, mediaUrl: string) => {
+When('creating a blast with mediaUrl {string}', async ({ request, world }, mediaUrl: string) => {
   const res = await apiPost(request, '/blasts', {
     title: 'Test Blast',
     body: 'Test body',
     mediaUrl,
     channels: ['sms'],
   })
-  shared.lastResponse = res
-  secNet.webhookResult = res
+  setLastResponse(world, res)
+  getNetworkSecState(world).webhookResult = res
 })
 
-Then('the server should reject with a validation error about HTTPS', async ({}) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('the server should reject with a validation error about HTTPS', async ({ world }) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
 
 // ── Upload Size Steps ────────────────────────────────────────────
 
-When('uploading a file of {int}MB', async ({ request }, sizeMB: number) => {
+When('uploading a file of {int}MB', async ({ request, world }, sizeMB: number) => {
   // Try to upload a chunk that's too large
   const largeBody = Buffer.alloc(sizeMB * 1024 * 1024, 'x')
   try {
@@ -575,14 +580,14 @@ When('uploading a file of {int}MB', async ({ request }, sizeMB: number) => {
       },
       data: largeBody,
     })
-    secNet.webhookResult = { status: res.status(), data: null }
+    getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
   } catch {
     // Request may be rejected at the transport level
-    secNet.webhookResult = { status: 413, data: null }
+    getNetworkSecState(world).webhookResult = { status: 413, data: null }
   }
 })
 
-Then('the server should reject with {int} Payload Too Large', async ({}, expectedStatus: number) => {
-  expect(secNet.webhookResult).toBeDefined()
-  expect(secNet.webhookResult!.status).toBeGreaterThanOrEqual(400)
+Then('the server should reject with {int} Payload Too Large', async ({ world }, expectedStatus: number) => {
+  expect(getNetworkSecState(world).webhookResult).toBeDefined()
+  expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })

@@ -22,10 +22,10 @@ val ShiftResponse.dayIndices: List<Int>
 /**
  * Derive a display status from the generated ShiftResponse.
  * The generated type doesn't have a status field — it contains
- * volunteerPubkeys which indicates assignment.
+ * userPubkeys which indicates assignment.
  */
 val ShiftResponse.displayStatus: String
-    get() = if (volunteerPubkeys.isEmpty()) "available" else "assigned"
+    get() = if (userPubkeys.isEmpty()) "available" else "assigned"
 
 // ---- CallRecordResponse Extensions ----
 

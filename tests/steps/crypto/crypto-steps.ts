@@ -170,7 +170,7 @@ When('I import that nsec into a fresh CryptoService', async ({ page }) => {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   const storedNsec = await page.evaluate(() => (window as Record<string, unknown>).__test_import_nsec) as string
-  await page.locator('#nsec').fill(storedNsec)
+  await page.getByTestId(TestIds.NSEC_INPUT).fill(storedNsec)
   await page.getByTestId(TestIds.LOGIN_SUBMIT_BTN).click()
 })
 
@@ -249,7 +249,7 @@ Then('the crypto service should be unlocked', async ({ page }) => {
 Then('the crypto service should be locked', async ({ page }) => {
   // When locked, should show PIN unlock screen or login screen
   const pinInput = page.locator('input[aria-label="PIN digit 1"]')
-  const nsecInput = page.locator('#nsec')
+  const nsecInput = page.getByTestId(TestIds.NSEC_INPUT)
   const isPin = await pinInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   const isNsec = await nsecInput.isVisible({ timeout: 2000 }).catch(() => false)
   expect(isPin || isNsec).toBe(true)

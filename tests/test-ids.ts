@@ -121,6 +121,7 @@ export const TestIds = {
   REPORT_METADATA: 'report-metadata',
   REPORT_STATUS_BADGE: 'report-status-badge',
   REPORT_FILTER_AREA: 'report-filter-area',
+  REPORT_TYPE_BADGE: 'report-type-badge',
   RECOVERY_KEY: 'recovery-key',
 
   // ============ Conversations ============
@@ -164,6 +165,7 @@ export const TestIds = {
   CONTINUE_TO_LOGIN: 'continue-to-login',
 
   // ============ Auth / Login ============
+  NSEC_INPUT: 'nsec-input',
   LOGIN_SUBMIT_BTN: 'login-submit-btn',
   GO_TO_SETUP_BTN: 'go-to-setup-btn',
   LOCK_BTN: 'lock-btn',
@@ -228,6 +230,26 @@ export const TestIds = {
   RCS_SERVICE_KEY: 'rcs-service-key',
   RCS_WEBHOOK_SECRET: 'rcs-webhook-secret',
 
+  // ============ Settings Sections ============
+  SETTINGS_CUSTOM_FIELDS: 'custom-fields',
+  SETTINGS_TELEPHONY: 'telephony',
+  SETTINGS_TRANSCRIPTION: 'transcription',
+  SETTINGS_SPAM: 'spam-section',
+  SETTINGS_KEY_BACKUP: 'key-backup',
+  SETTINGS_LINKED_DEVICES: 'linked-devices',
+  SETTINGS_ADVANCED: 'advanced',
+  SETTINGS_PROFILE: 'profile',
+  SETTINGS_THEME: 'theme',
+  SETTINGS_LANGUAGE: 'language',
+  SETTINGS_NOTIFICATIONS: 'notifications',
+  SETTINGS_PASSKEYS: 'passkeys',
+  SETTINGS_HUB_CONNECTION: 'hub-connection',
+  SETTINGS_CALL_PREFERENCE: 'call-preference',
+  SETTINGS_CMS_TOGGLE: 'cms-toggle',
+  SETTINGS_ENTITY_TYPES: 'entity-types',
+  SETTINGS_TEMPLATES: 'templates',
+  SETTINGS_REPORT_TYPES: 'report-types',
+
   // ============ Theme ============
   THEME_SYSTEM: 'theme-system',
   THEME_LIGHT: 'theme-light',
@@ -279,6 +301,32 @@ export function testIdSelector(id: TestId): string {
  */
 export function rowTestId(baseId: TestId, identifier: string): string {
   return `${baseId}-${identifier}`
+}
+
+/**
+ * Map from human-readable section names to their data-testid values.
+ * SettingsSection components render with data-testid={id} where id is the section slug.
+ * The trigger element within each section has data-testid="{id}-trigger".
+ */
+export const sectionTestIdMap: Record<string, string> = {
+  'Custom Note Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
+  'Custom Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
+  'Telephony': TestIds.SETTINGS_TELEPHONY,
+  'Transcription': TestIds.SETTINGS_TRANSCRIPTION,
+  'Spam Mitigation': TestIds.SETTINGS_SPAM,
+  'Spam': TestIds.SETTINGS_SPAM,
+  'Key Backup': TestIds.SETTINGS_KEY_BACKUP,
+  'Linked Devices': TestIds.SETTINGS_LINKED_DEVICES,
+  'Device Link': TestIds.SETTINGS_LINKED_DEVICES,
+  'Advanced Settings': TestIds.SETTINGS_ADVANCED,
+  'Profile': TestIds.SETTINGS_PROFILE,
+  'Identity': TestIds.SETTINGS_PROFILE,
+  'Theme': TestIds.SETTINGS_THEME,
+  'Language': TestIds.SETTINGS_LANGUAGE,
+  'Notifications': TestIds.SETTINGS_NOTIFICATIONS,
+  'Passkeys': TestIds.SETTINGS_PASSKEYS,
+  'Hub Connection': TestIds.SETTINGS_HUB_CONNECTION,
+  'Call Preference': TestIds.SETTINGS_CALL_PREFERENCE,
 }
 
 /**

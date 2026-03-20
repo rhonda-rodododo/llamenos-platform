@@ -11,9 +11,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { listVolunteers, getVolunteerLoads, updateConversation, type Volunteer, type Conversation } from '@/lib/api'
+import { listUsers, getUserLoads, updateConversation, type User, type Conversation } from '@/lib/api'
 import { useToast } from '@/lib/toast'
-import { User, Users, AlertCircle, Loader2 } from 'lucide-react'
+import { User as UserIcon, Users, AlertCircle, Loader2 } from 'lucide-react'
 
 interface ReassignDialogProps {
   conversation: Conversation
@@ -30,13 +30,13 @@ export function ReassignDialog({
 }: ReassignDialogProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [loads, setLoads] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [reassigning, setReassigning] = useState(false)
   const [selectedPubkey, setSelectedPubkey] = useState<string | null>(null)
 
-  // Load volunteers and their current loads when dialog opens
+  // Load users and their current loads when dialog opens
   useEffect(() => {
     if (!open) return
 
@@ -44,21 +44,21 @@ export function ReassignDialog({
     setSelectedPubkey(null)
 
     Promise.all([
-      listVolunteers(),
-      getVolunteerLoads(),
+      listUsers(),
+      getUserLoads(),
     ])
-      .then(([volRes, loadRes]) => {
-        // Filter to active volunteers with messaging enabled
-        const eligible = volRes.volunteers.filter(v =>
-          v.active &&
-          v.messagingEnabled !== false &&
-          v.pubkey !== conversation.assignedTo // Exclude current assignee
+      .then(([userRes, loadRes]) => {
+        // Filter to active users with messaging enabled
+        const eligible = userRes.users.filter(u =>
+          u.active &&
+          u.messagingEnabled !== false &&
+          u.pubkey !== conversation.assignedTo // Exclude current assignee
         )
-        setVolunteers(eligible)
+        setUsers(eligible)
         setLoads(loadRes.loads)
       })
       .catch(() => {
-        toast(t('conversations.loadVolunteersError', { defaultValue: 'Failed to load volunteers' }), 'error')
+        toast(t('conversations.loadUsersError', { defaultValue: 'Failed to load volunteers' }), 'error')
       })
       .finally(() => setLoading(false))
   }, [open, conversation.assignedTo, t, toast])
@@ -93,16 +93,16 @@ export function ReassignDialog({
     }
   }
 
-  // Check if volunteer can handle this channel
-  const canHandleChannel = (vol: Volunteer) => {
+  // Check if user can handle this channel
+  const canHandleChannel = (vol: User) => {
     if (!vol.supportedMessagingChannels || vol.supportedMessagingChannels.length === 0) {
       return true // Empty array means all channels
     }
-    return vol.supportedMessagingChannels.includes(conversation.channelType as string)
+    return vol.supportedMessagingChannels.some(ch => ch === conversation.channelType)
   }
 
-  // Sort volunteers: capable first, then by load (ascending)
-  const sortedVolunteers = [...volunteers].sort((a, b) => {
+  // Sort users: capable first, then by load (ascending)
+  const sortedUsers = [...users].sort((a, b) => {
     const aCanHandle = canHandleChannel(a)
     const bCanHandle = canHandleChannel(b)
     if (aCanHandle && !bCanHandle) return -1
@@ -127,17 +127,17 @@ export function ReassignDialog({
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : volunteers.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground">
-              {t('conversations.noVolunteersAvailable', { defaultValue: 'No volunteers available' })}
+              {t('conversations.noUsersAvailable', { defaultValue: 'No volunteers available' })}
             </p>
           </div>
         ) : (
           <ScrollArea className="max-h-64">
             <div className="space-y-2 pr-4">
-              {sortedVolunteers.map((vol) => {
+              {sortedUsers.map((vol) => {
                 const load = loads[vol.pubkey] || 0
                 const capable = canHandleChannel(vol)
                 const isSelected = selectedPubkey === vol.pubkey
@@ -168,7 +168,7 @@ export function ReassignDialog({
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <User className="h-3 w-3" />
+                        <UserIcon className="h-3 w-3" />
                         <span>
                           {load} {t('conversations.activeConversations', { defaultValue: 'active' })}
                         </span>

@@ -136,7 +136,6 @@ Feature: Call Routing & History
 
   @backend
   Scenario: Banned caller is rejected before ringing
-    Given the server is reset
     And "+15559999999" is on the ban list
     When a call arrives from "+15559999999"
     Then the call is rejected
@@ -144,7 +143,6 @@ Feature: Call Routing & History
 
   @backend
   Scenario: Non-banned caller rings volunteers
-    Given the server is reset
     And 2 volunteers are on shift
     When a call arrives from "+15550001111"
     Then the call status is "ringing"
@@ -153,14 +151,12 @@ Feature: Call Routing & History
 
   @backend
   Scenario: All on-shift volunteers ring simultaneously
-    Given the server is reset
     And 3 volunteers are on shift
     When a call arrives from "+15552223333"
     Then all 3 volunteers receive a ring
 
   @backend
   Scenario: First pickup ends ringing for others
-    Given the server is reset
     And 2 volunteers are on shift
     When a call arrives from "+15554445555"
     And volunteer 1 answers the call
@@ -171,7 +167,6 @@ Feature: Call Routing & History
 
   @backend
   Scenario: Unanswered call records voicemail
-    Given the server is reset
     And 1 volunteers are on shift
     When a call arrives from "+15556667777"
     And the call goes to voicemail
@@ -181,7 +176,6 @@ Feature: Call Routing & History
 
   @backend
   Scenario: Completed call appears in call history
-    Given the server is reset
     And 1 volunteers are on shift
     When a call arrives from "+15559876543"
     And volunteer 1 answers the call
@@ -192,7 +186,6 @@ Feature: Call Routing & History
 
   @backend
   Scenario: Call history filters by status
-    Given the server is reset
     And 1 volunteers are on shift
     And 2 calls were completed today
     And 1 call went to voicemail today
@@ -201,7 +194,6 @@ Feature: Call Routing & History
 
   @backend
   Scenario: Call history filters by date range
-    Given the server is reset
     And 1 volunteers are on shift
     And 3 calls were completed today
     When the call history is filtered to today's date
