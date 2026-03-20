@@ -7,20 +7,26 @@ import { messagingChannelTypeSchema } from './settings'
 export const volunteerResponseSchema = z.object({
   pubkey: pubkeySchema,
   name: z.string(),
-  phone: z.string().optional(),
   roles: z.array(z.string()),
   active: z.boolean(),
+  createdAt: z.string(),
   transcriptionEnabled: z.boolean().optional(),
   spokenLanguages: z.array(z.string()).optional(),
   uiLanguage: z.string().optional(),
   profileCompleted: z.boolean().optional(),
   onBreak: z.boolean().optional(),
-  callPreference: z.string().optional(),
+  callPreference: z.enum(['phone', 'browser', 'both']).optional(),
   // Epic 340: Volunteer profile extensions
   specializations: z.array(z.string()).optional(),
   maxCaseAssignments: z.number().optional(),
   teamId: z.string().optional(),
   supervisorPubkey: z.string().optional(),
+})
+
+export const volunteerAdminResponseSchema = volunteerResponseSchema.extend({
+  phone: z.string(),
+  messagingEnabled: z.boolean().optional(),
+  supportedMessagingChannels: z.array(messagingChannelTypeSchema).optional(),
 })
 
 // --- List/wrapper response schemas ---
