@@ -9,7 +9,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
+import { TestIds, navTestIdMap } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 /**
@@ -130,7 +130,22 @@ When('I fill in the reason with {string}', async ({ page }, reason: string) => {
 // --- Section expand/collapse ---
 
 When('I expand the {string} section', async ({ page }, sectionName: string) => {
-  const testId = sectionTestIdMap[sectionName]
+  const sectionTestIds: Record<string, string> = {
+    'Custom Note Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
+    'Custom Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
+    'Telephony': TestIds.SETTINGS_TELEPHONY,
+    'Transcription': TestIds.SETTINGS_TRANSCRIPTION,
+    'Spam': TestIds.SETTINGS_SPAM,
+    'Key Backup': TestIds.SETTINGS_KEY_BACKUP,
+    'Linked Devices': TestIds.SETTINGS_LINKED_DEVICES,
+    'Advanced': TestIds.SETTINGS_ADVANCED,
+    'Profile': TestIds.SETTINGS_PROFILE,
+    'Theme': TestIds.SETTINGS_THEME,
+    'Language': TestIds.SETTINGS_LANGUAGE,
+    'Notifications': TestIds.SETTINGS_NOTIFICATIONS,
+    'Passkeys': TestIds.SETTINGS_PASSKEYS,
+  }
+  const testId = sectionTestIds[sectionName]
   const slug = sectionName.toLowerCase().replace(/\s+/g, '-')
   const section = testId
     ? page.getByTestId(testId)
