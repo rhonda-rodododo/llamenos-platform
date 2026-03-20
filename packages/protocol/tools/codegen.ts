@@ -2,8 +2,8 @@
 /**
  * Protocol codegen tool.
  *
- * Generates TypeScript interfaces, Swift structs, and Kotlin data classes
- * from Zod schemas (via toJSONSchema()) defined in packages/protocol/schemas/.
+ * Generates Swift structs and Kotlin data classes from Zod schemas
+ * (via toJSONSchema()) defined in packages/protocol/schemas/.
  * Also generates crypto label constants.
  *
  * Usage:
@@ -28,11 +28,45 @@ const __dirname = dirname(__filename)
 const GENERATED_DIR = resolve(__dirname, '../generated')
 const CRYPTO_LABELS_FILE = resolve(__dirname, '../crypto-labels.json')
 
-// No-op schema store — all schemas are self-contained (no $ref across files)
-class InlineSchemaStore extends JSONSchemaStore {
-  async fetch(_address: string) {
-    return undefined
+/**
+ * Schema store backed by the full registry. Resolves $ref addresses by name
+ * so that any future schema using $defs or z.lazy() resolves correctly.
+ */
+class FlatSchemaStore extends JSONSchemaStore {
+  private readonly schemaMap: Map<string, object>
+
+  constructor(schemas: Array<{ name: string; schema: string }>) {
+    super()
+    this.schemaMap = new Map(schemas.map(({ name, schema }) => [name, JSON.parse(schema)]))
   }
+
+  async fetch(address: string): Promise<object | undefined> {
+    return this.schemaMap.get(address)
+  }
+}
+
+/**
+ * Recursively remove "additionalProperties" from a JSON Schema object.
+ * z.looseObject() emits additionalProperties: {} which causes quicktype to add
+ * open-map index signatures to generated types. Strip it before passing to quicktype.
+ */
+function stripAdditionalProperties(schema: object): object {
+  const s = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>
+  delete s['additionalProperties']
+  if (s['properties'] && typeof s['properties'] === 'object') {
+    for (const key of Object.keys(s['properties'] as object)) {
+      const prop = (s['properties'] as Record<string, object>)[key]
+      if (prop && typeof prop === 'object') {
+        (s['properties'] as Record<string, object>)[key] = stripAdditionalProperties(prop) as object
+      }
+    }
+  }
+  if (Array.isArray(s['items'])) {
+    s['items'] = (s['items'] as object[]).map(stripAdditionalProperties)
+  } else if (s['items'] && typeof s['items'] === 'object') {
+    s['items'] = stripAdditionalProperties(s['items'] as object)
+  }
+  return s
 }
 
 // Generate types for a target language from all schemas
@@ -41,7 +75,7 @@ async function generateForLanguage(
   schemas: Array<{ name: string; schema: string }>,
   rendererOptions: Record<string, string> = {},
 ): Promise<string[]> {
-  const store = new InlineSchemaStore()
+  const store = new FlatSchemaStore(schemas)
   const schemaInput = new JSONSchemaInput(store)
 
   for (const { name, schema } of schemas) {
@@ -412,7 +446,7 @@ async function main() {
   // Convert registry entries to JSON strings for quicktype
   const allSchemas = registry.map(({ name, jsonSchema }) => ({
     name,
-    schema: JSON.stringify(jsonSchema),
+    schema: JSON.stringify(stripAdditionalProperties(jsonSchema)),
   }))
 
   // Read crypto labels
