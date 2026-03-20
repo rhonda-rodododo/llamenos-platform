@@ -230,7 +230,7 @@ function SystemHealthPage() {
 
         {/* Volunteers */}
         <StatusCard
-          title={t('admin.system.volunteers')}
+          title={t('admin.system.users')}
           icon={<Users className="h-4 w-4" />}
           testId="system-card-volunteers"
         >

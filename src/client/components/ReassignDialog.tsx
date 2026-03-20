@@ -58,7 +58,7 @@ export function ReassignDialog({
         setLoads(loadRes.loads)
       })
       .catch(() => {
-        toast(t('conversations.loadVolunteersError', { defaultValue: 'Failed to load volunteers' }), 'error')
+        toast(t('conversations.loadUsersError', { defaultValue: 'Failed to load volunteers' }), 'error')
       })
       .finally(() => setLoading(false))
   }, [open, conversation.assignedTo, t, toast])
@@ -131,7 +131,7 @@ export function ReassignDialog({
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground">
-              {t('conversations.noVolunteersAvailable', { defaultValue: 'No volunteers available' })}
+              {t('conversations.noUsersAvailable', { defaultValue: 'No volunteers available' })}
             </p>
           </div>
         ) : (

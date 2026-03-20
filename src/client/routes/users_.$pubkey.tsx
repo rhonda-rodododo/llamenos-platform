@@ -105,7 +105,7 @@ function UserProfilePage() {
       <div className="space-y-4">
         <Link to="/users" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
-          {t('nav.volunteers')}
+          {t('nav.users')}
         </Link>
         <div className="py-8 text-center text-muted-foreground">
           {t('common.noData')}
@@ -128,7 +128,7 @@ function UserProfilePage() {
       {/* Back link */}
       <Link to="/users" data-testid="back-btn" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />
-        {t('nav.volunteers')}
+        {t('nav.users')}
       </Link>
 
       {/* User Info Card */}
@@ -146,9 +146,9 @@ function UserProfilePage() {
               <div className="flex flex-wrap gap-2">
                 <Badge data-testid="volunteer-role-badge" variant={user.roles.includes('role-super-admin') || user.roles.includes('role-hub-admin') ? 'default' : 'secondary'}>
                   {user.roles.includes('role-super-admin') || user.roles.includes('role-hub-admin') ? (
-                    <><ShieldCheck className="h-3 w-3" /> {t('volunteers.roleAdmin')}</>
+                    <><ShieldCheck className="h-3 w-3" /> {t('users.roleAdmin')}</>
                   ) : (
-                    <><Shield className="h-3 w-3" /> {t('volunteers.roleVolunteer')}</>
+                    <><Shield className="h-3 w-3" /> {t('users.roleVolunteer')}</>
                   )}
                 </Badge>
                 <Badge data-testid="volunteer-status-badge" variant="outline" className={
@@ -156,7 +156,7 @@ function UserProfilePage() {
                     ? 'border-green-500/50 text-green-700 dark:text-green-400'
                     : 'border-red-500/50 text-red-700 dark:text-red-400'
                 }>
-                  {user.active ? t('volunteers.active') : t('volunteers.inactive')}
+                  {user.active ? t('users.active') : t('users.inactive')}
                 </Badge>
                 {user.onBreak && (
                   <Badge variant="outline" className="border-yellow-500/50 text-yellow-700 dark:text-yellow-400">
@@ -177,7 +177,7 @@ function UserProfilePage() {
                 </span>
                 <span data-testid="volunteer-join-date" className="flex items-center gap-1.5">
                   <UserIcon className="h-3.5 w-3.5" />
-                  {t('volunteerProfile.joined')} {new Date(user.createdAt).toLocaleDateString()}
+                  {t('userProfile.joined')} {new Date(user.createdAt).toLocaleDateString()}
                 </span>
               </div>
             </div>
@@ -190,13 +190,13 @@ function UserProfilePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            {t('volunteerProfile.assignedShifts')}
+            {t('userProfile.assignedShifts')}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {assignedShifts.length === 0 ? (
             <div className="px-6 pb-6 text-sm text-muted-foreground">
-              {t('volunteerProfile.noShifts')}
+              {t('userProfile.noShifts')}
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -232,7 +232,7 @@ function UserProfilePage() {
               messagingEnabled: enabled,
             })
             setUser(updated)
-            toast(t('volunteerProfile.channelsSaved'), 'success')
+            toast(t('userProfile.channelsSaved'), 'success')
           } catch {
             toast(t('common.error'), 'error')
           } finally {
@@ -246,7 +246,7 @@ function UserProfilePage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <ScrollText className="h-4 w-4 text-muted-foreground" />
-            {t('volunteerProfile.activity')}
+            {t('userProfile.activity')}
             {auditTotal > 0 && (
               <span className="text-xs font-normal text-muted-foreground">({auditTotal})</span>
             )}
@@ -265,7 +265,7 @@ function UserProfilePage() {
             </div>
           ) : auditEntries.length === 0 ? (
             <div className="px-6 pb-6 text-sm text-muted-foreground">
-              {t('volunteerProfile.noActivity')}
+              {t('userProfile.noActivity')}
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -332,11 +332,11 @@ function MessagingChannelsCard({
   const [dirty, setDirty] = useState(false)
 
   const channelLabels: Record<string, string> = {
-    sms: t('volunteerProfile.channelSms'),
-    whatsapp: t('volunteerProfile.channelWhatsapp'),
-    signal: t('volunteerProfile.channelSignal'),
-    rcs: t('volunteerProfile.channelRcs'),
-    web: t('volunteerProfile.channelWeb'),
+    sms: t('userProfile.channelSms'),
+    whatsapp: t('userProfile.channelWhatsapp'),
+    signal: t('userProfile.channelSignal'),
+    rcs: t('userProfile.channelRcs'),
+    web: t('userProfile.channelWeb'),
   }
 
   function toggleChannel(ch: string) {
@@ -359,19 +359,19 @@ function MessagingChannelsCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          {t('volunteerProfile.messagingChannels')}
+          {t('userProfile.messagingChannels')}
         </CardTitle>
         <CardDescription>
-          {t('volunteerProfile.messagingChannelsDescription')}
+          {t('userProfile.messagingChannelsDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Messaging Enabled Toggle */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label htmlFor="messaging-enabled">{t('volunteerProfile.messagingEnabled')}</Label>
+            <Label htmlFor="messaging-enabled">{t('userProfile.messagingEnabled')}</Label>
             <p className="text-xs text-muted-foreground">
-              {t('volunteerProfile.messagingEnabledDescription')}
+              {t('userProfile.messagingEnabledDescription')}
             </p>
           </div>
           <Switch
@@ -384,7 +384,7 @@ function MessagingChannelsCard({
         {/* Channel Selection */}
         {enabled && (
           <div className="space-y-3">
-            <Label>{t('volunteerProfile.selectChannels')}</Label>
+            <Label>{t('userProfile.selectChannels')}</Label>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {MESSAGING_CHANNELS.map(ch => (
                 <label
@@ -401,7 +401,7 @@ function MessagingChannelsCard({
             </div>
             <p className="text-xs text-muted-foreground">
               {channels.length === 0
-                ? t('volunteerProfile.allChannels')
+                ? t('userProfile.allChannels')
                 : `${channels.length} ${channels.length === 1 ? 'channel' : 'channels'} selected`}
             </p>
           </div>

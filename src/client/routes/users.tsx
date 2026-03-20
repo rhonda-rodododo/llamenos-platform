@@ -77,16 +77,16 @@ function UsersPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <UserPlus className="h-6 w-6 text-primary" />
-          <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('volunteers.title')}</h1>
+          <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('users.title')}</h1>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => { setShowInviteForm(true); setInviteLink(null) }}>
             <Mail className="h-4 w-4" />
-            {t('volunteers.inviteVolunteer')}
+            {t('users.inviteVolunteer')}
           </Button>
           <Button data-testid="volunteer-add-btn" onClick={() => { setShowAddForm(true); setGeneratedNsec(null) }}>
             <UserPlus className="h-4 w-4" />
-            {t('volunteers.addVolunteer')}
+            {t('users.addVolunteer')}
           </Button>
         </div>
       </div>
@@ -98,8 +98,8 @@ function UsersPage() {
             <div className="flex items-start gap-2">
               <Key className="mt-0.5 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
               <div>
-                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">{t('volunteers.inviteGenerated')}</p>
-                <p className="mt-0.5 text-xs text-yellow-600 dark:text-yellow-400/80">{t('volunteers.secretKeyWarning')}</p>
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">{t('users.inviteGenerated')}</p>
+                <p className="mt-0.5 text-xs text-yellow-600 dark:text-yellow-400/80">{t('users.secretKeyWarning')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -127,8 +127,8 @@ function UsersPage() {
             <div className="flex items-start gap-2">
               <Mail className="mt-0.5 h-4 w-4 text-green-600 dark:text-green-400" />
               <div>
-                <p className="text-sm font-medium text-green-800 dark:text-green-300">{t('volunteers.inviteCreated')}</p>
-                <p className="mt-0.5 text-xs text-green-600 dark:text-green-400/80">{t('volunteers.inviteLinkLabel')}</p>
+                <p className="text-sm font-medium text-green-800 dark:text-green-300">{t('users.inviteCreated')}</p>
+                <p className="mt-0.5 text-xs text-green-600 dark:text-green-400/80">{t('users.inviteLinkLabel')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -181,7 +181,7 @@ function UsersPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Mail className="h-4 w-4 text-muted-foreground" />
-              {t('volunteers.pendingInvites')}
+              {t('users.pendingInvites')}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -200,7 +200,7 @@ function UsersPage() {
                       try {
                         await revokeInvite(invite.code)
                         setInvites(prev => prev.filter(i => i.code !== invite.code))
-                        toast(t('volunteers.inviteRevoked'), 'success')
+                        toast(t('users.inviteRevoked'), 'success')
                       } catch {
                         toast(t('common.error'), 'error')
                       }
@@ -208,7 +208,7 @@ function UsersPage() {
                     className="text-destructive hover:text-destructive"
                   >
                     <X className="h-3 w-3" />
-                    {t('volunteers.revokeInvite')}
+                    {t('users.revokeInvite')}
                   </Button>
                 </div>
               ))}
@@ -273,14 +273,14 @@ function InviteForm({ roles, onCreated, onCancel }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!isValidE164(phone)) {
-      toast(t('volunteers.invalidPhone'), 'error')
+      toast(t('users.invalidPhone'), 'error')
       return
     }
     setSaving(true)
     try {
       const res = await createInvite({ name, phone, roleIds: [roleId] })
       onCreated(res.invite)
-      toast(t('volunteers.inviteCreated'), 'success')
+      toast(t('users.inviteCreated'), 'success')
     } catch {
       toast(t('common.error'), 'error')
     } finally {
@@ -293,14 +293,14 @@ function InviteForm({ roles, onCreated, onCancel }: {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Mail className="h-4 w-4 text-muted-foreground" />
-          {t('volunteers.inviteVolunteer')}
+          {t('users.inviteVolunteer')}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="invite-name">{t('volunteers.name')}</Label>
+              <Label htmlFor="invite-name">{t('users.name')}</Label>
               <Input
                 id="invite-name"
                 value={name}
@@ -309,7 +309,7 @@ function InviteForm({ roles, onCreated, onCancel }: {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invite-phone">{t('volunteers.phone')}</Label>
+              <Label htmlFor="invite-phone">{t('users.phone')}</Label>
               <PhoneInput
                 id="invite-phone"
                 value={phone}
@@ -319,7 +319,7 @@ function InviteForm({ roles, onCreated, onCancel }: {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="invite-role">{t('volunteers.role')}</Label>
+            <Label htmlFor="invite-role">{t('users.role')}</Label>
             <Select value={roleId} onValueChange={setRoleId}>
               <SelectTrigger id="invite-role">
                 <SelectValue />
@@ -333,7 +333,7 @@ function InviteForm({ roles, onCreated, onCancel }: {
           </div>
           <div className="flex gap-2">
             <Button type="submit" disabled={saving}>
-              {saving ? t('common.loading') : t('volunteers.createInvite')}
+              {saving ? t('common.loading') : t('users.createInvite')}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               {t('common.cancel')}
@@ -360,7 +360,7 @@ function AddUserForm({ roles, onCreated, onCancel }: {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!isValidE164(phone)) {
-      toast(t('volunteers.invalidPhone'), 'error')
+      toast(t('users.invalidPhone'), 'error')
       return
     }
     setSaving(true)
@@ -368,7 +368,7 @@ function AddUserForm({ roles, onCreated, onCancel }: {
       const keyPair = await generateKeyPair()
       const user = await createUser({ name, phone, roleIds: [roleId], pubkey: keyPair.publicKey })
       onCreated(user, keyPair.nsec)
-      toast(t('volunteers.volunteerAdded'), 'success')
+      toast(t('users.userAdded'), 'success')
     } catch {
       toast(t('common.error'), 'error')
     } finally {
@@ -381,14 +381,14 @@ function AddUserForm({ roles, onCreated, onCancel }: {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <UserPlus className="h-4 w-4 text-muted-foreground" />
-          {t('volunteers.addVolunteer')}
+          {t('users.addVolunteer')}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="vol-name">{t('volunteers.name')}</Label>
+              <Label htmlFor="vol-name">{t('users.name')}</Label>
               <Input
                 id="vol-name"
                 value={name}
@@ -397,7 +397,7 @@ function AddUserForm({ roles, onCreated, onCancel }: {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vol-phone">{t('volunteers.phone')}</Label>
+              <Label htmlFor="vol-phone">{t('users.phone')}</Label>
               <PhoneInput
                 id="vol-phone"
                 value={phone}
@@ -407,7 +407,7 @@ function AddUserForm({ roles, onCreated, onCancel }: {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="vol-role">{t('volunteers.role')}</Label>
+            <Label htmlFor="vol-role">{t('users.role')}</Label>
             <Select value={roleId} onValueChange={setRoleId}>
               <SelectTrigger id="vol-role">
                 <SelectValue />
@@ -520,7 +520,7 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
               ? 'border-green-500/50 text-green-700 dark:text-green-400'
               : 'border-red-500/50 text-red-700 dark:text-red-400'
           }>
-            {user.active ? t('volunteers.active') : t('volunteers.inactive')}
+            {user.active ? t('users.active') : t('users.inactive')}
           </Badge>
         </button>
         {user.onBreak && (
@@ -531,7 +531,7 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
         )}
         <div className="flex items-center gap-1">
           <Select value={primaryRoleId} onValueChange={changeRole}>
-            <SelectTrigger className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none" aria-label={t('volunteers.changeRole')}>
+            <SelectTrigger className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none" aria-label={t('users.changeRole')}>
               <Shield className="h-3 w-3" />
               <SelectValue />
             </SelectTrigger>
@@ -550,7 +550,7 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
       <ConfirmDialog
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
-        title={t('volunteers.removeVolunteer')}
+        title={t('users.removeVolunteer')}
         description={`${user.name} (${maskedPhone(user.phone)})`}
         confirmLabel={t('common.delete')}
         onConfirm={handleDelete}

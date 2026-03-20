@@ -233,12 +233,12 @@ function DashboardPage() {
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4 text-primary" />
-              {t('dashboard.volunteerStatus')}
+              {t('dashboard.userStatus')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {presence.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">{t('dashboard.noVolunteersOnline')}</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">{t('dashboard.noUsersOnline')}</p>
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                 {presence.map(vol => {

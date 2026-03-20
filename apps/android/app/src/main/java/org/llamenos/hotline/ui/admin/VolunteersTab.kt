@@ -84,11 +84,11 @@ fun VolunteersTab(
         val volunteer = uiState.volunteers.find { it.id == volunteerId }
         AlertDialog(
             onDismissRequest = { viewModel.dismissDeleteVolunteerDialog() },
-            title = { Text(stringResource(R.string.volunteers_delete)) },
+            title = { Text(stringResource(R.string.users_delete)) },
             text = {
                 Text(
                     stringResource(
-                        R.string.volunteers_delete_confirm,
+                        R.string.users_delete_confirm,
                     ),
                 )
             },
@@ -97,7 +97,7 @@ fun VolunteersTab(
                     onClick = { viewModel.deleteVolunteer(volunteerId) },
                     modifier = Modifier.testTag("confirm-delete-volunteer"),
                 ) {
-                    Text(stringResource(R.string.volunteers_delete))
+                    Text(stringResource(R.string.users_delete))
                 }
             },
             dismissButton = {
@@ -125,7 +125,7 @@ fun VolunteersTab(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.volunteers_add),
+                    contentDescription = stringResource(R.string.users_add),
                 )
             }
         },
@@ -140,7 +140,7 @@ fun VolunteersTab(
             OutlinedTextField(
                 value = uiState.volunteerSearchQuery,
                 onValueChange = { viewModel.setVolunteerSearchQuery(it) },
-                placeholder = { Text(stringResource(R.string.search_volunteers)) },
+                placeholder = { Text(stringResource(R.string.search_users)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Filled.Search,
@@ -185,7 +185,7 @@ fun VolunteersTab(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = stringResource(R.string.volunteers_empty),
+                                text = stringResource(R.string.users_empty),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -276,7 +276,7 @@ private fun VolunteerCard(
             ) {
                 // Display name or "Unnamed"
                 Text(
-                    text = volunteer.displayName ?: stringResource(R.string.volunteers_unnamed),
+                    text = volunteer.displayName ?: stringResource(R.string.users_unnamed),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -333,7 +333,7 @@ private fun VolunteerCard(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.volunteers_delete),
+                    contentDescription = stringResource(R.string.users_delete),
                     tint = MaterialTheme.colorScheme.error,
                 )
             }
@@ -354,7 +354,7 @@ private fun AddVolunteerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.volunteers_add)) },
+        title = { Text(stringResource(R.string.users_add)) },
         text = {
             Column {
                 OutlinedTextField(
@@ -384,7 +384,7 @@ private fun AddVolunteerDialog(
                 enabled = name.isNotBlank() && phone.isNotBlank(),
                 modifier = Modifier.testTag("confirm-add-volunteer"),
             ) {
-                Text(stringResource(R.string.volunteers_add))
+                Text(stringResource(R.string.users_add))
             }
         },
         dismissButton = {

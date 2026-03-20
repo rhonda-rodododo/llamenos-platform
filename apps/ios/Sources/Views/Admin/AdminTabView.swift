@@ -17,7 +17,7 @@ struct AdminTabView: View {
                 VolunteersView(viewModel: vm)
             } label: {
                 Label(
-                    NSLocalizedString("admin_tab_volunteers", comment: "Volunteers"),
+                    NSLocalizedString("admin_tab_users", comment: "Volunteers"),
                     systemImage: "person.3.fill"
                 )
             }

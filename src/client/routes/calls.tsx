@@ -218,7 +218,7 @@ function CallHistoryPage() {
                       <div className="flex items-center gap-1.5">
                         <PhoneIncoming className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         <span className="text-sm font-medium">
-                          {call.answeredBy ? (nameMap.get(call.answeredBy) || t('volunteers.title')) : '-'}
+                          {call.answeredBy ? (nameMap.get(call.answeredBy) || t('users.title')) : '-'}
                         </span>
                       </div>
                     )}

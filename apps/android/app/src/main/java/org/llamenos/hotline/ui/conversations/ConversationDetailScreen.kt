@@ -139,7 +139,7 @@ fun ConversationDetailScreen(
                         }
                     } else if (uiState.assignableVolunteers.isEmpty()) {
                         Text(
-                            text = stringResource(R.string.conversations_no_volunteers),
+                            text = stringResource(R.string.conversations_no_users),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

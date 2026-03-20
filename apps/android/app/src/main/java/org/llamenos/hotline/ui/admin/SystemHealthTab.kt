@@ -349,7 +349,7 @@ private fun VolunteerActivityCard(
 ) {
     HealthCard(
         icon = Icons.Filled.Group,
-        title = stringResource(R.string.admin_system_volunteers),
+        title = stringResource(R.string.admin_system_users),
         testTag = "health-volunteers-card",
         modifier = modifier,
     ) {

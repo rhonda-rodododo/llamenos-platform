@@ -115,12 +115,12 @@ struct CustomFieldEditView: View {
                     .accessibilityIdentifier("field-required-toggle")
 
                     Toggle(
-                        NSLocalizedString("field_visible_volunteers", comment: "Visible to volunteers"),
+                        NSLocalizedString("field_visible_users", comment: "Visible to volunteers"),
                         isOn: $visibleToVolunteers
                     )
 
                     Toggle(
-                        NSLocalizedString("field_editable_volunteers", comment: "Editable by volunteers"),
+                        NSLocalizedString("field_editable_users", comment: "Editable by volunteers"),
                         isOn: $editableByVolunteers
                     )
                 }

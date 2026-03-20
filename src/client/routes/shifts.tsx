@@ -145,7 +145,7 @@ function ShiftsPage() {
                     </div>
                     <p data-testid="shift-volunteer-count" className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" />
-                      {shift.volunteerPubkeys.length} {t('shifts.volunteers').toLowerCase()}
+                      {shift.volunteerPubkeys.length} {t('shifts.users').toLowerCase()}
                     </p>
                   </div>
                   <div className="flex gap-1">
@@ -282,12 +282,12 @@ function ShiftForm({ shift, users, onSave, onCancel }: {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>{t('shifts.assignVolunteers')}</Label>
+            <Label>{t('shifts.assignUsers')}</Label>
             <UserMultiSelect
               users={users.filter(u => u.active)}
               selected={selectedVolunteers}
               onSelectionChange={setSelectedVolunteers}
-              placeholder={t('shifts.searchVolunteers')}
+              placeholder={t('shifts.searchUsers')}
             />
           </div>
           <div className="flex gap-2">

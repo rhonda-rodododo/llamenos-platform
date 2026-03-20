@@ -20,7 +20,7 @@ enum AdminTab: String, CaseIterable, Sendable {
 
     var title: String {
         switch self {
-        case .volunteers: return NSLocalizedString("admin_tab_volunteers", comment: "Volunteers")
+        case .volunteers: return NSLocalizedString("admin_tab_users", comment: "Volunteers")
         case .bans: return NSLocalizedString("admin_tab_bans", comment: "Ban List")
         case .auditLog: return NSLocalizedString("admin_tab_audit", comment: "Audit Log")
         case .invites: return NSLocalizedString("admin_tab_invites", comment: "Invites")

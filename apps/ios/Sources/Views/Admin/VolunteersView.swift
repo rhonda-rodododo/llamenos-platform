@@ -20,7 +20,7 @@ struct VolunteersView: View {
         .searchable(
             text: $viewModel.volunteerSearchText,
             placement: .navigationBarDrawer(displayMode: .automatic),
-            prompt: NSLocalizedString("admin_search_volunteers", comment: "Search volunteers...")
+            prompt: NSLocalizedString("admin_search_users", comment: "Search volunteers...")
         )
         .refreshable {
             viewModel.isLoadingVolunteers = false
@@ -95,13 +95,13 @@ struct VolunteersView: View {
     private var emptyState: some View {
         ContentUnavailableView {
             Label(
-                NSLocalizedString("admin_no_volunteers", comment: "No Volunteers"),
+                NSLocalizedString("admin_no_users", comment: "No Volunteers"),
                 systemImage: "person.3"
             )
         } description: {
             if viewModel.volunteerSearchText.isEmpty {
                 Text(NSLocalizedString(
-                    "admin_no_volunteers_message",
+                    "admin_no_users_message",
                     comment: "No members have joined yet."
                 ))
             } else {
@@ -121,7 +121,7 @@ struct VolunteersView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
-            Text(NSLocalizedString("admin_loading_volunteers", comment: "Loading members..."))
+            Text(NSLocalizedString("admin_loading_users", comment: "Loading members..."))
                 .font(.brand(.subheadline))
                 .foregroundStyle(Color.brandMutedForeground)
         }

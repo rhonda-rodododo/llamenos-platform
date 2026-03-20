@@ -146,7 +146,7 @@ function AdminSettingsPage() {
       : webauthnSettings.requireForAdmins
         ? t('webauthn.requiredAdmins', { defaultValue: 'Required for admins' })
         : webauthnSettings.requireForVolunteers
-          ? t('webauthn.requiredVolunteers', { defaultValue: 'Required for volunteers' })
+          ? t('webauthn.requiredUsers', { defaultValue: 'Required for volunteers' })
           : t('webauthn.notRequired', { defaultValue: 'Not required' })
     : undefined
 

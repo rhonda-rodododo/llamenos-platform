@@ -71,7 +71,7 @@ export function UserMultiSelect({
                 <span
                   role="button"
                   tabIndex={0}
-                  aria-label={t('shifts.removeVolunteer', { name: u.name })}
+                  aria-label={t('shifts.removeUser', { name: u.name })}
                   className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
                   onClick={(e) => remove(u.pubkey, e)}
                   onKeyDown={(e) => {
@@ -87,7 +87,7 @@ export function UserMultiSelect({
             ))
           ) : (
             <span className="text-muted-foreground">
-              {placeholder || t('shifts.searchVolunteers')}
+              {placeholder || t('shifts.searchUsers')}
             </span>
           )}
           <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
@@ -100,9 +100,9 @@ export function UserMultiSelect({
           const haystack = `${u.name} ${u.phone} ${u.pubkey}`.toLowerCase()
           return haystack.includes(search.toLowerCase()) ? 1 : 0
         }}>
-          <CommandInput placeholder={t('shifts.searchVolunteers')} />
+          <CommandInput placeholder={t('shifts.searchUsers')} />
           <CommandList className="max-h-[200px]">
-            <CommandEmpty>{t('shifts.noVolunteersFound')}</CommandEmpty>
+            <CommandEmpty>{t('shifts.noUsersFound')}</CommandEmpty>
             <CommandGroup>
               {users.map(u => (
                 <CommandItem

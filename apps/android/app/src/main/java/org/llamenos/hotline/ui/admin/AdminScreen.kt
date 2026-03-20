@@ -92,7 +92,7 @@ fun AdminScreen(
                         text = {
                             Text(
                                 text = when (tab) {
-                                    AdminTab.VOLUNTEERS -> stringResource(R.string.admin_volunteers)
+                                    AdminTab.VOLUNTEERS -> stringResource(R.string.admin_users)
                                     AdminTab.BANS -> stringResource(R.string.admin_bans)
                                     AdminTab.AUDIT -> stringResource(R.string.admin_audit)
                                     AdminTab.INVITES -> stringResource(R.string.admin_invites)
