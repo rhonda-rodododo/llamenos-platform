@@ -62,6 +62,7 @@ export interface AuditListFilters {
   search?: string
   limit?: number
   offset?: number
+  page?: number
 }
 
 export type AuditEntry = typeof auditLog.$inferSelect
@@ -179,8 +180,10 @@ export class AuditService {
       dateTo,
       search,
       limit = 50,
-      offset = 0,
+      page,
+      offset: rawOffset,
     } = filters
+    const offset = page != null ? (page - 1) * limit : (rawOffset ?? 0)
 
     const conditions = []
 
