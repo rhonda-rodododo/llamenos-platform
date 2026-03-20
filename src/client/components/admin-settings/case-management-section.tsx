@@ -577,8 +577,8 @@ function FieldsEditor({
     setEditingField({
       type: 'text',
       required: false,
-      visibleToVolunteers: true,
-      editableByVolunteers: true,
+      visibleToUsers: true,
+      editableByUsers: true,
       accessLevel: 'all',
       indexable: false,
       indexType: 'none',
@@ -604,8 +604,8 @@ function FieldsEditor({
         required: editingField.required ?? false,
         options: editingField.options,
         validation: editingField.validation,
-        visibleToVolunteers: editingField.visibleToVolunteers ?? true,
-        editableByVolunteers: editingField.editableByVolunteers ?? true,
+        visibleToUsers: editingField.visibleToUsers ?? true,
+        editableByUsers: editingField.editableByUsers ?? true,
         accessLevel: editingField.accessLevel || 'all',
         section: editingField.section,
         helpText: editingField.helpText,
@@ -758,10 +758,10 @@ function FieldsEditor({
             </div>
             <div className="flex items-center gap-2">
               <Switch
-                checked={editingField.visibleToVolunteers ?? true}
-                onCheckedChange={checked => setEditingField(prev => ({ ...prev!, visibleToVolunteers: checked }))}
+                checked={editingField.visibleToUsers ?? true}
+                onCheckedChange={checked => setEditingField(prev => ({ ...prev!, visibleToUsers: checked }))}
               />
-              <Label className="text-xs">{t('customFields.visibleToVolunteers')}</Label>
+              <Label className="text-xs">{t('customFields.visibleToUsers')}</Label>
             </div>
           </div>
 

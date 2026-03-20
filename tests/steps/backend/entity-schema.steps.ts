@@ -98,8 +98,8 @@ When('the admin adds a field {string} of type {string} to entity type {string}',
     indexable: false,
     indexType: 'none',
     accessLevel: 'all',
-    visibleToVolunteers: true,
-    editableByVolunteers: true,
+    visibleToUsers: true,
+    editableByUsers: true,
     hubEditable: true,
   }
 

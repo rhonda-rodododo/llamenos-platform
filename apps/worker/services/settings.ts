@@ -307,24 +307,24 @@ export class SettingsService {
 
   async getTranscriptionSettings(): Promise<{
     globalEnabled: boolean
-    allowVolunteerOptOut: boolean
+    allowUserOptOut: boolean
   }> {
     const row = await getSettings(this.db)
     return {
       globalEnabled: row.transcriptionEnabled ?? true,
-      allowVolunteerOptOut: row.allowUserTranscriptionOptOut ?? false,
+      allowUserOptOut: row.allowUserTranscriptionOptOut ?? false,
     }
   }
 
   async updateTranscriptionSettings(data: {
     globalEnabled?: boolean
-    allowVolunteerOptOut?: boolean
-  }): Promise<{ globalEnabled: boolean; allowVolunteerOptOut: boolean }> {
+    allowUserOptOut?: boolean
+  }): Promise<{ globalEnabled: boolean; allowUserOptOut: boolean }> {
     const updates: Record<string, unknown> = {}
     if (data.globalEnabled !== undefined)
       updates.transcriptionEnabled = data.globalEnabled
-    if (data.allowVolunteerOptOut !== undefined)
-      updates.allowUserTranscriptionOptOut = data.allowVolunteerOptOut
+    if (data.allowUserOptOut !== undefined)
+      updates.allowUserTranscriptionOptOut = data.allowUserOptOut
 
     if (Object.keys(updates).length > 0) {
       await this.db
@@ -409,11 +409,10 @@ export class SettingsService {
 
   async getFallbackGroup(): Promise<{
     volunteerPubkeys: string[]
-    volunteers: string[]
   }> {
     const row = await getSettings(this.db)
     const group = row.fallbackGroup ?? []
-    return { volunteerPubkeys: group, volunteers: group }
+    return { volunteerPubkeys: group }
   }
 
   async setFallbackGroup(data: {
@@ -499,8 +498,8 @@ export class SettingsService {
       required: r.required ?? false,
       options: r.options ?? undefined,
       validation: r.validation as CustomFieldDefinition['validation'],
-      visibleToVolunteers: r.visibleToUsers ?? true,
-      editableByVolunteers: r.editableByUsers ?? true,
+      visibleToUsers: r.visibleToUsers ?? true,
+      editableByUsers: r.editableByUsers ?? true,
       context: r.context as CustomFieldDefinition['context'],
       maxFileSize: r.maxFileSize ?? undefined,
       allowedMimeTypes: r.allowedMimeTypes ?? undefined,
@@ -623,8 +622,8 @@ export class SettingsService {
           required: f.required ?? false,
           options: f.options,
           validation: f.validation,
-          visibleToUsers: f.visibleToVolunteers ?? true,
-          editableByUsers: f.editableByVolunteers ?? true,
+          visibleToUsers: f.visibleToUsers ?? true,
+          editableByUsers: f.editableByUsers ?? true,
           context: f.context ?? 'all',
           maxFileSize: f.maxFileSize,
           allowedMimeTypes: f.allowedMimeTypes,
@@ -662,8 +661,8 @@ export class SettingsService {
       )
     }
     if (
-      updated.maxConcurrentPerVolunteer < 1 ||
-      updated.maxConcurrentPerVolunteer > 20
+      updated.maxConcurrentPerUser < 1 ||
+      updated.maxConcurrentPerUser > 20
     ) {
       throw new ServiceError(
         400,

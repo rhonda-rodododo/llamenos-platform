@@ -42,7 +42,7 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
   // Filter global fields for report context
   const reportFields = customFields
     .filter(f => fieldMatchesContext(f, 'reports'))
-    .filter(f => isAdmin || f.visibleToVolunteers)
+    .filter(f => isAdmin || f.visibleToUsers)
 
   useEffect(() => {
     if (!open) return
@@ -205,7 +205,7 @@ export function ReportForm({ open, onOpenChange, onCreated }: ReportFormProps) {
           {selectedType?.fields && selectedType.fields.length > 0 && (
             <div className="space-y-3">
               {selectedType.fields
-                .filter(f => f.visibleToVolunteers)
+                .filter(f => f.visibleToUsers)
                 .sort((a, b) => a.order - b.order)
                 .map(field => (
                   <CustomFieldInput

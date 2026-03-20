@@ -309,8 +309,8 @@ function ReportTypeFieldsEditor({ fields, onChange }: {
     setEditingField({
       type: 'text',
       required: false,
-      visibleToVolunteers: true,
-      editableByVolunteers: true,
+      visibleToUsers: true,
+      editableByUsers: true,
       context: 'reports',
     })
   }
@@ -332,8 +332,8 @@ function ReportTypeFieldsEditor({ fields, onChange }: {
         required: editingField.required ?? false,
         options: editingField.options,
         validation: editingField.validation,
-        visibleToVolunteers: editingField.visibleToVolunteers ?? true,
-        editableByVolunteers: editingField.editableByVolunteers ?? true,
+        visibleToUsers: editingField.visibleToUsers ?? true,
+        editableByUsers: editingField.editableByUsers ?? true,
         context: 'reports',
         order: fields.length,
         createdAt: new Date().toISOString(),

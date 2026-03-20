@@ -15,7 +15,7 @@ import { contactRelationshipResponseSchema, contactGroupResponseSchema } from '@
 // Protocol types used in function signatures within this file.
 // Re-exported to consumers via `export type { ... }` statements inline below.
 import type {
-  Volunteer,
+  User,
   Shift,
   ShiftStatus,
   BanEntry,
@@ -25,7 +25,7 @@ import type {
   InviteCode,
   CallRecord,
   ActiveCall,
-  VolunteerPresence,
+  UserPresence,
   AuditLogEntry,
   AssignmentSuggestion,
   EvidenceMetadata,
@@ -323,20 +323,20 @@ export async function getMe() {
   return request<{ pubkey: string; roles: string[]; permissions: string[]; primaryRole: { id: string; name: string; slug: string } | null; name: string; transcriptionEnabled: boolean; spokenLanguages: string[]; uiLanguage: string; profileCompleted: boolean; onBreak: boolean; callPreference: 'phone' | 'browser' | 'both'; webauthnRequired: boolean; webauthnRegistered: boolean; adminDecryptionPubkey: string; serverEventKeyHex?: string }>('/auth/me')
 }
 
-// --- Volunteers (admin only) ---
+// --- Users (admin only) ---
 
-export async function listVolunteers() {
-  return request<{ volunteers: Volunteer[] }>('/volunteers')
+export async function listUsers() {
+  return request<{ users: User[] }>('/users')
 }
 
-export async function createVolunteer(data: { name: string; phone: string; roleIds: string[]; pubkey: string }) {
-  return request<{ volunteer: Volunteer }>('/volunteers', {
+export async function createUser(data: { name: string; phone: string; roleIds: string[]; pubkey: string }) {
+  return request<User>('/users', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export async function updateVolunteer(pubkey: string, data: Partial<{
+export async function updateUser(pubkey: string, data: Partial<{
   name: string
   phone: string
   roles: string[]
@@ -344,15 +344,34 @@ export async function updateVolunteer(pubkey: string, data: Partial<{
   supportedMessagingChannels: string[]
   messagingEnabled: boolean
 }>) {
-  return request<{ volunteer: Volunteer }>(`/volunteers/${pubkey}`, {
+  return request<User>(`/users/${pubkey}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
 
-export async function deleteVolunteer(pubkey: string) {
-  return request<{ ok: true }>(`/volunteers/${pubkey}`, { method: 'DELETE' })
+export async function deleteUser(pubkey: string) {
+  return request<{ ok: true }>(`/users/${pubkey}`, { method: 'DELETE' })
 }
+
+// Backward-compat aliases — client routes still use old names (rename in separate task)
+/** @deprecated Use listUsers() */
+export async function listVolunteers() {
+  const r = await listUsers()
+  return { volunteers: r.users }
+}
+/** @deprecated Use createUser() */
+export async function createVolunteer(data: { name: string; phone: string; roleIds: string[]; pubkey: string }) {
+  const user = await createUser(data)
+  return { volunteer: user }
+}
+/** @deprecated Use updateUser() */
+export async function updateVolunteer(pubkey: string, data: Parameters<typeof updateUser>[1]) {
+  const user = await updateUser(pubkey, data)
+  return { volunteer: user }
+}
+/** @deprecated Use deleteUser() */
+export const deleteVolunteer = deleteUser
 
 // --- Shift Status (all users) ---
 
@@ -573,10 +592,10 @@ export async function getCallRecording(callId: string): Promise<ArrayBuffer> {
   throw new Error('Recording download failed')
 }
 
-// --- Volunteer Presence (admin only) ---
+// --- User Presence (admin only) ---
 
-export async function getVolunteerPresence() {
-  return request<{ volunteers: VolunteerPresence[] }>(hp('/calls/presence'))
+export async function getUserPresence() {
+  return request<{ users: UserPresence[] }>(hp('/calls/presence'))
 }
 
 // --- Audit Log (admin only) ---
@@ -646,11 +665,11 @@ export async function updateIvrLanguages(data: { enabledLanguages: string[] }) {
 // --- Transcription Settings ---
 
 export async function getTranscriptionSettings() {
-  return request<{ globalEnabled: boolean; allowVolunteerOptOut: boolean }>('/settings/transcription')
+  return request<{ globalEnabled: boolean; allowUserOptOut: boolean }>('/settings/transcription')
 }
 
-export async function updateTranscriptionSettings(data: { globalEnabled?: boolean; allowVolunteerOptOut?: boolean }) {
-  return request<{ globalEnabled: boolean; allowVolunteerOptOut: boolean }>('/settings/transcription', {
+export async function updateTranscriptionSettings(data: { globalEnabled?: boolean; allowUserOptOut?: boolean }) {
+  return request<{ globalEnabled: boolean; allowUserOptOut: boolean }>('/settings/transcription', {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
@@ -728,7 +747,7 @@ export async function redeemInvite(code: string, pubkey: string, secretKeyHex?: 
       const body = await res.text()
       throw new ApiError(res.status, body)
     }
-    return res.json() as Promise<{ volunteer: Volunteer }>
+    return res.json() as Promise<{ volunteer: User }>
   } catch (err) {
     if (err instanceof ApiError) throw err
     const e = err instanceof Error ? err : new Error(String(err))
@@ -906,7 +925,7 @@ export async function getMigrationStatus() {
 /** @deprecated Use roles array + permissions */
 export type UserRole = 'volunteer' | 'admin' | 'reporter'
 
-export type { Volunteer, Shift, BanEntry, EncryptedNote, ActiveCall, AuditLogEntry, VolunteerPresence, InviteCode }
+export type { User, User as Volunteer, Shift, BanEntry, EncryptedNote, ActiveCall, AuditLogEntry, UserPresence, InviteCode }
 
 export type { CallRecord }
 

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
 import { useCalls, useCallTimer, useShiftStatus } from '@/lib/hooks'
-import { createNote, banAndHangup, getCallsTodayCount, getVolunteerPresence, listVolunteers, type ActiveCall, type VolunteerPresence, type Volunteer } from '@/lib/api'
+import { createNote, banAndHangup, getCallsTodayCount, getUserPresence, listVolunteers, type ActiveCall, type UserPresence, type Volunteer } from '@/lib/api'
 import { encryptNote } from '@/lib/platform'
 import { useTranscription } from '@/lib/transcription'
 
@@ -43,7 +43,7 @@ function DashboardPage() {
   const { calls, currentCall, answerCall, hangupCall, reportSpam, ringingCalls, activeCalls } = useCalls()
   const { onShift, currentShift, nextShift } = useShiftStatus()
   const [callsToday, setCallsToday] = useState<number | null>(null)
-  const [presence, setPresence] = useState<VolunteerPresence[]>([])
+  const [presence, setPresence] = useState<UserPresence[]>([])
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
 
   useEffect(() => {
@@ -71,8 +71,8 @@ function DashboardPage() {
     if (!isAuthenticated || !isAdmin) return
     let mounted = true
     const fetchPresence = () => {
-      getVolunteerPresence().then(r => { if (mounted) setPresence(r.volunteers) }).catch(() => {
-        console.error('[dashboard] Failed to fetch volunteer presence')
+      getUserPresence().then(r => { if (mounted) setPresence(r.users) }).catch(() => {
+        console.error('[dashboard] Failed to fetch user presence')
       })
     }
     fetchPresence()

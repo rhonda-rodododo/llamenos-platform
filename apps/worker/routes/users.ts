@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { createVolunteerBodySchema, adminUpdateVolunteerBodySchema, volunteerResponseSchema, volunteerListResponseSchema, volunteerMetricsResponseSchema } from '@protocol/schemas/volunteers'
+import { createUserBodySchema, adminUpdateUserBodySchema, userResponseSchema, userListResponseSchema, userMetricsResponseSchema } from '@protocol/schemas/users'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -19,7 +19,7 @@ users.get('/',
         description: 'List of users',
         content: {
           'application/json': {
-            schema: resolver(volunteerListResponseSchema),
+            schema: resolver(userListResponseSchema),
           },
         },
       },
@@ -42,7 +42,7 @@ users.get('/:targetPubkey',
         description: 'User details',
         content: {
           'application/json': {
-            schema: resolver(volunteerResponseSchema),
+            schema: resolver(userResponseSchema),
           },
         },
       },
@@ -67,7 +67,7 @@ users.post('/',
         description: 'User created',
         content: {
           'application/json': {
-            schema: resolver(volunteerResponseSchema),
+            schema: resolver(userResponseSchema),
           },
         },
       },
@@ -75,7 +75,7 @@ users.post('/',
     },
   }),
   requirePermission('volunteers:create'),
-  validator('json', createVolunteerBodySchema),
+  validator('json', createUserBodySchema),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
@@ -109,7 +109,7 @@ users.patch('/:targetPubkey',
         description: 'User updated',
         content: {
           'application/json': {
-            schema: resolver(volunteerResponseSchema),
+            schema: resolver(userResponseSchema),
           },
         },
       },
@@ -117,7 +117,7 @@ users.patch('/:targetPubkey',
     },
   }),
   requirePermission('volunteers:update'),
-  validator('json', adminUpdateVolunteerBodySchema),
+  validator('json', adminUpdateUserBodySchema),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
@@ -225,7 +225,7 @@ users.get('/:targetPubkey/metrics',
         description: 'User metrics',
         content: {
           'application/json': {
-            schema: resolver(volunteerMetricsResponseSchema),
+            schema: resolver(userMetricsResponseSchema),
           },
         },
       },

@@ -144,7 +144,7 @@ auth.get('/me',
     const webauthnSettings = await services.identity.getWebAuthnSettings()
 
     const isAdmin = checkPermission(permissions, 'settings:manage')
-    const webauthnRequired = isAdmin ? webauthnSettings.requireForAdmins : webauthnSettings.requireForVolunteers
+    const webauthnRequired = isAdmin ? webauthnSettings.requireForAdmins : webauthnSettings.requireForUsers
 
     const primaryRole = getPrimaryRole(user.roles, allRoles)
 
@@ -286,7 +286,7 @@ auth.patch('/me/transcription',
     // If volunteer is trying to disable, check if admin allows opt-out
     if (!body.enabled && !checkPermission(permissions, 'settings:manage-transcription')) {
       const transSettings = await services.settings.getTranscriptionSettings()
-      if (!transSettings.allowVolunteerOptOut) {
+      if (!transSettings.allowUserOptOut) {
         return c.json({ error: 'Transcription opt-out is not allowed' }, 403)
       }
     }

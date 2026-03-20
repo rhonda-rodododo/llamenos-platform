@@ -192,7 +192,7 @@ export interface MessagingConfig {
   rcs: RCSConfig | null
   autoAssign: boolean               // auto-assign to on-shift volunteers
   inactivityTimeout: number         // minutes before auto-close
-  maxConcurrentPerVolunteer: number  // conversation limit per volunteer
+  maxConcurrentPerUser: number  // conversation limit per volunteer
 }
 
 export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
@@ -203,7 +203,7 @@ export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
   rcs: null,
   autoAssign: true,
   inactivityTimeout: 60,
-  maxConcurrentPerVolunteer: 3,
+  maxConcurrentPerUser: 3,
 }
 
 // --- Message Blasts ---

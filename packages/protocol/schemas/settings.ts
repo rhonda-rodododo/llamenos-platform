@@ -32,8 +32,8 @@ export const customFieldDefinitionSchema = z.object({
     min: z.number().optional(),
     max: z.number().optional(),
   }).optional(),
-  visibleToVolunteers: z.boolean(),
-  editableByVolunteers: z.boolean(),
+  visibleToUsers: z.boolean(),
+  editableByUsers: z.boolean(),
   context: customFieldContextSchema,
   maxFileSize: z.number().optional(),
   allowedMimeTypes: z.array(z.string()).optional(),
@@ -67,7 +67,7 @@ export const customFieldResponseSchema = z.object({
   options: z.array(z.string()).optional(),
   order: z.number().optional(),
   context: z.string().optional(),
-  visibleToVolunteers: z.boolean().optional(),
+  visibleToUsers: z.boolean().optional(),
 })
 
 export const reportTypeResponseSchema = z.object({
@@ -93,7 +93,7 @@ export const customFieldsBodySchema = z.looseObject({
     options: z.array(z.string().max(200)).optional(),
     order: z.number().int().optional(),
     context: z.string().optional(),
-    visibleToVolunteers: z.boolean().optional(),
+    visibleToUsers: z.boolean().optional(),
   })),
 })
 
@@ -137,7 +137,7 @@ export type CallSettings = z.infer<typeof callSettingsSchema>
 export const messagingConfigSchema = z.looseObject({
   enabledChannels: z.array(messagingChannelTypeSchema).optional(),
   autoAssignEnabled: z.boolean().optional(),
-  maxConcurrentPerVolunteer: z.number().int().min(1).max(20).optional(),
+  maxConcurrentPerUser: z.number().int().min(1).max(20).optional(),
   inactivityTimeout: z.number().int().min(5).max(1440).optional(),
   welcomeMessage: z.string().max(500).optional(),
   awayMessage: z.string().max(500).optional(),
@@ -179,14 +179,14 @@ export const updateRoleSchema = z.looseObject({
 
 export const webauthnSettingsSchema = z.looseObject({
   requireForAdmins: z.boolean().optional(),
-  requireForVolunteers: z.boolean().optional(),
+  requireForUsers: z.boolean().optional(),
 })
 
 export type WebAuthnSettings = z.infer<typeof webauthnSettingsSchema>
 
 export const transcriptionSettingsSchema = z.looseObject({
   globalEnabled: z.boolean().optional(),
-  allowVolunteerOptOut: z.boolean().optional(),
+  allowUserOptOut: z.boolean().optional(),
 })
 
 export const ivrLanguagesSchema = z.looseObject({

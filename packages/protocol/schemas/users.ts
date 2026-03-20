@@ -4,7 +4,7 @@ import { messagingChannelTypeSchema } from './settings'
 
 // --- Response schemas ---
 
-export const volunteerResponseSchema = z.object({
+export const userResponseSchema = z.object({
   pubkey: pubkeySchema,
   name: z.string(),
   roles: z.array(z.string()),
@@ -16,28 +16,28 @@ export const volunteerResponseSchema = z.object({
   profileCompleted: z.boolean().optional(),
   onBreak: z.boolean().optional(),
   callPreference: z.enum(['phone', 'browser', 'both']).optional(),
-  // Epic 340: Volunteer profile extensions
+  // Epic 340: User profile extensions
   specializations: z.array(z.string()).optional(),
   maxCaseAssignments: z.number().optional(),
   teamId: z.string().optional(),
   supervisorPubkey: z.string().optional(),
 })
 
-export const volunteerAdminResponseSchema = volunteerResponseSchema.extend({
+export const userAdminResponseSchema = userResponseSchema.extend({
   phone: z.string(),
   messagingEnabled: z.boolean().optional(),
   supportedMessagingChannels: z.array(messagingChannelTypeSchema).optional(),
 })
 
-export type Volunteer = z.infer<typeof volunteerAdminResponseSchema>
+export type User = z.infer<typeof userAdminResponseSchema>
 
 // --- List/wrapper response schemas ---
 
-export const volunteerListResponseSchema = z.object({
-  volunteers: z.array(volunteerResponseSchema),
+export const userListResponseSchema = z.object({
+  users: z.array(userResponseSchema),
 })
 
-export const volunteerMetricsResponseSchema = z.object({
+export const userMetricsResponseSchema = z.object({
   pubkey: z.string(),
   activeCaseCount: z.number(),
   totalCasesHandled: z.number(),
@@ -46,21 +46,21 @@ export const volunteerMetricsResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const createVolunteerBodySchema = z.looseObject({
+export const createUserBodySchema = z.looseObject({
   pubkey: pubkeySchema,
   name: z.string().min(1).max(200),
   phone: z.string().max(20),
   roleIds: z.array(z.string()).optional(),
   roles: z.array(z.string()).optional(),
   encryptedSecretKey: z.string().optional(),
-  // Epic 340: Volunteer profile extensions
+  // Epic 340: User profile extensions
   specializations: z.array(z.string().max(100)).optional(),
   maxCaseAssignments: z.number().int().min(0).optional(),
   teamId: z.string().max(100).optional(),
   supervisorPubkey: pubkeySchema.optional(),
 })
 
-export const updateVolunteerBodySchema = z.looseObject({
+export const updateUserBodySchema = z.looseObject({
   name: z.string().min(1).max(200).optional(),
   phone: z.string().max(20).optional(),
   spokenLanguages: z.array(z.string().max(5)).optional(),
@@ -69,11 +69,11 @@ export const updateVolunteerBodySchema = z.looseObject({
   transcriptionEnabled: z.boolean().optional(),
   onBreak: z.boolean().optional(),
   callPreference: z.enum(['phone', 'browser', 'both']).optional(),
-  // Epic 340: Volunteers can self-update specializations
+  // Epic 340: Users can self-update specializations
   specializations: z.array(z.string().max(100)).optional(),
 })
 
-export const adminUpdateVolunteerBodySchema = updateVolunteerBodySchema.extend({
+export const adminUpdateUserBodySchema = updateUserBodySchema.extend({
   roles: z.array(z.string()).optional(),
   active: z.boolean().optional(),
   messagingEnabled: z.boolean().optional(),

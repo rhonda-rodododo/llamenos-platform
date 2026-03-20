@@ -236,12 +236,12 @@ export class IdentityService {
   // =========================================================================
 
   /**
-   * List all volunteers (encryptedSecretKey stripped).
+   * List all users (encryptedSecretKey stripped).
    */
-  async getUsers(): Promise<{ volunteers: ReturnType<typeof sanitizeUser>[] }> {
+  async getUsers(): Promise<{ users: ReturnType<typeof sanitizeUser>[] }> {
     const rows = await this.db.select().from(users)
     return {
-      volunteers: rows.map(r => sanitizeUser(rowToUser(r))),
+      users: rows.map(r => sanitizeUser(rowToUser(r))),
     }
   }
 

@@ -617,10 +617,10 @@ export async function getSpamSettingsViaApi(
 
 export async function getTranscriptionSettingsViaApi(
   request: APIRequestContext,
-): Promise<{ globalEnabled: boolean; allowVolunteerOptOut: boolean }> {
+): Promise<{ globalEnabled: boolean; allowUserOptOut: boolean }> {
   const { status, data } = await apiGet(request, '/settings/transcription')
   if (status !== 200) throw new Error(`Failed to get transcription settings: ${status}`)
-  return data as { globalEnabled: boolean; allowVolunteerOptOut: boolean }
+  return data as { globalEnabled: boolean; allowUserOptOut: boolean }
 }
 
 // ── Auth Verification ─────────────────────────────────────────────
@@ -747,8 +747,8 @@ export async function createEntityTypeViaApi(
         indexable: false,
         indexType: 'none',
         accessLevel: 'all',
-        visibleToVolunteers: true,
-        editableByVolunteers: true,
+        visibleToUsers: true,
+        editableByUsers: true,
         hubEditable: true,
       })),
       numberPrefix: options?.numberPrefix,
@@ -930,8 +930,8 @@ export async function createCmsReportTypeViaApi(
         indexable: false,
         indexType: 'none',
         accessLevel: 'all',
-        visibleToVolunteers: true,
-        editableByVolunteers: true,
+        visibleToUsers: true,
+        editableByUsers: true,
         hubEditable: true,
         supportAudioInput: f.supportAudioInput ?? false,
       })),

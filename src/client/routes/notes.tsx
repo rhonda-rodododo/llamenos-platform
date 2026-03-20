@@ -215,7 +215,7 @@ function NotesPage() {
   const totalPages = Math.ceil(total / limit)
   const visibleFields = customFields
     .filter(f => fieldMatchesContext(f, 'call-notes'))
-    .filter(f => isAdmin || f.visibleToVolunteers)
+    .filter(f => isAdmin || f.visibleToUsers)
 
   async function handleExpandThread(noteId: string) {
     if (expandedThreadId === noteId) {

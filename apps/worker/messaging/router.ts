@@ -221,15 +221,15 @@ async function tryAutoAssign(
     const messagingConfig = await services.settings.getMessagingConfig()
     if (!messagingConfig?.autoAssign) return
 
-    const maxConcurrent = messagingConfig.maxConcurrentPerVolunteer || 3
+    const maxConcurrent = messagingConfig.maxConcurrentPerUser || 3
 
     // 2. Get current on-shift volunteers
     const onShiftPubkeys = await services.shifts.getCurrentVolunteers('')
     if (onShiftPubkeys.length === 0) return
 
-    // 3. Get volunteer details to filter by channel capability
-    const { volunteers } = await services.identity.getUsers()
-    const onShiftVolunteers = volunteers.filter(v =>
+    // 3. Get user details to filter by channel capability
+    const { users: allUsers } = await services.identity.getUsers()
+    const onShiftVolunteers = allUsers.filter(v =>
       onShiftPubkeys.includes(v.pubkey) &&
       v.active &&
       !v.onBreak &&

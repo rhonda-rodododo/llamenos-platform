@@ -122,7 +122,7 @@ export function NoteSheet() {
   const fieldContext = isConversationNote ? 'conversation-notes' as const : 'call-notes' as const
   const visibleFields = customFields
     .filter(f => fieldMatchesContext(f, fieldContext))
-    .filter(f => isAdmin || f.visibleToVolunteers)
+    .filter(f => isAdmin || f.visibleToUsers)
 
   const canSave = saving || !draft.text.trim() || (mode === 'new' && !isConversationNote && !draft.callId.trim())
 

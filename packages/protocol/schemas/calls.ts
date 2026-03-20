@@ -31,10 +31,10 @@ export const activeCallResponseSchema = z.object({
 
 export type CallRecord = z.infer<typeof callRecordResponseSchema>
 export type ActiveCall = z.infer<typeof activeCallResponseSchema>
-export type VolunteerPresence = z.infer<typeof callPresenceResponseSchema>['volunteers'][number]
+export type UserPresence = z.infer<typeof callPresenceResponseSchema>['users'][number]
 
 export const callPresenceResponseSchema = z.object({
-  volunteers: z.array(z.object({
+  users: z.array(z.object({
     pubkey: z.string(),
     status: z.enum(['available', 'on-call', 'online']),
   })),

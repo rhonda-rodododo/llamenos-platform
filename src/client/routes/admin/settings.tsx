@@ -55,7 +55,7 @@ function AdminSettingsPage() {
   const [spam, setSpam] = useState<SpamSettings | null>(null)
   const [callSet, setCallSet] = useState<CallSettings | null>(null)
   const [globalTranscription, setGlobalTranscription] = useState(false)
-  const [allowVolunteerOptOut, setAllowVolunteerOptOut] = useState(false)
+  const [allowUserOptOut, setAllowUserOptOut] = useState(false)
   const [ivrEnabled, setIvrEnabled] = useState<string[]>([...IVR_LANGUAGES])
   const [ivrAudio, setIvrAudio] = useState<IvrAudioRecording[]>([])
   const [loading, setLoading] = useState(true)
@@ -80,7 +80,7 @@ function AdminSettingsPage() {
       getCallSettings().then(setCallSet),
       getTranscriptionSettings().then(r => {
         setGlobalTranscription(r.globalEnabled)
-        setAllowVolunteerOptOut(r.allowVolunteerOptOut)
+        setAllowUserOptOut(r.allowUserOptOut)
       }),
       getIvrLanguages().then(r => setIvrEnabled(r.enabledLanguages)),
       listIvrAudio().then(r => setIvrAudio(r.recordings)),
@@ -211,9 +211,9 @@ function AdminSettingsPage() {
 
       <TranscriptionSection
         globalEnabled={globalTranscription}
-        allowOptOut={allowVolunteerOptOut}
+        allowOptOut={allowUserOptOut}
         onGlobalChange={setGlobalTranscription}
-        onOptOutChange={setAllowVolunteerOptOut}
+        onOptOutChange={setAllowUserOptOut}
         onConfirmToggle={handleConfirmToggle}
         expanded={expanded.has('transcription')}
         onToggle={(open) => toggleSection('transcription', open)}

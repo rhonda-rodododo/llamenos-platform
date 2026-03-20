@@ -65,8 +65,8 @@ export const entityFieldDefinitionSchema = z.object({
   accessRoles: z.array(z.string()).optional(),
 
   // Visibility rules
-  visibleToVolunteers: z.boolean().optional().default(true),
-  editableByVolunteers: z.boolean().optional().default(true),
+  visibleToUsers: z.boolean().optional().default(true),
+  editableByUsers: z.boolean().optional().default(true),
 
   // Conditional display
   showWhen: showWhenSchema.optional(),

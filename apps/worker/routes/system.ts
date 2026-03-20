@@ -119,13 +119,13 @@ async function fetchVolunteerInfo(services: Services, hubId: string): Promise<Sy
       services.shifts.getCurrentVolunteers(hubId),
     ])
 
-    const totalActive = volResult.volunteers.filter(v => v.active).length
+    const totalActive = volResult.users.filter(v => v.active).length
     const onShift = onShiftPubkeys.length
     const shiftCoverage = totalActive > 0 ? Math.round((onShift / totalActive) * 100) : 0
 
     return {
       totalActive,
-      onlineNow: presenceResult.volunteers.length,
+      onlineNow: presenceResult.users.length,
       onShift,
       shiftCoverage,
     }
