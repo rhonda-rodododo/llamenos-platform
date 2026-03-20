@@ -223,10 +223,8 @@ Then('I should see at least one toggle switch', async ({ page }) => {
     const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
     if (!isExpanded) {
       await section.locator('.cursor-pointer').first().click().catch(() => {})
-      await page.waitForTimeout(300)
     }
   }
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
   const switches = page.getByRole('switch')
   await expect(switches.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   const count = await switches.count()
@@ -238,13 +236,11 @@ Then('I should see at least one toggle switch', async ({ page }) => {
 When('I switch the language to Espanol', async ({ page }) => {
   await page.getByRole('combobox', { name: /switch to/i }).click()
   await page.getByRole('option', { name: /español/i }).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I switch the language back to English', async ({ page }) => {
   await page.getByRole('combobox', { name: /cambiar a/i }).click()
   await page.getByRole('option', { name: /english/i }).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Settings summaries ---

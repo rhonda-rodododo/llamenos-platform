@@ -40,14 +40,12 @@ Given('I am on the note detail screen', async ({ page, request }) => {
     const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
     await expect(saveBtn).toBeEnabled({ timeout: 5000 })
     await saveBtn.click({ timeout: Timeouts.ELEMENT })
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 
   // Open first note
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
   await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await noteCard.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Given('the note has no replies', async () => {

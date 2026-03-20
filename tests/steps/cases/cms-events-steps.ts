@@ -109,7 +109,6 @@ When('I click the new event button', async ({ page }) => {
   const btn = page.getByTestId('case-new-btn')
     .or(page.getByRole('button', { name: /new event/i }))
   await btn.first().click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I fill in the event name with a unique name', async ({ page }) => {
@@ -132,7 +131,6 @@ When('I fill in the event start date', async ({ page }) => {
 When('I submit the event creation form', async ({ page }) => {
   const submitBtn = page.getByTestId('case-create-submit')
   await submitBtn.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the new event should appear in the event list', async ({ page }) => {
@@ -155,7 +153,6 @@ When('I click on the {string} event card', async ({ page }, eventName: string) =
   const card = page.getByTestId('case-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the event detail should be visible', async ({ page }) => {
@@ -224,7 +221,6 @@ When('I view the event detail', async ({ page, backendRequest: request }) => {
   const card = page.getByTestId('case-card').first()
   if (await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
     await card.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -234,7 +230,6 @@ Then('linked case records should be visible', async ({ page }) => {
     .or(page.getByTestId('case-related-tab'))
   if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
     await tab.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -284,14 +279,12 @@ When('I search for a case by number', async ({ page }) => {
   const searchInput = page.locator('input[placeholder*="search" i], input[type="search"]').first()
   if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     await searchInput.fill('case')
-    await page.waitForTimeout(500)
   }
 })
 
 When('I select the case from the search results', async ({ page }) => {
   // Close the link dialog (the linking is done via API in the Given steps)
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   const overlay = page.locator('[data-slot="dialog-overlay"]')
   await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 })
@@ -303,7 +296,6 @@ Then('the case should appear in the event\'s linked cases', async ({ page }) => 
 When('I select the report', async ({ page }) => {
   // Close the link dialog (the linking is done via API in the Given steps)
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   const overlay = page.locator('[data-slot="dialog-overlay"]')
   await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 })
@@ -324,13 +316,11 @@ When('I change the event status to {string}', async ({ page }, newStatus: string
   const pill = page.getByTestId('case-status-pill')
   await expect(pill).toBeVisible({ timeout: Timeouts.ELEMENT })
   await pill.click()
-  await page.waitForTimeout(300)
 
   const dropdown = page.getByTestId('case-status-dropdown')
   const option = dropdown.locator('[role="option"]').filter({ hasText: new RegExp(newStatus, 'i') })
   if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
     await option.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -339,7 +329,6 @@ Then('the event status should reflect {string}', async ({ page }, status: string
   await expect(pill).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // Wait for API round-trip + React re-render
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
   // Check pill text OR toast confirmation
   const pillText = await pill.textContent() ?? ''
@@ -352,6 +341,5 @@ Then('the event status should reflect {string}', async ({ page }, status: string
   if (toastVisible) return
 
   // Final wait and accept pill being visible
-  await page.waitForTimeout(2000)
   await expect(pill).toBeVisible()
 })

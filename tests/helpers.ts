@@ -21,10 +21,6 @@ export const Timeouts = {
   ELEMENT: 10000,
   /** Time to wait for auth-related operations (includes PBKDF2 600K iterations) */
   AUTH: 45000,
-  /** Short delay for UI settling after login/navigation */
-  UI_SETTLE: 500,
-  /** Medium delay for route component mount and initial API calls */
-  ASYNC_SETTLE: 1500,
 } as const
 
 // Re-export TestIds for convenience
@@ -95,17 +91,15 @@ export async function enterPin(page: Page, pin: string) {
   const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
   await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
   await firstDigit.click()
-  // Type each digit with enough delay for React state updates + focus advance
+  // Type each digit — PinInput auto-advances focus on each keystroke
   for (const digit of pin) {
     await page.keyboard.type(digit)
-    // Wait for React to process the input event, update state, and advance focus
-    await page.waitForTimeout(100)
   }
   // PinInput has 8 fields but minLength is 6 — if PIN is shorter than 8 digits,
   // press Enter to trigger onComplete (auto-complete only fires at exactly 8 digits)
   await page.keyboard.press('Enter')
   // Wait for onComplete callback to fire and unlock to process
-  await page.waitForTimeout(500)
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
 }
 
 /**
@@ -148,8 +142,8 @@ export async function navigateAfterLogin(page: Page, url: string): Promise<void>
   }, { pathname: parsed.pathname, search: searchParams })
   await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: Timeouts.NAVIGATION })
 
-  // Allow route component to mount and initial API calls to complete
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
+  // Wait for route component to mount and render the page title
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 }
 
 /**
@@ -259,8 +253,6 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
 
   // Wait for the authenticated layout to be visible
   await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
-  // Short delay for initial API calls to complete
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 }
 
 /**

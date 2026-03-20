@@ -19,7 +19,6 @@ Then('I should see the notification toggles', async ({ page }) => {
   const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
   if (!isExpanded) {
     await section.locator('.cursor-pointer').first().click().catch(() => {})
-    await page.waitForTimeout(500)
   }
   const content = section.locator('[data-slot="switch"], [role="switch"], button[data-state]')
   const isSwitch = await content.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)

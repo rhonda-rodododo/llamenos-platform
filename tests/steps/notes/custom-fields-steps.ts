@@ -31,7 +31,6 @@ Given('a text custom field {string} exists', async ({ page, request }, fieldLabe
     await page.getByTestId(TestIds.CUSTOM_FIELD_ADD_BTN).click()
     await page.getByLabel(/label/i).fill(fieldLabel)
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
     // Verify creation via API
     const updatedFields = await getCustomFieldsViaApi(request)
@@ -67,7 +66,6 @@ Given('a note exists with {string} set to {string}', async ({ page }, fieldLabel
   await expect(customInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   await customInput.fill(value)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Given('a note exists with text {string} and {string} set to {string}', async ({ page }, noteText: string, fieldLabel: string, value: string) => {
@@ -78,7 +76,6 @@ Given('a note exists with text {string} and {string} set to {string}', async ({ 
   await expect(customInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   await customInput.fill(value)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I click edit on the note', async ({ page }) => {
@@ -144,7 +141,6 @@ When('I create two notes with the same call ID', async ({ page }) => {
   await page.getByTestId(TestIds.NOTE_CALL_ID).fill(callId)
   await page.getByTestId(TestIds.NOTE_CONTENT).fill('Note 1 same call')
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
   await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
   await page.getByTestId(TestIds.NOTE_CALL_ID).fill(callId)
@@ -167,7 +163,6 @@ Given('a note exists', async ({ page, request }) => {
     await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Existing note for testing')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -207,7 +202,6 @@ When('I add option {string}', async ({ page }, option: string) => {
   const addOptionBtn = page.getByTestId(TestIds.CUSTOM_FIELD_ADD_OPTION_BTN)
   await expect(addOptionBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await addOptionBtn.click()
-  await page.waitForTimeout(200)
   // Options are Input components in the edit form — find the last input that's empty or recently added
   // The form has specific inputs for label/name/etc, but option inputs are plain <input> without specific labels
   // Get all inputs in the form, the option inputs are the ones without id/data-testid attributes
@@ -230,7 +224,6 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
     await page.getByTestId(TestIds.CUSTOM_FIELD_ADD_BTN).click()
     await page.getByLabel(/label/i).fill(fieldLabel)
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -248,5 +241,4 @@ When('I click the delete button on {string}', async ({ page }, fieldLabel: strin
   ).catch(() => {
     // API might not be available in test env — continue anyway
   })
-  await page.waitForTimeout(1000)
 })

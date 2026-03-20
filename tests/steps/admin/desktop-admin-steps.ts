@@ -102,7 +102,6 @@ Then('I should see fields for Account SID, Auth Token, and TwiML App SID', async
 
 When('I navigate to the telephony settings', async ({ page }) => {
   await page.getByTestId(navTestIdMap['Hub Settings']).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I fill in valid Twilio credentials', async ({ page }) => {
@@ -151,7 +150,6 @@ Given('a call without a recording exists', async () => {
 Given('I am viewing a call with a recording', async ({ page }) => {
   // Navigate to call history and open a call detail
   await page.getByTestId(navTestIdMap['Call History']).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I open the call detail', async ({ page }) => {
@@ -187,7 +185,6 @@ Then('I should see play, pause, and progress controls', async ({ page }) => {
 
 When('I navigate to the messaging channel settings', async ({ page }) => {
   await page.getByTestId(navTestIdMap['Hub Settings']).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the RCS configuration section', async ({ page }) => {
@@ -206,7 +203,6 @@ When('I fill in valid RCS settings', async ({ page }) => {
     const rcsSection = page.locator('[data-settings-section]').filter({ hasText: /RCS|messaging/i }).first()
     if (await rcsSection.isVisible({ timeout: 2000 }).catch(() => false)) {
       await rcsSection.locator('.cursor-pointer').first().click()
-      await page.waitForTimeout(Timeouts.UI_SETTLE)
     }
   }
   // Fill the agent ID
@@ -229,7 +225,6 @@ Then('I should see the WebRTC configuration options', async ({ page }) => {
 
 When('I navigate to the WebRTC settings', async ({ page }) => {
   await page.getByTestId(navTestIdMap['Hub Settings']).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I toggle the WebRTC calling switch', async ({ page }) => {
@@ -239,7 +234,6 @@ When('I toggle the WebRTC calling switch', async ({ page }) => {
 
 Then('the setting should be saved', async ({ page }) => {
   // Auto-save or success indication
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see fields for STUN and TURN server configuration', async ({ page }) => {
@@ -251,7 +245,6 @@ Then('I should see fields for STUN and TURN server configuration', async ({ page
 
 When('I navigate to the hub management page', async ({ page }) => {
   await page.getByTestId(TestIds.NAV_ADMIN_HUBS).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I fill in the hub name', async ({ page }) => {
@@ -279,12 +272,10 @@ When('I select a different hub', async ({ page }) => {
 })
 
 Then('the app should switch to the selected hub context', async ({ page }) => {
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I navigate to the hub settings', async ({ page }) => {
   await page.getByTestId(navTestIdMap['Hub Settings']).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the hub-specific configuration', async ({ page }) => {
@@ -296,7 +287,6 @@ When('I switch to a specific hub', async ({ page }) => {
 })
 
 Then('I should see only volunteers for that hub', async ({ page }) => {
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Given('a non-default hub exists', async () => {
@@ -321,7 +311,6 @@ When('I confirm the deletion', async ({ page }) => {
 })
 
 Then('the hub should be removed', async ({ page }) => {
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Setup wizard ---
@@ -370,7 +359,6 @@ Then('the channel should be deselected', async () => {
 })
 
 Then('the error message should disappear', async ({ page }) => {
-  await page.waitForTimeout(500)
 })
 
 Then('the validation error should reappear', async ({ page }) => {
@@ -595,7 +583,6 @@ Given('a blast has been sent', async () => {
 
 Then('I should see the delivery status for the blast', async ({ page }) => {
   // Status indicator visible
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Multi-hub extended ---
@@ -613,7 +600,6 @@ Given('I have selected a hub', async ({ page }) => {
 
 When('I open hub settings', async ({ page }) => {
   await page.getByTestId(navTestIdMap['Hub Settings']).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see telephony, messaging, and general tabs', async ({ page }) => {

@@ -26,7 +26,6 @@ When('I start the device linking process', async ({ page }) => {
       await linkBtn.click()
     }
   }
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see a QR code displayed', async ({ page }) => {
@@ -61,7 +60,6 @@ When('the provisioning room expires', async ({ page }) => {
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('provisioning-timeout'))
   })
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see a timeout error message', async ({ page }) => {

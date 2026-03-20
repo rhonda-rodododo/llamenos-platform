@@ -44,7 +44,6 @@ Given('I navigate to the {string} page', async ({ page }, pageName: string) => {
     } else {
       await page.getByTestId(TestIds.NAV_SIDEBAR).getByText(pageName, { exact: true }).click()
     }
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -55,7 +54,6 @@ When('I navigate to {string}', async ({ page }, path: string) => {
   if (isPublic) {
     await page.goto(path)
     await page.waitForLoadState('domcontentloaded')
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   } else {
     await navigateAfterLogin(page, path)
   }
@@ -100,7 +98,6 @@ Given('I navigate to the device link screen from settings', async ({ page }) => 
   if (!isExpanded) {
     // The CardHeader has cursor-pointer and is the CollapsibleTrigger target
     await linkedDevicesSection.locator('.cursor-pointer').first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 

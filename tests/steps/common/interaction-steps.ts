@@ -210,7 +210,6 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
     const isExpanded = await el.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
     if (!isExpanded) {
       await el.locator('.cursor-pointer').first().click()
-      await page.waitForTimeout(300)
     }
   } else {
     // Last resort: find by text
@@ -247,7 +246,6 @@ Then('the {string} button should be disabled', async ({ page }, name: string) =>
       if (phoneValue) {
         await phoneInput.clear()
         await phoneInput.blur()
-        await page.waitForTimeout(300)
       }
     }
     await expect(btn.first()).toBeDisabled({ timeout: 3000 })
@@ -450,7 +448,6 @@ When('they navigate to the {string} page', async ({ page }, pageName: string) =>
   } else {
     await page.getByTestId(TestIds.NAV_SIDEBAR).getByText(pageName, { exact: true }).click()
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('they navigate to {string} via SPA', async ({ page }, path: string) => {

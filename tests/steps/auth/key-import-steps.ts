@@ -28,7 +28,6 @@ When('I start typing in the nsec field', async ({ page }) => {
 
 Then('the error should disappear', async ({ page }) => {
   // Wait briefly for error to clear
-  await page.waitForTimeout(500)
   const errorVisible = await page
     .getByTestId(TestIds.ERROR_MESSAGE)
     .isVisible({ timeout: 1000 })

@@ -77,7 +77,6 @@ When('I tap the back button on contacts', async ({ page }) => {
 
 When('I tap the view contacts button', async ({ page }) => {
   await page.getByTestId(TestIds.NAV_CONTACTS).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I tap a contact card', async ({ page }) => {

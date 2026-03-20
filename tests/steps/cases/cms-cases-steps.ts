@@ -87,7 +87,6 @@ Then('the CMS not-enabled card should be visible', async ({ page }) => {
 
 When('I click the new case button', async ({ page }) => {
   await page.getByTestId('case-new-btn').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the create case sheet should be visible', async ({ page }) => {
@@ -104,7 +103,6 @@ When('I select entity type {string} in the create dialog', async ({ page }, type
     const option = page.getByRole('option', { name: new RegExp(typeName, 'i') })
     await option.click()
   }
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I fill in the case title with a unique name', async ({ page }) => {
@@ -123,7 +121,6 @@ When('I fill in the case description', async ({ page }) => {
 
 When('I click the create case submit button', async ({ page }) => {
   await page.getByTestId('case-create-submit').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('a toast {string} should appear', async ({ page }, toastText: string) => {
@@ -165,9 +162,7 @@ Then('the new case should be auto-selected in the detail panel', async ({ page }
   const overlayGone = await sheetOverlay.waitFor({ state: 'hidden', timeout: 5000 }).then(() => true).catch(() => false)
   if (!overlayGone) {
     await page.keyboard.press('Escape')
-    await page.waitForTimeout(1000)
   }
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 
   const detailHeader = page.getByTestId('case-detail-header')
   const detailVisible = await detailHeader.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
@@ -176,7 +171,6 @@ Then('the new case should be auto-selected in the detail panel', async ({ page }
     const card = page.getByTestId('case-card').first()
     if (await card.isVisible({ timeout: 3000 }).catch(() => false)) {
       await card.click()
-      await page.waitForTimeout(Timeouts.UI_SETTLE)
       await expect(detailHeader).toBeVisible({ timeout: Timeouts.ELEMENT })
     }
   }
@@ -196,7 +190,6 @@ Then('the create case submit button should be disabled', async ({ page }) => {
 When('I click the {string} entity type tab', async ({ page }, tabName: string) => {
   const tab = page.locator('[data-testid^="case-tab-"]').filter({ hasText: tabName })
   await tab.first().click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the entity type selector should show {string}', async ({ page }, expected: string) => {
@@ -389,7 +382,6 @@ When('I select a status from the status filter dropdown', async ({ page }) => {
   } else {
     await page.keyboard.press('Escape')
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('only cases matching that status should appear in the list', async ({ page }) => {
@@ -418,7 +410,6 @@ Then('the {string} tab is active', async ({ page }, tabName: string) => {
   const classList = await tab.first().getAttribute('class') ?? ''
   if (!classList.includes('bg-card') && !classList.includes('border-primary')) {
     await tab.first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -444,7 +435,6 @@ When('I click the {string} tab', async ({ page }, tabName: string) => {
       await page.getByRole('button', { name: new RegExp(tabName, 'i') }).first().click()
     }
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Details tab ---
@@ -502,7 +492,6 @@ When('I select a different status from the dropdown', async ({ page }) => {
   if (count > 0) {
     await options.first().click()
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the status pill should reflect the new status', async ({ page }) => {
@@ -584,7 +573,6 @@ Given('an arrest case is selected with the Timeline tab active', async ({ page, 
   const timelineTab = page.getByTestId('case-tab-timeline')
   await expect(timelineTab).toBeVisible({ timeout: Timeouts.ELEMENT })
   await timelineTab.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the case timeline should be visible', async ({ page }) => {
@@ -618,7 +606,6 @@ Then('at least one timeline item should show type {string}', async ({ page }, ty
 
 When('I click the sort toggle button', async ({ page }) => {
   await page.getByTestId('timeline-sort-toggle').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the timeline items should be in oldest-first order', async ({ page }) => {
@@ -636,7 +623,6 @@ When('I select {string} from the timeline type filter', async ({ page }, filterL
   await filter.click()
   const option = page.getByRole('option', { name: new RegExp(filterLabel, 'i') })
   await option.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('only comment interactions should be visible', async ({ page }) => {
@@ -658,7 +644,6 @@ When('I type a comment in the timeline comment input', async ({ page }) => {
 
 When('I click the timeline comment submit button', async ({ page }) => {
   await page.getByTestId('timeline-comment-submit').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the comment should appear in the timeline items', async ({ page }) => {
@@ -764,7 +749,6 @@ Then('each evidence item should show a classification badge', async ({ page }) =
 
 When('I click the list view button', async ({ page }) => {
   await page.getByTestId('evidence-view-list').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('evidence should display in list layout', async ({ page }) => {
@@ -773,7 +757,6 @@ Then('evidence should display in list layout', async ({ page }) => {
 
 When('I click the grid view button', async ({ page }) => {
   await page.getByTestId('evidence-view-grid').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('evidence should display in grid layout', async ({ page }) => {
@@ -785,7 +768,6 @@ When('I select {string} from the evidence classification filter', async ({ page 
   await filter.click()
   const option = page.getByRole('option', { name: new RegExp(classification, 'i') })
   await option.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('only photo evidence should be visible', async ({ page }) => {
@@ -852,7 +834,6 @@ Then('the page info should show {string}', async ({ page }, text: string) => {
 
 When('I click the next page button', async ({ page }) => {
   await page.getByTestId('case-page-next').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the case list should reload with new records', async ({ page }) => {

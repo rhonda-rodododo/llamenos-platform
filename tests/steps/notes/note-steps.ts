@@ -111,7 +111,6 @@ Given('at least one note exists', async ({ page, request }) => {
     }
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created test note')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -119,7 +118,6 @@ When('I navigate to a note\'s detail view', async ({ page }) => {
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
   await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await noteCard.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see the full note text', async ({ page }) => {
@@ -154,7 +152,6 @@ When('I am on a note detail view', async ({ page }) => {
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
   await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await noteCard.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('a copy button should be visible in the top bar', async ({ page }) => {
@@ -193,13 +190,11 @@ Given('I open a note', async ({ page, request }) => {
     }
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created note for test')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
   await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await noteCard.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the note edit button', async ({ page }) => {
@@ -248,7 +243,6 @@ When('I type in the notes search input', async ({ page }) => {
   const searchInput = page.getByTestId(TestIds.NOTE_SEARCH)
   await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   await searchInput.fill('test')
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the notes list should update', async ({ page }) => {
@@ -265,7 +259,6 @@ When('I clear the notes search', async ({ page }) => {
   const searchInput = page.getByTestId(TestIds.NOTE_SEARCH)
   await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   await searchInput.clear()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see the full notes list', async ({ page }) => {

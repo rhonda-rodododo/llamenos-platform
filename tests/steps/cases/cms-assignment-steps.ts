@@ -146,12 +146,10 @@ When('I open the assignment dialog for the case', async ({ page }) => {
   const card = page.getByTestId('case-card').first()
   if (await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
     await card.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
   const assignBtn = page.getByTestId('case-assign-dialog-btn')
   if (await assignBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await assignBtn.click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -173,7 +171,6 @@ When('I click assign on the first suggested volunteer', async ({ page }) => {
   const btn = page.getByTestId('assign-volunteer-btn').first()
   if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await btn.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -196,7 +193,6 @@ When('I toggle the auto-assignment switch', async ({ page }) => {
   const toggle = page.getByTestId('auto-assignment-toggle')
   if (await toggle.isVisible({ timeout: 3000 }).catch(() => false)) {
     await toggle.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 

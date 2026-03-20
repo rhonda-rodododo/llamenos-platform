@@ -11,7 +11,6 @@ When('I tap a volunteer card', async ({ page }) => {
   const volCard = page.getByTestId(TestIds.VOLUNTEER_ROW).first()
   await expect(volCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await volCard.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the volunteer detail screen', async ({ page }) => {

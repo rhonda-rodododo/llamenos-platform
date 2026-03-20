@@ -34,7 +34,6 @@ Then('I should see the reports card on the dashboard', async ({ page }) => {
 
 When('I tap the view reports button', async ({ page }) => {
   await page.getByTestId(TestIds.NAV_REPORTS).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Report creation ---
@@ -50,7 +49,6 @@ Given('I navigate to the report creation form', async ({ page }) => {
   const createBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
   await expect(createBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await createBtn.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the create report button', async ({ page }) => {
@@ -91,7 +89,6 @@ When('I tap the first report card', async ({ page }) => {
   const reportCard = page.getByTestId(TestIds.REPORT_CARD).first()
   await expect(reportCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await reportCard.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the report detail screen', async ({ page }) => {
@@ -126,7 +123,6 @@ Given('I am viewing a report with status {string}', async ({ page, request }, st
 
   // Navigate to reports with the correct status filter
   await Navigation.goToReports(page)
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
   // If status filter exists, apply it
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
@@ -138,7 +134,6 @@ Given('I am viewing a report with status {string}', async ({ page, request }, st
       const option = page.getByRole('option', { name: new RegExp(status, 'i') })
       if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
         await option.click()
-        await page.waitForTimeout(Timeouts.UI_SETTLE)
       } else {
         await page.keyboard.press('Escape')
       }
@@ -148,7 +143,6 @@ Given('I am viewing a report with status {string}', async ({ page, request }, st
   const reportCard = page.getByTestId(TestIds.REPORT_CARD).first()
   await expect(reportCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await reportCard.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Report list (report-list.feature) ---
@@ -169,9 +163,7 @@ Then('I should see the {string} report status filter', async ({ page }, filterNa
     try {
       await createReportViaApi(page.request, { title: `Seed for filter ${Date.now()}` })
       await page.getByTestId(TestIds.NAV_DASHBOARD).click()
-      await page.waitForTimeout(300)
       await page.getByTestId(TestIds.NAV_REPORTS).click()
-      await page.waitForTimeout(2000)
       filterVisible = await filterArea.isVisible({ timeout: 3000 }).catch(() => false)
     } catch {
       // API may not support seeding in this env
@@ -214,7 +206,6 @@ When('I tap the {string} report status filter', async ({ page }, filterName: str
     // Fallback: direct text click
     await filterArea.getByText(new RegExp(filterName, 'i')).click()
   }
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the {string} report status filter should be selected', async ({ page }, filterName: string) => {
@@ -313,7 +304,6 @@ Then('the report type tabs should include template-defined types', async ({ page
     const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
     if (await newBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await newBtn.click()
-      await page.waitForTimeout(Timeouts.UI_SETTLE)
       // Fill minimal fields and submit to create a report
       const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
       if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -326,7 +316,6 @@ Then('the report type tabs should include template-defined types', async ({ page
       const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
       if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await submitBtn.click()
-        await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
       }
     }
     // After creating, the filter should appear
@@ -347,7 +336,6 @@ Then('the report type selector should list template-defined types', async ({ pag
   await expect(selector.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Click the select trigger to open the dropdown and verify options exist
   await selector.first().click()
-  await page.waitForTimeout(300)
   // Radix Select renders options in a portal — look globally
   const options = page.locator('[role="option"]')
   const count = await options.count()
@@ -362,7 +350,6 @@ When('I select the first template report type', async ({ page }) => {
   if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
     // Radix Select: click trigger, then click the first non-default option
     await selector.click()
-    await page.waitForTimeout(300)
     const options = page.locator('[role="option"]')
     const count = await options.count()
     if (count > 1) {
@@ -380,7 +367,6 @@ When('I select the first template report type', async ({ page }) => {
       await option.click()
     }
   }
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the report form should show dynamic schema fields', async ({ page }) => {

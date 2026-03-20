@@ -66,7 +66,6 @@ When('I click the first triage report card', async ({ page }) => {
   const card = page.getByTestId('triage-report-card').first()
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I click the {string} status tab', async ({ page }, tabLabel: string) => {
@@ -78,7 +77,6 @@ When('I click the {string} status tab', async ({ page }, tabLabel: string) => {
   }
   const key = keyMap[tabLabel] ?? tabLabel.toLowerCase().replace(/ /g, '_')
   await page.getByTestId(`triage-status-tab-${key}`).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I fill in the triage case title', async ({ page }) => {
@@ -89,17 +87,14 @@ When('I fill in the triage case title', async ({ page }) => {
 
 When('I click the triage create case button', async ({ page }) => {
   await page.getByTestId('triage-create-case-btn').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I click the mark in progress button', async ({ page }) => {
   await page.getByTestId('triage-mark-in-progress').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I click the mark completed button', async ({ page }) => {
   await page.getByTestId('triage-mark-completed').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I look at the navigation sidebar', async ({ page }) => {

@@ -102,7 +102,6 @@ test.describe('Report Types', () => {
     await navigateToReports(page)
 
     // Wait for reports to load
-    await page.waitForTimeout(2000)
 
     // At least one report should have a type badge visible in the list
     // The badge comes from the reportCategory set from the report type name

@@ -69,7 +69,6 @@ When('a QR code with relay URL {string} is scanned', async ({ page }, relayUrl: 
     // Dispatch a custom event that the link-device page can listen to
     window.dispatchEvent(new CustomEvent('test-qr-scan', { detail: { relayUrl: url } }))
   }, relayUrl)
-  await page.waitForTimeout(500)
 })
 
 // NOTE: "I should see the error state" is defined in settings-steps.ts

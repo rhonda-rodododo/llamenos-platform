@@ -28,7 +28,6 @@ When('I request the roles list', async ({ page, request }) => {
   if (await rolesSection.first().isVisible({ timeout: 2000 }).catch(() => false)) {
     await rolesSection.first().click()
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
   // Also fetch via API for behavioral verification
   cachedRoles = await listRolesViaApi(request)

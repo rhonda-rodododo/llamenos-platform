@@ -92,7 +92,6 @@ test.describe('Records Architecture', () => {
 
     // After sending, the reply count should update
     // Wait for the reply to be sent
-    await page.waitForTimeout(1500)
 
     // The reply button text should now show "1 replies"
     const replyBtn = page.getByTestId(TestIds.NOTE_REPLY_BTN).first()
@@ -118,7 +117,6 @@ test.describe('Records Architecture', () => {
     await expect(replyTextarea).toBeVisible({ timeout: 5000 })
     await replyTextarea.fill('Reply to collapse test')
     await page.getByTestId(TestIds.NOTE_REPLY_SEND).click()
-    await page.waitForTimeout(1000)
 
     // Collapse thread
     await page.getByTestId(TestIds.NOTE_REPLY_BTN).first().click()
@@ -152,7 +150,6 @@ test.describe('Records Architecture', () => {
   test('contacts page shows empty state when no contacts exist', async ({ page }) => {
     await Navigation.goToContacts(page)
     // Wait for loading to finish
-    await page.waitForTimeout(2000)
     // Should show either contacts or empty state
     const hasContacts = await page.getByTestId(TestIds.CONTACT_ROW).first().isVisible().catch(() => false)
     if (!hasContacts) {
@@ -178,7 +175,6 @@ test.describe('Records Architecture', () => {
     await loginAsVolunteer(page, volunteerNsec)
 
     // Wait for the app to fully load
-    await page.waitForTimeout(2000)
 
     // The contacts nav link should not be visible for a default volunteer role
     const contactsLink = page.getByRole('link', { name: 'Contacts' })
@@ -267,6 +263,5 @@ test.describe('Records Architecture', () => {
     await expect(heading).toBeVisible()
 
     // Should show either conversation list or empty/no-channels state
-    await page.waitForTimeout(1000)
   })
 })

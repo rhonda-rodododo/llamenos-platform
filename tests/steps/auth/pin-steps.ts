@@ -64,7 +64,6 @@ Then('I should arrive at the dashboard', async ({ page }) => {
   // After PIN unlock, user may land on dashboard or profile-setup (first-time volunteer).
   // Handle profile-setup by clicking "Complete Setup" if needed.
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
   if (page.url().includes('/profile-setup')) {
     const completeBtn = page.getByRole('button', { name: /complete setup|get started|comenzar/i })
@@ -72,7 +71,6 @@ Then('I should arrive at the dashboard', async ({ page }) => {
     if (hasBtnVisible) {
       await completeBtn.click()
       await page.waitForURL(url => !url.toString().includes('/profile-setup'), { timeout: Timeouts.AUTH })
-      await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
     }
   }
 
@@ -138,7 +136,6 @@ Then('the PIN pad should be displayed', async ({ page }) => {
 
 When('I see the error', async ({ page }) => {
   // Wait for any error message to appear and then clear
-  await page.waitForTimeout(500)
 })
 
 Then('the encrypted key data should be stored', async ({ page }) => {

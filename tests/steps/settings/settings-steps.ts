@@ -196,7 +196,6 @@ When('a QR code with invalid format is scanned', async ({ page }) => {
   await page.evaluate(() => {
     window.dispatchEvent(new CustomEvent('qr-scanned', { detail: { data: 'invalid-qr-data' } }))
   })
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 // --- Profile settings steps ---

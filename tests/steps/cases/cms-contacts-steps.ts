@@ -60,16 +60,13 @@ async function ensureContactVisibleInDirectory(
   const createBtn = newBtn.or(emptyBtn)
   if (await createBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
     await createBtn.first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
     const contactName = name ?? `Test Contact ${Date.now()}`
     await page.getByTestId('contact-name-input').fill(contactName)
     await page.getByTestId('create-contact-submit').click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
     // Wait for dialog to close
     const dialog = page.getByTestId('create-contact-dialog')
     await dialog.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 
     // Check if card appeared after creation
     const appeared = await card.isVisible({ timeout: 5000 }).catch(() => false)
@@ -152,20 +149,17 @@ When('I type {string} in the contact search input', async ({ page }, query: stri
     await ensureContactVisibleInDirectory(page, query)
     // Reload the page to get the search input
     await navigateAfterLogin(page, '/contacts-directory')
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
   // If input still not visible after helper, accept empty state gracefully
   if (!await input.isVisible({ timeout: 5000 }).catch(() => false)) return
   await input.fill(query)
   // Wait for debounce (300ms) + API round-trip + re-render
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I clear the contact search input', async ({ page }) => {
   const input = page.getByTestId('contact-search-input')
   if (!await input.isVisible({ timeout: 3000 }).catch(() => false)) return
   await input.clear()
-  await page.waitForTimeout(500)
 })
 
 Then('the contact list should update after debounce', async ({ page }) => {
@@ -218,14 +212,12 @@ When('I select {string} from the contact type filter', async ({ page }, filterLa
   }
   if (!await filter.isVisible({ timeout: 3000 }).catch(() => false)) return
   await filter.click()
-  await page.waitForTimeout(300)
   const option = page.locator('[role="option"]').filter({ hasText: new RegExp(filterLabel, 'i') })
   if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
     await option.first().click()
   } else {
     await page.keyboard.press('Escape')
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('only individual contacts should appear in the list', async ({ page }) => {
@@ -247,7 +239,6 @@ Then('both individual and organization contacts should be visible', async ({ pag
 
 When('I click the new contact button', async ({ page }) => {
   await page.getByTestId('new-contact-btn').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the create contact dialog should be visible', async ({ page }) => {
@@ -286,7 +277,6 @@ Then('the primary checkbox for the first identifier should be checked', async ({
 
 When('I click the create contact submit button', async ({ page }) => {
   await page.getByTestId('create-contact-submit').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('{string} should appear in the contact list', async ({ page }, name: string) => {
@@ -322,7 +312,6 @@ Then('the create contact submit button should be disabled', async ({ page }) => 
 
 When('I click the add identifier button', async ({ page }) => {
   await page.getByTestId('add-identifier-btn').click()
-  await page.waitForTimeout(300)
 })
 
 Then('{int} identifier rows should be visible', async ({ page }, count: number) => {
@@ -349,7 +338,6 @@ Then('only one identifier should have the primary checkbox checked', async ({ pa
 When('I click the remove button on the second identifier', async ({ page }) => {
   const removeBtn = page.getByTestId('remove-identifier-btn').nth(1)
   await removeBtn.click()
-  await page.waitForTimeout(300)
 })
 
 // --- Contact profile detail ---
@@ -471,7 +459,6 @@ When('I click on the {string} contact card', async ({ page }, name: string) => {
       await anyCard.click()
     }
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I click on the contact card', async ({ page }) => {
@@ -484,7 +471,6 @@ When('I click on the contact card', async ({ page }) => {
   }
   if (isVisible) {
     await card.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -575,7 +561,6 @@ Then('the contact relationships list should be visible', async ({ page }) => {
     const card = page.getByTestId('directory-contact-card').first()
     if (await card.isVisible({ timeout: 5000 }).catch(() => false)) {
       await card.click()
-      await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
     }
   }
 
@@ -585,7 +570,6 @@ Then('the contact relationships list should be visible', async ({ page }) => {
     const cls = await relTab.getAttribute('class') ?? ''
     if (!cls.includes('border-primary')) {
       await relTab.click()
-      await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
     }
   }
 
@@ -643,7 +627,6 @@ Given('I am logged in as a volunteer without PII access', async ({ page, backend
 
 When('I click on the restricted contact card', async ({ page }) => {
   // After re-login, ensure at least one contact is visible
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   await ensureContactVisibleInDirectory(page)
 
   // Look for a card showing "Restricted" text or lock icon
@@ -657,7 +640,6 @@ When('I click on the restricted contact card', async ({ page }) => {
       await firstCard.click()
     }
   }
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('the contact profile header should show a lock icon', async ({ page }) => {

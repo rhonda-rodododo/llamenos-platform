@@ -170,7 +170,6 @@ Then('the phone number input should not be visible', async ({ page }) => {
 When('I add two bans with different phone numbers', async ({ page }) => {
   const phone1 = `+1555${Date.now().toString().slice(-7)}`
   // Small delay to ensure unique timestamp
-  await page.waitForTimeout(10)
   const phone2 = `+1555${(Date.now() + 1).toString().slice(-7)}`
 
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()

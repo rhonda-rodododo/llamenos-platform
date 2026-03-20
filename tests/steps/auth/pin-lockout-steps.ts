@@ -104,7 +104,6 @@ Then('the failed attempt counter should be reset', async ({ page }) => {
 Given('I see the lockout message', async ({ page }) => {
   // Enter a wrong PIN to trigger lockout (attempts already seeded)
   await enterPin(page, '000000')
-  await page.waitForTimeout(1000)
   const lockoutText = page.locator('text=/locked out/i')
   await expect(lockoutText.first()).toBeVisible({ timeout: Timeouts.AUTH })
 })

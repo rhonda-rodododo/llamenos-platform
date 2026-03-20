@@ -13,7 +13,6 @@ When('I tap a shift card', async ({ page }) => {
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await shiftCard.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('I should see the shift detail screen', async ({ page }) => {

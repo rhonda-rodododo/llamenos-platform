@@ -44,7 +44,6 @@ When('I expand the CMS toggle section', async ({ page }) => {
       // Fallback: click the section's first header/title element
       await section.locator('h3, [class*="CardTitle"]').first().click()
     }
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
 })
 
@@ -54,7 +53,6 @@ When('I toggle the CMS enable switch on', async ({ page }) => {
   const checked = await toggle.getAttribute('data-state')
   if (checked !== 'checked') {
     await toggle.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -64,7 +62,6 @@ When('I toggle the CMS enable switch off', async ({ page }) => {
   const checked = await toggle.getAttribute('data-state')
   if (checked === 'checked') {
     await toggle.click()
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -116,7 +113,6 @@ Then('the CMS toggle section should show {string} in its status summary', async 
       await section.locator('h3').first().click()
     }
     // Wait for Collapsible animation to complete
-    await page.waitForTimeout(500)
   }
 
   // The status summary renders as a span with "hidden sm:block" when section is collapsed.
@@ -139,7 +135,6 @@ When('I expand the templates section', async ({ page }) => {
     } else {
       await section.locator('h3, [class*="CardTitle"]').first().click()
     }
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
   }
 })
 
@@ -168,7 +163,6 @@ When('I click the apply button on the first template', async ({ page }) => {
     page.waitForResponse(resp => resp.url().includes('/templates') && resp.request().method() === 'POST', { timeout: 15000 }).catch(() => {}),
     applyBtn.click(),
   ])
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the applied badge should appear on the template card', async ({ page }) => {
@@ -212,7 +206,6 @@ When('I expand the entity types section', async ({ page }) => {
       await section.locator('h3, [class*="CardTitle"]').first().click()
     }
     // Wait for Collapsible animation + async entity type data load
-    await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
     // Entity types load asynchronously on first expand — wait for rows or add button
     await content.first().waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).catch(() => {})
   }
@@ -265,7 +258,6 @@ Then('the entity type row should display a color swatch', async ({ page }) => {
 
 When('I click the create entity type button', async ({ page }) => {
   await page.getByTestId('entity-type-add-btn').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the entity type editor form should be visible', async ({ page }) => {
@@ -291,7 +283,6 @@ Then('the label input should be visible', async ({ page }) => {
 
 When('I fill in entity type label {string}', async ({ page }, label: string) => {
   await page.getByTestId('entity-type-label-input').fill(label)
-  await page.waitForTimeout(200)
 })
 
 Then('the name input should auto-populate with {string}', async ({ page }, expected: string) => {
@@ -309,7 +300,6 @@ Then('the plural label should auto-populate with {string}', async ({ page }, exp
 Then('default statuses {string} and {string} should be pre-populated', async ({ page }, s1: string, s2: string) => {
   // Switch to statuses tab to verify
   await page.getByTestId('entity-tab-statuses').click()
-  await page.waitForTimeout(300)
   const rows = page.getByTestId('status-row')
   const count = await rows.count()
   expect(count).toBeGreaterThanOrEqual(2)
@@ -317,12 +307,10 @@ Then('default statuses {string} and {string} should be pre-populated', async ({ 
   await expect(rows.first().getByText(s1, { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Go back to general tab
   await page.getByTestId('entity-tab-general').click()
-  await page.waitForTimeout(300)
 })
 
 When('I click the entity type save button', async ({ page }) => {
   await page.getByTestId('entity-type-save-btn').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('{string} should appear in the entity type list', async ({ page }, label: string) => {
@@ -340,14 +328,12 @@ When('I click the edit button on the first entity type', async ({ page }) => {
   const editBtn = page.getByTestId('entity-type-edit-btn').first()
   await expect(editBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await editBtn.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I click the edit button on the entity type', async ({ page }) => {
   const editBtn = page.getByTestId('entity-type-edit-btn').first()
   await expect(editBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await editBtn.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the label input should be populated with the entity type label', async ({ page }) => {
@@ -367,7 +353,6 @@ When('I click the {string} editor tab', async ({ page }, tabName: string) => {
   const tab = page.getByTestId(`entity-tab-${tabName}`)
   await expect(tab).toBeVisible({ timeout: Timeouts.ELEMENT })
   await tab.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('field rows should be visible', async ({ page }) => {
@@ -381,12 +366,10 @@ Then('the add field button should be visible', async ({ page }) => {
 
 When('I click the add field button', async ({ page }) => {
   await page.getByTestId('entity-field-add-btn').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I fill in the field label {string}', async ({ page }, label: string) => {
   await page.getByTestId('entity-field-label-input').fill(label)
-  await page.waitForTimeout(200)
 })
 
 Then('the field name should auto-populate with {string}', async ({ page }, expected: string) => {
@@ -400,7 +383,6 @@ Then('the field name should auto-populate with {string}', async ({ page }, expec
 
 When('I click the field save button', async ({ page }) => {
   await page.getByTestId('entity-field-save-btn').click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('a field row for {string} should appear in the list', async ({ page }, fieldLabel: string) => {
@@ -426,7 +408,6 @@ Then('it should offer types including text, number, select, and checkbox', async
 
 When('I select field type {string}', async ({ page }, fieldType: string) => {
   await page.getByTestId('entity-field-type-select').selectOption(fieldType)
-  await page.waitForTimeout(300)
 })
 
 Then('the add option button should be visible', async ({ page }) => {
@@ -510,7 +491,6 @@ When('I note the field count', async ({ page }) => {
 When('I click the delete button on a field', async ({ page }) => {
   const deleteBtn = page.getByTestId('entity-field-delete-btn').first()
   await deleteBtn.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('the field count should decrease by one', async ({ page }) => {
@@ -549,17 +529,14 @@ Then('each status row should display a color swatch', async ({ page }) => {
 
 When('I click the add status button', async ({ page }) => {
   await page.getByTestId('status-add-btn').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 When('I fill in the status label {string}', async ({ page }, label: string) => {
   await page.getByTestId('status-label-input').fill(label)
-  await page.waitForTimeout(200)
 })
 
 When('I click the status save button', async ({ page }) => {
   await page.getByTestId('status-save-btn').click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
 })
 
 Then('{string} should appear in the status list', async ({ page }, label: string) => {
@@ -602,7 +579,6 @@ When('I click the archive button on {string}', async ({ page }, name: string) =>
   await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   const archiveBtn = row.first().getByTestId('entity-type-archive-btn')
   await archiveBtn.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I confirm the archive dialog', async () => {
@@ -639,7 +615,6 @@ When('I click the delete button on the archived entity type', async ({ page }) =
   })
   const deleteBtn = page.getByTestId('entity-type-delete-btn').first()
   await deleteBtn.click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 When('I confirm the delete dialog', async () => {
@@ -650,7 +625,6 @@ When('I confirm the delete dialog', async () => {
 Then('the entity type should be removed from the list', async ({ page }) => {
   // After deletion, either the archived section should be gone or empty
   // Wait for the UI to update after the delete API call
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
   // The delete button we clicked should no longer be visible (the row is gone)
   const archivedDeleteBtn = page.getByTestId('entity-type-delete-btn')
   const remainingCount = await archivedDeleteBtn.count()

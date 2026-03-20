@@ -26,7 +26,6 @@ Then('I should see the transcription enabled toggle', async ({ page }) => {
   const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
   if (!isExpanded) {
     await section.locator('.cursor-pointer').first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
   const toggle = section.locator('[role="switch"], input[type="checkbox"]').first()
   await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -44,7 +43,6 @@ When('I toggle transcription on', async ({ page }) => {
   const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
   if (!isExpanded) {
     await section.locator('.cursor-pointer').first().click()
-    await page.waitForTimeout(Timeouts.UI_SETTLE)
   }
   const toggle = section.locator('[role="switch"], input[type="checkbox"]').first()
   await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })

@@ -21,7 +21,6 @@ Then('I should see the blasts card on the dashboard', async ({ page }) => {
 
 When('I tap the view blasts button', async ({ page }) => {
   await page.getByTestId(TestIds.NAV_BLASTS).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the blasts screen', async ({ page }) => {
@@ -71,7 +70,6 @@ Then('I should see the help card', async ({ page }) => {
 
 When('I tap the help card', async ({ page }) => {
   await page.getByTestId(TestIds.NAV_HELP).click()
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Then('I should see the help screen', async ({ page }) => {

@@ -57,7 +57,6 @@ Given('a volunteer is logged in and on the dashboard', async ({ page }) => {
   const nsec = await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   await loginAsVolunteer(page, nsec)
-  await page.waitForTimeout(Timeouts.ASYNC_SETTLE)
 })
 
 Given('a volunteer is logged in', async ({ page }) => {
@@ -261,7 +260,6 @@ When('they create a new report', async ({ page }) => {
   const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
   await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await newBtn.click()
-  await page.waitForTimeout(Timeouts.UI_SETTLE)
   // Reports use a chat-style interface — find textarea and submit button
   const textarea = page.locator('textarea').first()
   await expect(textarea).toBeVisible({ timeout: Timeouts.ELEMENT })
