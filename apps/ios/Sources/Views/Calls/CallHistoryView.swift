@@ -82,8 +82,7 @@ final class CallHistoryViewModel {
             calls = response.calls.map { dto in
                 let status: CallStatus
                 switch dto.status {
-                case "answered": status = .answered
-                case "voicemail": status = .voicemail
+                case .some(.completed), .some(.inProgress): status = .answered
                 default: status = .missed
                 }
                 return CallHistoryEntry(

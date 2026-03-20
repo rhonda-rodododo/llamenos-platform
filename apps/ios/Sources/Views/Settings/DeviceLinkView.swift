@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 // MARK: - DeviceLinkView
 
@@ -401,9 +402,11 @@ struct DeviceLinkView: View {
 /// UIViewRepresentable wrapper for `AVCaptureSession` that scans QR codes
 /// using the device camera. Calls `onCodeScanned` exactly once per scan session.
 struct QRScannerView: UIViewRepresentable {
+    typealias UIViewType = UIView
+    typealias Coordinator = QRScannerCoordinator
     let onCodeScanned: (String) -> Void
 
-    func makeUIView(context: Context) -> UIView {
+    func makeUIView(context: UIViewRepresentableContext<QRScannerView>) -> UIView {
         let view = UIView(frame: .zero)
         view.backgroundColor = .black
 
@@ -441,15 +444,20 @@ struct QRScannerView: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
+    func updateUIView(_ uiView: UIView, context: UIViewRepresentableContext<QRScannerView>) {
         context.coordinator.previewLayer?.frame = uiView.bounds
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onCodeScanned: onCodeScanned)
+    static func dismantleUIView(_ uiView: UIView, coordinator: QRScannerCoordinator) {
+        coordinator.captureSession?.stopRunning()
     }
 
-    class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+
+    func makeCoordinator() -> QRScannerCoordinator {
+        QRScannerCoordinator(onCodeScanned: onCodeScanned)
+    }
+
+    class QRScannerCoordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         let onCodeScanned: (String) -> Void
         var captureSession: AVCaptureSession?
         var previewLayer: AVCaptureVideoPreviewLayer?

@@ -235,7 +235,7 @@ final class DashboardViewModel {
                     id: first.id,
                     callerNumber: first.callerLast4,
                     startedAt: DateFormatting.parseISO(first.startedAt) ?? Date(),
-                    status: first.status
+                    status: first.status?.rawValue ?? "unknown"
                 )
             } else {
                 currentCall = nil
