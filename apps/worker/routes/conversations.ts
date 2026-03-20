@@ -64,7 +64,7 @@ conversations.get('/',
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const permissions = c.get('permissions')
-    const volunteer = c.get('volunteer')
+    const user = c.get('user')
     const canReadAll = checkPermission(permissions, 'conversations:read-all')
     const query = c.req.valid('query')
     const hubId = c.get('hubId')
@@ -94,7 +94,7 @@ conversations.get('/',
 
       // Filter waiting conversations by channels the volunteer can claim
       const claimableChannels = getClaimableChannels(permissions)
-      const volunteerChannels = volunteer.supportedMessagingChannels
+      const userChannels = user.supportedMessagingChannels
 
       let filteredWaiting = waiting.conversations
       // Filter by permission-based claimable channels
@@ -103,14 +103,14 @@ conversations.get('/',
           claimableChannels.includes(conv.channelType)
         )
       }
-      // Also filter by volunteer's configured supported channels (if set)
-      if (volunteerChannels && volunteerChannels.length > 0) {
+      // Also filter by user's configured supported channels (if set)
+      if (userChannels && userChannels.length > 0) {
         filteredWaiting = filteredWaiting.filter(conv =>
-          volunteerChannels.includes(conv.channelType as MessagingChannelType)
+          userChannels.includes(conv.channelType as MessagingChannelType)
         )
       }
-      // Hide all waiting if messaging is disabled for this volunteer
-      if (volunteer.messagingEnabled === false) {
+      // Hide all waiting if messaging is disabled for this user
+      if (user.messagingEnabled === false) {
         filteredWaiting = []
       }
 
@@ -479,7 +479,7 @@ conversations.post('/:id/claim',
     const id = c.req.param('id')
     const pubkey = c.get('pubkey')
     const permissions = c.get('permissions')
-    const volunteer = c.get('volunteer')
+    const user = c.get('user')
 
     // Fetch conversation to check channel type
     const conv = await services.conversations.getById(id)
@@ -493,20 +493,20 @@ conversations.post('/:id/claim',
       }, 403)
     }
 
-    // Check volunteer's supported messaging channels (if defined)
-    if (volunteer.supportedMessagingChannels && volunteer.supportedMessagingChannels.length > 0) {
-      if (!volunteer.supportedMessagingChannels.includes(conv.channelType as MessagingChannelType)) {
+    // Check user's supported messaging channels (if defined)
+    if (user.supportedMessagingChannels && user.supportedMessagingChannels.length > 0) {
+      if (!user.supportedMessagingChannels.includes(conv.channelType as MessagingChannelType)) {
         return c.json({
-          error: 'Volunteer not configured for this channel',
+          error: 'User not configured for this channel',
           channelType: conv.channelType,
-          supportedChannels: volunteer.supportedMessagingChannels,
+          supportedChannels: user.supportedMessagingChannels,
         }, 403)
       }
     }
 
-    // Check if volunteer has messaging enabled (defaults to true for backwards compatibility)
-    if (volunteer.messagingEnabled === false) {
-      return c.json({ error: 'Messaging not enabled for this volunteer' }, 403)
+    // Check if user has messaging enabled (defaults to true for backwards compatibility)
+    if (user.messagingEnabled === false) {
+      return c.json({ error: 'Messaging not enabled for this user' }, 403)
     }
 
     const claimed = await services.conversations.claim(id, pubkey)

@@ -34,10 +34,10 @@ webrtc.get('/webrtc-token',
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
-    const volunteer = c.get('volunteer')
+    const user = c.get('user')
 
-    // Check volunteer's call preference allows browser calls
-    const callPref = volunteer.callPreference ?? 'phone'
+    // Check user's call preference allows browser calls
+    const callPref = user.callPreference ?? 'phone'
     if (callPref === 'phone') {
       return c.json({ error: 'Call preference is set to phone only. Enable browser calling in settings.' }, 400)
     }
@@ -88,7 +88,7 @@ webrtc.get('/sip-token',
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
-    const volunteer = c.get('volunteer')
+    const volunteer = c.get('user')
 
     // Check volunteer's call preference allows VoIP
     const callPref = volunteer.callPreference ?? 'phone'

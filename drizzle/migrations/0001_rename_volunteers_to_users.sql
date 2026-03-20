@@ -31,6 +31,11 @@ ALTER TABLE "shifts"
   RENAME COLUMN "volunteer_pubkeys" TO "user_pubkeys";
 --> statement-breakpoint
 
+-- Fix roles column default: 'volunteer' -> 'role-volunteer'
+ALTER TABLE "users"
+  ALTER COLUMN "roles" SET DEFAULT '{"role-volunteer"}'::text[];
+--> statement-breakpoint
+
 -- Migrate stored permission strings: volunteers:* -> users:*
 UPDATE "roles"
 SET permissions = ARRAY(

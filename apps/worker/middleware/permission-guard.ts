@@ -75,10 +75,10 @@ export function requireEntityTypeAccess(action: 'read' | 'write') {
     }
 
     const permissions = c.get('permissions')
-    const volunteer = c.get('volunteer')
-    // Resolve role slugs from the volunteer's role IDs + all role definitions
+    const user = c.get('user')
+    // Resolve role slugs from the user's role IDs + all role definitions
     const allRoles = c.get('allRoles')
-    const userRoleSlugs = volunteer.roles
+    const userRoleSlugs = user.roles
       .map(roleId => allRoles.find(r => r.id === roleId)?.slug)
       .filter((s): s is string => !!s)
 

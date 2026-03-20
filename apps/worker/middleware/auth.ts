@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory'
-import type { AppEnv, Volunteer } from '../types'
+import type { AppEnv, User } from '../types'
 import { authenticateRequest, parseAuthHeader, parseSessionHeader, validateToken } from '../lib/auth'
 import type { Role } from '@shared/permissions'
 import { resolvePermissions } from '@shared/permissions'
@@ -26,9 +26,9 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     const devAuthHeader = c.req.header('Authorization') ?? null
     const authPayload = parseAuthHeader(devAuthHeader)
     if (authPayload?.pubkey && validateToken(authPayload)) {
-      const volunteer = await services.identity.getVolunteerInternal(authPayload.pubkey)
-      if (volunteer) {
-        authResult = { pubkey: authPayload.pubkey, volunteer }
+      const user = await services.identity.getUserInternal(authPayload.pubkey)
+      if (user) {
+        authResult = { pubkey: authPayload.pubkey, user }
         reqLog.info('Dev-mode signature bypass', { pubkeyPrefix: authPayload.pubkey.slice(0, 8) })
       }
     }
@@ -59,10 +59,10 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
   const { roles: allRoles } = await services.settings.getRoles()
 
   // Resolve effective permissions from user's role IDs
-  const permissions = resolvePermissions(authResult.volunteer.roles, allRoles)
+  const permissions = resolvePermissions(authResult.user.roles, allRoles)
 
   c.set('pubkey', authResult.pubkey)
-  c.set('volunteer', authResult.volunteer)
+  c.set('user', authResult.user)
   c.set('permissions', permissions)
   c.set('allRoles', allRoles)
   await next()

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env, Volunteer } from '../types'
+import type { AppEnv, Env, User } from '../types'
 import type { MessagingChannelType, MessagingConfig, WhatsAppConfig } from '@shared/types'
 import type { MessagingAdapter, IncomingMessage, MessageStatusUpdate } from './adapter'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
@@ -228,7 +228,7 @@ async function tryAutoAssign(
     if (onShiftPubkeys.length === 0) return
 
     // 3. Get volunteer details to filter by channel capability
-    const { volunteers } = await services.identity.getVolunteers()
+    const { volunteers } = await services.identity.getUsers()
     const onShiftVolunteers = volunteers.filter(v =>
       onShiftPubkeys.includes(v.pubkey) &&
       v.active &&

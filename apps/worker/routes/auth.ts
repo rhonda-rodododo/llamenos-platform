@@ -55,7 +55,7 @@ auth.post('/login',
     if (!isValid) return c.json({ error: 'Invalid credentials' }, 401)
 
     try {
-      const volunteer = await services.identity.getVolunteer(body.pubkey)
+      const volunteer = await services.identity.getUser(body.pubkey)
       return c.json({ ok: true, roles: volunteer.roles })
     } catch {
       return c.json({ error: 'Invalid credentials' }, 401)
@@ -136,7 +136,7 @@ auth.get('/me',
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
-    const volunteer = c.get('volunteer')
+    const user = c.get('user')
     const permissions = c.get('permissions')
     const allRoles = c.get('allRoles')
 
@@ -146,7 +146,7 @@ auth.get('/me',
     const isAdmin = checkPermission(permissions, 'settings:manage')
     const webauthnRequired = isAdmin ? webauthnSettings.requireForAdmins : webauthnSettings.requireForVolunteers
 
-    const primaryRole = getPrimaryRole(volunteer.roles, allRoles)
+    const primaryRole = getPrimaryRole(user.roles, allRoles)
 
     // Derive server event key for client-side decryption of encrypted relay events (Epic 252)
     // Moved here from /api/config to keep it behind authentication (Epic 258 C2)
@@ -155,17 +155,17 @@ auth.get('/me',
       : undefined
 
     return c.json({
-      pubkey: volunteer.pubkey,
-      roles: volunteer.roles,
+      pubkey: user.pubkey,
+      roles: user.roles,
       permissions,
       primaryRole: primaryRole ? { id: primaryRole.id, name: primaryRole.name, slug: primaryRole.slug } : null,
-      name: volunteer.name,
-      transcriptionEnabled: volunteer.transcriptionEnabled,
-      spokenLanguages: volunteer.spokenLanguages || ['en'],
-      uiLanguage: volunteer.uiLanguage || 'en',
-      profileCompleted: volunteer.profileCompleted ?? true,
-      onBreak: volunteer.onBreak ?? false,
-      callPreference: volunteer.callPreference ?? 'phone',
+      name: user.name,
+      transcriptionEnabled: user.transcriptionEnabled,
+      spokenLanguages: user.spokenLanguages || ['en'],
+      uiLanguage: user.uiLanguage || 'en',
+      profileCompleted: user.profileCompleted ?? true,
+      onBreak: user.onBreak ?? false,
+      callPreference: user.callPreference ?? 'phone',
       webauthnRequired,
       webauthnRegistered: webauthnCreds.length > 0,
       // H17: Removed adminPubkey (signing key identity) — only decryption pubkey needed
@@ -229,7 +229,7 @@ auth.patch('/me/profile',
     if (body.phone && !isValidE164(body.phone)) {
       return c.json({ error: 'Invalid phone number. Use E.164 format (e.g. +12125551234)' }, 400)
     }
-    await services.identity.updateVolunteer(pubkey, body, false)
+    await services.identity.updateUser(pubkey, body, false)
     return c.json({ ok: true })
   },
 )
@@ -255,7 +255,7 @@ auth.patch('/me/availability',
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
-    await services.identity.updateVolunteer(pubkey, { onBreak: body.onBreak }, false)
+    await services.identity.updateUser(pubkey, { onBreak: body.onBreak }, false)
     await audit(services.audit, body.onBreak ? 'volunteerOnBreak' : 'volunteerAvailable', pubkey)
     return c.json({ ok: true })
   },
@@ -290,7 +290,7 @@ auth.patch('/me/transcription',
         return c.json({ error: 'Transcription opt-out is not allowed' }, 403)
       }
     }
-    await services.identity.updateVolunteer(pubkey, { transcriptionEnabled: body.enabled }, false)
+    await services.identity.updateUser(pubkey, { transcriptionEnabled: body.enabled }, false)
     await audit(services.audit, 'transcriptionToggled', pubkey, { enabled: body.enabled })
     return c.json({ ok: true })
   },

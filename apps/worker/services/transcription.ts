@@ -16,7 +16,7 @@ export async function maybeTranscribe(
 
   // Check if volunteer has transcription enabled
   try {
-    const volunteer = await services.identity.getVolunteer(volunteerPubkey)
+    const volunteer = await services.identity.getUser(volunteerPubkey)
     if (!volunteer.transcriptionEnabled) return
   } catch {
     return

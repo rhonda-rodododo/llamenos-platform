@@ -208,7 +208,7 @@ telephony.post('/volunteer-answer', async (c) => {
   }).catch((e) => { console.error('[telephony] Failed to publish presence update:', e) })
 
   const [volInfo, activeCalls] = await Promise.all([
-    services.identity.getVolunteer(pubkey).catch(() => ({} as { name?: string })),
+    services.identity.getUser(pubkey).catch(() => ({} as { name?: string })),
     services.calls.getActiveCalls(hubId ?? ''),
   ])
   const callRecord = activeCalls.find(call => call.callId === parentCallSid)

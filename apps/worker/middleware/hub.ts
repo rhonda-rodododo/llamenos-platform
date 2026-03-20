@@ -12,7 +12,7 @@ export async function hubContext(c: Context<AppEnv>, next: Next): Promise<Respon
     return c.json({ error: 'Hub ID required' }, 400)
   }
 
-  const volunteer = c.get('volunteer')
+  const user = c.get('user')
   const allRoles = c.get('allRoles')
   const services = c.get('services')
 
@@ -24,8 +24,8 @@ export async function hubContext(c: Context<AppEnv>, next: Next): Promise<Respon
 
   // Resolve hub-scoped permissions
   const hubPermissions = resolveHubPermissions(
-    volunteer.roles,
-    volunteer.hubRoles || [],
+    user.roles,
+    user.hubRoles || [],
     allRoles,
     hubId,
   )

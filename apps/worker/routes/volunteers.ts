@@ -28,7 +28,7 @@ volunteers.get('/',
   }),
   async (c) => {
     const services = c.get('services')
-    const result = await services.identity.getVolunteers()
+    const result = await services.identity.getUsers()
     return c.json(result)
   },
 )
@@ -53,7 +53,7 @@ volunteers.get('/:targetPubkey',
   async (c) => {
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')
-    const volunteer = await services.identity.getVolunteer(targetPubkey)
+    const volunteer = await services.identity.getUser(targetPubkey)
     return c.json(volunteer)
   },
 )
@@ -81,7 +81,7 @@ volunteers.post('/',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
 
-    const result = await services.identity.createVolunteer({
+    const result = await services.identity.createUser({
       pubkey: body.pubkey,
       name: body.name,
       phone: body.phone,
@@ -124,7 +124,7 @@ volunteers.patch('/:targetPubkey',
     const targetPubkey = c.req.param('targetPubkey')
     const body = c.req.valid('json')
 
-    const result = await services.identity.updateVolunteer(targetPubkey, body, true)
+    const result = await services.identity.updateUser(targetPubkey, body, true)
 
     if (body.roles) await audit(services.audit, 'rolesChanged', pubkey, { target: targetPubkey, roles: body.roles })
     if (body.active === false) await audit(services.audit, 'volunteerDeactivated', pubkey, { target: targetPubkey })
@@ -161,7 +161,7 @@ volunteers.delete('/:targetPubkey',
     // Revoke all sessions before deletion — proceed even if this fails
     // (orphaned sessions will expire naturally via TTL)
     await services.identity.revokeAllSessions(targetPubkey).catch(() => {})
-    await services.identity.deleteVolunteer(targetPubkey)
+    await services.identity.deleteUser(targetPubkey)
     await audit(services.audit, 'volunteerRemoved', pubkey, { target: targetPubkey })
     return c.json({ ok: true })
   },
@@ -192,7 +192,7 @@ volunteers.get('/:targetPubkey/cases',
     const targetPubkey = c.req.param('targetPubkey')
 
     // Verify volunteer exists (throws 404 if not found)
-    await services.identity.getVolunteer(targetPubkey)
+    await services.identity.getUser(targetPubkey)
 
     const page = parseInt(c.req.query('page') ?? '1', 10)
     const limit = parseInt(c.req.query('limit') ?? '20', 10)
@@ -239,7 +239,7 @@ volunteers.get('/:targetPubkey/metrics',
     const targetPubkey = c.req.param('targetPubkey')
 
     // Verify volunteer exists (throws 404 if not found)
-    await services.identity.getVolunteer(targetPubkey)
+    await services.identity.getUser(targetPubkey)
 
     // Get all records assigned to this volunteer
     const result = await services.cases.list({

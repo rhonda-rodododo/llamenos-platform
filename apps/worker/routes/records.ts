@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import type { AppEnv, Volunteer } from '../types'
+import type { AppEnv, User } from '../types'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import {
@@ -53,7 +53,7 @@ async function resolveHubMembers(services: Services): Promise<HubMemberInfo[]> {
   const { roles: roleDefs } = await services.settings.getRoles()
 
   // Get all volunteers (hub members)
-  const { volunteers } = await services.identity.getVolunteers()
+  const { volunteers } = await services.identity.getUsers()
 
   return volunteers
     .filter(v => v.active)
@@ -653,7 +653,7 @@ records.get('/:id/suggest-assignees',
     const onShiftPubkeys = await services.shifts.getCurrentVolunteers(hubId)
 
     // 3. Get all volunteer profiles
-    const { volunteers } = await services.identity.getVolunteers()
+    const { volunteers } = await services.identity.getUsers()
 
     const onShiftSet = new Set(onShiftPubkeys)
     const alreadyAssigned = new Set(record.assignedTo)

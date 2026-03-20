@@ -37,7 +37,7 @@ export async function startParallelRinging(
     }
 
     // Get volunteer details (including call preference)
-    const { volunteers: allVolunteers } = await services.identity.getVolunteers()
+    const { volunteers: allVolunteers } = await services.identity.getUsers()
 
     // All available on-shift volunteers (for Nostr relay notification)
     const available = allVolunteers

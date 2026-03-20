@@ -120,15 +120,12 @@ export interface FullPushPayload extends WakePayload {
 // Storage-level entity types (extra fields beyond API response schemas)
 // ---------------------------------------------------------------------------
 
-/** @deprecated Use roles array + permission system instead */
-export type UserRole = 'volunteer' | 'admin' | 'reporter'
-
 /**
- * Server-internal Volunteer record — includes storage-only fields
+ * Server-internal User record — includes storage-only fields
  * (encryptedSecretKey, hubRoles) not present in the API response schema.
  * See @protocol/schemas/volunteers for the API response type.
  */
-export interface Volunteer {
+export interface User {
   pubkey: string
   name: string
   phone: string
@@ -352,7 +349,7 @@ export type AppEnv = {
   Bindings: Env
   Variables: {
     pubkey: string
-    volunteer: Volunteer
+    user: User
     /** Effective permissions resolved from all roles */
     permissions: string[]
     /** All role definitions (loaded once per request) */

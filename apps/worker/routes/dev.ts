@@ -90,7 +90,7 @@ dev.post('/test-reset-no-admin', async (c) => {
   await services.identity.testSkipAdminSeed()
   // Delete the admin volunteer that the reset's ensureInit() already created
   if (c.env.ADMIN_PUBKEY) {
-    await services.identity.deleteVolunteer(c.env.ADMIN_PUBKEY).catch(() => {})
+    await services.identity.deleteUser(c.env.ADMIN_PUBKEY).catch(() => {})
   }
   return c.json({ ok: true })
 })
@@ -143,10 +143,10 @@ dev.post('/test-promote-admin', async (c) => {
   const services = c.get('services')
   // Try to update existing volunteer to super-admin role.
   try {
-    await services.identity.updateVolunteer(pubkey, { roles: ['role-super-admin'] }, true)
+    await services.identity.updateUser(pubkey, { roles: ['role-super-admin'] }, true)
   } catch {
     // Volunteer may not exist yet — create with admin role
-    await services.identity.createVolunteer({
+    await services.identity.createUser({
       pubkey,
       name: 'BDD Test Admin',
       phone: '+15550000001',

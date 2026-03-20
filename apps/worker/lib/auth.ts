@@ -1,4 +1,4 @@
-import type { AuthPayload, Volunteer } from '../types'
+import type { AuthPayload, User } from '../types'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
@@ -50,7 +50,7 @@ export async function verifyAuthToken(auth: AuthPayload, method?: string, path?:
 export async function authenticateRequest(
   request: Request,
   identityService: IdentityService,
-): Promise<{ pubkey: string; volunteer: Volunteer } | null> {
+): Promise<{ pubkey: string; user: User } | null> {
   const authHeader = request.headers.get('Authorization')
 
   // Try session token auth first (WebAuthn-based sessions)
@@ -58,10 +58,10 @@ export async function authenticateRequest(
   if (sessionToken) {
     try {
       const session = await identityService.validateSession(sessionToken)
-      const volunteer = await identityService.getVolunteerInternal(session.pubkey)
-      if (!volunteer) return null
-      if (volunteer.active === false) return null
-      return { pubkey: session.pubkey, volunteer }
+      const user = await identityService.getUserInternal(session.pubkey)
+      if (!user) return null
+      if (user.active === false) return null
+      return { pubkey: session.pubkey, user }
     } catch {
       return null
     }
@@ -75,10 +75,10 @@ export async function authenticateRequest(
 
   // Look up volunteer via identity service
   try {
-    const volunteer = await identityService.getVolunteerInternal(auth.pubkey)
-    if (!volunteer) return null
-    if (volunteer.active === false) return null
-    return { pubkey: auth.pubkey, volunteer }
+    const user = await identityService.getUserInternal(auth.pubkey)
+    if (!user) return null
+    if (user.active === false) return null
+    return { pubkey: auth.pubkey, user }
   } catch {
     return null
   }

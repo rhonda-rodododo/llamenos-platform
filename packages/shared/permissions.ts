@@ -61,14 +61,14 @@ export const PERMISSION_CATALOG = {
   'conversations:send-any': 'Send messages in any conversation',
   'conversations:update': 'Reassign/close/reopen conversations',
 
-  // Volunteers
-  'volunteers:read': 'List/view volunteer profiles',
-  'volunteers:read-cases': 'View case records assigned to a volunteer',
-  'volunteers:read-metrics': 'View volunteer workload metrics',
-  'volunteers:create': 'Create new volunteers',
-  'volunteers:update': 'Update volunteer profiles',
-  'volunteers:delete': 'Deactivate/delete volunteers',
-  'volunteers:manage-roles': 'Assign/change volunteer roles',
+  // Users
+  'users:read': 'List/view user profiles',
+  'users:read-cases': 'View case records assigned to a user',
+  'users:read-metrics': 'View user workload metrics',
+  'users:create': 'Create new users',
+  'users:update': 'Update user profiles',
+  'users:delete': 'Deactivate/delete users',
+  'users:manage-roles': 'Assign/change user roles',
 
   // Shifts
   'shifts:read-own': 'Check own shift status',
@@ -221,7 +221,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
     name: 'Hub Admin',
     slug: 'hub-admin',
     permissions: [
-      'volunteers:*', 'shifts:*', 'settings:*', 'audit:read',
+      'users:*', 'shifts:*', 'settings:*', 'audit:read',
       'bans:*', 'invites:*', 'notes:*',
       'reports:*', 'conversations:*', 'calls:*', 'blasts:*', 'files:*',
       'contacts:*', 'cases:*', 'events:*', 'evidence:*',
@@ -243,7 +243,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'reports:read-assigned', 'reports:read-all', 'reports:read-types',
       'reports:assign', 'reports:update', 'reports:send-message',
       'conversations:read-assigned', 'conversations:send',
-      'volunteers:read-cases', 'volunteers:read-metrics',
+      'users:read-cases', 'users:read-metrics',
       'shifts:read-own', 'files:download-own', 'files:upload',
       'settings:read',
       'cases:read-assigned', 'cases:update', 'cases:assign', 'cases:link', 'cases:unlink',

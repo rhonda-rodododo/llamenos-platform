@@ -114,7 +114,7 @@ async function fetchCallMetrics(services: Services, hubId: string): Promise<Syst
 async function fetchVolunteerInfo(services: Services, hubId: string): Promise<SystemHealth['volunteers']> {
   try {
     const [volResult, presenceResult, onShiftPubkeys] = await Promise.all([
-      services.identity.getVolunteers(),
+      services.identity.getUsers(),
       services.calls.getPresence(hubId),
       services.shifts.getCurrentVolunteers(hubId),
     ])

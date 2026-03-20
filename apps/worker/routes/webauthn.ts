@@ -129,12 +129,12 @@ webauthn.post('/register/options',
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
-    const volunteer = c.get('volunteer')
+    const user = c.get('user')
     const body = c.req.valid('json')
     const rpID = new URL(c.req.url).hostname
     const rpName = c.env.HOTLINE_NAME || 'Hotline'
     const { credentials: existing } = await services.identity.getWebAuthnCredentials(pubkey)
-    const options = await generateRegOptions({ pubkey, name: volunteer.name }, existing, rpID, rpName)
+    const options = await generateRegOptions({ pubkey, name: user.name }, existing, rpID, rpName)
     const challengeId = crypto.randomUUID()
     await services.identity.storeWebAuthnChallenge(challengeId, options.challenge)
     return c.json({ ...options, challengeId })
