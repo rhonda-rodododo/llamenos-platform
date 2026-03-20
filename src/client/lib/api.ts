@@ -9,6 +9,8 @@ import { createShiftBodySchema } from '@protocol/schemas/shifts'
 import { recordSchema, recordContactSchema } from '@protocol/schemas/records'
 import { caseInteractionSchema } from '@protocol/schemas/interactions'
 import { reportTypeDefinitionSchema } from '@protocol/schemas/report-types'
+import { createEntityTypeBodySchema, templateSummarySchema } from '@protocol/schemas/entity-schema'
+import { contactRelationshipResponseSchema, contactGroupResponseSchema } from '@protocol/schemas/contact-relationships'
 
 // Protocol types used in function signatures within this file.
 // Re-exported to consumers via `export type { ... }` statements inline below.
@@ -484,7 +486,7 @@ export type { ContactTimelineSummary }
 export type ContactSummary = ContactTimelineSummary
 
 // Composed type — no single schema covers this
-export interface ContactTimeline {
+export type ContactTimeline = {
   contact: ContactTimelineSummary
   calls: CallRecord[]
   conversations: Conversation[]
@@ -1044,7 +1046,7 @@ export async function testWhatsAppConnection(data: { phoneNumberId: string; acce
 
 export type ConversionStatus = 'pending' | 'in_progress' | 'completed'
 
-export interface Report extends Conversation {
+export type Report = Conversation & {
   metadata: {
     type: 'report'
     reportTitle?: string
@@ -1510,31 +1512,7 @@ export async function listEntityTypes() {
   return request<{ entityTypes: EntityTypeDefinition[] }>(hp('/settings/cms/entity-types'))
 }
 
-export interface CreateEntityTypeBody {
-  name: string
-  label: string
-  labelPlural: string
-  description?: string
-  icon?: string
-  color?: string
-  category: EntityCategory
-  fields?: EntityFieldDefinition[]
-  statuses: EnumOption[]
-  defaultStatus: string
-  closedStatuses?: string[]
-  severities?: EnumOption[]
-  defaultSeverity?: string
-  categories?: EnumOption[]
-  contactRoles?: EnumOption[]
-  numberPrefix?: string
-  numberingEnabled?: boolean
-  defaultAccessLevel?: 'assigned' | 'team' | 'hub'
-  piiFields?: string[]
-  showInNavigation?: boolean
-  showInDashboard?: boolean
-  templateId?: string
-  templateVersion?: string
-}
+export type CreateEntityTypeBody = z.input<typeof createEntityTypeBodySchema>
 
 export async function createEntityType(body: CreateEntityTypeBody) {
   return request<EntityTypeDefinition>(hp('/settings/cms/entity-types'), {
@@ -1556,18 +1534,7 @@ export async function deleteEntityType(id: string) {
   })
 }
 
-export interface TemplateSummary {
-  id: string
-  name: string
-  description: string
-  icon?: string
-  version: string
-  entityTypeCount: number
-  totalFieldCount: number
-  suggestedRoleCount: number
-  tags: string[]
-  comingSoon?: boolean
-}
+export type TemplateSummary = z.infer<typeof templateSummarySchema>
 
 export async function listTemplates() {
   return request<{ templates: TemplateSummary[]; appliedTemplateIds?: string[] }>(hp('/settings/cms/templates'))
@@ -1723,24 +1690,9 @@ export type DirectoryContact = import('@protocol/schemas').DirectoryContact & {
   _raw?: RawContact
 }
 
-export interface ContactRelationship {
-  id: string
-  sourceContactId: string
-  targetContactId: string
-  relationshipType: string
-  direction: 'outgoing' | 'incoming'
-  targetDisplayName: string
-  targetContactType: import('@protocol/schemas').DirectoryContactType
-  createdAt: string
-}
+export type ContactRelationship = z.infer<typeof contactRelationshipResponseSchema>
 
-export interface ContactGroup {
-  id: string
-  name: string
-  description?: string
-  role?: string
-  memberCount: number
-}
+export type ContactGroup = z.infer<typeof contactGroupResponseSchema>
 
 /** Fetch raw encrypted contacts from /directory (backend returns encrypted data) */
 export async function listRawContacts(params?: {
@@ -1826,7 +1778,7 @@ export async function listDirectoryContactCases(id: string) {
 }
 
 // Keep legacy type alias for create dialog (now encrypts client-side)
-export interface CreateDirectoryContactBody {
+export type CreateDirectoryContactBody = {
   displayName: string
   contactType: DirectoryContactType
   tags?: string[]

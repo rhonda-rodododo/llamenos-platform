@@ -43,6 +43,11 @@ type EntityTypeDraft = Partial<CreateEntityTypeBody> & {
   isArchived?: boolean
 }
 
+/** Normalize enum option items — ensures order is always set (defaults to array index) */
+function normalizeEnumOptions(items: Array<EnumOption | (Omit<EnumOption, 'order'> & { order?: number })>): EnumOption[] {
+  return items.map((item, i) => ({ ...item, order: item.order ?? i }))
+}
+
 // Tab names for the inline entity type editor
 type EditorTab = 'general' | 'fields' | 'statuses' | 'severities' | 'contactRoles'
 
@@ -82,7 +87,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
         name: editing.name!.trim(),
         label: editing.label!.trim(),
         labelPlural: editing.labelPlural!.trim(),
-        description: editing.description?.trim(),
+        description: editing.description?.trim() ?? '',
         icon: editing.icon?.trim() || undefined,
         color: editing.color || undefined,
         category: editing.category || 'case',
@@ -357,7 +362,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
               {/* Statuses tab */}
               {activeTab === 'statuses' && (
                 <EnumListEditor
-                  items={editing.statuses || []}
+                  items={normalizeEnumOptions(editing.statuses || [])}
                   onChange={statuses => setEditing(prev => ({
                     ...prev!,
                     statuses,
@@ -376,7 +381,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
               {/* Severities tab */}
               {activeTab === 'severities' && (
                 <EnumListEditor
-                  items={editing.severities || []}
+                  items={normalizeEnumOptions(editing.severities || [])}
                   onChange={severities => setEditing(prev => ({ ...prev!, severities }))}
                   defaultValue={editing.defaultSeverity}
                   onDefaultChange={val => setEditing(prev => ({ ...prev!, defaultSeverity: val }))}
@@ -390,7 +395,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
               {/* Contact Roles tab */}
               {activeTab === 'contactRoles' && (
                 <EnumListEditor
-                  items={editing.contactRoles || []}
+                  items={normalizeEnumOptions(editing.contactRoles || [])}
                   onChange={contactRoles => setEditing(prev => ({ ...prev!, contactRoles }))}
                   addLabel={t('caseManagement.addContactRole')}
                   itemLabel={t('caseManagement.contactRoleLabel')}

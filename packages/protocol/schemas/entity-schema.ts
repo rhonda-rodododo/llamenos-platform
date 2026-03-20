@@ -312,10 +312,14 @@ export const caseNumberResponseSchema = z.object({
 export const templateSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string().optional(),
-  version: z.string().optional(),
-  entityTypes: z.array(z.string()).optional().default([]),
-  roles: z.array(z.string()).optional().default([]),
+  description: z.string(),
+  icon: z.string().optional(),
+  version: z.string(),
+  entityTypeCount: z.number(),
+  totalFieldCount: z.number(),
+  suggestedRoleCount: z.number(),
+  tags: z.array(z.string()),
+  comingSoon: z.boolean().optional(),
 })
 
 export type TemplateSummary = z.infer<typeof templateSummarySchema>
