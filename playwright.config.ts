@@ -17,6 +17,7 @@ export default defineConfig({
   workers: 3,
   reporter: "html",
   timeout: 30_000,
+  globalSetup: './tests/global-setup.ts',
   expect: {
     timeout: 10_000,
   },
@@ -28,28 +29,9 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "setup",
-      testDir: "./tests",
-      testMatch: /global-setup\.ts/,
-    },
-    {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: [/bootstrap\.spec\.ts/, "**/live/**", "**/desktop/**", "**/integration/**"],
-      dependencies: ["setup"],
-    },
-    {
-      // Bootstrap tests run after main tests to avoid admin-deletion race conditions
-      name: "bootstrap",
-      use: { ...devices["Desktop Chrome"] },
-      testMatch: /bootstrap\.spec\.ts/,
-      dependencies: ["chromium"],
-    },
-    {
-      name: "mobile-chromium",
-      use: { ...devices["Pixel 7"] },
-      testMatch: /responsive\.spec\.ts/,
-      dependencies: ["setup"],
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**"],
     },
     {
       ...defineBddProject({
@@ -60,35 +42,12 @@ export default defineConfig({
           ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
         ],
         featuresRoot: "packages/test-specs/features",
-        tags: "@desktop and not @backend and not @wip and not @resets-state",
+        tags: "@desktop and not @backend and not @wip",
         // Backend-only scenarios have steps not defined in desktop — skip them
         missingSteps: "skip-scenario",
       }),
       use: { ...devices["Desktop Chrome"] },
       fullyParallel: true,
-      dependencies: ["setup"],
-    },
-    {
-      // @resets-state tests modify shared server state (toggle CMS, apply templates,
-      // create/archive entity types) — must run serially to avoid parallel conflicts.
-      ...defineBddProject({
-        name: "bdd-serial",
-        features: "packages/test-specs/features/**/*.feature",
-        steps: [
-          "tests/steps/*.ts",
-          ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
-        ],
-        featuresRoot: "packages/test-specs/features",
-        tags: "@desktop and @resets-state and not @backend and not @wip",
-        missingSteps: "skip-scenario",
-      }),
-      use: { ...devices["Desktop Chrome"] },
-      fullyParallel: false,
-      // Must run on a single worker: @resets-state tests call test-reset before each
-      // scenario. With workers > 1, multiple feature files run concurrently and their
-      // test-resets race against each other, corrupting shared server state.
-      workers: 1,
-      dependencies: ["setup"],
     },
     {
       ...defineBddProject({
@@ -103,7 +62,6 @@ export default defineConfig({
       use: {
         baseURL: process.env.TEST_HUB_URL || "http://localhost:3000",
       },
-      // Backend tests share server state (test-reset between scenarios) — must run serially
       fullyParallel: false,
     },
   ],

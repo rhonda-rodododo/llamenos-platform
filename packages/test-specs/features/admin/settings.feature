@@ -92,14 +92,14 @@ Feature: Admin & User Settings
 
   # ── Demo Mode ─────────────────────────────────────────────────────
 
-  @desktop @ios @android @resets-state
+  @desktop @ios @android
   Scenario: Summary step shows demo mode toggle
     Given I am logged in as an admin
     When I navigate to the setup wizard summary step
     Then I should see a "Populate with sample data" toggle
     And the toggle should be off by default
 
-  @desktop @ios @android @resets-state
+  @desktop @ios @android
   Scenario: Complete setup with demo mode creates demo accounts
     Given I am logged in as an admin
     When I navigate to the setup wizard summary step

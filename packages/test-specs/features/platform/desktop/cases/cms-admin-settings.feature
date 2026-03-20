@@ -1,4 +1,4 @@
-@desktop @resets-state
+@desktop
 Feature: Case Management Settings
   Admins configure entity types, apply templates, and manage
   the schema editor through the case management settings page.
