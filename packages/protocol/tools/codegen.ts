@@ -8,6 +8,7 @@
  *
  * Usage:
  *   bun run codegen           # Generate all platform types
+ *   bun run codegen:check     # Check generated files are up-to-date (local pre-push gate)
  */
 
 import {
@@ -17,10 +18,12 @@ import {
   JSONSchemaStore,
   type LanguageName,
 } from 'quicktype-core'
-import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { join, resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { getSchemaRegistry } from './schema-registry'
+
+const CHECK_MODE = process.argv.includes('--check')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -429,6 +432,28 @@ function postProcessKotlin(
   return result.join('\n')
 }
 
+/**
+ * In normal mode: write content to outputPath.
+ * In --check mode: compare content to existing file; exit 1 if different.
+ */
+function writeOrCheck(outputPath: string, content: string): void {
+  if (CHECK_MODE) {
+    if (!existsSync(outputPath)) {
+      console.error(`DRIFT DETECTED: ${outputPath} does not exist.`)
+      console.error('Run: bun run codegen')
+      process.exit(1)
+    }
+    const existing = readFileSync(outputPath, 'utf-8')
+    if (existing !== content) {
+      console.error(`DRIFT DETECTED: ${outputPath} is out of sync with schemas.`)
+      console.error('Run: bun run codegen')
+      process.exit(1)
+    }
+  } else {
+    writeFileSync(outputPath, content)
+  }
+}
+
 async function main() {
   // Build schema registry from Zod schemas
   const registry = getSchemaRegistry()
@@ -469,19 +494,25 @@ async function main() {
   const swiftCryptoContent = generateSwiftCryptoLabels(cryptoLabels)
   const kotlinCryptoContent = generateKotlinCryptoLabels(cryptoLabels)
 
-  // Write generated files
-  for (const dir of ['swift', 'kotlin']) {
-    mkdirSync(join(GENERATED_DIR, dir), { recursive: true })
+  // Write generated files (or check for drift in --check mode)
+  if (!CHECK_MODE) {
+    for (const dir of ['swift', 'kotlin']) {
+      mkdirSync(join(GENERATED_DIR, dir), { recursive: true })
+    }
   }
 
-  writeFileSync(join(GENERATED_DIR, 'swift', 'Types.swift'), swiftContent)
-  writeFileSync(join(GENERATED_DIR, 'swift', 'CryptoLabels.swift'), swiftCryptoContent)
-  writeFileSync(join(GENERATED_DIR, 'kotlin', 'Types.kt'), kotlinContent)
-  writeFileSync(join(GENERATED_DIR, 'kotlin', 'CryptoLabels.kt'), kotlinCryptoContent)
+  writeOrCheck(join(GENERATED_DIR, 'swift', 'Types.swift'), swiftContent)
+  writeOrCheck(join(GENERATED_DIR, 'swift', 'CryptoLabels.swift'), swiftCryptoContent)
+  writeOrCheck(join(GENERATED_DIR, 'kotlin', 'Types.kt'), kotlinContent)
+  writeOrCheck(join(GENERATED_DIR, 'kotlin', 'CryptoLabels.kt'), kotlinCryptoContent)
 
-  console.log('Generated:')
-  console.log('  swift/Types.swift + CryptoLabels.swift')
-  console.log('  kotlin/Types.kt + CryptoLabels.kt')
+  if (CHECK_MODE) {
+    console.log('Check passed: generated files are up-to-date.')
+  } else {
+    console.log('Generated:')
+    console.log('  swift/Types.swift + CryptoLabels.swift')
+    console.log('  kotlin/Types.kt + CryptoLabels.kt')
+  }
 }
 
 main()
