@@ -92,6 +92,7 @@ export interface EncryptedFileMetadata {
 // FileRecord and UploadInit canonical types are in @protocol/schemas/files
 export type { FileRecord, UploadInit } from '@protocol/schemas/files'
 
+// Client-side plaintext payload — not a wire format
 /** What gets encrypted before storage — replaces plain text */
 export interface NotePayload {
   text: string
@@ -206,6 +207,8 @@ export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
 }
 
 // --- Message Blasts ---
+// These are storage-level types with more fields than API response schemas in @protocol/schemas/blasts.
+// API response types: Blast, Subscriber, BlastSettings from @protocol/schemas/blasts
 
 export interface Subscriber {
   id: string
@@ -311,6 +314,7 @@ export interface EnabledChannels {
 }
 
 // --- Report Types ---
+// Storage type with fields: CustomFieldDefinition[] — richer than the API response schema in @protocol/schemas/settings
 
 export interface ReportType {
   id: string               // UUID
@@ -373,18 +377,8 @@ export const ENTITY_CATEGORY_LABELS: Record<string, string> = {
 }
 
 // --- Hub Types ---
-
-export interface Hub {
-  id: string              // UUID
-  name: string            // Display name (e.g., "NYC Hotline")
-  slug: string            // URL-safe identifier
-  description?: string
-  status: 'active' | 'suspended' | 'archived'
-  phoneNumber?: string    // Primary hotline number (for routing)
-  createdBy: string       // Super admin pubkey
-  createdAt: string
-  updatedAt: string
-}
+// Canonical Hub type is in @protocol/schemas/hubs
+export type { Hub } from '@protocol/schemas/hubs'
 
 export interface HubRoleAssignment {
   hubId: string

@@ -10,6 +10,7 @@ export const hubResponseSchema = z.object({
   description: z.string().optional(),
   phoneNumber: z.string().optional(),
   status: z.enum(['active', 'suspended', 'archived']),
+  createdBy: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
