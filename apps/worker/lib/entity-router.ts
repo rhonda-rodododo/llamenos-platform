@@ -66,6 +66,8 @@ export interface EntityRouterConfig<
     update?: string
     delete?: string
   }
+  /** If true, GET / (list) is not registered (default: false) */
+  disableList?: boolean
   /** If true, GET /:id is not registered (default: false) */
   disableGet?: boolean
   /** If true, DELETE /:id is not registered (default: false) */
@@ -109,6 +111,7 @@ export function createEntityRouter<
     hubScoped = false,
     auditEvents = {},
     methods = {},
+    disableList = false,
     disableGet = false,
     disableDelete = false,
     permissionOverrides = {},
@@ -134,43 +137,45 @@ export function createEntityRouter<
   // GET / — List
   // ---------------------------------------------------------------------------
 
-  const listDescribe = describeRoute({
-    tags: [tag],
-    summary: `List ${domain}`,
-    responses: {
-      200: {
-        description: `List of ${domain}`,
-        content: { 'application/json': { schema: resolver(listResponseSchema) } },
+  if (!disableList) {
+    const listDescribe = describeRoute({
+      tags: [tag],
+      summary: `List ${domain}`,
+      responses: {
+        200: {
+          description: `List of ${domain}`,
+          content: { 'application/json': { schema: resolver(listResponseSchema) } },
+        },
+        ...authErrors,
       },
-      ...authErrors,
-    },
-  })
+    })
 
-  const listHandler = async (c: Ctx) => {
-    const services = c.get('services')
-    const svc = getSvc(services)
-    const args: unknown[] = []
-    if (hubScoped) args.push(getHubId(c))
-    if (listQuerySchema) {
-      args.push(c.req.valid('query' as never))
+    const listHandler = async (c: Ctx) => {
+      const services = c.get('services')
+      const svc = getSvc(services)
+      const args: unknown[] = []
+      if (hubScoped) args.push(getHubId(c))
+      if (listQuerySchema) {
+        args.push(c.req.valid('query' as never))
+      }
+      const result = await (svc[listMethod] as ServiceMethod)(...args)
+      return c.json(result as Record<string, unknown>)
     }
-    const result = await (svc[listMethod] as ServiceMethod)(...args)
-    return c.json(result as Record<string, unknown>)
-  }
 
-  if (listQuerySchema) {
-    router.get('/',
-      listDescribe,
-      requirePermission(perm('read', permissionOverrides.list)),
-      validator('query', listQuerySchema),
-      listHandler,
-    )
-  } else {
-    router.get('/',
-      listDescribe,
-      requirePermission(perm('read', permissionOverrides.list)),
-      listHandler,
-    )
+    if (listQuerySchema) {
+      router.get('/',
+        listDescribe,
+        requirePermission(perm('read', permissionOverrides.list)),
+        validator('query', listQuerySchema),
+        listHandler,
+      )
+    } else {
+      router.get('/',
+        listDescribe,
+        requirePermission(perm('read', permissionOverrides.list)),
+        listHandler,
+      )
+    }
   }
 
   // ---------------------------------------------------------------------------
