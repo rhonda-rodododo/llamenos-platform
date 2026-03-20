@@ -13,7 +13,10 @@
   ],
 
 
-  // Durable Object bindings
+  // NOTE: The DO bindings and migrations below are for the demo.llamenos-hotline.com
+  // Cloudflare Workers deployment ONLY. The production backend runs as Bun+PostgreSQL
+  // (self-hosted via Docker/Helm) and does NOT use Durable Objects — they were removed
+  // in Epic 358. Do not add DO patterns to the main codebase.
   "durable_objects": {
     "bindings": [
       {
@@ -130,6 +133,7 @@
       "routes": [
         { "pattern": "demo-next.llamenos-hotline.com", "custom_domain": true }
       ],
+      // NOTE: CF demo deployment only — not used by the Bun+PostgreSQL production backend.
       "durable_objects": {
         "bindings": [
           { "name": "CALL_ROUTER", "class_name": "CallRouterDO" },
