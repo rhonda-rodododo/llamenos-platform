@@ -9,7 +9,7 @@ export const systemStatusResponseSchema = z.object({
   environment: z.string().optional(),
 })
 
-const serviceStatusSchema = z.object({
+export const serviceStatusSchema = z.object({
   name: z.string(),
   status: z.enum(['ok', 'degraded', 'down']),
   details: z.string().optional(),

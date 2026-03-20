@@ -309,8 +309,17 @@ export const caseNumberResponseSchema = z.object({
   prefix: z.string(),
 })
 
+export const templateSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  version: z.string().optional(),
+  entityTypes: z.array(z.string()).optional().default([]),
+  roles: z.array(z.string()).optional().default([]),
+})
+
 export const templateListResponseSchema = z.object({
-  templates: z.array(z.unknown()),
+  templates: z.array(templateSummarySchema),
   appliedTemplateIds: z.array(z.string()),
 })
 

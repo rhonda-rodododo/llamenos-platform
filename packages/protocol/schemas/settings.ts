@@ -21,11 +21,11 @@ export const roleResponseSchema = z.object({
   name: z.string(),
   slug: z.string(),
   permissions: z.array(z.string()),
-  isDefault: z.boolean().optional(),
-  isSystem: z.boolean().optional(),
+  isDefault: z.boolean(),
+  isSystem: z.boolean(),
   description: z.string(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 })
 
 export const customFieldResponseSchema = z.object({
@@ -173,6 +173,13 @@ export const roleListResponseSchema = z.object({
 
 export const reportTypeListResponseSchema = z.object({
   reportTypes: z.array(reportTypeResponseSchema),
+})
+
+export const ivrAudioRecordingSchema = z.object({
+  promptType: z.string(),
+  language: z.string(),
+  size: z.number(),
+  uploadedAt: z.string(),
 })
 
 export const ivrAudioPromptsResponseSchema = z.object({

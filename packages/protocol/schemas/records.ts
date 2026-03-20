@@ -173,14 +173,16 @@ export const envelopeRecipientsResponseSchema = z.object({
   pii: z.array(z.string()),
 })
 
+export const assignmentSuggestionSchema = z.object({
+  pubkey: z.string(),
+  score: z.number(),
+  reasons: z.array(z.string()),
+  activeCaseCount: z.number(),
+  maxCases: z.number(),
+})
+
 export const suggestAssigneesResponseSchema = z.object({
-  suggestions: z.array(z.object({
-    pubkey: z.string(),
-    score: z.number(),
-    reasons: z.array(z.string()),
-    activeCaseCount: z.number(),
-    maxCases: z.number(),
-  })),
+  suggestions: z.array(assignmentSuggestionSchema),
 })
 
 export const recordsByContactResponseSchema = z.object({
