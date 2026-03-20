@@ -50,7 +50,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.Volunteer
+import org.llamenos.hotline.model.User
 
 /**
  * Volunteers management tab in the admin panel.
@@ -242,7 +242,7 @@ fun VolunteersTab(
  */
 @Composable
 private fun VolunteerCard(
-    volunteer: Volunteer,
+    volunteer: User,
     onClick: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,

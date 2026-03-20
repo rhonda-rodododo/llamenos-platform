@@ -45,7 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.Volunteer
+import org.llamenos.hotline.model.User
 import org.llamenos.hotline.util.DateFormatUtils
 
 /**
@@ -286,7 +286,7 @@ fun ShiftDetailScreen(
  */
 @Composable
 private fun VolunteerAssignmentCard(
-    volunteer: Volunteer,
+    volunteer: User,
     isAssigned: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,

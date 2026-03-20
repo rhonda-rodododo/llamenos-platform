@@ -22,7 +22,7 @@ data class BlastItem(
 )
 
 @Serializable
-data class BlastVolunteer(
+data class BlastUser(
     val id: String,
     val pubkey: String,
     val displayName: String? = null,
@@ -34,8 +34,8 @@ data class BlastsListResponse(
 )
 
 @Serializable
-data class BlastVolunteersResponse(
-    val volunteers: List<BlastVolunteer>,
+data class BlastUsersResponse(
+    val users: List<BlastUser>,
 )
 
 @Serializable
@@ -47,7 +47,7 @@ data class CreateBlastRequest(
 
 data class BlastsUiState(
     val blasts: List<BlastItem> = emptyList(),
-    val volunteers: List<BlastVolunteer> = emptyList(),
+    val users: List<BlastUser> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val showCreateDialog: Boolean = false,
@@ -56,7 +56,7 @@ data class BlastsUiState(
 /**
  * ViewModel for the Blasts screen.
  *
- * Provides CRUD for broadcast messages to volunteers.
+ * Provides CRUD for broadcast messages to users.
  */
 @HiltViewModel
 class BlastsViewModel @Inject constructor(
@@ -90,22 +90,22 @@ class BlastsViewModel @Inject constructor(
 
     fun showCreateDialog() {
         _uiState.update { it.copy(showCreateDialog = true) }
-        loadVolunteers()
+        loadUsers()
     }
 
     fun dismissCreateDialog() {
         _uiState.update { it.copy(showCreateDialog = false) }
     }
 
-    private fun loadVolunteers() {
+    private fun loadUsers() {
         viewModelScope.launch {
             try {
-                val response = apiService.request<BlastVolunteersResponse>(
-                    "GET", "/api/admin/volunteers",
+                val response = apiService.request<BlastUsersResponse>(
+                    "GET", "/api/users",
                 )
-                _uiState.update { it.copy(volunteers = response.volunteers) }
+                _uiState.update { it.copy(users = response.users) }
             } catch (_: Exception) {
-                // Silently fail — volunteers list is supplementary
+                // Silently fail — users list is supplementary
             }
         }
     }

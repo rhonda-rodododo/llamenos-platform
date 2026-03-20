@@ -15,7 +15,7 @@ import org.llamenos.hotline.steps.BaseSteps
  * Covers navigation to the volunteer detail screen, profile card content,
  * activity section, and back navigation.
  */
-class VolunteerDetailSteps : BaseSteps() {
+class UserDetailSteps : BaseSteps() {
 
     @When("I tap a volunteer card")
     fun iTapAVolunteerCard() {

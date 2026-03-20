@@ -15,7 +15,7 @@ import org.llamenos.hotline.steps.BaseSteps
  * Covers: volunteer creation, login as volunteer, access control,
  * profile setup, and break status toggle.
  */
-class VolunteerSteps : BaseSteps() {
+class UserSteps : BaseSteps() {
 
     // ---- Volunteer creation (admin side) ----
 

@@ -55,16 +55,16 @@ import org.llamenos.hotline.model.AuditEntry
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VolunteerDetailScreen(
+fun UserDetailScreen(
     pubkey: String,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: VolunteerDetailViewModel = hiltViewModel(),
+    viewModel: UserDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(pubkey) {
-        viewModel.loadVolunteer(pubkey)
+        viewModel.loadUser(pubkey)
     }
 
     Scaffold(
@@ -340,7 +340,7 @@ fun VolunteerDetailScreen(
                         org.llamenos.hotline.ui.components.ErrorCard(
                             error = uiState.error ?: "",
                             onDismiss = { viewModel.dismissError() },
-                            onRetry = { viewModel.loadVolunteer(pubkey) },
+                            onRetry = { viewModel.loadUser(pubkey) },
                             testTag = "volunteer-detail-error",
                         )
                     }
