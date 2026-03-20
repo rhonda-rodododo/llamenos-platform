@@ -149,6 +149,18 @@ export async function apiDelete<T = unknown>(
   return { status: res.status(), data: data as T }
 }
 
+export async function createHubViaApi(
+  request: APIRequestContext,
+  name: string,
+): Promise<string> {
+  const slug = name.toLowerCase().replace(/\s+/g, '-')
+  const { status, data } = await apiPost<{ id: string }>(request, '/hubs', { name, slug })
+  if (status !== 200 && status !== 201) {
+    throw new Error(`Failed to create hub: ${status}`)
+  }
+  return (data as { id: string }).id
+}
+
 // ── Unique Test Data Generators ───────────────────────────────────
 
 export function uniquePhone(): string {
