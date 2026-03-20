@@ -312,7 +312,7 @@ export class SettingsService {
     const row = await getSettings(this.db)
     return {
       globalEnabled: row.transcriptionEnabled ?? true,
-      allowVolunteerOptOut: row.allowVolunteerTranscriptionOptOut ?? false,
+      allowVolunteerOptOut: row.allowUserTranscriptionOptOut ?? false,
     }
   }
 
@@ -324,7 +324,7 @@ export class SettingsService {
     if (data.globalEnabled !== undefined)
       updates.transcriptionEnabled = data.globalEnabled
     if (data.allowVolunteerOptOut !== undefined)
-      updates.allowVolunteerTranscriptionOptOut = data.allowVolunteerOptOut
+      updates.allowUserTranscriptionOptOut = data.allowVolunteerOptOut
 
     if (Object.keys(updates).length > 0) {
       await this.db
@@ -487,7 +487,7 @@ export class SettingsService {
       .orderBy(customFieldDefinitions.sortOrder)
 
     if (role !== 'admin') {
-      rows = rows.filter((r) => r.visibleToVolunteers)
+      rows = rows.filter((r) => r.visibleToUsers)
     }
 
     // Map DB rows to CustomFieldDefinition shape
@@ -499,8 +499,8 @@ export class SettingsService {
       required: r.required ?? false,
       options: r.options ?? undefined,
       validation: r.validation as CustomFieldDefinition['validation'],
-      visibleToVolunteers: r.visibleToVolunteers ?? true,
-      editableByVolunteers: r.editableByVolunteers ?? true,
+      visibleToVolunteers: r.visibleToUsers ?? true,
+      editableByVolunteers: r.editableByUsers ?? true,
       context: r.context as CustomFieldDefinition['context'],
       maxFileSize: r.maxFileSize ?? undefined,
       allowedMimeTypes: r.allowedMimeTypes ?? undefined,
@@ -623,8 +623,8 @@ export class SettingsService {
           required: f.required ?? false,
           options: f.options,
           validation: f.validation,
-          visibleToVolunteers: f.visibleToVolunteers ?? true,
-          editableByVolunteers: f.editableByVolunteers ?? true,
+          visibleToUsers: f.visibleToVolunteers ?? true,
+          editableByUsers: f.editableByVolunteers ?? true,
           context: f.context ?? 'all',
           maxFileSize: f.maxFileSize,
           allowedMimeTypes: f.allowedMimeTypes,

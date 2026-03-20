@@ -8,7 +8,7 @@
 import { eq, and, lt, sql, inArray } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
-  volunteers,
+  users,
   sessions,
   inviteCodes,
   webauthnCredentials,
@@ -58,7 +58,7 @@ function randomHexToken(bytes: number): string {
 }
 
 /** Map a DB volunteer row to the legacy Volunteer interface shape */
-function rowToVolunteer(row: typeof volunteers.$inferSelect): Volunteer {
+function rowToVolunteer(row: typeof users.$inferSelect): Volunteer {
   return {
     pubkey: row.pubkey,
     name: row.displayName ?? '',
@@ -154,12 +154,12 @@ export class IdentityService {
    */
   async hasAdmin(): Promise<{ hasAdmin: boolean }> {
     const rows = await this.db
-      .select({ pubkey: volunteers.pubkey })
-      .from(volunteers)
+      .select({ pubkey: users.pubkey })
+      .from(users)
       .where(
         and(
-          eq(volunteers.active, true),
-          sql`${volunteers.roles} @> ARRAY['role-super-admin']::text[]`,
+          eq(users.active, true),
+          sql`${users.roles} @> ARRAY['role-super-admin']::text[]`,
         ),
       )
       .limit(1)
@@ -173,7 +173,7 @@ export class IdentityService {
     const { hasAdmin } = await this.hasAdmin()
     if (hasAdmin) throw new ServiceError(403, 'Admin already exists')
 
-    await this.db.insert(volunteers).values({
+    await this.db.insert(users).values({
       pubkey,
       displayName: 'Admin',
       phone: '',
@@ -195,7 +195,7 @@ export class IdentityService {
    */
   async ensureInit(adminPubkey?: string, demoMode = false): Promise<void> {
     if (adminPubkey) {
-      await this.db.insert(volunteers).values({
+      await this.db.insert(users).values({
         pubkey: adminPubkey,
         displayName: 'Admin',
         phone: '',
@@ -213,7 +213,7 @@ export class IdentityService {
 
     if (demoMode) {
       for (const account of DEMO_ACCOUNTS) {
-        await this.db.insert(volunteers).values({
+        await this.db.insert(users).values({
           pubkey: account.pubkey,
           displayName: account.name,
           phone: account.phone,
@@ -239,7 +239,7 @@ export class IdentityService {
    * List all volunteers (encryptedSecretKey stripped).
    */
   async getVolunteers(): Promise<{ volunteers: ReturnType<typeof sanitizeVolunteer>[] }> {
-    const rows = await this.db.select().from(volunteers)
+    const rows = await this.db.select().from(users)
     return {
       volunteers: rows.map(r => sanitizeVolunteer(rowToVolunteer(r))),
     }
@@ -251,8 +251,8 @@ export class IdentityService {
   async getVolunteer(pubkey: string): Promise<ReturnType<typeof sanitizeVolunteer>> {
     const rows = await this.db
       .select()
-      .from(volunteers)
-      .where(eq(volunteers.pubkey, pubkey))
+      .from(users)
+      .where(eq(users.pubkey, pubkey))
       .limit(1)
     if (rows.length === 0) throw new ServiceError(404, 'Not found')
     return sanitizeVolunteer(rowToVolunteer(rows[0]))
@@ -264,8 +264,8 @@ export class IdentityService {
   async getVolunteerInternal(pubkey: string): Promise<Volunteer | null> {
     const rows = await this.db
       .select()
-      .from(volunteers)
-      .where(eq(volunteers.pubkey, pubkey))
+      .from(users)
+      .where(eq(users.pubkey, pubkey))
       .limit(1)
     return rows.length > 0 ? rowToVolunteer(rows[0]) : null
   }
@@ -286,7 +286,7 @@ export class IdentityService {
     supervisorPubkey?: string
   }): Promise<{ volunteer: ReturnType<typeof sanitizeVolunteer> }> {
     const roles = data.roleIds ?? data.roles ?? ['role-volunteer']
-    const [row] = await this.db.insert(volunteers).values({
+    const [row] = await this.db.insert(users).values({
       pubkey: data.pubkey,
       displayName: data.name,
       phone: data.phone,
@@ -319,13 +319,13 @@ export class IdentityService {
     // Verify volunteer exists
     const existing = await this.db
       .select()
-      .from(volunteers)
-      .where(eq(volunteers.pubkey, pubkey))
+      .from(users)
+      .where(eq(users.pubkey, pubkey))
       .limit(1)
     if (existing.length === 0) throw new ServiceError(404, 'Not found')
 
     // Build update payload — map Volunteer fields to DB columns
-    const updates: Partial<typeof volunteers.$inferInsert> = {}
+    const updates: Partial<typeof users.$inferInsert> = {}
 
     const applyField = (key: string, value: unknown) => {
       switch (key) {
@@ -359,9 +359,9 @@ export class IdentityService {
     updates.updatedAt = new Date()
 
     const [row] = await this.db
-      .update(volunteers)
+      .update(users)
       .set(updates)
-      .where(eq(volunteers.pubkey, pubkey))
+      .where(eq(users.pubkey, pubkey))
       .returning()
 
     return { volunteer: sanitizeVolunteer(rowToVolunteer(row)) }
@@ -371,7 +371,7 @@ export class IdentityService {
    * Delete (hard-remove) a volunteer. Cascading FKs clean up sessions, creds, devices.
    */
   async deleteVolunteer(pubkey: string): Promise<void> {
-    await this.db.delete(volunteers).where(eq(volunteers.pubkey, pubkey))
+    await this.db.delete(users).where(eq(users.pubkey, pubkey))
   }
 
   // =========================================================================
@@ -394,9 +394,9 @@ export class IdentityService {
     }
 
     const [row] = await this.db
-      .update(volunteers)
+      .update(users)
       .set({ hubRoles, updatedAt: new Date() })
-      .where(eq(volunteers.pubkey, data.pubkey))
+      .where(eq(users.pubkey, data.pubkey))
       .returning()
 
     return { volunteer: rowToVolunteer(row) }
@@ -412,9 +412,9 @@ export class IdentityService {
     const hubRoles = (vol.hubRoles ?? []).filter(hr => hr.hubId !== data.hubId)
 
     const [row] = await this.db
-      .update(volunteers)
+      .update(users)
       .set({ hubRoles, updatedAt: new Date() })
-      .where(eq(volunteers.pubkey, data.pubkey))
+      .where(eq(users.pubkey, data.pubkey))
       .returning()
 
     return { volunteer: rowToVolunteer(row) }
@@ -508,7 +508,7 @@ export class IdentityService {
         .where(eq(inviteCodes.code, data.code))
 
       // Create volunteer
-      const [volRow] = await tx.insert(volunteers).values({
+      const [volRow] = await tx.insert(users).values({
         pubkey: data.pubkey,
         displayName: invite.name,
         phone: invite.phone,
@@ -1140,7 +1140,7 @@ export class IdentityService {
       await tx.delete(sessions)
       await tx.delete(provisionRooms)
       await tx.delete(inviteCodes)
-      await tx.delete(volunteers)
+      await tx.delete(users)
     })
   }
 
@@ -1154,7 +1154,7 @@ export class IdentityService {
       await tx.delete(webauthnCredentials)
       await tx.delete(webauthnChallenges)
       await tx.delete(sessions)
-      await tx.delete(volunteers)
+      await tx.delete(users)
     })
   }
 }

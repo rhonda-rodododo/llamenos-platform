@@ -45,7 +45,7 @@ type ShiftInsert = Omit<typeof shifts.$inferInsert, 'id' | 'createdAt'>
 export class ShiftsService {
   constructor(
     protected db: Database,
-    private settingsService?: { getFallbackGroup(): Promise<{ volunteerPubkeys: string[] }> },
+    private settingsService?: { getFallbackGroup(): Promise<{ userPubkeys: string[] }> },
   ) {}
 
   // =========================================================================
@@ -81,7 +81,7 @@ export class ShiftsService {
   async update(
     hubId: string,
     shiftId: string,
-    data: Partial<Pick<ShiftInsert, 'name' | 'startTime' | 'endTime' | 'days' | 'volunteerPubkeys'>>,
+    data: Partial<Pick<ShiftInsert, 'name' | 'startTime' | 'endTime' | 'days' | 'userPubkeys'>>,
   ): Promise<ShiftRow> {
     if (data.startTime && !isValidTimeFormat(data.startTime)) {
       throw new ServiceError(400, 'Invalid time format — expected HH:MM (00:00-23:59)')
@@ -136,7 +136,7 @@ export class ShiftsService {
     const currentTime = utcTimeNow(now)
 
     // Filter to shifts that include this volunteer
-    const myShifts = allShifts.filter(s => s.volunteerPubkeys.includes(pubkey))
+    const myShifts = allShifts.filter(s => s.userPubkeys.includes(pubkey))
 
     // Find current active shift
     let currentShift: { name: string; startTime: string; endTime: string } | null = null
@@ -190,7 +190,7 @@ export class ShiftsService {
 
     for (const shift of allShifts) {
       if (isShiftActive(shift, currentDay, currentTime)) {
-        for (const pubkey of shift.volunteerPubkeys) {
+        for (const pubkey of shift.userPubkeys) {
           activeVolunteers.add(pubkey)
         }
       }
@@ -199,7 +199,7 @@ export class ShiftsService {
     // Fallback to settings group if no active volunteers and a settings service is available
     if (activeVolunteers.size === 0 && this.settingsService) {
       const fallback = await this.settingsService.getFallbackGroup()
-      return fallback.volunteerPubkeys
+      return fallback.userPubkeys
     }
 
     return Array.from(activeVolunteers)
