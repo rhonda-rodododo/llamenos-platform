@@ -15,13 +15,9 @@ struct Hub: Codable, Identifiable, Sendable, Equatable {
     let updatedAt: String
 }
 
-// MARK: - HubStatus
+// MARK: - HubStatus display extensions
 
-enum HubStatus: String, Codable, Sendable, Equatable {
-    case active
-    case suspended
-    case archived
-
+extension HubStatus {
     var displayName: String {
         switch self {
         case .active:
