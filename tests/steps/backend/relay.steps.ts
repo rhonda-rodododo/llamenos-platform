@@ -57,7 +57,7 @@ Given('the test relay is connected and capturing events', async ({ world }) => {
 
 After(async ({ world }) => {
   const state = getScenarioState(world)
-  if (state.relayCapture) {
+  if (state?.relayCapture) {
     state.relayCapture.close()
     state.relayCapture = undefined
   }

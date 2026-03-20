@@ -60,10 +60,10 @@ function getE2EEIntegrityState(world: Record<string, unknown>): E2EEIntegritySta
 
 
 Before(async ({ world }) => {
-  s = {
+  setState<E2EEIntegrityState>(world, E2EE_INTEGRITY_KEY, {
     keypairs: new Map(),
     envelopes: new Map(),
-  }
+  })
 })
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ function nsecToSkHex(nsec: string): string {
   return bytesToHex(decoded.data as Uint8Array)
 }
 
-function getKeypair(name: string) {
+function getKeypair(world: Record<string, unknown>, name: string) {
   const kp = getE2EEIntegrityState(world).keypairs.get(name)
   if (!kp) throw new Error(`No keypair registered for "${name}"`)
   return kp
@@ -173,7 +173,7 @@ When(
 When(
   'volunteer {string} encrypts note content {string} with envelopes for themselves and the admin',
   async ({ world }, volName: string, plaintext: string) => {
-    const volKp = getKeypair(volName)
+    const volKp = getKeypair(world, volName)
     expect(getE2EEIntegrityState(world).adminPubkey).toBeDefined()
 
     getE2EEIntegrityState(world).contentKey = generateContentKey()
@@ -190,7 +190,7 @@ When(
 )
 
 When('the encrypted note is submitted via the API by {string}', async ({ request, world }, volName: string) => {
-  const volKp = getKeypair(volName)
+  const volKp = getKeypair(world, volName)
   expect(getE2EEIntegrityState(world).ciphertextHex).toBeDefined()
 
   const adminEnvelopes = []
@@ -219,7 +219,7 @@ When('the encrypted note is submitted via the API by {string}', async ({ request
 })
 
 When('volunteer {string} fetches the note', async ({ request, world }, volName: string) => {
-  const volKp = getKeypair(volName)
+  const volKp = getKeypair(world, volName)
   expect(getE2EEIntegrityState(world).noteId).toBeDefined()
 
   // VolB can fetch notes if they have notes:read-own permission (registered volunteer)
@@ -415,7 +415,7 @@ Then('volunteer {string} should see the ciphertext', async ({ world }, _volName:
 })
 
 Then('volunteer {string} should have no envelope for their pubkey', async ({ world }, volName: string) => {
-  const volKp = getKeypair(volName)
+  const volKp = getKeypair(world, volName)
   expect(getE2EEIntegrityState(world).apiNote).toBeDefined()
 
   const adminEnvelopes = getE2EEIntegrityState(world).apiNote!.adminEnvelopes as Array<{ pubkey: string }> | undefined
@@ -428,7 +428,7 @@ Then('volunteer {string} should have no envelope for their pubkey', async ({ wor
 })
 
 Then('attempting to unwrap with {string} secret key should fail', async ({ world }, volName: string) => {
-  const volKp = getKeypair(volName)
+  const volKp = getKeypair(world, volName)
   expect(getE2EEIntegrityState(world).apiNote).toBeDefined()
 
   // Try to unwrap the author envelope (which is VolA's) with VolB's key
@@ -455,7 +455,7 @@ Then('attempting to unwrap with {string} secret key should fail', async ({ world
 Then(
   'admin {string} can unwrap their envelope and decrypt to {string}',
   async ({ world }, adminName: string, expectedText: string) => {
-    const adminKp = getKeypair(adminName)
+    const adminKp = getKeypair(world, adminName)
     expect(getE2EEIntegrityState(world).ciphertextHex).toBeDefined()
 
     const envelope = getE2EEIntegrityState(world).envelopes.get(adminKp.pubkey)

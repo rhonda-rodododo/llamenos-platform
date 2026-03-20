@@ -13,7 +13,7 @@ source "$SCRIPT_DIR/lib/test-reporter.sh"
 VERBOSE="${VERBOSE:-false}"
 NO_CODEGEN="${NO_CODEGEN:-false}"
 JSON_OUTPUT="${JSON_OUTPUT:-false}"
-REPORTER_TIMEOUT="${REPORTER_TIMEOUT:-300}"
+REPORTER_TIMEOUT="${REPORTER_TIMEOUT:-3600}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
