@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { loginAsAdmin, TestIds } from './helpers'
+import { listCmsReportTypesViaApi, createReportViaApi } from './api-helpers'
 
 async function navigateToAdminSettings(page: Page): Promise<void> {
   await page.getByTestId('nav-admin-settings').click()
@@ -98,10 +99,20 @@ test.describe('Report Types', () => {
   })
 
   test('report card shows report type badge', async ({ page }) => {
+    // Seed own report with a report type — do not rely on prior test side-effects
+    const reportTypes = await listCmsReportTypesViaApi(page.request)
+    const reportType = reportTypes[0] as { id: string } | undefined
+    if (!reportType) throw new Error('No report types available — seeding failed in earlier tests')
+
+    await createReportViaApi(page.request, {
+      title: `Badge Test Report ${Date.now()}`,
+      reportTypeId: reportType.id,
+    })
+
     await loginAsAdmin(page)
     await navigateToReports(page)
 
-    // The previous serial test created a report with a type — its badge must be visible
+    // The report we just created must show a type badge
     const badge = page.getByTestId(TestIds.REPORT_TYPE_BADGE).first()
     await expect(badge).toBeVisible({ timeout: 10000 })
 
