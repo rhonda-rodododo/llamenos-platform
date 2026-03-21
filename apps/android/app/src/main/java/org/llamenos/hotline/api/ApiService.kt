@@ -13,7 +13,7 @@ import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.service.OfflineQueue
-import org.llamenos.protocol.KeyEnvelope
+import org.llamenos.protocol.HubKeyEnvelopeResponse
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -245,6 +245,7 @@ class ApiService @Inject constructor(
      * Falls back to the bare path if no hub is currently active.
      */
     fun hp(path: String): String {
+        require(path.startsWith("/")) { "hp() path must start with '/': $path" }
         val hubId = activeHubState.activeHubId.value ?: return path
         return "/hubs/$hubId$path"
     }
@@ -252,8 +253,9 @@ class ApiService @Inject constructor(
     /**
      * Fetch the E2EE key envelope for a specific hub.
      * Used during hub selection to decrypt the hub key.
+     * Returns HubKeyEnvelopeResponse wrapping the ECIES envelope fields.
      */
-    suspend fun getHubKey(hubId: String): KeyEnvelope {
+    suspend fun getHubKey(hubId: String): HubKeyEnvelopeResponse {
         return request("GET", "/api/hubs/$hubId/key")
     }
 
