@@ -83,13 +83,17 @@ Given(
   'a hub with {int} members: {string}, {string}, and {string}',
   async ({ request, world }, count: number, name1: string, name2: string, name3: string) => {
     // Create the hub
-    getHubKeyState(world).hubId = await createHub(request)
+    const hubId = await createHub(request)
+    getHubKeyState(world).hubId = hubId
 
-    // Create 3 volunteer members
+    // Create 3 volunteer members and add them to the hub
+    // CRIT-H1: Hub membership via hubRoles is required to fetch key envelopes
     for (const name of [name1, name2, name3]) {
       const vol = await createVolunteerViaApi(request, {
         name: `${name} ${Date.now()}`,
       })
+      // Add volunteer as hub member
+      await apiPost(request, `/hubs/${hubId}/members`, { pubkey: vol.pubkey, roleIds: ['role-volunteer'] })
       getHubKeyState(world).members.set(name, {
         name,
         nsec: vol.nsec,
@@ -272,3 +276,111 @@ Then(
     expect(getHubKeyState(world).lastEnvelopeCount).toBe(count)
   },
 )
+
+// ── Auth Guards ────────────────────────────────────────────────────
+
+const AUTH_GUARD_KEY = 'hub_key_auth_guard'
+
+interface AuthGuardState {
+  hubId?: string
+  memberNsec?: string
+  nonMemberNsec?: string
+  noEnvelopeMemberNsec?: string
+  lastStatus?: number
+}
+
+function getAuthGuardState(world: Record<string, unknown>): AuthGuardState {
+  let s = getState<AuthGuardState | undefined>(world, AUTH_GUARD_KEY)
+  if (!s) {
+    s = {}
+    setState(world, AUTH_GUARD_KEY, s)
+  }
+  return s
+}
+
+Given('a hub exists with a member {string}', async ({ request, world }, name: string) => {
+  const slug = `bdd-hub-auth-${Date.now()}`
+  const hubRes = await apiPost<{ hub: { id: string } }>(
+    request,
+    '/hubs',
+    { name: `Hub Auth Test ${Date.now()}`, slug },
+  )
+  expect(hubRes.status).toBe(200)
+  const hubId = hubRes.data.hub.id
+
+  const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
+  getAuthGuardState(world).hubId = hubId
+  getAuthGuardState(world).memberNsec = vol.nsec
+
+  // Store member pubkey for hub membership purposes — hub membership is implied by envelope presence
+  getHubKeyState(world).hubId = hubId
+  getHubKeyState(world).members.set(name, { name, nsec: vol.nsec, pubkey: vol.pubkey })
+})
+
+Given('hub key envelopes are set for {string}', async ({ request, world }, name: string) => {
+  const hubId = getAuthGuardState(world).hubId
+  expect(hubId).toBeTruthy()
+  const member = getHubKeyState(world).members.get(name)
+  expect(member).toBeTruthy()
+
+  const entry = generateMockEnvelopeEntry(member!.pubkey, 'initial')
+  const res = await apiPut(request, `/hubs/${hubId}/key`, { envelopes: [entry] })
+  expect(res.status).toBe(200)
+  getHubKeyState(world).originalEnvelopes.set(name, entry.wrappedKey)
+  getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
+})
+
+Given('a volunteer {string} who is not a hub member', async ({ request, world }, name: string) => {
+  const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
+  getAuthGuardState(world).nonMemberNsec = vol.nsec
+})
+
+Given(
+  'a volunteer {string} is added to the hub but has no envelope',
+  async ({ request, world }, name: string) => {
+    // Create a volunteer but do NOT set their envelope — they're "in the hub" via hub roles
+    // but the key server has no wrapped key for them
+    const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
+    getHubKeyState(world).members.set(name, { name, nsec: vol.nsec, pubkey: vol.pubkey })
+    // Add them to the hub via hub membership (PUT envelopes with existing members only)
+    // They won't have an envelope entry, so GET /hubs/:id/key will return 404 for them
+    getAuthGuardState(world).noEnvelopeMemberNsec = vol.nsec
+
+    // Add them as a hub member via hub membership API (hub membership = having a hub role)
+    // But do NOT add their key envelope — so GET /hubs/:id/key returns 404 for them
+    const hubId = getAuthGuardState(world).hubId
+    if (hubId) {
+      await apiPost(request, `/hubs/${hubId}/members`, { pubkey: vol.pubkey, roleIds: ['role-volunteer'] })
+    }
+  },
+)
+
+When('an unauthenticated client requests the hub key', async ({ request, world }) => {
+  const hubId = getAuthGuardState(world).hubId
+  expect(hubId).toBeTruthy()
+  // No nsec — unauthenticated request
+  const res = await request.get(`/api/hubs/${hubId}/key`)
+  getAuthGuardState(world).lastStatus = res.status()
+})
+
+When('{string} requests the hub key envelope', async ({ request, world }, name: string) => {
+  const hubId = getAuthGuardState(world).hubId
+  expect(hubId).toBeTruthy()
+
+  // Determine which nsec to use based on the name
+  let nsec: string | undefined
+  if (getHubKeyState(world).members.has(name)) {
+    // Could be the no-envelope member
+    nsec = getAuthGuardState(world).noEnvelopeMemberNsec
+      ?? getHubKeyState(world).members.get(name)!.nsec
+  } else {
+    nsec = getAuthGuardState(world).nonMemberNsec
+  }
+
+  const res = await apiGet(request, `/hubs/${hubId}/key`, nsec)
+  getAuthGuardState(world).lastStatus = res.status
+})
+
+Then('the hub key response status should be {int}', async ({ world }, expectedStatus: number) => {
+  expect(getAuthGuardState(world).lastStatus).toBe(expectedStatus)
+})

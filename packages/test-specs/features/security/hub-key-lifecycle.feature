@@ -35,3 +35,25 @@ Feature: Hub Key Lifecycle
     Then "Alice"'s new envelope should differ from the original
     And "Bob"'s new envelope should differ from the original
     And the new envelopes should contain exactly 2 entries
+
+  # ── Auth Guards ───────────────────────────────────────────────────
+
+  Scenario: Unauthenticated request to hub key endpoint returns 401
+    Given a hub exists with a member "Alice"
+    And hub key envelopes are set for "Alice"
+    When an unauthenticated client requests the hub key
+    Then the hub key response status should be 401
+
+  Scenario: Non-member cannot fetch hub key envelope
+    Given a hub exists with a member "Alice"
+    And hub key envelopes are set for "Alice"
+    And a volunteer "Eve" who is not a hub member
+    When "Eve" requests the hub key envelope
+    Then the hub key response status should be 403
+
+  Scenario: Member without an envelope receives 404
+    Given a hub exists with a member "Alice"
+    And hub key envelopes are set for "Alice"
+    And a volunteer "Bob" is added to the hub but has no envelope
+    When "Bob" requests the hub key envelope
+    Then the hub key response status should be 404

@@ -311,10 +311,20 @@ routes.get('/:hubId/key',
       ...notFoundError,
     },
   }),
+  requirePermission('hubs:read'),
   async (c) => {
     const hubId = c.req.param('hubId')
     const pubkey = c.get('pubkey')
     const services = c.get('services')
+    const user = c.get('user')
+    const permissions = c.get('permissions')
+
+    // CRIT-H1: Verify caller is a member of this specific hub (or is super-admin)
+    const isSuperAdmin = checkPermission(permissions, '*')
+    const hasHubAccess = (user.hubRoles || []).some((hr: { hubId: string }) => hr.hubId === hubId)
+    if (!isSuperAdmin && !hasHubAccess) {
+      return c.json({ error: 'Access denied' }, 403)
+    }
 
     try {
       const { envelopes } = await services.settings.getHubKeyEnvelopes(hubId)
