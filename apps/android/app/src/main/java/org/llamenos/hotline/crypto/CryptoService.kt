@@ -8,6 +8,7 @@ import org.llamenos.hotline.model.NotePayload
 import org.llamenos.protocol.CryptoLabels
 import org.llamenos.protocol.HubKeyEnvelopeResponse
 import org.llamenos.protocol.RecipientEnvelope
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -564,7 +565,7 @@ class CryptoService @Inject constructor() {
      * Hub keys are 32-byte random values used to decrypt Nostr relay events.
      * Populated via [loadHubKey]; cleared on [lock].
      */
-    private val hubKeys: MutableMap<String, ByteArray> = java.util.concurrent.ConcurrentHashMap()
+    private val hubKeys: MutableMap<String, ByteArray> = ConcurrentHashMap()
 
     /**
      * Returns true if the hub key for [hubId] is already cached in memory.
