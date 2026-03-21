@@ -16,6 +16,7 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.crypto.WakeKeyService
+import org.llamenos.hotline.hub.ActiveHubState
 import javax.inject.Inject
 
 /**
@@ -50,6 +51,12 @@ class PushService : FirebaseMessagingService() {
 
     @Inject
     lateinit var wakeKeyService: WakeKeyService
+
+    @Inject
+    lateinit var activeHubState: ActiveHubState
+
+    @Inject
+    lateinit var linphoneService: LinphoneService
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -104,6 +111,11 @@ class PushService : FirebaseMessagingService() {
                 val wakePayload = wakeKeyService.decryptWakePayload(wakeEncrypted, wakeEphemeral)
                 if (wakePayload != null) {
                     Log.d(TAG, "Wake payload decrypted: type=${wakePayload.type}")
+                    // Route to the active hub from wake payload when available
+                    val wakeHubId = wakePayload.hubId
+                    if (!wakeHubId.isNullOrEmpty()) {
+                        activeHubState.setActiveHub(wakeHubId)
+                    }
                     // Use wake payload for notification content when app is locked
                     if (!cryptoService.isUnlocked) {
                         showNotificationFromWakePayload(wakePayload.type, wakePayload.message)
@@ -199,6 +211,13 @@ class PushService : FirebaseMessagingService() {
 
     private fun handleIncomingCall(data: Map<String, String>) {
         Log.d(TAG, "Incoming call notification received")
+
+        val callId = data["call-id"] ?: ""
+        val hubId = data["hub-id"] ?: ""
+        if (callId.isNotEmpty() && hubId.isNotEmpty()) {
+            linphoneService.storePendingCallHub(callId, hubId)
+        }
+
         ensureNotificationChannel(
             CHANNEL_CALLS,
             getString(R.string.notification_channel_calls),

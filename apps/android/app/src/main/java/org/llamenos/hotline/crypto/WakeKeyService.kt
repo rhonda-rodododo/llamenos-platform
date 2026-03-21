@@ -23,6 +23,7 @@ data class WakePayload(
     val shiftId: String? = null,
     val timestamp: Long = 0,
     val message: String? = null,
+    val hubId: String? = null,
 )
 
 /**

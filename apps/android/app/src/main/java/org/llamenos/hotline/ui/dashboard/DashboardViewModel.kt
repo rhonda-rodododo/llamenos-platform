@@ -83,9 +83,12 @@ class DashboardViewModel @Inject constructor(
 
         // Subscribe to typed (decrypted + parsed) events from the relay.
         // Each event carries the hub ID that was active when it arrived.
+        // Guard: skip events from non-active hubs to prevent spurious UI refreshes.
         viewModelScope.launch {
             webSocketService.typedEvents.collect { attributed ->
-                handleEvent(attributed.event)
+                if (attributed.hubId.isEmpty() || attributed.hubId == activeHubState.activeHubId.value) {
+                    handleEvent(attributed.event)
+                }
             }
         }
 
