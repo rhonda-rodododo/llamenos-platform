@@ -15,7 +15,7 @@ use crate::encryption::{
     EncryptedMessage, EncryptedNote,
 };
 use crate::errors::CryptoError;
-use crate::labels::{LABEL_DEVICE_PROVISION, SAS_INFO, SAS_SALT};
+use crate::labels::{SAS_INFO, SAS_SALT};
 use zeroize::Zeroize;
 
 /// Generate 32 random bytes, returned as a hex string.
@@ -111,6 +111,7 @@ pub fn decrypt_call_record_for_reader(
 /// Derive a 32-byte KEK from a PIN using PBKDF2-SHA256, returned as hex.
 ///
 /// `salt_hex` is a hex-encoded salt (typically 16 bytes / 32 hex chars).
+#[allow(dead_code)]
 pub(crate) fn derive_kek_hex(pin: &str, salt_hex: &str) -> Result<String, CryptoError> {
     let salt = hex::decode(salt_hex).map_err(CryptoError::HexError)?;
     let mut kek = derive_kek_from_pin(pin, &salt);
@@ -516,6 +517,7 @@ mod tests {
         use k256::SecretKey;
         use rand::rngs::OsRng;
 
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
         let sk = SecretKey::random(&mut OsRng);
         let pk = sk.public_key();
         let pk_encoded = pk.to_encoded_point(true);

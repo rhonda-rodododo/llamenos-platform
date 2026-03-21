@@ -57,7 +57,8 @@ fn nsec_to_hex(nsec: &str) -> Result<String, JsError> {
 pub struct WasmCryptoState {
     secret_key: Option<Zeroizing<Vec<u8>>>,
     public_key: Option<String>,
-    provisioning_token: Option<String>,
+    /// Ephemeral secret key for device provisioning — generated in WASM, never exported.
+    ephemeral_sk: Option<k256::SecretKey>,
 }
 
 #[wasm_bindgen]
@@ -68,7 +69,7 @@ impl WasmCryptoState {
         Self {
             secret_key: None,
             public_key: None,
-            provisioning_token: None,
+            ephemeral_sk: None,
         }
     }
 
@@ -446,21 +447,39 @@ impl WasmCryptoState {
         serde_wasm_bindgen::to_value(&json).map_err(to_js_err)
     }
 
+    /// Generate an ephemeral secp256k1 keypair for device provisioning.
+    ///
+    /// The secret key is stored in `self.ephemeral_sk` and NEVER exported to JS.
+    /// Returns only the x-only public key hex for the QR code / pairing flow.
+    #[wasm_bindgen(js_name = "generateProvisioningEphemeral")]
+    pub fn generate_provisioning_ephemeral(&mut self) -> Result<String, JsError> {
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let sk = k256::SecretKey::random(&mut rand::rngs::OsRng);
+        let pk = sk.public_key();
+        let pk_point = pk.to_encoded_point(true);
+        let pk_bytes = pk_point.as_bytes();
+        // x-only: skip the 0x02/0x03 prefix
+        let pk_xonly = &pk_bytes[1..];
+        let pk_hex = hex::encode(pk_xonly);
+        self.ephemeral_sk = Some(sk);
+        Ok(pk_hex)
+    }
+
     /// Decrypt a provisioned nsec from the primary device.
     ///
-    /// Takes the ephemeral secret key bytes (hex), the encrypted payload, and
-    /// the primary device's pubkey. Returns JSON: { nsec, sasCode }
-    ///
-    /// NOTE: This is for the NEW device side — the ephemeral SK is passed in
-    /// because it was generated before CryptoState existed on this device.
+    /// Uses the ephemeral secret key stored in state by `generateProvisioningEphemeral`.
+    /// The ephemeral SK is consumed on use (one-shot). Returns JSON: { nsec, sasCode }
     #[wasm_bindgen(js_name = "decryptProvisionedNsec")]
     pub fn decrypt_provisioned_nsec(
-        &self,
+        &mut self,
         encrypted_hex: &str,
         primary_pubkey_hex: &str,
-        ephemeral_sk_hex: &str,
     ) -> Result<JsValue, JsError> {
-        let sk_bytes = hex::decode(ephemeral_sk_hex).map_err(to_js_err)?;
+        let sk = self
+            .ephemeral_sk
+            .take()
+            .ok_or_else(|| JsError::new("No ephemeral key — call generateProvisioningEphemeral first"))?;
+        let sk_bytes = zeroize::Zeroizing::new(sk.to_bytes().to_vec());
 
         let result = provisioning::decrypt_provisioned_nsec(
             encrypted_hex,
@@ -474,36 +493,6 @@ impl WasmCryptoState {
             "sasCode": result.sas_code,
         });
         serde_wasm_bindgen::to_value(&json).map_err(to_js_err)
-    }
-
-    /// Request a one-time provisioning token. Must be called before `getNsec`.
-    /// Returns a random hex token stored in state. Each call replaces any existing token.
-    #[wasm_bindgen(js_name = "requestProvisioningToken")]
-    pub fn request_provisioning_token(&mut self) -> Result<String, JsError> {
-        let mut bytes = [0u8; 16];
-        getrandom::getrandom(&mut bytes).map_err(|e| JsError::new(&e.to_string()))?;
-        let token = hex::encode(bytes);
-        self.provisioning_token = Some(token.clone());
-        Ok(token)
-    }
-
-    /// Get the nsec from state. Used ONLY for device provisioning and backup.
-    /// Requires a one-time provisioning token (from `requestProvisioningToken`).
-    /// The token is consumed on use.
-    #[wasm_bindgen(js_name = "getNsec")]
-    pub fn get_nsec(&mut self, token: &str) -> Result<String, JsError> {
-        // Consume the provisioning token (one-time use via .take())
-        match self.provisioning_token.take() {
-            Some(expected) if expected == token => {}
-            _ => return Err(JsError::new("Invalid or expired provisioning token")),
-        }
-
-        let sk_hex = sk_hex_from(&self.secret_key)?;
-        let sk_bytes = hex::decode(&sk_hex).map_err(to_js_err)?;
-        let nsec =
-            bech32::encode::<bech32::Bech32>(bech32::Hrp::parse("nsec").unwrap(), &sk_bytes)
-                .map_err(to_js_err)?;
-        Ok(nsec)
     }
 }
 

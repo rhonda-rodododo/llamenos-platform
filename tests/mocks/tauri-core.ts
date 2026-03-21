@@ -203,11 +203,8 @@ const commands: Record<string, CommandHandler> = {
 
   // --- Provisioning ---
 
-  request_provisioning_token: () =>
-    getWasmState().requestProvisioningToken(),
-
-  get_nsec_from_state: (a) =>
-    getWasmState().getNsec(a.token as string),
+  generate_provisioning_ephemeral: () =>
+    getWasmState().generateProvisioningEphemeral(),
 
   encrypt_nsec_for_provisioning: (a) =>
     getWasmState().encryptNsecForProvisioning(a.ephemeralPubkeyHex as string),
@@ -216,7 +213,6 @@ const commands: Record<string, CommandHandler> = {
     getWasmState().decryptProvisionedNsec(
       a.encryptedHex as string,
       a.primaryPubkeyHex as string,
-      a.ephemeralSkHex as string,
     ),
 
   // --- PIN lockout (WASM handles internally) ---

@@ -565,40 +565,37 @@ export async function encryptNsecForProvisioning(
 }
 
 /**
+ * Generate an ephemeral secp256k1 keypair for device provisioning.
+ * The secret key is stored in Rust/WASM state and never exposed to JS.
+ * Returns only the x-only public key hex for the QR code / pairing flow.
+ */
+export async function generateProvisioningEphemeral(): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('generate_provisioning_ephemeral')
+  }
+  const state = await getWasmState()
+  return state.generateProvisioningEphemeral()
+}
+
+/**
  * Decrypt a provisioned nsec from the primary device entirely in Rust/WASM.
  * Used by the NEW device after receiving the encrypted payload.
  *
- * Note: The ephemeral SK is passed in because it was generated before
- * CryptoState existed on this device.
+ * Requires `generateProvisioningEphemeral` to have been called first — the
+ * ephemeral SK lives in Rust/WASM state and is consumed on use.
  */
 export async function decryptProvisionedNsec(
   encryptedHex: string,
   primaryPubkeyHex: string,
-  ephemeralSkHex: string,
 ): Promise<ProvisioningDecryptResult> {
   if (useTauri) {
     return tauriInvoke<ProvisioningDecryptResult>('decrypt_provisioned_nsec', {
       encryptedHex,
       primaryPubkeyHex,
-      ephemeralSkHex,
     })
   }
   const state = await getWasmState()
-  return state.decryptProvisionedNsec(encryptedHex, primaryPubkeyHex, ephemeralSkHex)
-}
-
-/**
- * Get nsec from CryptoState for device provisioning/backup ONLY.
- * @deprecated Use encryptNsecForProvisioning instead — this leaks the nsec into JS.
- */
-export async function getNsecFromState(): Promise<string> {
-  if (useTauri) {
-    const token = await tauriInvoke<string>('request_provisioning_token')
-    return tauriInvoke<string>('get_nsec_from_state', { token })
-  }
-  const state = await getWasmState()
-  const token = state.requestProvisioningToken()
-  return state.getNsec(token)
+  return state.decryptProvisionedNsec(encryptedHex, primaryPubkeyHex)
 }
 
 // ── Nsec validation & parsing (stateless) ────────────────────────────

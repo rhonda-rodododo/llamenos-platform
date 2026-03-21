@@ -125,7 +125,9 @@ const commands: Record<string, (a: Args) => unknown> = {
   unwrap_file_key_from_state: () => bytesToHex(randomBytes(32)),
   unwrap_hub_key_from_state: () => bytesToHex(randomBytes(32)),
   rewrap_file_key_from_state: (a) => ({ pubkey: a.newRecipientPubkeyHex, ...eciesWrap(bytesToHex(randomBytes(32)), a.newRecipientPubkeyHex as string) }),
-  get_nsec_from_state: () => nsecEncode(requireUnlocked()),
+  generate_provisioning_ephemeral: () => bytesToHex(randomBytes(32)),
+  encrypt_nsec_for_provisioning: (a) => ({ encryptedHex: bytesToHex(randomBytes(64)), sasCode: '0000' }),
+  decrypt_provisioned_nsec: () => ({ nsec: nsecEncode(requireUnlocked()), sasCode: '0000' }),
   lock_crypto: () => { secretKeyHex = null },
   is_crypto_unlocked: () => secretKeyHex !== null,
 }
