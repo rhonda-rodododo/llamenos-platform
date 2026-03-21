@@ -7,7 +7,8 @@
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
-FROM oven/bun:1 AS deps
+FROM oven/bun:1@sha256:0733e50325078969732ebe3b15ce4c4be5082f18c4ac1a0f0ca4839c2e4e42a7 AS deps
+# oven/bun:1 pinned 2026-03-21 — update via Dependabot or on new minor release
 WORKDIR /app
 COPY package.json bun.lockb ./
 # Strip workspace references — Docker only builds the server, not the full monorepo
@@ -15,7 +16,8 @@ RUN bun -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf-8'
 RUN bun install --production --ignore-scripts
 
 # Stage 2: Production
-FROM oven/bun:1-slim
+FROM oven/bun:1-slim@sha256:478281fdd196871c7e51ba6a820b7803a8ae97042ec86cdbc2e1c6b6626442d9
+# oven/bun:1-slim pinned 2026-03-21 — update via Dependabot
 
 # Create non-root user
 RUN groupadd -r llamenos && useradd -r -g llamenos -d /app -s /sbin/nologin llamenos

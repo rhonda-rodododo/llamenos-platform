@@ -9,3 +9,15 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+  - package-ecosystem: "docker"
+    directory: "/deploy/docker"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      docker-base-images:
+        patterns: ["*"]
