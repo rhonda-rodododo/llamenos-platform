@@ -126,7 +126,8 @@ Then('the call history should show a completed call', async ({ request, world })
   if (getCrossDoState(world).callStatus === 'in-progress') {
     await simulateEndCall(request, getCrossDoState(world).callId!)
   }
-  const { data } = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(request, '/calls/history')
+  const hubId = getScenarioState(world).hubId
+  const { data } = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(request, `/hubs/${hubId}/calls/history`)
   const calls = (data as { calls: Array<{ callId: string; status: string }> }).calls
   const call = calls.find(c => c.callId === getCrossDoState(world).callId)
   expect(call).toBeDefined()
@@ -399,7 +400,8 @@ Then('the call should go to voicemail', async ({ world }) => {
 })
 
 Then('the call history should show an unanswered call', async ({ request, world }) => {
-  const { data } = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(request, '/calls/history')
+  const hubId = getScenarioState(world).hubId
+  const { data } = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(request, `/hubs/${hubId}/calls/history`)
   const calls = (data as { calls: Array<{ callId: string; status: string }> }).calls
   const call = calls.find(c => c.callId === getCrossDoState(world).callId)
   expect(call).toBeDefined()
