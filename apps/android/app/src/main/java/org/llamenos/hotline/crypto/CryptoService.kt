@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.llamenos.hotline.model.NotePayload
+import org.llamenos.protocol.CryptoLabels
 import org.llamenos.protocol.HubKeyEnvelopeResponse
 import org.llamenos.protocol.RecipientEnvelope
 import javax.inject.Inject
@@ -571,15 +572,92 @@ class CryptoService @Inject constructor() {
     fun hasHubKey(hubId: String): Boolean = hubKeys.containsKey(hubId)
 
     /**
+     * Returns a snapshot copy of all currently cached hub keys.
+     * The returned map is independent of the internal cache — callers cannot
+     * mutate the internal state via the returned map.
+     */
+    fun allHubKeys(): Map<String, ByteArray> = HashMap(hubKeys)
+
+    /**
+     * Evict all hub keys from the in-memory cache without locking the service.
+     * Called when the user switches away from all hubs or before re-loading keys
+     * after a hub membership change.
+     */
+    fun clearHubKeys() {
+        hubKeys.clear()
+    }
+
+    /**
      * Unwrap and cache the hub key from a server-provided ECIES envelope.
      *
-     * Uses our nsec to ECIES-decrypt the wrapped key from [envelope].
-     * The plaintext hub key is stored in [hubKeys] for subsequent event decryption.
+     * Uses our nsec (via [org.llamenos.core.eciesUnwrapKeyHex]) to ECIES-decrypt
+     * the wrapped 32-byte hub key from [envelope]. The key is stored in [hubKeys]
+     * under [hubId] for subsequent Nostr event decryption.
      *
-     * TODO Task 12: implement ECIES unwrap via llamenos-core FFI.
+     * ECIES protocol (must match backend hub-key-manager.ts):
+     *   - Shared secret: secp256k1 ECDH(ephemeralPubkey, ourNsec) → x-coordinate (32 bytes)
+     *   - KDF: HKDF-SHA256(ikm=sharedX, info=LABEL_HUB_KEY_WRAP, salt=none)
+     *   - Cipher: XChaCha20-Poly1305, 24-byte nonce prepended to wrappedKey (base64)
+     *
+     * NOTE: If the native JNI library is not built (nativeLibLoaded=false — e.g. in
+     * pre-production dev without .so files), this will throw [IllegalStateException].
+     * That is the correct C6 hard-fail behaviour — callers must handle it.
      */
-    suspend fun loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) {
-        throw UnsupportedOperationException("TODO: Task 12 — implement ECIES hub key unwrap")
+    suspend fun loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse): Unit =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) {
+                "Cannot load hub key: native crypto library not loaded."
+            }
+
+            val secret = nsecHex ?: throw CryptoException("No key loaded")
+
+            val ffiEnvelope = org.llamenos.core.KeyEnvelope(
+                wrappedKey = envelope.envelope.wrappedKey,
+                ephemeralPubkey = envelope.envelope.ephemeralPubkey,
+            )
+
+            val keyHex = try {
+                org.llamenos.core.eciesUnwrapKeyHex(
+                    envelope = ffiEnvelope,
+                    secretKeyHex = secret,
+                    label = CryptoLabels.LABEL_HUB_KEY_WRAP,
+                )
+            } catch (e: org.llamenos.core.CryptoException) {
+                throw CryptoException("Hub key decryption failed for hub $hubId: ${e.message}", e)
+            }
+
+            val keyBytes = try {
+                hexToBytes(keyHex)
+            } catch (e: IllegalArgumentException) {
+                throw CryptoException("Hub key decryption produced invalid hex for hub $hubId", e)
+            }
+
+            if (keyBytes.size != 32) {
+                throw CryptoException(
+                    "Hub key for $hubId has wrong length: expected 32 bytes, got ${keyBytes.size}"
+                )
+            }
+
+            hubKeys[hubId] = keyBytes
+        }
+
+    /** Decode a hex string to a ByteArray. Throws [IllegalArgumentException] for malformed input. */
+    private fun hexToBytes(hex: String): ByteArray {
+        require(hex.length % 2 == 0) { "Hex string has odd length" }
+        return ByteArray(hex.length / 2) { i ->
+            hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        }
+    }
+
+    /**
+     * Inject a pre-decoded hub key directly into the cache for unit testing.
+     *
+     * Bypasses the ECIES decryption path so tests can exercise [hasHubKey],
+     * [allHubKeys], [clearHubKeys], and [lock] without the native library.
+     * Only available within this module (internal).
+     */
+    internal fun injectHubKeyForTest(hubId: String, key: ByteArray) {
+        hubKeys[hubId] = key
     }
 
     /**
