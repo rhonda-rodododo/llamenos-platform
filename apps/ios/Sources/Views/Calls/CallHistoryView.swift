@@ -293,7 +293,7 @@ struct CallHistoryView: View {
 #if DEBUG
 #Preview("Call History") {
     CallHistoryView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
         .environment(Router())
 }
 #endif

@@ -354,6 +354,6 @@ private struct EventRow: View {
 #if DEBUG
 #Preview("Events List") {
     EventListView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
 }
 #endif

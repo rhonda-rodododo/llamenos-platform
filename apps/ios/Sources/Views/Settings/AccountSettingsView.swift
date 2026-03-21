@@ -279,7 +279,7 @@ struct AccountSettingsView: View {
 #Preview("Account Settings") {
     NavigationStack {
         AccountSettingsView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

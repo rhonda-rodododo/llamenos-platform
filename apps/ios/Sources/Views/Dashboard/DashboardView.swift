@@ -470,7 +470,7 @@ struct DashboardView: View {
 #Preview("Dashboard - Off Shift") {
     NavigationStack {
         DashboardView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
             .environment(Router())
     }
 }

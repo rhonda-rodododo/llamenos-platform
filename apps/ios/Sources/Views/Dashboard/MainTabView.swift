@@ -124,7 +124,7 @@ struct MainTabView: View {
 #if DEBUG
 #Preview("Main Tab View") {
     MainTabView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
         .environment(Router())
 }
 #endif

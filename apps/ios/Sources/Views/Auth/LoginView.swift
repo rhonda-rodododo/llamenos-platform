@@ -287,7 +287,7 @@ struct ImportKeyView: View {
 #Preview("Login") {
     NavigationStack {
         LoginView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
             .environment(Router())
     }
 }

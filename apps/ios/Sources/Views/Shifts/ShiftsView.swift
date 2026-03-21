@@ -325,6 +325,6 @@ private struct CircularClockButtonStyle: ButtonStyle {
 #if DEBUG
 #Preview("Shifts - Off Shift") {
     ShiftsView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
 }
 #endif

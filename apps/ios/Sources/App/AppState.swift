@@ -20,6 +20,7 @@ enum AuthStatus: Equatable {
 final class AppState {
     // MARK: - Services
 
+    let hubContext: HubContext
     let cryptoService: CryptoService
     let keychainService: KeychainService
     let apiService: APIService
@@ -69,10 +70,11 @@ final class AppState {
 
     // MARK: - Initialization
 
-    init() {
+    init(hubContext: HubContext) {
+        self.hubContext = hubContext
         let crypto = CryptoService()
         let keychain = KeychainService()
-        let api = APIService(cryptoService: crypto)
+        let api = APIService(cryptoService: crypto, hubContext: hubContext)
         let auth = AuthService(cryptoService: crypto, keychainService: keychain)
         let ws = WebSocketService()
         let wake = WakeKeyService(keychainService: keychain, cryptoService: crypto, apiService: api)
@@ -326,6 +328,21 @@ final class AppState {
         authStatus = .unauthenticated
         userRole = .volunteer
         unreadConversationCount = 0
+    }
+
+    // MARK: - Hub Key Management
+
+    /// Load hub keys for all hubs in parallel. Called after login.
+    /// Full implementation added in Task 13 (requires APIService.getHubKey from Task 4
+    /// and CryptoService.loadHubKey from Task 7).
+    func loadAllHubKeys(hubs: [Hub]) async {
+        // Implemented in Task 13
+    }
+
+    /// Clear hub key cache on lock / logout.
+    /// Full implementation added in Task 13 (requires CryptoService.clearHubKeys from Task 7).
+    func clearHubKeys() {
+        hubContext.clearActiveHub()
     }
 
     // MARK: - WebSocket Connection

@@ -222,7 +222,7 @@ private struct HubRow: View {
 #Preview("Hub Management") {
     NavigationStack {
         HubManagementView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

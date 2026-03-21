@@ -66,6 +66,7 @@ final class APIService: @unchecked Sendable {
     static let apiVersion: Int = 1
     private(set) var baseURL: URL?
     private let cryptoService: CryptoService
+    private let hubContext: HubContext
     private let session: URLSession
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
@@ -78,8 +79,9 @@ final class APIService: @unchecked Sendable {
     /// Certificate pinning delegate (H14). Retained by the URLSession.
     private let pinningDelegate = CertificatePinningDelegate()
 
-    init(cryptoService: CryptoService) {
+    init(cryptoService: CryptoService, hubContext: HubContext) {
         self.cryptoService = cryptoService
+        self.hubContext = hubContext
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
@@ -131,6 +133,12 @@ final class APIService: @unchecked Sendable {
             throw APIError.invalidURL(hubURLString)
         }
         self.baseURL = url
+    }
+
+    /// Returns path prefixed with /hubs/{activeHubId}. Falls back to bare path if no hub selected.
+    func hp(_ path: String) -> String {
+        guard let hubId = hubContext.activeHubId else { return path }
+        return "/hubs/\(hubId)\(path)"
     }
 
     /// Test whether the hub URL is reachable. Returns true if the server responds.

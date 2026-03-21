@@ -174,7 +174,7 @@ struct PINUnlockView: View {
 #Preview("PIN Unlock View") {
     NavigationStack {
         PINUnlockView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
             .environment(Router())
     }
 }

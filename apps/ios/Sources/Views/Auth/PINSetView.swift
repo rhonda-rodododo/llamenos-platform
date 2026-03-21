@@ -151,7 +151,7 @@ struct PINSetView: View {
 #Preview("PIN Set View") {
     NavigationStack {
         PINSetView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
             .environment(Router())
     }
 }

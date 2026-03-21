@@ -278,6 +278,6 @@ struct ConversationRowView: View {
 #if DEBUG
 #Preview("Conversations - Empty") {
     ConversationsView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
 }
 #endif

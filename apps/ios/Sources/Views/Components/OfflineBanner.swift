@@ -69,6 +69,6 @@ struct OfflineBanner: View {
         OfflineBanner()
         Spacer()
     }
-    .environment(AppState())
+    .environment(AppState(hubContext: HubContext()))
 }
 #endif

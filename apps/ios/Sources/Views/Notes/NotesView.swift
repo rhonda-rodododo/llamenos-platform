@@ -274,7 +274,7 @@ struct NoteRowView: View {
 #if DEBUG
 #Preview("Notes - Empty") {
     NotesView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
         .environment(Router())
 }
 #endif

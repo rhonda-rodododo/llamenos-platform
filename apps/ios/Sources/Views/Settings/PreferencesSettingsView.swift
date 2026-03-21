@@ -132,7 +132,7 @@ struct PreferencesSettingsView: View {
 #Preview("Preferences") {
     NavigationStack {
         PreferencesSettingsView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

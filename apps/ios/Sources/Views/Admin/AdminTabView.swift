@@ -206,7 +206,7 @@ struct AdminTabView: View {
 #Preview("Admin Panel") {
     NavigationStack {
         AdminTabView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

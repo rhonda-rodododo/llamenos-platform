@@ -106,7 +106,7 @@ struct ContentView: View {
 
 #if DEBUG
 #Preview("Content View - Unauthenticated") {
-    let appState = AppState()
+    let appState = AppState(hubContext: HubContext())
     let router = Router()
     router.resetForAuthStatus(.unauthenticated)
     return ContentView()
@@ -115,7 +115,7 @@ struct ContentView: View {
 }
 
 #Preview("Content View - Locked") {
-    let appState = AppState()
+    let appState = AppState(hubContext: HubContext())
     let router = Router()
     router.resetForAuthStatus(.locked)
     return ContentView()

@@ -171,7 +171,7 @@ private struct EntityTypeRow: View {
 #Preview("Schema Browser") {
     NavigationStack {
         SchemaBrowserView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

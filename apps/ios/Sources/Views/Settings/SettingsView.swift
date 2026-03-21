@@ -386,6 +386,6 @@ struct SettingsView: View {
 #if DEBUG
 #Preview("Settings") {
     SettingsView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
 }
 #endif

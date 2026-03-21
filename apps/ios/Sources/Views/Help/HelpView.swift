@@ -312,7 +312,7 @@ struct HelpView: View {
 #Preview("Help") {
     NavigationStack {
         HelpView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

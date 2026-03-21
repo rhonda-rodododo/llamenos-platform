@@ -501,6 +501,6 @@ struct QRScannerView: UIViewRepresentable {
 #if DEBUG
 #Preview("Device Link - Scanning") {
     DeviceLinkView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
 }
 #endif

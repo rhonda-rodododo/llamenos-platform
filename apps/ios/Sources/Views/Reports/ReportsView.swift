@@ -399,6 +399,6 @@ struct ReportRowView: View {
 #if DEBUG
 #Preview("Reports - Empty") {
     ReportsView()
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
 }
 #endif

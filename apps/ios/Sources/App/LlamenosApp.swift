@@ -9,6 +9,11 @@ import UserNotifications
 struct LlamenosApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var hubContext: HubContext
+    @State private var appState: AppState
+    @State private var router = Router()
+
     init() {
         let largeTitleAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont(name: "DMSans-Bold", size: 34) ?? UIFont.systemFont(ofSize: 34, weight: .bold)
@@ -24,11 +29,11 @@ struct LlamenosApp: App {
         UINavigationBar.appearance().standardAppearance = navBarAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
         UINavigationBar.appearance().compactAppearance = navBarAppearance
-    }
 
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var appState = AppState()
-    @State private var router = Router()
+        let ctx = HubContext()
+        _hubContext = State(initialValue: ctx)
+        _appState = State(initialValue: AppState(hubContext: ctx))
+    }
     @State private var backgroundTimestamp: Date?
 
     /// M28: Whether to show the privacy overlay (app switcher / inactive state).
@@ -56,6 +61,7 @@ struct LlamenosApp: App {
                         ContentView()
                             .environment(appState)
                             .environment(router)
+                            .environment(hubContext)
                     }
                 }
             }

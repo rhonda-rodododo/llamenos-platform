@@ -174,7 +174,7 @@ struct CreateEventView: View {
 #Preview("Create Event") {
     CreateEventView(
         viewModel: EventsViewModel(
-            apiService: APIService(cryptoService: CryptoService()),
+            apiService: APIService(cryptoService: CryptoService(), hubContext: HubContext()),
             cryptoService: CryptoService()
         ),
         onDismiss: {}

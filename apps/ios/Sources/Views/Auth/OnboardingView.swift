@@ -194,7 +194,7 @@ struct OnboardingView: View {
             nsec: "nsec1qqqsyqcyq5rqwzqfhg9scnmcesgvse3s43jy5wdxkfhmyzxhldqqu69m0z",
             npub: "npub1qqqsyqcyq5rqwzqfhg9scnmcesgvse3s43jy5wdxkfhmyzxhldqqsnefgh"
         )
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
         .environment(Router())
     }
 }

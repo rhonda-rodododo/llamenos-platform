@@ -127,7 +127,7 @@ struct PanicWipeConfirmationView: View {
 #Preview("Panic Wipe Confirmation") {
     NavigationStack {
         PanicWipeConfirmationView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

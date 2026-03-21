@@ -110,7 +110,7 @@ struct DiagnosticsSettingsView: View {
 #Preview("Diagnostics") {
     NavigationStack {
         DiagnosticsSettingsView()
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

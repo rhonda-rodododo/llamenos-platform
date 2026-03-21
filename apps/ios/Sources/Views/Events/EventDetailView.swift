@@ -566,11 +566,11 @@ enum EventDetailTab: String, CaseIterable, Sendable {
                 createdBy: "pubkey123"
             ),
             viewModel: EventsViewModel(
-                apiService: APIService(cryptoService: CryptoService()),
+                apiService: APIService(cryptoService: CryptoService(), hubContext: HubContext()),
                 cryptoService: CryptoService()
             )
         )
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

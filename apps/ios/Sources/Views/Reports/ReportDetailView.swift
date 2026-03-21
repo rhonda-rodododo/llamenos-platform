@@ -251,11 +251,11 @@ struct ReportDetailView: View {
                 )
             ),
             viewModel: ReportsViewModel(
-                apiService: APIService(cryptoService: CryptoService()),
+                apiService: APIService(cryptoService: CryptoService(), hubContext: HubContext()),
                 cryptoService: CryptoService()
             )
         )
-        .environment(AppState())
+        .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif

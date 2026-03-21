@@ -323,7 +323,7 @@ struct MessageBubbleView: View {
 #Preview("Conversation Detail") {
     NavigationStack {
         ConversationDetailView(conversationId: "preview-1")
-            .environment(AppState())
+            .environment(AppState(hubContext: HubContext()))
     }
 }
 #endif
