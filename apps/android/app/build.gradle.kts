@@ -140,6 +140,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.datastore.preferences)
+    implementation(libs.play.services.location)
     implementation(libs.security.crypto)
     implementation(libs.biometric)
 
