@@ -4,11 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ApiService
+import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.hotline.hub.HubRepository
 import org.llamenos.hotline.model.CreateHubRequest
 import org.llamenos.hotline.model.CreateHubResponse
 import org.llamenos.hotline.model.Hub
@@ -29,8 +33,7 @@ data class HubListState(
     val createError: String? = null,
     val createSuccess: Boolean = false,
 
-    // Active hub (the currently-connected hub)
-    val activeHubId: String? = null,
+    // Switching state (active hub ID is a separate StateFlow — see HubManagementViewModel.activeHubId)
     val isSwitching: Boolean = false,
 )
 
@@ -38,15 +41,22 @@ data class HubListState(
  * ViewModel for hub management screens (list + create).
  *
  * Loads hubs from GET /api/hubs and supports creating new hubs
- * via POST /api/hubs. Hub switching updates the active hub state.
+ * via POST /api/hubs. Hub switching delegates to [HubRepository] which
+ * fetches the E2EE key envelope and persists the active hub via [ActiveHubState].
  */
 @HiltViewModel
 class HubManagementViewModel @Inject constructor(
     private val apiService: ApiService,
+    private val hubRepository: HubRepository,
+    private val activeHubState: ActiveHubState,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HubListState())
     val uiState: StateFlow<HubListState> = _uiState.asStateFlow()
+
+    /** The currently active hub ID, driven by persisted ActiveHubState. */
+    val activeHubId: StateFlow<String?> = activeHubState.activeHubId
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         loadHubs()
@@ -114,11 +124,17 @@ class HubManagementViewModel @Inject constructor(
     /**
      * Switch the active hub.
      *
-     * This updates local state only. The actual hub context switch
-     * is handled by the ApiService/SessionState when making requests.
+     * Delegates to HubRepository which fetches the E2EE key envelope,
+     * unwraps it, and persists the active hub ID via ActiveHubState.
+     * On failure, sets the error field in uiState.
      */
-    fun switchHub(hubId: String) {
-        _uiState.update { it.copy(activeHubId = hubId) }
+    fun switchHub(hub: Hub) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSwitching = true) }
+            runCatching { hubRepository.switchHub(hub.id) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+            _uiState.update { it.copy(isSwitching = false) }
+        }
     }
 
     fun refresh() {

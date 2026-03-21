@@ -69,6 +69,7 @@ fun HubListScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val activeHubId by viewModel.activeHubId.collectAsState()
 
     Scaffold(
         topBar = {
@@ -168,8 +169,8 @@ fun HubListScreen(
                         ) { hub ->
                             HubCard(
                                 hub = hub,
-                                isActive = hub.id == uiState.activeHubId,
-                                onClick = { viewModel.switchHub(hub.id) },
+                                isActive = hub.id == activeHubId,
+                                onClick = { viewModel.switchHub(hub) },
                             )
                         }
                     }

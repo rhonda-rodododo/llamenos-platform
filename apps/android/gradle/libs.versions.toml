@@ -23,6 +23,7 @@ jna = "5.18.1"
 cucumber = "7.18.1"
 datastore = "1.1.4"
 turbine = "1.2.0"
+mockk = "1.14.0"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -60,6 +61,7 @@ cucumber-android = { group = "io.cucumber", name = "cucumber-android", version.r
 okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 espresso = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 test-runner = { group = "androidx.test", name = "runner", version = "1.7.0" }

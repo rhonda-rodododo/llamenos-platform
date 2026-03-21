@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.llamenos.hotline.model.NotePayload
+import org.llamenos.protocol.HubKeyEnvelopeResponse
 import org.llamenos.protocol.RecipientEnvelope
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -552,6 +553,32 @@ class CryptoService @Inject constructor() {
     fun lock() {
         nsecHex = null
         nsecBech32 = null
+    }
+
+    // ---- Hub Key Management ----
+
+    /**
+     * In-memory cache of decrypted hub keys keyed by hub ID.
+     * Hub keys are 32-byte random values used to decrypt Nostr relay events.
+     * Populated via [loadHubKey]; cleared on [lock].
+     */
+    private val hubKeys: MutableMap<String, ByteArray> = mutableMapOf()
+
+    /**
+     * Returns true if the hub key for [hubId] is already cached in memory.
+     */
+    fun hasHubKey(hubId: String): Boolean = hubKeys.containsKey(hubId)
+
+    /**
+     * Unwrap and cache the hub key from a server-provided ECIES envelope.
+     *
+     * Uses our nsec to ECIES-decrypt the wrapped key from [envelope].
+     * The plaintext hub key is stored in [hubKeys] for subsequent event decryption.
+     *
+     * TODO Task 12: implement ECIES unwrap via llamenos-core FFI.
+     */
+    suspend fun loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) {
+        throw UnsupportedOperationException("TODO: Task 12 — implement ECIES hub key unwrap")
     }
 
     /**
