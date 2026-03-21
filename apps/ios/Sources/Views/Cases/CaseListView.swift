@@ -6,6 +6,7 @@ import SwiftUI
 /// decrypted summary titles, and navigation to case detail.
 struct CaseListView: View {
     @Environment(AppState.self) private var appState
+    @Environment(HubContext.self) private var hubContext
     @State private var viewModel: CaseManagementViewModel?
 
     private var vm: CaseManagementViewModel {
@@ -50,7 +51,7 @@ struct CaseListView: View {
                     }
                 }
             }
-            .task {
+            .task(id: hubContext.activeHubId) {
                 await vm.loadInitial()
             }
             .refreshable {

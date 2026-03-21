@@ -6,6 +6,7 @@ import SwiftUI
 /// with channel badges, unread counts, status filtering, and pull-to-refresh.
 struct ConversationsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(HubContext.self) private var hubContext
     @State private var viewModel: ConversationsViewModel?
 
     var body: some View {
@@ -33,7 +34,7 @@ struct ConversationsView: View {
             .refreshable {
                 await vm.refresh()
             }
-            .task {
+            .task(id: hubContext.activeHubId) {
                 await vm.loadConversations()
                 vm.startEventListener()
             }

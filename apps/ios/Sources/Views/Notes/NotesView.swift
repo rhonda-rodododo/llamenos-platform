@@ -7,6 +7,7 @@ import SwiftUI
 struct NotesView: View {
     @Environment(AppState.self) private var appState
     @Environment(Router.self) private var router
+    @Environment(HubContext.self) private var hubContext
     @State private var viewModel: NotesViewModel?
 
     var body: some View {
@@ -59,7 +60,7 @@ struct NotesView: View {
             .refreshable {
                 await vm.refresh()
             }
-            .task {
+            .task(id: hubContext.activeHubId) {
                 await vm.loadNotes()
             }
             .navigationDestination(for: String.self) { noteId in

@@ -6,6 +6,7 @@ import SwiftUI
 /// system actions with actor, action type, timestamp, and chain hash.
 struct AuditLogView: View {
     @Bindable var viewModel: AdminViewModel
+    @Environment(HubContext.self) private var hubContext
 
     var body: some View {
         ZStack {
@@ -21,7 +22,7 @@ struct AuditLogView: View {
             viewModel.isLoadingAudit = false
             await viewModel.loadAuditLog()
         }
-        .task {
+        .task(id: hubContext.activeHubId) {
             await viewModel.loadAuditLog()
         }
     }

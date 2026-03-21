@@ -6,6 +6,7 @@ import SwiftUI
 /// with reasons and allows adding/removing bans.
 struct BanListView: View {
     @Bindable var viewModel: AdminViewModel
+    @Environment(HubContext.self) private var hubContext
 
     var body: some View {
         ZStack {
@@ -37,7 +38,7 @@ struct BanListView: View {
             viewModel.isLoadingBans = false
             await viewModel.loadBans()
         }
-        .task {
+        .task(id: hubContext.activeHubId) {
             await viewModel.loadBans()
         }
     }

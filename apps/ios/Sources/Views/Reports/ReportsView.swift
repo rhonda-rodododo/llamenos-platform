@@ -7,6 +7,7 @@ import SwiftUI
 /// legacy form or the template-driven report type picker.
 struct ReportsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(HubContext.self) private var hubContext
     @State private var viewModel: ReportsViewModel?
     @State private var selectedReportType: ClientReportTypeDefinition?
 
@@ -86,7 +87,7 @@ struct ReportsView: View {
         .refreshable {
             await vm.refresh()
         }
-        .task {
+        .task(id: hubContext.activeHubId) {
             await vm.loadReports()
         }
         .navigationDestination(for: String.self) { reportId in

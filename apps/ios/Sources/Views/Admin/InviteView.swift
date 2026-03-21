@@ -6,6 +6,7 @@ import SwiftUI
 /// status (active/claimed/expired) and allows generating new ones.
 struct InviteView: View {
     @Bindable var viewModel: AdminViewModel
+    @Environment(HubContext.self) private var hubContext
 
     var body: some View {
         ZStack {
@@ -37,7 +38,7 @@ struct InviteView: View {
             viewModel.isLoadingInvites = false
             await viewModel.loadInvites()
         }
-        .task {
+        .task(id: hubContext.activeHubId) {
             await viewModel.loadInvites()
         }
     }

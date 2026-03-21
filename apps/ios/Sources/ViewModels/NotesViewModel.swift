@@ -7,7 +7,7 @@ import UIKit
 /// using CryptoService, and manages pagination and custom field definitions.
 @Observable
 final class NotesViewModel {
-    private let apiService: APIService
+    private let apiService: HubAPIServiceProtocol
     private let cryptoService: CryptoService
 
     // MARK: - Public State
@@ -44,7 +44,7 @@ final class NotesViewModel {
 
     // MARK: - Initialization
 
-    init(apiService: APIService, cryptoService: CryptoService) {
+    init(apiService: HubAPIServiceProtocol, cryptoService: CryptoService) {
         self.apiService = apiService
         self.cryptoService = cryptoService
     }
@@ -127,7 +127,7 @@ final class NotesViewModel {
 
         let _: EncryptedNoteResponse = try await apiService.request(
             method: "POST",
-            path: "/api/notes",
+            path: apiService.hp("/api/notes"),
             body: request
         )
 
@@ -199,7 +199,7 @@ final class NotesViewModel {
         do {
             let response: NotesListResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/notes?page=\(page)&limit=\(pageSize)"
+                path: apiService.hp("/api/notes?page=\(page)&limit=\(pageSize)")
             )
 
             if replacing {
@@ -227,7 +227,7 @@ final class NotesViewModel {
         do {
             let response: CustomFieldsResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/settings/custom-fields"
+                path: apiService.hp("/api/settings/custom-fields")
             )
             customFields = response.fields
                 .filter { $0.visibleToVolunteers }

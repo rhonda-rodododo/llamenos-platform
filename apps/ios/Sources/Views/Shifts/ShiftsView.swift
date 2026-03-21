@@ -6,6 +6,7 @@ import SwiftUI
 /// Uses a native iOS List with sections per day.
 struct ShiftsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(HubContext.self) private var hubContext
     @State private var viewModel: ShiftsViewModel?
 
     var body: some View {
@@ -26,7 +27,7 @@ struct ShiftsView: View {
             .refreshable {
                 await vm.refresh()
             }
-            .task {
+            .task(id: hubContext.activeHubId) {
                 await vm.loadShifts()
             }
             .alert(

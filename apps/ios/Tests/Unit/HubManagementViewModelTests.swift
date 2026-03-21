@@ -10,6 +10,10 @@ final class MockHubAPIService: HubAPIServiceProtocol {
     var hubKeyResult: Result<HubKeyEnvelopeResponse, Error>?
     /// Stub for request<T> — set to a closure returning any Decodable for loadHubs/createHub tests.
     var requestStub: ((String, String) throws -> Any)?
+    /// The path from the most recent request<T> call — used to assert hub-scoped routing.
+    var lastRequestPath: String?
+    /// Active hub ID used by hp() to prefix paths.
+    var activeHubId: String?
 
     func getHubKey(_ hubId: String) async throws -> HubKeyEnvelopeResponse {
         switch hubKeyResult {
@@ -30,7 +34,13 @@ final class MockHubAPIService: HubAPIServiceProtocol {
         }
     }
 
+    func hp(_ path: String) -> String {
+        guard let hubId = activeHubId else { return path }
+        return "/hubs/\(hubId)\(path)"
+    }
+
     func request<T: Decodable>(method: String, path: String, body: (any Encodable)?) async throws -> T {
+        lastRequestPath = path
         if let stub = requestStub, let result = try stub(method, path) as? T {
             return result
         }

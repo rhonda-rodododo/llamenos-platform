@@ -6,6 +6,7 @@ import SwiftUI
 /// with role badges and allows role updates.
 struct UsersView: View {
     @Bindable var viewModel: AdminViewModel
+    @Environment(HubContext.self) private var hubContext
 
     var body: some View {
         ZStack {
@@ -26,7 +27,7 @@ struct UsersView: View {
             viewModel.isLoadingUsers = false
             await viewModel.loadUsers()
         }
-        .task {
+        .task(id: hubContext.activeHubId) {
             await viewModel.loadUsers()
         }
     }
