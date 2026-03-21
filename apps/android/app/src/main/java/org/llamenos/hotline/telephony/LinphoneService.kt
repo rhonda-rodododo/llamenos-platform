@@ -32,6 +32,9 @@ class LinphoneService @Inject constructor(
 ) {
     private var core: Core? = null
     private val hubAccounts = ConcurrentHashMap<String, org.linphone.core.Account>()
+    // TODO: Add eviction (e.g. LruCache) for entries that are never consumed
+    // (call push arrives but Linphone never connects). Low risk for now given
+    // low per-session call volume on a crisis line.
     private val pendingCallHubIds = ConcurrentHashMap<String, String>()  // callId → hubId
 
     fun initialize() {

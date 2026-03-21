@@ -11,6 +11,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
 import org.llamenos.hotline.crypto.CryptoService
@@ -81,6 +82,11 @@ class PushService : FirebaseMessagingService() {
         wakeKeyService.getOrCreateWakePublicKey()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
+    }
+
     /**
      * Called when a push message is received while the app is in the foreground,
      * or when a data-only message arrives (regardless of app state).
@@ -127,22 +133,20 @@ class PushService : FirebaseMessagingService() {
 
         // If app is unlocked, use full-tier handling for richer notifications
         if (cryptoService.isUnlocked) {
-            when (type) {
-                "incoming_call" -> handleIncomingCall(data)
-                "call_ended" -> handleCallEnded()
-                "shift_reminder" -> handleShiftReminder(data)
-                "announcement" -> handleAnnouncement(data)
-                else -> Log.d(TAG, "Unknown message type: $type")
-            }
+            dispatchByType(data, type)
         } else if (wakeEncrypted == null) {
             // No wake payload and app is locked — show generic notification
-            when (type) {
-                "incoming_call" -> handleIncomingCall(data)
-                "call_ended" -> handleCallEnded()
-                "shift_reminder" -> handleShiftReminder(data)
-                "announcement" -> handleAnnouncement(data)
-                else -> Log.d(TAG, "Unknown message type: $type")
-            }
+            dispatchByType(data, type)
+        }
+    }
+
+    private fun dispatchByType(data: Map<String, String>, type: String) {
+        when (type) {
+            "incoming_call" -> handleIncomingCall(data)
+            "call_ended" -> handleCallEnded()
+            "shift_reminder" -> handleShiftReminder(data)
+            "announcement" -> handleAnnouncement(data)
+            else -> Log.d(TAG, "Unknown message type: $type")
         }
     }
 
@@ -217,6 +221,14 @@ class PushService : FirebaseMessagingService() {
         val hubId = data["hub-id"] ?: ""
         if (callId.isNotEmpty() && hubId.isNotEmpty()) {
             linphoneService.storePendingCallHub(callId, hubId)
+        }
+
+        // Route to the correct hub synchronously from plaintext FCM data.
+        // This covers the app-unlocked path where the async wake-payload coroutine
+        // may not have committed the hub switch before handleIncomingCall runs.
+        // Hub ID is not sensitive — no decryption needed.
+        if (hubId.isNotEmpty()) {
+            serviceScope.launch { activeHubState.setActiveHub(hubId) }
         }
 
         ensureNotificationChannel(
