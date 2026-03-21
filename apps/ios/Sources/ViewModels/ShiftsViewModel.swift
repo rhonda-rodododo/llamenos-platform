@@ -5,10 +5,16 @@ import UIKit
 
 /// View model for the Shifts tab. Manages shift schedule display, clock in/out toggle,
 /// and shift signup. Groups shifts by day for the weekly calendar view.
+///
+/// SIP integration: when the volunteer clocks in, `onShiftStarted` fetches a short-lived
+/// SIP token from the hub and registers a Linphone account. On clock out, `onShiftEnded`
+/// unregisters the account so the volunteer stops receiving VoIP calls.
 @Observable
 final class ShiftsViewModel {
     private let apiService: APIService
     private let cryptoService: CryptoService
+    private let hubContext: HubContext
+    private let linphoneService: any LinphoneServiceProtocol
 
     // MARK: - Public State
 
@@ -61,9 +67,32 @@ final class ShiftsViewModel {
 
     // MARK: - Initialization
 
-    init(apiService: APIService, cryptoService: CryptoService) {
+    init(
+        apiService: APIService,
+        cryptoService: CryptoService,
+        hubContext: HubContext,
+        linphoneService: any LinphoneServiceProtocol
+    ) {
         self.apiService = apiService
         self.cryptoService = cryptoService
+        self.hubContext = hubContext
+        self.linphoneService = linphoneService
+    }
+
+    // MARK: - SIP Account Lifecycle
+
+    /// Register a SIP account with Linphone for the given hub. Called after clock-in succeeds.
+    func onShiftStarted(hubId: String, sipParams: SipTokenResponse) async {
+        do {
+            try linphoneService.registerHubAccount(hubId: hubId, sipParams: sipParams)
+        } catch {
+            print("[LinphoneService] Failed to register SIP account for hub \(hubId): \(error.localizedDescription)")
+        }
+    }
+
+    /// Unregister the SIP account for the given hub. Called after clock-out succeeds.
+    func onShiftEnded(hubId: String) {
+        linphoneService.unregisterHubAccount(hubId: hubId)
     }
 
     // MARK: - Data Loading
@@ -108,6 +137,12 @@ final class ShiftsViewModel {
             shiftStartedAt = Date()
             startTimer()
 
+            // Register a SIP account so the volunteer receives VoIP calls for this hub.
+            if let hubId = hubContext.activeHubId,
+               let sipParams = try? await apiService.getSipToken(hubId: hubId) {
+                await onShiftStarted(hubId: hubId, sipParams: sipParams)
+            }
+
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
 
@@ -135,6 +170,11 @@ final class ShiftsViewModel {
             activeShiftId = nil
             shiftStartedAt = nil
             stopTimer()
+
+            // Unregister the SIP account so the volunteer stops receiving VoIP calls.
+            if let hubId = hubContext.activeHubId {
+                onShiftEnded(hubId: hubId)
+            }
 
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()

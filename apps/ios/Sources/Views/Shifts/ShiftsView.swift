@@ -302,7 +302,12 @@ struct ShiftsView: View {
         if let vm = viewModel {
             return vm
         }
-        let vm = ShiftsViewModel(apiService: appState.apiService, cryptoService: appState.cryptoService)
+        let vm = ShiftsViewModel(
+            apiService: appState.apiService,
+            cryptoService: appState.cryptoService,
+            hubContext: hubContext,
+            linphoneService: appState.linphoneService
+        )
         DispatchQueue.main.async {
             self.viewModel = vm
         }

@@ -157,6 +157,9 @@ dependencies {
     // JNA for UniFFI-generated Rust bindings (llamenos-core)
     implementation(libs.jna) { artifact { type = "aar" } }
 
+    // Linphone SDK for SIP/VoIP (multi-hub parallel ringing)
+    implementation("org.linphone:linphone-sdk-android:5.4.100")
+
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
@@ -165,6 +168,7 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
+    testImplementation(kotlin("test"))
 
     androidTestImplementation(libs.espresso)
     androidTestImplementation(platform(libs.compose.bom))

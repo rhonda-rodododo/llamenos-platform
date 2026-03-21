@@ -351,6 +351,14 @@ final class APIService: @unchecked Sendable {
         )
     }
 
+    // MARK: - Telephony / SIP
+
+    /// Fetch short-lived SIP credentials for the given hub.
+    /// Called when the volunteer clocks in so a SIP account can be registered with Linphone.
+    func getSipToken(hubId: String) async throws -> SipTokenResponse {
+        return try await request(method: "GET", path: "/api/hubs/\(hubId)/telephony/sip-token")
+    }
+
     // MARK: - Version Check
 
     /// Compare this client's API version against the server's config.

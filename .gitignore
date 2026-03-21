@@ -34,6 +34,7 @@ apps/ios/.build/
 apps/ios/*.xcodeproj/
 apps/ios/DerivedData/
 apps/ios/LlamenosCoreFFI.xcframework/
+apps/ios/Frameworks/linphone-sdk.xcframework/
 
 # Rust/Tauri build
 target/

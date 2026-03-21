@@ -17,6 +17,7 @@ import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.crypto.WakeKeyService
 import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.hotline.telephony.LinphoneService
 import javax.inject.Inject
 
 /**
