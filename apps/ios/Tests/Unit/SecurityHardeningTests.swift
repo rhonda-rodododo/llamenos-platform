@@ -130,7 +130,7 @@ final class SecurityHardeningTests: XCTestCase {
 
     func testAPIServiceRejectsHTTP() {
         let crypto = CryptoService()
-        let api = APIService(cryptoService: crypto)
+        let api = APIService(cryptoService: crypto, hubContext: HubContext())
 
         XCTAssertThrowsError(try api.configure(hubURLString: "http://evil.example.com")) { error in
             guard let apiError = error as? APIError else {
@@ -147,7 +147,7 @@ final class SecurityHardeningTests: XCTestCase {
 
     func testAPIServiceRejectsHTTPCaseInsensitive() {
         let crypto = CryptoService()
-        let api = APIService(cryptoService: crypto)
+        let api = APIService(cryptoService: crypto, hubContext: HubContext())
 
         XCTAssertThrowsError(try api.configure(hubURLString: "HTTP://evil.example.com"))
         XCTAssertThrowsError(try api.configure(hubURLString: "Http://evil.example.com"))
@@ -155,7 +155,7 @@ final class SecurityHardeningTests: XCTestCase {
 
     func testAPIServiceAcceptsHTTPS() throws {
         let crypto = CryptoService()
-        let api = APIService(cryptoService: crypto)
+        let api = APIService(cryptoService: crypto, hubContext: HubContext())
 
         // Should not throw
         try api.configure(hubURLString: "https://app.llamenos.org")
@@ -163,7 +163,7 @@ final class SecurityHardeningTests: XCTestCase {
 
     func testAPIServiceAutoPrependsHTTPS() throws {
         let crypto = CryptoService()
-        let api = APIService(cryptoService: crypto)
+        let api = APIService(cryptoService: crypto, hubContext: HubContext())
 
         // Should not throw — auto-prepends https://
         try api.configure(hubURLString: "app.llamenos.org")
@@ -230,7 +230,7 @@ final class SecurityHardeningTests: XCTestCase {
         // with -34018, but the service should still construct.
         let keychainService = KeychainService()
         let cryptoService = CryptoService()
-        let apiService = APIService(cryptoService: cryptoService)
+        let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
 
         let wakeKeyService = WakeKeyService(
             keychainService: keychainService,
@@ -258,7 +258,7 @@ final class SecurityHardeningTests: XCTestCase {
         // before ensureKeypairExists().
         let keychainService = KeychainService()
         let cryptoService = CryptoService()
-        let apiService = APIService(cryptoService: cryptoService)
+        let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
 
         let wakeKeyService = WakeKeyService(
             keychainService: keychainService,
@@ -316,7 +316,7 @@ final class SecurityHardeningTests: XCTestCase {
         // The initial step must be scanning — import cannot be the first step
         let cryptoService = CryptoService()
         let keychainService = KeychainService()
-        let apiService = APIService(cryptoService: cryptoService)
+        let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
         let authService = AuthService(
             cryptoService: cryptoService,
             keychainService: keychainService
@@ -345,7 +345,7 @@ final class SecurityHardeningTests: XCTestCase {
     func testAuthViewModelClearsNsecOnCancel() {
         let cryptoService = CryptoService()
         let keychainService = KeychainService()
-        let apiService = APIService(cryptoService: cryptoService)
+        let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
         let authService = AuthService(
             cryptoService: cryptoService,
             keychainService: keychainService
@@ -376,7 +376,7 @@ final class SecurityHardeningTests: XCTestCase {
     func testAuthViewModelResetsNsecOnFullReset() {
         let cryptoService = CryptoService()
         let keychainService = KeychainService()
-        let apiService = APIService(cryptoService: cryptoService)
+        let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
         let authService = AuthService(
             cryptoService: cryptoService,
             keychainService: keychainService

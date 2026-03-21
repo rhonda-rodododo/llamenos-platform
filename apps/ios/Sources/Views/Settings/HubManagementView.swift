@@ -11,7 +11,11 @@ struct HubManagementView: View {
 
     private var vm: HubManagementViewModel {
         if let viewModel { return viewModel }
-        let vm = HubManagementViewModel(apiService: appState.apiService)
+        let vm = HubManagementViewModel(
+            apiService: appState.apiService,
+            cryptoService: appState.cryptoService,
+            hubContext: appState.hubContext
+        )
         DispatchQueue.main.async { self.viewModel = vm }
         return vm
     }
@@ -55,10 +59,10 @@ struct HubManagementView: View {
         }
         .alert(
             NSLocalizedString("common_error", comment: "Error"),
-            isPresented: .constant(vm.errorMessage != nil)
+            isPresented: .constant(vm.error != nil)
         ) {
             Button(NSLocalizedString("common_ok", comment: "OK")) {
-                vm.errorMessage = nil
+                vm.error = nil
             }
         } message: {
             if let msg = vm.errorMessage {
@@ -104,7 +108,7 @@ struct HubManagementView: View {
                         hub: hub,
                         isActive: vm.isActive(hub),
                         onTap: {
-                            vm.switchHub(to: hub)
+                            Task { await vm.switchHub(to: hub) }
                         }
                     )
                 }

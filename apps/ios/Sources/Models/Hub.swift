@@ -62,3 +62,6 @@ struct UpdateHubRequest: Codable, Sendable {
     let description: String?
     let phoneNumber: String?
 }
+
+// HubKeyEnvelopeResponse and HubKeyEnvelopeResponseEnvelope are generated from
+// packages/protocol/generated/swift/Types.swift — do not redefine here.

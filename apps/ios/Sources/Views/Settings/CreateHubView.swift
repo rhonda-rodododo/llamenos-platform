@@ -136,9 +136,12 @@ struct CreateHubView: View {
 
 #if DEBUG
 #Preview("Create Hub") {
+    let ctx = HubContext()
     CreateHubView(
         viewModel: HubManagementViewModel(
-            apiService: APIService(cryptoService: CryptoService(), hubContext: HubContext())
+            apiService: APIService(cryptoService: CryptoService(), hubContext: ctx),
+            cryptoService: CryptoService(),
+            hubContext: ctx
         ),
         onDismiss: {}
     )
