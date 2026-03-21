@@ -47,7 +47,7 @@ When('a call arrives from a unique caller', async ({ request, world }) => {
   const caller = uniqueCallerNumber()
   getLifecycleState(world).callerNumber = caller
   try {
-    const result = await simulateIncomingCall(request, { callerNumber: caller })
+    const result = await simulateIncomingCall(request, { callerNumber: caller, hubId: getScenarioState(world).hubId })
     getScenarioState(world).callId = result.callId
     getScenarioState(world).callStatus = result.status
   } catch {
