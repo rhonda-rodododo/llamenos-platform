@@ -14,6 +14,8 @@ import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.crypto.CryptoService
+import org.llamenos.hotline.model.LlamenosEvent
+import org.llamenos.hotline.service.AttributedHubEvent
 import org.llamenos.hotline.ui.calls.CallHistoryViewModel
 import org.llamenos.hotline.ui.cases.CaseManagementViewModel
 import org.llamenos.hotline.ui.contacts.ContactsViewModel
@@ -63,7 +65,7 @@ class HubScopedViewModelReloadTest {
     private fun mockWebSocketService(): WebSocketService {
         val ws = mockk<WebSocketService>(relaxed = true)
         every { ws.connectionState } returns MutableStateFlow(WebSocketService.ConnectionState.DISCONNECTED)
-        every { ws.typedEvents } returns MutableSharedFlow()
+        every { ws.typedEvents } returns MutableSharedFlow<AttributedHubEvent<LlamenosEvent>>()
         return ws
     }
 

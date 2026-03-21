@@ -25,7 +25,9 @@ import okhttp3.WebSocketListener
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
+import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.model.LlamenosEvent
+import org.llamenos.hotline.service.AttributedHubEvent
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,6 +45,7 @@ import javax.inject.Singleton
 class WebSocketService @Inject constructor(
     private val cryptoService: CryptoService,
     private val keystoreService: KeyValueStore,
+    private val activeHubState: ActiveHubState,
 ) {
 
     @Serializable
@@ -76,10 +79,16 @@ class WebSocketService @Inject constructor(
     private val _events = MutableSharedFlow<NostrEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<NostrEvent> = _events.asSharedFlow()
 
-    private val _typedEvents = MutableSharedFlow<LlamenosEvent>(extraBufferCapacity = 64)
+    private val _typedEvents = MutableSharedFlow<AttributedHubEvent<LlamenosEvent>>(extraBufferCapacity = 64)
 
-    /** Typed application events parsed from Nostr relay messages. */
-    val typedEvents: SharedFlow<LlamenosEvent> = _typedEvents.asSharedFlow()
+    /**
+     * Typed application events parsed from Nostr relay messages.
+     *
+     * Each event is wrapped in [AttributedHubEvent] carrying the [ActiveHubState.activeHubId]
+     * that was current at the moment the event was received. Subscribers should use
+     * [AttributedHubEvent.hubId] to route or discard events from non-active hubs.
+     */
+    val typedEvents: SharedFlow<AttributedHubEvent<LlamenosEvent>> = _typedEvents.asSharedFlow()
 
     /** Server event encryption key, set after authentication via GET /api/auth/me. */
     var serverEventKeyHex: String? = null
@@ -192,7 +201,8 @@ class WebSocketService @Inject constructor(
                     event.content
                 }
                 parseTypedEvent(content)?.let { typed ->
-                    _typedEvents.emit(typed)
+                    val hubId = activeHubState.activeHubId.value ?: ""
+                    _typedEvents.emit(AttributedHubEvent(hubId = hubId, event = typed))
                 }
             }
         } catch (_: Exception) {

@@ -101,7 +101,8 @@ class ConversationsViewModel @Inject constructor(
      */
     private fun subscribeToEvents() {
         viewModelScope.launch {
-            webSocketService.typedEvents.collect { event ->
+            webSocketService.typedEvents.collect { attributed ->
+                val event = attributed.event
                 when (event) {
                     is LlamenosEvent.MessageNew -> {
                         // If we are viewing this conversation, reload messages
