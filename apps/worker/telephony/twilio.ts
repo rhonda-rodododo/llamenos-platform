@@ -191,10 +191,10 @@ export class TwilioAdapter implements TelephonyAdapter {
   }
 
   async handleCallAnswered(params: CallAnsweredParams): Promise<TelephonyResponse> {
-    const hp = hubXmlParam(params.hubId)
+    // CRIT-W1: Hub and pubkey are resolved from DB in /call-recording — no URL params needed
     return this.twiml(`
       <Response>
-        <Dial record="record-from-answer" recordingStatusCallback="${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.userPubkey}${hp}" recordingStatusCallbackEvent="completed">
+        <Dial record="record-from-answer" recordingStatusCallback="${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}" recordingStatusCallbackEvent="completed">
           <Queue>${params.parentCallSid}</Queue>
         </Dial>
       </Response>
@@ -242,15 +242,16 @@ export class TwilioAdapter implements TelephonyAdapter {
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const callSids: string[] = []
-    const hubParam = params.hubId ? `&hub=${encodeURIComponent(params.hubId)}` : ''
 
     const calls = await Promise.allSettled(
       params.volunteers.map(async (vol) => {
+        // CRIT-W2: Use opaque callToken instead of raw pubkey in callback URLs
+        // CRIT-W1: No ?hub= param — hub is resolved from DB call record server-side
         const body = new URLSearchParams({
           To: vol.phone,
           From: this.phoneNumber,
-          Url: `${params.callbackUrl}/api/telephony/user-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
-          StatusCallback: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
+          Url: `${params.callbackUrl}/api/telephony/user-answer?callToken=${encodeURIComponent(vol.callToken)}`,
+          StatusCallback: `${params.callbackUrl}/api/telephony/call-status?callToken=${encodeURIComponent(vol.callToken)}`,
           Timeout: '30',
           MachineDetection: 'Enable',
         })
@@ -269,7 +270,7 @@ export class TwilioAdapter implements TelephonyAdapter {
           const data = await res.json() as { sid: string }
           return data.sid
         }
-        throw new Error(`Failed to call ${vol.pubkey}`)
+        throw new Error(`Failed to call volunteer`)
       })
     )
 

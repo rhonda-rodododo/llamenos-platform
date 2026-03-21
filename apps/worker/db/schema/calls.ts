@@ -1,5 +1,6 @@
 /**
- * Calls domain tables: active calls and encrypted call history records.
+ * Calls domain tables: active calls, encrypted call history records,
+ * and single-use call tokens for secure telephony callback resolution.
  */
 import {
   boolean,
@@ -68,5 +69,24 @@ export const callRecords = pgTable(
   (table) => [
     index('call_records_hub_id_idx').on(table.hubId),
     index('call_records_started_at_idx').on(table.startedAt.desc()),
+  ],
+)
+
+// ---------------------------------------------------------------------------
+// call_tokens — CRIT-W2: Opaque single-use tokens replacing pubkey in callback URLs
+// ---------------------------------------------------------------------------
+
+export const callTokens = pgTable(
+  'call_tokens',
+  {
+    token: text('token').primaryKey(),
+    callSid: text('call_sid').notNull(),
+    volunteerPubkey: text('volunteer_pubkey').notNull(),
+    hubId: text('hub_id').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('call_tokens_call_sid_idx').on(table.callSid),
+    index('call_tokens_created_at_idx').on(table.createdAt),
   ],
 )

@@ -7,7 +7,7 @@
  */
 import { eq, and, desc, sql, gte, lte, count, or, lt } from 'drizzle-orm'
 import type { Database } from '../db'
-import { activeCalls, callRecords } from '../db/schema'
+import { activeCalls, callRecords, callTokens } from '../db/schema'
 import { ServiceError } from './settings'
 import type { ShiftsService } from './shifts'
 
@@ -461,10 +461,68 @@ export class CallsService {
     return { ok: true }
   }
 
+  // =========================================================================
+  // Call Tokens — CRIT-W2: Opaque single-use tokens for telephony callbacks
+  // =========================================================================
+
+  /**
+   * Create a single-use call token mapping to a volunteer pubkey + hub.
+   * The token is embedded in Twilio callback URLs instead of the raw pubkey.
+   */
+  async createCallToken(params: { callSid: string; volunteerPubkey: string; hubId: string }): Promise<string> {
+    const token = crypto.randomUUID()
+    await this.db.insert(callTokens).values({
+      token,
+      callSid: params.callSid,
+      volunteerPubkey: params.volunteerPubkey,
+      hubId: params.hubId,
+    })
+    return token
+  }
+
+  /**
+   * Resolve and consume a call token atomically (DELETE...RETURNING).
+   * Returns null if the token is unknown or expired (> 5 minutes old).
+   */
+  async resolveCallToken(token: string): Promise<{ callSid: string; volunteerPubkey: string; hubId: string } | null> {
+    const TOKEN_TTL_MS = 5 * 60 * 1000
+    const rows = await this.db
+      .delete(callTokens)
+      .where(
+        and(
+          eq(callTokens.token, token),
+          gte(callTokens.createdAt, new Date(Date.now() - TOKEN_TTL_MS)),
+        ),
+      )
+      .returning()
+    if (rows.length === 0) return null
+    const row = rows[0]
+    return { callSid: row.callSid, volunteerPubkey: row.volunteerPubkey, hubId: row.hubId }
+  }
+
+  /**
+   * Resolve hub ID for a given call SID from the active_calls table.
+   * Used by /call-recording to get hub without trusting URL params (CRIT-W1).
+   */
+  async getHubIdForCall(callSid: string): Promise<string | null> {
+    if (!callSid) return null
+    const rows = await this.db
+      .select({ hubId: activeCalls.hubId })
+      .from(activeCalls)
+      .where(eq(activeCalls.callId, callSid))
+      .limit(1)
+    if (rows.length === 0) return null
+    return rows[0].hubId ?? null
+  }
+
   /** Truncate all call data for a hub */
   async reset(hubId: string): Promise<{ ok: true }> {
     await this.db.delete(activeCalls).where(eq(activeCalls.hubId, hubId))
     await this.db.delete(callRecords).where(eq(callRecords.hubId, hubId))
+    // Also clean up any expired call tokens (best-effort)
+    await this.db.delete(callTokens).where(
+      lt(callTokens.createdAt, new Date(Date.now() - 10 * 60 * 1000)),
+    )
     return { ok: true }
   }
 }

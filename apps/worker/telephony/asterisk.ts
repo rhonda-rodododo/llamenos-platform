@@ -212,10 +212,12 @@ export class AsteriskAdapter implements TelephonyAdapter {
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const { callSid, callerNumber, volunteers, callbackUrl, hubId } = params
+    // CRIT-W2: Pass callToken instead of pubkey to bridge — bridge uses token in callback URLs
+    // CRIT-W1: hubId retained for bridge internal routing (not embedded in callback URLs)
     const result = await this.bridgeRequest('POST', '/commands/ring', {
       parentCallSid: callSid,
       callerNumber,
-      volunteers: volunteers.map(v => ({ pubkey: v.pubkey, phone: v.phone })),
+      volunteers: volunteers.map(v => ({ callToken: v.callToken, phone: v.phone })),
       callbackUrl,
       hubId,
     })

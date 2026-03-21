@@ -173,9 +173,12 @@ export interface CallAnsweredParams {
   parentCallSid: string
   /** Origin URL for recording status callbacks */
   callbackUrl: string
-  /** User pubkey for recording callback routing */
+  /**
+   * User pubkey — kept for audit trail in the route layer.
+   * CRIT-W2: Recording callback URL no longer embeds pubkey; hub is resolved from DB (CRIT-W1).
+   */
   userPubkey: string
-  /** Hub ID for multi-hub routing — appended to callback URLs as &hub= */
+  /** Hub ID — no longer embedded in recording callback URL (CRIT-W1); resolved from DB instead */
   hubId?: string
 }
 
@@ -192,9 +195,16 @@ export interface VoicemailParams {
 export interface RingVolunteersParams {
   callSid: string
   callerNumber: string
-  volunteers: Array<{ pubkey: string; phone: string }>
+  /**
+   * CRIT-W2: callToken replaces pubkey in callback URLs.
+   * Each volunteer gets a unique opaque single-use token that is resolved to their pubkey server-side.
+   */
+  volunteers: Array<{ phone: string; callToken: string }>
   callbackUrl: string
-  /** Hub ID for multi-hub routing — appended to callback URLs as ?hub= */
+  /**
+   * Hub ID — no longer embedded in callback URLs as ?hub= (CRIT-W1).
+   * Retained for adapter internals (e.g. Asterisk bridge selection).
+   */
   hubId?: string
 }
 

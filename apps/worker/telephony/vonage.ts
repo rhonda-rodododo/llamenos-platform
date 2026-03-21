@@ -224,7 +224,7 @@ export class VonageAdapter implements TelephonyAdapter {
   }
 
   async handleCallAnswered(params: CallAnsweredParams): Promise<TelephonyResponse> {
-    const hp = hubQP(params.hubId)
+    // CRIT-W1: Hub and pubkey resolved from DB in /call-recording — no URL params needed
     return this.ncco([
       {
         action: 'conversation',
@@ -232,7 +232,7 @@ export class VonageAdapter implements TelephonyAdapter {
         startOnEnter: true,
         endOnExit: true,
         record: true,
-        eventUrl: [`${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&pubkey=${params.userPubkey}${hp}`],
+        eventUrl: [`${params.callbackUrl}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}`],
         eventMethod: 'POST',
       },
     ])
@@ -286,16 +286,17 @@ export class VonageAdapter implements TelephonyAdapter {
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const callSids: string[] = []
-    const hubParam = params.hubId ? `&hub=${encodeURIComponent(params.hubId)}` : ''
 
     const calls = await Promise.allSettled(
       params.volunteers.map(async (vol) => {
+        // CRIT-W2: Use opaque callToken instead of raw pubkey in callback URLs
+        // CRIT-W1: No ?hub= param — hub resolved from DB server-side
         const body = {
           to: [{ type: 'phone', number: vol.phone.replace('+', '') }],
           from: { type: 'phone', number: this.phoneNumber.replace('+', '') },
-          answer_url: [`${params.callbackUrl}/api/telephony/user-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`],
+          answer_url: [`${params.callbackUrl}/api/telephony/user-answer?callToken=${encodeURIComponent(vol.callToken)}`],
           answer_method: 'POST',
-          event_url: [`${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`],
+          event_url: [`${params.callbackUrl}/api/telephony/call-status?callToken=${encodeURIComponent(vol.callToken)}`],
           event_method: 'POST',
           ringing_timer: 30,
           machine_detection: 'hangup',
@@ -310,7 +311,7 @@ export class VonageAdapter implements TelephonyAdapter {
           const data = await res.json() as { uuid: string }
           return data.uuid
         }
-        throw new Error(`Failed to call ${vol.pubkey}`)
+        throw new Error(`Failed to call volunteer`)
       })
     )
 

@@ -203,9 +203,9 @@ export class PlivoAdapter implements TelephonyAdapter {
   }
 
   async handleCallAnswered(params: CallAnsweredParams): Promise<TelephonyResponse> {
-    const hp = hubXmlParam(params.hubId)
+    // CRIT-W1: Hub and pubkey resolved from DB in /call-recording — no URL params needed
     return this.plivoXml(`
-      <Conference record="true" recordFileFormat="mp3" callbackUrl="${escapeXml(params.callbackUrl)}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}&amp;pubkey=${params.userPubkey}${hp}" callbackMethod="POST" startConferenceOnEnter="true" endConferenceOnExit="true">${params.parentCallSid}</Conference>
+      <Conference record="true" recordFileFormat="mp3" callbackUrl="${escapeXml(params.callbackUrl)}/api/telephony/call-recording?parentCallSid=${params.parentCallSid}" callbackMethod="POST" startConferenceOnEnter="true" endConferenceOnExit="true">${params.parentCallSid}</Conference>
     `)
   }
 
@@ -245,18 +245,19 @@ export class PlivoAdapter implements TelephonyAdapter {
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const callSids: string[] = []
-    const hubParam = params.hubId ? `&hub=${encodeURIComponent(params.hubId)}` : ''
 
     const calls = await Promise.allSettled(
       params.volunteers.map(async (vol) => {
+        // CRIT-W2: Use opaque callToken instead of raw pubkey in callback URLs
+        // CRIT-W1: No ?hub= param — hub resolved from DB server-side
         const body = {
           from: this.phoneNumber,
           to: vol.phone,
-          answer_url: `${params.callbackUrl}/api/telephony/user-answer?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
+          answer_url: `${params.callbackUrl}/api/telephony/user-answer?callToken=${encodeURIComponent(vol.callToken)}`,
           answer_method: 'POST',
-          hangup_url: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
+          hangup_url: `${params.callbackUrl}/api/telephony/call-status?callToken=${encodeURIComponent(vol.callToken)}`,
           hangup_method: 'POST',
-          ring_url: `${params.callbackUrl}/api/telephony/call-status?parentCallSid=${params.callSid}&pubkey=${vol.pubkey}${hubParam}`,
+          ring_url: `${params.callbackUrl}/api/telephony/call-status?callToken=${encodeURIComponent(vol.callToken)}`,
           ring_method: 'POST',
           ring_timeout: 30,
           machine_detection: 'hangup',
@@ -271,7 +272,7 @@ export class PlivoAdapter implements TelephonyAdapter {
           const data = await res.json() as { request_uuid: string }
           return data.request_uuid
         }
-        throw new Error(`Failed to call ${vol.pubkey}`)
+        throw new Error(`Failed to call volunteer`)
       })
     )
 

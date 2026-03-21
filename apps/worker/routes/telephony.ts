@@ -187,11 +187,18 @@ telephony.post('/captcha', async (c) => {
 // --- Step 4: User answered -> bridge via queue ---
 telephony.post('/user-answer', async (c) => {
   const url = new URL(c.req.url)
-  const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
-  const adapter = (await getHubAdapter(c.env, services, hubId))!
-  const parentCallSid = url.searchParams.get('parentCallSid') || ''
-  const pubkey = url.searchParams.get('pubkey') || ''
+
+  // CRIT-W2: Resolve volunteer pubkey from opaque call token (delete-on-read for single-use guarantee)
+  // CRIT-W1: Hub resolved from DB call record via token, not from URL param
+  const callToken = url.searchParams.get('callToken') || ''
+  const tokenData = callToken ? await services.calls.resolveCallToken(callToken) : null
+  if (!tokenData) {
+    logger.warn('user-answer: invalid or expired call token', { callToken: callToken.slice(0, 8) })
+    return new Response('Forbidden', { status: 403 })
+  }
+  const { callSid: parentCallSid, volunteerPubkey: pubkey, hubId } = tokenData
+  const adapter = (await getHubAdapter(c.env, services, hubId || undefined))!
 
   await services.calls.answerCall(hubId ?? '', parentCallSid, pubkey)
 
@@ -207,11 +214,11 @@ telephony.post('/user-answer', async (c) => {
     callId: parentCallSid,
   }).catch((e) => { console.error('[telephony] Failed to publish presence update:', e) })
 
-  const [volInfo, activeCalls] = await Promise.all([
+  const [, activeCallsForAnswer] = await Promise.all([
     services.identity.getUser(pubkey).catch(() => ({} as { name?: string })),
     services.calls.getActiveCalls(hubId ?? ''),
   ])
-  const callRecord = activeCalls.find(call => call.callId === parentCallSid)
+  const callRecord = activeCallsForAnswer.find(call => call.callId === parentCallSid)
   await audit(services.audit, 'callAnswered', pubkey, {
     callerLast4: callRecord?.callerLast4 || '',
   })
@@ -224,16 +231,21 @@ telephony.post('/user-answer', async (c) => {
 // --- Step 5: Call status callback ---
 telephony.post('/call-status', async (c) => {
   const url = new URL(c.req.url)
-  const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
+
+  // CRIT-W2: Resolve volunteer pubkey from opaque call token (may already be consumed by /user-answer)
+  // CRIT-W1: Hub resolved from DB call record, not from URL param
+  const callToken = url.searchParams.get('callToken') || ''
+  const tokenData = callToken ? await services.calls.resolveCallToken(callToken) : null
+  const parentCallSid = tokenData?.callSid || url.searchParams.get('parentCallSid') || ''
+  const pubkey = tokenData?.volunteerPubkey || ''
+  const hubId = tokenData?.hubId || (await services.calls.getHubIdForCall(parentCallSid)) || undefined
   const adapter = (await getHubAdapter(c.env, services, hubId))!
   const { status: callStatus } = await adapter.parseCallStatusWebhook(c.req.raw)
-  const parentCallSid = url.searchParams.get('parentCallSid') || ''
 
   logger.info('Call status update', { status: callStatus, parentCallSid, hubId: hubId || 'global' })
 
   if (callStatus === 'completed' || callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed') {
-    const pubkey = url.searchParams.get('pubkey') || ''
     if (callStatus === 'completed') {
       const preCalls = await services.calls.getActiveCalls(hubId ?? '')
       const preCall = preCalls.find(call => call.callId === parentCallSid)
@@ -331,17 +343,20 @@ telephony.post('/voicemail-complete', async (c) => {
 // --- Step 9: Call recording status callback (bridged call recording) ---
 telephony.post('/call-recording', async (c) => {
   const url = new URL(c.req.url)
-  const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
+
+  // CRIT-W1: Hub resolved from DB call record, not from URL param
+  // CRIT-W2: Pubkey resolved from active call record (answeredBy), not URL param
+  const parentCallSid = url.searchParams.get('parentCallSid') || ''
+  const hubId = (await services.calls.getHubIdForCall(parentCallSid)) || undefined
   const adapter = (await getHubAdapter(c.env, services, hubId))!
   const { status: recordingStatus, recordingSid } = await adapter.parseRecordingWebhook(c.req.raw)
-  const parentCallSid = url.searchParams.get('parentCallSid') || ''
-  const pubkey = url.searchParams.get('pubkey') || ''
 
   if (recordingStatus === 'completed' && parentCallSid) {
-    // Get call info before ending (for audit)
-    const activeCalls = await services.calls.getActiveCalls(hubId ?? '')
-    const callRecord = activeCalls.find(call => call.callId === parentCallSid)
+    // Get call info before ending (for audit); also resolves pubkey via answeredBy
+    const activeCallsList = await services.calls.getActiveCalls(hubId ?? '')
+    const callRecord = activeCallsList.find(call => call.callId === parentCallSid)
+    const pubkey = callRecord?.answeredBy ?? ''
 
     // Recording completed means the bridge ended — end the call
     // (safety net in case /call-status doesn't fire)
