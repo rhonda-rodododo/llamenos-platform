@@ -86,7 +86,8 @@ When('the admin creates a shift including the volunteer', async ({ request, worl
 
 When('an incoming call arrives', async ({ request, world }) => {
   const caller = uniqueCallerNumber()
-  const result = await simulateIncomingCall(request, { callerNumber: caller })
+  const hubId = getScenarioState(world).hubId
+  const result = await simulateIncomingCall(request, { callerNumber: caller, hubId })
   getCrossDoState(world).callId = result.callId
   getCrossDoState(world).callStatus = result.status
 })

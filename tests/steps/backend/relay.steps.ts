@@ -70,14 +70,14 @@ After(async ({ world }) => {
 When('an incoming call arrives from a unique number', async ({ request, world }) => {
   const state = getScenarioState(world)
   const caller = uniqueCallerNumber()
-  const result = await simulateIncomingCall(request, { callerNumber: caller })
+  const result = await simulateIncomingCall(request, { callerNumber: caller, hubId: state.hubId })
   state.callId = result.callId
 })
 
 Given('an incoming call is ringing', async ({ request, world }) => {
   const state = getScenarioState(world)
   const caller = uniqueCallerNumber()
-  const result = await simulateIncomingCall(request, { callerNumber: caller })
+  const result = await simulateIncomingCall(request, { callerNumber: caller, hubId: state.hubId })
   state.callId = result.callId
 })
 
