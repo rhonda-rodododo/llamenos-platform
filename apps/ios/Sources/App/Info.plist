@@ -22,24 +22,5 @@
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>llamenos</string>
-			</array>
-			<key>CFBundleURLName</key>
-			<string>org.llamenos.hotline</string>
-		</dict>
-	</array>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Llamenos uses the microphone for voice-to-text input when filling out report fields.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Llamenos uses speech recognition to transcribe voice input into report fields.</string>
 </dict>
 </plist>

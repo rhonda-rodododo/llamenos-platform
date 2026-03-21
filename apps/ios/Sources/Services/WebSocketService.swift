@@ -52,6 +52,21 @@ struct NostrEvent: Codable, Sendable, Identifiable {
     }
 }
 
+// MARK: - AttributedHubEvent
+
+/// A decoded event paired with the hub ID whose key successfully decrypted it.
+///
+/// `WebSocketService` tries all loaded hub keys for each incoming event. The first
+/// key that decrypts successfully identifies the source hub. Downstream consumers
+/// (e.g. `HubActivityService`) use `hubId` to route the event to the correct hub's
+/// data model without maintaining their own connection-identity bookkeeping.
+struct AttributedHubEvent: Sendable {
+    /// The UUID of the hub whose key decrypted this event.
+    let hubId: String
+    /// The hub event type decoded from the decrypted event content.
+    let event: HubEventType
+}
+
 // MARK: - HubEventType
 
 /// Known hub event types parsed from decrypted event content's `type` field.
@@ -63,6 +78,8 @@ enum HubEventType: String, Sendable {
     case callAnswered = "call:answered"
     case callUpdate = "call:update"
     case callEnded = "call:ended"
+    case shiftStarted = "shift:started"
+    case shiftEnded = "shift:ended"
     case shiftUpdate = "shift:update"
     case noteCreated = "note:created"
     case voicemailNew = "voicemail:new"
@@ -84,7 +101,7 @@ enum HubEventType: String, Sendable {
 ///
 /// Usage:
 /// ```swift
-/// let ws = WebSocketService()
+/// let ws = WebSocketService(cryptoService: cryptoService)
 /// await ws.connect(to: "wss://hub.example.org/relay")
 /// for await event in ws.events {
 ///     handleEvent(event)
@@ -101,9 +118,10 @@ final class WebSocketService: @unchecked Sendable {
     /// Count of events received since last connect (for diagnostics).
     private(set) var eventCount: Int = 0
 
-    /// Server event encryption key (hex), set after authentication.
-    /// Used to decrypt XChaCha20-Poly1305-encrypted event content from the relay.
-    var serverEventKeyHex: String?
+    // MARK: - Dependencies
+
+    /// CryptoService provides the hub key cache for multi-hub event attribution.
+    private let cryptoService: CryptoService
 
     // MARK: - Event Streams
 
@@ -122,9 +140,10 @@ final class WebSocketService: @unchecked Sendable {
         }
     }
 
-    /// Public async stream of decrypted, typed hub events.
-    /// Only emits events that were successfully decrypted and parsed.
-    var typedEvents: AsyncStream<HubEventType> {
+    /// Public async stream of decrypted, hub-attributed typed events.
+    /// Only emits events that were successfully decrypted by one of the loaded hub keys.
+    /// The `hubId` on each `AttributedHubEvent` identifies which hub's key decrypted it.
+    var attributedEvents: AsyncStream<AttributedHubEvent> {
         AsyncStream { continuation in
             let id = UUID()
             typedContinuationsLock.lock()
@@ -154,7 +173,7 @@ final class WebSocketService: @unchecked Sendable {
     private let continuationsLock = NSLock()
 
     /// Thread-safe storage for typed event stream continuations.
-    private var typedContinuations: [UUID: AsyncStream<HubEventType>.Continuation] = [:]
+    private var typedContinuations: [UUID: AsyncStream<AttributedHubEvent>.Continuation] = [:]
     private let typedContinuationsLock = NSLock()
 
     /// Maximum reconnection attempts before giving up.
@@ -168,7 +187,8 @@ final class WebSocketService: @unchecked Sendable {
 
     // MARK: - Initialization
 
-    init() {
+    init(cryptoService: CryptoService) {
+        self.cryptoService = cryptoService
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = true
         self.session = URLSession(configuration: config)
@@ -310,39 +330,65 @@ final class WebSocketService: @unchecked Sendable {
     }
 
     /// Broadcast an event to all active continuations (raw + typed).
-    private func emitEvent(_ event: NostrEvent) {
+    /// `internal` (not `private`) so unit tests can inject synthetic events via `@testable import`.
+    func emitEvent(_ event: NostrEvent) {
         eventCount += 1
 
         // Emit raw event
         continuationsLock.lock()
-        let activeContinuations = continuations.values
+        let activeContinuations = Array(continuations.values)
         continuationsLock.unlock()
         for continuation in activeContinuations {
             continuation.yield(event)
         }
 
-        // Decrypt and emit typed event
-        if let json = decryptEventContent(event.content),
-           let eventType = parseTypedContent(json) {
+        // Try all loaded hub keys to decrypt the event. The first key that succeeds
+        // identifies the source hub. Events that no key can decrypt are silently dropped
+        // from the attributed stream — raw events are still delivered above.
+        if let attributed = decryptEvent(event.content) {
             typedContinuationsLock.lock()
-            let activeTyped = typedContinuations.values
+            let activeTyped = Array(typedContinuations.values)
             typedContinuationsLock.unlock()
             for continuation in activeTyped {
-                continuation.yield(eventType)
+                continuation.yield(attributed)
             }
         }
     }
 
-    // MARK: - Event Decryption & Parsing
+    // MARK: - Event Decryption & Attribution
 
-    /// Decrypt event content using the server event key.
-    private func decryptEventContent(_ encryptedHex: String) -> String? {
-        guard let keyHex = serverEventKeyHex else { return nil }
-        return CryptoService.decryptServerEvent(encryptedHex: encryptedHex, keyHex: keyHex)
+    #if DEBUG
+    /// Overridable decryption closure for unit testing.
+    /// Defaults to the real `CryptoService.decryptServerEvent`.
+    /// Tests may inject a mock that returns predetermined plaintext for a known key.
+    var decryptionHandler: (String, String) -> String? = { encryptedHex, keyHex in
+        CryptoService.decryptServerEvent(encryptedHex: encryptedHex, keyHex: keyHex)
+    }
+    #endif
+
+    /// Tries all loaded hub keys and returns an `AttributedHubEvent` for the first key
+    /// that successfully decrypts the event content. Returns `nil` if no key matches.
+    ///
+    /// This is the core of multi-hub support: the hub whose key decrypts the event
+    /// is identified as the source hub, without requiring a separate per-hub connection.
+    internal func decryptEvent(_ encryptedContent: String) -> AttributedHubEvent? {
+        let hubKeys = cryptoService.allHubKeys()
+        for (hubId, keyHex) in hubKeys {
+            let json: String?
+            #if DEBUG
+            json = decryptionHandler(encryptedContent, keyHex)
+            #else
+            json = CryptoService.decryptServerEvent(encryptedHex: encryptedContent, keyHex: keyHex)
+            #endif
+            if let json, let eventType = parseHubEvent(json) {
+                return AttributedHubEvent(hubId: hubId, event: eventType)
+            }
+        }
+        return nil
     }
 
-    /// Parse decrypted JSON content into a HubEventType.
-    private func parseTypedContent(_ json: String) -> HubEventType? {
+    /// Parse decrypted JSON content into a `HubEventType` using the `type` field.
+    private func parseHubEvent(_ json: String) -> HubEventType? {
         guard let data = json.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = obj["type"] as? String else { return nil }

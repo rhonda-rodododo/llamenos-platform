@@ -159,6 +159,7 @@ struct ConversationsView: View {
             apiService: appState.apiService,
             cryptoService: appState.cryptoService,
             webSocketService: appState.webSocketService,
+            hubContext: hubContext,
             adminPubkeys: [appState.adminDecryptionPubkey].compactMap { $0 }
         )
         DispatchQueue.main.async {

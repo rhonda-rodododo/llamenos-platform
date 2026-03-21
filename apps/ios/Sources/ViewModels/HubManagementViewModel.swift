@@ -50,12 +50,38 @@ final class HubManagementViewModel {
             )
             hubs = response.hubs
 
+            // Eager-load hub keys for all hubs in parallel.
+            // Errors from individual key fetches are logged but do not fail the overall load.
+            await eagerLoadHubKeys(for: hubs)
+
             // If no active hub is set and there are hubs, select the first one
             if hubContext.activeHubId == nil, let first = hubs.first {
                 await switchHub(to: first)
             }
         } catch {
             self.error = error
+        }
+    }
+
+    // MARK: - Eager Hub Key Loading
+
+    /// Pre-fetch and cache hub keys for all hubs in the background.
+    /// Runs fetches in parallel; individual failures are logged and skipped.
+    func eagerLoadHubKeys(for hubs: [Hub]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for hub in hubs {
+                guard !cryptoService.hasHubKey(hubId: hub.id) else { continue }
+                group.addTask {
+                    do {
+                        let envelope = try await self.apiService.getHubKey(hub.id)
+                        try self.cryptoService.loadHubKey(hubId: hub.id, envelope: envelope)
+                    } catch {
+                        // Individual key fetch errors do not propagate — log and continue
+                        // so that the hub list remains usable even if some keys fail.
+                        print("[HubManagementViewModel] Failed to eager-load key for hub \(hub.id): \(error)")
+                    }
+                }
+            }
         }
     }
 

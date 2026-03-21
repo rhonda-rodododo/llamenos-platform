@@ -347,6 +347,11 @@ final class CryptoService: @unchecked Sendable {
     /// Uses eciesUnwrapKeyHex with the CryptoLabels.LABEL_HUB_KEY_WRAP domain separation label.
     /// Requires the user's nsec to be loaded (app unlocked).
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws {
+        hubKeyCacheLock.lock()
+        let alreadyCached = hubKeyCache[hubId] != nil
+        hubKeyCacheLock.unlock()
+        guard !alreadyCached else { return }
+
         guard let nsecHex else { throw CryptoServiceError.noKeyLoaded }
         let ffiEnvelope = KeyEnvelope(
             wrappedKey: envelope.envelope.wrappedKey,
@@ -379,6 +384,15 @@ final class CryptoService: @unchecked Sendable {
         nsecHex = nil
         nsecBech32 = nil
         clearHubKeys()
+    }
+
+    /// Store a server event encryption key directly for a hub (no ECIES unwrapping needed —
+    /// the key is provided in plaintext by `GET /api/auth/me` as `serverEventKeyHex`).
+    /// This is distinct from `loadHubKey(hubId:envelope:)` which unwraps hub membership keys.
+    func storeServerEventKey(hubId: String, keyHex: String) {
+        hubKeyCacheLock.lock()
+        defer { hubKeyCacheLock.unlock() }
+        hubKeyCache[hubId] = keyHex
     }
 
     // MARK: - Test Support

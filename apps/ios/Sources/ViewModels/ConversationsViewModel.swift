@@ -10,6 +10,7 @@ final class ConversationsViewModel {
     private let apiService: APIService
     private let cryptoService: CryptoService
     private let webSocketService: WebSocketService
+    private let hubContext: HubContext
     private let adminPubkeys: [String]
 
     // MARK: - Public State
@@ -57,10 +58,11 @@ final class ConversationsViewModel {
 
     // MARK: - Initialization
 
-    init(apiService: APIService, cryptoService: CryptoService, webSocketService: WebSocketService, adminPubkeys: [String] = []) {
+    init(apiService: APIService, cryptoService: CryptoService, webSocketService: WebSocketService, hubContext: HubContext, adminPubkeys: [String] = []) {
         self.apiService = apiService
         self.cryptoService = cryptoService
         self.webSocketService = webSocketService
+        self.hubContext = hubContext
         self.adminPubkeys = adminPubkeys
     }
 
@@ -215,9 +217,10 @@ final class ConversationsViewModel {
         eventTask?.cancel()
         eventTask = Task { [weak self] in
             guard let self else { return }
-            for await eventType in self.webSocketService.typedEvents {
+            for await attributed in self.webSocketService.attributedEvents {
                 guard !Task.isCancelled else { break }
-                await self.handleTypedEvent(eventType)
+                guard attributed.hubId == self.hubContext.activeHubId else { continue }
+                await self.handleTypedEvent(attributed.event)
             }
         }
     }
@@ -243,7 +246,7 @@ final class ConversationsViewModel {
             if let id = currentConversationId {
                 Task { await loadMessages(for: id) }
             }
-        case .callRing, .callAnswered, .callUpdate, .callEnded, .voicemailNew, .presenceSummary, .presenceDetail, .shiftUpdate, .noteCreated, .unknown:
+        case .callRing, .callAnswered, .callUpdate, .callEnded, .voicemailNew, .presenceSummary, .presenceDetail, .shiftStarted, .shiftEnded, .shiftUpdate, .noteCreated, .unknown:
             // Not conversation-related — ignore
             break
         }

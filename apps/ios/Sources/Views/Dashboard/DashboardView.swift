@@ -456,7 +456,8 @@ struct DashboardView: View {
         let vm = DashboardViewModel(
             apiService: appState.apiService,
             cryptoService: appState.cryptoService,
-            webSocketService: appState.webSocketService
+            webSocketService: appState.webSocketService,
+            hubContext: hubContext
         )
         DispatchQueue.main.async {
             self.viewModel = vm

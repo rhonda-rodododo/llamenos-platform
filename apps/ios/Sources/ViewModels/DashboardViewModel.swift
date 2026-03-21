@@ -40,6 +40,7 @@ final class DashboardViewModel {
     private let apiService: APIService
     private let cryptoService: CryptoService
     private let webSocketService: WebSocketService
+    private let hubContext: HubContext
 
     /// Current shift status.
     var shiftStatus: ShiftStatus = .offShift
@@ -85,10 +86,11 @@ final class DashboardViewModel {
     private var eventTask: Task<Void, Never>?
     private var timerTask: Task<Void, Never>?
 
-    init(apiService: APIService, cryptoService: CryptoService, webSocketService: WebSocketService) {
+    init(apiService: APIService, cryptoService: CryptoService, webSocketService: WebSocketService, hubContext: HubContext) {
         self.apiService = apiService
         self.cryptoService = cryptoService
         self.webSocketService = webSocketService
+        self.hubContext = hubContext
     }
 
     // MARK: - Data Loading
@@ -124,9 +126,10 @@ final class DashboardViewModel {
         eventTask?.cancel()
         eventTask = Task { [weak self] in
             guard let self else { return }
-            for await eventType in self.webSocketService.typedEvents {
+            for await attributed in self.webSocketService.attributedEvents {
                 guard !Task.isCancelled else { break }
-                await self.handleTypedEvent(eventType)
+                guard attributed.hubId == self.hubContext.activeHubId else { continue }
+                await self.handleTypedEvent(attributed.event)
             }
         }
     }
@@ -152,7 +155,7 @@ final class DashboardViewModel {
             // Call ended — clear active call immediately, then refresh
             currentCall = nil
             Task { await fetchShiftStatus() }
-        case .shiftUpdate:
+        case .shiftStarted, .shiftEnded, .shiftUpdate:
             Task { await fetchShiftStatus() }
         case .noteCreated:
             Task { await fetchRecentNotes() }
