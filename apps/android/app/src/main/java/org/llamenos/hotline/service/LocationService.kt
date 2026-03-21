@@ -9,6 +9,8 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.serialization.Serializable
 import org.llamenos.hotline.api.ApiService
 import javax.inject.Inject
@@ -78,7 +80,7 @@ class LocationService @Inject constructor(
             cont.invokeOnCancellation { cts.cancel() }
             fusedClient.getCurrentLocation(priority, cts.token)
                 .addOnSuccessListener { loc ->
-                    if (loc != null) cont.resume(loc, null)
+                    if (loc != null) cont.resume(loc)
                     else cont.resumeWithException(LocationError.NoResult)
                 }
                 .addOnFailureListener { e -> cont.resumeWithException(e) }
