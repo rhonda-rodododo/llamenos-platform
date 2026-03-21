@@ -4,10 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useConfig } from '@/lib/config'
 import { validateInvite, redeemInvite } from '@/lib/api'
-import { generateKeyPair } from '@/lib/platform'
+import { generateKeypairAndLoad, generateBackupFromState, createAuthToken, type GenerateAndLoadResult } from '@/lib/platform'
 import { isValidPin } from '@/lib/key-manager'
-import * as keyManager from '@/lib/key-manager'
-import { createBackup, generateRecoveryKey, downloadBackupFile } from '@/lib/backup'
+import { generateRecoveryKey, downloadBackupFile } from '@/lib/backup'
 import { useToast } from '@/lib/toast'
 import { setLanguage } from '@/lib/i18n'
 import { LANGUAGES } from '@shared/languages'
@@ -25,7 +24,7 @@ type Step = 'loading' | 'error' | 'welcome' | 'pin' | 'keypair' | 'backup' | 'do
 
 function OnboardingPage() {
   const { t, i18n } = useTranslation()
-  const { signIn } = useAuth()
+  const { loginAfterKeyLoaded } = useAuth()
   const { hotlineName } = useConfig()
   const { toast } = useToast()
   const navigate = useNavigate()
@@ -45,9 +44,8 @@ function OnboardingPage() {
   const [pinStep, setPinStep] = useState<'create' | 'confirm'>('create')
   const [pinError, setPinError] = useState('')
 
-  // Keypair state (nsec never displayed to user)
-  const [nsec, setNsec] = useState('')
-  const [pubkey, setPubkey] = useState('')
+  // Keypair result (no nsec in JS state — it lives in Rust/WASM CryptoState)
+  const [genResult, setGenResult] = useState<GenerateAndLoadResult | null>(null)
 
   // Recovery key & backup
   const [recoveryKeyStr, setRecoveryKeyStr] = useState('')
@@ -132,13 +130,15 @@ function OnboardingPage() {
   async function generateKeypairAndRedeem(pin: string) {
     setStep('keypair')
     try {
-      const kp = await generateKeyPair()
-      setNsec(kp.nsec)
-      setPubkey(kp.publicKey)
+      // Generate keypair atomically — nsec goes directly into Rust/WASM CryptoState, never into JS
+      const result = await generateKeypairAndLoad(pin)
+      setGenResult(result)
       setConfirmedPin(pin)
 
-      // Redeem invite on server (with Schnorr signature proving key ownership)
-      await redeemInvite(inviteCode, kp.publicKey, kp.secretKeyHex)
+      // Prove key ownership: sign redeem request using CryptoState (nsec stays in Rust/WASM)
+      const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/invites/redeem')
+      const parsed = JSON.parse(tokenJson) as { timestamp: number; token: string }
+      await redeemInvite(inviteCode, result.publicKey, parsed.timestamp, parsed.token)
 
       // Generate recovery key (shown to user instead of nsec)
       const rk = generateRecoveryKey()
@@ -152,17 +152,21 @@ function OnboardingPage() {
   }
 
   async function downloadBackup() {
-    const backup = await createBackup(nsec, confirmedPin, pubkey, recoveryKeyStr)
+    if (!genResult) return
+    // Backup created entirely in Rust — nsec never enters JS
+    const backupJson = await generateBackupFromState(genResult.publicKey, confirmedPin, recoveryKeyStr)
+    const backup = JSON.parse(backupJson) as Parameters<typeof downloadBackupFile>[0]
     downloadBackupFile(backup)
     setBackupDownloaded(true)
     toast(t('onboarding.backupDownloaded'), 'success')
   }
 
   async function handleComplete() {
+    if (!genResult) return
     try {
-      // Import key via key manager (encrypts with PIN and loads into memory)
-      await keyManager.importKey(nsec, confirmedPin)
-      await signIn(nsec)
+      // Key is already in CryptoState (loaded by generateKeypairAndLoad).
+      // Use loginAfterKeyLoaded — do NOT call signIn() which would double-import the key.
+      await loginAfterKeyLoaded(genResult.publicKey)
       navigate({ to: '/profile-setup' })
     } catch {
       toast(t('common.error'), 'error')

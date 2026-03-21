@@ -193,9 +193,9 @@ export async function loginAsAdmin(page: Page) {
   // crypto implementation (browser-side @noble/ciphers).
   await page.evaluate(async ({ nsec, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const kp = await platform.keyPairFromNsec(nsec)
-    if (!kp) throw new Error('Failed to parse admin nsec')
-    await platform.encryptWithPin(nsec, pin, kp.publicKey)
+    const publicKey = await platform.pubkeyFromNsec(nsec)
+    if (!publicKey) throw new Error('Failed to parse admin nsec')
+    await platform.encryptWithPin(nsec, pin, publicKey)
     await platform.lockCrypto()
   }, { nsec: ADMIN_NSEC, pin: TEST_PIN })
 
@@ -234,9 +234,9 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   // Encrypt and store via the browser's platform layer (same context as decrypt)
   await page.evaluate(async ({ nsec, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const kp = await platform.keyPairFromNsec(nsec)
-    if (!kp) throw new Error('Failed to parse user nsec')
-    await platform.encryptWithPin(nsec, pin, kp.publicKey)
+    const publicKey = await platform.pubkeyFromNsec(nsec)
+    if (!publicKey) throw new Error('Failed to parse user nsec')
+    await platform.encryptWithPin(nsec, pin, publicKey)
     await platform.lockCrypto()
   }, { nsec, pin: TEST_PIN })
 

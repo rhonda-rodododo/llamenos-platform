@@ -15,7 +15,7 @@ import {
   lockCrypto,
   encryptWithPin,
   clearStoredKey as platformClearStoredKey,
-  keyPairFromNsec,
+  pubkeyFromNsec,
   hasStoredKey as platformHasStoredKey,
 } from './platform'
 
@@ -123,17 +123,17 @@ export function lock() {
  * Import a key (onboarding / recovery): encrypt and store, then load into CryptoState.
  */
 export async function importKey(nsec: string, pin: string): Promise<string> {
-  const kp = await keyPairFromNsec(nsec)
-  if (!kp) throw new Error('Invalid nsec')
+  const pubkeyHex = await pubkeyFromNsec(nsec)
+  if (!pubkeyHex) throw new Error('Invalid nsec')
 
   // encryptWithPin calls import_key_to_state — encrypts + loads into CryptoState
-  await encryptWithPin(nsec, pin, kp.publicKey)
+  await encryptWithPin(nsec, pin, pubkeyHex)
 
-  publicKey = kp.publicKey
+  publicKey = pubkeyHex
   unlocked = true
   resetIdleTimer()
   unlockCallbacks.forEach(cb => cb())
-  return kp.publicKey
+  return pubkeyHex
 }
 
 /**

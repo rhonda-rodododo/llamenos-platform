@@ -707,23 +707,20 @@ export async function validateInvite(code: string) {
   }
 }
 
-export async function redeemInvite(code: string, pubkey: string, secretKeyHex?: string) {
-  // Include Schnorr signature to prove key possession
-  let authFields = {}
-  if (secretKeyHex) {
-    const { createAuthTokenStateless } = await import('./platform')
-    const timestamp = Date.now()
-    const tokenJson = await createAuthTokenStateless(secretKeyHex, timestamp, 'POST', '/api/invites/redeem')
-    const parsed = JSON.parse(tokenJson)
-    authFields = { timestamp: parsed.timestamp, token: parsed.token }
-  }
+export async function redeemInvite(
+  code: string,
+  pubkey: string,
+  timestamp: number,
+  token: string,
+) {
+  // Auth fields are pre-computed by the caller via createAuthToken (stateful — nsec stays in Rust)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     const res = await fetch(`${API_BASE}/invites/redeem`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, pubkey, ...authFields }),
+      body: JSON.stringify({ code, pubkey, timestamp, token }),
       signal: controller.signal,
     })
     if (!res.ok) {

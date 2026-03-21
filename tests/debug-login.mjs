@@ -29,11 +29,11 @@ if (hasPlatform) {
   try {
     const result = await page.evaluate(async ({ nsec, pin }) => {
       const platform = window.__TEST_PLATFORM;
-      const kp = await platform.keyPairFromNsec(nsec);
-      if (!kp) return 'FAILED: keyPairFromNsec returned null';
-      await platform.encryptWithPin(nsec, pin, kp.publicKey);
+      const publicKey = await platform.pubkeyFromNsec(nsec);
+      if (!publicKey) return 'FAILED: pubkeyFromNsec returned null';
+      await platform.encryptWithPin(nsec, pin, publicKey);
       await platform.lockCrypto();
-      return 'OK: ' + kp.publicKey;
+      return 'OK: ' + publicKey;
     }, {
       nsec: 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh',
       pin: '123456'

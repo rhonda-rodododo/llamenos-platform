@@ -13,14 +13,15 @@ import { Given, When, Then } from '../fixtures'
 import { enterPin, Timeouts } from '../../helpers'
 
 /**
- * Invoke a Tauri IPC mock command via the browser's window.__TEST_INVOKE.
- * This avoids the dynamic import('@tauri-apps/api/core') issue in page.evaluate.
+ * Invoke a Tauri IPC mock command via the browser's Symbol-keyed window entry.
+ * Uses Symbol.for('llamenos_test_invoke') which is accessible across VM contexts.
  */
 async function testInvoke(page: import('@playwright/test').Page, cmd: string, args?: Record<string, unknown>) {
   return page.evaluate(async ({ cmd, args }) => {
-    const invoke = (window as Record<string, unknown>).__TEST_INVOKE as
-      (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
-    if (!invoke) throw new Error('__TEST_INVOKE not available — is the Tauri mock loaded?')
+    const sym = Symbol.for('llamenos_test_invoke')
+    const invoke = (window as Record<symbol, unknown>)[sym] as
+      ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | undefined
+    if (!invoke) throw new Error('llamenos_test_invoke not available — is the Tauri mock loaded?')
     return invoke(cmd, args)
   }, { cmd, args })
 }
@@ -41,7 +42,7 @@ Then('I should not see a lockout timer', async ({ page }) => {
 
 Given('I have {int} failed PIN attempts', async ({ page }, count: number) => {
   // Seed the mock with N failed attempts
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_INVOKE, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')], { timeout: 10000 })
   await seedFailedAttempts(page, count)
 })
 

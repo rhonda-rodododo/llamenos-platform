@@ -15,7 +15,7 @@ import {
   type InviteCode,
   type RoleDefinition,
 } from '@/lib/api'
-import { generateKeyPair } from '@/lib/platform'
+import { generateEphemeralKeypair } from '@/lib/platform'
 import { useToast } from '@/lib/toast'
 import { UserPlus, Shield, ShieldCheck, Trash2, Key, Copy, Coffee, Eye, EyeOff, Mail, X } from 'lucide-react'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -365,7 +365,7 @@ function AddUserForm({ roles, onCreated, onCancel }: {
     }
     setSaving(true)
     try {
-      const keyPair = await generateKeyPair()
+      const keyPair = await generateEphemeralKeypair()
       const user = await createUser({ name, phone, roleIds: [roleId], pubkey: keyPair.publicKey })
       onCreated(user, keyPair.nsec)
       toast(t('users.userAdded'), 'success')

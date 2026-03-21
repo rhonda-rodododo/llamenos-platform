@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
-import { keyPairFromNsec, createAuthTokenStateless, hasStoredKey } from './platform'
+import { pubkeyFromNsec, encryptWithPin, createAuthToken, hasStoredKey } from './platform'
 import * as keyManager from './key-manager'
 import { getMe, login, logout as apiLogout, updateMyAvailability, setOnAuthExpired, setOnApiActivity } from './api'
 import { permissionGranted } from '@shared/permissions'
@@ -28,7 +28,8 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  signIn: (nsec: string) => Promise<void>
+  signIn: (nsec: string, pin: string) => Promise<void>
+  loginAfterKeyLoaded: (pubkeyHex: string) => Promise<void>
   signInWithPasskey: () => Promise<void>
   signOut: () => void
   refreshProfile: () => Promise<void>
@@ -205,26 +206,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { mounted = false }
   }, [])
 
-  // Sign in with nsec (import flow — onboarding/recovery only)
-  const signIn = useCallback(async (nsec: string) => {
+  // Sign in with nsec + PIN (import flow — onboarding/recovery only)
+  // The nsec is encrypted with the PIN and loaded into CryptoState; auth token created from state.
+  const signIn = useCallback(async (nsec: string, pin: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }))
-    const keyPair = await keyPairFromNsec(nsec)
-    if (!keyPair) {
+    const pubkeyHex = await pubkeyFromNsec(nsec)
+    if (!pubkeyHex) {
       setState(s => ({ ...s, isLoading: false, error: 'Invalid secret key' }))
       return
     }
     try {
-      // Use stateless auth token (nsec not yet in CryptoState)
-      const tokenJson = await createAuthTokenStateless(
-        keyPair.secretKeyHex, Date.now(), 'POST', '/api/auth/login',
-      )
+      // Load nsec into CryptoState (nsec stays in Rust/WASM — never enters JS from this point)
+      await encryptWithPin(nsec, pin, pubkeyHex)
+      // Create auth token using CryptoState (nsec never leaves Rust)
+      const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/login')
       const parsed = JSON.parse(tokenJson)
-      await login(parsed.pubkey, parsed.timestamp, parsed.token)
+      await login(pubkeyHex, parsed.timestamp, parsed.token)
       const me = await getMe()
       lastApiActivity.current = Date.now()
       setState({
-        isKeyUnlocked: keyManager.isUnlocked(),
-        publicKey: keyPair.publicKey,
+        isKeyUnlocked: true,
+        publicKey: pubkeyHex,
+        roles: me.roles || [],
+        permissions: me.permissions || [],
+        primaryRoleName: me.primaryRole?.name || null,
+        name: me.name,
+        isLoading: false,
+        error: null,
+        transcriptionEnabled: me.transcriptionEnabled,
+        spokenLanguages: me.spokenLanguages || ['en'],
+        uiLanguage: me.uiLanguage || 'en',
+        profileCompleted: me.profileCompleted ?? true,
+        onBreak: me.onBreak ?? false,
+        callPreference: me.callPreference ?? 'phone',
+        adminPubkey: me.adminDecryptionPubkey || '',
+        adminDecryptionPubkey: me.adminDecryptionPubkey || '',
+        serverEventKeyHex: me.serverEventKeyHex ?? null,
+        sessionExpiring: false,
+        sessionExpired: false,
+      })
+    } catch (err) {
+      setState(s => ({
+        ...s,
+        isLoading: false,
+        error: err instanceof Error ? err.message : 'Login failed',
+      }))
+    }
+  }, [])
+
+  // Log in after key is already loaded into CryptoState (post-onboarding / post-bootstrap).
+  // Do NOT call signIn() in this case — it would try to import the key again (double-encrypt).
+  const loginAfterKeyLoaded = useCallback(async (pubkeyHex: string) => {
+    setState(s => ({ ...s, isLoading: true, error: null }))
+    try {
+      const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/login')
+      const parsed = JSON.parse(tokenJson)
+      await login(pubkeyHex, parsed.timestamp, parsed.token)
+      const me = await getMe()
+      lastApiActivity.current = Date.now()
+      setState({
+        isKeyUnlocked: true,
+        publicKey: pubkeyHex,
         roles: me.roles || [],
         permissions: me.permissions || [],
         primaryRoleName: me.primaryRole?.name || null,
@@ -434,6 +476,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     ...state,
     signIn,
+    loginAfterKeyLoaded,
     signInWithPasskey,
     signOut,
     refreshProfile,

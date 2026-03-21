@@ -20,6 +20,7 @@
     "build:docker": "bun run build:server",
     "start:server": "PLATFORM=bun bun --sql-preconnect src/server/index.ts",
     "typecheck": "bunx tsc --noEmit",
+    "check:ipc-allowlist": "bash scripts/check-ipc-allowlist.sh",
     "bootstrap-admin": "bun run scripts/bootstrap-admin.ts",
     "test": "PLAYWRIGHT_TEST=true bunx playwright test",
     "test:build": "PLAYWRIGHT_TEST=true bun run build",

@@ -23,6 +23,22 @@ pub use llamenos_core::ecies::{KeyEnvelope, RecipientKeyEnvelope};
 pub use llamenos_core::encryption::{EncryptedKeyData, EncryptedMessage, EncryptedNote};
 pub use llamenos_core::keys::KeyPair;
 
+/// Public-key-only keypair result — secret key NEVER leaves Rust.
+#[allow(dead_code)] // Kept for potential future use; IPC uses GenerateAndLoadResult
+#[derive(serde::Serialize)]
+pub struct PublicKeyPair {
+    pub public_key: String,
+    pub npub: String,
+}
+
+/// Result of generate_keypair_and_load — includes encrypted key blob for persistence.
+#[derive(serde::Serialize)]
+pub struct GenerateAndLoadResult {
+    pub public_key: String,
+    pub npub: String,
+    pub encrypted_key_data: EncryptedKeyData,
+}
+
 fn err_str(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
@@ -37,6 +53,12 @@ pub struct CryptoState {
     public_key: Mutex<Option<String>>,
     /// One-time provisioning token — consumed on use, prevents concurrent provisioning races.
     provisioning_token: Mutex<Option<String>>,
+    /// PIN attempt counter — stored in Rust memory only (JS cannot tamper via plugin:store|set).
+    /// Resets on process restart, which is acceptable: an attacker who can kill the process
+    /// loses their XSS execution context anyway.
+    pin_failed_attempts: Mutex<u32>,
+    /// PIN lockout expiry — epoch millis. Zero means no lockout.
+    pin_lockout_until: Mutex<u64>,
 }
 
 impl CryptoState {
@@ -45,6 +67,8 @@ impl CryptoState {
             secret_key: Mutex::new(None),
             public_key: Mutex::new(None),
             provisioning_token: Mutex::new(None),
+            pin_failed_attempts: Mutex::new(0),
+            pin_lockout_until: Mutex::new(0),
         }
     }
 
@@ -81,13 +105,17 @@ impl CryptoState {
 /// Decrypt the nsec from PIN-encrypted storage, store in CryptoState.
 /// Returns only the public key — nsec never leaves the Rust process.
 ///
-/// PIN attempt tracking is persisted in the Tauri Store so it survives
-/// page refreshes. Lockout schedule:
+/// PIN attempt tracking is held exclusively in Rust memory (`CryptoState`).
+/// This means JS cannot tamper with the counter via `plugin:store|set`
+/// (HIGH-D3). The counter resets on process restart, which is acceptable:
+/// an attacker who can kill the process loses their XSS execution context.
+///
+/// Lockout schedule:
 ///   1-4 failures: no lockout
 ///   5-6 failures: 30s lockout
 ///   7-8 failures: 2min lockout
 ///   9 failures: 10min lockout
-///   10+ failures: wipe encrypted keys
+///   10+ failures: wipe encrypted keys from store
 #[tauri::command]
 pub fn unlock_with_pin(
     state: tauri::State<'_, CryptoState>,
@@ -95,17 +123,9 @@ pub fn unlock_with_pin(
     data: EncryptedKeyData,
     pin: String,
 ) -> Result<String, String> {
-    let store = app_handle
-        .store("settings.json")
-        .map_err(|e: tauri_plugin_store::Error| e.to_string())?;
-    let attempts: u32 = store
-        .get("pin_failed_attempts")
-        .and_then(|v: serde_json::Value| v.as_u64())
-        .unwrap_or(0) as u32;
-    let lockout_until: u64 = store
-        .get("pin_lockout_until")
-        .and_then(|v: serde_json::Value| v.as_u64())
-        .unwrap_or(0);
+    // Read PIN counters from tamper-resistant Rust memory (HIGH-D3 fix).
+    let attempts: u32 = *state.pin_failed_attempts.lock().unwrap();
+    let lockout_until: u64 = *state.pin_lockout_until.lock().unwrap();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -119,9 +139,9 @@ pub fn unlock_with_pin(
 
     match encryption::decrypt_with_pin(&data, &pin) {
         Ok(nsec) => {
-            // Success — reset counters
-            store.set("pin_failed_attempts", serde_json::json!(0));
-            store.set("pin_lockout_until", serde_json::json!(0));
+            // Success — reset counters in Rust memory
+            *state.pin_failed_attempts.lock().unwrap() = 0;
+            *state.pin_lockout_until.lock().unwrap() = 0;
 
             let sk_hex = nsec_to_hex(&nsec)?;
             let pubkey = keys::get_public_key(&sk_hex).map_err(err_str)?;
@@ -133,7 +153,7 @@ pub fn unlock_with_pin(
         }
         Err(_) => {
             let new_attempts = attempts + 1;
-            store.set("pin_failed_attempts", serde_json::json!(new_attempts));
+            *state.pin_failed_attempts.lock().unwrap() = new_attempts;
 
             let lockout_ms: u64 = match new_attempts {
                 1..=4 => 0,
@@ -141,15 +161,18 @@ pub fn unlock_with_pin(
                 7..=8 => 120_000,
                 9 => 600_000,
                 _ => {
-                    // 10+ failures — wipe keys
-                    store.delete("encrypted_keys");
-                    store.set("pin_failed_attempts", serde_json::json!(0));
-                    store.set("pin_lockout_until", serde_json::json!(0));
+                    // 10+ failures — wipe encrypted keys from Tauri Store and reset counters
+                    let store = app_handle
+                        .store("keys.json")
+                        .map_err(|e: tauri_plugin_store::Error| e.to_string())?;
+                    store.delete("llamenos-encrypted-key");
+                    *state.pin_failed_attempts.lock().unwrap() = 0;
+                    *state.pin_lockout_until.lock().unwrap() = 0;
                     return Err("Too many failed attempts. Keys wiped.".to_string());
                 }
             };
             if lockout_ms > 0 {
-                store.set("pin_lockout_until", serde_json::json!(now + lockout_ms));
+                *state.pin_lockout_until.lock().unwrap() = now + lockout_ms;
             }
             Err("Wrong PIN".to_string())
         }
@@ -396,11 +419,155 @@ pub fn rewrap_file_key_from_state(
     })
 }
 
-/// Request a one-time provisioning token. Must be called before `get_nsec_from_state`.
+/// Generate a new keypair, encrypt with PIN, and load into CryptoState atomically.
+/// Returns only the public key and encrypted key blob — the secret NEVER leaves Rust.
+#[tauri::command]
+pub fn generate_keypair_and_load(
+    state: tauri::State<'_, CryptoState>,
+    pin: String,
+) -> Result<GenerateAndLoadResult, String> {
+    if !pin.chars().all(|c| c.is_ascii_digit()) || !(6..=8).contains(&pin.len()) {
+        return Err("PIN must be 6–8 digits".into());
+    }
+
+    let kp = keys::generate_keypair();
+    // Dereference Zeroizing<String> to get the inner String
+    let sk_hex: String = (*kp.secret_key_hex).clone();
+    let npub = kp.npub.clone();
+    let pubkey_hex = kp.public_key.clone();
+
+    let encrypted = encryption::encrypt_with_pin(&kp.nsec, &pin, &pubkey_hex).map_err(err_str)?;
+
+    // Drop the full keypair before loading — only store hex fields in CryptoState
+    drop(kp);
+
+    *state.secret_key.lock().unwrap() = Some(sk_hex);
+    *state.public_key.lock().unwrap() = Some(pubkey_hex.clone());
+
+    Ok(GenerateAndLoadResult {
+        public_key: pubkey_hex,
+        npub,
+        encrypted_key_data: encrypted,
+    })
+}
+
+/// Derive the x-only public key hex from an nsec. Stateless — does NOT load into CryptoState.
+/// Used during sign-in to get pubkey before import_key_to_state.
+#[tauri::command]
+pub fn pubkey_from_nsec(nsec: String) -> Result<String, String> {
+    let sk_hex = nsec_to_hex(&nsec)?;
+    keys::get_public_key(&sk_hex).map_err(err_str)
+}
+
+/// Generate an encrypted backup blob from the nsec in CryptoState.
+/// Performs PIN + recovery key encryption in Rust — nsec NEVER enters JavaScript.
+/// Returns a JSON string matching the BackupFile format from backup.ts.
+#[tauri::command]
+pub fn generate_backup_from_state(
+    state: tauri::State<'_, CryptoState>,
+    pubkey: String,
+    pin: String,
+    recovery_key: String,
+) -> Result<String, String> {
+    use chacha20poly1305::{
+        aead::{Aead, KeyInit},
+        XChaCha20Poly1305, XNonce,
+    };
+    use pbkdf2::pbkdf2_hmac;
+    use sha2::{Digest, Sha256};
+    use zeroize::Zeroize;
+
+    let sk_hex = state.get_secret_key()?;
+    let sk_bytes = hex::decode(&sk_hex).map_err(err_str)?;
+    let nsec = bech32::encode::<bech32::Bech32>(bech32::Hrp::parse("nsec").unwrap(), &sk_bytes)
+        .map_err(err_str)?;
+
+    // PIN-encrypted block (matches backup.ts createBackup PIN path)
+    let pin_block = encryption::encrypt_with_pin(&nsec, &pin, &pubkey).map_err(err_str)?;
+
+    // Recovery-key-encrypted block:
+    // Normalize key (strip dashes, uppercase) then PBKDF2-SHA256 — matches JS backup.ts
+    let normalized_rk = recovery_key.replace('-', "").to_uppercase();
+    // JS backup.ts uses static RECOVERY_SALT label as the PBKDF2 salt (not per-backup random salt)
+    const RECOVERY_PBKDF2_SALT: &[u8] = b"llamenos:recovery";
+    const RK_ITERATIONS: u32 = 600_000;
+
+    let mut rk_nonce_bytes = [0u8; 24];
+    getrandom::getrandom(&mut rk_nonce_bytes).map_err(err_str)?;
+
+    let mut rk_kek = [0u8; 32];
+    pbkdf2_hmac::<Sha256>(
+        normalized_rk.as_bytes(),
+        RECOVERY_PBKDF2_SALT,
+        RK_ITERATIONS,
+        &mut rk_kek,
+    );
+
+    let rk_nonce = XNonce::from_slice(&rk_nonce_bytes);
+    let rk_cipher = XChaCha20Poly1305::new_from_slice(&rk_kek)
+        .map_err(|e| e.to_string())?;
+    let rk_ciphertext = rk_cipher
+        .encrypt(rk_nonce, nsec.as_bytes())
+        .map_err(|e| e.to_string())?;
+    rk_kek.zeroize();
+
+    // Truncated SHA-256(pubkey) — first 6 hex chars (matches backup.ts)
+    let pubkey_bytes = hex::decode(&pubkey).unwrap_or_default();
+    let hash = Sha256::digest(&pubkey_bytes);
+    let id = hex::encode(&hash[..3]);
+
+    let t = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(err_str)?
+        .as_secs();
+    let t_rounded = (t / 3600) * 3600;
+
+    let backup = serde_json::json!({
+        "v": 1,
+        "id": id,
+        "t": t_rounded,
+        "d": {
+            "s": pin_block.salt,
+            "i": pin_block.iterations,
+            "n": pin_block.nonce,
+            "c": pin_block.ciphertext,
+        },
+        "r": {
+            // JS backup.ts uses static salt for recovery key PBKDF2; we encode it for compat.
+            // The "s" field is not actually used during decryption (static salt is known).
+            "s": hex::encode(RECOVERY_PBKDF2_SALT),
+            "i": RK_ITERATIONS,
+            "n": hex::encode(rk_nonce_bytes),
+            "c": hex::encode(rk_ciphertext),
+        },
+    });
+
+    serde_json::to_string(&backup).map_err(err_str)
+}
+
+/// Generate an ephemeral keypair for admin-initiated user creation.
+/// Returns the nsec ONE TIME for display — NOT loaded into CryptoState.
+#[tauri::command]
+pub fn generate_ephemeral_keypair() -> Result<serde_json::Value, String> {
+    let kp = keys::generate_keypair();
+    let pk_bytes = hex::decode(&kp.public_key).map_err(err_str)?;
+    let npub = bech32::encode::<bech32::Bech32>(
+        bech32::Hrp::parse("npub").unwrap(),
+        &pk_bytes,
+    )
+    .map_err(err_str)?;
+    Ok(serde_json::json!({
+        "publicKey": kp.public_key,
+        "npub": npub,
+        "nsec": kp.nsec,
+    }))
+}
+
+/// Request a one-time provisioning token. Deregistered from IPC — kept for unit tests only.
 ///
 /// Returns a random 32-char hex token stored in CryptoState. Each call replaces
 /// any existing token — only the latest token is valid.
-#[tauri::command]
+#[allow(dead_code)] // Deregistered from IPC — kept for unit tests
 pub fn request_provisioning_token(
     state: tauri::State<'_, CryptoState>,
 ) -> Result<String, String> {
@@ -410,12 +577,12 @@ pub fn request_provisioning_token(
     Ok(token)
 }
 
-/// Get the nsec from CryptoState. Used ONLY for device provisioning and backup.
+/// Get the nsec from CryptoState. Deregistered from IPC — nsec must never leave Rust process.
 ///
 /// Requires a one-time provisioning token (from `request_provisioning_token`).
 /// The token is consumed on use — calling again without a new token will fail.
 /// This prevents concurrent provisioning races and limits nsec exposure.
-#[tauri::command]
+#[allow(dead_code)] // Deregistered from IPC — nsec must never leave Rust process
 pub fn get_nsec_from_state(
     token: String,
     state: tauri::State<'_, CryptoState>,
@@ -558,7 +725,7 @@ pub fn decrypt_message(
     .map_err(err_str)
 }
 
-#[tauri::command]
+#[allow(dead_code)] // Deregistered from IPC — secret_key_hex must not cross IPC boundary
 pub fn create_auth_token(
     secret_key_hex: String,
     timestamp: u64,
@@ -586,7 +753,7 @@ pub fn decrypt_with_pin(data: EncryptedKeyData, pin: String) -> Result<String, S
     encryption::decrypt_with_pin(&data, &pin).map_err(err_str)
 }
 
-#[tauri::command]
+#[allow(dead_code)] // Deregistered from IPC (Epic 257 C4) — kept for unit tests
 pub fn generate_keypair() -> Result<KeyPair, String> {
     Ok(keys::generate_keypair())
 }
@@ -614,8 +781,8 @@ pub fn is_valid_nsec(nsec: String) -> bool {
 }
 
 /// Derive a keypair from an nsec. Stateless — for onboarding flows.
-/// The nsec crosses the IPC boundary only during import.
-#[tauri::command]
+/// Deregistered from IPC (Epic 257 C4) — use pubkey_from_nsec instead (nsec must not cross IPC).
+#[allow(dead_code)]
 pub fn key_pair_from_nsec(nsec: String) -> Result<KeyPair, String> {
     keys::keypair_from_nsec(&nsec).map_err(err_str)
 }

@@ -22,7 +22,7 @@
         "script-src": "'self' 'wasm-unsafe-eval'",
         "connect-src": "ipc: http://ipc.localhost https://app.llamenos.org wss://relay.llamenos.org",
         "img-src": "'self' asset: http://asset.localhost blob: data:",
-        "style-src": "'unsafe-inline' 'self'",
+        "style-src": "'self'",
         "font-src": "'self' data:",
         "worker-src": "'self' blob:",
         "media-src": "'self' blob:",
@@ -67,7 +67,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_PUBKEY_FROM_TAURI_SIGNER_GENERATE",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUxRjM1RTU4QkQ4MzE0MkYKUldRdkZJTzlXRjd6NFNTREVwZ0ZXYlVlVUtPd2JxVkplTmZ1SUZoaGhNa1MvMEs4WEdNWEo5TTIK",
       "endpoints": [
         "https://updates.llamenos.org/desktop/latest.json",
         "https://github.com/rhonda-rodododo/llamenos/releases/latest/download/latest.json"

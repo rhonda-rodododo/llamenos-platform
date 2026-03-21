@@ -2642,6 +2642,8 @@ name = "llamenos-desktop"
 version = "0.18.0"
 dependencies = [
  "bech32",
+ "chacha20poly1305",
+ "getrandom 0.2.17",
  "hex",
  "hmac",
  "llamenos-core",

@@ -2,11 +2,10 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
-import { generateKeyPair, createAuthTokenStateless } from '@/lib/platform'
+import { generateKeypairAndLoad, generateBackupFromState, createAuthToken, type GenerateAndLoadResult } from '@/lib/platform'
 import { isValidPin } from '@/lib/key-manager'
-import * as keyManager from '@/lib/key-manager'
 import { bootstrapAdmin } from '@/lib/api'
-import { createBackup, generateRecoveryKey, downloadBackupFile } from '@/lib/backup'
+import { generateRecoveryKey, downloadBackupFile } from '@/lib/backup'
 import { setLanguage } from '@/lib/i18n'
 import { LANGUAGES } from '@shared/languages'
 import { PinInput } from '@/components/pin-input'
@@ -33,7 +32,7 @@ interface AdminBootstrapProps {
 
 export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
   const { t, i18n } = useTranslation()
-  const { signIn } = useAuth()
+  const { loginAfterKeyLoaded } = useAuth()
   const { toast } = useToast()
 
   const [step, setStep] = useState<BootstrapStep>('welcome')
@@ -46,15 +45,14 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
   const [pinStep, setPinStep] = useState<'create' | 'confirm'>('create')
   const [pinError, setPinError] = useState('')
 
-  // Keypair state
-  const [nsec, setNsec] = useState('')
+  // Keypair result (no nsec in JS state — lives in Rust/WASM CryptoState)
+  const [genResult, setGenResult] = useState<GenerateAndLoadResult | null>(null)
   const [confirmedPin, setConfirmedPin] = useState('')
 
   // Recovery key & backup
   const [recoveryKeyStr, setRecoveryKeyStr] = useState('')
   const [backupAcknowledged, setBackupAcknowledged] = useState(false)
   const [backupDownloaded, setBackupDownloaded] = useState(false)
-  const [pubkey, setPubkey] = useState('')
 
   const stepHeadingRef = useRef<HTMLHeadingElement>(null)
   const langGroupRef = useRef<HTMLDivElement>(null)
@@ -129,17 +127,17 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
     setStep('generating')
     setError('')
     try {
-      const kp = await generateKeyPair()
-      setNsec(kp.nsec)
-      setPubkey(kp.publicKey)
+      // Generate keypair atomically — nsec goes directly into Rust/WASM CryptoState, never into JS
+      const result = await generateKeypairAndLoad(pin)
+      setGenResult(result)
       setConfirmedPin(pin)
 
-      // Create Schnorr signature to prove key ownership
-      const tokenJson = await createAuthTokenStateless(kp.secretKeyHex, Date.now(), 'POST', '/api/auth/bootstrap')
-      const parsed = JSON.parse(tokenJson)
+      // Sign bootstrap request using CryptoState (nsec stays in Rust/WASM)
+      const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/bootstrap')
+      const parsed = JSON.parse(tokenJson) as { timestamp: number; token: string }
 
       // Call bootstrap endpoint
-      await bootstrapAdmin(parsed.pubkey, parsed.timestamp, parsed.token)
+      await bootstrapAdmin(result.publicKey, parsed.timestamp, parsed.token)
 
       // Generate recovery key
       const rk = generateRecoveryKey()
@@ -156,21 +154,23 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
   }
 
   async function downloadBackup() {
-    const backup = await createBackup(nsec, confirmedPin, pubkey, recoveryKeyStr)
+    if (!genResult) return
+    // Backup created entirely in Rust — nsec never enters JS
+    const backupJson = await generateBackupFromState(genResult.publicKey, confirmedPin, recoveryKeyStr)
+    const backup = JSON.parse(backupJson) as Parameters<typeof downloadBackupFile>[0]
     downloadBackupFile(backup)
     setBackupDownloaded(true)
     toast(t('onboarding.backupDownloaded'), 'success')
   }
 
   async function handleComplete() {
+    if (!genResult) return
     try {
-      // Import key via key manager (encrypts with PIN and loads into memory)
-      await keyManager.importKey(nsec, confirmedPin)
-      // Mark bootstrap as complete BEFORE signIn triggers re-renders
+      // Key is already in CryptoState (loaded by generateKeypairAndLoad).
+      // Use loginAfterKeyLoaded — do NOT call signIn() which would double-import the key.
       sessionStorage.setItem('bootstrapComplete', '1')
-      await signIn(nsec)
+      await loginAfterKeyLoaded(genResult.publicKey)
       setStep('complete')
-      // Brief delay for the success message, then advance to wizard
       setTimeout(onComplete, 1000)
     } catch {
       toast(t('common.error'), 'error')

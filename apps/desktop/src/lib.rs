@@ -163,19 +163,18 @@ pub fn run() {
             crypto::unwrap_file_key_from_state,
             crypto::unwrap_hub_key_from_state,
             crypto::rewrap_file_key_from_state,
-            crypto::request_provisioning_token,
-            crypto::get_nsec_from_state,
             crypto::encrypt_nsec_for_provisioning,
             crypto::decrypt_provisioned_nsec,
+            crypto::generate_keypair_and_load,
+            crypto::generate_backup_from_state,
+            crypto::generate_ephemeral_keypair,
             // Stateless commands — public-key-only, validation, or sign-in flow only
             crypto::ecies_wrap_key,
             crypto::encrypt_note,
             crypto::encrypt_message,
-            crypto::create_auth_token, // Used during sign-in before CryptoState is loaded
-            crypto::generate_keypair,
+            crypto::pubkey_from_nsec,
             crypto::verify_schnorr,
             crypto::is_valid_nsec,
-            crypto::key_pair_from_nsec,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

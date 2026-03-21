@@ -33,16 +33,60 @@ type CommandHandler = (a: Args) => unknown | Promise<unknown>
 
 // ── Command handlers ──────────────────────────────────────────────────
 
-const commands: Record<string, CommandHandler> = {
-  // --- Keypair operations (stateless) ---
+// Module-level storage for encrypted key (mock equivalent of Stronghold)
+let _mockEncryptedKey: unknown = null
 
-  generate_keypair: () => {
-    const result = getWasmModule().generateKeypair()
-    return { secretKeyHex: result.skHex, publicKey: result.pubkeyHex, nsec: result.nsec, npub: result.npub }
+const commands: Record<string, CommandHandler> = {
+  // --- Atomic keypair operations (new — nsec never returned to caller) ---
+
+  generate_keypair_and_load: (a) => {
+    const mod = getWasmModule()
+    const state = getWasmState()
+    const kp = mod.generateKeypair()
+    const rawResult = state.importKey(kp.nsec, a.pin as string)
+    // serde_wasm_bindgen 0.6 returns Maps — convert to plain objects
+    const result = (function fromWasm(val: unknown): unknown {
+      if (val instanceof Map) {
+        const obj: Record<string, unknown> = {}
+        val.forEach((v: unknown, k: unknown) => { obj[String(k)] = fromWasm(v) })
+        return obj
+      }
+      if (Array.isArray(val)) return val.map(fromWasm)
+      return val
+    })(rawResult) as { encryptedKeyData: unknown }
+    _mockEncryptedKey = result.encryptedKeyData
+    return {
+      publicKey: kp.pubkeyHex,
+      npub: kp.npub,
+      encryptedKeyData: result.encryptedKeyData,
+    }
   },
 
-  get_public_key: (a) =>
-    getWasmModule().getPublicKeyFromSecret(a.secretKeyHex as string),
+  pubkey_from_nsec: (a) => {
+    try {
+      const result = getWasmModule().keyPairFromNsec(a.nsec as string)
+      return result.pubkeyHex
+    } catch {
+      return null
+    }
+  },
+
+  generate_backup_from_state: () => {
+    // Return a minimal valid backup JSON for tests
+    return JSON.stringify({
+      v: 1,
+      id: 'test00',
+      t: Math.round(Date.now() / 3600000) * 3600,
+      d: { s: '00'.repeat(32), i: 600000, n: '00'.repeat(24), c: '00'.repeat(48), pubkey: 'test' },
+    })
+  },
+
+  generate_ephemeral_keypair: () => {
+    const kp = getWasmModule().generateKeypair()
+    return { publicKey: kp.pubkeyHex, npub: kp.npub, nsec: kp.nsec }
+  },
+
+  // --- Legacy keypair operations (still registered for backward compat during migration) ---
 
   get_public_key_from_state: () =>
     getWasmState().getPublicKey(),
@@ -50,22 +94,19 @@ const commands: Record<string, CommandHandler> = {
   is_valid_nsec: (a) =>
     getWasmModule().isValidNsec(a.nsec as string),
 
-  key_pair_from_nsec: (a) => {
-    try {
-      const result = getWasmModule().keyPairFromNsec(a.nsec as string)
-      return { secretKeyHex: result.skHex, publicKey: result.pubkeyHex, nsec: result.nsec, npub: result.npub }
-    } catch {
-      return null
-    }
-  },
-
   // --- CryptoState management ---
 
-  import_key_to_state: (a) =>
-    getWasmState().importKey(a.nsec as string, a.pin as string),
+  import_key_to_state: (a) => {
+    const result = getWasmState().importKey(a.nsec as string, a.pin as string)
+    _mockEncryptedKey = result
+    return result
+  },
 
   unlock_with_pin: (a) => {
-    const data = a.data as Record<string, unknown>
+    // In tests, read encrypted key from mock storage (mirroring Stronghold behavior)
+    // Fall back to data arg if present (legacy callers)
+    const data = _mockEncryptedKey ?? a.data
+    if (!data) throw new Error('No key stored. Complete onboarding first.')
     return getWasmState().unlockWithPin(JSON.stringify(data), a.pin as string)
   },
 
@@ -80,11 +121,6 @@ const commands: Record<string, CommandHandler> = {
 
   create_auth_token_from_state: (a) =>
     JSON.stringify(getWasmState().createAuthToken(a.method as string, a.path as string)),
-
-  create_auth_token: (a) =>
-    JSON.stringify(
-      getWasmModule().createAuthTokenStateless(a.secretKeyHex as string, a.method as string, a.path as string),
-    ),
 
   verify_schnorr: (a) => {
     try {
@@ -240,10 +276,15 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
   return await handler(args || {}) as T
 }
 
-// Expose invoke on window for test helpers (page.evaluate can't use dynamic imports
-// because Vite aliases are resolved at build time, not at runtime)
-if (typeof window !== 'undefined') {
-  (window as Record<string, unknown>).__TEST_INVOKE = invoke
+// Expose invoke on window using a Symbol key (not a guessable string).
+// IMPORTANT: Must use Symbol.for (global symbol registry), NOT Symbol() (module-scoped).
+// page.evaluate() runs in a separate VM context — module-scoped Symbols are not accessible
+// across that boundary. Symbol.for('llamenos_test_invoke') resolves to the same Symbol
+// in any VM context, making it accessible from page.evaluate() calls in Playwright tests.
+export const __TEST_INVOKE_SYMBOL = Symbol.for('llamenos_test_invoke')
+
+if (typeof window !== 'undefined' && import.meta.env.PLAYWRIGHT_TEST) {
+  (window as Record<symbol, unknown>)[__TEST_INVOKE_SYMBOL] = invoke
 }
 
 export function convertFileSrc(path: string): string { return path }

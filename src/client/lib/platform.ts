@@ -65,13 +65,6 @@ async function getWasmState(): Promise<WasmState> {
 
 // ── Crypto types ─────────────────────────────────────────────────────
 
-export interface PlatformKeyPair {
-  secretKeyHex: string
-  publicKey: string
-  nsec: string
-  npub: string
-}
-
 export interface SignedNostrEvent {
   id: string
   pubkey: string
@@ -180,9 +173,8 @@ export async function generateBackupFromState(
       recoveryKey,
     })
   }
-  // WASM path: use backup.ts with nsec from WASM state (still in-process, not over IPC)
+  // WASM path: get nsec from WASM state (still in-process, not over IPC)
   const state = await getWasmState()
-  const kp = mod_placeholder // can't call getWasm() here without await; use dynamic import below
   const nsecStr = (state as unknown as { getNsec?: (t: string) => string }).getNsec?.('__wasm_internal__') ?? ''
   const { createBackup } = await import('./backup')
   const backup = await createBackup(nsecStr, pin, pubkey, recoveryKey)
@@ -200,20 +192,6 @@ export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
   const mod = await getWasm()
   const kp = mod.generateKeypair()
   return { publicKey: kp.pubkeyHex, npub: kp.npub, nsec: kp.nsec }
-}
-
-// ── Legacy keypair generation (kept for compatibility — prefer generateKeypairAndLoad) ─
-
-/** @deprecated Use generateKeypairAndLoad instead */
-export async function generateKeyPair(): Promise<PlatformKeyPair> {
-  if (useTauri) {
-    // No longer registered in handler — use ephemeral keypair internally
-    const kp = await generateEphemeralKeypair()
-    return { secretKeyHex: '', publicKey: kp.publicKey, nsec: kp.nsec, npub: kp.npub }
-  }
-  const mod = await getWasm()
-  const result = mod.generateKeypair()
-  return { secretKeyHex: result.skHex, publicKey: result.pubkeyHex, nsec: result.nsec, npub: result.npub }
 }
 
 /** Get public key from CryptoState (stateful). */
@@ -252,28 +230,6 @@ export async function createAuthToken(
   }
   const state = await getWasmState()
   return JSON.stringify(state.createAuthToken(method, path))
-}
-
-/**
- * Create a Schnorr auth token with an explicit secret key hex.
- * For sign-in flow ONLY (nsec not yet in CryptoState).
- */
-export async function createAuthTokenStateless(
-  secretKeyHex: string,
-  timestamp: number,
-  method: string,
-  path: string,
-): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('create_auth_token', {
-      secretKeyHex,
-      timestamp,
-      method,
-      path,
-    })
-  }
-  const mod = await getWasm()
-  return JSON.stringify(mod.createAuthTokenStateless(secretKeyHex, method, path))
 }
 
 // ── ECIES operations ─────────────────────────────────────────────────
@@ -710,27 +666,6 @@ export async function isValidNsec(nsec: string): Promise<boolean> {
     return mod.isValidNsec(nsec)
   } catch {
     return false
-  }
-}
-
-/**
- * Parse nsec to keypair (stateless, for onboarding sign-in).
- * Returns null if the nsec is invalid.
- */
-export async function keyPairFromNsec(nsec: string): Promise<PlatformKeyPair | null> {
-  if (useTauri) {
-    try {
-      return await tauriInvoke<PlatformKeyPair>('key_pair_from_nsec', { nsec })
-    } catch {
-      return null
-    }
-  }
-  try {
-    const mod = await getWasm()
-    const result = mod.keyPairFromNsec(nsec)
-    return { secretKeyHex: result.skHex, publicKey: result.pubkeyHex, nsec: result.nsec, npub: result.npub }
-  } catch {
-    return null
   }
 }
 
