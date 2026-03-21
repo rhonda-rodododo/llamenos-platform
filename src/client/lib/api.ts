@@ -38,6 +38,7 @@ import type {
   SystemHealth,
   RoleDefinition,
   IvrAudioRecording,
+  WebAuthnSettings,
   CreateRecordBody,
   UpdateRecordBody,
   DirectoryContactType,
@@ -834,8 +835,7 @@ export async function getWebRtcStatus() {
 
 // --- WebAuthn Settings ---
 
-// Response has all fields required (schema uses optional for input/looseObject)
-export type WebAuthnSettings = Required<import('@protocol/schemas').WebAuthnSettings>
+export type { WebAuthnSettings }
 
 export async function getWebAuthnSettings() {
   return request<WebAuthnSettings>('/settings/webauthn')
@@ -1045,19 +1045,12 @@ export async function testWhatsAppConnection(data: { phoneNumberId: string; acce
 
 // --- Reports ---
 
-export type ConversionStatus = 'pending' | 'in_progress' | 'completed'
+/** Narrowing of ConversationMessage conversionStatus enum from conversationResponseSchema */
+export type ConversionStatus = NonNullable<NonNullable<Conversation['metadata']>['conversionStatus']>
 
+/** Narrowing of Conversation where metadata is required and type is 'report' */
 export type Report = Conversation & {
-  metadata: {
-    type: 'report'
-    reportTitle?: string
-    reportCategory?: string
-    reportTypeId?: string
-    customFieldValues?: string
-    linkedCallId?: string
-    reportId?: string
-    conversionStatus?: ConversionStatus
-  }
+  metadata: NonNullable<Conversation['metadata']> & { type: 'report' }
 }
 
 export async function listReports(params?: { status?: string; category?: string; page?: number; limit?: number }) {
@@ -1782,14 +1775,6 @@ export async function listDirectoryContactGroups(id: string) {
 
 export async function listDirectoryContactCases(id: string) {
   return request<{ cases: ContactCaseLink[] }>(hp(`/directory/${id}/cases`))
-}
-
-// Keep legacy type alias for create dialog (now encrypts client-side)
-export type CreateDirectoryContactBody = {
-  displayName: string
-  contactType: DirectoryContactType
-  tags?: string[]
-  identifiers?: Array<{ type: IdentifierType; value: string; isPrimary: boolean }>
 }
 
 export async function assignRecord(id: string, pubkeys: string[]) {

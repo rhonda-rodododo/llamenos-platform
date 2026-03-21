@@ -182,7 +182,13 @@ export const webauthnSettingsSchema = z.looseObject({
   requireForUsers: z.boolean().optional(),
 })
 
-export type WebAuthnSettings = z.infer<typeof webauthnSettingsSchema>
+/** Strict response type — server always returns both fields */
+export const webauthnSettingsResponseSchema = z.object({
+  requireForAdmins: z.boolean(),
+  requireForUsers: z.boolean(),
+})
+
+export type WebAuthnSettings = z.infer<typeof webauthnSettingsResponseSchema>
 
 export const transcriptionSettingsSchema = z.looseObject({
   globalEnabled: z.boolean().optional(),

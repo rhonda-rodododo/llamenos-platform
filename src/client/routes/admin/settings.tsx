@@ -141,11 +141,11 @@ function AdminSettingsPage() {
 
   // Compute status summaries for collapsed sections
   const passkeyStatus = webauthnSettings
-    ? (webauthnSettings.requireForAdmins && webauthnSettings.requireForVolunteers)
+    ? (webauthnSettings.requireForAdmins && webauthnSettings.requireForUsers)
       ? t('webauthn.requiredAll', { defaultValue: 'Required for all' })
       : webauthnSettings.requireForAdmins
         ? t('webauthn.requiredAdmins', { defaultValue: 'Required for admins' })
-        : webauthnSettings.requireForVolunteers
+        : webauthnSettings.requireForUsers
           ? t('webauthn.requiredUsers', { defaultValue: 'Required for volunteers' })
           : t('webauthn.notRequired', { defaultValue: 'Not required' })
     : undefined
