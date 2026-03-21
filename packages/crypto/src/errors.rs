@@ -56,4 +56,7 @@ pub enum CryptoError {
 
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    #[error("invalid format: {0}")]
+    InvalidFormat(String),
 }

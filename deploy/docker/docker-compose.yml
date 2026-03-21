@@ -223,7 +223,7 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://llamenos:${PG_PASSWORD:?PG_PASSWORD is required}@postgres:5432/glitchtip
-      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:-change-me-to-a-random-string}
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required — set to a 64-char random hex value (openssl rand -hex 32)}
       - PORT=8000
       - EMAIL_URL=${GLITCHTIP_EMAIL_URL:-consolemail://}
       - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN:-http://localhost:8000}
@@ -252,7 +252,7 @@ services:
     command: ./bin/run-celery-with-beat.sh
     environment:
       - DATABASE_URL=postgresql://llamenos:${PG_PASSWORD:?PG_PASSWORD is required}@postgres:5432/glitchtip
-      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:-change-me-to-a-random-string}
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required — set to a 64-char random hex value (openssl rand -hex 32)}
       - EMAIL_URL=${GLITCHTIP_EMAIL_URL:-consolemail://}
       - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN:-http://localhost:8000}
       - DEFAULT_FROM_EMAIL=${GLITCHTIP_FROM_EMAIL:-noreply@localhost}

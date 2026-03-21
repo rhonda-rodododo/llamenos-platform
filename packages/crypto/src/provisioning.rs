@@ -23,6 +23,9 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::errors::CryptoError;
 use crate::labels::{LABEL_DEVICE_PROVISION, SAS_INFO, SAS_SALT};
 
+/// Domain-specific HKDF salt for provisioning key derivation.
+const PROVISIONING_HKDF_SALT: &[u8] = b"llamenos:provisioning:v1";
+
 /// Result of encrypting the nsec for device provisioning.
 /// Contains the encrypted payload and the SAS code for verification.
 #[derive(Debug, Clone)]
@@ -76,9 +79,9 @@ fn compute_shared_x(sk: &SecretKey, their_pk: &PublicKey) -> Result<[u8; 32], Cr
 
 /// Derive the symmetric key for provisioning using HKDF-SHA256.
 ///
-/// Uses LABEL_DEVICE_PROVISION as the HKDF info parameter (matches JS v2 format).
-fn derive_provisioning_key(shared_x: &[u8]) -> [u8; 32] {
-    let hk = Hkdf::<Sha256>::new(None, shared_x);
+/// Uses PROVISIONING_HKDF_SALT and LABEL_DEVICE_PROVISION as the HKDF info parameter.
+pub(crate) fn derive_provisioning_key(shared_x: &[u8]) -> [u8; 32] {
+    let hk = Hkdf::<Sha256>::new(Some(PROVISIONING_HKDF_SALT), shared_x);
     let mut okm = [0u8; 32];
     hk.expand(LABEL_DEVICE_PROVISION.as_bytes(), &mut okm)
         .expect("HKDF expand should not fail for 32-byte output");
@@ -229,6 +232,89 @@ mod tests {
     use super::*;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use rand::rngs::OsRng;
+
+    /// CRIT-C3 integration test: encrypt_nsec_for_provisioning → decrypt_provisioned_nsec
+    /// Both paths use the same HKDF KDF (derive_provisioning_key with PROVISIONING_HKDF_SALT).
+    #[test]
+    fn provisioning_round_trip_unified_kdf() {
+        let primary_sk = SecretKey::random(&mut OsRng);
+        let primary_pk = primary_sk.public_key();
+        let primary_pk_encoded = primary_pk.to_encoded_point(true);
+        let primary_pk_xonly = hex::encode(&primary_pk_encoded.as_bytes()[1..]);
+
+        // New device generates ephemeral keypair
+        let ephemeral_sk = SecretKey::random(&mut OsRng);
+        let ephemeral_pk = ephemeral_sk.public_key();
+        let ephemeral_pk_encoded = ephemeral_pk.to_encoded_point(true);
+        let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
+
+        // Primary encrypts nsec for provisioning
+        let result = encrypt_nsec_for_provisioning(
+            primary_sk.to_bytes().as_slice(),
+            &ephemeral_pk_hex,
+        )
+        .unwrap();
+
+        // New device decrypts using same HKDF path
+        let decrypted = decrypt_provisioned_nsec(
+            &result.encrypted_hex,
+            &primary_pk_xonly,
+            ephemeral_sk.to_bytes().as_slice(),
+        )
+        .unwrap();
+
+        // Verify the nsec round-trips
+        let expected_nsec = bech32::encode::<bech32::Bech32>(
+            bech32::Hrp::parse("nsec").unwrap(),
+            primary_sk.to_bytes().as_slice(),
+        )
+        .unwrap();
+        assert_eq!(*decrypted.nsec, expected_nsec, "Recovered nsec must match original");
+    }
+
+    /// Negative: HKDF-encrypted ciphertext must not decrypt with SHA-256 concat KDF
+    #[test]
+    fn provisioning_kdf_mismatch_fails() {
+        use chacha20poly1305::{
+            aead::{Aead, KeyInit},
+            XChaCha20Poly1305, XNonce,
+        };
+        use sha2::{Digest, Sha256};
+
+        let primary_sk = SecretKey::random(&mut OsRng);
+        let primary_pk = primary_sk.public_key();
+        let primary_pk_encoded = primary_pk.to_encoded_point(true);
+
+        let ephemeral_sk = SecretKey::random(&mut OsRng);
+        let ephemeral_pk = ephemeral_sk.public_key();
+        let ephemeral_pk_encoded = ephemeral_pk.to_encoded_point(true);
+        let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
+
+        // Encrypt using provisioning HKDF
+        let result = encrypt_nsec_for_provisioning(
+            primary_sk.to_bytes().as_slice(),
+            &ephemeral_pk_hex,
+        )
+        .unwrap();
+
+        // Compute shared_x the mobile way (ephemeral SK × primary PK)
+        let shared_x = compute_shared_x(&ephemeral_sk, &primary_pk).unwrap();
+
+        // Derive key with SHA-256 concat (wrong KDF)
+        let mut hasher = Sha256::new();
+        hasher.update(LABEL_DEVICE_PROVISION.as_bytes());
+        hasher.update(&shared_x);
+        let wrong_key: [u8; 32] = hasher.finalize().into();
+
+        let data = hex::decode(&result.encrypted_hex).unwrap();
+        let nonce = XNonce::from_slice(&data[..24]);
+        let cipher = XChaCha20Poly1305::new_from_slice(&wrong_key).unwrap();
+        let decrypt_result = cipher.decrypt(nonce, &data[24..]);
+        assert!(
+            decrypt_result.is_err(),
+            "SHA-256 KDF must NOT decrypt HKDF-encrypted ciphertext"
+        );
+    }
 
     #[test]
     fn roundtrip_provisioning_encryption() {

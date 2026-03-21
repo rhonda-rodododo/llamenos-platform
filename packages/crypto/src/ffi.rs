@@ -111,8 +111,7 @@ pub fn decrypt_call_record_for_reader(
 /// Derive a 32-byte KEK from a PIN using PBKDF2-SHA256, returned as hex.
 ///
 /// `salt_hex` is a hex-encoded salt (typically 16 bytes / 32 hex chars).
-#[uniffi::export]
-pub fn derive_kek_hex(pin: &str, salt_hex: &str) -> Result<String, CryptoError> {
+pub(crate) fn derive_kek_hex(pin: &str, salt_hex: &str) -> Result<String, CryptoError> {
     let salt = hex::decode(salt_hex).map_err(CryptoError::HexError)?;
     let mut kek = derive_kek_from_pin(pin, &salt);
     let hex = hex::encode(kek);
@@ -167,8 +166,7 @@ pub fn compute_shared_x_hex(
 /// `ciphertext_hex`: hex(nonce_24 + ciphertext) — XChaCha20-Poly1305
 /// `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
 ///
-/// Derives the symmetric key via SHA-256(LABEL_DEVICE_PROVISION || shared_x),
-/// matching the desktop JS implementation.
+/// Derives the symmetric key via HKDF (matches provisioning.rs — CRIT-C3 fix).
 #[uniffi::export]
 pub fn decrypt_with_shared_key_hex(
     ciphertext_hex: &str,
@@ -178,19 +176,14 @@ pub fn decrypt_with_shared_key_hex(
         aead::{Aead, KeyInit},
         XChaCha20Poly1305, XNonce,
     };
-    use sha2::{Digest, Sha256};
 
     let shared_x = hex::decode(shared_x_hex).map_err(CryptoError::HexError)?;
     if shared_x.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
     }
 
-    // Derive symmetric key: SHA-256(LABEL_DEVICE_PROVISION || shared_x)
-    let mut hasher = Sha256::new();
-    hasher.update(LABEL_DEVICE_PROVISION.as_bytes());
-    hasher.update(&shared_x);
-    let mut symmetric_key = [0u8; 32];
-    symmetric_key.copy_from_slice(&hasher.finalize());
+    // Derive symmetric key via HKDF (matches provisioning.rs — CRIT-C3 fix)
+    let mut symmetric_key = crate::provisioning::derive_provisioning_key(&shared_x);
 
     let data = hex::decode(ciphertext_hex).map_err(CryptoError::HexError)?;
     if data.len() < 24 {
@@ -408,7 +401,6 @@ mod tests {
             aead::{Aead, KeyInit},
             XChaCha20Poly1305, XNonce,
         };
-        use sha2::{Digest, Sha256};
 
         let alice = generate_keypair();
         let bob = generate_keypair();
@@ -416,11 +408,8 @@ mod tests {
         let shared_x_hex = compute_shared_x_hex(&alice.secret_key_hex, &bob.public_key).unwrap();
         let shared_x = hex::decode(&shared_x_hex).unwrap();
 
-        // Encrypt with the shared key (simulating the primary device)
-        let mut hasher = Sha256::new();
-        hasher.update(crate::labels::LABEL_DEVICE_PROVISION.as_bytes());
-        hasher.update(&shared_x);
-        let symmetric_key: [u8; 32] = hasher.finalize().into();
+        // Encrypt with the shared key via HKDF (CRIT-C3: matches provisioning.rs)
+        let symmetric_key = crate::provisioning::derive_provisioning_key(&shared_x);
 
         let plaintext = "this is the nsec to transfer";
         let mut nonce_bytes = [0u8; 24];
@@ -465,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    fn ecies_decrypt_content_via_ffi() {
+    fn ecies_decrypt_content_via_ffi_v1_hard_fails() {
         use chacha20poly1305::{
             aead::{Aead, KeyInit},
             XChaCha20Poly1305, XNonce,
@@ -478,21 +467,20 @@ mod tests {
         let label = crate::labels::LABEL_PUSH_WAKE;
         let content = r#"{"type":"call","callId":"abc123"}"#;
 
-        // Simulate server-side ECIES encryption
+        // Construct v1-style ciphertext (no version byte) using SHA-256 KDF
         let ephemeral = EphemeralSecret::random(&mut OsRng);
         let ephemeral_pub = ephemeral.public_key();
-
         let compressed = {
             let mut c = vec![0x02u8];
             c.extend_from_slice(&hex::decode(&recipient.public_key).unwrap());
             c
         };
         let recipient_pk = k256::PublicKey::from_sec1_bytes(&compressed).unwrap();
-
         let shared_point = ephemeral.diffie_hellman(&recipient_pk);
         let mut shared_x = [0u8; 32];
         shared_x.copy_from_slice(shared_point.raw_secret_bytes());
 
+        // v1 KDF: SHA-256(label || shared_x)
         let mut hasher = Sha256::new();
         hasher.update(label.as_bytes());
         hasher.update(&shared_x);
@@ -504,6 +492,7 @@ mod tests {
         let cipher = XChaCha20Poly1305::new_from_slice(&sym_key).unwrap();
         let ct = cipher.encrypt(nonce, content.as_bytes()).unwrap();
 
+        // Pack WITHOUT version byte (v1 format)
         let mut packed = Vec::with_capacity(24 + ct.len());
         packed.extend_from_slice(&nonce_bytes);
         packed.extend_from_slice(&ct);
@@ -512,10 +501,34 @@ mod tests {
         let eph_encoded = ephemeral_pub.to_encoded_point(true);
         let eph_hex = hex::encode(eph_encoded.as_bytes());
 
-        // Decrypt via FFI
+        let result =
+            ecies_decrypt_content_hex(&packed_hex, &eph_hex, &recipient.secret_key_hex, label);
+        assert!(
+            matches!(result, Err(CryptoError::InvalidFormat(_))),
+            "Expected v1 FFI content to hard-fail, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn ecies_decrypt_content_via_ffi_v2_roundtrip() {
+        use crate::ecies::ecies_encrypt_content;
+        use k256::SecretKey;
+        use rand::rngs::OsRng;
+
+        let sk = SecretKey::random(&mut OsRng);
+        let pk = sk.public_key();
+        let pk_encoded = pk.to_encoded_point(true);
+        let xonly_hex = hex::encode(&pk_encoded.as_bytes()[1..]);
+        let sk_hex = hex::encode(sk.to_bytes());
+
+        let label = crate::labels::LABEL_PUSH_WAKE;
+        let content = r#"{"type":"call","callId":"abc123"}"#;
+
+        let (packed_hex, eph_hex) =
+            ecies_encrypt_content(content.as_bytes(), &xonly_hex, label).unwrap();
         let decrypted =
-            ecies_decrypt_content_hex(&packed_hex, &eph_hex, &recipient.secret_key_hex, label)
-                .unwrap();
+            ecies_decrypt_content_hex(&packed_hex, &eph_hex, &sk_hex, label).unwrap();
         assert_eq!(decrypted, content);
     }
 

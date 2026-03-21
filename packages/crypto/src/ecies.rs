@@ -21,13 +21,16 @@ use k256::{
 };
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use zeroize::Zeroize;
 
 use crate::errors::CryptoError;
 
 /// ECIES version byte for HKDF-based key derivation (v2).
 const ECIES_VERSION_V2: u8 = 0x02;
+
+/// Domain-specific HKDF salt for ECIES v2 key derivation.
+const ECIES_V2_HKDF_SALT: &[u8] = b"llamenos:ecies:v2";
 
 /// A symmetric key wrapped via ECIES for a single recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,38 +72,31 @@ pub fn random_bytes_32() -> [u8; 32] {
 
 /// Derive the ECIES symmetric key using HKDF-SHA256 (v2).
 ///
-/// symmetric_key = HKDF-Expand(HKDF-Extract(salt=empty, ikm=shared_x), info=label, len=32)
+/// symmetric_key = HKDF-Expand(HKDF-Extract(salt=ECIES_V2_HKDF_SALT, ikm=shared_x), info=label, len=32)
 fn derive_ecies_key_v2(label: &str, shared_x: &[u8]) -> [u8; 32] {
-    let hk = Hkdf::<Sha256>::new(None, shared_x);
+    let hk = Hkdf::<Sha256>::new(Some(ECIES_V2_HKDF_SALT), shared_x);
     let mut okm = [0u8; 32];
     hk.expand(label.as_bytes(), &mut okm)
         .expect("HKDF expand should not fail for 32-byte output");
     okm
 }
 
-/// Legacy ECIES key derivation (v1): SHA-256(label || shared_x).
-///
-/// Used only for decryption of existing ciphertext without version byte.
-fn derive_ecies_key_v1(label: &str, shared_x: &[u8]) -> [u8; 32] {
-    let label_bytes = label.as_bytes();
-    let mut input = Vec::with_capacity(label_bytes.len() + shared_x.len());
-    input.extend_from_slice(label_bytes);
-    input.extend_from_slice(shared_x);
-    let result = Sha256::digest(&input);
-    input.zeroize();
-    let mut key = [0u8; 32];
-    key.copy_from_slice(&result);
-    key
-}
 
-/// Parse an x-only pubkey hex (32 bytes) into a compressed SEC1 pubkey (prepend 0x02).
+/// Converts a 32-byte x-only (BIP-340) public key to SEC1 compressed form.
+///
+/// # BIP-340 assumption
+/// This function always uses the even-y (`0x02`) prefix, which is correct for
+/// Nostr/BIP-340 x-only keys where even-y is the canonical form. Do NOT use
+/// this function for arbitrary secp256k1 keys where the y-coordinate may be
+/// odd — the resulting ECDH shared secret would be wrong for ~50% of such keys.
 fn xonly_to_compressed(xonly_hex: &str) -> Result<Vec<u8>, CryptoError> {
     let x_bytes = hex::decode(xonly_hex).map_err(CryptoError::HexError)?;
     if x_bytes.len() != 32 {
         return Err(CryptoError::InvalidPublicKey);
     }
+    debug_assert_eq!(x_bytes.len(), 32, "BIP-340 x-only keys must be exactly 32 bytes");
     let mut compressed = Vec::with_capacity(33);
-    compressed.push(0x02);
+    compressed.push(0x02); // BIP-340 canonical even-y
     compressed.extend_from_slice(&x_bytes);
     Ok(compressed)
 }
@@ -173,26 +169,15 @@ pub fn ecies_wrap_key(
     })
 }
 
-/// Unwrap a 32-byte symmetric key from an ECIES envelope.
+/// Unwrap a 32-byte symmetric key from an ECIES envelope (v2 only).
 ///
-/// Supports both v2 (HKDF, version byte prefix) and v1 (legacy SHA-256) formats.
-/// Returns `(key, needs_migration)` — caller should re-encrypt with v2 if true.
+/// Returns `Err(CryptoError::InvalidFormat)` for any non-v2 ciphertext.
 pub fn ecies_unwrap_key(
     envelope: &KeyEnvelope,
     secret_key_hex: &str,
     label: &str,
 ) -> Result<[u8; 32], CryptoError> {
-    let (key, _needs_migration) = ecies_unwrap_key_versioned(envelope, secret_key_hex, label)?;
-    Ok(key)
-}
-
-/// Unwrap with migration flag indicating whether the ciphertext was v1 (legacy).
-pub fn ecies_unwrap_key_versioned(
-    envelope: &KeyEnvelope,
-    secret_key_hex: &str,
-    label: &str,
-) -> Result<([u8; 32], bool), CryptoError> {
-    // Parse secret key — zeroize immediately after constructing SecretKey (H1)
+    // Parse secret key
     let mut sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
     if sk_bytes.len() != 32 {
         sk_bytes.zeroize();
@@ -205,21 +190,21 @@ pub fn ecies_unwrap_key_versioned(
     sk_bytes.zeroize();
 
     // Parse ephemeral public key (compressed SEC1, 33 bytes)
-    let ephemeral_bytes = hex::decode(&envelope.ephemeral_pubkey).map_err(CryptoError::HexError)?;
+    let ephemeral_bytes =
+        hex::decode(&envelope.ephemeral_pubkey).map_err(CryptoError::HexError)?;
     let ephemeral_pubkey = PublicKey::from_sec1_bytes(&ephemeral_bytes)
         .map_err(|_| CryptoError::InvalidEphemeralKey)?;
 
     // ECDH: compute shared x-coordinate
     let mut shared_x = ecdh_shared_x(&secret_key, &ephemeral_pubkey)?;
 
-    // Unpack: detect version byte
+    // Unpack: require v2 version byte
     let data = hex::decode(&envelope.wrapped_key).map_err(CryptoError::HexError)?;
-
-    let (version, payload) = if !data.is_empty() && data[0] == ECIES_VERSION_V2 {
-        (2, &data[1..])
-    } else {
-        (1, &data[..])
-    };
+    if data.is_empty() || data[0] != ECIES_VERSION_V2 {
+        shared_x.zeroize();
+        return Err(CryptoError::InvalidFormat("unsupported ECIES version".into()));
+    }
+    let payload = &data[1..];
 
     if payload.len() < 24 {
         shared_x.zeroize();
@@ -228,12 +213,8 @@ pub fn ecies_unwrap_key_versioned(
     let nonce = XNonce::from_slice(&payload[..24]);
     let ciphertext = &payload[24..];
 
-    // Derive symmetric key based on version
-    let mut symmetric_key = if version == 2 {
-        derive_ecies_key_v2(label, &shared_x)
-    } else {
-        derive_ecies_key_v1(label, &shared_x)
-    };
+    // Derive symmetric key (v2 only)
+    let mut symmetric_key = derive_ecies_key_v2(label, &shared_x);
 
     // Decrypt
     let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key)
@@ -244,10 +225,7 @@ pub fn ecies_unwrap_key_versioned(
     symmetric_key.zeroize();
     shared_x.zeroize();
 
-    let plaintext = result.map_err(|_| {
-        // If v2 decryption failed, try v1 fallback (shouldn't happen for properly versioned data)
-        CryptoError::DecryptionFailed
-    })?;
+    let plaintext = result.map_err(|_| CryptoError::DecryptionFailed)?;
 
     if plaintext.len() != 32 {
         return Err(CryptoError::DecryptionFailed);
@@ -255,7 +233,7 @@ pub fn ecies_unwrap_key_versioned(
 
     let mut key = [0u8; 32];
     key.copy_from_slice(&plaintext);
-    Ok((key, version == 1))
+    Ok(key)
 }
 
 /// Encrypt arbitrary-length content via ECIES for a recipient.
@@ -305,11 +283,11 @@ pub fn ecies_encrypt_content(
     ))
 }
 
-/// Decrypt arbitrary-length ECIES-encrypted content.
+/// Decrypt arbitrary-length ECIES-encrypted content (v2 only).
 ///
-/// Supports v2 (HKDF, version byte prefix) and v1 (legacy SHA-256) formats.
+/// Returns `Err(CryptoError::InvalidFormat)` for any non-v2 ciphertext.
 ///
-/// - `packed_hex`: hex(version_byte? + nonce_24 + ciphertext)
+/// - `packed_hex`: hex(version_byte(1) + nonce_24 + ciphertext)
 /// - `ephemeral_pubkey_hex`: compressed SEC1 (33 bytes / 66 hex chars)
 /// - `secret_key_hex`: recipient's secret key
 /// - `label`: domain separation label
@@ -319,7 +297,7 @@ pub fn ecies_decrypt_content(
     secret_key_hex: &str,
     label: &str,
 ) -> Result<String, CryptoError> {
-    // Parse secret key — zeroize immediately after constructing SecretKey (H1)
+    // Parse secret key — zeroize immediately after constructing SecretKey
     let mut sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
     if sk_bytes.len() != 32 {
         sk_bytes.zeroize();
@@ -339,13 +317,13 @@ pub fn ecies_decrypt_content(
     // ECDH: compute shared x-coordinate
     let mut shared_x = ecdh_shared_x(&secret_key, &ephemeral_pubkey)?;
 
-    // Detect version byte
+    // Require v2 version byte
     let data = hex::decode(packed_hex).map_err(CryptoError::HexError)?;
-    let (version, payload) = if !data.is_empty() && data[0] == ECIES_VERSION_V2 {
-        (2, &data[1..])
-    } else {
-        (1, &data[..])
-    };
+    if data.is_empty() || data[0] != ECIES_VERSION_V2 {
+        shared_x.zeroize();
+        return Err(CryptoError::InvalidFormat("unsupported ECIES version".into()));
+    }
+    let payload = &data[1..];
 
     if payload.len() < 24 {
         shared_x.zeroize();
@@ -354,11 +332,7 @@ pub fn ecies_decrypt_content(
     let nonce = XNonce::from_slice(&payload[..24]);
     let ciphertext = &payload[24..];
 
-    let mut symmetric_key = if version == 2 {
-        derive_ecies_key_v2(label, &shared_x)
-    } else {
-        derive_ecies_key_v1(label, &shared_x)
-    };
+    let mut symmetric_key = derive_ecies_key_v2(label, &shared_x);
 
     let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
@@ -398,43 +372,33 @@ mod tests {
     }
 
     #[test]
-    fn v2_produces_different_key_than_v1() {
-        let shared_x = [0xABu8; 32];
-        let label = "test-label";
-        let key_v1 = derive_ecies_key_v1(label, &shared_x);
-        let key_v2 = derive_ecies_key_v2(label, &shared_x);
-        assert_ne!(key_v1, key_v2);
-    }
+    fn v1_ciphertext_rejected() {
+        use k256::ecdh::EphemeralSecret;
 
-    #[test]
-    fn v1_ciphertext_decryptable_with_fallback() {
-        // Simulate a v1 (legacy) wrapped key: SHA-256(label || sharedX), no version byte
+        // Create a v1-format envelope: no version byte prefix
         let sk = SecretKey::random(&mut OsRng);
         let pk = sk.public_key();
         let pk_encoded = pk.to_encoded_point(true);
         let xonly_hex = hex::encode(&pk_encoded.as_bytes()[1..]);
         let sk_hex = hex::encode(sk.to_bytes());
 
-        // Manually create a v1 envelope (no version byte)
-        let original_key = random_bytes_32();
         let ephemeral_secret = EphemeralSecret::random(&mut OsRng);
         let ephemeral_public = ephemeral_secret.public_key();
 
         let recipient_compressed = xonly_to_compressed(&xonly_hex).unwrap();
         let recipient_pubkey = PublicKey::from_sec1_bytes(&recipient_compressed).unwrap();
-
         let shared_point = ephemeral_secret.diffie_hellman(&recipient_pubkey);
         let mut shared_x = [0u8; 32];
         shared_x.copy_from_slice(shared_point.raw_secret_bytes());
 
-        // v1 key derivation: SHA-256(label || sharedX)
-        let symmetric_key = derive_ecies_key_v1(LABEL_NOTE_KEY, &shared_x);
+        // Simulate v1 ciphertext: nonce + encrypted payload, NO version byte
+        let some_key = random_bytes_32();
         let nonce_bytes = random_nonce();
         let nonce = XNonce::from_slice(&nonce_bytes);
-        let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key).unwrap();
-        let ciphertext = cipher.encrypt(nonce, original_key.as_ref()).unwrap();
-
-        // Pack WITHOUT version byte (v1 format)
+        // Use dummy key (v1-style SHA-256 derived) — doesn't matter, version byte is checked first
+        let dummy_key = [0x42u8; 32];
+        let cipher = XChaCha20Poly1305::new_from_slice(&dummy_key).unwrap();
+        let ciphertext = cipher.encrypt(nonce, some_key.as_ref()).unwrap();
         let mut packed = Vec::with_capacity(24 + ciphertext.len());
         packed.extend_from_slice(&nonce_bytes);
         packed.extend_from_slice(&ciphertext);
@@ -445,28 +409,12 @@ mod tests {
             ephemeral_pubkey: hex::encode(ephemeral_encoded.as_bytes()),
         };
 
-        // Should decrypt with v1 fallback
-        let (recovered, needs_migration) =
-            ecies_unwrap_key_versioned(&v1_envelope, &sk_hex, LABEL_NOTE_KEY).unwrap();
-        assert_eq!(original_key, recovered);
-        assert!(needs_migration);
-    }
-
-    #[test]
-    fn v2_roundtrip_no_migration() {
-        let sk = SecretKey::random(&mut OsRng);
-        let pk = sk.public_key();
-        let pk_encoded = pk.to_encoded_point(true);
-        let xonly_hex = hex::encode(&pk_encoded.as_bytes()[1..]);
-        let sk_hex = hex::encode(sk.to_bytes());
-
-        let original_key = random_bytes_32();
-        let envelope = ecies_wrap_key(&original_key, &xonly_hex, LABEL_NOTE_KEY).unwrap();
-
-        let (recovered, needs_migration) =
-            ecies_unwrap_key_versioned(&envelope, &sk_hex, LABEL_NOTE_KEY).unwrap();
-        assert_eq!(original_key, recovered);
-        assert!(!needs_migration);
+        let result = ecies_unwrap_key(&v1_envelope, &sk_hex, LABEL_NOTE_KEY);
+        assert!(
+            matches!(result, Err(CryptoError::InvalidFormat(_))),
+            "Expected InvalidFormat for v1 envelope, got: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -579,15 +527,12 @@ mod tests {
     }
 
     #[test]
-    fn v1_content_decrypts_with_fallback() {
-        // Simulate a v1 (legacy) content encryption: SHA-256(label || sharedX), no version byte
+    fn v1_content_rejected() {
         let recipient_sk = SecretKey::random(&mut OsRng);
         let recipient_pk = recipient_sk.public_key();
         let recipient_pk_encoded = recipient_pk.to_encoded_point(true);
         let recipient_xonly_hex = hex::encode(&recipient_pk_encoded.as_bytes()[1..]);
         let recipient_sk_hex = hex::encode(recipient_sk.to_bytes());
-
-        let content = "Legacy encrypted content";
         let label = "llamenos:transcription";
 
         let ephemeral_secret = EphemeralSecret::random(&mut OsRng);
@@ -599,13 +544,12 @@ mod tests {
         let mut shared_x = [0u8; 32];
         shared_x.copy_from_slice(shared_point.raw_secret_bytes());
 
-        let symmetric_key = derive_ecies_key_v1(label, &shared_x);
+        // Produce v1-format content: nonce + ciphertext, NO version byte
+        let dummy_key = [0x42u8; 32];
         let nonce_bytes = random_nonce();
         let nonce = XNonce::from_slice(&nonce_bytes);
-        let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key).unwrap();
-        let ciphertext = cipher.encrypt(nonce, content.as_bytes()).unwrap();
-
-        // Pack WITHOUT version byte (v1 format)
+        let cipher = XChaCha20Poly1305::new_from_slice(&dummy_key).unwrap();
+        let ciphertext = cipher.encrypt(nonce, b"Legacy content".as_ref()).unwrap();
         let mut packed = Vec::with_capacity(24 + ciphertext.len());
         packed.extend_from_slice(&nonce_bytes);
         packed.extend_from_slice(&ciphertext);
@@ -614,8 +558,12 @@ mod tests {
         let ephemeral_encoded = ephemeral_public.to_encoded_point(true);
         let ephemeral_hex = hex::encode(ephemeral_encoded.as_bytes());
 
-        let decrypted =
-            ecies_decrypt_content(&packed_hex, &ephemeral_hex, &recipient_sk_hex, label).unwrap();
-        assert_eq!(decrypted, content);
+        let result =
+            ecies_decrypt_content(&packed_hex, &ephemeral_hex, &recipient_sk_hex, label);
+        assert!(
+            matches!(result, Err(CryptoError::InvalidFormat(_))),
+            "Expected InvalidFormat for v1 content, got: {:?}",
+            result
+        );
     }
 }
