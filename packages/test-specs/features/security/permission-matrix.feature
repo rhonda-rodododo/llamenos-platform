@@ -137,7 +137,8 @@ Feature: Permission Matrix
 
   # ─── Bans Domain ──────────────────────────────────────────────────
 
-  Scenario Outline: <role> <expected> access to report a ban
+  Scenario Outline: <role> <expected> access to create a ban
+    # MED-W2: bans:create (admin-only) replaces bans:report — volunteers can no longer ban numbers directly
     When the "<role>" user sends "POST" to "/api/bans" with valid ban body
     Then the response status should be <status>
 
@@ -146,7 +147,7 @@ Feature: Permission Matrix
       | super-admin  | has       | 200    |
       | hub-admin    | has       | 200    |
       | reviewer     | denied    | 403    |
-      | volunteer    | has       | 200    |
+      | volunteer    | denied    | 403    |
       | reporter     | denied    | 403    |
 
   Scenario Outline: <role> <expected> access to list bans

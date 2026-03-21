@@ -8,6 +8,7 @@ import { createBanBodySchema, bulkBanBodySchema, banListResponseSchema, bulkBanR
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { createEntityRouter } from '../lib/entity-router'
+import { hashPhone } from '../lib/crypto'
 
 const bans = new Hono<AppEnv>()
 
@@ -27,7 +28,7 @@ const banListRouter = createEntityRouter({
 })
 bans.route('/', banListRouter)
 
-// Any authenticated user with bans:report can report/ban
+// MED-W2: Only admins (bans:create) can ban numbers — not volunteers (bans:report)
 bans.post('/',
   describeRoute({
     tags: ['Bans'],
@@ -44,7 +45,7 @@ bans.post('/',
       ...authErrors,
     },
   }),
-  requirePermission('bans:report'),
+  requirePermission('bans:create'),
   validator('json', createBanBodySchema),
   async (c) => {
     const services = c.get('services')
@@ -60,7 +61,8 @@ bans.post('/',
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
-    await audit(services.audit, 'numberBanned', pubkey, { phone: body.phone }, undefined, hubId ?? undefined)
+    // HIGH-W3: Log phone hash, not raw phone number, to protect caller privacy in audit log
+    await audit(services.audit, 'numberBanned', pubkey, { phoneHash: hashPhone(body.phone, c.env.HMAC_SECRET) }, undefined, hubId ?? undefined)
     return c.json({ ok: true })
   },
 )

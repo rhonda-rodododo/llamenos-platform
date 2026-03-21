@@ -321,7 +321,7 @@ When('the {string} user sends {string} to {string} with telephony body', async (
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/telephony-provider', {
     type: 'twilio',
-    accountSid: 'AC_test',
+    accountSid: 'AC' + '0'.repeat(32), // HIGH-W5: AC + 32 hex chars (obviously fake test value)
     authToken: 'test_token',
     phoneNumber: '+15551234567',
   }, user.nsec)

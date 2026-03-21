@@ -5,7 +5,8 @@
  * and accept valid input. Uses admin credentials for all requests.
  * Status assertions are in assertions.steps.ts (shared).
  */
-import { When, Before } from './fixtures'
+import { expect } from '@playwright/test'
+import { When, Then, Given, Before } from './fixtures'
 import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
@@ -118,7 +119,7 @@ When('an admin sends {string} to {string} with negative day body', async ({ requ
 When('an admin sends {string} to {string} with valid twilio body', async ({ request, world }, _method: string, _path: string) => {
   setLastResponse(world, await apiPatch(request, '/settings/telephony-provider', {
     type: 'twilio',
-    accountSid: 'ACtest123456789012345678901234',
+    accountSid: 'AC' + '0'.repeat(32), // HIGH-W5: AC + 32 hex chars = 34 chars total (obviously fake test value)
     authToken: 'test_auth_token_value',
     phoneNumber: '+15551234567',
   }, ADMIN_NSEC))
@@ -145,3 +146,49 @@ When('an admin creates a shift with valid data', async ({ request, world }) => {
     userPubkeys: [],
   }, ADMIN_NSEC))
 })
+
+// ── Security: Ban Audit Log Privacy (HIGH-W3) ───────────────────────
+
+Given('I am authenticated as admin', async () => {
+  // Admin auth is the default for all admin steps via ADMIN_NSEC — no setup needed
+})
+
+Then(
+  'the audit log entry for {string} should not contain the raw phone {string}',
+  async ({ request }, eventType: string, rawPhone: string) => {
+    const res = await apiGet<{ entries: Array<{ eventType: string; payload: unknown }> }>(
+      request,
+      '/audit-log',
+      ADMIN_NSEC,
+    )
+    expect(res.status).toBe(200)
+    const entries = res.data.entries ?? []
+    const matching = entries.filter(e => e.eventType === eventType)
+    for (const entry of matching) {
+      const payloadStr = JSON.stringify(entry.payload)
+      expect(payloadStr).not.toContain(rawPhone)
+    }
+  },
+)
+
+// ── Security: Dev Endpoint Disclosure (HIGH-W4) ─────────────────────
+
+When(
+  'a client sends {string} to {string} with header {string}',
+  async ({ request, world }, method: string, path: string, header: string) => {
+    // No auth — testing unauthenticated access with specific custom header
+    const [headerName, headerValue] = header.split(': ', 2)
+    const headers: Record<string, string> = { [headerName]: headerValue }
+
+    let res: Awaited<ReturnType<typeof request.post>>
+    if (method === 'POST') {
+      res = await request.post(path, { headers })
+    } else if (method === 'GET') {
+      res = await request.get(path, { headers })
+    } else {
+      throw new Error(`Unsupported method: ${method}`)
+    }
+    const data = res.ok() ? await res.json().catch(() => null) : null
+    setLastResponse(world, { status: res.status(), data })
+  },
+)

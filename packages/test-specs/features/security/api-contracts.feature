@@ -208,3 +208,41 @@ Feature: API Contract Validation
   Scenario: Pagination accepts valid bounds
     When an admin sends "GET" to "/api/notes?page=1&limit=100"
     Then the response status should not be 400
+
+  # ─── Ban Audit Log Privacy ──────────────────────────────────────
+
+  Scenario: Ban audit log does not expose raw phone number
+    Given I am authenticated as admin
+    When an admin sends "POST" to "/api/bans" with body:
+      | phone  | +15551234567   |
+      | reason | audit log test |
+    Then the response status should be 200
+    And the audit log entry for "numberBanned" should not contain the raw phone "+15551234567"
+
+  # ─── Dev Endpoint Disclosure ────────────────────────────────────
+
+  Scenario: Dev reset endpoint returns 404 for wrong secret in development
+    When a client sends "POST" to "/api/test-reset" with header "X-Test-Secret: wrong-secret"
+    Then the response status should be 404
+
+  Scenario: Dev reset-no-admin endpoint returns 404 for wrong secret in development
+    When a client sends "POST" to "/api/test-reset-no-admin" with header "X-Test-Secret: wrong-secret"
+    Then the response status should be 404
+
+  # ─── Twilio SID Format Validation ───────────────────────────────
+
+  Scenario: Telephony provider test rejects malformed Twilio Account SID
+    When an admin sends "POST" to "/api/settings/telephony-provider/test" with body:
+      | type       | twilio         |
+      | accountSid | NOT_A_REAL_SID |
+      | authToken  | test           |
+    Then the response status should be 400
+
+  # ─── Permission Hardening ────────────────────────────────────────
+
+  Scenario: Admin with bans:create can directly ban a phone number
+    Given I am authenticated as admin
+    When an admin sends "POST" to "/api/bans" with body:
+      | phone  | +15559876543 |
+      | reason | admin ban    |
+    Then the response status should be 200
