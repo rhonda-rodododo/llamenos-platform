@@ -386,6 +386,15 @@ final class CryptoService: @unchecked Sendable {
         clearHubKeys()
     }
 
+    /// Store a server event encryption key directly for a hub (no ECIES unwrapping needed —
+    /// the key is provided in plaintext by `GET /api/auth/me` as `serverEventKeyHex`).
+    /// This is distinct from `loadHubKey(hubId:envelope:)` which unwraps hub membership keys.
+    func storeServerEventKey(hubId: String, keyHex: String) {
+        hubKeyCacheLock.lock()
+        defer { hubKeyCacheLock.unlock() }
+        hubKeyCache[hubId] = keyHex
+    }
+
     // MARK: - Test Support
 
     #if DEBUG
