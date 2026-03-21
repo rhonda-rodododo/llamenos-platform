@@ -164,7 +164,9 @@ private extension XCUIElement {
         } else {
             // Fallback: triple-tap to select all, then type
             let coordinate = coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            coordinate.tap(withNumberOfTaps: 3, numberOfTouches: 1)
+            coordinate.tap()
+            coordinate.tap()
+            coordinate.tap()
             typeText(text)
         }
     }
