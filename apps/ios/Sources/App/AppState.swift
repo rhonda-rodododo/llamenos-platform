@@ -30,6 +30,7 @@ final class AppState {
     let transcriptionService: TranscriptionService
     let crashReportingService: CrashReportingService
     let offlineQueue: OfflineQueue
+    let hubActivityService: HubActivityService
 
     // MARK: - Auth State
 
@@ -81,6 +82,7 @@ final class AppState {
         let transcription = TranscriptionService()
         let crashReporting = CrashReportingService()
         let offline = OfflineQueue(apiService: api)
+        let hubActivity = HubActivityService()
 
         self.cryptoService = crypto
         self.keychainService = keychain
@@ -91,6 +93,7 @@ final class AppState {
         self.transcriptionService = transcription
         self.crashReportingService = crashReporting
         self.offlineQueue = offline
+        self.hubActivityService = hubActivity
 
         // Wire offline queue into API service for automatic enqueue on network errors
         api.offlineQueue = offline
@@ -420,13 +423,17 @@ final class AppState {
             relayURL += "/relay"
         }
 
-        // Tag the WebSocket connection with the active hub ID so emitted events
-        // carry hub context. When no hub is selected yet (fresh install), events
-        // arrive without a hub ID and are dropped from the typed stream.
-        webSocketService.activeHubId = hubContext.activeHubId
-
         Task {
             await webSocketService.connect(to: relayURL)
+        }
+
+        // Start (or restart) the attributed-event consumer that drives per-hub activity state.
+        eventListenerTask?.cancel()
+        eventListenerTask = Task { [weak self] in
+            guard let self else { return }
+            for await attributed in webSocketService.attributedEvents {
+                hubActivityService.handle(attributed)
+            }
         }
     }
 }

@@ -43,39 +43,11 @@ struct AttributedHubEventTests {
         #expect(a.event == b.event)
     }
 
-    // MARK: - activeHubId tagging
+    // MARK: - Raw event stream delivery
 
-    @Test func webSocketServiceExposesActiveHubIdProperty() {
+    @Test func rawEventsStreamDeliversEmittedEvents() async {
         let ws = WebSocketService(cryptoService: CryptoService())
-        #expect(ws.activeHubId == nil)
-        ws.activeHubId = "hub-001"
-        #expect(ws.activeHubId == "hub-001")
-    }
 
-    @Test func activeHubIdChangesAreReflectedImmediately() {
-        let ws = WebSocketService(cryptoService: CryptoService())
-        ws.activeHubId = "hub-1"
-        #expect(ws.activeHubId == "hub-1")
-        ws.activeHubId = "hub-2"
-        #expect(ws.activeHubId == "hub-2")
-    }
-
-    // MARK: - Typed event stream carries hub attribution
-
-    @Test func typedEventsCarryHubIdFromHub1Connection() async {
-        let ws = WebSocketService(cryptoService: CryptoService())
-        ws.activeHubId = "hub-1"
-        // Install a mock decrypt key so emitEvent can produce typed events.
-        // We use a known-valid XChaCha20-Poly1305 ciphertext via a real CryptoService
-        // encrypt call — but since we can't do that without a key derivation here,
-        // we verify via the raw events stream and the activeHubId snapshot instead.
-        //
-        // Verify: setting activeHubId = "hub-1" is captured at the moment of emit.
-        // The typed stream requires successful decryption, which needs a real key;
-        // we test the hub-ID snapshot separately from decryption correctness.
-        #expect(ws.activeHubId == "hub-1")
-
-        // Collect one raw event, confirm the service's activeHubId at that instant.
         let collected: NostrEvent? = await withCheckedContinuation { continuation in
             var resumed = false
             Task {
@@ -94,40 +66,11 @@ struct AttributedHubEventTests {
             }
         }
         #expect(collected?.id == "evt-hub-1")
-        // The activeHubId at the time of emitEvent was "hub-1".
-        #expect(ws.activeHubId == "hub-1")
     }
 
-    @Test func typedEventsCarryHubIdFromHub2Connection() async {
+    @Test func rawEventsStreamDeliversMultipleSequentialEvents() async {
         let ws = WebSocketService(cryptoService: CryptoService())
-        ws.activeHubId = "hub-2"
-        #expect(ws.activeHubId == "hub-2")
 
-        let collected: NostrEvent? = await withCheckedContinuation { continuation in
-            var resumed = false
-            Task {
-                for await event in ws.events {
-                    if !resumed {
-                        resumed = true
-                        continuation.resume(returning: event)
-                    }
-                    return
-                }
-            }
-            Task {
-                await Task.yield()
-                ws.emitEvent(self.makeRawEvent(id: "evt-hub-2"))
-            }
-        }
-        #expect(collected?.id == "evt-hub-2")
-        #expect(ws.activeHubId == "hub-2")
-    }
-
-    @Test func switchingActiveHubIdChangesTagOnSubsequentEmits() async {
-        let ws = WebSocketService(cryptoService: CryptoService())
-        ws.activeHubId = "hub-1"
-
-        // Collect the first raw event (hub-1)
         let first: NostrEvent? = await withCheckedContinuation { continuation in
             var resumed = false
             Task {
@@ -145,10 +88,7 @@ struct AttributedHubEventTests {
             }
         }
         #expect(first?.id == "evt-first")
-        #expect(ws.activeHubId == "hub-1")
 
-        // Switch hub and emit a second event — the service now reports "hub-2"
-        ws.activeHubId = "hub-2"
         let second: NostrEvent? = await withCheckedContinuation { continuation in
             var resumed = false
             Task {
@@ -166,23 +106,13 @@ struct AttributedHubEventTests {
             }
         }
         #expect(second?.id == "evt-second")
-        #expect(ws.activeHubId == "hub-2")
     }
 
-    @Test func typedEventStreamYieldsAttributedHubEventWithCorrectHubId() async {
+    @Test func attributedEventsStreamHasCorrectElementType() {
         let ws = WebSocketService(cryptoService: CryptoService())
-        ws.activeHubId = "hub-tagged"
-
-        // Provide a server event key and a pre-encrypted payload so the typed
-        // stream fires. We can synthesize a real encrypted event using CryptoService
-        // if the key is available — but here we verify the attribution struct itself.
-        // This test checks the stream type is AsyncStream<AttributedHubEvent>.
-        // We subscribe and verify we get a stream back (compile-time type check).
-        let stream: AsyncStream<AttributedHubEvent> = ws.attributedEvents
-        // The stream is valid and has the correct element type.
-        // Actual emission requires decryption; that's covered in WebSocketServiceAttributionTests.
         // Type-level assertion: if this compiles, the stream element type is correct.
+        // Actual emission requires decryption; that's covered in WebSocketServiceAttributionTests.
+        let stream: AsyncStream<AttributedHubEvent> = ws.attributedEvents
         _ = stream
-        #expect(ws.activeHubId == "hub-tagged")
     }
 }

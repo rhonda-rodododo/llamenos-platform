@@ -78,6 +78,8 @@ enum HubEventType: String, Sendable {
     case callAnswered = "call:answered"
     case callUpdate = "call:update"
     case callEnded = "call:ended"
+    case shiftStarted = "shift:started"
+    case shiftEnded = "shift:ended"
     case shiftUpdate = "shift:update"
     case noteCreated = "note:created"
     case voicemailNew = "voicemail:new"
@@ -115,12 +117,6 @@ final class WebSocketService: @unchecked Sendable {
 
     /// Count of events received since last connect (for diagnostics).
     private(set) var eventCount: Int = 0
-
-    /// The hub ID whose relay this connection is subscribed to.
-    /// Set by the caller before or immediately after `connect(to:)`. Events received
-    /// while this is nil are tagged with an empty string and dropped by attributed-event
-    /// subscribers that require a hub ID.
-    var activeHubId: String?
 
     // MARK: - Dependencies
 
@@ -340,7 +336,7 @@ final class WebSocketService: @unchecked Sendable {
 
         // Emit raw event
         continuationsLock.lock()
-        let activeContinuations = continuations.values
+        let activeContinuations = Array(continuations.values)
         continuationsLock.unlock()
         for continuation in activeContinuations {
             continuation.yield(event)
@@ -351,7 +347,7 @@ final class WebSocketService: @unchecked Sendable {
         // from the attributed stream — raw events are still delivered above.
         if let attributed = decryptEvent(event.content) {
             typedContinuationsLock.lock()
-            let activeTyped = typedContinuations.values
+            let activeTyped = Array(typedContinuations.values)
             typedContinuationsLock.unlock()
             for continuation in activeTyped {
                 continuation.yield(attributed)

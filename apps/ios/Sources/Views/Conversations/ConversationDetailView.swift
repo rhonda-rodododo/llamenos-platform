@@ -6,6 +6,7 @@ import SwiftUI
 /// text input, and real-time updates.
 struct ConversationDetailView: View {
     @Environment(AppState.self) private var appState
+    @Environment(HubContext.self) private var hubContext
     @State private var viewModel: ConversationsViewModel?
 
     let conversationId: String
@@ -236,6 +237,7 @@ struct ConversationDetailView: View {
             apiService: appState.apiService,
             cryptoService: appState.cryptoService,
             webSocketService: appState.webSocketService,
+            hubContext: hubContext,
             adminPubkeys: [appState.adminDecryptionPubkey].compactMap { $0 }
         )
         DispatchQueue.main.async {
