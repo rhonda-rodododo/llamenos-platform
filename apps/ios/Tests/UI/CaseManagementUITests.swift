@@ -72,7 +72,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Requires the Docker Compose backend with CMS enabled and entity types configured.
     func testCaseListShowsEntityTypeTabs() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to the Cases tab") {
@@ -110,7 +109,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Verifies the list renders actual case card rows with data.
     func testCaseListShowsCaseCards() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to the Cases tab") {
@@ -144,7 +142,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Empty state displays when no records exist.
     func testCaseListEmptyState() {
         given("I am authenticated as admin with API and fresh state") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to the Cases tab") {
@@ -180,7 +177,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Tapping an entity type tab changes the selected filter.
     func testEntityTypeTabFiltering() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to Cases and entity type tabs are visible") {
@@ -216,7 +212,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Status filter chips are visible when CMS is enabled.
     func testStatusFilterChips() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to Cases") {
@@ -248,7 +243,6 @@ final class CaseManagementUITests: BaseUITest {
     /// This tests the pagination bar structure (prev/next/page label).
     func testPaginationControlsStructure() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to Cases") {
@@ -277,7 +271,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Tapping a case card opens the detail view with header.
     func testCaseDetailShowsHeader() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to Cases and tap a case card") {
@@ -307,7 +300,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Case detail shows the status pill.
     func testCaseDetailShowsStatusPill() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail") {
@@ -328,7 +320,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Case detail shows all 4 tabs (Details, Timeline, Contacts, Evidence).
     func testCaseDetailTabBar() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail") {
@@ -365,7 +356,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Details tab renders field rows from entity type schema.
     func testDetailsTabShowsFields() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail on the Details tab") {
@@ -395,7 +385,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Timeline tab shows interactions or empty state.
     func testTimelineTabShowsInteractions() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail and tap the Timeline tab") {
@@ -425,7 +414,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Contacts tab shows linked contacts or empty state.
     func testContactsTabShowsLinkedContacts() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail and tap the Contacts tab") {
@@ -464,7 +452,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Evidence tab shows evidence items or empty state.
     func testEvidenceTabShowsItems() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail and tap the Evidence tab") {
@@ -505,7 +492,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Tapping the status pill opens the QuickStatusSheet.
     func testStatusPillOpensSheet() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail and tap the status pill") {
@@ -538,7 +524,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Selecting a new status updates the pill.
     func testSelectNewStatus() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open status sheet and select a different status") {
@@ -580,7 +565,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Full add comment flow — open sheet, type text, submit.
     func testAddCommentFlow() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail, navigate to timeline, and open the comment sheet") {
@@ -642,7 +626,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Unassigned case shows "Assign to me" button.
     func testAssignToMeButton() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail") {
@@ -674,7 +657,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Closing the case detail returns to the list.
     func testCaseDetailCloseReturnsToList() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail and tap the close button") {
@@ -706,7 +688,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Switching between all 4 detail tabs renders the correct content.
     func testDetailTabSwitching() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a case detail") {
@@ -779,7 +760,6 @@ final class CaseManagementUITests: BaseUITest {
     /// Scenario: Cancelling the QuickStatusSheet dismisses it without changes.
     func testQuickStatusSheetCancel() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open the status sheet and cancel") {

@@ -67,7 +67,6 @@ final class HubSwitchUITests: BaseUITest {
     /// the active hub indicator updates and the notes screen loads.
     func testHubSwitchUpdatesDataScope() throws {
         given("the app is launched as admin with live API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
 

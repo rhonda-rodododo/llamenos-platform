@@ -169,7 +169,6 @@ final class ReportFlowUITests: BaseUITest {
     /// Requires Docker Compose backend with report types configured.
     func testReportTypePickerShowsTypes() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to reports and tap create") {
@@ -199,7 +198,6 @@ final class ReportFlowUITests: BaseUITest {
     /// Requires Docker Compose backend with mobile-optimized report types.
     func testTypedReportFormRendersFields() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to reports and open a typed report form") {
@@ -249,7 +247,6 @@ final class ReportFlowUITests: BaseUITest {
     /// Verifies that cancelling the typed report form returns to the reports screen.
     func testCancelTypedReportForm() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a typed report form and cancel") {
@@ -296,7 +293,6 @@ final class ReportFlowUITests: BaseUITest {
     /// mic button (AudioInputButton) for speech-to-text dictation.
     func testAudioInputButtonVisibleOnTextareaFields() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a typed report form") {
