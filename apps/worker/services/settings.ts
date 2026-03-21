@@ -2051,9 +2051,14 @@ export class SettingsService {
 
   async bulkSetEntityTypes(data: {
     entityTypes: EntityTypeDefinition[]
+    hubId?: string
   }): Promise<{ entityTypes: EntityTypeDefinition[] }> {
     await this.db.transaction(async (tx) => {
-      await tx.delete(entityTypeDefinitions)
+      if (data.hubId !== undefined) {
+        await tx.delete(entityTypeDefinitions).where(eq(entityTypeDefinitions.hubId, data.hubId))
+      } else {
+        await tx.delete(entityTypeDefinitions)
+      }
       for (const et of data.entityTypes) {
         const now = new Date()
         await tx.insert(entityTypeDefinitions).values({
@@ -2112,10 +2117,12 @@ export class SettingsService {
   // Relationship Types
   // =========================================================================
 
-  async getRelationshipTypes(): Promise<{
+  async getRelationshipTypes(hubId?: string): Promise<{
     relationshipTypes: RelationshipTypeDefinition[]
   }> {
-    const rows = await this.db.select().from(relationshipTypeDefinitions)
+    const rows = hubId !== undefined
+      ? await this.db.select().from(relationshipTypeDefinitions).where(eq(relationshipTypeDefinitions.hubId, hubId))
+      : await this.db.select().from(relationshipTypeDefinitions)
     return {
       relationshipTypes: rows.map((r) => this.rowToRelationshipType(r)),
     }
@@ -2219,9 +2226,14 @@ export class SettingsService {
 
   async bulkSetRelationshipTypes(data: {
     relationshipTypes: RelationshipTypeDefinition[]
+    hubId?: string
   }): Promise<{ relationshipTypes: RelationshipTypeDefinition[] }> {
     await this.db.transaction(async (tx) => {
-      await tx.delete(relationshipTypeDefinitions)
+      if (data.hubId !== undefined) {
+        await tx.delete(relationshipTypeDefinitions).where(eq(relationshipTypeDefinitions.hubId, data.hubId))
+      } else {
+        await tx.delete(relationshipTypeDefinitions)
+      }
       for (const rt of data.relationshipTypes) {
         const now = new Date()
         await tx.insert(relationshipTypeDefinitions).values({
@@ -2475,9 +2487,14 @@ export class SettingsService {
 
   async bulkSetCmsReportTypes(data: {
     reportTypes: ReportTypeDefinition[]
+    hubId?: string
   }): Promise<{ reportTypes: ReportTypeDefinition[] }> {
     await this.db.transaction(async (tx) => {
-      await tx.delete(reportTypeDefinitions)
+      if (data.hubId !== undefined) {
+        await tx.delete(reportTypeDefinitions).where(eq(reportTypeDefinitions.hubId, data.hubId))
+      } else {
+        await tx.delete(reportTypeDefinitions)
+      }
       for (const rt of data.reportTypes) {
         const now = new Date()
         await tx.insert(reportTypeDefinitions).values({

@@ -160,10 +160,13 @@ Then('the call status should be {string}', async ({ request, world }, expectedSt
   const state = getScenarioState(world)
   expect(state.callId).toBeTruthy()
 
+  const historyPath = state.hubId ? `/hubs/${state.hubId}/calls/history` : '/calls/history'
+  const activePath = state.hubId ? `/hubs/${state.hubId}/calls/active` : '/calls/active'
+
   // Check call history first (completed/unanswered calls)
   const historyRes = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(
     request,
-    '/calls/history',
+    historyPath,
   )
   if (historyRes.status === 200) {
     const historyCall = historyRes.data.calls.find(c => c.callId === state.callId)
@@ -176,7 +179,7 @@ Then('the call status should be {string}', async ({ request, world }, expectedSt
   // If not in history, check active calls (ringing/in-progress calls)
   const activeRes = await apiGet<{ calls: Array<{ callId: string; status: string }> }>(
     request,
-    '/calls/active',
+    activePath,
   )
   if (activeRes.status === 200) {
     const activeCall = activeRes.data.calls.find(c => c.callId === state.callId)

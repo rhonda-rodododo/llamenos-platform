@@ -114,7 +114,8 @@ Given('{int} closed record is linked to the contact', async ({ request, world },
 // ── When Steps ─────────────────────────────────────────────────────
 
 When('a call arrives from identifier hash {string}', async ({ request, world }, hash: string) => {
-  getScreenPopState(world).identificationResult = await identifyCallerViaApi(request, hash)
+  const hubId = getScenarioState(world).hubId
+  getScreenPopState(world).identificationResult = await identifyCallerViaApi(request, hash, undefined, hubId)
 })
 
 When('the admin looks up identifier hash {string}', async ({ request, world }, hash: string) => {

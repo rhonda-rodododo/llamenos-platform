@@ -936,8 +936,11 @@ export async function applyTemplateViaApi(
   request: APIRequestContext,
   templateId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ status: number; data: Record<string, unknown> }> {
-  return apiPost<Record<string, unknown>>(request, '/settings/cms/templates/apply', { templateId }, nsec)
+  const body: Record<string, unknown> = { templateId }
+  if (hubId) body.hubId = hubId
+  return apiPost<Record<string, unknown>>(request, '/settings/cms/templates/apply', body, nsec)
 }
 
 // ── Case Management: CMS Report Types (Epic 343) ────────────────
@@ -1483,10 +1486,14 @@ export async function identifyCallerViaApi(
   request: APIRequestContext,
   identifierHash: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<CallerIdentificationResult> {
+  const path = hubId
+    ? `/hubs/${hubId}/calls/identify/${identifierHash}`
+    : `/calls/identify/${identifierHash}`
   const { status, data } = await apiGet<CallerIdentificationResult>(
     request,
-    `/calls/identify/${identifierHash}`,
+    path,
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to identify caller: ${status}`)

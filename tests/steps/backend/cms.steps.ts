@@ -184,7 +184,8 @@ Then('the template should have relationship types', async ({ world }) => {
 })
 
 When('the admin applies template {string}', async ({ request, world }, templateId: string) => {
-  const result = await applyTemplateViaApi(request, templateId)
+  const hubId = getScenarioState(world).hubId
+  const result = await applyTemplateViaApi(request, templateId, undefined, hubId)
   if (result.status !== 201 && result.status !== 200) {
     setLastResponse(world, { status: result.status, data: result.data })
     return
@@ -219,8 +220,9 @@ Then('entity types from both templates should exist', async ({request, world}) =
 })
 
 When('a volunteer tries to apply template {string}', async ({request, world}, templateId: string) => {
+  const hubId = getScenarioState(world).hubId
   const vol = await createVolunteerViaApi(request, { name: `vol-tmpl-${Date.now()}` })
-  const result = await applyTemplateViaApi(request, templateId, vol.nsec)
+  const result = await applyTemplateViaApi(request, templateId, vol.nsec, hubId)
   setLastResponse(world, { status: result.status, data: result.data })
 })
 

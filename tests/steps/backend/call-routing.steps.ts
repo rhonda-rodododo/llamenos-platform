@@ -19,18 +19,19 @@ const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 // ── Call Simulation ────────────────────────────────────────────────
 
 When('a call arrives from {string}', async ({ request, world }, caller: string) => {
+  const state = getScenarioState(world)
   try {
-    const result = await simulateIncomingCall(request, { callerNumber: caller })
-    getScenarioState(world).callId = result.callId
-    getScenarioState(world).callStatus = result.status
+    const result = await simulateIncomingCall(request, { callerNumber: caller, hubId: state.hubId })
+    state.callId = result.callId
+    state.callStatus = result.status
 
     // Check if the caller is on the ban list — simulation endpoint bypasses ban logic
-    if (getScenarioState(world).banPhones.includes(caller)) {
-      getScenarioState(world).callStatus = 'rejected'
+    if (state.banPhones.includes(caller)) {
+      state.callStatus = 'rejected'
     }
   } catch (e) {
     // Call rejected (e.g., banned caller, server error)
-    getScenarioState(world).callStatus = 'rejected'
+    state.callStatus = 'rejected'
   }
 })
 
@@ -84,9 +85,11 @@ Then('volunteer {int} no longer receives a ring', async ({ world }, _index: numb
 // ── Call History Assertions ────────────────────────────────────────
 
 Then('the call history contains {int} entry/entries', async ({request, world}, count: number) => {
+  const { hubId } = getScenarioState(world)
+  const path = hubId ? `/hubs/${hubId}/calls/history` : '/calls/history'
   const { status, data } = await apiGet<{ calls: Array<{ callId: string }>; total: number }>(
     request,
-    '/calls/history',
+    path,
   )
   expect(status).toBe(200)
   expect(data.total).toBeGreaterThanOrEqual(count)
@@ -94,9 +97,11 @@ Then('the call history contains {int} entry/entries', async ({request, world}, c
 
 
 Then('the most recent call shows status {string}', async ({request, world}, expectedStatus: string) => {
+  const { hubId } = getScenarioState(world)
+  const path = hubId ? `/hubs/${hubId}/calls/history?limit=1` : '/calls/history?limit=1'
   const { status, data } = await apiGet<{ calls: Array<{ status: string }> }>(
     request,
-    '/calls/history?limit=1',
+    path,
   )
   expect(status).toBe(200)
   expect(data.calls.length).toBeGreaterThan(0)
@@ -104,9 +109,11 @@ Then('the most recent call shows status {string}', async ({request, world}, expe
 })
 
 Then('the most recent call shows caller {string}', async ({request, world}, expectedCaller: string) => {
+  const { hubId } = getScenarioState(world)
+  const path = hubId ? `/hubs/${hubId}/calls/history?limit=1` : '/calls/history?limit=1'
   const { status, data } = await apiGet<{ calls: Array<{ callerLast4?: string; callerNumber?: string }> }>(
     request,
-    '/calls/history?limit=1',
+    path,
   )
   expect(status).toBe(200)
   expect(data.calls.length).toBeGreaterThan(0)
@@ -116,9 +123,11 @@ Then('the most recent call shows caller {string}', async ({request, world}, expe
 })
 
 When('the call history is filtered by status {string}', async ({ request, world }, filterStatus: string) => {
+  const { hubId } = getScenarioState(world)
+  const path = hubId ? `/hubs/${hubId}/calls/history?status=${filterStatus}` : `/calls/history?status=${filterStatus}`
   const { status, data } = await apiGet<{ calls: Array<{ callId: string }>; total: number }>(
     request,
-    `/calls/history?status=${filterStatus}`,
+    path,
   )
   expect(status).toBe(200)
   getScenarioState(world).lastApiResponse = { status, data }
@@ -126,9 +135,13 @@ When('the call history is filtered by status {string}', async ({ request, world 
 
 When('the call history is filtered to today\'s date', async ({ request, world }) => {
   const today = new Date().toISOString().split('T')[0]
+  const { hubId } = getScenarioState(world)
+  const path = hubId
+    ? `/hubs/${hubId}/calls/history?dateFrom=${today}&dateTo=${today}`
+    : `/calls/history?dateFrom=${today}&dateTo=${today}`
   const { status, data } = await apiGet<{ calls: Array<{ callId: string }>; total: number }>(
     request,
-    `/calls/history?dateFrom=${today}&dateTo=${today}`,
+    path,
   )
   expect(status).toBe(200)
   getScenarioState(world).lastApiResponse = { status, data }
