@@ -141,10 +141,8 @@ services:
 
   # ── Core: Nostr Relay (strfry) ────────────────────────────
   strfry:
-    # Pin to specific tag for reproducible deployments
-    # Check https://hub.docker.com/r/dockurr/strfry/tags for latest stable version
-    # TODO: pin to digest after pulling — run: docker pull dockurr/strfry:1.0.1 && docker inspect --format='{{index .RepoDigests 0}}' dockurr/strfry:1.0.1
-    image: dockurr/strfry:1.0.1
+    # dockurr/strfry:1.0.1 pinned 2026-03-21
+    image: dockurr/strfry:1.0.1@sha256:4bcfddc8aab07e17d35198c0618d6a9c8e5d3e27b211741ebce9f7058cdd1e21
     restart: unless-stopped
     ulimits:
       nofile:
@@ -163,7 +161,8 @@ services:
 
   # ── Optional: Whisper Transcription ───────────────────────
   whisper:
-    # TODO: pin to digest after pulling — run: docker pull fedirz/faster-whisper-server:0.4.1 && docker inspect --format='{{index .RepoDigests 0}}' fedirz/faster-whisper-server:0.4.1
+    # fedirz/faster-whisper-server:0.4.1 — digest pin pending: tag not yet published to Docker Hub
+    # Run: docker pull fedirz/faster-whisper-server:0.4.1 && docker inspect --format='{{index .RepoDigests 0}}' fedirz/faster-whisper-server:0.4.1
     image: fedirz/faster-whisper-server:0.4.1
     profiles: ["transcription"]
     restart: unless-stopped

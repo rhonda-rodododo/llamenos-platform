@@ -53,7 +53,7 @@ whisper:
   enabled: false
   image:
     repository: fedirz/faster-whisper-server
-    tag: "0.4.1"  # TODO: pin to digest when available
+    tag: "0.4.1"  # digest pin pending: tag not yet published to Docker Hub — pin once available
   model: "Systran/faster-whisper-base"
   device: "cpu"  # or "cuda" for GPU
   resources:
@@ -85,7 +85,8 @@ nostr:
   relayUrl: "ws://strfry:7777"
   image:
     repository: dockurr/strfry
-    tag: "latest"
+    tag: "1.0.1@sha256:4bcfddc8aab07e17d35198c0618d6a9c8e5d3e27b211741ebce9f7058cdd1e21"
+    # dockurr/strfry:1.0.1 pinned 2026-03-21
   persistence:
     size: 5Gi
     storageClass: ""
