@@ -344,7 +344,7 @@ final class CryptoService: @unchecked Sendable {
     }
 
     /// Unwrap a hub key envelope using the user's nsec and store in the in-memory cache.
-    /// Uses eciesUnwrapKeyHex with the "llamenos:hub-key-wrap" domain separation label.
+    /// Uses eciesUnwrapKeyHex with the CryptoLabels.LABEL_HUB_KEY_WRAP domain separation label.
     /// Requires the user's nsec to be loaded (app unlocked).
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws {
         guard let nsecHex else { throw CryptoServiceError.noKeyLoaded }
@@ -352,21 +352,23 @@ final class CryptoService: @unchecked Sendable {
             wrappedKey: envelope.envelope.wrappedKey,
             ephemeralPubkey: envelope.envelope.ephemeralPubkey
         )
+        // FFI call happens before acquiring the lock — no point holding the lock
+        // during decryption, which may be slow and does not access hubKeyCache.
         let keyHex = try eciesUnwrapKeyHex(
             envelope: ffiEnvelope,
             secretKeyHex: nsecHex,
-            label: "llamenos:hub-key-wrap"
+            label: CryptoLabels.LABEL_HUB_KEY_WRAP
         )
         hubKeyCacheLock.lock()
+        defer { hubKeyCacheLock.unlock() }
         hubKeyCache[hubId] = keyHex
-        hubKeyCacheLock.unlock()
     }
 
     /// Evict all hub keys. Must be called on lock and logout.
     func clearHubKeys() {
         hubKeyCacheLock.lock()
+        defer { hubKeyCacheLock.unlock() }
         hubKeyCache.removeAll()
-        hubKeyCacheLock.unlock()
     }
 
     // MARK: - Lock
@@ -385,8 +387,8 @@ final class CryptoService: @unchecked Sendable {
     /// Store a hub key directly for testing (bypasses FFI envelope decryption).
     func storeHubKeyForTesting(hubId: String, keyHex: String) {
         hubKeyCacheLock.lock()
+        defer { hubKeyCacheLock.unlock() }
         hubKeyCache[hubId] = keyHex
-        hubKeyCacheLock.unlock()
     }
 
     /// Set a deterministic test identity for XCUITest automation.
