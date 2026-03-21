@@ -261,7 +261,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
         do {
             let decryptedJSON = try appState.wakeKeyService.decryptWakePayload(encryptedHex: encryptedHex)
-            print("[APNs] Decrypted wake payload: \(decryptedJSON.prefix(80))...")
 
             // Parse the decrypted payload and post a local notification
             if let data = decryptedJSON.data(using: .utf8),

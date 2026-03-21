@@ -184,9 +184,7 @@ private struct PINDigitButton: View {
     struct PreviewWrapper: View {
         @State private var pin = ""
         var body: some View {
-            PINPadView(pin: $pin, maxLength: 4) { completed in
-                print("PIN entered: \(completed)")
-            }
+            PINPadView(pin: $pin, maxLength: 4) { _ in }
         }
     }
     return PreviewWrapper()
@@ -196,9 +194,7 @@ private struct PINDigitButton: View {
     struct PreviewWrapper: View {
         @State private var pin = "12"
         var body: some View {
-            PINPadView(pin: $pin, maxLength: 6) { completed in
-                print("PIN entered: \(completed)")
-            }
+            PINPadView(pin: $pin, maxLength: 6) { _ in }
         }
     }
     return PreviewWrapper()

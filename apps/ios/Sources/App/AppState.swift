@@ -212,8 +212,12 @@ final class AppState {
               let baseURL = URL(string: hubURL) else { return }
         guard let userPubkey = cryptoService.pubkey else { return }
 
-        // Step 1: Bootstrap admin (admin key is hardcoded — same as setMockIdentity)
-        let adminSecretHex = "f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb"
+        // Step 1: Bootstrap admin using key injected via XCTEST_ADMIN_SECRET env var
+        let adminSecretHex = ProcessInfo.processInfo.environment["XCTEST_ADMIN_SECRET"] ?? ""
+        guard !adminSecretHex.isEmpty else {
+            print("[DEBUG] XCTEST_ADMIN_SECRET not set — skipping admin bootstrap")
+            return
+        }
         bootstrapAdmin(baseURL: baseURL, adminSecretHex: adminSecretHex)
 
         // Step 2: Create user using admin auth

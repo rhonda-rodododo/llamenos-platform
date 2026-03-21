@@ -510,6 +510,13 @@ jobs:
           ./scripts/build-mobile.sh ios
           cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
 
+      - name: Check for hardcoded secrets in Swift source
+        run: |
+          if grep -rE '[0-9a-f]{64}' apps/ios/Sources/ --include="*.swift"; then
+            echo "ERROR: Potential hardcoded hex secret found in iOS source"
+            exit 1
+          fi
+
       - name: Install xcodegen
         run: brew install xcodegen
 

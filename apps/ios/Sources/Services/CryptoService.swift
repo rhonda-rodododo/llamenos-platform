@@ -407,16 +407,15 @@ final class CryptoService: @unchecked Sendable {
 
     /// Set a deterministic test identity for XCUITest automation.
     /// Uses the same admin secret key as the desktop Playwright tests,
-    /// matching the ADMIN_PUBKEY configured in Docker Compose. The real
-    /// pubkey/npub are derived via the Rust FFI so auth tokens, note
-    /// envelope matching, and API requests all use consistent keys.
-    ///
-    /// Admin nsec (desktop tests/helpers.ts): nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh
-    /// Secret hex: f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb
-    /// Pubkey:     ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228
+    /// Uses the admin key from XCTEST_ADMIN_SECRET env var (set by test runner).
     func setMockIdentity() {
-        // Same admin key used in desktop tests — matches ADMIN_PUBKEY in Docker .env
-        let secretHex = "f5450e96b38e7cb7f109fb6e55a2d616fa6bf7e3f1f86594379023bdcf4dd1bb"
+        // Read from XCTEST_ADMIN_SECRET env var — set by test runner from CI secrets.
+        // Never hardcode this value in source.
+        let secretHex = ProcessInfo.processInfo.environment["XCTEST_ADMIN_SECRET"] ?? ""
+        guard !secretHex.isEmpty else {
+            print("[DEBUG] XCTEST_ADMIN_SECRET not set — mock identity not loaded")
+            return
+        }
         setIdentity(secretHex: secretHex)
     }
 
