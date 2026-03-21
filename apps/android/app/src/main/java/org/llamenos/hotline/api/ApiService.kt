@@ -2,6 +2,7 @@ package org.llamenos.hotline.api
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import okhttp3.CertificatePinner
@@ -37,6 +38,15 @@ class ApiService @Inject constructor(
     @PublishedApi internal val keystoreService: KeyValueStore,
     private val activeHubState: ActiveHubState,
 ) {
+
+    /**
+     * Dispatcher used for all HTTP I/O. Defaults to [Dispatchers.IO] in production.
+     * Tests may override this to [kotlinx.coroutines.test.UnconfinedTestDispatcher] so that
+     * the inline [request] function executes synchronously within the test scheduler instead
+     * of dispatching to a real thread pool (which races with [advanceUntilIdle]).
+     */
+    @PublishedApi
+    internal var ioDispatcher: CoroutineContext = Dispatchers.IO
 
     @PublishedApi
     internal var client: OkHttpClient = OkHttpClient.Builder()
@@ -94,7 +104,7 @@ class ApiService @Inject constructor(
         method: String,
         path: String,
         body: Any? = null,
-    ): T = withContext(Dispatchers.IO) {
+    ): T = withContext(ioDispatcher) {
         val baseUrl = getBaseUrl()
         val url = "$baseUrl$path"
 
@@ -152,7 +162,7 @@ class ApiService @Inject constructor(
         method: String,
         path: String,
         body: Any? = null,
-    ): Unit = withContext(Dispatchers.IO) {
+    ): Unit = withContext(ioDispatcher) {
         val baseUrl = getBaseUrl()
         val url = "$baseUrl$path"
 
@@ -212,7 +222,7 @@ class ApiService @Inject constructor(
         method: String,
         path: String,
         rawJsonBody: String? = null,
-    ): Unit = withContext(Dispatchers.IO) {
+    ): Unit = withContext(ioDispatcher) {
         val baseUrl = getBaseUrl()
         val url = "$baseUrl$path"
 
