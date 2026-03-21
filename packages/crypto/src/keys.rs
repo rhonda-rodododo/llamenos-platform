@@ -6,16 +6,19 @@ use bech32::{Bech32, Hrp};
 use k256::{elliptic_curve::sec1::ToEncodedPoint, SecretKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use zeroize::Zeroizing;
 
 use crate::errors::CryptoError;
 
 /// A secp256k1 keypair with Nostr bech32 encodings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+///
+/// `secret_key_hex` is wrapped in `Zeroizing<String>` so it is wiped from memory on drop.
+/// On the mobile FFI boundary, use `PublicKeyPair` instead — `KeyPair` is never exported
+/// to Swift/Kotlin directly.
+#[derive(Debug, Clone)]
 pub struct KeyPair {
-    /// hex-encoded 32-byte secret key
-    pub secret_key_hex: String,
+    /// hex-encoded 32-byte secret key (zeroized on drop)
+    pub secret_key_hex: Zeroizing<String>,
     /// hex-encoded 32-byte x-only public key
     pub public_key: String,
     /// bech32-encoded secret key (nsec1...)
@@ -24,19 +27,32 @@ pub struct KeyPair {
     pub npub: String,
 }
 
-/// Generate a new random secp256k1 keypair.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+/// Mobile-safe keypair type — excludes secret key material.
+///
+/// Returned by UniFFI-exported keygen functions. The secret key never crosses
+/// the FFI boundary; callers use the stateful loadKey/loadKeyFromNsec pattern.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+pub struct PublicKeyPair {
+    /// hex-encoded 32-byte x-only public key
+    pub public_key: String,
+    /// bech32-encoded public key (npub1...)
+    pub npub: String,
+}
+
+/// Internal: generate a new random secp256k1 keypair (full KeyPair with secret material).
 pub fn generate_keypair() -> KeyPair {
     let sk = SecretKey::random(&mut OsRng);
     let pk = sk.public_key();
 
-    let sk_bytes = sk.to_bytes();
+    let sk_bytes = Zeroizing::new(sk.to_bytes()); // zeroized on drop
     let pk_point = pk.to_encoded_point(true);
     let pk_compressed = pk_point.as_bytes();
     // x-only = skip the 0x02/0x03 prefix
     let pk_xonly = &pk_compressed[1..];
 
-    let secret_key_hex = hex::encode(sk_bytes);
+    let secret_key_hex = Zeroizing::new(hex::encode(*sk_bytes));
     let public_key = hex::encode(pk_xonly);
 
     let nsec = bech32::encode::<Bech32>(Hrp::parse("nsec").unwrap(), &sk_bytes)
@@ -52,13 +68,13 @@ pub fn generate_keypair() -> KeyPair {
     }
 }
 
-/// Derive a keypair from an nsec bech32 string.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+/// Internal: derive a keypair from an nsec bech32 string.
 pub fn keypair_from_nsec(nsec: &str) -> Result<KeyPair, CryptoError> {
     let (hrp, data) = bech32::decode(nsec).map_err(|_| CryptoError::InvalidNsec)?;
     if hrp.as_str() != "nsec" || data.len() != 32 {
         return Err(CryptoError::InvalidNsec);
     }
+    let data = Zeroizing::new(data); // zeroize the decoded key bytes on drop
 
     let sk = SecretKey::from_slice(&data).map_err(|_| CryptoError::InvalidSecretKey)?;
     let pk = sk.public_key();
@@ -67,7 +83,7 @@ pub fn keypair_from_nsec(nsec: &str) -> Result<KeyPair, CryptoError> {
     let pk_compressed = pk_point.as_bytes();
     let pk_xonly = &pk_compressed[1..];
 
-    let secret_key_hex = hex::encode(&data);
+    let secret_key_hex = Zeroizing::new(hex::encode(&data[..]));
     let public_key = hex::encode(pk_xonly);
 
     let npub = bech32::encode::<Bech32>(Hrp::parse("npub").unwrap(), pk_xonly)
@@ -81,10 +97,9 @@ pub fn keypair_from_nsec(nsec: &str) -> Result<KeyPair, CryptoError> {
     })
 }
 
-/// Derive a keypair from a 64-char hex secret key.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+/// Internal: derive a keypair from a 64-char hex secret key.
 pub fn keypair_from_secret_key_hex(secret_key_hex: &str) -> Result<KeyPair, CryptoError> {
-    let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
+    let sk_bytes = Zeroizing::new(hex::decode(secret_key_hex).map_err(CryptoError::HexError)?);
     if sk_bytes.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
     }
@@ -96,7 +111,7 @@ pub fn keypair_from_secret_key_hex(secret_key_hex: &str) -> Result<KeyPair, Cryp
     let pk_compressed = pk_point.as_bytes();
     let pk_xonly = &pk_compressed[1..];
 
-    let secret_key_hex = hex::encode(&sk_bytes);
+    let secret_key_hex = Zeroizing::new(hex::encode(&sk_bytes[..]));
     let public_key = hex::encode(pk_xonly);
 
     let nsec = bech32::encode::<Bech32>(Hrp::parse("nsec").unwrap(), &sk_bytes)
@@ -109,6 +124,39 @@ pub fn keypair_from_secret_key_hex(secret_key_hex: &str) -> Result<KeyPair, Cryp
         public_key,
         nsec,
         npub,
+    })
+}
+
+/// Mobile FFI exports — return PublicKeyPair only (no secret material crosses the FFI boundary).
+#[cfg(feature = "mobile")]
+#[uniffi::export]
+pub fn generate_keypair_mobile() -> PublicKeyPair {
+    let kp = generate_keypair();
+    PublicKeyPair {
+        public_key: kp.public_key,
+        npub: kp.npub,
+    }
+}
+
+#[cfg(feature = "mobile")]
+#[uniffi::export]
+pub fn keypair_from_nsec_mobile(nsec: &str) -> Result<PublicKeyPair, CryptoError> {
+    let kp = keypair_from_nsec(nsec)?;
+    Ok(PublicKeyPair {
+        public_key: kp.public_key,
+        npub: kp.npub,
+    })
+}
+
+#[cfg(feature = "mobile")]
+#[uniffi::export]
+pub fn keypair_from_secret_key_hex_mobile(
+    secret_key_hex: &str,
+) -> Result<PublicKeyPair, CryptoError> {
+    let kp = keypair_from_secret_key_hex(secret_key_hex)?;
+    Ok(PublicKeyPair {
+        public_key: kp.public_key,
+        npub: kp.npub,
     })
 }
 

@@ -45,8 +45,8 @@ pub fn encrypt_note(
     author_pubkey: &str,
     admin_pubkeys: &[String],
 ) -> Result<EncryptedNote, CryptoError> {
-    // Generate random per-note symmetric key
-    let mut note_key = random_bytes_32();
+    // Generate random per-note symmetric key (zeroized on all exit paths via Zeroizing drop)
+    let note_key = Zeroizing::new(random_bytes_32());
     let nonce_bytes = {
         let mut n = [0u8; 24];
         getrandom::getrandom(&mut n).expect("getrandom failed");
@@ -55,7 +55,7 @@ pub fn encrypt_note(
 
     // Encrypt content with XChaCha20-Poly1305
     let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&note_key)
+    let cipher = XChaCha20Poly1305::new_from_slice(&*note_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let ciphertext = cipher
         .encrypt(nonce, payload_json.as_bytes())
@@ -81,9 +81,6 @@ pub fn encrypt_note(
             })
         })
         .collect();
-
-    // Zero out note key
-    note_key.zeroize();
 
     Ok(EncryptedNote {
         encrypted_content: hex::encode(&packed),
@@ -139,7 +136,7 @@ pub fn encrypt_message(
     plaintext: &str,
     reader_pubkeys: &[String],
 ) -> Result<EncryptedMessage, CryptoError> {
-    let mut message_key = random_bytes_32();
+    let message_key = Zeroizing::new(random_bytes_32());
     let nonce_bytes = {
         let mut n = [0u8; 24];
         getrandom::getrandom(&mut n).expect("getrandom failed");
@@ -147,7 +144,7 @@ pub fn encrypt_message(
     };
 
     let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&message_key)
+    let cipher = XChaCha20Poly1305::new_from_slice(&*message_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())
@@ -168,8 +165,6 @@ pub fn encrypt_message(
             })
         })
         .collect();
-
-    message_key.zeroize();
 
     Ok(EncryptedMessage {
         encrypted_content: hex::encode(&packed),

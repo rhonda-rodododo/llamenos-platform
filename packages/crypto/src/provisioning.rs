@@ -283,7 +283,6 @@ mod tests {
 
         let primary_sk = SecretKey::random(&mut OsRng);
         let primary_pk = primary_sk.public_key();
-        let primary_pk_encoded = primary_pk.to_encoded_point(true);
 
         let ephemeral_sk = SecretKey::random(&mut OsRng);
         let ephemeral_pk = ephemeral_sk.public_key();
