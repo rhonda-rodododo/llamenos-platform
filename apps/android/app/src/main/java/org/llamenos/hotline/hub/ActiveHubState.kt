@@ -27,7 +27,9 @@ class ActiveHubState @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
-    private val ACTIVE_HUB_KEY = stringPreferencesKey("activeHubId")
+    companion object {
+        private val ACTIVE_HUB_KEY = stringPreferencesKey("activeHubId")
+    }
 
     val activeHubId: StateFlow<String?> = dataStore.data
         .map { prefs -> prefs[ACTIVE_HUB_KEY] }
