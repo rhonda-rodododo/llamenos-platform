@@ -2708,6 +2708,51 @@ export class SettingsService {
     } as RelationshipTypeDefinition
   }
 
+  // =========================================================================
+  // Geocoding Config
+  // =========================================================================
+
+  async getGeocodingConfig(): Promise<import('@protocol/schemas/geocoding').GeocodingConfig> {
+    const settings = await getSettings(this.db)
+    const config = settings.geocodingConfig as Record<string, unknown> | null
+    if (!config || typeof config !== 'object' || !('provider' in config)) {
+      return { provider: null, countries: [], enabled: false }
+    }
+    const rawProvider = config.provider as string | null
+    const validProviders = ['opencage', 'geoapify', 'llamenos-central'] as const
+    const provider = validProviders.includes(rawProvider as typeof validProviders[number])
+      ? rawProvider as typeof validProviders[number]
+      : null
+    return {
+      provider,
+      countries: Array.isArray(config.countries) ? config.countries as string[] : [],
+      enabled: Boolean(config.enabled),
+    }
+  }
+
+  async getGeocodingConfigAdmin(): Promise<import('@protocol/schemas/geocoding').GeocodingConfigAdmin> {
+    const settings = await getSettings(this.db)
+    const config = settings.geocodingConfig as Record<string, unknown> | null
+    if (!config || typeof config !== 'object') {
+      return { provider: null, apiKey: '', countries: [], enabled: false }
+    }
+    const rawProvider = config.provider as string | null
+    const validProviders = ['opencage', 'geoapify', 'llamenos-central'] as const
+    const provider = validProviders.includes(rawProvider as typeof validProviders[number])
+      ? rawProvider as typeof validProviders[number]
+      : null
+    return {
+      provider,
+      apiKey: (config.apiKey as string) ?? '',
+      countries: Array.isArray(config.countries) ? config.countries as string[] : [],
+      enabled: Boolean(config.enabled),
+    }
+  }
+
+  async updateGeocodingConfig(data: import('@protocol/schemas/geocoding').GeocodingConfigAdmin): Promise<void> {
+    await this.db.update(systemSettings).set({ geocodingConfig: data }).where(eq(systemSettings.id, SINGLETON_ID))
+  }
+
   private rowToReportTypeDefinition(
     r: typeof reportTypeDefinitions.$inferSelect,
   ): ReportTypeDefinition {

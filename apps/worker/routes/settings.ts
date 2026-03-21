@@ -29,6 +29,11 @@ import {
   cleanupMetricsResponseSchema,
   ttlOverridesResponseSchema,
 } from '@protocol/schemas/settings'
+import {
+  geocodingConfigSchema,
+  geocodingConfigAdminSchema,
+  geocodingTestResponseSchema,
+} from '@protocol/schemas/geocoding'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -431,7 +436,8 @@ settings.post('/telephony-provider/test',
 
       switch (body.type) {
         case 'twilio':
-          testUrl = `https://api.twilio.com/2010-04-01/Accounts/${body.accountSid}.json`
+          // HIGH-W5: encodeURIComponent prevents SSRF via crafted accountSid (schema regex also guards)
+          testUrl = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(body.accountSid ?? '')}.json`
           testHeaders['Authorization'] = 'Basic ' + btoa(`${body.accountSid}:${body.authToken}`)
           break
         case 'signalwire': {
@@ -1026,6 +1032,67 @@ settings.get('/cleanup-metrics',
       identity: {},
       conversation: {},
     })
+  },
+)
+
+// --- Geocoding config: readable by authenticated users, writable by settings:manage ---
+settings.get('/geocoding',
+  describeRoute({
+    tags: ['Settings'],
+    summary: 'Get geocoding configuration (API key omitted)',
+    responses: {
+      200: { description: 'Geocoding config', content: { 'application/json': { schema: resolver(geocodingConfigSchema) } } },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const config = await c.get('services').settings.getGeocodingConfig()
+    return c.json(config)
+  },
+)
+
+settings.put('/geocoding',
+  describeRoute({
+    tags: ['Settings'],
+    summary: 'Update geocoding configuration (admin only)',
+    responses: {
+      200: { description: 'Config updated', content: { 'application/json': { schema: resolver(geocodingConfigSchema) } } },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage'),
+  validator('json', geocodingConfigAdminSchema),
+  async (c) => {
+    const body = c.req.valid('json')
+    const pubkey = c.get('pubkey')
+    const services = c.get('services')
+    await services.settings.updateGeocodingConfig(body)
+    await audit(services.audit, 'settings.geocoding.updated', pubkey, { provider: body.provider, enabled: body.enabled })
+    return c.json({ provider: body.provider, countries: body.countries, enabled: body.enabled })
+  },
+)
+
+settings.get('/geocoding/test',
+  describeRoute({
+    tags: ['Settings'],
+    summary: 'Test geocoding connectivity (admin only)',
+    responses: {
+      200: { description: 'Test result', content: { 'application/json': { schema: resolver(geocodingTestResponseSchema) } } },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage'),
+  async (c) => {
+    const config = await c.get('services').settings.getGeocodingConfigAdmin()
+    const { createGeocodingAdapter } = await import('../geocoding/factory')
+    const adapter = createGeocodingAdapter(config)
+    const start = Date.now()
+    try {
+      await adapter.autocomplete('test', { limit: 1 })
+      return c.json({ ok: true, latency: Date.now() - start })
+    } catch {
+      return c.json({ ok: false, latency: Date.now() - start })
+    }
   },
 )
 
