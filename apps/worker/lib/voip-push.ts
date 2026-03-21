@@ -30,6 +30,7 @@ export async function dispatchVoipPushFromService(
   volunteerPubkeys: string[],
   callId: string,
   callerDisplay: string,
+  hubId: string,
   env: Env,
   identityService: IdentityService,
 ): Promise<void> {
@@ -48,9 +49,9 @@ export async function dispatchVoipPushFromService(
 
   for (const device of deviceList) {
     if (device.platform === 'ios' && hasApns) {
-      promises.push(sendApnsVoipPush(device.voipToken, callId, callerDisplay, env))
+      promises.push(sendApnsVoipPush(device.voipToken, callId, callerDisplay, hubId, env))
     } else if (device.platform === 'android' && hasFcm) {
-      promises.push(sendFcmVoipPush(device.voipToken, callId, callerDisplay, env))
+      promises.push(sendFcmVoipPush(device.voipToken, callId, callerDisplay, hubId, env))
     }
   }
 
@@ -66,6 +67,7 @@ async function sendApnsVoipPush(
   deviceToken: string,
   callId: string,
   callerDisplay: string,
+  hubId: string,
   env: Env,
 ): Promise<void> {
   try {
@@ -88,6 +90,7 @@ async function sendApnsVoipPush(
       data: {
         'call-id': callId,
         'caller': callerDisplay,
+        'hub-id': hubId,
         'type': 'incoming_call',
       },
     })
@@ -106,6 +109,7 @@ async function sendFcmVoipPush(
   fcmToken: string,
   callId: string,
   callerDisplay: string,
+  hubId: string,
   env: Env,
 ): Promise<void> {
   try {
@@ -117,6 +121,7 @@ async function sendFcmVoipPush(
         type: 'incoming_call',
         'call-id': callId,
         caller: callerDisplay,
+        'hub-id': hubId,
       },
       priority: 'high',
       // No title/body — data-only message for native SIP stack handling

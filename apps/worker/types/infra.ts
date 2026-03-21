@@ -98,6 +98,7 @@ export type PushNotificationType = 'message' | 'voicemail' | 'shift_reminder' | 
 
 /** Wake-tier payload — decryptable without PIN (minimal metadata) */
 export interface WakePayload {
+  hubId: string          // identifies which hub this push belongs to
   type: PushNotificationType
   conversationId?: string
   channelType?: string

@@ -84,6 +84,7 @@ export async function startParallelRinging(
       browserVoip.map(v => v.pubkey),
       callSid,
       callerLast4,
+      hubId ?? '',
       env,
       services.identity,
     ).catch(err => {

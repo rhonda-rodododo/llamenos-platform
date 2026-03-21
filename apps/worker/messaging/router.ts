@@ -178,10 +178,12 @@ messaging.post('/:channel/webhook', async (c) => {
         if (conv.assignedTo) {
           const dispatcher = createPushDispatcherFromService(c.env, services.identity, services.shifts)
           await dispatcher.sendToVolunteer(conv.assignedTo, {
+            hubId: hubId ?? '',
             type: 'message',
             conversationId: convResult.conversationId,
             channelType: conv.channelType,
           }, {
+            hubId: hubId ?? '',
             type: 'message',
             conversationId: convResult.conversationId,
             channelType: conv.channelType,
