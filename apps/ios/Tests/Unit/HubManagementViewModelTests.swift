@@ -8,6 +8,8 @@ import Testing
 /// APIService is final, so we use the narrow protocol for injection.
 final class MockHubAPIService: HubAPIServiceProtocol {
     var hubKeyResult: Result<HubKeyEnvelopeResponse, Error>?
+    /// Stub for request<T> — set to a closure returning any Decodable for loadHubs/createHub tests.
+    var requestStub: ((String, String) throws -> Any)?
 
     func getHubKey(_ hubId: String) async throws -> HubKeyEnvelopeResponse {
         switch hubKeyResult {
@@ -26,6 +28,13 @@ final class MockHubAPIService: HubAPIServiceProtocol {
                 )
             )
         }
+    }
+
+    func request<T: Decodable>(method: String, path: String, body: (any Encodable)?) async throws -> T {
+        if let stub = requestStub, let result = try stub(method, path) as? T {
+            return result
+        }
+        throw URLError(.unsupportedURL)
     }
 }
 

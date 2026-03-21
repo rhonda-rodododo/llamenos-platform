@@ -2,13 +2,14 @@ import Foundation
 
 // MARK: - HubAPIServiceProtocol
 
-/// Narrow protocol exposing only the hub-key fetch that HubManagementViewModel needs.
-/// Allows test doubles without subclassing the final APIService class.
+/// Narrow protocol exposing the hub-key fetch and generic request method that
+/// HubManagementViewModel needs. Allows test doubles without subclassing the final APIService class.
 protocol HubAPIServiceProtocol {
     func getHubKey(_ hubId: String) async throws -> HubKeyEnvelopeResponse
+    func request<T: Decodable>(method: String, path: String, body: (any Encodable)?) async throws -> T
 }
 
-// APIService conforms automatically — its getHubKey signature matches.
+// APIService conforms automatically — its getHubKey and request signatures match.
 extension APIService: HubAPIServiceProtocol {}
 
 // MARK: - HubCryptoServiceProtocol

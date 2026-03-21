@@ -9,6 +9,7 @@ final class HubManagementViewModel {
     private let apiService: any HubAPIServiceProtocol
     private let cryptoService: any HubCryptoServiceProtocol
     private let hubContext: HubContext
+    private let feedbackGenerator = UINotificationFeedbackGenerator()
 
     // MARK: - State
 
@@ -31,6 +32,7 @@ final class HubManagementViewModel {
         self.apiService = apiService
         self.cryptoService = cryptoService
         self.hubContext = hubContext
+        feedbackGenerator.prepare()
     }
 
     // MARK: - Data Loading
@@ -42,13 +44,9 @@ final class HubManagementViewModel {
         defer { isLoading = false }
         error = nil
 
-        // apiService is typed as HubAPIServiceProtocol which only exposes getHubKey;
-        // for the generic request we need the concrete APIService. Cast gracefully.
-        guard let concreteAPI = apiService as? APIService else { return }
-
         do {
-            let response: HubsListResponse = try await concreteAPI.request(
-                method: "GET", path: "/api/hubs"
+            let response: HubsListResponse = try await apiService.request(
+                method: "GET", path: "/api/hubs", body: nil
             )
             hubs = response.hubs
 
@@ -83,7 +81,7 @@ final class HubManagementViewModel {
                 try cryptoService.loadHubKey(hubId: hub.id, envelope: envelope)
             }
             hubContext.setActiveHub(hub.id)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            feedbackGenerator.notificationOccurred(.success)
         } catch {
             self.error = error
         }
@@ -98,7 +96,6 @@ final class HubManagementViewModel {
 
     /// Create a new hub.
     func createHub(name: String, slug: String?, description: String?, phoneNumber: String?) async -> Bool {
-        guard let concreteAPI = apiService as? APIService else { return false }
         isSaving = true
         defer { isSaving = false }
         error = nil
@@ -111,16 +108,16 @@ final class HubManagementViewModel {
         )
 
         do {
-            let response: AppHubResponse = try await concreteAPI.request(
-                method: "POST", path: "/api/hubs", body: body
+            let response: AppHubResponse = try await apiService.request(
+                method: "POST", path: "/api/hubs", body: body as (any Encodable)?
             )
             hubs.append(response.hub)
             successMessage = NSLocalizedString("hubs_created_success", comment: "Hub created successfully")
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            feedbackGenerator.notificationOccurred(.success)
             return true
         } catch {
             self.error = error
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            feedbackGenerator.notificationOccurred(.error)
             return false
         }
     }
