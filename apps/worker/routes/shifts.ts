@@ -56,7 +56,8 @@ shifts.get('/fallback',
   requirePermission('shifts:manage-fallback'),
   async (c) => {
     const services = c.get('services')
-    const result = await services.settings.getFallbackGroup()
+    const hubId = c.get('hubId') ?? undefined
+    const result = await services.settings.getFallbackGroup(hubId)
     return c.json(result)
   },
 )
@@ -81,8 +82,9 @@ shifts.put('/fallback',
   validator('json', fallbackGroupSchema),
   async (c) => {
     const services = c.get('services')
+    const hubId = c.get('hubId') ?? undefined
     const body = c.req.valid('json')
-    const result = await services.settings.setFallbackGroup(body)
+    const result = await services.settings.setFallbackGroup(body, hubId)
     return c.json(result)
   },
 )

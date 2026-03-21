@@ -6,6 +6,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import {
   apiGet,
   apiPost,
@@ -64,8 +65,10 @@ async function ensureEntityType(
 ): Promise<string> {
   if (getLifecycleState(world).entityTypeId) return getLifecycleState(world).entityTypeId!
   await enableCaseManagementViaApi(request, true)
+  const hubId = getScenarioState(world).hubId
   const et = await createEntityTypeViaApi(request, {
     name: `lifecycle_case_${Date.now()}`,
+    hubId,
   })
   getLifecycleState(world).entityTypeId = et.id
   return et.id

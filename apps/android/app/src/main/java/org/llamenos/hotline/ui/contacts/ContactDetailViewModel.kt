@@ -56,7 +56,7 @@ class ContactDetailViewModel @Inject constructor(
         try {
             val response = apiService.request<ContactDetailResponse>(
                 "GET",
-                "/api/contacts/$contactHash",
+                apiService.hp("/api/contacts/$contactHash"),
             )
             _uiState.update {
                 it.copy(
@@ -79,7 +79,7 @@ class ContactDetailViewModel @Inject constructor(
         try {
             val response = apiService.request<ContactRelationshipsResponse>(
                 "GET",
-                "/api/contacts/$contactHash/relationships",
+                apiService.hp("/api/contacts/$contactHash/relationships"),
             )
             _uiState.update {
                 it.copy(

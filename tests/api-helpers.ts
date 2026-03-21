@@ -154,18 +154,32 @@ export async function createHubViaApi(
   name: string,
 ): Promise<string> {
   const slug = name.toLowerCase().replace(/\s+/g, '-')
-  const { status, data } = await apiPost<{ id: string }>(request, '/hubs', { name, slug })
+  const { status, data } = await apiPost<{ hub: { id: string } }>(request, '/hubs', { name, slug })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create hub: ${status}`)
   }
-  return (data as { id: string }).id
+  return data.hub.id
+}
+
+export async function deleteHubViaApi(
+  request: APIRequestContext,
+  hubId: string,
+): Promise<void> {
+  const { status } = await apiDelete(request, `/hubs/${hubId}`)
+  if (status !== 200 && status !== 204) {
+    // Non-fatal: log but don't throw — teardown should not fail tests
+    console.warn(`Failed to delete hub ${hubId}: ${status}`)
+  }
 }
 
 // ── Unique Test Data Generators ───────────────────────────────────
 
+// Incrementing counter ensures uniqueness within a single worker process,
+// preventing collisions when multiple phones are generated in tight loops.
+let _phoneSeq = 0
 export function uniquePhone(): string {
-  const suffix = Date.now().toString().slice(-7)
-  return `+1555${suffix}`
+  const seq = ++_phoneSeq
+  return `+1555${String(seq).padStart(7, '0')}`
 }
 
 export function uniqueName(prefix: string): string {
@@ -763,6 +777,7 @@ export async function createEntityTypeViaApi(
     label?: string
     category?: string
     color?: string
+    hubId?: string
     statuses?: Array<{ value: string; label: string; order: number }>
     fields?: Array<{ name: string; label: string; type: string; required?: boolean; order: number }>
     numberPrefix?: string
@@ -784,6 +799,7 @@ export async function createEntityTypeViaApi(
       description: `Test entity type ${name}`,
       category: options?.category ?? 'case',
       color: options?.color,
+      hubId: options?.hubId ?? '',
       statuses: options?.statuses ?? defaultStatuses,
       defaultStatus: (options?.statuses ?? defaultStatuses)[0].value,
       closedStatuses: (options?.statuses ?? defaultStatuses).filter(s => (s as Record<string, unknown>).isClosed).map(s => s.value),
@@ -810,9 +826,11 @@ export async function createEntityTypeViaApi(
 
 export async function listEntityTypesViaApi(
   request: APIRequestContext,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>[]> {
-  const { data } = await apiGet<{ entityTypes: Record<string, unknown>[] }>(request, '/settings/cms/entity-types', nsec)
+  const path = hubId ? `/settings/cms/entity-types?hubId=${hubId}` : '/settings/cms/entity-types'
+  const { data } = await apiGet<{ entityTypes: Record<string, unknown>[] }>(request, path, nsec)
   return data?.entityTypes ?? []
 }
 
@@ -844,6 +862,7 @@ export async function createRelationshipTypeViaApi(
     cardinality?: string
     label?: string
     reverseLabel?: string
+    hubId?: string
   },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
@@ -858,6 +877,7 @@ export async function createRelationshipTypeViaApi(
       reverseLabel: options.reverseLabel ?? 'Related',
       sourceLabel: 'has',
       targetLabel: 'belongs to',
+      hubId: options.hubId ?? '',
     },
     nsec,
   )
@@ -868,12 +888,13 @@ export async function createRelationshipTypeViaApi(
 export async function generateCaseNumberViaApi(
   request: APIRequestContext,
   prefix: string,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<{ number: string; sequence: number }> {
   const { status, data } = await apiPost<{ number: string; sequence: number }>(
     request,
     '/settings/cms/case-number',
-    { prefix },
+    { prefix, hubId: hubId ?? '' },
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to generate case number: ${status}`)
@@ -915,17 +936,22 @@ export async function applyTemplateViaApi(
   request: APIRequestContext,
   templateId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ status: number; data: Record<string, unknown> }> {
-  return apiPost<Record<string, unknown>>(request, '/settings/cms/templates/apply', { templateId }, nsec)
+  const body: Record<string, unknown> = { templateId }
+  if (hubId) body.hubId = hubId
+  return apiPost<Record<string, unknown>>(request, '/settings/cms/templates/apply', body, nsec)
 }
 
 // ── Case Management: CMS Report Types (Epic 343) ────────────────
 
 export async function listCmsReportTypesViaApi(
   request: APIRequestContext,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>[]> {
-  const { data } = await apiGet<{ reportTypes: Record<string, unknown>[] }>(request, '/settings/cms/report-types', nsec)
+  const path = hubId ? `/settings/cms/report-types?hubId=${hubId}` : '/settings/cms/report-types'
+  const { data } = await apiGet<{ reportTypes: Record<string, unknown>[] }>(request, path, nsec)
   return data?.reportTypes ?? []
 }
 
@@ -946,6 +972,7 @@ export async function createCmsReportTypeViaApi(
     label?: string
     labelPlural?: string
     description?: string
+    hubId?: string
     fields?: Array<Record<string, unknown>>
     statuses?: Array<{ value: string; label: string; order: number }>
     allowCaseConversion?: boolean
@@ -967,6 +994,7 @@ export async function createCmsReportTypeViaApi(
       label: options?.label ?? name.replace(/_/g, ' '),
       labelPlural: options?.labelPlural ?? `${name.replace(/_/g, ' ')}s`,
       description: options?.description ?? `Test report type ${name}`,
+      hubId: options?.hubId ?? '',
       statuses: options?.statuses ?? defaultStatuses,
       defaultStatus: (options?.statuses ?? defaultStatuses)[0].value,
       closedStatuses: (options?.statuses ?? defaultStatuses).filter(s => (s as Record<string, unknown>).isClosed).map(s => s.value),
@@ -1058,15 +1086,16 @@ export async function createContactViaApi(
     trigramTokens?: string[]
     encryptedSummary?: string
     contactTypeHash?: string
+    hubId?: string
   },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
   const envelope = dummyEnvelope(nsec)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    '/directory',
+    hubPath('/directory', options?.hubId),
     {
-      hubId: '',
+      hubId: options?.hubId ?? '',
       identifierHashes: options?.identifierHashes ?? [`idhash_${Date.now()}_${Math.random().toString(36).slice(2)}`],
       nameHash: options?.nameHash,
       trigramTokens: options?.trigramTokens,
@@ -1084,7 +1113,7 @@ export async function createContactViaApi(
 
 export async function listContactsViaApi(
   request: APIRequestContext,
-  params?: { page?: number; limit?: number; contactTypeHash?: string },
+  params?: { page?: number; limit?: number; contactTypeHash?: string; hubId?: string },
   nsec = ADMIN_NSEC,
 ): Promise<{ contacts: Record<string, unknown>[]; total: number; hasMore: boolean }> {
   const qs = new URLSearchParams()
@@ -1092,7 +1121,7 @@ export async function listContactsViaApi(
   if (params?.limit) qs.set('limit', String(params.limit))
   if (params?.contactTypeHash) qs.set('contactTypeHash', params.contactTypeHash)
   const qsStr = qs.toString()
-  const path = `/directory${qsStr ? `?${qsStr}` : ''}`
+  const path = `${hubPath('/directory', params?.hubId)}${qsStr ? `?${qsStr}` : ''}`
   const { status, data } = await apiGet<{ contacts: Record<string, unknown>[]; total: number; hasMore: boolean }>(request, path, nsec)
   if (status !== 200) throw new Error(`Failed to list contacts: ${status}`)
   return data
@@ -1101,9 +1130,10 @@ export async function listContactsViaApi(
 export async function lookupContactViaApi(
   request: APIRequestContext,
   identifierHash: string,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<{ contact: Record<string, unknown> | null }> {
-  const { status, data } = await apiGet<{ contact: Record<string, unknown> | null }>(request, `/directory/lookup/${identifierHash}`, nsec)
+  const { status, data } = await apiGet<{ contact: Record<string, unknown> | null }>(request, `${hubPath('/directory', hubId)}/lookup/${identifierHash}`, nsec)
   if (status !== 200) throw new Error(`Failed to lookup contact: ${status}`)
   return data
 }
@@ -1112,9 +1142,10 @@ export async function updateContactViaApi(
   request: APIRequestContext,
   contactId: string,
   updates: Record<string, unknown>,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/directory/${contactId}`, updates, nsec)
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, `${hubPath('/directory', hubId)}/${contactId}`, updates, nsec)
   if (status !== 200) throw new Error(`Failed to update contact: ${status}`)
   return data
 }
@@ -1122,9 +1153,10 @@ export async function updateContactViaApi(
 export async function deleteContactViaApi(
   request: APIRequestContext,
   contactId: string,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/directory/${contactId}`, nsec)
+  const { status } = await apiDelete(request, `${hubPath('/directory', hubId)}/${contactId}`, nsec)
   if (status !== 200) throw new Error(`Failed to delete contact: ${status}`)
 }
 
@@ -1138,13 +1170,14 @@ export async function createRecordViaApi(
     assignedTo?: string[]
     blindIndexes?: Record<string, string>
     parentRecordId?: string
+    hubId?: string
   },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
   const envelope = dummyEnvelope(nsec)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    '/records',
+    hubPath('/records', options?.hubId),
     {
       entityTypeId,
       statusHash: options?.statusHash ?? 'status_open_hash',
@@ -1162,7 +1195,7 @@ export async function createRecordViaApi(
 
 export async function listRecordsViaApi(
   request: APIRequestContext,
-  params?: { entityTypeId?: string; statusHash?: string; assignedTo?: string; page?: number; limit?: number },
+  params?: { entityTypeId?: string; statusHash?: string; assignedTo?: string; page?: number; limit?: number; hubId?: string },
   nsec = ADMIN_NSEC,
 ): Promise<{ records: Record<string, unknown>[]; total: number; hasMore: boolean }> {
   const qs = new URLSearchParams()
@@ -1172,7 +1205,7 @@ export async function listRecordsViaApi(
   if (params?.statusHash) qs.set('statusHash', params.statusHash)
   if (params?.assignedTo) qs.set('assignedTo', params.assignedTo)
   const qsStr = qs.toString()
-  const path = `/records${qsStr ? `?${qsStr}` : ''}`
+  const path = `${hubPath('/records', params?.hubId)}${qsStr ? `?${qsStr}` : ''}`
   const { status, data } = await apiGet<{ records: Record<string, unknown>[]; total: number; hasMore: boolean }>(request, path, nsec)
   if (status !== 200) throw new Error(`Failed to list records: ${status}`)
   return data
@@ -1181,9 +1214,10 @@ export async function listRecordsViaApi(
 export async function getRecordViaApi(
   request: APIRequestContext,
   recordId: string,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/records/${recordId}`, nsec)
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `${hubPath('/records', hubId)}/${recordId}`, nsec)
   if (status !== 200) throw new Error(`Failed to get record: ${status}`)
   return data
 }
@@ -1192,9 +1226,10 @@ export async function updateRecordViaApi(
   request: APIRequestContext,
   recordId: string,
   updates: Record<string, unknown>,
+  hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/records/${recordId}`, updates, nsec)
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, `${hubPath('/records', hubId)}/${recordId}`, updates, nsec)
   if (status !== 200) throw new Error(`Failed to update record: ${status}`)
   return data
 }
@@ -1451,10 +1486,14 @@ export async function identifyCallerViaApi(
   request: APIRequestContext,
   identifierHash: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<CallerIdentificationResult> {
+  const path = hubId
+    ? `/hubs/${hubId}/calls/identify/${identifierHash}`
+    : `/calls/identify/${identifierHash}`
   const { status, data } = await apiGet<CallerIdentificationResult>(
     request,
-    `/calls/identify/${identifierHash}`,
+    path,
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to identify caller: ${status}`)

@@ -31,6 +31,7 @@ final class AppState {
     let crashReportingService: CrashReportingService
     let offlineQueue: OfflineQueue
     let hubActivityService: HubActivityService
+    let linphoneService: LinphoneService
 
     // MARK: - Auth State
 
@@ -83,6 +84,7 @@ final class AppState {
         let crashReporting = CrashReportingService()
         let offline = OfflineQueue(apiService: api)
         let hubActivity = HubActivityService()
+        let linphone = LinphoneService()
 
         self.cryptoService = crypto
         self.keychainService = keychain
@@ -94,6 +96,7 @@ final class AppState {
         self.crashReportingService = crashReporting
         self.offlineQueue = offline
         self.hubActivityService = hubActivity
+        self.linphoneService = linphone
 
         // Wire offline queue into API service for automatic enqueue on network errors
         api.offlineQueue = offline

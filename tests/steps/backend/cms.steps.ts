@@ -9,6 +9,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getSharedState, setLastResponse } from './shared-state'
+import { getScenarioState } from './common.steps'
 import {
   createEntityTypeViaApi,
   listEntityTypesViaApi,
@@ -108,7 +109,8 @@ async function resolveEntityTypeId(
   const cached = getCmsState(world).entityTypeIds.get(name)
   if (cached) return cached
 
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const existing = types.find(t => t.name === name)
   if (existing) {
     const id = existing.id as string
@@ -116,7 +118,7 @@ async function resolveEntityTypeId(
     return id
   }
 
-  const created = await createEntityTypeViaApi(request, { name, category: 'case' })
+  const created = await createEntityTypeViaApi(request, { name, category: 'case', hubId })
   const id = created.id as string
   getCmsState(world).entityTypeIds.set(name, id)
   return id
@@ -130,7 +132,8 @@ async function resolveEventEntityTypeId(
   const cached = getCmsState(world).eventEntityTypeIds.get(name)
   if (cached) return cached
 
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const existing = types.find(t => t.name === name)
   if (existing) {
     const id = existing.id as string
@@ -138,7 +141,7 @@ async function resolveEventEntityTypeId(
     return id
   }
 
-  const created = await createEntityTypeViaApi(request, { name, category: 'event' })
+  const created = await createEntityTypeViaApi(request, { name, category: 'event', hubId })
   const id = created.id as string
   getCmsState(world).eventEntityTypeIds.set(name, id)
   return id
@@ -181,7 +184,8 @@ Then('the template should have relationship types', async ({ world }) => {
 })
 
 When('the admin applies template {string}', async ({ request, world }, templateId: string) => {
-  const result = await applyTemplateViaApi(request, templateId)
+  const hubId = getScenarioState(world).hubId
+  const result = await applyTemplateViaApi(request, templateId, undefined, hubId)
   if (result.status !== 201 && result.status !== 200) {
     setLastResponse(world, { status: result.status, data: result.data })
     return
@@ -195,7 +199,8 @@ Then('the template should be applied successfully', async ({ world }) => {
 })
 
 Then('entity types from the template should exist', async ({request, world}) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   expect(types.length).toBeGreaterThan(0)
 })
 
@@ -205,7 +210,8 @@ Then('relationship types from the template should exist', async ({request, world
 })
 
 Then('entity types from both templates should exist', async ({request, world}) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   // jail-support creates arrest_case; street-medic creates medical_encounter
   const hasArrest = types.some(t => t.name === 'arrest_case')
   const hasPatient = types.some(t => t.name === 'medical_encounter')
@@ -214,8 +220,9 @@ Then('entity types from both templates should exist', async ({request, world}) =
 })
 
 When('a volunteer tries to apply template {string}', async ({request, world}, templateId: string) => {
+  const hubId = getScenarioState(world).hubId
   const vol = await createVolunteerViaApi(request, { name: `vol-tmpl-${Date.now()}` })
-  const result = await applyTemplateViaApi(request, templateId, vol.nsec)
+  const result = await applyTemplateViaApi(request, templateId, vol.nsec, hubId)
   setLastResponse(world, { status: result.status, data: result.data })
 })
 
@@ -224,7 +231,8 @@ When('a volunteer tries to apply template {string}', async ({request, world}, te
 // ============================================================
 
 When('the admin creates a contact with encrypted profile', async ({ request, world }) => {
-  getCmsState(world).lastContact = await createContactViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastContact = await createContactViaApi(request, { hubId })
 })
 
 Then('the contact should have a generated UUID id', async ({ world }) => {
@@ -238,14 +246,16 @@ Then('the contact should have an encrypted summary', async ({ world }) => {
 })
 
 Given('{int} contacts exist', async ({ request, world }, count: number) => {
+  const hubId = getScenarioState(world).hubId
   for (let i = 0; i < count; i++) {
-    const c = await createContactViaApi(request)
+    const c = await createContactViaApi(request, { hubId })
     getCmsState(world).contacts.push(c)
   }
 })
 
 When('the admin lists contacts with limit {int}', async ({ request, world }, limit: number) => {
-  getCmsState(world).contactListResult = await listContactsViaApi(request, { page: 1, limit })
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).contactListResult = await listContactsViaApi(request, { page: 1, limit, hubId })
 })
 
 Then('the contact list should have {int} contacts', async ({ world }, count: number) => {
@@ -258,11 +268,13 @@ Then('the contact list should indicate more pages', async ({ world }) => {
 })
 
 Given('a contact exists with identifier hash {string}', async ({ request, world }, hash: string) => {
-  getCmsState(world).lastContact = await createContactViaApi(request, { identifierHashes: [hash] })
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastContact = await createContactViaApi(request, { identifierHashes: [hash], hubId })
 })
 
 When('the admin looks up contact by identifier hash {string}', async ({ request, world }, hash: string) => {
-  const result = await lookupContactViaApi(request, hash)
+  const hubId = getScenarioState(world).hubId
+  const result = await lookupContactViaApi(request, hash, hubId)
   getCmsState(world).lookedUpContact = result.contact
 })
 
@@ -272,14 +284,17 @@ Then('the looked-up contact should match the created contact', async ({ world })
 })
 
 Given('a contact exists', async ({ request, world }) => {
-  getCmsState(world).lastContact = await createContactViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastContact = await createContactViaApi(request, { hubId })
 })
 
 When('the admin updates the contact encrypted summary', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
   const updated = await updateContactViaApi(
     request,
     getCmsState(world).lastContact!.id as string,
     { encryptedSummary: 'dXBkYXRlZCBjb250YWN0' },
+    hubId,
   )
   getCmsState(world).lastContact = updated
 })
@@ -289,7 +304,8 @@ Then('the contact should have the updated summary', async ({ world }) => {
 })
 
 When('the admin deletes the contact', async ({ request, world }) => {
-  await deleteContactViaApi(request, getCmsState(world).lastContact!.id as string)
+  const hubId = getScenarioState(world).hubId
+  await deleteContactViaApi(request, getCmsState(world).lastContact!.id as string, hubId)
 })
 
 Then('the contact should no longer exist', async ({ request, world }) => {
@@ -345,7 +361,8 @@ When('the volunteer tries to create a contact', async ({ request, world }) => {
 
 When('the admin creates a record of type {string} with status hash {string}', async ({ request, world }, typeName: string, statusHash: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
-  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { statusHash })
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { statusHash, hubId })
   getCmsState(world).records.push(getCmsState(world).lastRecord)
 })
 
@@ -366,19 +383,22 @@ Then('the record should have status hash {string}', async ({ world }, statusHash
 
 Given('a record of type {string} exists', async ({ request, world }, typeName: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
-  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId)
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { hubId })
   getCmsState(world).records.push(getCmsState(world).lastRecord)
 })
 
 Given('a record of type {string} exists with status hash {string}', async ({ request, world }, typeName: string, statusHash: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
-  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { statusHash })
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastRecord = await createRecordViaApi(request, entityTypeId, { statusHash, hubId })
   getCmsState(world).records.push(getCmsState(world).lastRecord)
 })
 
 When('the admin lists records filtered by entity type {string}', async ({ request, world }, typeName: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
-  getCmsState(world).recordListResult = await listRecordsViaApi(request, { entityTypeId })
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).recordListResult = await listRecordsViaApi(request, { entityTypeId, hubId })
 })
 
 Then('all returned records should have entity type {string}', async ({ request, world }, typeName: string) => {
@@ -419,24 +439,28 @@ When('the admin assigns the volunteer to the record', async ({ request, world })
 })
 
 Then('the record should include the volunteer in assignedTo', async ({ request, world }) => {
-  const record = await getRecordViaApi(request, getCmsState(world).lastRecord!.id as string)
+  const hubId = getScenarioState(world).hubId
+  const record = await getRecordViaApi(request, getCmsState(world).lastRecord!.id as string, hubId)
   const assignedTo = record.assignedTo as string[]
   expect(assignedTo).toContain(getCmsState(world).volunteerPubkey!)
 })
 
 Given('an entity type with number prefix {string} exists', async ({ request, world }, prefix: string) => {
+  const hubId = getScenarioState(world).hubId
   const name = `numbered_type_${Date.now()}`
   const created = await createEntityTypeViaApi(request, {
     name,
     category: 'case',
     numberPrefix: prefix,
+    hubId,
   })
   getCmsState(world).numberedEntityTypeId = created.id as string
   getCmsState(world).entityTypeIds.set(name, created.id as string)
 })
 
 When('the admin creates a record of the numbered type', async ({ request, world }) => {
-  getCmsState(world).lastRecord = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!)
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastRecord = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!, { hubId })
   getCmsState(world).records.push(getCmsState(world).lastRecord)
 })
 
@@ -447,7 +471,8 @@ Then('the record should have a case number matching {string}', async ({ world },
 })
 
 When('the admin creates another record of the numbered type', async ({ request, world }) => {
-  getCmsState(world).lastRecord = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!)
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).lastRecord = await createRecordViaApi(request, getCmsState(world).numberedEntityTypeId!, { hubId })
   getCmsState(world).records.push(getCmsState(world).lastRecord)
 })
 
@@ -458,10 +483,12 @@ Then('the second record should have a case number matching {string}', async ({ w
 })
 
 When('the admin updates the record status hash to {string}', async ({ request, world }, statusHash: string) => {
+  const hubId = getScenarioState(world).hubId
   const updated = await updateRecordViaApi(
     request,
     getCmsState(world).lastRecord!.id as string,
     { statusHash },
+    hubId,
   )
   getCmsState(world).lastRecord = updated
 })
@@ -482,7 +509,8 @@ Given('a volunteer exists with cases:read-own and cases:create permissions', asy
 })
 
 When('the volunteer lists records', async ({ request, world }) => {
-  getCmsState(world).recordListResult = await listRecordsViaApi(request, {}, getCmsState(world).volunteerNsec!)
+  const hubId = getScenarioState(world).hubId
+  getCmsState(world).recordListResult = await listRecordsViaApi(request, { hubId }, getCmsState(world).volunteerNsec!)
 })
 
 Then('the volunteer should see {int} records', async ({ world }, count: number) => {
@@ -551,8 +579,9 @@ Then('the event should have {int} linked report', async ({ request, world }, cou
 
 Given('{int} records of type {string} are linked to the event', async ({ request, world }, count: number, typeName: string) => {
   const entityTypeId = await resolveEntityTypeId(world, request, typeName)
+  const hubId = getScenarioState(world).hubId
   for (let i = 0; i < count; i++) {
-    const record = await createRecordViaApi(request, entityTypeId)
+    const record = await createRecordViaApi(request, entityTypeId, { hubId })
     await linkRecordToEventViaApi(request, getCmsState(world).lastEvent!.id as string, record.id as string)
     getCmsState(world).records.push(record)
   }

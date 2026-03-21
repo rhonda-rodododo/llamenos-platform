@@ -53,7 +53,7 @@ export function NewNoteForm({ recentCalls, customFieldDefs, saving, onSave, onCa
           <Label htmlFor="call-id">{t('notes.callId')}</Label>
           {recentCalls.length > 0 ? (
             <Select value={callId || undefined} onValueChange={setCallId}>
-              <SelectTrigger id="call-id">
+              <SelectTrigger id="call-id" data-testid="call-id-select">
                 <SelectValue placeholder={t('notes.selectCall')} />
               </SelectTrigger>
               <SelectContent>

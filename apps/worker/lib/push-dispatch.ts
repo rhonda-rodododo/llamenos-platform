@@ -13,6 +13,38 @@ import type { ShiftsService } from '../services/shifts'
 import { encryptWakePayload, encryptFullPayload } from './push-encryption'
 import { FcmClient } from './fcm-client'
 
+// ── Test Push Log (dev/test environments only) ────────────────────────────────
+// In-memory store for the last dispatched WakePayload — used by BDD tests to
+// verify that push payloads carry the correct hubId without real APNs/FCM credentials.
+
+interface TestPushLogEntry {
+  wakePayload: WakePayload
+  recipientPubkey: string
+  recordedAt: string
+}
+
+const testPushLog: TestPushLogEntry[] = []
+
+/**
+ * Record a dispatched WakePayload for test inspection.
+ * Only call this in ENVIRONMENT=development — guarded at call sites.
+ */
+export function recordTestPushPayload(wakePayload: WakePayload, recipientPubkey: string): void {
+  testPushLog.push({ wakePayload, recipientPubkey, recordedAt: new Date().toISOString() })
+  // Keep only the last 50 entries to avoid unbounded memory growth
+  if (testPushLog.length > 50) testPushLog.splice(0, testPushLog.length - 50)
+}
+
+/** Return all recorded push log entries (most recent last). */
+export function getTestPushLog(): TestPushLogEntry[] {
+  return [...testPushLog]
+}
+
+/** Clear the push log — call before each scenario to ensure isolation. */
+export function clearTestPushLog(): void {
+  testPushLog.splice(0, testPushLog.length)
+}
+
 const APNS_BUNDLE_ID = 'org.llamenos.mobile'
 
 export interface PushDispatcher {
@@ -37,6 +69,8 @@ export interface PushDispatcher {
 /**
  * Create a PushDispatcher from services (no DO stubs).
  * Returns a no-op dispatcher if push credentials aren't configured.
+ * In ENVIRONMENT=development, always returns a logging dispatcher so BDD tests
+ * can verify push payload structure without real APNs/FCM credentials.
  */
 export function createPushDispatcherFromService(
   env: Env,
@@ -45,8 +79,13 @@ export function createPushDispatcherFromService(
 ): PushDispatcher {
   const hasApns = !!(env.APNS_KEY_P8 && env.APNS_KEY_ID && env.APNS_TEAM_ID)
   const hasFcm = !!env.FCM_SERVICE_ACCOUNT_KEY
+  const isDev = env.ENVIRONMENT === 'development'
 
   if (!hasApns && !hasFcm) {
+    // In development, return a logging-only dispatcher so push payloads are recorded
+    if (isDev) {
+      return new LoggingPushDispatcher(identityService, shiftsService)
+    }
     return new NoopPushDispatcher()
   }
 
@@ -56,6 +95,34 @@ export function createPushDispatcherFromService(
 class NoopPushDispatcher implements PushDispatcher {
   async sendToVolunteer(): Promise<void> {}
   async sendToAllOnShift(): Promise<void> {}
+}
+
+/**
+ * Development-only dispatcher that records payloads in the in-memory log
+ * without attempting real APNs/FCM delivery.
+ * Used when ENVIRONMENT=development but no push credentials are configured.
+ */
+class LoggingPushDispatcher implements PushDispatcher {
+  constructor(
+    private identityService: IdentityService,
+    private shiftsService: ShiftsService,
+  ) {}
+
+  async sendToVolunteer(
+    userPubkey: string,
+    wakePayload: WakePayload,
+  ): Promise<void> {
+    recordTestPushPayload(wakePayload, userPubkey)
+  }
+
+  async sendToAllOnShift(
+    wakePayload: WakePayload,
+  ): Promise<void> {
+    const pubkeys = await this.shiftsService.getCurrentVolunteers('')
+    for (const pk of pubkeys) {
+      recordTestPushPayload(wakePayload, pk)
+    }
+  }
 }
 
 /**

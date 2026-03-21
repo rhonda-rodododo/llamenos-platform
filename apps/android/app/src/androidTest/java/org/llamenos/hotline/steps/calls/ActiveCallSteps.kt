@@ -11,6 +11,7 @@ import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Step definitions for active-call.feature scenarios.
@@ -33,7 +34,8 @@ class ActiveCallSteps : BaseSteps() {
         // The call will then appear on the dashboard as an active call card.
         try {
             val callResult = SimulationClient.simulateIncomingCall(
-                callerNumber = "+15559${System.currentTimeMillis().toString().takeLast(6)}"
+                callerNumber = "+15559${System.currentTimeMillis().toString().takeLast(6)}",
+                hubId = ScenarioHooks.currentHubId.ifEmpty { null },
             )
             activeCallId = callResult.callId
             Log.d("ActiveCallSteps", "Simulated call: id=$activeCallId, status=${callResult.status}")

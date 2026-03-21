@@ -1270,7 +1270,14 @@
     "switchHub": "Switch hub",
     "title": "Hub Management",
     "urlLabel": "Hub URL",
-    "urlPlaceholder": "https://hub.example.com"
+    "urlPlaceholder": "https://hub.example.com",
+    "deleteHub": "Delete Hub",
+    "deleteHubConfirmLabel": "Type the hub name to confirm deletion",
+    "deleteHubConfirmPlaceholder": "Hub name",
+    "deleteHubDescription": "Permanently delete this hub and all of its data. This cannot be undone.",
+    "deleteHubNameMismatch": "Hub name does not match",
+    "deleteHubWarning": "This will permanently delete all calls, notes, cases, contacts, shifts, and user accounts associated with this hub.",
+    "hubDeleted": "Hub deleted permanently"
   },
   "identityLabel": "Identity",
   "import": {

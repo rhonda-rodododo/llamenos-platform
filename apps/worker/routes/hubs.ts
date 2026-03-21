@@ -6,6 +6,8 @@ import { createHubBodySchema, updateHubBodySchema, addHubMemberBodySchema, hubKe
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import type { Hub } from '@shared/types'
+import { ServiceError } from '../services/settings'
+import { audit } from '../services/audit'
 
 const routes = new Hono<AppEnv>()
 
@@ -90,6 +92,9 @@ routes.post('/',
     try {
       await services.settings.createHub(hub)
     } catch (err) {
+      if (err instanceof ServiceError) {
+        return c.json({ error: err.message }, err.status as 400 | 409 | 500)
+      }
       const message = err instanceof Error ? err.message : 'Failed to create hub'
       return c.json({ error: message }, 500)
     }
@@ -198,12 +203,14 @@ routes.post('/:hubId/members',
     const services = c.get('services')
     const body = c.req.valid('json')
 
+    const pubkey = c.get('pubkey')
     try {
       const result = await services.identity.setHubRole({
         pubkey: body.pubkey,
         hubId,
         roleIds: body.roleIds,
       })
+      await audit(services.audit, 'userAdded', pubkey, { target: body.pubkey, roles: body.roleIds }, undefined, hubId)
       return c.json(result)
     } catch {
       return c.json({ error: 'Failed to add member' }, 500)
@@ -231,14 +238,52 @@ routes.delete('/:hubId/members/:pubkey',
   requirePermission('hubs:manage-members'),
   async (c) => {
     const hubId = c.req.param('hubId')
-    const pubkey = c.req.param('pubkey')
+    const targetPubkey = c.req.param('pubkey')
+    const actorPubkey = c.get('pubkey')
     const services = c.get('services')
 
     try {
-      await services.identity.removeHubRole({ pubkey, hubId })
+      await services.identity.removeHubRole({ pubkey: targetPubkey, hubId })
+      await audit(services.audit, 'userRemoved', actorPubkey, { target: targetPubkey }, undefined, hubId)
       return c.json({ ok: true })
     } catch {
       return c.json({ error: 'Failed to remove member' }, 500)
+    }
+  },
+)
+
+// Delete hub (super admin only — permanent, cascades all hub data)
+routes.delete('/:hubId',
+  describeRoute({
+    tags: ['Hubs'],
+    summary: 'Permanently delete a hub and all its data',
+    responses: {
+      200: {
+        description: 'Hub deleted',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('system:manage-hubs'),
+  async (c) => {
+    const hubId = c.req.param('hubId')
+    const services = c.get('services')
+
+    try {
+      await services.settings.deleteHub(hubId)
+      return c.json({ ok: true })
+    } catch (err) {
+      if (err instanceof ServiceError) {
+        return c.json({ error: err.message }, err.status as 404 | 500)
+      }
+      const message = err instanceof Error ? err.message : 'Failed to delete hub'
+      return c.json({ error: message }, 500)
     }
   },
 )

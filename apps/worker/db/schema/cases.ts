@@ -72,8 +72,8 @@ export const caseRecords = pgTable(
       table.severityHash,
     ),
     index('case_records_entity_type_id_idx').on(table.entityTypeId),
-    uniqueIndex('case_records_case_number_idx')
-      .on(table.caseNumber)
+    uniqueIndex('case_records_hub_id_case_number_idx')
+      .on(table.hubId, table.caseNumber)
       .where(sql`case_number IS NOT NULL`),
     index('case_records_assigned_to_idx').using('gin', table.assignedTo),
     index('case_records_hub_id_category_hash_idx').on(

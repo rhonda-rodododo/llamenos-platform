@@ -86,7 +86,8 @@ class TriageViewModel @Inject constructor(
         try {
             val filter = _uiState.value.selectedFilter
             val path = buildString {
-                append("/api/reports?conversionEnabled=true&limit=50")
+                append(apiService.hp("/api/reports"))
+                append("?conversionEnabled=true&limit=50")
                 filter.apiValue?.let { append("&conversionStatus=$it") }
             }
             val response = apiService.request<ReportsListResponse>("GET", path)
@@ -153,7 +154,7 @@ class TriageViewModel @Inject constructor(
                 )
                 apiService.request<ConvertReportToCaseResponse>(
                     "POST",
-                    "/api/reports/${report.id}/convert-to-case",
+                    apiService.hp("/api/reports/${report.id}/convert-to-case"),
                     body = body,
                 )
                 _uiState.update { it.copy(isConverting = false, selectedReport = null) }

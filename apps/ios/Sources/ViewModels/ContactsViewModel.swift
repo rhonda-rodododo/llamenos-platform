@@ -38,7 +38,7 @@ final class ContactsViewModel {
         errorMessage = nil
 
         do {
-            var path = "/api/contacts?page=1&limit=50"
+            var path = apiService.hp("/api/contacts") + "?page=1&limit=50"
             if let contactType = selectedContactType {
                 let encoded = contactType.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? contactType
                 path += "&contactType=\(encoded)"
@@ -67,7 +67,7 @@ final class ContactsViewModel {
 
         let nextPage = currentPage + 1
         do {
-            var path = "/api/contacts?page=\(nextPage)&limit=50"
+            var path = apiService.hp("/api/contacts") + "?page=\(nextPage)&limit=50"
             if !searchQuery.isEmpty {
                 let encoded = searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? searchQuery
                 path += "&search=\(encoded)"
@@ -98,7 +98,7 @@ final class ContactsViewModel {
 
         do {
             let query = searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? searchQuery
-            var path = "/api/contacts/search?q=\(query)"
+            var path = apiService.hp("/api/contacts/search") + "?q=\(query)"
             if let contactType = selectedContactType {
                 let encoded = contactType.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? contactType
                 path += "&contactType=\(encoded)"
@@ -171,7 +171,7 @@ final class ContactDetailViewModel {
         do {
             let response: ContactDetailResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/contacts/\(contactHash)"
+                path: apiService.hp("/api/contacts/\(contactHash)")
             )
             contact = response.contact
         } catch {
@@ -190,7 +190,7 @@ final class ContactDetailViewModel {
         do {
             let response: AppContactRelationshipsResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/contacts/\(contactHash)/relationships"
+                path: apiService.hp("/api/contacts/\(contactHash)/relationships")
             )
             relationships = response.relationships
         } catch {
@@ -239,7 +239,7 @@ final class ContactTimelineViewModel {
         do {
             let response: ContactTimelineResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/contacts/\(contactHash)/timeline?limit=100"
+                path: apiService.hp("/api/contacts/\(contactHash)/timeline") + "?limit=100"
             )
             events = response.events
             total = response.total

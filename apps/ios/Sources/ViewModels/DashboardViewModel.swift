@@ -191,7 +191,7 @@ final class DashboardViewModel {
     func hangupCall() async {
         guard let callId = currentCall?.id else { return }
         do {
-            try await apiService.request(method: "POST", path: "/api/calls/\(callId)/hangup")
+            try await apiService.request(method: "POST", path: apiService.hp("/api/calls/\(callId)/hangup"))
             currentCall = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -202,7 +202,7 @@ final class DashboardViewModel {
     func reportSpam() async {
         guard let callId = currentCall?.id else { return }
         do {
-            try await apiService.request(method: "POST", path: "/api/calls/\(callId)/spam")
+            try await apiService.request(method: "POST", path: apiService.hp("/api/calls/\(callId)/spam"))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -214,9 +214,9 @@ final class DashboardViewModel {
         do {
             let body: [String: String]? = reason.map { ["reason": $0] }
             if let body {
-                try await apiService.request(method: "POST", path: "/api/calls/\(callId)/ban", body: body)
+                try await apiService.request(method: "POST", path: apiService.hp("/api/calls/\(callId)/ban"), body: body)
             } else {
-                try await apiService.request(method: "POST", path: "/api/calls/\(callId)/ban")
+                try await apiService.request(method: "POST", path: apiService.hp("/api/calls/\(callId)/ban"))
             }
             currentCall = nil
         } catch {
@@ -231,7 +231,7 @@ final class DashboardViewModel {
         do {
             let response: ActiveCallsResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/calls/active"
+                path: apiService.hp("/api/calls/active")
             )
             if let first = response.calls.first {
                 currentCall = ActiveCall(
@@ -280,7 +280,7 @@ final class DashboardViewModel {
         do {
             let response: NotesListResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/notes?page=1&limit=3"
+                path: apiService.hp("/api/notes") + "?page=1&limit=3"
             )
 
             recentNoteCount = response.total

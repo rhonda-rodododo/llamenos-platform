@@ -69,7 +69,8 @@ class CallHistoryViewModel @Inject constructor(
             }
             try {
                 val query = buildString {
-                    append("/api/calls/history?page=$page&limit=50")
+                    append(apiService.hp("/api/calls/history"))
+                    append("?page=$page&limit=50")
                     val search = _uiState.value.searchQuery
                     if (search.isNotBlank()) {
                         append("&search=$search")

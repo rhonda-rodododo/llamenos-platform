@@ -166,8 +166,10 @@ users.get('/:targetPubkey/cases',
     const limit = parseInt(c.req.query('limit') ?? '20', 10)
     const entityTypeId = c.req.query('entityTypeId')
 
+    const hubId = c.req.query('hubId') ?? c.get('hubId') ?? ''
+
     const result = await services.cases.list({
-      hubId: '',
+      hubId,
       page,
       limit,
       assignedTo: targetPubkey,
@@ -209,9 +211,11 @@ users.get('/:targetPubkey/metrics',
     // Verify user exists (throws 404 if not found)
     await services.identity.getUser(targetPubkey)
 
+    const hubId = c.req.query('hubId') ?? c.get('hubId') ?? ''
+
     // Get all records assigned to this user
     const result = await services.cases.list({
-      hubId: '',
+      hubId,
       page: 1,
       limit: 1000,
       assignedTo: targetPubkey,

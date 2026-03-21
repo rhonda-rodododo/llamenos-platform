@@ -82,10 +82,9 @@ async function advanceWizardToStep(page: Page, targetStep: number, channel = 'Re
 // --- Telephony provider ---
 
 When('I expand the telephony provider section', async ({ page }) => {
-  const section = page.locator('[data-settings-section]').filter({ hasText: /telephony|provider/i })
-    .or(page.getByTestId(TestIds.TELEPHONY_PROVIDER))
-  await section.first().scrollIntoViewIfNeeded()
-  await section.first().click()
+  const trigger = page.getByTestId(`${TestIds.SETTINGS_TELEPHONY}-trigger`)
+  await trigger.scrollIntoViewIfNeeded()
+  await trigger.click()
 })
 
 Then('I should see the Twilio credentials form', async ({ page }) => {
@@ -160,14 +159,10 @@ When('I fill in valid RCS settings', async ({ page }) => {
     // Navigate to hub settings
     const { Navigation } = await import('../../pages/index')
     await Navigation.goToHubSettings(page)
-    // Expand the RCS/messaging section
-    const rcsSection = page.locator('[data-settings-section]').filter({ hasText: /RCS|messaging/i }).first()
-    if (await rcsSection.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Click the trigger element using data-testid pattern "{id}-trigger"
-      const sectionTestId = await rcsSection.getAttribute('data-testid')
-      if (sectionTestId) {
-        await rcsSection.getByTestId(`${sectionTestId}-trigger`).click()
-      }
+    // Expand the messaging/telephony section using the trigger pattern
+    const trigger = page.getByTestId(`${TestIds.SETTINGS_TELEPHONY}-trigger`)
+    if (await trigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await trigger.click()
     }
   }
   // Fill the agent ID
@@ -178,9 +173,10 @@ When('I fill in valid RCS settings', async ({ page }) => {
 // --- WebRTC ---
 
 When('I expand the WebRTC section', async ({ page }) => {
-  const section = page.locator('[data-settings-section]').filter({ hasText: /webrtc/i })
-  await section.first().scrollIntoViewIfNeeded()
-  await section.first().click()
+  const trigger = page.getByTestId(`${TestIds.SETTINGS_TRANSCRIPTION}-trigger`)
+    .or(page.getByRole('button', { name: /webrtc/i }))
+  await trigger.first().scrollIntoViewIfNeeded()
+  await trigger.first().click()
 })
 
 Then('I should see the WebRTC configuration options', async ({ page }) => {
@@ -508,7 +504,7 @@ When('I navigate to the setup wizard summary step', async ({ page }) => {
 
 When('I enable the demo mode toggle', async ({ page }) => {
   // Find the Switch by its id (linked to the "Populate with sample data" label via htmlFor="demo-mode")
-  const toggle = page.locator('#demo-mode')
+  const toggle = page.getByTestId(TestIds.DEMO_MODE_TOGGLE)
   await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })
   const state = await toggle.getAttribute('data-state').catch(() => null)
   if (state !== 'checked') {
@@ -519,7 +515,7 @@ When('I enable the demo mode toggle', async ({ page }) => {
 Given('demo mode has been enabled', async ({ page }) => {
   // Navigate to wizard summary and enable the demo mode toggle
   await advanceWizardToStep(page, 5)
-  const toggle = page.locator('#demo-mode')
+  const toggle = page.getByTestId(TestIds.DEMO_MODE_TOGGLE)
   await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })
   const state = await toggle.getAttribute('data-state').catch(() => null)
   if (state !== 'checked') {

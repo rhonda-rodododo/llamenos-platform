@@ -9,7 +9,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { TestIds, navTestIdMap } from '../../test-ids'
+import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 /**
@@ -130,49 +130,24 @@ When('I fill in the reason with {string}', async ({ page }, reason: string) => {
 // --- Section expand/collapse ---
 
 When('I expand the {string} section', async ({ page }, sectionName: string) => {
-  const sectionTestIds: Record<string, string> = {
-    'Custom Note Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
-    'Custom Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
-    'Telephony': TestIds.SETTINGS_TELEPHONY,
-    'Transcription': TestIds.SETTINGS_TRANSCRIPTION,
-    'Spam': TestIds.SETTINGS_SPAM,
-    'Key Backup': TestIds.SETTINGS_KEY_BACKUP,
-    'Linked Devices': TestIds.SETTINGS_LINKED_DEVICES,
-    'Advanced': TestIds.SETTINGS_ADVANCED,
-    'Profile': TestIds.SETTINGS_PROFILE,
-    'Theme': TestIds.SETTINGS_THEME,
-    'Language': TestIds.SETTINGS_LANGUAGE,
-    'Notifications': TestIds.SETTINGS_NOTIFICATIONS,
-    'Passkeys': TestIds.SETTINGS_PASSKEYS,
-  }
-  const testId = sectionTestIds[sectionName]
-  const slug = sectionName.toLowerCase().replace(/\s+/g, '-')
-  const section = testId
-    ? page.getByTestId(testId)
-    : page.locator(`[data-testid="${slug}"]`)
-        .or(page.locator(`[data-testid="settings-section-${slug}"]`))
+  const testId = sectionTestIdMap[sectionName]
+  if (!testId) throw new Error(`Unknown section: "${sectionName}". Add it to sectionTestIdMap in test-ids.ts`)
+  const section = page.getByTestId(testId)
   const el = section.first()
-  if (await el.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await el.scrollIntoViewIfNeeded()
-    // Check if already expanded
-    const isExpanded = await el.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
-    if (!isExpanded) {
-      // Click the trigger element (CardHeader with data-testid="{id}-trigger")
-      const triggerId = testId || slug
-      const trigger = el.locator(`[data-testid="${triggerId}-trigger"]`)
-      if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await trigger.click()
-      } else {
-        // Fallback: click the first heading/title
-        await el.locator('h3, [class*="CardTitle"]').first().click()
-      }
+  await el.scrollIntoViewIfNeeded()
+  // Check if already expanded
+  const isExpanded = await el.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+  if (!isExpanded) {
+    // Click the trigger element (CardHeader with data-testid="{id}-trigger")
+    const trigger = page.getByTestId(`${testId}-trigger`)
+    if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await trigger.click()
+    } else {
+      // Fallback: click the first heading/title within the section
+      await el.locator('h3, [class*="CardTitle"]').first().click()
     }
-  } else {
-    // Last resort: find by text
-    const byText = page.getByText(sectionName, { exact: true }).first()
-    await byText.scrollIntoViewIfNeeded()
-    await byText.click()
   }
+  await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Reload and auth ---

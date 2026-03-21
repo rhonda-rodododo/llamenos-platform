@@ -60,7 +60,7 @@ bans.post('/',
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
-    await audit(services.audit, 'numberBanned', pubkey, { phone: body.phone })
+    await audit(services.audit, 'numberBanned', pubkey, { phone: body.phone }, undefined, hubId ?? undefined)
     return c.json({ ok: true })
   },
 )
@@ -93,7 +93,7 @@ bans.post('/bulk',
       return c.json({ error: `Invalid phone number(s): ${invalidPhones[0]}. Use E.164 format (e.g. +12125551234)` }, 400)
     }
     const added = await services.records.bulkAddBans(body.phones, body.reason ?? '', pubkey, hubId)
-    await audit(services.audit, 'numberBanned', pubkey, { count: body.phones.length, bulk: true })
+    await audit(services.audit, 'numberBanned', pubkey, { count: body.phones.length, bulk: true }, undefined, hubId ?? undefined)
     return c.json({ count: added })
   },
 )
@@ -121,7 +121,7 @@ bans.delete('/:phone',
     const hubId = c.get('hubId')
     const phone = decodeURIComponent(c.req.param('phone'))
     await services.records.removeBan(phone, hubId)
-    await audit(services.audit, 'numberUnbanned', pubkey, {})
+    await audit(services.audit, 'numberUnbanned', pubkey, {}, undefined, hubId ?? undefined)
     return c.json({ ok: true })
   },
 )

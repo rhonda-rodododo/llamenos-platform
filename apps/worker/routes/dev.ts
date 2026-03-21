@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../types'
-import type { MessagingChannelType } from '@shared/types'
+import type { Hub, MessagingChannelType } from '@shared/types'
 import { hashPhone } from '../lib/crypto'
 import { publishNostrEvent } from '../lib/nostr-events'
 import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
 import { nip19 } from 'nostr-tools'
+import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 
 /**
  * Decode a pubkey that may be in npub1... bech32 format or raw hex.
@@ -528,6 +529,102 @@ dev.post('/test-simulate/delivery-status', async (c) => {
   })
 
   return c.json({ ok: true })
+})
+
+// ─── Test Push Log (dev/test BDD helper) ──────────────────────────────────
+// Returns or clears the in-memory push payload log recorded by push-dispatch.ts.
+// Used by backend BDD tests to verify that push payloads carry hubId without
+// real APNs/FCM credentials being configured.
+
+dev.get('/test-push-log', (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  return c.json({ entries: getTestPushLog() })
+})
+
+dev.delete('/test-push-log', (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  clearTestPushLog()
+  return c.json({ ok: true })
+})
+
+// 7. Simulate push dispatch — directly invokes createPushDispatcherFromService with
+//    a synthetic WakePayload to verify that hubId is present in the dispatched payload.
+//    Useful for BDD scenarios that need to assert push payload structure without
+//    requiring a full telephony or messaging flow.
+
+interface SimulatePushDispatchBody {
+  hubId: string
+  type: 'message' | 'voicemail' | 'shift_reminder' | 'assignment'
+  recipientPubkey: string
+  conversationId?: string
+  channelType?: string
+  callId?: string
+}
+
+dev.post('/test-simulate/push-dispatch', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json().catch(() => ({})) as SimulatePushDispatchBody
+  if (!body.hubId || !body.type || !body.recipientPubkey) {
+    return c.json({ error: 'hubId, type, and recipientPubkey are required' }, 400)
+  }
+
+  const services = c.get('services')
+  const { createPushDispatcherFromService } = await import('../lib/push-dispatch')
+
+  const wake = {
+    hubId: body.hubId,
+    type: body.type,
+    conversationId: body.conversationId,
+    channelType: body.channelType,
+    callId: body.callId,
+  }
+
+  const dispatcher = createPushDispatcherFromService(c.env, services.identity, services.shifts)
+  await dispatcher.sendToVolunteer(body.recipientPubkey, wake, { ...wake })
+
+  return c.json({ ok: true, wake })
+})
+
+// ─── Test Hub Creation (dev/test isolation helper) ──────────────────────────
+// Creates an isolated hub for a single test run.
+// Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
+
+dev.post('/test-create-hub', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const rawBody = await c.req.json().catch(() => ({}))
+  const hubName = typeof rawBody === 'object' && rawBody !== null && 'name' in rawBody && typeof rawBody.name === 'string'
+    ? rawBody.name
+    : `test-hub-${Date.now()}`
+  const name = hubName.trim()
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+  const hub: Hub = {
+    id: crypto.randomUUID(),
+    name,
+    slug,
+    status: 'active',
+    createdBy: 'test',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+
+  const services = c.get('services')
+  try {
+    await services.settings.createHub(hub)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create hub'
+    return c.json({ error: message }, 500)
+  }
+
+  return c.json({ id: hub.id, name: hub.name })
 })
 
 export default dev

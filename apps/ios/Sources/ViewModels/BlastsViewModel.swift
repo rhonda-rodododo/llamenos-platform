@@ -27,7 +27,7 @@ final class BlastsViewModel {
         do {
             let response: AppBlastsListResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/blasts"
+                path: apiService.hp("/api/blasts")
             )
             blasts = response.blasts
         } catch {
@@ -45,7 +45,7 @@ final class BlastsViewModel {
         do {
             subscriberStats = try await apiService.request(
                 method: "GET",
-                path: "/api/blasts/subscribers/stats"
+                path: apiService.hp("/api/blasts/subscribers/stats")
             )
         } catch {
             // Non-critical — stats may not be available
@@ -69,7 +69,7 @@ final class BlastsViewModel {
             )
             let _: AppBlast = try await apiService.request(
                 method: "POST",
-                path: "/api/blasts",
+                path: apiService.hp("/api/blasts"),
                 body: body
             )
             await loadBlasts()
@@ -89,7 +89,7 @@ final class BlastsViewModel {
         do {
             let _: EmptyResponse = try await apiService.request(
                 method: "POST",
-                path: "/api/blasts/\(id)/send"
+                path: apiService.hp("/api/blasts/\(id)/send")
             )
             await loadBlasts()
         } catch {
@@ -107,7 +107,7 @@ final class BlastsViewModel {
             let body = ScheduleBlastRequest(scheduledAt: ISO8601DateFormatter().string(from: date))
             let _: EmptyResponse = try await apiService.request(
                 method: "POST",
-                path: "/api/blasts/\(id)/schedule",
+                path: apiService.hp("/api/blasts/\(id)/schedule"),
                 body: body
             )
             await loadBlasts()

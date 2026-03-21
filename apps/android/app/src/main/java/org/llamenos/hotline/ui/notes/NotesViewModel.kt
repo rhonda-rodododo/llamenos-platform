@@ -135,7 +135,7 @@ class NotesViewModel @Inject constructor(
             try {
                 val response = apiService.request<NotesListResponse>(
                     "GET",
-                    "/api/notes?page=$page&limit=20",
+                    apiService.hp("/api/notes") + "?page=$page&limit=20",
                 )
 
                 val decrypted = response.notes.mapNotNull { note ->
@@ -279,7 +279,7 @@ class NotesViewModel @Inject constructor(
                     callID = callId,
                 )
 
-                apiService.request<NoteResponse>("POST", "/api/notes", request)
+                apiService.request<NoteResponse>("POST", apiService.hp("/api/notes"), request)
 
                 _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
 
@@ -401,7 +401,7 @@ class NotesViewModel @Inject constructor(
                     },
                 )
 
-                apiService.request<NoteResponse>("PUT", "/api/notes/$noteId", request)
+                apiService.request<NoteResponse>("PUT", apiService.hp("/api/notes/$noteId"), request)
 
                 // Update local state with edited content
                 val updatedNote = _uiState.value.selectedNote?.copy(
@@ -439,7 +439,7 @@ class NotesViewModel @Inject constructor(
             _uiState.update { it.copy(isLoadingReplies = true) }
             try {
                 val response = apiService.request<NoteRepliesResponse>(
-                    "GET", "/api/notes/$noteId/replies",
+                    "GET", apiService.hp("/api/notes/$noteId/replies"),
                 )
                 val decrypted = response.replies.mapNotNull { reply ->
                     decryptReply(reply)
@@ -474,7 +474,7 @@ class NotesViewModel @Inject constructor(
                     readerEnvelopes = readerEnvelopes,
                 )
 
-                apiService.requestNoContent("POST", "/api/notes/$noteId/replies", request)
+                apiService.requestNoContent("POST", apiService.hp("/api/notes/$noteId/replies"), request)
 
                 // Increment local reply count
                 val updatedNote = _uiState.value.selectedNote?.copy(

@@ -45,7 +45,6 @@ final class HubManagementUITests: BaseUITest {
     /// Verifies hub cards render with name, slug, and status when hubs exist.
     func testHubListShowsHubCards() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to Settings > Hubs") {
@@ -71,7 +70,6 @@ final class HubManagementUITests: BaseUITest {
     /// Verifies the currently active hub has a visual indicator.
     func testActiveHubIndicatorVisible() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to Settings > Hubs") {

@@ -138,8 +138,9 @@ Then('the notes list should contain the volunteer\'s note', async ({request, wor
 })
 
 Then('the audit log should have entries for each step', async ({request, world}) => {
-  const hubId = getScenarioState(world).hubId
-  const { entries } = await listAuditLogViaApi(request, { hubId })
+  // 'userAdded' and 'noteCreated' are logged without hub scope (global events).
+  // Query without hubId to find them; hub-scoped entries (shifts, bans) will also appear.
+  const { entries } = await listAuditLogViaApi(request)
   expect(entries.length).toBeGreaterThan(0)
   // Should have volunteer creation and note creation at minimum
   const events = entries.map(e => e.action)
@@ -155,8 +156,9 @@ When('an admin bans {string}', async ({request, world}, phone: string) => {
 })
 
 When('an incoming call arrives from {string}', async ({ request, world }, phone: string) => {
+  const hubId = getScenarioState(world).hubId
   try {
-    const result = await simulateIncomingCall(request, { callerNumber: phone })
+    const result = await simulateIncomingCall(request, { callerNumber: phone, hubId })
     getCrossDoState(world).callId = result.callId
     getCrossDoState(world).callStatus = result.status
   } catch (e) {
@@ -213,7 +215,12 @@ When('the volunteer claims the conversation', async ({ request, world }) => {
   const volPubkey = getScenarioState(world).volunteers[0]?.pubkey ?? getCrossDoState(world).volunteerPubkey
   if (volPubkey && getCrossDoState(world).conversationId) {
     const volNsec = getScenarioState(world).volunteers[0]?.nsec ?? getCrossDoState(world).volunteerNsec
-    await apiPost(request, `/conversations/${getCrossDoState(world).conversationId}/claim`, {
+    // Conversation claim requires hub context — use hub-scoped path
+    const hubId = getScenarioState(world).hubId
+    const claimPath = hubId
+      ? `/hubs/${hubId}/conversations/${getCrossDoState(world).conversationId}/claim`
+      : `/conversations/${getCrossDoState(world).conversationId}/claim`
+    await apiPost(request, claimPath, {
       pubkey: volPubkey,
     }, volNsec!)
   }
@@ -372,8 +379,8 @@ Then('the report should show the reviewer as assignee', async ({ request, world 
 })
 
 Then('the audit log should contain report assignment entries', async ({request, world}) => {
-  const hubId = getScenarioState(world).hubId
-  const { entries } = await listAuditLogViaApi(request, { hubId })
+  // Report-related audit entries are logged without hub scope — query globally
+  const { entries } = await listAuditLogViaApi(request)
   // Look for report-related audit entries
   expect(entries.length).toBeGreaterThan(0)
 })

@@ -296,7 +296,13 @@ export class RecordsService {
       )
 
     const existingPhones = new Set(existingRows.map((r) => r.phone))
-    const newPhones = phones.filter((p) => !existingPhones.has(p))
+    // Deduplicate within the input array AND exclude already-banned phones
+    const seen = new Set<string>()
+    const newPhones = phones.filter((p) => {
+      if (existingPhones.has(p) || seen.has(p)) return false
+      seen.add(p)
+      return true
+    })
 
     if (newPhones.length === 0) return 0
 

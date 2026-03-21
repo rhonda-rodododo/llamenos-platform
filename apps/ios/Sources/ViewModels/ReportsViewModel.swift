@@ -171,7 +171,7 @@ final class ReportsViewModel {
 
             let _: ClientReportResponse = try await apiService.request(
                 method: "POST",
-                path: "/api/reports",
+                path: apiService.hp("/api/reports"),
                 body: request
             )
 
@@ -239,7 +239,7 @@ final class ReportsViewModel {
 
             let _: ClientReportResponse = try await apiService.request(
                 method: "POST",
-                path: "/api/reports",
+                path: apiService.hp("/api/reports"),
                 rawBody: rawBody
             )
 
@@ -270,7 +270,7 @@ final class ReportsViewModel {
             let request = ReportAssignRequest(assignTo: pubkey)
             let _: ClientReportResponse = try await apiService.request(
                 method: "POST",
-                path: "/api/reports/\(id)/assign",
+                path: apiService.hp("/api/reports/\(id)/assign"),
                 body: request
             )
 
@@ -294,7 +294,7 @@ final class ReportsViewModel {
             let request = ReportUpdateRequest(status: "closed")
             let _: ClientReportResponse = try await apiService.request(
                 method: "PATCH",
-                path: "/api/reports/\(id)",
+                path: apiService.hp("/api/reports/\(id)"),
                 body: request
             )
 
@@ -315,7 +315,7 @@ final class ReportsViewModel {
         do {
             let response: ReportsListResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/reports?limit=50"
+                path: apiService.hp("/api/reports") + "?limit=50"
             )
             reports = response.conversations
             totalCount = response.total
@@ -332,7 +332,7 @@ final class ReportsViewModel {
         do {
             let response: ReportCategoriesResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/reports/categories"
+                path: apiService.hp("/api/reports/categories")
             )
             categories = response.categories
         } catch {
@@ -345,7 +345,7 @@ final class ReportsViewModel {
         do {
             let response: ClientReportTypesResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/reports/types"
+                path: apiService.hp("/api/reports/types")
             )
             reportTypes = response.reportTypes
         } catch {

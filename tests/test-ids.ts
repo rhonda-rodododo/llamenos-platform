@@ -265,6 +265,7 @@ export const TestIds = {
   SETUP_NEXT_BTN: 'setup-next-btn',
   SETUP_BACK_BTN: 'setup-back-btn',
   SETUP_SKIP_BTN: 'setup-skip-btn',
+  DEMO_MODE_TOGGLE: 'demo-mode-toggle',
 
   // ============ Forms (Generic) ============
   FORM_SAVE_BTN: 'form-save-btn',
@@ -312,21 +313,29 @@ export const sectionTestIdMap: Record<string, string> = {
   'Custom Note Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
   'Custom Fields': TestIds.SETTINGS_CUSTOM_FIELDS,
   'Telephony': TestIds.SETTINGS_TELEPHONY,
+  'Telephony Provider': TestIds.SETTINGS_TELEPHONY,
   'Transcription': TestIds.SETTINGS_TRANSCRIPTION,
   'Spam Mitigation': TestIds.SETTINGS_SPAM,
   'Spam': TestIds.SETTINGS_SPAM,
   'Key Backup': TestIds.SETTINGS_KEY_BACKUP,
+  'key backup': TestIds.SETTINGS_KEY_BACKUP,
   'Linked Devices': TestIds.SETTINGS_LINKED_DEVICES,
   'Device Link': TestIds.SETTINGS_LINKED_DEVICES,
   'Advanced Settings': TestIds.SETTINGS_ADVANCED,
+  'Advanced': TestIds.SETTINGS_ADVANCED,
   'Profile': TestIds.SETTINGS_PROFILE,
   'Identity': TestIds.SETTINGS_PROFILE,
   'Theme': TestIds.SETTINGS_THEME,
   'Language': TestIds.SETTINGS_LANGUAGE,
   'Notifications': TestIds.SETTINGS_NOTIFICATIONS,
+  'notifications': TestIds.SETTINGS_NOTIFICATIONS,
   'Passkeys': TestIds.SETTINGS_PASSKEYS,
   'Hub Connection': TestIds.SETTINGS_HUB_CONNECTION,
   'Call Preference': TestIds.SETTINGS_CALL_PREFERENCE,
+  'CMS Toggle': TestIds.SETTINGS_CMS_TOGGLE,
+  'Entity Types': TestIds.SETTINGS_ENTITY_TYPES,
+  'Templates': TestIds.SETTINGS_TEMPLATES,
+  'Report Types': TestIds.SETTINGS_REPORT_TYPES,
 }
 
 /**

@@ -25,7 +25,10 @@ function getCrossHubState(world: Record<string, unknown>): CrossHubState {
 }
 
 
-Before({ tags: '@cases' }, async ({ world }) => {
+Before({ tags: '@cases' }, async ({ request, world }) => {
+  // Reset cross-hub sharing to disabled before each scenario to prevent
+  // test pollution (systemSettings is shared across all scenarios).
+  try { await enableCrossHubSharingViaApi(request, false) } catch { /* ignore if not supported */ }
   const crossHub = {}
   setState(world, CROSS_HUB_KEY, crossHub)
 })

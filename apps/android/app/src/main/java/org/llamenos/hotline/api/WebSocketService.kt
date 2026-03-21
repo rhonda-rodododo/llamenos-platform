@@ -25,7 +25,10 @@ import okhttp3.WebSocketListener
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
+import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.hotline.hub.HubActivityService
 import org.llamenos.hotline.model.LlamenosEvent
+import org.llamenos.hotline.service.AttributedHubEvent
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,6 +46,8 @@ import javax.inject.Singleton
 class WebSocketService @Inject constructor(
     private val cryptoService: CryptoService,
     private val keystoreService: KeyValueStore,
+    private val activeHubState: ActiveHubState,
+    private val hubActivityService: HubActivityService,
 ) {
 
     @Serializable
@@ -76,10 +81,16 @@ class WebSocketService @Inject constructor(
     private val _events = MutableSharedFlow<NostrEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<NostrEvent> = _events.asSharedFlow()
 
-    private val _typedEvents = MutableSharedFlow<LlamenosEvent>(extraBufferCapacity = 64)
+    private val _typedEvents = MutableSharedFlow<AttributedHubEvent<LlamenosEvent>>(extraBufferCapacity = 64)
 
-    /** Typed application events parsed from Nostr relay messages. */
-    val typedEvents: SharedFlow<LlamenosEvent> = _typedEvents.asSharedFlow()
+    /**
+     * Typed application events parsed from Nostr relay messages.
+     *
+     * Each event is wrapped in [AttributedHubEvent] carrying the [ActiveHubState.activeHubId]
+     * that was current at the moment the event was received. Subscribers should use
+     * [AttributedHubEvent.hubId] to route or discard events from non-active hubs.
+     */
+    val typedEvents: SharedFlow<AttributedHubEvent<LlamenosEvent>> = _typedEvents.asSharedFlow()
 
     /** Server event encryption key, set after authentication via GET /api/auth/me. */
     var serverEventKeyHex: String? = null
@@ -184,21 +195,42 @@ class WebSocketService @Inject constructor(
 
             scope.launch {
                 _events.emit(event)
-                // Decrypt server-encrypted content if we have the key, then parse
-                val keyHex = serverEventKeyHex
-                val content = if (keyHex != null) {
-                    cryptoService.decryptServerEvent(event.content, keyHex) ?: return@launch
-                } else {
-                    event.content
-                }
-                parseTypedEvent(content)?.let { typed ->
-                    _typedEvents.emit(typed)
-                }
+                // Attribute the event to its hub via key-trial decryption across all cached hub keys.
+                val attributed = decryptEvent(event.content) ?: return@launch
+                _typedEvents.emit(attributed)
+                hubActivityService.handle(attributed)
             }
         } catch (_: Exception) {
             // Malformed messages are silently dropped — relay may send
             // NOTICE or other non-EVENT messages we don't need to handle.
         }
+    }
+
+    /**
+     * Attribute an encrypted Nostr event to its hub by trying all cached hub keys.
+     *
+     * Iterates [CryptoService.allHubKeys], attempting [CryptoService.decryptServerEvent]
+     * with each key's hex representation. The first key that successfully decrypts the
+     * content determines the [AttributedHubEvent.hubId]. Falls back to [serverEventKeyHex]
+     * if no hub key matches (e.g. during early auth before hub keys are loaded).
+     *
+     * @param encryptedContent Hex-encoded ciphertext from the Nostr event content field
+     * @return [AttributedHubEvent] with the originating hub ID, or null if no key works
+     */
+    private fun decryptEvent(encryptedContent: String): AttributedHubEvent<LlamenosEvent>? {
+        // Try each cached hub key — first successful decryption identifies the hub.
+        for ((hubId, keyBytes) in cryptoService.allHubKeys()) {
+            val keyHex = keyBytes.joinToString("") { "%02x".format(it) }
+            val plaintext = cryptoService.decryptServerEvent(encryptedContent, keyHex) ?: continue
+            val event = parseTypedEvent(plaintext) ?: continue
+            return AttributedHubEvent(hubId = hubId, event = event)
+        }
+        // Fall back to serverEventKeyHex for events received before hub keys are loaded.
+        val keyHex = serverEventKeyHex ?: return null
+        val plaintext = cryptoService.decryptServerEvent(encryptedContent, keyHex) ?: return null
+        val event = parseTypedEvent(plaintext) ?: return null
+        val hubId = activeHubState.activeHubId.value ?: ""
+        return AttributedHubEvent(hubId = hubId, event = event)
     }
 
     /**

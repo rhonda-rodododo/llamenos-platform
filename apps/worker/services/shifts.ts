@@ -8,7 +8,7 @@
 import { eq, and, sql } from 'drizzle-orm'
 import type { Database } from '../db'
 import { shifts, pushRemindersSent } from '../db/schema'
-import { ServiceError } from './settings'
+import { ServiceError, SettingsService } from './settings'
 
 /** Validate HH:MM format (00:00-23:59) */
 function isValidTimeFormat(time: string): boolean {
@@ -45,7 +45,7 @@ type ShiftInsert = Omit<typeof shifts.$inferInsert, 'id' | 'createdAt'>
 export class ShiftsService {
   constructor(
     protected db: Database,
-    private settingsService?: { getFallbackGroup(): Promise<{ userPubkeys: string[] }> },
+    private settingsService?: { getFallbackGroup(hubId?: string): Promise<{ userPubkeys: string[] }> },
   ) {}
 
   // =========================================================================
@@ -199,7 +199,7 @@ export class ShiftsService {
 
     // Fallback to settings group if no active volunteers and a settings service is available
     if (activeVolunteers.size === 0 && this.settingsService) {
-      const fallback = await this.settingsService.getFallbackGroup()
+      const fallback = await this.settingsService.getFallbackGroup(hubId)
       return fallback.userPubkeys
     }
 

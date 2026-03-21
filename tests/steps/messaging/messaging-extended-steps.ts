@@ -27,9 +27,10 @@ Then('I should see the messaging configuration section', async ({ page }) => {
 
 Given('I am on the messaging settings', async ({ page }) => {
   await Navigation.goToHubSettings(page)
-  const messagingSection = page.locator('[data-settings-section]').filter({ hasText: /messaging/i })
-  await expect(messagingSection.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await messagingSection.first().click()
+  // Expand the telephony section which contains messaging configuration
+  const telephonyTrigger = page.getByTestId('telephony-trigger')
+  await expect(telephonyTrigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await telephonyTrigger.click()
 })
 
 When('I configure SMS channel with Twilio credentials', async ({ page }) => {

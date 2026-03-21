@@ -7,6 +7,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
+
 import { getSharedState, setLastResponse } from './shared-state'
 import {
   apiGet,
@@ -59,18 +60,22 @@ function parseMetadata(report: Record<string, unknown>): Record<string, unknown>
 // ── CMS Report Type Steps ────────────────────────────────────────
 
 Given('a CMS report type with allowCaseConversion enabled exists', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
   const rt = await createCmsReportTypeViaApi(request, {
     name: `triage_enabled_${Date.now()}`,
     allowCaseConversion: true,
+    hubId,
   })
   getTriageState(world).enabledReportTypeId = rt.id as string
   getTriageState(world).enabledReportTypeName = rt.name as string
 })
 
 Given('a CMS report type with allowCaseConversion disabled exists', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
   const rt = await createCmsReportTypeViaApi(request, {
     name: `triage_disabled_${Date.now()}`,
     allowCaseConversion: false,
+    hubId,
   })
   getTriageState(world).disabledReportTypeId = rt.id as string
   getTriageState(world).disabledReportTypeName = rt.name as string
@@ -236,7 +241,8 @@ When('the admin creates a case record from the report', async ({ request, world 
   // Look up entity type by name if not already set
   if (!getTriageState(world).entityTypeId) {
     const { listEntityTypesViaApi } = await import('../../api-helpers')
-    const types = await listEntityTypesViaApi(request)
+    const hubId = getScenarioState(world).hubId
+    const types = await listEntityTypesViaApi(request, hubId)
     const caseType = types.find(t => t.name === 'triage_case_type' || t.category === 'case')
     if (caseType) getTriageState(world).entityTypeId = caseType.id as string
   }

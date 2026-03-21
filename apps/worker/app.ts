@@ -177,6 +177,7 @@ hubScoped.route('/contacts', contactsRoutes)
 hubScoped.route('/directory', contactsV2Routes)
 hubScoped.route('/records', recordsRoutes)
 hubScoped.route('/events', eventsRoutes)
+hubScoped.route('/settings/cms', entitySchemaRoutes)
 hubScoped.route('/', evidenceRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)

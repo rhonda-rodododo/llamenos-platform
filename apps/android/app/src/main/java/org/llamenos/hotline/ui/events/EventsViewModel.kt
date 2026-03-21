@@ -180,7 +180,7 @@ class EventsViewModel @Inject constructor(
                 val firstEventType = eventTypes.first()
                 val response = apiService.request<RecordsListResponse>(
                     "GET",
-                    "/api/records?entityTypeId=${firstEventType.id}&limit=50",
+                    apiService.hp("/api/records") + "?entityTypeId=${firstEventType.id}&limit=50",
                 )
                 _uiState.update {
                     it.copy(
@@ -215,7 +215,7 @@ class EventsViewModel @Inject constructor(
                 )
             }
             try {
-                val record = apiService.request<Record>("GET", "/api/records/$eventId")
+                val record = apiService.request<Record>("GET", apiService.hp("/api/records/$eventId"))
                 _uiState.update {
                     it.copy(
                         selectedEvent = record,
@@ -241,7 +241,7 @@ class EventsViewModel @Inject constructor(
             _uiState.update { it.copy(isUpdatingStatus = true, actionError = null) }
             try {
                 val request = UpdateRecordRequest(statusHash = statusHash)
-                apiService.request<Record>("PATCH", "/api/records/$recordId", request)
+                apiService.request<Record>("PATCH", apiService.hp("/api/records/$recordId"), request)
                 _uiState.update {
                     it.copy(
                         isUpdatingStatus = false,
@@ -285,7 +285,7 @@ class EventsViewModel @Inject constructor(
 
                 apiService.requestNoContent(
                     "POST",
-                    "/api/records",
+                    apiService.hp("/api/records"),
                     CreateBody(entityTypeId, defaultStatus, summaryJson, emptyList()),
                 )
                 loadEvents()

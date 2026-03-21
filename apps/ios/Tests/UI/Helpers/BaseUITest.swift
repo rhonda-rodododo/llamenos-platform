@@ -2,13 +2,20 @@ import XCTest
 
 /// Base class for all BDD-aligned UI tests.
 /// Provides shared setup, BDD step helpers (given/when/then), and navigation utilities.
+///
+/// Each test gets an isolated hub created via POST /api/test-create-hub in setUp().
+/// The hub ID is stored in `testHubId` and passed to the app via --test-hub-id.
 class BaseUITest: XCTestCase {
     var app: XCUIApplication!
+
+    /// Isolated hub created for this test. Set in setUp() via createTestHub().
+    var testHubId: String = ""
 
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
         app = XCUIApplication()
+        testHubId = createTestHub()
     }
 
     override func tearDown() {
@@ -22,6 +29,56 @@ class BaseUITest: XCTestCase {
     var testHubURL: String {
         ProcessInfo.processInfo.environment["TEST_HUB_URL"]
             ?? "http://localhost:3000"
+    }
+
+    // MARK: - Test Secret
+
+    /// The test secret, matching DEV_RESET_SECRET / E2E_TEST_SECRET in docker-compose.test.yml.
+    private var testSecret: String {
+        ProcessInfo.processInfo.environment["E2E_TEST_SECRET"]
+            ?? ProcessInfo.processInfo.environment["TEST_RESET_SECRET"]
+            ?? "test-reset-secret"
+    }
+
+    // MARK: - Hub Isolation
+
+    /// Create a fresh isolated hub for this test run.
+    /// Returns the hub ID, or empty string on failure (with XCTFail).
+    func createTestHub() -> String {
+        let hubName = "ios-test-\(Int(Date().timeIntervalSince1970 * 1000))"
+        guard let url = URL(string: "\(testHubURL)/api/test-create-hub") else {
+            XCTFail("Invalid test hub URL: \(testHubURL)")
+            return ""
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(testSecret, forHTTPHeaderField: "X-Test-Secret")
+        request.timeoutInterval = 15
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["name": hubName])
+
+        var hubId = ""
+        let semaphore = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { semaphore.signal() }
+            if let error {
+                print("Warning: createTestHub failed: \(error.localizedDescription)")
+                return
+            }
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                print("Warning: createTestHub returned \(code)")
+                return
+            }
+            if let data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let id = json["id"] as? String {
+                hubId = id
+            }
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 15)
+        XCTAssertFalse(hubId.isEmpty, "createTestHub returned empty hub ID — is the backend running?")
+        return hubId
     }
 
     // MARK: - Launch Helpers
@@ -56,6 +113,7 @@ class BaseUITest: XCTestCase {
             "--reset-keychain",
             "--test-authenticated",
             "--test-hub-url", testHubURL,
+            "--test-hub-id", testHubId,
             "--test-register",
         ])
         app.launch()
@@ -70,6 +128,7 @@ class BaseUITest: XCTestCase {
             "--test-authenticated",
             "--test-volunteer-identity",
             "--test-hub-url", testHubURL,
+            "--test-hub-id", testHubId,
             "--test-register",
         ])
         app.launch()
@@ -83,45 +142,18 @@ class BaseUITest: XCTestCase {
             "--test-authenticated",
             "--test-admin",
             "--test-hub-url", testHubURL,
+            "--test-hub-id", testHubId,
             "--test-register",
         ])
         app.launch()
     }
 
-    // MARK: - Server State
+    // MARK: - Server State (deprecated)
 
-    /// The test reset secret, matching DEV_RESET_SECRET in docker-compose.test.yml.
-    /// Override via TEST_RESET_SECRET environment variable if needed.
-    var testResetSecret: String {
-        ProcessInfo.processInfo.environment["TEST_RESET_SECRET"]
-            ?? "test-reset-secret"
-    }
-
-    /// Reset the test server state by calling POST /api/test-reset.
-    /// Call this in setUp() before launching the app for API-connected tests.
-    /// Uses the standard reset which preserves the ADMIN_PUBKEY admin —
-    /// the iOS mock identity uses the matching admin keypair so login works.
+    /// Deprecated: hub isolation via createTestHub() in setUp() replaces this.
+    /// Each test gets its own fresh hub — no global reset needed.
     func resetServerState() {
-        guard let url = URL(string: "\(testHubURL)/api/test-reset") else {
-            XCTFail("Invalid test hub URL: \(testHubURL)")
-            return
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(testResetSecret, forHTTPHeaderField: "X-Test-Secret")
-        request.timeoutInterval = 15
-
-        let expectation = XCTestExpectation(description: "Reset test state")
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            if let error {
-                // Server might not be running — don't fail, just warn
-                print("⚠️ Test reset failed: \(error.localizedDescription)")
-            } else if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                print("⚠️ Test reset returned \(http.statusCode)")
-            }
-            expectation.fulfill()
-        }.resume()
-        wait(for: [expectation], timeout: 20)
+        fatalError("resetServerState() is removed — hub isolation via createTestHub() in setUp() provides per-test isolation. Remove this call.")
     }
 
     // MARK: - Simulation Helpers
@@ -201,7 +233,7 @@ class BaseUITest: XCTestCase {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue(testResetSecret, forHTTPHeaderField: "X-Test-Secret")
+        request.setValue(testSecret, forHTTPHeaderField: "X-Test-Secret")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15
 

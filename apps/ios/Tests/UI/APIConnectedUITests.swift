@@ -13,17 +13,6 @@ final class APIConnectedUITests: BaseUITest {
     /// Used for call simulation endpoints that require a pubkey parameter.
     private let mockPubkey = "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
 
-    /// API tests share server state — run serially to avoid conflicts.
-    override class var defaultTestSuite: XCTestSuite {
-        let suite = XCTestSuite(forTestCaseClass: self)
-        return suite
-    }
-
-    override func setUp() {
-        super.setUp()
-        resetServerState()
-    }
-
     // MARK: - Connection & Bootstrap
 
     func testVolunteerBootstrapsAndSeesConnected() {

@@ -206,7 +206,8 @@ When('the {string} user sends {string} to the test shift endpoint with shift upd
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await apiPatch(request, `/shifts/${getPermMatrixState(world).testShiftId}`, {
+  const hubId = getScenarioState(world).hubId
+  getSharedState(world).lastResponse = await apiPatch(request, `/hubs/${hubId}/shifts/${getPermMatrixState(world).testShiftId}`, {
     name: uniqueName('PM Shift Updated'),
   }, user.nsec)
 })
@@ -215,7 +216,8 @@ When('the {string} user sends {string} to the deletable shift endpoint', async (
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await apiDelete(request, `/shifts/${getPermMatrixState(world).deletableShiftId}`, user.nsec)
+  const hubId = getScenarioState(world).hubId
+  getSharedState(world).lastResponse = await apiDelete(request, `/hubs/${hubId}/shifts/${getPermMatrixState(world).deletableShiftId}`, user.nsec)
 })
 
 When('the {string} user sends {string} to {string} with fallback body', async ({ request, world }, role: string, _method: string, _path: string) => {

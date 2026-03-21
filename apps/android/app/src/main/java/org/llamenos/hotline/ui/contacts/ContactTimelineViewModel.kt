@@ -43,7 +43,7 @@ class ContactTimelineViewModel @Inject constructor(
             try {
                 val response = apiService.request<ContactTimelineResponse>(
                     "GET",
-                    "/api/contacts/$contactHash/timeline?limit=100",
+                    apiService.hp("/api/contacts/$contactHash/timeline") + "?limit=100",
                 )
                 _uiState.update {
                     it.copy(

@@ -98,10 +98,13 @@ class ConversationsViewModel @Inject constructor(
 
     /**
      * Subscribe to real-time conversation and message events from the WebSocket.
+     * Guard: skip events from non-active hubs to prevent spurious UI refreshes.
      */
     private fun subscribeToEvents() {
         viewModelScope.launch {
-            webSocketService.typedEvents.collect { event ->
+            webSocketService.typedEvents.collect { attributed ->
+                if (attributed.hubId.isNotEmpty() && attributed.hubId != activeHubState.activeHubId.value) return@collect
+                val event = attributed.event
                 when (event) {
                     is LlamenosEvent.MessageNew -> {
                         // If we are viewing this conversation, reload messages

@@ -13,7 +13,6 @@ final class ActiveCallUITests: BaseUITest {
     /// a simulated incoming+answered call.
     func testActiveCallPanelVisible() {
         given("I am authenticated as admin with API and a call is active") {
-            resetServerState()
             launchAsAdminWithAPI()
 
             // Simulate an incoming call and answer it
@@ -49,7 +48,6 @@ final class ActiveCallUITests: BaseUITest {
     /// and tapping it dismisses the card.
     func testHangupButtonEndsCall() {
         given("I am authenticated as admin with API and a call is active") {
-            resetServerState()
             launchAsAdminWithAPI()
 
             let call = simulateIncomingCall(callerNumber: "+15551110002")
@@ -78,7 +76,6 @@ final class ActiveCallUITests: BaseUITest {
     /// with a reason text field.
     func testBanDialogShowsReasonField() {
         given("I am authenticated as admin with API and a call is active") {
-            resetServerState()
             launchAsAdminWithAPI()
 
             let call = simulateIncomingCall(callerNumber: "+15551110003")
@@ -113,7 +110,6 @@ final class ActiveCallUITests: BaseUITest {
     /// Verifies the quick note button is present on the active call card.
     func testQuickNoteButtonVisibleDuringCall() {
         given("I am authenticated as admin with API and a call is active") {
-            resetServerState()
             launchAsAdminWithAPI()
 
             let call = simulateIncomingCall(callerNumber: "+15551110004")
@@ -138,7 +134,6 @@ final class ActiveCallUITests: BaseUITest {
     /// Verifies the report spam button is present on the active call card.
     func testReportSpamButtonVisible() {
         given("I am authenticated as admin with API and a call is active") {
-            resetServerState()
             launchAsAdminWithAPI()
 
             let call = simulateIncomingCall(callerNumber: "+15551110005")

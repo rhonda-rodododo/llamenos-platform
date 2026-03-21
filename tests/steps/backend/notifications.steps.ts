@@ -13,9 +13,10 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getSharedState, setLastResponse } from './shared-state'
+import { getScenarioState } from './common.steps'
 import {
-  apiGet,
   createContactViaApi,
+  listRecordsViaApi,
   linkContactToRecordViaApi,
   listRecordContactsViaApi,
   notifyContactsViaApi,
@@ -51,17 +52,14 @@ Before({ tags: '@cases' }, async ({ world }) => {
 
 /**
  * Helper: get the most recently created record ID via the API.
- * Since "the server is reset" runs before each scenario and records
- * are created in order, limit=1 returns the latest (and only) one.
+ * Uses the scenario hub to ensure only records from this scenario are returned.
  */
 async function getLatestRecordId(
   request: import('@playwright/test').APIRequestContext,
+  hubId: string,
 ): Promise<string> {
-  const { data } = await apiGet<{ records: Array<{ id: string }> }>(
-    request,
-    '/records?limit=1',
-  )
-  const recordId = data.records[0]?.id
+  const data = await listRecordsViaApi(request, { limit: 1, hubId })
+  const recordId = (data.records[0] as { id: string })?.id
   expect(recordId).toBeTruthy()
   return recordId
 }
@@ -69,21 +67,23 @@ async function getLatestRecordId(
 // ── Given ──────────────────────────────────────────────────────────
 
 Given('a contact with role {string} is linked to the record', async ({ request, world }, role: string) => {
-  const recordId = await getLatestRecordId(request)
+  const hubId = getScenarioState(world).hubId
+  const recordId = await getLatestRecordId(request, hubId)
 
   const phone = uniquePhone()
-  const contact = await createContactViaApi(request)
+  const contact = await createContactViaApi(request, { hubId })
   const contactId = contact.id as string
   await linkContactToRecordViaApi(request, recordId, contactId, role)
   getNotificationState(world).contacts.push({ contactId, role, phone })
 })
 
 Given('{int} contacts with role {string} are linked to the record', async ({ request, world }, count: number, role: string) => {
-  const recordId = await getLatestRecordId(request)
+  const hubId = getScenarioState(world).hubId
+  const recordId = await getLatestRecordId(request, hubId)
 
   for (let i = 0; i < count; i++) {
     const phone = uniquePhone()
-    const contact = await createContactViaApi(request)
+    const contact = await createContactViaApi(request, { hubId })
     const contactId = contact.id as string
     await linkContactToRecordViaApi(request, recordId, contactId, role)
     getNotificationState(world).contacts.push({ contactId, role, phone })
@@ -107,7 +107,7 @@ Given('a volunteer exists without cases:update permission', async ({ request, wo
 // ── When ──────────────────────────────────────────────────────────
 
 When('the admin triggers notifications for the record with recipients', async ({ request, world }) => {
-  const recordId = await getLatestRecordId(request)
+  const recordId = await getLatestRecordId(request, getScenarioState(world).hubId)
 
   const recipients = getNotificationState(world).contacts
     .filter(c => c.role === 'support_contact')
@@ -127,7 +127,7 @@ When('the admin triggers notifications for the record with recipients', async ({
 })
 
 When('the admin triggers notifications for the record with all support contact recipients', async ({ request, world }) => {
-  const recordId = await getLatestRecordId(request)
+  const recordId = await getLatestRecordId(request, getScenarioState(world).hubId)
 
   const recipients = getNotificationState(world).contacts
     .filter(c => c.role === 'support_contact')
@@ -147,7 +147,7 @@ When('the admin triggers notifications for the record with all support contact r
 })
 
 When('the admin triggers notifications with no recipients', async ({ request, world }) => {
-  const recordId = await getLatestRecordId(request)
+  const recordId = await getLatestRecordId(request, getScenarioState(world).hubId)
 
   const { status, data } = await notifyContactsRawViaApi(
     request,
@@ -162,7 +162,7 @@ When('the admin triggers notifications with no recipients', async ({ request, wo
 })
 
 When('the volunteer tries to send notifications for the record', async ({ request, world }) => {
-  const recordId = await getLatestRecordId(request)
+  const recordId = await getLatestRecordId(request, getScenarioState(world).hubId)
   expect(getNotificationState(world).volunteerNsec).toBeTruthy()
 
   const { status, data } = await notifyContactsRawViaApi(
@@ -183,7 +183,7 @@ When('the volunteer tries to send notifications for the record', async ({ reques
 })
 
 When('the admin lists contacts linked to the record', async ({ request, world }) => {
-  const recordId = await getLatestRecordId(request)
+  const recordId = await getLatestRecordId(request, getScenarioState(world).hubId)
 
   const result = await listRecordContactsViaApi(request, recordId)
   getNotificationState(world).contacts = result.contacts.map(c => ({

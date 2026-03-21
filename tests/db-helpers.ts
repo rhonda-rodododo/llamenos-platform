@@ -116,23 +116,36 @@ export class TestDB {
    * verifies chain links (previousEntryHash matches prior entryHash) but may
    * not be able to recompute hashes exactly due to this mismatch.
    */
-  static async verifyAuditChain(limit?: number): Promise<{
+  static async verifyAuditChain(hubId?: string, limit?: number): Promise<{
     valid: boolean
     entries: number
     brokenAt?: number
   }> {
-    const rows = limit !== undefined
-      ? await sql`
-          SELECT id, action, actor_pubkey, details, previous_entry_hash, entry_hash,
-                 to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
-          FROM audit_log
-          ORDER BY created_at ASC
-          LIMIT ${limit}`
-      : await sql`
-          SELECT id, action, actor_pubkey, details, previous_entry_hash, entry_hash,
-                 to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
-          FROM audit_log
-          ORDER BY created_at ASC`
+    // Filter by hub_id to verify a single chain in isolation.
+    // Different hubs have independent chains; verifying across hubs would
+    // interleave entries from separate chains and always fail.
+    let rows
+    if (hubId) {
+      rows = limit !== undefined
+        ? await sql`
+            SELECT id, action, actor_pubkey, details, previous_entry_hash, entry_hash,
+                   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+            FROM audit_log WHERE hub_id = ${hubId} ORDER BY created_at ASC LIMIT ${limit}`
+        : await sql`
+            SELECT id, action, actor_pubkey, details, previous_entry_hash, entry_hash,
+                   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+            FROM audit_log WHERE hub_id = ${hubId} ORDER BY created_at ASC`
+    } else {
+      rows = limit !== undefined
+        ? await sql`
+            SELECT id, action, actor_pubkey, details, previous_entry_hash, entry_hash,
+                   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+            FROM audit_log WHERE hub_id IS NULL ORDER BY created_at ASC LIMIT ${limit}`
+        : await sql`
+            SELECT id, action, actor_pubkey, details, previous_entry_hash, entry_hash,
+                   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+            FROM audit_log WHERE hub_id IS NULL ORDER BY created_at ASC`
+    }
 
     if (rows.length === 0) {
       return { valid: true, entries: 0 }

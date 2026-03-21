@@ -1,5 +1,5 @@
 import { test as base, createBdd } from 'playwright-bdd'
-import { createHubViaApi } from '../../api-helpers'
+import { createHubViaApi, deleteHubViaApi } from '../../api-helpers'
 
 /**
  * Backend BDD fixture — API-only, no browser page required.
@@ -24,6 +24,8 @@ export const test = base.extend<
     const name = `bdd-hub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const hubId = await createHubViaApi(request, name)
     await use(hubId)
+    // Teardown: clean up hub and all its data after scenario completes
+    await deleteHubViaApi(request, hubId)
   },
 })
 

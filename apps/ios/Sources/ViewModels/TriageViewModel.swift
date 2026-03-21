@@ -71,7 +71,7 @@ final class TriageViewModel {
 
     private func fetchReports() async {
         do {
-            var path = "/api/reports?conversionEnabled=true&limit=50"
+            var path = apiService.hp("/api/reports") + "?conversionEnabled=true&limit=50"
             if selectedFilter != .all {
                 path += "&conversionStatus=\(selectedFilter.rawValue)"
             }
@@ -138,7 +138,7 @@ final class TriageViewModel {
 
             let _: ConvertReportToCaseResponse = try await apiService.request(
                 method: "POST",
-                path: "/api/reports/\(report.id)/convert-to-case",
+                path: apiService.hp("/api/reports/\(report.id)/convert-to-case"),
                 body: createBody
             )
 

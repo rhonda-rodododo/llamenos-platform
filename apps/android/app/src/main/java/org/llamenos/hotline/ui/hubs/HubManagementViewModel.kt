@@ -83,6 +83,11 @@ class HubManagementViewModel @Inject constructor(
                         isRefreshing = false,
                     )
                 }
+                // Pre-fetch hub keys for all hubs in the background so relay events
+                // from any hub can be decrypted immediately without waiting for hub switch.
+                viewModelScope.launch {
+                    hubRepository.loadAllHubKeys(response.hubs)
+                }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(

@@ -69,7 +69,8 @@ class ContactsViewModel @Inject constructor(
                 // Use trigram search endpoint if there's a search query
                 if (search.isNotBlank() && page == 1) {
                     val query = buildString {
-                        append("/api/contacts/search?q=$search")
+                        append(apiService.hp("/api/contacts/search"))
+                        append("?q=$search")
                         state.selectedContactType?.let {
                             append("&contactType=$it")
                         }
@@ -89,7 +90,8 @@ class ContactsViewModel @Inject constructor(
                     }
                 } else {
                     val query = buildString {
-                        append("/api/contacts?page=$page&limit=50")
+                        append(apiService.hp("/api/contacts"))
+                        append("?page=$page&limit=50")
                         if (search.isNotBlank()) {
                             append("&search=$search")
                         }

@@ -314,13 +314,56 @@ Then(
 )
 
 Then('each settings section should have a {string} button', async ({ page }) => {
-  // Each SettingsSection has a copy-link button inside the CardHeader
-  // The button has aria-label containing "Copy" or "link"
-  const sections = page.locator('[data-settings-section]')
+  // Each SettingsSection renders with data-testid={id} and data-settings-section.
+  // The copy-link button lives inside the CardHeader trigger element.
+  const sections = page.locator('[data-testid][data-settings-section]')
   const sectionCount = await sections.count()
   expect(sectionCount).toBeGreaterThanOrEqual(1)
-  // Check at least one section has a button (copy link button is always in CardHeader)
-  const linkButtons = page.locator('[data-settings-section] button[aria-label]')
+  // Check at least one section has an aria-labelled button (copy link)
+  const linkButtons = page.locator('[data-testid][data-settings-section] button[aria-label]')
   const count = await linkButtons.count()
   expect(count).toBeGreaterThanOrEqual(1)
+})
+
+// --- Settings toggle confirmation (settings-toggle.feature) ---
+
+When('I click the spam mitigation toggle', async ({ page }) => {
+  // Spam toggle is a role="switch" inside the spam-section
+  const spamSection = page.getByTestId(TestIds.SETTINGS_SPAM)
+  const toggle = spamSection.getByRole('switch').first()
+  await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await toggle.click()
+})
+
+Then('I can cancel without applying the change', async ({ page }) => {
+  // Click the Cancel button in the confirmation dialog
+  const cancelBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_CANCEL)
+    .or(page.getByRole('button', { name: /cancel/i }).first())
+  await expect(cancelBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await cancelBtn.click()
+  // The dialog should close
+  await expect(page.getByTestId(TestIds.CONFIRM_DIALOG)).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+})
+
+When('I press {string}', async ({ page }, keys: string) => {
+  await page.keyboard.press(keys)
+})
+
+Then('I should see the command palette', async ({ page }) => {
+  // Command palette renders as a dialog or cmdk overlay
+  const palette = page.getByRole('dialog').first()
+    .or(page.locator('[cmdk-root]').first())
+    .or(page.locator('[role="combobox"]').first())
+  await expect(palette).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
+
+Then('it should be focusable and searchable', async ({ page }) => {
+  // The command palette input should accept text
+  const input = page.getByRole('combobox')
+    .or(page.locator('[cmdk-input]'))
+    .or(page.getByPlaceholder(/search|type a command/i))
+  await expect(input.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await input.first().fill('vol')
+  // Should still be focusable (not errored or closed)
+  await expect(input.first()).toBeVisible({ timeout: 2000 })
 })

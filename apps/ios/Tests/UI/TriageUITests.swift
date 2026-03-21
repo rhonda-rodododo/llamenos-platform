@@ -25,7 +25,6 @@ final class TriageUITests: BaseUITest {
     /// Verifies the triage queue renders with content or appropriate empty state.
     func testTriageListShowsReports() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to triage") {
@@ -48,7 +47,6 @@ final class TriageUITests: BaseUITest {
     /// Verifies triage report cards render when triage-eligible reports exist.
     func testTriageListShowsReportCards() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to triage") {
@@ -75,7 +73,6 @@ final class TriageUITests: BaseUITest {
     /// Verifies the filter button is present on the triage screen.
     func testTriageFilterButtonVisible() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to triage") {
@@ -95,7 +92,6 @@ final class TriageUITests: BaseUITest {
     /// with title, status, and metadata.
     func testTriageDetailShowsInfo() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to triage and tap a report") {
@@ -141,7 +137,6 @@ final class TriageUITests: BaseUITest {
     /// Verifies the "Convert to Case" button is present on the triage detail view.
     func testConvertToCaseButtonVisible() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a triage report detail") {
@@ -174,7 +169,6 @@ final class TriageUITests: BaseUITest {
     /// Verifies the report type label is displayed on the triage detail.
     func testTriageReportTypeLabelVisible() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open a triage report detail") {
@@ -222,7 +216,6 @@ final class TriageUITests: BaseUITest {
     /// Verifies the empty state displays when no triage-eligible reports exist.
     func testTriageEmptyState() {
         given("I am authenticated as admin with API and fresh state") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to triage") {

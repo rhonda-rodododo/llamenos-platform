@@ -121,6 +121,7 @@ events.post('/',
       if (entityType.numberingEnabled && entityType.numberPrefix) {
         const result = await services.settings.generateCaseNumber({
           prefix: entityType.numberPrefix,
+          hubId: c.get('hubId') ?? '',
         })
         caseNumber = result.number
       }

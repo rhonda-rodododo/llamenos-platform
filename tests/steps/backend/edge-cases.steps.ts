@@ -375,10 +375,12 @@ Then('the volunteer appears in both the shift and fallback group', async ({ requ
 })
 
 When('the admin removes the volunteer from the shift', async ({ request, world }) => {
-  await updateShiftViaApi(request, getEdgeState(world).shiftId!, { userPubkeys: [] })
+  const hubId = getScenarioState(world).hubId
+  await updateShiftViaApi(request, getEdgeState(world).shiftId!, { userPubkeys: [] }, hubId)
 })
 
 Then('the volunteer still appears in the fallback group', async ({ request, world }) => {
-  const fg = await getFallbackGroupViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const fg = await getFallbackGroupViaApi(request, hubId)
   expect(fg.volunteers).toContain(getEdgeState(world).volunteerPubkey)
 })

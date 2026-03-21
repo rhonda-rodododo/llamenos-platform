@@ -31,10 +31,11 @@ Then('the {string} option should be disabled', async ({ page }, optionText: stri
 })
 
 When('I enable the WebRTC toggle', async ({ page }) => {
-  const webrtcSection = page.locator('[data-settings-section]').filter({ hasText: /WebRTC/ })
-    .or(page.locator('div').filter({ hasText: /WebRTC Configuration/ }).filter({ has: page.getByRole('switch') }).last())
-  const toggle = webrtcSection.getByRole('switch')
-  await toggle.click()
+  // The WebRTC toggle is within the telephony settings section
+  const telephonySection = page.getByTestId('telephony')
+  const toggle = telephonySection.getByRole('switch').first()
+    .or(page.getByLabel(/webrtc|browser calling/i).first())
+  await toggle.first().click()
 })
 
 When('I switch the provider to {string}', async ({ page }, provider: string) => {
@@ -47,17 +48,17 @@ When('I fill in Twilio credentials with WebRTC config', async ({ page }) => {
   await page.getByTestId(TestIds.AUTH_TOKEN).fill('webrtc-auth-token')
 
   // Fill provider phone number (required for save button to be enabled)
-  const phoneInput = page.locator('#provider-phone')
+  const phoneInput = page.getByLabel(/phone number/i).first()
   if (await phoneInput.isVisible({ timeout: 2000 }).catch(() => false)) {
     await phoneInput.fill('+15551234567')
     await phoneInput.blur()
   }
 
   // Enable WebRTC
-  const webrtcSection = page.locator('[data-settings-section]').filter({ hasText: /WebRTC/ })
-    .or(page.locator('div').filter({ hasText: /WebRTC Configuration/ }).filter({ has: page.getByRole('switch') }).last())
-  const toggle = webrtcSection.getByRole('switch')
-  await toggle.click()
+  const telephonySection = page.getByTestId('telephony')
+  const toggle = telephonySection.getByRole('switch').first()
+    .or(page.getByLabel(/webrtc|browser calling/i).first())
+  await toggle.first().click()
 
   await page.getByTestId(TestIds.API_KEY_SID).fill('SKtestkey123')
   await page.getByTestId(TestIds.TWIML_APP_SID).fill('APtestapp456')

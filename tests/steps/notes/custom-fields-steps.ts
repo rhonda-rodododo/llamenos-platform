@@ -22,11 +22,11 @@ Given('a text custom field {string} exists', async ({ page, request }, fieldLabe
   const exists = fields.some(f => f.label === fieldLabel)
 
   if (!exists) {
-    // Navigate to hub settings and create the custom field
+    // Navigate to hub settings and expand the custom fields section
     await Navigation.goToHubSettings(page)
-    const section = page.locator('[data-settings-section]').filter({ hasText: /custom/i })
-    await expect(section.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await section.first().click()
+    const trigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
+    await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await trigger.click()
 
     await page.getByTestId(TestIds.CUSTOM_FIELD_ADD_BTN).click()
     await page.getByLabel(/label/i).fill(fieldLabel)
@@ -216,11 +216,11 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
   const fields = await getCustomFieldsViaApi(request)
   const exists = fields.some(f => f.label === fieldLabel)
   if (!exists) {
-    // Navigate to settings and create
+    // Navigate to settings and expand the custom fields section
     await Navigation.goToHubSettings(page)
-    const section = page.locator('[data-settings-section]').filter({ hasText: /custom/i })
-    await expect(section.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await section.first().click()
+    const trigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
+    await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await trigger.click()
     await page.getByTestId(TestIds.CUSTOM_FIELD_ADD_BTN).click()
     await page.getByLabel(/label/i).fill(fieldLabel)
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()

@@ -6,8 +6,8 @@
  * correct name and slug.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { apiGet, apiPost } from '../../api-helpers'
+import { Given, When, Then, Before, After, getState, setState } from './fixtures'
+import { apiGet, apiPost, apiDelete } from '../../api-helpers'
 import { getSharedState, setLastResponse } from './shared-state'
 
 // ── Local State ────────────────────────────────────────────────────
@@ -27,6 +27,13 @@ function getHubManagementState(world: Record<string, unknown>): HubManagementSta
 Before(async ({ world }) => {
   const hubState = {}
   setState(world, HUB_MANAGEMENT_KEY, hubState)
+})
+
+After(async ({ request, world }) => {
+  const state = getHubManagementState(world)
+  if (state.createdHub?.id) {
+    await apiDelete(request, `/hubs/${state.createdHub.id}`).catch(() => {})
+  }
 })
 
 // ── Given ──────────────────────────────────────────────────────────
@@ -58,6 +65,14 @@ When('the admin lists all hubs', async ({ request, world }) => {
 When(
   'the admin creates a hub with name {string} and slug {string}',
   async ({ request, world }, name: string, slug: string) => {
+    // Clean up any existing hub with this slug (left over from a previous test run)
+    const listRes = await apiGet<{ hubs: Array<{ id: string; slug: string }> }>(request, '/hubs')
+    if (listRes.status === 200) {
+      const existing = listRes.data?.hubs?.find(h => h.slug === slug)
+      if (existing) {
+        await apiDelete(request, `/hubs/${existing.id}`).catch(() => {})
+      }
+    }
     const res = await apiPost<{ hub: { id: string; name: string; slug: string } }>(
       request,
       '/hubs',

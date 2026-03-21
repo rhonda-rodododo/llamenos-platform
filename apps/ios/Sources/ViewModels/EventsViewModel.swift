@@ -120,7 +120,7 @@ final class EventsViewModel {
         do {
             let response: EventsListResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/events?page=\(currentPage)&limit=\(pageSize)"
+                path: apiService.hp("/api/events") + "?page=\(currentPage)&limit=\(pageSize)"
             )
             events = response.events
             totalEvents = response.total
@@ -164,7 +164,7 @@ final class EventsViewModel {
         // Load linked records (cases)
         do {
             let response: AppCaseEventLinksResponse = try await apiService.request(
-                method: "GET", path: "/api/events/\(event.id)/records"
+                method: "GET", path: apiService.hp("/api/events/\(event.id)/records")
             )
             linkedCases = response.links
         } catch {
@@ -174,7 +174,7 @@ final class EventsViewModel {
         // Load linked reports
         do {
             let response: ReportEventLinksResponse = try await apiService.request(
-                method: "GET", path: "/api/events/\(event.id)/reports"
+                method: "GET", path: apiService.hp("/api/events/\(event.id)/reports")
             )
             linkedReports = response.links
         } catch {
@@ -185,7 +185,7 @@ final class EventsViewModel {
         do {
             let response: SubEventsResponse = try await apiService.request(
                 method: "GET",
-                path: "/api/events/\(event.id)/subevents"
+                path: apiService.hp("/api/events/\(event.id)/subevents")
             )
             subEvents = response.events
         } catch {
@@ -297,7 +297,7 @@ final class EventsViewModel {
 
         do {
             let _: AppCaseEvent = try await apiService.request(
-                method: "POST", path: "/api/events", body: body
+                method: "POST", path: apiService.hp("/api/events"), body: body
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             await loadEvents()

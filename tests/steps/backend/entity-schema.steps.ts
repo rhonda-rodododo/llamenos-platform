@@ -7,6 +7,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getSharedState, setLastResponse } from './shared-state'
+import { getScenarioState } from './common.steps'
 import {
   enableCaseManagementViaApi,
   getCaseManagementEnabledViaApi,
@@ -49,13 +50,14 @@ Given('case management is enabled', async ({request, world}) => {
 })
 
 Given('an entity type {string} exists', async ({ request, world }, name: string) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const existing = types.find(t => t.name === name)
   if (existing) {
     getEntitySchemaState(world).lastEntityType = existing
     return
   }
-  const created = await createEntityTypeViaApi(request, { name, category: 'case' })
+  const created = await createEntityTypeViaApi(request, { name, category: 'case', hubId })
   getEntitySchemaState(world).lastEntityType = created
 })
 
@@ -66,17 +68,19 @@ When('the admin enables case management', async ({request, world}) => {
 })
 
 When('the admin creates an entity type named {string} with category {string}', async ({ request, world }, name: string, category: string) => {
-  // Parallel workers may have already created this name — treat as idempotent
-  const existing = (await listEntityTypesViaApi(request)).find((t) => t.name === name)
+  const hubId = getScenarioState(world).hubId
+  // Parallel workers may have already created this name — treat as idempotent within hub
+  const existing = (await listEntityTypesViaApi(request, hubId)).find((t) => t.name === name)
   if (existing) {
     getEntitySchemaState(world).lastEntityType = existing
     return
   }
-  const result = await createEntityTypeViaApi(request, { name, category })
+  const result = await createEntityTypeViaApi(request, { name, category, hubId })
   getEntitySchemaState(world).lastEntityType = result
 })
 
 When('the admin creates an entity type with statuses {string} and fields {string}', async ({ request, world }, statusesStr: string, fieldsStr: string) => {
+  const hubId = getScenarioState(world).hubId
   const statuses = statusesStr.split(',').map((v, i) => ({
     value: v.trim(),
     label: v.trim().charAt(0).toUpperCase() + v.trim().slice(1),
@@ -89,6 +93,7 @@ When('the admin creates an entity type with statuses {string} and fields {string
   const result = await createEntityTypeViaApi(request, {
     name: `type_${Date.now()}`,
     category: 'case',
+    hubId,
     statuses,
     fields,
   })
@@ -96,7 +101,8 @@ When('the admin creates an entity type with statuses {string} and fields {string
 })
 
 When('the admin adds a field {string} of type {string} to entity type {string}', async ({ request, world }, fieldName: string, fieldType: string, entityTypeName: string) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const entityType = types.find(t => t.name === entityTypeName)
   expect(entityType).toBeTruthy()
 
@@ -122,15 +128,17 @@ When('the admin adds a field {string} of type {string} to entity type {string}',
 })
 
 When('the admin deletes entity type {string}', async ({request, world}, name: string) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const entityType = types.find(t => t.name === name)
   expect(entityType).toBeTruthy()
   await deleteEntityTypeViaApi(request, entityType!.id as string)
 })
 
 When('the admin tries to create an entity type named {string}', async ({request, world}, name: string) => {
+  const hubId = getScenarioState(world).hubId
   try {
-    await createEntityTypeViaApi(request, { name, category: 'case' })
+    await createEntityTypeViaApi(request, { name, category: 'case', hubId })
     setLastResponse(world, { status: 201, data: null })
   } catch (e: unknown) {
     const msg = (e as Error).message
@@ -140,7 +148,8 @@ When('the admin tries to create an entity type named {string}', async ({request,
 })
 
 When('the admin creates a relationship type from {string} to {string} with cardinality {string}', async ({ request, world }, source: string, target: string, cardinality: string) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const sourceId = source === 'contact' ? 'contact' : (types.find(t => t.name === source)?.id as string)
   const targetId = target === 'contact' ? 'contact' : (types.find(t => t.name === target)?.id as string)
   expect(sourceId).toBeTruthy()
@@ -150,6 +159,7 @@ When('the admin creates a relationship type from {string} to {string} with cardi
     sourceEntityTypeId: sourceId,
     targetEntityTypeId: targetId,
     cardinality,
+    hubId,
   })
   getEntitySchemaState(world).lastRelationshipType = result
 })
@@ -167,12 +177,14 @@ When('a volunteer tries to create an entity type', async ({request, world}) => {
 })
 
 When('a case number is generated with prefix {string}', async ({ request, world }, prefix: string) => {
-  const result = await generateCaseNumberViaApi(request, prefix)
+  const hubId = getScenarioState(world).hubId
+  const result = await generateCaseNumberViaApi(request, prefix, hubId)
   getEntitySchemaState(world).caseNumbers.push(result.number)
 })
 
 When('another case number is generated with prefix {string}', async ({ request, world }, prefix: string) => {
-  const result = await generateCaseNumberViaApi(request, prefix)
+  const hubId = getScenarioState(world).hubId
+  const result = await generateCaseNumberViaApi(request, prefix, hubId)
   getEntitySchemaState(world).caseNumbers.push(result.number)
 })
 
@@ -188,7 +200,8 @@ Then('case management should be enabled', async ({request, world}) => {
 })
 
 Then('the entity type {string} should exist', async ({ request, world }, name: string) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const found = types.find(t => t.name === name)
   expect(found).toBeTruthy()
   getEntitySchemaState(world).lastEntityType = found
@@ -215,7 +228,8 @@ Then('the created entity type should have {int} fields', async ({ world }, count
 })
 
 Then('entity type {string} should have the field {string}', async ({request, world}, entityTypeName: string, fieldName: string) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const entityType = types.find(t => t.name === entityTypeName)
   expect(entityType).toBeTruthy()
   const fields = entityType!.fields as Array<Record<string, unknown>>
@@ -223,7 +237,8 @@ Then('entity type {string} should have the field {string}', async ({request, wor
 })
 
 Then('entity type {string} should not exist', async ({request, world}, name: string) => {
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   expect(types.some(t => t.name === name)).toBe(false)
 })
 

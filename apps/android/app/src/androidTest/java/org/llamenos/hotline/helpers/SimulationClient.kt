@@ -183,6 +183,30 @@ object SimulationClient {
         return json.decodeFromString<StatusResponse>(responseText)
     }
 
+    // ─── Hub Management ───────────────────────────────────────────
+
+    @Serializable
+    data class HubResponse(
+        val id: String = "",
+        val name: String = "",
+        val error: String? = null,
+    )
+
+    /**
+     * Create an isolated test hub via the test endpoint.
+     *
+     * Calls POST /api/test-create-hub with X-Test-Secret header.
+     * Returns the new hub's ID. Called once per Cucumber scenario in ScenarioHooks @Before.
+     *
+     * Hub is NOT deleted after the scenario — stale hubs accumulate and are purged periodically.
+     */
+    fun createTestHub(name: String? = null): HubResponse {
+        val hubName = name ?: "android-test-${System.currentTimeMillis()}"
+        val body = """{"name":"${escapeJson(hubName)}"}"""
+        val responseText = post("/api/test-create-hub", body)
+        return json.decodeFromString<HubResponse>(responseText)
+    }
+
     // ─── CMS Setup ────────────────────────────────────────────────
 
     /**

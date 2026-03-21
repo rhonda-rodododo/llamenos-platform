@@ -194,7 +194,9 @@ entitySchema.get('/entity-types',
   requireAnyPermission('settings:read', 'cases:read-own', 'cases:read-assigned', 'cases:create'),
   async (c) => {
     const services = c.get('services')
-    const result = await services.settings.getEntityTypes()
+    // Support optional hubId query param for filtering by hub (or falls back to hub middleware context)
+    const hubId = c.req.query('hubId') ?? c.get('hubId')
+    const result = await services.settings.getEntityTypes(hubId)
     return c.json(result)
   },
 )
@@ -280,7 +282,13 @@ entitySchema.post('/case-number',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    const result = await services.settings.generateCaseNumber(body)
+    // hubId is passed in body (looseObject allows extra fields) or falls back to middleware context
+    const bodyRecord = body as Record<string, unknown>
+    const result = await services.settings.generateCaseNumber({
+      prefix: body.prefix,
+      year: body.year,
+      hubId: (bodyRecord.hubId as string) || c.get('hubId') || '',
+    })
     return c.json(result)
   },
 )
@@ -361,25 +369,27 @@ entitySchema.post('/templates/apply',
     },
   }),
   requirePermission('cases:manage-types'),
-  validator('json', z.object({ templateId: z.string() })),
+  validator('json', z.object({ templateId: z.string(), hubId: z.string().optional() })),
   async (c) => {
-    const { templateId } = c.req.valid('json')
+    const { templateId, hubId: bodyHubId } = c.req.valid('json')
     const services = c.get('services')
+    // Prefer hubId from body (allows explicit hub targeting), fall back to middleware context
+    const hubId = bodyHubId ?? c.get('hubId') ?? ''
 
     // Load template
     const templates = await loadBundledTemplates()
     const template = templates.find(t => t.id === templateId)
     if (!template) return c.json({ error: 'Template not found' }, 404)
 
-    // Get existing entity types
-    const { entityTypes: existing } = await services.settings.getEntityTypes()
+    // Get existing entity types for this hub only
+    const { entityTypes: existing } = await services.settings.getEntityTypes(hubId)
 
-    // Get existing CMS report types
-    const { reportTypes: existingReportTypes } = await services.settings.getCmsReportTypes()
+    // Get existing CMS report types for this hub only
+    const { reportTypes: existingReportTypes } = await services.settings.getCmsReportTypes(hubId)
 
-    // Apply template
+    // Apply template with correct hubId so new entity types are hub-scoped
     const allTemplatesMap = new Map(templates.map(t => [t.id, t]))
-    const result = applyTemplate(template, '', allTemplatesMap, existing, existingReportTypes)
+    const result = applyTemplate(template, hubId, allTemplatesMap, existing, existingReportTypes)
 
     // Merge entity types: replace matching names, add new
     const merged = [...existing]
@@ -389,13 +399,14 @@ entitySchema.post('/templates/apply',
       else merged.push(newET)
     }
 
-    // Save entity types (bulk replacement)
-    await services.settings.bulkSetEntityTypes({ entityTypes: merged })
+    // Save entity types (hub-scoped bulk replacement — only touches this hub's rows)
+    await services.settings.bulkSetEntityTypes({ entityTypes: merged, hubId })
 
-    // Save relationship types (append)
-    const { relationshipTypes: existingRels } = await services.settings.getRelationshipTypes()
+    // Save relationship types (hub-scoped append)
+    const { relationshipTypes: existingRels } = await services.settings.getRelationshipTypes(hubId)
     await services.settings.bulkSetRelationshipTypes({
       relationshipTypes: [...existingRels, ...result.relationshipTypes],
+      hubId,
     })
 
     // Merge CMS report types: replace matching names, add new (Epic 343)
@@ -406,7 +417,7 @@ entitySchema.post('/templates/apply',
         if (idx >= 0) mergedReportTypes[idx] = newRT
         else mergedReportTypes.push(newRT)
       }
-      await services.settings.bulkSetCmsReportTypes({ reportTypes: mergedReportTypes })
+      await services.settings.bulkSetCmsReportTypes({ reportTypes: mergedReportTypes, hubId })
     }
 
     // Track applied template
@@ -540,7 +551,8 @@ entitySchema.get('/report-types',
   requirePermission('settings:read'),
   async (c) => {
     const services = c.get('services')
-    const result = await services.settings.getCmsReportTypes()
+    const hubId = c.req.query('hubId') ?? c.get('hubId')
+    const result = await services.settings.getCmsReportTypes(hubId)
     return c.json(result)
   },
 )

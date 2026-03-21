@@ -308,15 +308,16 @@ export const captchas = pgTable('captchas', {
 })
 
 // ---------------------------------------------------------------------------
-// case_number_sequences (composite PK: prefix + year)
+// case_number_sequences (composite PK: hub_id + prefix + year)
 // ---------------------------------------------------------------------------
 
 export const caseNumberSequences = pgTable(
   'case_number_sequences',
   {
+    hubId: text('hub_id').notNull().default(''),
     prefix: text('prefix').notNull(),
     year: integer('year').notNull(),
     nextValue: integer('next_value').notNull().default(1),
   },
-  (t) => [primaryKey({ columns: [t.prefix, t.year] })],
+  (t) => [primaryKey({ columns: [t.hubId, t.prefix, t.year] })],
 )

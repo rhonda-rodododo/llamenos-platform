@@ -9,6 +9,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import {
   apiPost,
   apiGet,
@@ -81,8 +82,10 @@ When('the admin converts the submitted report to a case', async ({ request, worl
   // Ensure an entity type exists for case records
   if (!getTransitionState(world).entityTypeId) {
     await enableCaseManagementViaApi(request, true)
+    const hubId = getScenarioState(world).hubId
     const et = await createEntityTypeViaApi(request, {
       name: `case_type_${Date.now()}`,
+      hubId,
     })
     getTransitionState(world).entityTypeId = et.id as string
   }

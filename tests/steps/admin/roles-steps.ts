@@ -19,10 +19,10 @@ import {
 } from '../../api-helpers'
 
 When('I request the roles list', async ({ page, request, rolesWorld }) => {
-  // Navigate to roles section in UI
-  const rolesSection = page.locator('[data-settings-section]').filter({ hasText: /roles/i })
-  if (await rolesSection.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await rolesSection.first().click()
+  // Navigate to roles section in UI — look for a roles trigger button
+  const rolesTrigger = page.getByRole('button', { name: /roles/i }).first()
+  if (await rolesTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await rolesTrigger.click()
   }
 
   // Also fetch via API for behavioral verification

@@ -1474,6 +1474,12 @@ export async function updateHub(hubId: string, data: Partial<Hub>) {
   })
 }
 
+export async function deleteHub(hubId: string) {
+  return request<{ ok: true }>(`/hubs/${hubId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function addHubMember(hubId: string, pubkey: string, roleIds: string[]) {
   return request<{ ok: true }>(`/hubs/${hubId}/members`, {
     method: 'POST',

@@ -81,10 +81,14 @@ class DashboardViewModel @Inject constructor(
             }
         }
 
-        // Subscribe to typed (decrypted + parsed) events from the relay
+        // Subscribe to typed (decrypted + parsed) events from the relay.
+        // Each event carries the hub ID that was active when it arrived.
+        // Guard: skip events from non-active hubs to prevent spurious UI refreshes.
         viewModelScope.launch {
-            webSocketService.typedEvents.collect { event ->
-                handleEvent(event)
+            webSocketService.typedEvents.collect { attributed ->
+                if (attributed.hubId.isEmpty() || attributed.hubId == activeHubState.activeHubId.value) {
+                    handleEvent(attributed.event)
+                }
             }
         }
 
@@ -259,7 +263,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isHangingUp = true) }
             try {
-                apiService.requestNoContent("POST", "/api/calls/$callId/hangup")
+                apiService.requestNoContent("POST", apiService.hp("/api/calls/$callId/hangup"))
                 _uiState.update { it.copy(currentCall = null, isHangingUp = false) }
             } catch (_: Exception) {
                 _uiState.update { it.copy(isHangingUp = false, errorRes = R.string.call_actions_ban_failed) }
@@ -275,7 +279,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isReportingSpam = true) }
             try {
-                apiService.requestNoContent("POST", "/api/calls/$callId/spam")
+                apiService.requestNoContent("POST", apiService.hp("/api/calls/$callId/spam"))
                 _uiState.update { it.copy(isReportingSpam = false) }
             } catch (_: Exception) {
                 _uiState.update { it.copy(isReportingSpam = false, errorRes = R.string.call_actions_ban_failed) }
@@ -292,9 +296,9 @@ class DashboardViewModel @Inject constructor(
             _uiState.update { it.copy(isBanning = true) }
             try {
                 if (reason != null) {
-                    apiService.requestNoContent("POST", "/api/calls/$callId/ban", BanRequest(reason))
+                    apiService.requestNoContent("POST", apiService.hp("/api/calls/$callId/ban"), BanRequest(reason))
                 } else {
-                    apiService.requestNoContent("POST", "/api/calls/$callId/ban")
+                    apiService.requestNoContent("POST", apiService.hp("/api/calls/$callId/ban"))
                 }
                 _uiState.update { it.copy(currentCall = null, isBanning = false) }
             } catch (_: Exception) {
@@ -308,7 +312,7 @@ class DashboardViewModel @Inject constructor(
      */
     private suspend fun fetchActiveCall() {
         try {
-            val response = apiService.request<ActiveCallsResponse>("GET", "/api/calls/active")
+            val response = apiService.request<ActiveCallsResponse>("GET", apiService.hp("/api/calls/active"))
             val call = response.calls.firstOrNull()
             _uiState.update { it.copy(currentCall = call) }
         } catch (_: Exception) {

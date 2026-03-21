@@ -11,6 +11,7 @@ import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.helpers.SimulationClient.CallSimulationResponse
 import org.llamenos.hotline.helpers.SimulationClient.MessageSimulationResponse
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Cucumber step definitions for simulated call and message scenarios.
@@ -41,7 +42,10 @@ class CallSimulationSteps : BaseSteps() {
     @Given("an incoming call from {string}")
     fun anIncomingCallFrom(callerNumber: String) {
         Log.d(TAG, "Simulating incoming call from $callerNumber")
-        val response = SimulationClient.simulateIncomingCall(callerNumber)
+        val response = SimulationClient.simulateIncomingCall(
+            callerNumber = callerNumber,
+            hubId = ScenarioHooks.currentHubId.ifEmpty { null },
+        )
         lastCallResponse = response
         lastCallId = response.callId
         lastStatus = response.status
@@ -59,6 +63,7 @@ class CallSimulationSteps : BaseSteps() {
         val response = SimulationClient.simulateIncomingCall(
             callerNumber = callerNumber,
             language = language,
+            hubId = ScenarioHooks.currentHubId.ifEmpty { null },
         )
         lastCallResponse = response
         lastCallId = response.callId

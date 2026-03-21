@@ -175,7 +175,7 @@ final class CaseManagementViewModel {
         isLoading = true
         defer { isLoading = false }
 
-        var path = "/api/records?page=\(currentPage)&limit=\(pageSize)"
+        var path = apiService.hp("/api/records") + "?page=\(currentPage)&limit=\(pageSize)"
         if let etFilter = entityTypeFilter {
             path += "&entityTypeId=\(etFilter)"
         }
@@ -310,7 +310,7 @@ final class CaseManagementViewModel {
 
         do {
             let response: InteractionListResponse = try await apiService.request(
-                method: "GET", path: "/api/records/\(recordId)/interactions?limit=100"
+                method: "GET", path: apiService.hp("/api/records/\(recordId)/interactions") + "?limit=100"
             )
             interactions = response.interactions
         } catch {
@@ -325,7 +325,7 @@ final class CaseManagementViewModel {
 
         do {
             let response: RecordContactsResponse = try await apiService.request(
-                method: "GET", path: "/api/records/\(recordId)/contacts"
+                method: "GET", path: apiService.hp("/api/records/\(recordId)/contacts")
             )
             contacts = response.contacts
         } catch {
@@ -340,7 +340,7 @@ final class CaseManagementViewModel {
 
         do {
             let response: EvidenceListResponse = try await apiService.request(
-                method: "GET", path: "/api/records/\(recordId)/evidence?limit=100"
+                method: "GET", path: apiService.hp("/api/records/\(recordId)/evidence") + "?limit=100"
             )
             evidence = response.evidence
         } catch {
@@ -357,7 +357,7 @@ final class CaseManagementViewModel {
 
         do {
             let _: CaseRecord = try await apiService.request(
-                method: "PATCH", path: "/api/records/\(recordId)",
+                method: "PATCH", path: apiService.hp("/api/records/\(recordId)"),
                 body: UpdateRecordRequest(statusHash: newStatus, severityHash: nil)
             )
             await loadRecords()
@@ -365,7 +365,7 @@ final class CaseManagementViewModel {
                 // Refresh selected record
                 do {
                     let fresh: CaseRecord = try await apiService.request(
-                        method: "GET", path: "/api/records/\(recordId)"
+                        method: "GET", path: apiService.hp("/api/records/\(recordId)")
                     )
                     selectedRecord = fresh
                     // Reload timeline to reflect status change interaction
@@ -407,7 +407,7 @@ final class CaseManagementViewModel {
             )
 
             let _: CaseInteraction = try await apiService.request(
-                method: "POST", path: "/api/records/\(recordId)/interactions",
+                method: "POST", path: apiService.hp("/api/records/\(recordId)/interactions"),
                 body: body
             )
 
@@ -428,7 +428,7 @@ final class CaseManagementViewModel {
 
         do {
             try await apiService.request(
-                method: "POST", path: "/api/records/\(recordId)/assign",
+                method: "POST", path: apiService.hp("/api/records/\(recordId)/assign"),
                 body: AssignRecordRequest(pubkeys: [pubkey])
             )
             await loadRecords()
@@ -436,7 +436,7 @@ final class CaseManagementViewModel {
             if selectedRecord?.id == recordId {
                 do {
                     let fresh: CaseRecord = try await apiService.request(
-                        method: "GET", path: "/api/records/\(recordId)"
+                        method: "GET", path: apiService.hp("/api/records/\(recordId)")
                     )
                     selectedRecord = fresh
                 } catch { /* keep stale */ }
@@ -455,7 +455,7 @@ final class CaseManagementViewModel {
 
         do {
             try await apiService.request(
-                method: "POST", path: "/api/records/\(recordId)/unassign",
+                method: "POST", path: apiService.hp("/api/records/\(recordId)/unassign"),
                 body: UnassignRecordRequest(pubkey: pubkey)
             )
             await loadRecords()
@@ -463,7 +463,7 @@ final class CaseManagementViewModel {
             if selectedRecord?.id == recordId {
                 do {
                     let fresh: CaseRecord = try await apiService.request(
-                        method: "GET", path: "/api/records/\(recordId)"
+                        method: "GET", path: apiService.hp("/api/records/\(recordId)")
                     )
                     selectedRecord = fresh
                 } catch { /* keep stale */ }

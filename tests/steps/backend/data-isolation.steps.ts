@@ -7,6 +7,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import {
   apiGet,
   apiPost,
@@ -68,15 +69,20 @@ Before({ tags: '@security or @permissions' }, async ({ world }) => {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-async function ensureEntityType(request: import('@playwright/test').APIRequestContext): Promise<string> {
-  if (getIsolationState(world).entityTypeId) return getIsolationState(world).entityTypeId
+async function ensureEntityType(
+  request: import('@playwright/test').APIRequestContext,
+  world: Record<string, unknown>,
+): Promise<string> {
+  const isoState = getIsolationState(world)
+  if (isoState.entityTypeId) return isoState.entityTypeId
   await enableCaseManagementViaApi(request, true)
+  const hubId = getScenarioState(world).hubId
   const et = await createEntityTypeViaApi(request, {
-    name: `Isolation Case ${Date.now()}`,
-    slug: `isolation-case-${Date.now()}`,
+    name: `isolation_case_${Date.now()}`,
+    hubId,
   })
-  getIsolationState(world).entityTypeId = et.id
-  return et.id
+  isoState.entityTypeId = et.id as string
+  return et.id as string
 }
 
 // ── Parameterized: <role> can only see their own <resource> ───────
@@ -123,7 +129,7 @@ Given(
 
       // Create a record (if CMS enabled)
       try {
-        const etId = await ensureEntityType(request)
+        const etId = await ensureEntityType(request, world)
         const rec = await createRecordViaApi(request, etId, {}, vol.nsec)
         if ((rec as { id?: string }).id) {
           user.recordIds.push((rec as { id: string }).id)

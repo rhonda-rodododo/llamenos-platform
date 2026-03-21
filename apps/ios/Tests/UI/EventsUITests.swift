@@ -33,7 +33,6 @@ final class EventsUITests: BaseUITest {
     /// Verifies the event list screen renders with content or empty state.
     func testEventListShowsEvents() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to events") {
@@ -55,7 +54,6 @@ final class EventsUITests: BaseUITest {
     /// Verifies event rows render when events exist in the system.
     func testEventListShowsEventRows() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to events") {
@@ -82,7 +80,6 @@ final class EventsUITests: BaseUITest {
     /// Verifies tapping an event row opens the detail view with tabs.
     func testEventDetailShowsInfo() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to events and tap an event") {
@@ -124,7 +121,6 @@ final class EventsUITests: BaseUITest {
     /// Verifies switching between event detail tabs renders correct content.
     func testEventDetailTabSwitching() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I open an event detail") {
@@ -194,7 +190,6 @@ final class EventsUITests: BaseUITest {
     /// Verifies the search field is present on the event list screen.
     func testEventSearchFieldVisible() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to events") {
@@ -213,7 +208,6 @@ final class EventsUITests: BaseUITest {
     /// Verifies the create event button is visible on the events screen.
     func testCreateEventButtonVisible() {
         given("I am authenticated as admin with API") {
-            resetServerState()
             launchAsAdminWithAPI()
         }
         when("I navigate to events") {

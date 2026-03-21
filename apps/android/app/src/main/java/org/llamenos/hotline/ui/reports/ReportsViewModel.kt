@@ -119,7 +119,8 @@ class ReportsViewModel @Inject constructor(
             }
             try {
                 val query = buildString {
-                    append("/api/reports?limit=50")
+                    append(apiService.hp("/api/reports"))
+                    append("?limit=50")
                     val status = _uiState.value.selectedStatus
                     if (status.queryParam != null) {
                         append("&status=${status.queryParam}")
@@ -153,7 +154,7 @@ class ReportsViewModel @Inject constructor(
     private fun loadCategories() {
         viewModelScope.launch {
             try {
-                val response = apiService.request<ReportCategoriesResponse>("GET", "/api/reports/categories")
+                val response = apiService.request<ReportCategoriesResponse>("GET", apiService.hp("/api/reports/categories"))
                 _uiState.update { it.copy(categories = response.categories) }
             } catch (_: Exception) {
                 // Non-critical — categories are optional
@@ -269,7 +270,7 @@ class ReportsViewModel @Inject constructor(
                     encryptedContent = encrypted.ciphertext,
                     readerEnvelopes = envelopes,
                 )
-                apiService.request<Report>("POST", "/api/reports", request)
+                apiService.request<Report>("POST", apiService.hp("/api/reports"), request)
                 _uiState.update { it.copy(isCreating = false, createSuccess = true) }
                 refresh()
             } catch (e: Exception) {
@@ -324,7 +325,7 @@ class ReportsViewModel @Inject constructor(
                     encryptedContent = encrypted.ciphertext,
                     readerEnvelopes = envelopes,
                 )
-                apiService.request<Report>("POST", "/api/reports", request)
+                apiService.request<Report>("POST", apiService.hp("/api/reports"), request)
                 _uiState.update {
                     it.copy(
                         isCreating = false,
@@ -370,7 +371,7 @@ class ReportsViewModel @Inject constructor(
             }
             try {
                 val request = AssignReportRequest(assignedTo = pubkey)
-                val updated = apiService.request<Report>("POST", "/api/reports/$reportId/assign", request)
+                val updated = apiService.request<Report>("POST", apiService.hp("/api/reports/$reportId/assign"), request)
                 _uiState.update {
                     it.copy(
                         isClaiming = false,
@@ -399,7 +400,7 @@ class ReportsViewModel @Inject constructor(
             _uiState.update { it.copy(isClosing = true, actionError = null) }
             try {
                 val request = UpdateReportRequest(status = "closed")
-                val updated = apiService.request<Report>("PATCH", "/api/reports/$reportId", request)
+                val updated = apiService.request<Report>("PATCH", apiService.hp("/api/reports/$reportId"), request)
                 _uiState.update {
                     it.copy(
                         isClosing = false,

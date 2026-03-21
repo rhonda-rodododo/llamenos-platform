@@ -7,6 +7,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import {
   createContactViaApi,
   createRelationshipViaApi,
@@ -60,8 +61,10 @@ async function ensureNamedContact(
 ): Promise<Record<string, unknown>> {
   const existing = getRelState(world).contacts.get(alias)
   if (existing) return existing
+  const hubId = getScenarioState(world).hubId
   const contact = await createContactViaApi(request, {
     identifierHashes: [`idhash_${alias}_${Date.now()}`],
+    hubId,
   })
   getRelState(world).contacts.set(alias, contact)
   return contact

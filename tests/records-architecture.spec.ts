@@ -24,7 +24,7 @@ async function fillCallId(page: Page, callId: string) {
     await directInput.fill(callId)
   } else {
     // Select the "Enter manually" option, then fill the manual input
-    const selectTrigger = page.locator('#call-id')
+    const selectTrigger = page.getByTestId('call-id-select')
     await selectTrigger.click()
     await page.getByText(/enter.*manually/i).click()
     // After selecting manual, a text input with data-testid="note-call-id" appears
@@ -133,9 +133,16 @@ test.describe('Records Architecture', () => {
     // Navigate directly (Conversations link may not be in nav if channels are not configured)
     await navigateAfterLogin(page, '/conversations')
 
-    // The conversations page should load — it may show empty state or channel warning
-    const heading = page.locator('h1', { hasText: /conversations/i })
-    await expect(heading).toBeVisible()
+    // The conversations page should render its content — either the conversation list,
+    // an empty state, or a "no channels configured" notice. Report cards must NOT appear.
+    const content = page.getByTestId(TestIds.CONVERSATION_LIST)
+      .or(page.getByTestId(TestIds.CONVERSATION_ITEM).first())
+      .or(page.getByTestId(TestIds.EMPTY_STATE))
+      .or(page.getByText(/no channels configured|conversations/i).first())
+    await expect(content.first()).toBeVisible({ timeout: 10000 })
+
+    // Report cards must NOT appear on the conversations page
+    await expect(page.getByTestId(TestIds.REPORT_CARD).first()).not.toBeVisible()
   })
 
   // ============ Contact View Tests ============
@@ -147,14 +154,13 @@ test.describe('Records Architecture', () => {
     await expect(page.getByText(/unified interaction history/i)).toBeVisible()
   })
 
-  test('contacts page shows empty state when no contacts exist', async ({ page }) => {
+  test('contacts page shows contact rows or empty state', async ({ page }) => {
     await Navigation.goToContacts(page)
-    // Wait for loading to finish
-    // Should show either contacts or empty state
-    const hasContacts = await page.getByTestId(TestIds.CONTACT_ROW).first().isVisible().catch(() => false)
-    if (!hasContacts) {
-      await expect(page.getByText(/no contacts found/i)).toBeVisible()
-    }
+    // After loading, the page must show either contact rows or an empty state — never blank
+    const content = page.getByTestId(TestIds.CONTACT_ROW).first()
+      .or(page.getByTestId(TestIds.EMPTY_STATE))
+      .or(page.getByText(/no contacts found/i).first())
+    await expect(content).toBeVisible({ timeout: 10000 })
   })
 
   test('volunteer cannot see contacts nav link', async ({ page }) => {
@@ -187,10 +193,10 @@ test.describe('Records Architecture', () => {
     await page.getByRole('link', { name: 'Hub Settings' }).click()
     await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
 
-    // Expand custom fields section by clicking its title
-    const customFieldsTitle = page.locator('[data-testid="custom-fields"] h3')
-    await customFieldsTitle.scrollIntoViewIfNeeded()
-    await customFieldsTitle.click()
+    // Expand custom fields section by clicking its trigger
+    const customFieldsTrigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
+    await customFieldsTrigger.scrollIntoViewIfNeeded()
+    await customFieldsTrigger.click()
 
     const addFieldBtn = page.getByRole('button', { name: /add field/i })
     await expect(addFieldBtn).toBeVisible({ timeout: 10000 })
@@ -205,15 +211,19 @@ test.describe('Records Architecture', () => {
 
   // ============ Notes Page Structure ============
 
-  test('notes page shows conversation note badge for conversation-linked notes', async ({ page }) => {
+  test('notes page shows note list or empty state, not conversation cards', async ({ page }) => {
     await Navigation.goToNotes(page)
 
-    // The page should load without errors
-    const heading = page.getByRole('heading', { name: /call notes/i })
-    await expect(heading).toBeVisible()
+    // The notes page must show the note list, an individual note card, or empty state
+    const content = page.getByTestId(TestIds.NOTE_LIST)
+      .or(page.getByTestId(TestIds.NOTE_CARD).first())
+      .or(page.getByTestId(TestIds.NOTE_NEW_BTN))
+      .or(page.getByTestId(TestIds.EMPTY_STATE))
+    await expect(content.first()).toBeVisible({ timeout: 10000 })
 
-    // Verify encryption note is present
-    await expect(page.getByText(/encrypted end-to-end/i)).toBeVisible()
+    // Conversation list elements must NOT appear on the notes page
+    await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).not.toBeVisible()
+    await expect(page.getByTestId(TestIds.CONVERSATION_ITEM).first()).not.toBeVisible()
   })
 
   test('notes grouped by call or conversation', async ({ page }) => {

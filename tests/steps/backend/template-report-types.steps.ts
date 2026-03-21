@@ -8,6 +8,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getSharedState, setLastResponse } from './shared-state'
+import { getScenarioState } from './common.steps'
 import {
   listCmsReportTypesViaApi,
   getCmsReportTypeViaApi,
@@ -109,7 +110,8 @@ Then('the CMS report type field {string} should have {string} enabled', async ({
 // ============================================================
 
 When('the admin creates a custom CMS report type {string}', async ({ request, world }, name: string) => {
-  getReportTypeState(world).lastReportType = await createCmsReportTypeViaApi(request, { name })
+  const hubId = getScenarioState(world).hubId
+  getReportTypeState(world).lastReportType = await createCmsReportTypeViaApi(request, { name, hubId })
   getReportTypeState(world).lastReportTypeId = getReportTypeState(world).lastReportType.id as string
 })
 
@@ -141,8 +143,9 @@ Then('the CMS report type should be marked as archived', async ({ request, world
 })
 
 When('the admin tries to create a CMS report type {string}', async ({request, world}, name: string) => {
+  const hubId = getScenarioState(world).hubId
   try {
-    await createCmsReportTypeViaApi(request, { name })
+    await createCmsReportTypeViaApi(request, { name, hubId })
     setLastResponse(world, { status: 201, data: null })
   } catch (e: unknown) {
     const msg = (e as Error).message

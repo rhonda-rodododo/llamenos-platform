@@ -10,6 +10,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import {
   createVolunteerViaApi,
   getVolunteerViaApi,
@@ -65,7 +66,8 @@ async function resolveEntityTypeId(
   const cached = getProfileState(world).entityTypeIds.get(name)
   if (cached) return cached
 
-  const types = await listEntityTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
   const existing = types.find(t => t.name === name)
   if (existing) {
     const id = existing.id as string
@@ -73,7 +75,7 @@ async function resolveEntityTypeId(
     return id
   }
 
-  const created = await createEntityTypeViaApi(request, { name, category: 'case' })
+  const created = await createEntityTypeViaApi(request, { name, category: 'case', hubId })
   const id = created.id as string
   getProfileState(world).entityTypeIds.set(name, id)
   return id
@@ -112,9 +114,10 @@ Given('{int} records of type {string} are assigned to volunteer {string}', async
 
   const entityTypeId = await resolveEntityTypeId(request, world, typeName)
 
+  const hubId = getScenarioState(world).hubId
   for (let i = 0; i < count; i++) {
     // Create record with initial assignment (assignedTo set at creation time)
-    await createRecordViaApi(request, entityTypeId, { assignedTo: [vol!.pubkey] })
+    await createRecordViaApi(request, entityTypeId, { assignedTo: [vol!.pubkey], hubId })
   }
 })
 
@@ -166,13 +169,14 @@ When('the admin sets the volunteer team to {string}', async ({ request, world },
 When('the admin fetches volunteer {string} metrics', async ({ request, world }, alias: string) => {
   const vol = getProfileState(world).volunteers.get(alias)
   expect(vol).toBeTruthy()
+  const hubId = getScenarioState(world).hubId
 
   const { status, data } = await apiGet<{
     pubkey: string
     activeCaseCount: number
     totalCasesHandled: number
     averageResolutionDays: number | null
-  }>(request, `/users/${vol!.pubkey}/metrics`)
+  }>(request, `/users/${vol!.pubkey}/metrics${hubId ? `?hubId=${hubId}` : ''}`)
   expect(status).toBe(200)
   getProfileState(world).metricsResult = data
 })
@@ -180,11 +184,12 @@ When('the admin fetches volunteer {string} metrics', async ({ request, world }, 
 When('the admin lists cases for volunteer {string}', async ({ request, world }, alias: string) => {
   const vol = getProfileState(world).volunteers.get(alias)
   expect(vol).toBeTruthy()
+  const hubId = getScenarioState(world).hubId
 
   const { status, data } = await apiGet<{
     records: Record<string, unknown>[]
     total: number
-  }>(request, `/users/${vol!.pubkey}/cases`)
+  }>(request, `/users/${vol!.pubkey}/cases${hubId ? `?hubId=${hubId}` : ''}`)
   expect(status).toBe(200)
   getProfileState(world).casesResult = data
 })

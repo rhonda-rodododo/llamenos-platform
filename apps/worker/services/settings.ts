@@ -5,7 +5,7 @@
  * IVR audio, rate limits, captchas, and case number sequences.
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, sql, lt } from 'drizzle-orm'
+import { eq, and, sql, lt, inArray, or } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   systemSettings,
@@ -21,6 +21,33 @@ import {
   rateLimits,
   captchas,
   caseNumberSequences,
+  // Hub deletion — all tables with hub-scoped data
+  users,
+  notes,
+  noteReplies,
+  bans,
+  contactMetadata,
+  auditLog,
+  shifts,
+  activeCalls,
+  callRecords,
+  conversations,
+  contacts,
+  contactRelationships,
+  affinityGroups,
+  groupMembers,
+  blasts,
+  subscribers,
+  blastSettings,
+  caseRecords,
+  caseContacts,
+  caseEvents,
+  caseInteractions,
+  evidence,
+  custodyEntries,
+  reportEvents,
+  reportCases,
+  events as hubCaseEvents,
 } from '../db/schema'
 import type { SpamSettings, CallSettings } from '../types'
 import type {
@@ -112,6 +139,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'spamSettings',
   'transcriptionEnabled',
   'autoAssignment',
+  'fallbackGroup',
 ])
 
 const VALID_PROVIDER_TYPES = [
@@ -407,9 +435,14 @@ export class SettingsService {
   // Fallback Group
   // =========================================================================
 
-  async getFallbackGroup(): Promise<{
+  async getFallbackGroup(hubId?: string): Promise<{
     userPubkeys: string[]
   }> {
+    if (hubId) {
+      const settings = await this.getHubSettings(hubId)
+      const group = settings.fallbackGroup
+      return { userPubkeys: Array.isArray(group) ? (group as string[]) : [] }
+    }
     const row = await getSettings(this.db)
     const group = row.fallbackGroup ?? []
     return { userPubkeys: group }
@@ -417,7 +450,11 @@ export class SettingsService {
 
   async setFallbackGroup(data: {
     userPubkeys: string[]
-  }): Promise<{ ok: true }> {
+  }, hubId?: string): Promise<{ ok: true }> {
+    if (hubId) {
+      await this.updateHubSettings(hubId, { fallbackGroup: data.userPubkeys })
+      return { ok: true }
+    }
     await this.db
       .update(systemSettings)
       .set({ fallbackGroup: data.userPubkeys })
@@ -1482,6 +1519,132 @@ export class SettingsService {
     return { ok: true }
   }
 
+  async deleteHub(id: string): Promise<{ ok: true }> {
+    const [existing] = await this.db
+      .select()
+      .from(hubsTable)
+      .where(eq(hubsTable.id, id))
+    if (!existing) {
+      throw new ServiceError(404, 'Hub not found')
+    }
+
+    await this.db.transaction(async (tx) => {
+      // 1. Delete users who belong exclusively to this hub (cascade deletes sessions, webauthn, etc.)
+      await tx.execute(sql`
+        DELETE FROM users
+        WHERE (
+          SELECT COUNT(*) FROM jsonb_array_elements(hub_roles) AS hr
+          WHERE hr->>'hubId' = ${id}
+        ) > 0
+        AND (
+          SELECT COUNT(*) FROM jsonb_array_elements(hub_roles) AS hr
+          WHERE hr->>'hubId' != ${id}
+        ) = 0
+      `)
+
+      // 2. Remove this hub from remaining users' hubRoles
+      await tx.execute(sql`
+        UPDATE users
+        SET hub_roles = (
+          SELECT COALESCE(jsonb_agg(hr), '[]'::jsonb)
+          FROM jsonb_array_elements(hub_roles) AS hr
+          WHERE hr->>'hubId' != ${id}
+        )
+        WHERE EXISTS (
+          SELECT 1 FROM jsonb_array_elements(hub_roles) AS hr
+          WHERE hr->>'hubId' = ${id}
+        )
+      `)
+
+      // 3. Notes (noteReplies cascade from notes via FK)
+      const hubNoteIds = await tx
+        .select({ id: notes.id })
+        .from(notes)
+        .where(eq(notes.hubId, id))
+      if (hubNoteIds.length > 0) {
+        await tx.delete(noteReplies).where(
+          inArray(noteReplies.noteId, hubNoteIds.map(n => n.id))
+        )
+      }
+      await tx.delete(notes).where(eq(notes.hubId, id))
+
+      // 4. Bans, contact metadata, audit log
+      await tx.delete(bans).where(eq(bans.hubId, id))
+      await tx.delete(contactMetadata).where(eq(contactMetadata.hubId, id))
+      await tx.delete(auditLog).where(eq(auditLog.hubId, id))
+
+      // 5. Case-related tables (join tables reference caseId, not hubId)
+      const hubCaseIds = await tx
+        .select({ id: caseRecords.id })
+        .from(caseRecords)
+        .where(eq(caseRecords.hubId, id))
+      if (hubCaseIds.length > 0) {
+        const ids = hubCaseIds.map(c => c.id)
+        // Delete custody entries (grandchildren of evidence)
+        const hubEvidenceIds = await tx
+          .select({ id: evidence.id })
+          .from(evidence)
+          .where(inArray(evidence.caseId, ids))
+        if (hubEvidenceIds.length > 0) {
+          await tx.delete(custodyEntries).where(
+            inArray(custodyEntries.evidenceId, hubEvidenceIds.map(e => e.id))
+          )
+        }
+        await tx.delete(evidence).where(inArray(evidence.caseId, ids))
+        await tx.delete(caseInteractions).where(inArray(caseInteractions.caseId, ids))
+        await tx.delete(caseContacts).where(inArray(caseContacts.caseId, ids))
+        await tx.delete(caseEvents).where(inArray(caseEvents.caseId, ids))
+        await tx.delete(reportEvents).where(inArray(reportEvents.reportId, ids))
+        // reportCases joins reports to cases — delete where either side is from this hub
+        await tx.delete(reportCases).where(
+          or(inArray(reportCases.reportId, ids), inArray(reportCases.caseId, ids))
+        )
+      }
+      await tx.delete(caseRecords).where(eq(caseRecords.hubId, id))
+      await tx.delete(hubCaseEvents).where(eq(hubCaseEvents.hubId, id))
+
+      // 6. Conversations (messages, files, contactIdentifiers cascade via FK)
+      await tx.delete(conversations).where(eq(conversations.hubId, id))
+
+      // 7. Contacts
+      await tx.delete(contactRelationships).where(eq(contactRelationships.hubId, id))
+      const hubGroupIds = await tx
+        .select({ id: affinityGroups.id })
+        .from(affinityGroups)
+        .where(eq(affinityGroups.hubId, id))
+      if (hubGroupIds.length > 0) {
+        await tx.delete(groupMembers).where(
+          inArray(groupMembers.groupId, hubGroupIds.map(g => g.id))
+        )
+      }
+      await tx.delete(affinityGroups).where(eq(affinityGroups.hubId, id))
+      await tx.delete(contacts).where(eq(contacts.hubId, id))
+
+      // 8. Shifts
+      await tx.delete(shifts).where(eq(shifts.hubId, id))
+
+      // 9. Calls
+      await tx.delete(activeCalls).where(eq(activeCalls.hubId, id))
+      await tx.delete(callRecords).where(eq(callRecords.hubId, id))
+
+      // 10. Blasts
+      await tx.delete(blasts).where(eq(blasts.hubId, id))
+      await tx.delete(subscribers).where(eq(subscribers.hubId, id))
+      await tx.delete(blastSettings).where(eq(blastSettings.hubId, id))
+
+      // 11. CMS definitions
+      await tx.delete(entityTypeDefinitions).where(eq(entityTypeDefinitions.hubId, id))
+      await tx.delete(relationshipTypeDefinitions).where(eq(relationshipTypeDefinitions.hubId, id))
+      await tx.delete(reportTypeDefinitions).where(eq(reportTypeDefinitions.hubId, id))
+      await tx.delete(caseNumberSequences).where(eq(caseNumberSequences.hubId, id))
+
+      // 12. Delete hub (hub_settings and hub_keys cascade via FK)
+      await tx.delete(hubsTable).where(eq(hubsTable.id, id))
+    })
+
+    return { ok: true }
+  }
+
   async getHubSettings(
     hubId: string,
   ): Promise<Record<string, unknown>> {
@@ -1698,10 +1861,12 @@ export class SettingsService {
   // Entity Types
   // =========================================================================
 
-  async getEntityTypes(): Promise<{
+  async getEntityTypes(hubId?: string): Promise<{
     entityTypes: EntityTypeDefinition[]
   }> {
-    const rows = await this.db.select().from(entityTypeDefinitions)
+    const rows = hubId !== undefined
+      ? await this.db.select().from(entityTypeDefinitions).where(eq(entityTypeDefinitions.hubId, hubId))
+      : await this.db.select().from(entityTypeDefinitions)
     return {
       entityTypes: rows.map((r) => this.rowToEntityType(r)),
     }
@@ -1723,9 +1888,11 @@ export class SettingsService {
   async createEntityType(
     data: Record<string, unknown>,
   ): Promise<EntityTypeDefinition> {
+    const hubId = (data.hubId as string) ?? ''
     const count = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(entityTypeDefinitions)
+      .where(eq(entityTypeDefinitions.hubId, hubId))
     if (Number(count[0].count) >= MAX_ENTITY_TYPES) {
       throw new ServiceError(
         400,
@@ -1734,12 +1901,13 @@ export class SettingsService {
     }
 
     const name = data.name as string
-    // Check for duplicate name (non-archived)
+    // Check for duplicate name (non-archived) within the same hub
     const [dup] = await this.db
       .select()
       .from(entityTypeDefinitions)
       .where(
         and(
+          eq(entityTypeDefinitions.hubId, hubId),
           eq(entityTypeDefinitions.name, name),
           eq(entityTypeDefinitions.isArchived, false),
         ),
@@ -1883,9 +2051,14 @@ export class SettingsService {
 
   async bulkSetEntityTypes(data: {
     entityTypes: EntityTypeDefinition[]
+    hubId?: string
   }): Promise<{ entityTypes: EntityTypeDefinition[] }> {
     await this.db.transaction(async (tx) => {
-      await tx.delete(entityTypeDefinitions)
+      if (data.hubId !== undefined) {
+        await tx.delete(entityTypeDefinitions).where(eq(entityTypeDefinitions.hubId, data.hubId))
+      } else {
+        await tx.delete(entityTypeDefinitions)
+      }
       for (const et of data.entityTypes) {
         const now = new Date()
         await tx.insert(entityTypeDefinitions).values({
@@ -1944,10 +2117,12 @@ export class SettingsService {
   // Relationship Types
   // =========================================================================
 
-  async getRelationshipTypes(): Promise<{
+  async getRelationshipTypes(hubId?: string): Promise<{
     relationshipTypes: RelationshipTypeDefinition[]
   }> {
-    const rows = await this.db.select().from(relationshipTypeDefinitions)
+    const rows = hubId !== undefined
+      ? await this.db.select().from(relationshipTypeDefinitions).where(eq(relationshipTypeDefinitions.hubId, hubId))
+      : await this.db.select().from(relationshipTypeDefinitions)
     return {
       relationshipTypes: rows.map((r) => this.rowToRelationshipType(r)),
     }
@@ -1956,9 +2131,11 @@ export class SettingsService {
   async createRelationshipType(
     data: Record<string, unknown>,
   ): Promise<RelationshipTypeDefinition> {
+    const hubId = (data.hubId as string) ?? ''
     const count = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(relationshipTypeDefinitions)
+      .where(eq(relationshipTypeDefinitions.hubId, hubId))
     if (Number(count[0].count) >= MAX_RELATIONSHIP_TYPES) {
       throw new ServiceError(
         400,
@@ -2049,9 +2226,14 @@ export class SettingsService {
 
   async bulkSetRelationshipTypes(data: {
     relationshipTypes: RelationshipTypeDefinition[]
+    hubId?: string
   }): Promise<{ relationshipTypes: RelationshipTypeDefinition[] }> {
     await this.db.transaction(async (tx) => {
-      await tx.delete(relationshipTypeDefinitions)
+      if (data.hubId !== undefined) {
+        await tx.delete(relationshipTypeDefinitions).where(eq(relationshipTypeDefinitions.hubId, data.hubId))
+      } else {
+        await tx.delete(relationshipTypeDefinitions)
+      }
       for (const rt of data.relationshipTypes) {
         const now = new Date()
         await tx.insert(relationshipTypeDefinitions).values({
@@ -2097,15 +2279,17 @@ export class SettingsService {
   async generateCaseNumber(data: {
     prefix: string
     year?: number
+    hubId?: string
   }): Promise<{ number: string; sequence: number }> {
     const year = data.year ?? new Date().getFullYear()
+    const hubId = data.hubId ?? ''
 
     // Use upsert with RETURNING to atomically get the next value
     const [result] = await this.db
       .insert(caseNumberSequences)
-      .values({ prefix: data.prefix, year, nextValue: 1 })
+      .values({ hubId, prefix: data.prefix, year, nextValue: 1 })
       .onConflictDoUpdate({
-        target: [caseNumberSequences.prefix, caseNumberSequences.year],
+        target: [caseNumberSequences.hubId, caseNumberSequences.prefix, caseNumberSequences.year],
         set: {
           nextValue: sql`${caseNumberSequences.nextValue} + 1`,
         },
@@ -2146,10 +2330,12 @@ export class SettingsService {
   // CMS Report Type Definitions (Epic 343)
   // =========================================================================
 
-  async getCmsReportTypes(): Promise<{
+  async getCmsReportTypes(hubId?: string): Promise<{
     reportTypes: ReportTypeDefinition[]
   }> {
-    const rows = await this.db.select().from(reportTypeDefinitions)
+    const rows = hubId !== undefined
+      ? await this.db.select().from(reportTypeDefinitions).where(eq(reportTypeDefinitions.hubId, hubId))
+      : await this.db.select().from(reportTypeDefinitions)
     return {
       reportTypes: rows.map((r) => this.rowToReportTypeDefinition(r)),
     }
@@ -2171,9 +2357,11 @@ export class SettingsService {
   async createCmsReportType(
     data: Record<string, unknown>,
   ): Promise<ReportTypeDefinition> {
+    const hubId = (data.hubId as string) ?? ''
     const count = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(reportTypeDefinitions)
+      .where(eq(reportTypeDefinitions.hubId, hubId))
     if (Number(count[0].count) >= MAX_ENTITY_TYPES) {
       throw new ServiceError(
         400,
@@ -2187,6 +2375,7 @@ export class SettingsService {
       .from(reportTypeDefinitions)
       .where(
         and(
+          eq(reportTypeDefinitions.hubId, hubId),
           eq(reportTypeDefinitions.name, name),
           eq(reportTypeDefinitions.isArchived, false),
         ),
@@ -2298,9 +2487,14 @@ export class SettingsService {
 
   async bulkSetCmsReportTypes(data: {
     reportTypes: ReportTypeDefinition[]
+    hubId?: string
   }): Promise<{ reportTypes: ReportTypeDefinition[] }> {
     await this.db.transaction(async (tx) => {
-      await tx.delete(reportTypeDefinitions)
+      if (data.hubId !== undefined) {
+        await tx.delete(reportTypeDefinitions).where(eq(reportTypeDefinitions.hubId, data.hubId))
+      } else {
+        await tx.delete(reportTypeDefinitions)
+      }
       for (const rt of data.reportTypes) {
         const now = new Date()
         await tx.insert(reportTypeDefinitions).values({

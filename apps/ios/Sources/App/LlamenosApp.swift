@@ -77,6 +77,12 @@ struct LlamenosApp: App {
                 requestPushNotificationPermission()
                 // Inject appState into the delegate so it can forward push tokens
                 appDelegate.appState = appState
+                // Initialize Linphone SIP core for VoIP call handling
+                do {
+                    try appState.linphoneService.initialize(hubContext: hubContext)
+                } catch {
+                    print("[Linphone] Core initialization failed: \(error.localizedDescription)")
+                }
             }
             .onOpenURL { url in
                 handleDeepLink(url)

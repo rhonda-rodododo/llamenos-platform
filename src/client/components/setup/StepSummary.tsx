@@ -167,6 +167,7 @@ export function StepSummary({ data, onComplete, saving, headingRef }: Props) {
           </div>
           <Switch
             id="demo-mode"
+            data-testid="demo-mode-toggle"
             checked={demoMode}
             onCheckedChange={setDemoMode}
           />

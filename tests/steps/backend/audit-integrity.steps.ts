@@ -9,13 +9,12 @@ import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
 import {
-  apiGet,
-  apiPatch,
+  apiPost,
+  apiDelete,
   createVolunteerViaApi,
   createShiftViaApi,
   createBanViaApi,
   listAuditLogViaApi,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 import { computeAuditEntryHash } from '../../integrity-helpers'
 import { TestDB } from '../../db-helpers'
@@ -73,7 +72,11 @@ Given(
 
       if (operation === 'create volunteer') {
         const vol = await createVolunteerViaApi(request, { name: `${detail} ${Date.now()}` })
-        // Store for potential deactivation
+        // Add to hub so the userAdded audit event is scoped to this hub
+        if (hubId) {
+          await apiPost(request, `/hubs/${hubId}/members`, { pubkey: vol.pubkey, roleIds: ['role-volunteer'] })
+        }
+        // Store pubkey for potential removal
         if (detail === 'BDD Audit Vol') {
           getAuditTestState(world).latestEntry = { id: vol.pubkey } as unknown as AuditEntry
         }
@@ -82,9 +85,9 @@ Given(
       } else if (operation === 'create ban') {
         await createBanViaApi(request, { phone: detail, reason: 'audit test', hubId })
       } else if (operation === 'update volunteer') {
-        // Deactivate the previously created volunteer
-        if (getAuditTestState(world).latestEntry?.id) {
-          await apiPatch(request, `/users/${getAuditTestState(world).latestEntry.id}`, { active: false })
+        // Remove from hub to generate a hub-scoped userRemoved audit entry
+        if (getAuditTestState(world).latestEntry?.id && hubId) {
+          await apiDelete(request, `/hubs/${hubId}/members/${getAuditTestState(world).latestEntry.id}`)
         }
       }
     }
@@ -182,8 +185,9 @@ Then(
   },
 )
 
-Then('the full chain should pass database-level verification', async () => {
-  const result = await TestDB.verifyAuditChain()
+Then('the full chain should pass database-level verification', async ({ world }) => {
+  const hubId = getScenarioState(world).hubId
+  const result = await TestDB.verifyAuditChain(hubId)
   expect(result.valid).toBe(true)
   expect(result.entries).toBeGreaterThan(0)
 })
@@ -192,9 +196,12 @@ Then('the full chain should pass database-level verification', async () => {
 
 Given(
   'an admin creates a volunteer to generate an audit entry',
-  async ({ request }) => {
-    await createVolunteerViaApi(request, {
-      name: `Tamper Test Vol ${Date.now()}`,
+  async ({ request, world }) => {
+    const hubId = getScenarioState(world).hubId
+    // Create a hub-scoped shift to generate an audit entry visible to hub-scoped queries
+    await createShiftViaApi(request, {
+      name: `Tamper Test ${Date.now()}`,
+      hubId,
     })
   },
 )
