@@ -273,6 +273,13 @@ Domain skills (e.g. `bdd-feature-development`, `protocol-schema-change`) are **r
 2. Every test is **isolated** — per-test PostgreSQL schema, no shared state between tests
 3. Tests must **pass immediately** — no `waitForTimeout()`, use DOM-native or Playwright `waitFor` only
 
+### Parallel Agent Execution
+
+- **Dispatch agents per client in parallel**: iOS, Android, Desktop, Backend work happens simultaneously — never serialize across platforms
+- **Test-first on changes**: Before running any suite, update tests/test infra to match the change. Never run to see what breaks.
+- **After every major iteration**: Run all e2e and test suites (iOS unit, Android unit, Desktop E2E, backend BDD) to confirm green before moving on
+- **Fully complete plans**: Never mark a spec/plan done before all tasks are complete. No quiet deferral. If something is incomplete, say so and keep going.
+
 ### General Rules
 
 - Implement features completely — no stubs, no shortcuts, no TODOs

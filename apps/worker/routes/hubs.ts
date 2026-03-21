@@ -1,3 +1,6 @@
+// Hub routes are not migrated to the entity-router factory — access control
+// (super-admin vs member-filtered) and hub construction logic cannot be
+// expressed in factory config. All CRUD handlers remain hand-written.
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
