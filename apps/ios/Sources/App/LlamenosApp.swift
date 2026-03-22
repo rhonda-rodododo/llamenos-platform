@@ -211,6 +211,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     /// Injected by LlamenosApp on appear so the delegate can forward push tokens.
     var appState: AppState?
 
+    #if DEBUG
+    /// Overrides wake-payload decryption in unit tests. If set, the closure is called
+    /// with the raw `encryptedHex` string and must return the decrypted JSON string (or throw).
+    /// Never set this in production code.
+    var payloadDecryptorForTesting: ((String) throws -> String)?
+    #endif
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -260,7 +267,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         do {
+            #if DEBUG
+            let decryptedJSON: String
+            if let injected = payloadDecryptorForTesting {
+                decryptedJSON = try injected(encryptedHex)
+            } else {
+                decryptedJSON = try appState.wakeKeyService.decryptWakePayload(encryptedHex: encryptedHex)
+            }
+            #else
             let decryptedJSON = try appState.wakeKeyService.decryptWakePayload(encryptedHex: encryptedHex)
+            #endif
 
             // Parse the decrypted payload and post a local notification
             if let data = decryptedJSON.data(using: .utf8),
@@ -272,12 +288,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                     ?? NSLocalizedString("notification_call_body", comment: "A caller needs assistance")
                 content.sound = .default
 
-                // Switch to the notified hub before posting the local notification
                 if let hubId = payload["hubId"] as? String {
-                    Task { @MainActor in
-                        appState.hubContext.setActiveHub(hubId)
-                    }
+                    // Store hubId in notification userInfo so the TAP handler can switch
+                    // UI context (userNotificationCenter(_:didReceive:)). Background push
+                    // must NEVER call setActiveHub — that silently hijacks the volunteer's
+                    // browsing context and breaks multi-hub operation.
                     content.userInfo["hubId"] = hubId
+
+                    // For incoming calls, register the call→hub mapping so LinphoneService
+                    // can switch context at call-answer time (onCallStateChanged).
+                    if let type = payload["type"] as? String, type == "incoming_call",
+                       let callId = payload["callId"] as? String {
+                        appState.linphoneService.handleVoipPush(callId: callId, hubId: hubId)
+                    }
                 }
 
                 // Attach deep link data for navigation on tap
