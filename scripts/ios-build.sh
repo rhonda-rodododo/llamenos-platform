@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# iOS build pipeline — runs locally on Mac
+# iOS build pipeline — runs on Mac; auto-SSHes when run from Linux.
 #
 # Usage:
 #   ./scripts/ios-build.sh status      # Check Xcode/toolchain status
@@ -12,8 +12,20 @@
 #
 # Environment:
 #   IOS_SIMULATOR   Simulator device name (default: auto-detected)
+#   MAC_SSH_HOST    SSH host alias for the Mac when running from Linux (default: mac)
+#   MAC_PROJECT     Project root on the Mac (default: ~/projects/llamenos)
 
 set -euo pipefail
+
+# ─── Auto-SSH when not on macOS ───────────────────────────────
+# Transparently forwards the command to the Mac so `bun run ios:*`
+# works from any machine (Linux dev box, CI, etc.).
+if [[ "$(uname)" != "Darwin" ]]; then
+  MAC_HOST="${MAC_SSH_HOST:-mac}"
+  MAC_PROJECT="${MAC_PROJECT:-~/projects/llamenos}"
+  exec ssh "$MAC_HOST" \
+    "cd ${MAC_PROJECT} && eval \"\$(/opt/homebrew/bin/brew shellenv)\" 2>/dev/null; export PATH=\"\$HOME/.asdf/shims:\$HOME/.asdf/bin:\$PATH\"; bash scripts/ios-build.sh $*"
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"

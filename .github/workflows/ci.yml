@@ -84,6 +84,9 @@ jobs:
       - name: Run codegen
         run: bun run codegen
 
+      - name: Verify codegen output is up to date
+        run: bun run codegen:check
+
       - name: Validate i18n strings
         run: bun run i18n:validate:all
 
