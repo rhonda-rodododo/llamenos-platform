@@ -143,11 +143,13 @@ reviewedAt    timestamp
 ```
 id            text PK
 phoneHash     text NOT NULL UNIQUE  -- HMAC blind index
-phone         text NOT NULL  -- encrypted with server key (for enforcement)
+phone         text NOT NULL  -- encrypted (see below)
 reason        text
 bannedBy      text NOT NULL
 bannedAt      timestamp NOT NULL DEFAULT NOW()
 ```
+
+Encrypt `phone` using `LABEL_NETWORK_BAN_PHONE = 'llamenos:network-ban-phone'` with the hub's symmetric key ECIES-wrapped for super-admin readers only — same pattern as contact PII envelopes. Only super-admins can decrypt the raw phone from a network ban. Admins see only the `phoneHash` in their UI.
 
 #### Service Layer (`apps/worker/services/records.ts`)
 
@@ -196,7 +198,7 @@ GET /network/bans  (super-admin only)
   Returns: all network-wide bans
 ```
 
-**Mount location:** `POST /network/bans` mounts on the `/network` prefix (new top-level route group). Other ban routes remain on the existing `/bans` prefix.
+**Mount location:** `POST /network/bans` mounts on the `/network` prefix (new top-level route group). Other ban routes remain on the existing `/bans` prefix. The `network.ts` router mounts at `/api/network` in the main Hono app. All endpoint paths in this spec should be read as `/api/network/bans`, `/api/network/users/:pubkey/flag`, etc. Add `app.route('/api/network', networkRouter)` in `apps/worker/app.ts`.
 
 **Hub routing middleware** must be updated: `isNetworkBanned()` is checked during call routing (telephony webhook) before the hub-specific ban check.
 
@@ -204,14 +206,18 @@ GET /network/bans  (super-admin only)
 
 When a ban is propagated, emit an encrypted Nostr event (kind `20002`) to Hub B's relay subscription:
 - Content: ECIES-encrypted JSON with `{ type: "ban:suggestion", sourceHubId, phoneHash, reason, suggestionId }` using Hub B's hub key
-- Generic tag: `["t", "llamenos:ban-suggestion"]`
+- Generic tag: `["t", "llamenos:event"]` — all Nostr events emitted by the server use this generic tag; the event type is encoded only in the encrypted payload content, not in relay-visible tags
 - Hub B clients display an in-app badge on the ban management screen when a suggestion arrives
 
 #### Protocol Schema (`packages/protocol/schemas/bans.ts`)
 
 Add:
 - `banSuggestionSchema` — for suggestion list responses
-- `banPropagateBodySchema` — for `POST /bans/:id/propagate`
+- `banPropagateBodySchema` — for `POST /bans/:id/propagate`:
+  ```ts
+  banPropagateBodySchema = z.object({ targetHubIds: z.array(z.string()).optional() })
+  ```
+  Omitting `targetHubIds` (or passing an empty array) means propagate to ALL hubs where the banned phone hash matches a caller.
 - `banSuggestionReviewBodySchema` — for `POST /bans/suggestions/:id/review`
 - `networkBanBodySchema` — for `POST /network/bans`
 - `networkBanResponseSchema`
@@ -280,10 +286,10 @@ suspendedAt    timestamp NOT NULL DEFAULT NOW()
 #### Service Layer (`apps/worker/services/identity.ts`)
 
 Add methods:
-- `flagUserForReview(flaggedPubkey, sourceHubId, reason, flaggedBy)` — creates flag records for all other hubs where the user is a member; emits Nostr notification to those hub admins
+- `flagUserForReview(flaggedPubkey, sourceHubId, reason, flaggedBy)` — creates flag records for ALL other hubs where the user is a member; emits Nostr notification to those hub admins. **Flag-for-review is an all-or-nothing operation:** when Hub A flags a user, records are created for ALL other hubs where that user is a member. There is no per-hub targeting. This is intentional — admins should not need to know which other hubs the user belongs to. Hub B admins receive the flag and independently decide whether to act.
 - `listUserFlags(hubId)` — pending flags for the requesting hub's admins
 - `dismissUserFlag(flagId, reviewerPubkey)` — marks flag reviewed/dismissed without action
-- `networkSuspendUser(pubkey, reason, suspendedBy)` — creates network suspension record; removes from all hub-roles; emits Nostr notification to all affected hub admins
+- `networkSuspendUser(pubkey, reason, suspendedBy)` — creates network suspension record; does NOT delete `user_hub_roles` rows. Instead it sets a `network_suspensions` record, and the auth middleware's `isNetworkSuspended()` check returns 403 before any hub-role check. If the suspension is lifted (`DELETE /network/users/:pubkey/suspend`), hub memberships are still intact. Removing rows would require tracking them elsewhere for reinstatement. Emits Nostr notification to all affected hub admins.
 - `isNetworkSuspended(pubkey)` — checked during auth resolution
 
 #### API Endpoints
@@ -320,6 +326,7 @@ DELETE /network/users/:pubkey/suspend  (super-admin only)
 
 When a user is flagged, emit encrypted Nostr event (kind `20003`) to all target hub relay subscriptions:
 - Content: ECIES-encrypted `{ type: "user:flag", flaggedPubkey, sourceHubId, reason, flagId }` using each target hub's key
+- Generic tag: `["t", "llamenos:event"]` — event type is in the encrypted payload only, not in relay-visible tags
 - Desktop and mobile clients show a badge on the admin user management screen
 
 #### Desktop UI
@@ -365,7 +372,7 @@ The gap is in when registrations happen: SIP registration is currently tied to s
 
 **`apps/ios/Sources/ViewModels/ShiftsViewModel.swift`** — When loading shift status on launch or after hub context switch, register SIP accounts for ALL hubs where the user has an active shift, not just the currently active hub. The method that fetches shift status must iterate over all member hubs and call `registerHubAccount` for each.
 
-**`apps/ios/Sources/App/AppState.swift`** — On post-authentication hub list load, iterate member hubs and pre-register SIP accounts for hubs where the user is on-shift (or eligible). Do not wait for the user to manually switch hub context.
+**`apps/ios/Sources/App/AppState.swift`** — On post-authentication hub list load, iterate member hubs and pre-register SIP accounts for hubs where the user has an active on-shift record (shift `startTime <= now AND endTime >= now`). Do not pre-register for all member hubs indiscriminately — this would waste SIP server resources for hubs where the user is not currently on duty. Do not wait for the user to manually switch hub context.
 
 **`apps/ios/Sources/Services/LinphoneService.swift`** — No changes required to the core service (the architecture is already correct). The fix is in the callers.
 
@@ -379,13 +386,15 @@ Option 2 (display without forcing hub switch) is preferred: the user should not 
 
 #### Android
 
-**`apps/android/app/src/main/java/.../service/LinphoneService.kt`** — Same fix: register SIP accounts for all on-shift hubs, not just active hub. On incoming call from non-active hub, display hub identity in the incoming call notification/screen.
+**`apps/android/app/src/main/java/.../service/LinphoneService.kt`** — Android changes mirror iOS: iterate all on-shift hubs on startup and call `registerHubAccount()` for each. In `PushService.kt`, when handling an `incoming_call` notification, do NOT call `setActiveHub()` — this would disrupt the user's browsing context. Display the incoming call notification with hub name from the payload. On incoming call from non-active hub, display hub identity in the incoming call notification/screen. Specific files: `apps/android/app/src/main/java/.../service/LinphoneService.kt` and `apps/android/app/src/main/java/.../ui/calls/IncomingCallScreen.kt`.
 
 #### SIP Token Fetching for All Hubs
 
 The endpoint `GET /api/hubs/{hubId}/telephony/sip-token` is already hub-scoped. Fetching tokens for multiple hubs requires one request per hub. This is acceptable — SIP registrations are long-lived (expiry from `SipTokenResponse.expiry`) and do not refresh frequently.
 
 **Token refresh:** Implement a background refresh timer per hub (refresh at 80% of `expiry`). This is an extension of the existing shift-linked registration — currently the token is fetched once per shift start.
+
+> **Before implementing the refresh timer:** Verify the `expiry` field type in `SipTokenResponse` schema by running `grep -A5 'expiry' packages/protocol/schemas/telephony.ts`. If it is a Unix timestamp (number), compute `refreshAt = expiry * 1000 * 0.8`. If it is a duration in seconds, compute `refreshAt = Date.now() + expiry * 1000 * 0.8`.
 
 ### Multi-Hub Axiom Applicability
 
@@ -436,9 +445,9 @@ UNIQUE(primaryHubId, fallbackHubId)
 
 Update `ringVolunteers()` (or equivalent):
 1. Attempt to ring on-shift users for the primary hub.
-2. If none available (all off-shift, all busy, or zero on-shift), check `hub_fallback_configs` for the primary hub.
+2. If none available — meaning zero users with `status='on_shift'` and `busyStatus != 'on_call'` in the primary hub's shift roster — check `hub_fallback_configs` for the primary hub.
 3. For each fallback hub in priority order:
-   - Check if fallback is within its active window (if configured).
+   - Check if fallback is within its active window (if configured). The active window comparison uses PostgreSQL: `CURRENT_TIME AT TIME ZONE hub_fallback_configs.timezone BETWEEN activeWindowStart AND activeWindowEnd`. Validate that `timezone` is a valid IANA timezone identifier before insertion.
    - Attempt to ring on-shift users for the fallback hub.
    - Pass the originating hub ID as call metadata so the user's UI can display it.
 4. If still no users, fall through to TwiML fallback.
@@ -448,6 +457,8 @@ Update `ringVolunteers()` (or equivalent):
 The `calls` table already has a `hubId` column. Add an `originatingHubId` column (nullable) to record when a call was routed via fallback. This is displayed in the call detail UI and audit log.
 
 #### API Endpoints (`apps/worker/routes/hubs.ts`)
+
+> **Before implementing fallback endpoints:** Check whether `system:manage-hubs` exists in the PBAC permission registry (`apps/worker/lib/auth.ts` and `packages/protocol/schemas/auth.ts`). If it does not exist, create it as a new super-admin-only permission and add it to the permission registry. Hub fallback configuration is a cross-hub operation and must be behind this permission.
 
 ```
 GET /hubs/:hubId/fallbacks
@@ -511,12 +522,14 @@ Add `network_broadcasts` table (`apps/worker/db/schema/`):
 ```
 id           text PK
 subject      text NOT NULL
-body         text NOT NULL  -- plaintext (shown to all users — no E2EE for admin broadcast)
+body         text NOT NULL  -- plaintext (see design note below)
 severity     text NOT NULL DEFAULT 'info'  -- info | warning | critical
 sentBy       text NOT NULL
 sentAt       timestamp NOT NULL DEFAULT NOW()
 expiresAt    timestamp  -- null = no expiry; clients hide after this time
 ```
+
+> **Plaintext design note:** Network broadcast body is stored in plaintext in the DB by design. This is an accepted tradeoff: super-admin broadcasts are system-level messages (outage warnings, policy updates), not user PII. Super-admins who can send broadcasts already have platform-level access. Future consideration: encrypt at rest if broadcast content evolves to include sensitive operational details.
 
 #### Service Layer
 
@@ -524,9 +537,9 @@ expiresAt    timestamp  -- null = no expiry; clients hide after this time
 - `sendNetworkBroadcast(subject, body, severity, expiresAt, sentBy)` — inserts record, pushes APNs notification to all active user devices, emits encrypted Nostr event (kind `20004`) to all hub relay subscriptions
 - `listActiveBroadcasts()` — returns non-expired broadcasts (used by client on app launch and WebSocket reconnect)
 
-APNs delivery: iterate all user device tokens (from the devices/push-tokens table), send a display notification with `{ type: "broadcast", broadcastId }`. Clients fetch the broadcast body via `GET /network/broadcasts/:id` on receipt.
+APNs delivery: use the existing push infrastructure in `apps/worker/lib/push-dispatch.ts`. Call `createPushDispatcherFromService(env, db)` and iterate all distinct device tokens registered in the `devices` table. Send a display notification (not a silent wake push) with `{ type: 'broadcast', broadcastId }` to each device. Clients fetch the broadcast body via `GET /network/broadcasts/:id` on receipt.
 
-Nostr delivery: emit one event per hub (encrypted with each hub's key) carrying the broadcast payload. Clients subscribed to their hub Nostr feeds receive it in real time.
+Nostr delivery: emit one event per hub (encrypted with each hub's key) carrying the broadcast payload, using the generic tag `["t", "llamenos:event"]`. The broadcast type is encoded only in the encrypted payload content. Clients subscribed to their hub Nostr feeds receive it in real time.
 
 #### API Endpoints
 
@@ -586,7 +599,7 @@ Super-admins can view a unified audit feed spanning all hubs simultaneously. Cur
 
 **`apps/worker/db/schema/records.ts`** — `auditLog` table has a nullable `hubId` column. All audit events are already stored in a single PostgreSQL table — the data is co-located. The only barrier is that the `GET /audit` API endpoint filters by the requesting user's hub.
 
-**`apps/worker/services/audit.ts`** — The `listAuditLog()` method likely accepts `hubId` as a filter. Cross-hub querying requires either removing the filter for super-admin requests, or adding a new service method.
+**`apps/worker/services/audit.ts`** — The implementer must check the actual signature of `listAuditLog()` in `apps/worker/services/audit.ts` before writing the cross-hub extension. Do not assume any parameter signature. Cross-hub querying requires either removing the hub filter for super-admin requests, or adding a new service method.
 
 ### Required Changes
 
@@ -708,6 +721,12 @@ Cross-hub audit is a read-only super-admin view. It does not affect call handlin
 
 ---
 
+## Super-Admin Identity Model
+
+Super-admins are users with the `*` permission grant in a platform-level hub (not a tenant hub). The auth middleware populates `permissions` including `*` for these users. `checkPermission(permissions, '*')` returns true if the user has `*` in their permission set. Super-admin status is stored as a role in `user_hub_roles` for the designated platform admin hub (hub with `isPlatformAdmin = true` in the `hubs` table). If this column doesn't exist yet, add it as part of Feature 3's DB schema changes.
+
+---
+
 ## Architectural Constraints
 
 **Privacy — phone numbers never cross hub boundaries.**
@@ -720,7 +739,7 @@ Flagging a user is informational only. Hub B's admin retains full autonomy. The 
 Features 4 (multi-hub SIP) and the documented axiom in Feature 1 are prerequisites for all other features — they establish the correct foundation. Features 2, 3, 5, 6, 7 are additive capabilities layered on top.
 
 **No PII in Nostr events.**
-All Nostr events for cross-hub coordination (ban suggestions, user flags, broadcasts) must be ECIES-encrypted with the target hub's key. The relay cannot distinguish event types (already enforced via generic `["t", "llamenos:event"]` tags — ban/flag/broadcast events get type-specific sub-tags but content remains opaque).
+All Nostr events for cross-hub coordination (ban suggestions, user flags, broadcasts) must be ECIES-encrypted with the target hub's key. All server-emitted Nostr events use the generic tag `["t", "llamenos:event"]` — the relay cannot distinguish event types. The event type is encoded only in the encrypted payload content, never in relay-visible tags.
 
 **Super-admin permission model.**
 Super-admin actions (`POST /network/bans`, `POST /network/users/:pubkey/suspend`, `POST /network/broadcasts`) require `checkPermission(permissions, '*')` — the wildcard permission already held by `role-super-admin`. No new permission strings needed for super-admin routes.

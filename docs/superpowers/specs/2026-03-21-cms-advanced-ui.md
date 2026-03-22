@@ -109,9 +109,8 @@ Add a "Custody Chain" tab to the evidence detail dialog (alongside any existing 
 
 Content:
 - "Verify Integrity" button at the top of the custody tab
-  - Calls `verifyEvidenceIntegrity(evidenceId, currentHash)`
-  - `currentHash` requires the downloaded file to be hashed on the client — for this UI, either hash the downloaded blob, or call verify without a currentHash (backend can verify stored hash against file storage)
-  - Show result as a green "Integrity verified" badge or red "Integrity mismatch" badge with timestamps
+  - Calls `verifyEvidenceIntegrity(evidenceId)` — the desktop calls `POST /evidence/:id/verify` WITHOUT a `currentHash` body. The server computes the hash of the stored file from MinIO and compares against the stored `fileHash`. The response includes `{ verified: boolean, storedHash: string, computedHash: string }`. The desktop displays a green checkmark or a red "Hash mismatch — file may have been tampered" message. No client-side hashing required.
+  - Show result as a green "Integrity verified" badge or red "Hash mismatch — file may have been tampered" badge with timestamps
   - `data-testid="evidence-verify-btn"`, `data-testid="evidence-verify-result"`
 - Chronological list of custody entries from `getEvidenceCustody(evidenceId)`
 - Each entry shows:
@@ -154,6 +153,8 @@ Content (admin-only — check `appState.permissions.contains("evidence:manage-cu
 
 Navigation: from the evidence list in `CaseDetailView.swift`, tapping evidence detail navigation link should show a tab picker: Details | Custody Chain (if admin).
 
+**Note for implementer:** First determine how evidence items are currently rendered in `CaseDetailView.swift`. If evidence items are in a list but not tappable, add `NavigationLink` wrappers first. The custody chain tab is added inside the evidence detail destination view (new `EvidenceDetailView` if it doesn't exist).
+
 #### Android — evidence detail in `CaseDetailScreen`
 
 **New file:** `apps/android/app/src/main/java/org/llamenos/hotline/ui/cases/EvidenceCustodyScreen.kt`
@@ -168,7 +169,7 @@ Equivalent to iOS: lists custody entries, verify button. Admin-only.
 
 **File:** `src/client/components/admin-settings/report-types-section.tsx`
 
-The `ReportTypeFieldsEditor` component is already referenced in the form at line 255. Implement it in the same file (or extract to `src/client/components/admin-settings/report-type-fields-editor.tsx` and import it).
+Search `src/client/routes/settings/report-types-section.tsx` for the `ReportTypeFieldsEditor` reference — it is currently a stub/placeholder. Replace it with the actual implementation. (Do not rely on line numbers; find it by searching for the identifier.) Implement it in the same file or extract to `src/client/components/admin-settings/report-type-fields-editor.tsx` and import it.
 
 `ReportTypeFieldsEditor` props:
 ```typescript
@@ -179,6 +180,8 @@ interface ReportTypeFieldsEditorProps {
 ```
 
 The component must mirror the existing entity type field editor in `src/client/components/admin-settings/case-management-section.tsx`. Do not duplicate the logic — extract a shared `FieldsEditor` component and use it from both `ReportTypeFieldsEditor` and the entity type fields editor.
+
+**Refactor scope for `case-management-section.tsx`:** The current `case-management-section.tsx` renders field definitions as an inline list with add/remove buttons and individual field property inputs. The refactor extracts this into the shared `FieldsEditor` component (from the `fields-editor.tsx` file described below) so both entity types and report types use the same editor UI. The existing behavior must be preserved exactly.
 
 **Extracted shared component:** `src/client/components/admin-settings/fields-editor.tsx`
 
@@ -266,6 +269,8 @@ Implementation: join `case_records` with `case_envelopes` (or equivalent), filte
 
 In `determineEnvelopeRecipients()`, include super-admin pubkeys (users with `cases:read-cross-hub` permission) in the `summary`, `fields`, and `pii` recipient tiers for every new record creation, regardless of hub.
 
+To identify super-admins at record creation time, `determineEnvelopeRecipients()` queries for users with the `cases:read-cross-hub` permission in `user_hub_roles`. This is an additional DB query per record creation. Cache the result for the duration of the request (not across requests). Implement as `getNetworkSuperAdminPubkeys(db): Promise<string[]>` in `apps/worker/services/identity.ts`. New records cannot be retroactively accessed by super-admins added after record creation — this is an accepted limitation.
+
 This ensures super-admins can always decrypt records they later retrieve via cross-hub queries. Records created before this change will not be decryptable — this is acceptable (no retroactive re-encryption; the spec covers forward-only).
 
 #### Client API
@@ -297,9 +302,7 @@ For users with `cases:read-cross-hub` permission:
 - Filtering still works (entityType, status, etc.) but the assignedTo filter is hidden in all-hubs mode (not meaningful cross-hub)
 - Clicking a case navigates to the standard case detail — but the detail route must handle cross-hub cases (the `hp()` prefix must resolve to the correct hub's path, not the currently active hub)
 
-**Cross-hub navigation:** When in all-hubs mode, case detail navigation must use the case record's own `hubId`, not `activeHubId`. Either:
-- Pass `hubId` as a query param to the case detail route
-- Or the case detail route reads `record.hubId` from the already-loaded record and constructs its API calls with that specific hub ID
+**Cross-hub navigation:** Use option A: cases accessed via cross-hub endpoint are rendered using a special hub prefix in the URL (`/hubs/:hubId/cases/:caseId`). The router handles this by extracting `hubId` from the URL and loading hub context before rendering `CaseDetailView`. Do not use option B (hub context switch on navigation) as it disrupts the user's browsing context.
 
 `data-testid="cases-all-hubs-toggle"`, `data-testid="cases-hub-badge"` (per row)
 

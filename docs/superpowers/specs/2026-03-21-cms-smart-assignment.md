@@ -78,7 +78,7 @@ requiredSpecializations: text('required_specializations')
   .default(sql`'{}'::text[]`),
 ```
 
-**Protocol schema** (`packages/protocol/schemas/entity-schema.ts` or wherever the entity type schema is defined — verify path):
+**Protocol schema** — The entity type schema is at `packages/protocol/schemas/cms/entity-type.ts` — verify this path in the filesystem before writing the implementation:
 - Add `requiredSpecializations: z.array(z.string()).optional().default([])` to the entity type definition schema.
 
 **Entity schema service / routes** — expose `requiredSpecializations` in the entity type CRUD response and update input schemas.
@@ -120,40 +120,28 @@ The current scoring uses `?language` query parameter and `vol.spokenLanguages`. 
 
 ### 3. Wire auto-assignment to record creation
 
-**File**: `apps/worker/services/cases.ts` — `CasesService.create()`.
+**File**: `apps/worker/routes/records.ts` — `POST /` route handler.
 
-The service currently has no access to the identity, shifts, or settings services. Auto-assignment requires cross-service access. Two options:
-
-**Option A (preferred)**: Add an optional `autoAssign` callback parameter to `CasesService.create()`:
-
-```ts
-async create(
-  input: CreateRecordBody & {
-    hubId: string
-    createdBy: string
-    caseNumber?: string
-    autoAssign?: () => Promise<string | null>  // returns pubkey or null
-  },
-): Promise<CaseRecordRow>
-```
-
-After the record is created (and contact links inserted), if `input.autoAssign` is provided, call it and set `assignedTo` on the record. This keeps the service lean and testable.
-
-**Option B**: Move the auto-assignment logic entirely into the route handler (`POST /api/records/` in `apps/worker/routes/records.ts`), after calling `services.cases.create()`. This is simpler but duplicates the pattern across any future record-creation paths.
-
-Use Option A. The route handler for `POST /api/records/` already has access to all services and can construct the `autoAssign` callback.
+Auto-assignment is implemented entirely in the route handler, after `services.cases.create()` returns. Do NOT add callback parameters to `CasesService.create()` — keep the service lean.
 
 **Route handler changes** (`apps/worker/routes/records.ts`, `POST /`):
 
 After `services.cases.create(input)` returns `record`:
 
 ```ts
-if (autoAssignEnabled && record.assignedTo.length === 0) {
+// Step 1: create the record
+const record = await services.cases.create(input)
+
+// Step 2: attempt auto-assignment (pickBestAssignee returns null if disabled or no eligible user)
+if (record.assignedTo.length === 0) {
   const assignee = await pickBestAssignee(services, hubId, record)
   if (assignee) {
-    await services.cases.update(record.id, { assignedTo: [assignee] })
+    // Step 3: assign to best candidate
+    await services.cases.assign(record.id, [assignee])
     record.assignedTo = [assignee]
     // Emit Nostr event to notify the assigned user
+    // NOTE: publishNostrEvent and KIND_RECORD_ASSIGNED are already imported in this file
+    // for the existing assign route — copy the import pattern from there.
     publishNostrEvent(c.env, KIND_RECORD_ASSIGNED, {
       type: 'record:assigned',
       recordId: record.id,
@@ -165,15 +153,16 @@ if (autoAssignEnabled && record.assignedTo.length === 0) {
 ```
 
 Extract `pickBestAssignee` as a private helper that:
-1. Reads `autoAssignment` from hub settings — returns `null` if disabled.
-2. Calls `services.shifts.getCurrentVolunteers(hubId)`.
+1. Reads `autoAssignment` from hub settings — returns `null` immediately if disabled. This guard lives INSIDE `pickBestAssignee`, not in the route handler. The route handler always calls `pickBestAssignee()` unconditionally.
+2. Calls the appropriate method on `services.shifts` to get currently on-shift user pubkeys — check `apps/worker/services/shifts.ts` for the actual method name (e.g. `getOnShiftUsers(hubId)` or equivalent) before writing the code. Do not assume a specific method name.
+2.5. Fetches active case counts per user — use the same query as the suggestions route: count of records where `assignedTo @> ARRAY[pubkey]` and `status != 'closed'`. Without this, the capacity gate in step 6 can never work.
 3. Loads user profiles.
 4. Loads entity type `requiredSpecializations` if `record.entityTypeId` is set.
 5. Scores each user (same algorithm as the suggestions route — extract into a shared `scoreVolunteer()` utility to avoid duplication).
 6. Skips users at capacity.
 7. Returns the pubkey of the top-scoring eligible user, or `null` if none available.
 
-When `null` is returned (all off-shift, all at capacity), the record is created unassigned. Set a `flags` field or log an audit entry. No error should be thrown — unassigned records are valid.
+When `null` is returned (all off-shift, all at capacity, or auto-assignment disabled), the record is created unassigned. Set a `flags` field or log an audit entry. No error should be thrown — unassigned records are valid.
 
 ### 4. Extract scoring into a shared utility
 
@@ -222,11 +211,9 @@ These fields are already in `adminUpdateUserBodySchema` and the API endpoint. Th
 |------|-------------|-------------|
 | `apps/worker/db/schema/settings.ts` | Edit | Add `requiredSpecializations text[]` to `entityTypeDefinitions` |
 | `apps/worker/db/migrations/NNNN_add_entity_type_specializations.sql` | New | ALTER TABLE migration |
-| `packages/protocol/schemas/entity-schema.ts` (verify path) | Edit | Add `requiredSpecializations` to entity type schema |
+| `packages/protocol/schemas/cms/entity-type.ts` (verify path in filesystem) | Edit | Add `requiredSpecializations` to entity type schema |
 | `apps/worker/lib/assignment-scorer.ts` | New | Shared scoring utility |
-| `apps/worker/routes/records.ts` | Edit | Fix suggestions scoring; wire auto-assign on POST |
-| `apps/worker/services/cases.ts` | Edit | Add optional `autoAssign` callback to `create()` |
-| `apps/worker/routes/records.ts` | Edit | `pickBestAssignee` helper + auto-assign wiring |
+| `apps/worker/routes/records.ts` | Edit | Fix suggestions scoring; `pickBestAssignee` helper + auto-assign wiring on POST |
 | `src/client/routes/admin/users/$pubkey.tsx` (verify path) | Edit | Add specializations + maxCaseAssignments fields |
 | `apps/ios/Sources/Views/Profile/` (verify path) | Edit | Read-only specializations display |
 | `apps/android/app/src/main/java/org/llamenos/hotline/ui/profile/` (verify path) | Edit | Read-only specializations display |
@@ -237,7 +224,7 @@ These fields are already in `adminUpdateUserBodySchema` and the API endpoint. Th
 
 | Platform | Work |
 |----------|------|
-| Worker (TypeScript) | DB migration, scoring fix, auto-assign wiring, shared scorer utility |
+| Worker (TypeScript) | DB migration, scoring fix, `pickBestAssignee` helper + auto-assign wiring in route handler, shared scorer utility |
 | Protocol (TypeScript) | `requiredSpecializations` added to entity type schema; run `bun run codegen` |
 | Desktop frontend | Admin user edit form fields |
 | iOS (Swift) | Read-only profile display of specializations |
@@ -262,6 +249,7 @@ These fields are already in `adminUpdateUserBodySchema` and the API endpoint. Th
 - [ ] BDD test: two users, same specializations, different workload — lower workload user ranked first
 - [ ] BDD test: user at `maxCaseAssignments` capacity excluded from suggestions
 - [ ] BDD test: `requiredSpecializations` empty on entity type → specialization scoring contributes 0 (not negative)
+- [ ] BDD test: user with specializations that do NOT match the entity type's `requiredSpecializations` scores NO specialization points — same score as a user with no specializations at all (confirms the stub is fully removed)
 - [ ] Unit test: `scoreVolunteer()` in `assignment-scorer.ts` covers all score components
 
 ### Auto-assignment

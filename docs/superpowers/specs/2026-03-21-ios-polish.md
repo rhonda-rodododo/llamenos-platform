@@ -79,11 +79,12 @@ final class NavigationBus {
    ```swift
    navigationBus?.post(hubId: hubId, deepLinkType: deepLinkType, entityId: entityId)
    ```
+   **Important:** Once `NavigationBus` is in place, remove the direct `appState?.hubContext.setActiveHub(hubId)` call from this same delegate method. The `NavigationBus` `.onChange` handler (step 3 below) becomes the sole place that calls `setActiveHub`. Leaving both in place would call `setActiveHub` twice on every notification tap — once in `AppDelegate` and once in the SwiftUI handler.
 
 3. In `LlamenosApp.body`, add an `.onChange(of: navigationBus.pending)` modifier that:
    - Guards `appState.authStatus == .unlocked` (if locked, store navigation intent and replay after unlock)
    - Calls `navigationBus.consume()`
-   - Calls `hubContext.setActiveHub(nav.hubId)` if hubId is present (idempotent if already set — already done in AppDelegate but safe to repeat)
+   - Calls `hubContext.setActiveHub(nav.hubId)` if hubId is present — this is now the **only** call site for hub switching from notification taps (AppDelegate no longer calls it directly)
    - Translates `nav.deepLinkType` to the appropriate `Route` and calls `router.navigate(to:)`
 
 **Deep link type → Route mapping** (mirrors the existing `handleDeepLink` URL handler):
@@ -182,6 +183,19 @@ Task.detached(priority: .userInitiated) {
 
 `Task.detached` is appropriate here because the bootstrap work is explicitly test infrastructure, not app logic, and must not inherit the actor context of the caller.
 
+**`bootstrapForXCUITest()` entry point:** This function itself must also be marked `async`, since it now calls `async` methods in sequence. Its existing call site — inside a `#if DEBUG` block in `applicationDidFinishLaunching` or `application(_:didFinishLaunchingWithOptions:)` (which is synchronous) — must wrap it in a `Task`:
+
+```swift
+// In applicationDidFinishLaunching (synchronous context):
+#if DEBUG
+if ProcessInfo.processInfo.environment["XCUITEST_BOOTSTRAP"] == "1" {
+    Task { await appState.bootstrapForXCUITest() }
+}
+#endif
+```
+
+Do not call `await bootstrapForXCUITest()` directly from the synchronous launch method — it will not compile. The `Task { ... }` wrapper is required.
+
 **Timeout handling:** `URLSession.shared.data(for:)` respects `request.timeoutInterval`. The existing `request.timeoutInterval = 5` on each request is sufficient — no additional `withTimeout` wrapper needed. If the request times out, `URLSession` throws `URLError.timedOut`, which the `try?` discards (same behavior as the semaphore timeout).
 
 ### Files to Change
@@ -240,6 +254,8 @@ Remove the hardcoded key from source entirely, including the doc comment lines t
 
 **CI configuration:** Add `XCTEST_VOLUNTEER_SECRET` to the GitHub Actions secrets store alongside `XCTEST_ADMIN_SECRET`. Set it in the Xcode test scheme environment variables (same location as `XCTEST_ADMIN_SECRET`). The value should be a randomly generated 32-byte hex string generated during project setup, not reused from the old hardcoded value.
 
+**Scheme configuration:** `XCTEST_VOLUNTEER_SECRET` must be added to `project.yml` under the test scheme's `environmentVariables` section — the same location where `XCTEST_ADMIN_SECRET` is already configured. Do NOT add it by hand in Xcode's scheme editor, because `xcodegen generate` overwrites hand-edited schemes and the change would be lost. The value in `project.yml` should reference a CI-injected environment variable (e.g., `$(XCTEST_VOLUNTEER_SECRET)`) rather than a literal hex string. Generate the actual secret value as a fresh random 32-byte hex string (64 hex chars) — do NOT reuse or derive it from the old hardcoded `a1b2c3d4...` value being replaced. The old value is now considered compromised since it was committed to source history.
+
 **Local development:** Document in `apps/ios/README.md` or the Xcode scheme's environment variables UI that both `XCTEST_ADMIN_SECRET` and `XCTEST_VOLUNTEER_SECRET` are required for XCUITest runs. The `bun run ios:uitest` command should pass these through from the shell environment.
 
 ### Files to Change
@@ -295,7 +311,7 @@ Then replace each `print(...)` with the appropriate level:
 - `logger.info("...")`
 - `logger.error("...")`
 
-In `AppState.swift` and `CryptoService.swift`, the `#if DEBUG` print calls for missing test env vars should use `.debug` level — they are only meaningful in test builds and will be compiled out of release builds via `#if DEBUG`.
+In `AppState.swift` and `CryptoService.swift`, the `#if DEBUG` print calls for missing test env vars should use `.debug` level — they are only meaningful in test builds and will be compiled out of release builds via `#if DEBUG`. Note: replacing a `#if DEBUG print()` with a `#if DEBUG Logger.debug()` call is low-value on its own — the output goes to the same place in debug builds. The primary benefit is consistency with the rest of the Logger migration and ensuring these events would reach any future log backend (crash reporters, log aggregation). If there is no plan to wire `Logger` to a crash reporter or aggregation pipeline in debug builds, this specific substitution can be deferred until that wiring is in place; prioritize the production-build `print()` calls (all the non-`#if DEBUG` ones in the inventory above) first.
 
 For the `BiometricPrompt.swift` `print("Authenticated!")` — this is a vestigial debug statement. Replace with `logger.debug("Biometric authentication succeeded.")` and use category `"auth"`.
 

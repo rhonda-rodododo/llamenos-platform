@@ -46,6 +46,7 @@ Implement three CMS automation features that have route scaffolding, schema defi
 
 **What is missing:**
 - The assign route does not call `createPushDispatcherFromService(...).sendToVolunteer(...)` for each newly assigned pubkey.
+- `WakePayload` (and `FullPushPayload`) do not have a `recordId` field — mobile clients need this to navigate to the assigned case on notification tap.
 - No Nostr relay event specifically notifying the user of the case assignment (distinct from the broadcast `KIND_RECORD_ASSIGNED` which goes to all hub members). The distinction: the push notification targets specific devices of the assigned user only.
 
 ---
@@ -92,14 +93,16 @@ This calls `POST /api/records/:recordId/notify-contacts` with `body`.
 Import `NotifyContactsBody` and `NotifyContactsResponse` from `@protocol/schemas/notifications` (via the api module's existing import structure).
 
 #### Desktop Client — trigger from case detail
-**File:** `src/client/components/cases/case-detail.tsx` (or wherever case status is updated)
+**File:** `src/client/components/cases/case-detail.tsx` (or the file containing the status mutation)
+
+> **Implementation note:** grep for `status` update calls in `src/client/routes/cases/` (or `case-detail.tsx`) to find the exact mutation. Look for the `PATCH /api/cms/records/:id` call that sets status. This is the trigger point.
 
 After a status change is successfully saved (via `PATCH /records/:id`), if the case has linked contacts, show a toast-anchored prompt: "Notify linked contacts about this status change?" with a "Notify" button.
 
 The notification flow:
 1. Fetch linked contacts for the case via `GET /records/:id/contacts`.
 2. For each contact, decrypt the contact's field data client-side to extract `identifier` (phone/handle) and `channel` preference.
-3. Render a message template client-side: `"Case #[caseNumber] has been updated: [statusLabel]"` (or a hub-configured template string).
+3. Render a message template client-side. **V1 uses a static template only:** `'Case #[caseNumber] has been updated: [statusLabel]'`. Hub-configurable templates are out of scope for this spec.
 4. Batch into `notifyContactsBodySchema.recipients` and call `notifyContacts(recordId, body)`.
 5. Show results toast: "X contacts notified, Y failed."
 
@@ -110,6 +113,8 @@ A dialog component that:
 - Shows the pre-rendered message (editable by the user before sending).
 - Calls `notifyContacts()` on confirm.
 - Reports per-contact success/failure from `NotifyContactsResponse.results`.
+
+**Out of scope:** Mobile contact notification UI is not part of this spec. The Nostr `KIND_RECORD_ASSIGNED` event is a separate mechanism (broadcast to hub members) and is not related to contact notifications — do not conflate the two.
 
 #### i18n keys to add
 ```json
@@ -138,10 +143,12 @@ const hubId = c.get('hubId') ?? ''
 const wakePayload: WakePayload = {
   hubId,
   type: 'assignment',
+  recordId: result.id,   // mobile clients navigate to this case on tap
 }
 const fullPayload: FullPushPayload = {
   ...wakePayload,
   previewText: `You have been assigned to case ${result.caseNumber ?? result.id.slice(0, 8)}`,
+  recordId: result.id,
 }
 
 // Dispatch to each newly assigned user — fire-and-forget, never block
@@ -154,6 +161,8 @@ for (const assignedPubkey of body.pubkeys) {
 **Critical constraint:** Push must route to the correct hub. `hubId` is already available in the request context (`c.get('hubId')`). The user may be offline or on a different hub — push reaches their device regardless of which hub they currently have active. This is already handled by `sendToVolunteer`, which looks up all registered devices for the pubkey across all platforms.
 
 **Import to add:** `import type { WakePayload, FullPushPayload } from '../types/infra'` (match existing pattern from `routes/conversations.ts`).
+
+**Required schema change:** Add `recordId?: string` to `WakePayload` in `apps/worker/types/infra.ts`. `FullPushPayload` inherits the field via `extends WakePayload`. Mobile clients use `recordId` to navigate directly to the assigned case when the notification is tapped. This field is optional so that all existing push payloads (message, voicemail, shift_reminder) remain valid without change.
 
 #### Desktop Client — receive assignment notification
 **File:** `src/client/lib/ws.ts` or the Nostr event listener
@@ -214,13 +223,16 @@ Response: ConvertReportToCaseResponse
 ```
 
 Handler logic:
-1. Fetch the report (conversation) — verify it is type `'report'` and its `reportTypeId` maps to a `ReportTypeDefinition` with `allowCaseConversion=true`.
-2. Generate a case number if the entity type has numbering enabled.
-3. Call `services.cases.create({ hubId, entityTypeId, createdBy, caseNumber, encryptedContent, readerEnvelopes, fieldValues: body.caseFieldValues })`.
-4. Call `services.cases.linkReportCase(newCase.id, reportId, pubkey)`.
-5. Update `conversionStatus` to `'completed'` via `services.conversations.update(reportId, { metadata: { conversionStatus: 'completed' } })`.
-6. Audit: `'reportConvertedToCase'` with `{ reportId, caseId: newCase.id, caseNumber }`.
-7. Return `ConvertReportToCaseResponse`.
+1. Fetch the report (conversation) — verify it is type `'report'` and its `reportTypeId` maps to a `ReportTypeDefinition` with `allowCaseConversion=true`. If not, return 422 with error `'Report type does not allow case conversion'` before opening a transaction.
+2. Generate a case number if the entity type has numbering enabled (this can be done outside the transaction).
+3. Wrap steps 3–5 in a single database transaction using `db.transaction(async (tx) => { ... })`. If any step fails, all changes are rolled back:
+   - Call `services.cases.create(...)` passing `tx`.
+   - Call `services.cases.linkReportCase(newCase.id, reportId, pubkey)` passing `tx`.
+   - Update `conversionStatus` to `'completed'` via `services.conversations.update(reportId, { metadata: { conversionStatus: 'completed' } })` passing `tx`.
+4. Audit: `'reportConvertedToCase'` with `{ reportId, caseId: newCase.id, caseNumber }` (outside the transaction, after commit).
+5. Return `ConvertReportToCaseResponse`.
+
+**Field mapping rule (V1):** name-based matching only. If a report field's `name` exactly matches an entity type field's `name` and their types are compatible (same type or both text-like), copy the value into `fieldValues`. Non-matching fields are silently skipped. Document this rule in a comment at the top of the handler. No fuzzy matching.
 
 If the report type does not have `allowCaseConversion=true`, return 422 with error `'Report type does not allow case conversion'`.
 
@@ -242,7 +254,7 @@ When the report's `reportTypeId` maps to a type with `allowCaseConversion=true` 
 Clicking it opens a `ConvertToCaseDialog` component:
 - Entity type selector (dropdown of available entity types for the hub).
 - The report content is pre-populated into the case's initial note (encrypted client-side).
-- Report field values that match entity field names are pre-populated as `caseFieldValues`.
+- Report field values are pre-populated as `caseFieldValues` using **name-based matching only**: if a report field's `name` exactly matches an entity type field's `name`, and their `type` is compatible (same type, or both text-like), copy the value. Non-matching fields are silently skipped. No fuzzy matching.
 - "Create Case" button calls `convertReportToCase(reportId, body)`.
 - On success: navigate to the new case at `/cases/:caseId`, show toast "Case #X created from report."
 
@@ -332,5 +344,6 @@ The existing `TriageCaseCreationPanel` should call `convertReportToCase()` inste
 - [ ] `TriageCaseCreationPanel` calls `convertReportToCase()` — not independent case creation + link.
 - [ ] BDD test: create a report with a conversion-enabled report type, call `POST /reports/:id/convert-to-case`, verify the case exists, the report is linked, and `conversionStatus='completed'`.
 - [ ] BDD test: attempt conversion on a report with `allowCaseConversion=false` type — expect 422.
+- [ ] BDD regression test: existing triage queue listing still works after `TriageCaseCreationPanel` is migrated to `convertReportToCase()` — reports appear in the queue, conversion still creates a linked case with `status='in_progress'`, and `conversionStatus` is set to `'completed'`. This guards against the migration accidentally breaking the triage flow.
 - [ ] `bun run typecheck && bun run build` passes.
 - [ ] `bun run codegen` succeeds after schema additions.

@@ -12,6 +12,12 @@ Fix six classes of production-risk defects found in the codebase audit. None req
 
 ---
 
+## General Notes
+
+- **Line numbers are guidance only.** All file:line references in this spec are from the 2026-03-21 audit snapshot and may have shifted since. Implementers must use grep/search to locate the relevant code rather than jumping directly to a line number.
+
+---
+
 ## Issue Inventory
 
 ### Issue 1 — Offline queue plaintext race condition (HIGH)
@@ -41,6 +47,8 @@ The comment acknowledges this is intentional but treats it as acceptable. It is 
 **Fix:**
 
 Make `save()` async. Always encrypt first; only write to `localStorage` after encryption succeeds. If encryption fails (crypto not unlocked), do not write to `localStorage` at all — the queue lives in memory only until the key is available.
+
+> **Accepted tradeoff — data loss on restart while offline**: While the encryption key is unavailable (crypto not yet unlocked), queued operations remain in memory only and will be lost if the app is restarted. This is an intentional and accepted tradeoff: no unencrypted data is persisted to disk. Users should be informed via UI feedback if the app is restarted while there are unsynced offline operations pending.
 
 ```typescript
 private async save(): Promise<void> {
@@ -159,59 +167,13 @@ Add `CORS_ALLOWED_ORIGINS?: string` to the `Env` interface in `apps/worker/types
 
 ---
 
-### Issue 4 — No startup env var validation (MEDIUM)
+### Issue 4 — Startup env var validation
 
-**File:** `src/server/index.ts`
-
-**Current state:**
-
-`HMAC_SECRET` is read via `readSecret()` which silently returns `''` if the secret file and env var are both missing. `DATABASE_URL` defaults to `'postgresql://llamenos:dev@localhost:5432/llamenos'`. `SERVER_NOSTR_SECRET` is optional but must be exactly 64 hex chars when set — no validation.
-
-If `HMAC_SECRET` is empty, HMAC operations produce a deterministic output based on an empty key — effectively no secret. If `DATABASE_URL` points to the dev default in production, the server starts against the wrong database silently.
-
-**Fix:**
-
-Add a `validateStartupEnv()` function called before the server binds, that checks required vars are non-empty and optionally validates format. Exit with a clear error message if validation fails.
-
-```typescript
-function validateStartupEnv(env: {
-  databaseUrl: string
-  hmacSecret: string
-  environment: string
-  serverNostrSecret: string
-}): void {
-  const errors: string[] = []
-
-  if (!env.databaseUrl || env.databaseUrl === 'postgresql://llamenos:dev@localhost:5432/llamenos') {
-    if (env.environment === 'production') {
-      errors.push('DATABASE_URL must be set to a production value in production')
-    }
-  }
-
-  if (!env.hmacSecret || env.hmacSecret.length < 32) {
-    errors.push('HMAC_SECRET must be at least 32 characters (use a 64-char hex string)')
-  }
-
-  if (env.serverNostrSecret && !/^[0-9a-f]{64}$/.test(env.serverNostrSecret)) {
-    errors.push('SERVER_NOSTR_SECRET must be exactly 64 hex characters')
-  }
-
-  if (env.environment === 'production') {
-    // In production, warn about non-critical but recommended vars
-    if (!process.env.CORS_ALLOWED_ORIGINS) {
-      console.warn('[startup] CORS_ALLOWED_ORIGINS not set — using default origin allowlist')
-    }
-  }
-
-  if (errors.length > 0) {
-    console.error('[startup] Configuration errors:')
-    for (const err of errors) console.error(`  - ${err}`)
-    process.exit(1)
-  }
-}
-```
-
-Call this immediately after reading secrets, before `createDatabase()`. Blocking startup on misconfiguration is a feature, not a regression.
+> **This issue is covered in `2026-03-21-hardening-final.md` Gap 4, which is the canonical implementation.**
+>
+> Startup env var validation is defined there as `validateConfig()` in `apps/worker/lib/config.ts`, called from `apps/worker/app.ts`. The required var list, hex-length assertions, and warning policy are all specified in that gap.
+>
+> Do not create a second validation system here. Skip this issue — it is fully covered by hardening-final Gap 4.
 
 ---
 
@@ -302,7 +264,7 @@ Or define a narrow schema for `GoogleServiceAccountKey` and use `z.parse()` to v
 | `apps/worker/lib/service-factories.ts` | Issue 2 |
 | `apps/worker/middleware/cors.ts` | Issue 3 |
 | `apps/worker/types/infra.ts` | Issue 3 (add `CORS_ALLOWED_ORIGINS` to `Env`) |
-| `src/server/index.ts` | Issue 4 |
+| *(see hardening-final Gap 4)* | Issue 4 — deferred to hardening-final spec |
 | `asterisk-bridge/src/webhook-sender.ts` | Issue 5 |
 | `apps/worker/db/index.ts` | Issue 6a |
 | `apps/worker/messaging/rcs/adapter.ts` | Issue 6b |
@@ -315,7 +277,7 @@ Or define a narrow schema for `GoogleServiceAccountKey` and use `z.parse()` to v
 2. `bun run build` passes — no dead imports from the `events.tsx` records import removal (that is in the other spec; listed here for awareness that typecheck covers both specs)
 3. `bun run test:backend:bdd` passes — CORS changes must not break the BDD test server (tests run with `ENVIRONMENT=development`, fallback localhost origins still work)
 4. Offline queue: manual test — lock the desktop, enqueue an operation (note draft), kill the process before the async encryption completes, reopen app, confirm `localStorage` does not contain plaintext JSON
-5. Startup validation: start server with `HMAC_SECRET=` unset or short; confirm process exits with a clear error message rather than starting with an empty HMAC key
+5. *(Issue 4 startup validation gates are in hardening-final Gap 4)*
 6. CORS: start server with `CORS_ALLOWED_ORIGINS=https://custom.example.com`; confirm that origin receives CORS headers and `http://localhost:5173` does not (when `ENVIRONMENT=production`)
 7. `cd asterisk-bridge && bun run typecheck` (if available) or confirm no runtime errors in webhook-sender tests with the `workerWebhookUrl` base change
 
@@ -326,11 +288,11 @@ Or define a narrow schema for `GoogleServiceAccountKey` and use `z.parse()` to v
 Execute in this order to de-risk:
 
 1. **Issue 1** (offline queue plaintext) — highest confidentiality risk, self-contained change
-2. **Issue 4** (startup validation) — prevents silent misconfiguration in production; cheap to implement
-3. **Issue 3** (CORS) — enables self-hosted deployments; requires `Env` type update
-4. **Issue 2** (empty catches) — systematic; audit each file individually before changing
-5. **Issue 5** (placeholder URLs) — low risk, one-line replacements
-6. **Issue 6** (type assertions) — lowest risk, clean-up only
+2. **Issue 3** (CORS) — enables self-hosted deployments; requires `Env` type update
+3. **Issue 2** (empty catches) — systematic; audit each file individually before changing
+4. **Issue 5** (placeholder URLs) — low risk, one-line replacements
+5. **Issue 6** (type assertions) — lowest risk, clean-up only
+6. ~~**Issue 4**~~ — deferred to `hardening-final` Gap 4 (canonical startup validation)
 
 ---
 

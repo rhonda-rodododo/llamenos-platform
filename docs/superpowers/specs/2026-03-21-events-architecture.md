@@ -134,6 +134,8 @@ Import types from `@protocol/schemas/events`. Mirror the offline-queue exclusion
 
 ### 5. iOS: no API changes needed
 
+**PREREQUISITE:** Before implementing iOS changes, verify whether `createEventBodySchema` in `packages/protocol/schemas/cms/events.ts` has `eventTypeHash` and `statusHash` as required fields or as `.optional()`. Run `grep -A2 'eventTypeHash' packages/protocol/schemas/cms/events.ts`. If optional: the iOS fix (passing empty string) is valid as-is but should still be corrected to pass the real blind index. If required with min(1): the iOS empty string causes immediate 400 errors and this is a critical bug — fix it first.
+
 iOS `EventsViewModel` already uses the events API correctly. Review only:
 - Confirm `eventTypeHash` and `statusHash` are derived properly (currently not set in `CreateEventRequest` — the iOS create path passes empty `blindIndexes: [:]` and omits `eventTypeHash`/`statusHash`). These are required fields on `createEventBodySchema`. Add them to `CreateEventRequest` and populate from the selected entity type's default status.
 

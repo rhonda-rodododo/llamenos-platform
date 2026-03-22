@@ -47,9 +47,9 @@ The current code treats `setActiveHub` as the only routing action. If a user is 
 **Principle**: Distinguish between "context switch the UI" (only on user action or on the hub the call belongs to) and "route notification to hub handler" (always, regardless of active hub).
 
 **iOS changes:**
-- In `AppDelegate.application(_:didReceiveRemoteNotification:...)`: after decrypting the wake payload, do NOT unconditionally call `appState.hubContext.setActiveHub(hubId)`. Only do so when the `type` field is `"incoming_call"` and the user has explicitly answered (or from the notification tap path). For the display path, store `hubId` in `content.userInfo` and ensure `LinphoneService` / ring logic is notified with the hub ID — without switching the active hub.
+- In `AppDelegate.application(_:didReceiveRemoteNotification:completionHandler:)` (the **background push path**): after decrypting the wake payload, do **NOT** call `appState.hubContext.setActiveHub(hubId)` under any condition — not even for `type == "incoming_call"`. This path runs silently in the background. Its sole responsibilities are decrypting the payload, notifying `LinphoneService` / ring logic with the hub ID, and calling the completion handler. No UI context switch should ever originate here.
 - Add a `routeIncomingCallNotification(hubId: String, callId: String?)` method to `HubActivityService` (or a new `PushRoutingService`) that rings regardless of active hub.
-- The hub-switch-on-tap path (`UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:)`) is correct and should be preserved — the user tapping a notification is an explicit context switch intent.
+- The hub-switch-on-tap path (`UNUserNotificationCenterDelegate.userNotificationCenter(_:didReceive:)`) is the **only** correct place for `setActiveHub` — the user tapping a notification is an explicit context switch intent. This path is correct and must be preserved.
 
 **Android changes (`PushService.kt`):**
 - In the wake-payload coroutine block (lines ~119–131): do NOT call `activeHubState.setActiveHub(wakeHubId)` unconditionally. This is the routing-on-push bug.
@@ -146,33 +146,37 @@ The server entry point for Bun self-hosted is `apps/worker/app.ts` (which sets u
 
 ### Required Fix
 
-Create `apps/worker/lib/config.ts` with an `assertRequiredEnv(env: Env): void` function that:
+> **This is the canonical env var validation spec.** The code-quality spec (Issue 4) defers to this section for the implementation. Do not create a second validation system. See the note at the bottom of Gap 4.
+
+Create `apps/worker/lib/config.ts` with a `validateConfig(): void` function (called from `apps/worker/app.ts`) that:
 
 1. Asserts each required var is present and non-empty.
 2. Asserts `HMAC_SECRET` is exactly 64 hex characters (matches `SERVER_NOSTR_SECRET` validation already done in auth route).
-3. Asserts `SERVER_NOSTR_SECRET` is exactly 64 hex characters if set.
+3. Asserts `SERVER_NOSTR_SECRET` is exactly 64 hex characters.
 4. Asserts `DATABASE_URL` starts with `postgres://` or `postgresql://`.
 5. Logs a clear startup message listing which optional vars are absent (push keys, Nostr relay, etc.) for observability without failing.
 6. Throws a descriptive error for any missing required var — **never** a generic "undefined" stack trace.
 
-Required vars to assert:
+Required vars to assert (all vars from both this spec and code-quality Issue 4):
 
 | Var | Condition |
 |-----|-----------|
 | `DATABASE_URL` | Non-empty, starts with `postgres` |
 | `HMAC_SECRET` | Exactly 64 hex chars |
+| `SERVER_NOSTR_SECRET` | Exactly 64 hex chars |
 | `ADMIN_PUBKEY` | Non-empty, 64 hex chars |
 | `HOTLINE_NAME` | Non-empty |
 | `ENVIRONMENT` | Non-empty |
 
 Optional vars to warn when absent (not fail):
 
-- `SERVER_NOSTR_SECRET` — warn: Nostr relay events unsigned
 - `NOSTR_RELAY_URL` — warn: real-time relay disabled
 - `FCM_SERVICE_ACCOUNT_KEY` — warn: Android push disabled
 - `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID` — warn: iOS push disabled
 
-Call `assertRequiredEnv(env)` early in the Bun startup path. Since `app.ts` is framework-agnostic (serves both Bun and CF), the call should be placed in a Bun-specific startup hook. The Bun entry path calls `app.fetch` — add a startup block to `apps/worker/app.ts` that runs `assertRequiredEnv(process.env as Env)` at module load time, wrapped in a `if (typeof Bun !== 'undefined')` guard so it does not break CF Workers deployment.
+Call `validateConfig()` from `apps/worker/app.ts` at module load time. Since `app.ts` is framework-agnostic (serves both Bun and CF Workers), wrap the call in a `if (typeof Bun !== 'undefined')` guard so it does not run during CF Workers deployment.
+
+> **Note for code-quality spec implementers**: code-quality Issue 4 (`validateStartupEnv()` in `src/server/index.ts`) is superseded by this Gap 4. The function name, file location, and required var list defined here are canonical. Do not implement a second validation system.
 
 ### Files
 

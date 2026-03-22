@@ -100,6 +100,9 @@ export async function addGroupMember(groupId: string, body: AddGroupMemberBody) 
 
 export async function removeGroupMember(groupId: string, contactId: string) { ... }
 // DELETE /directory/groups/:groupId/members/:contactId
+
+export async function listAffinityGroups() { ... }
+// GET /directory/groups — required for Gap 4 group management UI
 ```
 
 Import types from `@protocol/schemas/contact-relationships`:
@@ -136,7 +139,7 @@ Import types from `@protocol/schemas/contact-relationships`:
 
 `apps/ios/Sources/Services/ApiService.swift` (or equivalent API layer)
 - Ensure `createRawContact()`, `updateDirectoryContact()`, `deleteDirectoryContact()` are exposed
-- These map to `POST /directory`, `PUT /directory/:id`, `DELETE /directory/:id`
+- These map to `POST /directory`, `PATCH /directory/:id`, `DELETE /directory/:id`
 
 **Android — new files:**
 
@@ -165,7 +168,7 @@ Import types from `@protocol/schemas/contact-relationships`:
 - Add edit icon button in `TopAppBar` visible when user has `contacts:edit` permission
 - Navigate to `ContactEditScreen`
 
-**E2EE requirement:** Contact PII fields (name, phone, email, free-form notes) are hub-key encrypted on device before being sent. The backend never receives plaintext PII. Use `LABEL_CONTACT_PII` domain separation constant (add to `crypto-labels.json` if not present).
+**E2EE requirement:** Contact PII fields (name, phone, email, free-form notes) are hub-key encrypted on device before being sent. The backend never receives plaintext PII. Before using `LABEL_CONTACT_PII`, run `grep -r 'LABEL_CONTACT' packages/protocol/crypto-labels.json`. If absent, add it to `crypto-labels.json` as `'llamenos:contact-pii'` and run `bun run codegen` to regenerate labels across all platforms. This is a prerequisite for the contact encryption work.
 
 ### Gap 3: Desktop — relationship management UI
 
@@ -190,7 +193,7 @@ Add a "Groups" section to the contact detail view (read-only — shows which aff
 **File:** `src/client/routes/directory/groups.tsx` (new route) OR add as a tab to the existing directory view
 
 Affinity groups management page:
-- List all groups (`listAffinityGroups()` — add to API if missing, calls `GET /directory/groups`)
+- List all groups (`listAffinityGroups()` — calls `GET /directory/groups`, added in Gap 1 above)
 - "Create group" button: opens form with fields:
   - Group name and description (displayed as plaintext; stored encrypted with hub key)
   - Member picker (multi-select, search contacts)
@@ -219,46 +222,39 @@ Affinity groups management page:
 
 New endpoint: `POST /directory/merge`
 
+> **E2EE constraint:** Contact merge re-encryption CANNOT be done server-side — the server never holds the hub key plaintext. The server merge endpoint receives a pre-merged, re-encrypted profile blob from the client. The client is responsible for: (1) decrypting both contact profiles using the hub key, (2) applying field resolution rules, (3) re-encrypting the merged profile, (4) POSTing `{ survivingId, deletedId, mergedEncryptedProfile: string }` to `POST /contacts/merge`. The server performs only: validate both contact IDs exist, replace `survivor.encryptedProfile` with `mergedEncryptedProfile`, unlink `deleted` contact's cases and relink to survivor, delete the `deleted` contact record. No server-side PII handling.
+
 ```
 Permission: contacts:delete (admin-level)
 Body: {
-  primaryId: string (uuid),
-  duplicateId: string (uuid),
-  fieldResolution: {
-    // For each PII field, 'primary' | 'secondary' | 'both' (for identifiers)
-    name: 'primary' | 'secondary',
-    phone: 'primary' | 'secondary',
-    email: 'primary' | 'secondary',
-    notes: 'primary' | 'secondary',
-  }
+  survivingId: string (uuid),
+  deletedId: string (uuid),
+  mergedEncryptedProfile: string,  // re-encrypted by client
 }
 ```
 
 Server-side operations (in `services.contacts.merge()`):
-1. Load both contacts
-2. Apply `fieldResolution`: produce merged `encryptedProfile` with chosen field values — re-encrypt with hub key
+1. Validate both `survivingId` and `deletedId` exist in the hub
+2. Replace `survivor.encryptedProfile` with `mergedEncryptedProfile`
 3. Merge identifier hashes: union of both contacts' blind index entries (HMAC hashes)
-4. Re-link all case contact links (`record_contacts` table): update `contactId` from `duplicateId` → `primaryId`
-5. Re-link all interactions referencing `duplicateId`
-6. Re-link all relationships: replace `contactIdA` or `contactIdB` where = `duplicateId` with `primaryId`; deduplicate
-7. Re-link all affinity group memberships: update `contactId` from `duplicateId` → `primaryId`; deduplicate
-8. Delete `duplicateId` contact record
-9. Audit log: `contactMerged` with `{ primaryId, duplicateId }`
-10. Return: updated primary contact
+4. Re-link all case contact links (`record_contacts` table): update `contactId` from `deletedId` → `survivingId`
+5. Re-link all interactions referencing `deletedId`
+6. Re-link all relationships: replace `contactIdA` or `contactIdB` where = `deletedId` with `survivingId`; deduplicate
+7. Re-link all affinity group memberships: update `contactId` from `deletedId` → `survivingId`; deduplicate
+8. Delete `deletedId` contact record
+9. Audit log: `contactMerged` with `{ survivingId, deletedId }`
+10. Return: updated surviving contact
 
 Schema in `@protocol/schemas/contacts-v2` — add `mergeContactsBodySchema`:
 ```typescript
 export const mergeContactsBodySchema = z.object({
-  primaryId: z.uuid(),
-  duplicateId: z.uuid(),
-  fieldResolution: z.object({
-    name: z.enum(['primary', 'secondary']).optional().default('primary'),
-    phone: z.enum(['primary', 'secondary']).optional().default('primary'),
-    email: z.enum(['primary', 'secondary']).optional().default('primary'),
-    notes: z.enum(['primary', 'secondary']).optional().default('primary'),
-  }).optional().default({}),
+  survivingId: z.uuid(),
+  deletedId: z.uuid(),
+  mergedEncryptedProfile: z.string(),
 })
 ```
+
+> **Contact `notes` field:** The `notes` field is treated as a scalar string for merge purposes (surviving/deleted resolution). If notes contain multiple entries in a structured format, this must be revisited. V1 assumes scalar notes.
 
 ### Gap 7: Contact merge — client API + desktop UI
 
@@ -266,14 +262,9 @@ export const mergeContactsBodySchema = z.object({
 
 ```typescript
 export async function mergeContacts(params: {
-  primaryId: string
-  duplicateId: string
-  fieldResolution?: {
-    name?: 'primary' | 'secondary'
-    phone?: 'primary' | 'secondary'
-    email?: 'primary' | 'secondary'
-    notes?: 'primary' | 'secondary'
-  }
+  survivingId: string
+  deletedId: string
+  mergedEncryptedProfile: string  // pre-merged, re-encrypted by caller
 }): Promise<RawContact>
 ```
 
@@ -282,9 +273,10 @@ export async function mergeContacts(params: {
 - Opens a merge dialog:
   - Contact search field to find the duplicate
   - Side-by-side field comparison showing decrypted PII from both contacts
-  - Radio selectors per field: keep from primary or keep from secondary
+  - Radio selectors per field: keep from surviving or keep from deleted contact
+  - The dialog performs client-side merge: decrypts both profiles, applies selections, re-encrypts merged result
   - Confirmation step before submit
-  - On confirm: calls `mergeContacts()`, navigates to surviving contact
+  - On confirm: calls `mergeContacts()` with the pre-encrypted merged profile, navigates to surviving contact
 
 ### Gap 8: Case merge backend
 
@@ -346,7 +338,7 @@ export async function mergeCases(params: {
 
 | File | Change |
 |------|--------|
-| `src/client/lib/api.ts` | Add `createContactRelationship`, `deleteContactRelationship`, `createAffinityGroup`, `updateAffinityGroup`, `deleteAffinityGroup`, `addGroupMember`, `removeGroupMember`, `mergeContacts`, `mergeCases` |
+| `src/client/lib/api.ts` | Add `createContactRelationship`, `deleteContactRelationship`, `listAffinityGroups`, `createAffinityGroup`, `updateAffinityGroup`, `deleteAffinityGroup`, `addGroupMember`, `removeGroupMember`, `mergeContacts`, `mergeCases` |
 | `apps/ios/Sources/Views/Contacts/ContactCreateView.swift` | New file — contact creation sheet |
 | `apps/ios/Sources/Views/Contacts/ContactEditView.swift` | New file — contact edit sheet |
 | `apps/ios/Sources/Views/Contacts/ContactsView.swift` | Add `+` toolbar button, present create sheet |
@@ -368,7 +360,7 @@ export async function mergeCases(params: {
 
 ## Verification Gates
 
-1. **Client API coverage:** `createContactRelationship`, `deleteContactRelationship`, `createAffinityGroup`, `updateAffinityGroup`, `deleteAffinityGroup`, `addGroupMember`, `removeGroupMember`, `mergeContacts`, `mergeCases` all exist and are typed against protocol schemas.
+1. **Client API coverage:** `createContactRelationship`, `deleteContactRelationship`, `listAffinityGroups`, `createAffinityGroup`, `updateAffinityGroup`, `deleteAffinityGroup`, `addGroupMember`, `removeGroupMember`, `mergeContacts`, `mergeCases` all exist and are typed against protocol schemas.
 
 2. **Mobile contact create (iOS):** Admin can create a contact with name, phone, email; contact appears in list; PII is visible only after hub-key decryption in the client.
 
@@ -382,7 +374,7 @@ export async function mergeCases(params: {
 
 7. **Desktop affinity group management:** Admin can create a group, add/remove members, update group name/description, delete group.
 
-8. **Contact merge backend:** `POST /directory/merge` merges two contacts — surviving contact has union of identifier hashes, all case/interaction/relationship links updated, duplicate deleted.
+8. **Contact merge backend:** `POST /directory/merge` accepts `{ survivingId, deletedId, mergedEncryptedProfile }` — surviving contact's `encryptedProfile` is replaced with the client-provided merged blob, union of identifier hashes applied, all case/interaction/relationship links updated, deleted contact record removed. Server never decrypts PII.
 
 9. **Contact merge desktop UI:** Admin can trigger merge from contact detail, select field resolutions, confirm — duplicate record is gone from list.
 
