@@ -179,7 +179,7 @@ export async function deleteHubViaApi(
 let _phoneSeq = 0
 export function uniquePhone(): string {
   const seq = ++_phoneSeq
-  return `+1555${String(seq).padStart(7, '0')}`
+  return `+1212${String(seq).padStart(7, '0')}`
 }
 
 export function uniqueName(prefix: string): string {

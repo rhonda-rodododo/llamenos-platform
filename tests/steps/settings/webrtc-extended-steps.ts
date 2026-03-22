@@ -50,7 +50,7 @@ When('I fill in Twilio credentials with WebRTC config', async ({ page }) => {
   // Fill provider phone number (required for save button to be enabled)
   const phoneInput = page.getByLabel(/phone number/i).first()
   if (await phoneInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await phoneInput.fill('+15551234567')
+    await phoneInput.fill('+12121234567')
     await phoneInput.blur()
   }
 

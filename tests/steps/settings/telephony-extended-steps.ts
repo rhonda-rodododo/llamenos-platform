@@ -30,7 +30,7 @@ Then(
 // "the {string} button should be disabled" is defined in interaction-steps.ts
 
 When('I fill in Twilio credentials with phone number', async ({ page }) => {
-  await page.locator('input[type="tel"]').fill('+15551234567')
+  await page.locator('input[type="tel"]').fill('+12121234567')
   await page.getByPlaceholder('AC...').fill('AC1234567890abcdef')
   const authTokenInput = page.locator('input[type="password"]').first()
   await authTokenInput.fill('test-auth-token-123')
@@ -45,7 +45,7 @@ Then('I should see {string} with {string}', async ({ page }, text1: string, text
 When('I fill in Twilio credentials with a different phone number', async ({ page }) => {
   const telInput = page.locator('input[type="tel"]')
   if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.fill('+15559876543')
+    await telInput.fill('+12129876543')
   }
   const acInput = page.getByPlaceholder('AC...')
   if (await acInput.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -68,7 +68,7 @@ Then('the Account SID field should be pre-filled', async ({ page }) => {
 When('I fill in SignalWire credentials', async ({ page }) => {
   const telInput = page.locator('input[type="tel"]')
   if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.fill('+15551112222')
+    await telInput.fill('+12121112222')
   }
   const acInput = page.getByPlaceholder('AC...')
   if (await acInput.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -87,7 +87,7 @@ When('I fill in SignalWire credentials', async ({ page }) => {
 When('I fill in fake Twilio credentials', async ({ page }) => {
   const telInput = page.locator('input[type="tel"]')
   if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.fill('+15551234567')
+    await telInput.fill('+12121234567')
   }
   const acInput = page.getByPlaceholder('AC...')
   if (await acInput.isVisible({ timeout: 2000 }).catch(() => false)) {

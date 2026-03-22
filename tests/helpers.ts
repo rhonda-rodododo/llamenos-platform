@@ -98,8 +98,6 @@ export async function enterPin(page: Page, pin: string) {
   // PinInput has 8 fields but minLength is 6 — if PIN is shorter than 8 digits,
   // press Enter to trigger onComplete (auto-complete only fires at exactly 8 digits)
   await page.keyboard.press('Enter')
-  // Wait for onComplete callback to fire and unlock to process
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
 }
 
 /**
@@ -203,6 +201,7 @@ export async function loginAsAdmin(page: Page) {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await enterPin(page, TEST_PIN)
+  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
   // Wait for admin section in sidebar — confirms getMe() completed and permissions are set.
   // Without this, the brief window between isKeyUnlocked=true (onUnlock fires synchronously)
@@ -308,8 +307,9 @@ export async function completeProfileSetup(page: Page) {
 }
 
 export function uniquePhone(): string {
+  // Use 212 (NYC) area code — 555 numbers fail libphonenumber-js validation
   const suffix = Date.now().toString().slice(-7)
-  return `+1555${suffix}`
+  return `+1212${suffix}`
 }
 
 const TEST_RESET_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'

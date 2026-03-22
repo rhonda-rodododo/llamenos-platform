@@ -7,7 +7,7 @@
  * The hash chain guarantees tamper detection: each entry stores the SHA-256
  * hash of the previous entry. Verification walks the chain backward.
  */
-import { eq, and, desc, sql, count, gte, lte } from 'drizzle-orm'
+import { eq, and, desc, sql, count, gte, lte, inArray } from 'drizzle-orm'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
@@ -200,7 +200,7 @@ export class AuditService {
     // Event category filter (maps category name to allowed action list)
     if (eventType && EVENT_CATEGORIES[eventType]) {
       const allowed = EVENT_CATEGORIES[eventType]
-      conditions.push(sql`${auditLog.action} = ANY(${allowed})`)
+      conditions.push(inArray(auditLog.action, allowed))
     }
 
     // Actor filter

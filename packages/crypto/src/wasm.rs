@@ -137,7 +137,7 @@ impl WasmCryptoState {
     pub fn lock(&mut self) {
         self.secret_key = None; // Zeroizing<Vec<u8>> zeroizes on drop
         self.public_key = None;
-        self.provisioning_token = None;
+        self.ephemeral_sk = None;
     }
 
     /// Check if the crypto state is unlocked.
@@ -499,17 +499,20 @@ impl WasmCryptoState {
 // ── Stateless free functions ─────────────────────────────────────────
 
 /// Generate a new random secp256k1 keypair.
-/// Returns JSON: { skHex, pubkeyHex, nsec, npub }
+/// Returns plain JS object: { skHex, pubkeyHex, nsec, npub }
 #[wasm_bindgen(js_name = "generateKeypair")]
 pub fn generate_keypair() -> Result<JsValue, JsError> {
     let kp = keys::generate_keypair();
+    use serde::Serialize as _;
     let result = serde_json::json!({
-        "skHex": kp.secret_key_hex,
+        "skHex": *kp.secret_key_hex,  // deref Zeroizing<String> to &String for Serialize
         "pubkeyHex": kp.public_key,
         "nsec": kp.nsec,
         "npub": kp.npub,
     });
-    serde_wasm_bindgen::to_value(&result).map_err(to_js_err)
+    result
+        .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+        .map_err(to_js_err)
 }
 
 /// Get the x-only public key hex from a secret key hex.
@@ -525,17 +528,22 @@ pub fn is_valid_nsec(nsec: &str) -> bool {
 }
 
 /// Derive a keypair from an nsec bech32 string.
-/// Returns JSON: { skHex, pubkeyHex, nsec, npub }
+/// Returns plain JS object: { skHex, pubkeyHex, nsec, npub }
 #[wasm_bindgen(js_name = "keyPairFromNsec")]
 pub fn key_pair_from_nsec(nsec: &str) -> Result<JsValue, JsError> {
     let kp = keys::keypair_from_nsec(nsec).map_err(to_js_err)?;
+    // Use json_compatible() so serde_json::Value::Object becomes a plain JS object.
+    // Without it, serde_wasm_bindgen converts Object to a JS Map, breaking property access.
     let result = serde_json::json!({
-        "skHex": kp.secret_key_hex,
+        "skHex": *kp.secret_key_hex,  // deref Zeroizing<String> to &String for Serialize
         "pubkeyHex": kp.public_key,
         "nsec": kp.nsec,
         "npub": kp.npub,
     });
-    serde_wasm_bindgen::to_value(&result).map_err(to_js_err)
+    use serde::Serialize as _;
+    result
+        .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+        .map_err(to_js_err)
 }
 
 /// Verify a raw Schnorr signature over a pre-hashed message.

@@ -26,6 +26,7 @@ Given('the app is freshly installed', async ({ page }) => {
 Given('no identity exists on the device', async ({ page }) => {
   // Ensure no encrypted key exists in storage
   await page.evaluate(() => {
+    localStorage.removeItem('llamenos:llamenos-encrypted-key')
     localStorage.removeItem('llamenos-encrypted-key')
     localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
   })
@@ -74,16 +75,10 @@ Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
     pubkey: pubkeyHash,
   }
 
+  // platform.ts non-Tauri getStore() uses 'llamenos:' prefix
   await page.evaluate(
-    ({ legacyKey, storeKey, value }) => {
-      localStorage.setItem(legacyKey, value)
-      localStorage.setItem(storeKey, value)
-    },
-    {
-      legacyKey: 'llamenos-encrypted-key',
-      storeKey: 'tauri-store:keys.json:llamenos-encrypted-key',
-      value: JSON.stringify(data),
-    },
+    (value) => { localStorage.setItem('llamenos:llamenos-encrypted-key', value) },
+    JSON.stringify(data),
   )
 })
 
@@ -161,16 +156,10 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
     pubkey: pubkeyHash,
   }
 
+  // platform.ts non-Tauri getStore() uses 'llamenos:' prefix
   await page.evaluate(
-    ({ legacyKey, storeKey, value }) => {
-      localStorage.setItem(legacyKey, value)
-      localStorage.setItem(storeKey, value)
-    },
-    {
-      legacyKey: 'llamenos-encrypted-key',
-      storeKey: 'tauri-store:keys.json:llamenos-encrypted-key',
-      value: JSON.stringify(data),
-    },
+    (value) => { localStorage.setItem('llamenos:llamenos-encrypted-key', value) },
+    JSON.stringify(data),
   )
 })
 

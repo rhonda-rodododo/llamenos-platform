@@ -391,7 +391,7 @@ When('I fill in the volunteer name', async ({ page }) => {
 })
 
 When('I fill in the volunteer phone', async ({ page }) => {
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel(/phone/i).first().fill(phone)
   await page.getByLabel(/phone/i).first().blur()
 })

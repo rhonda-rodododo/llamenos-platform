@@ -114,7 +114,7 @@ When('I fill in phone with {string}', async ({ page }, phone: string) => {
 })
 
 When('I fill in a valid phone number', async ({ page }) => {
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel(/phone/i).fill(phone)
   await page.getByLabel(/phone/i).blur()
 })

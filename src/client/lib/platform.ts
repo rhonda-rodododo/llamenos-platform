@@ -150,7 +150,10 @@ export async function pubkeyFromNsec(nsec: string): Promise<string | null> {
   try {
     const mod = await getWasm()
     const kp = mod.keyPairFromNsec(nsec)
-    return kp.pubkeyHex
+    // serde_wasm_bindgen without json_compatible() serializes serde_json::Value::Object
+    // as a JS Map (not a plain object). Support both until WASM is rebuilt with json_compatible().
+    const pubkeyHex = (kp instanceof Map ? kp.get('pubkeyHex') : kp?.pubkeyHex) as string | undefined
+    return pubkeyHex ?? null
   } catch {
     return null
   }

@@ -27,7 +27,7 @@ Then('I should see bans or the {string} message', async ({ page }, _emptyMsg: st
 })
 
 When('I fill in the phone number', async ({ page }) => {
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel(/phone/i).fill(phone)
   await page.getByLabel(/phone/i).blur()
   await page.evaluate((p) => {
@@ -57,7 +57,7 @@ Then('the phone number should appear in the ban list', async ({ page, request })
 
 When('I add a ban with reason {string}', async ({ page }, reason: string) => {
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel(/phone/i).fill(phone)
   await page.getByLabel(/phone/i).blur()
   await page.getByLabel(/reason/i).fill(reason)
@@ -75,7 +75,7 @@ Then('the ban entry should contain the current year', async ({ page }) => {
 
 Given('a ban exists', async ({ page, request }) => {
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel(/phone/i).fill(phone)
   await page.getByLabel(/phone/i).blur()
   await page.getByLabel(/reason/i).fill('Test ban')
@@ -168,9 +168,9 @@ Then('the phone number input should not be visible', async ({ page }) => {
 })
 
 When('I add two bans with different phone numbers', async ({ page }) => {
-  const phone1 = `+1555${Date.now().toString().slice(-7)}`
+  const phone1 = `+1212${Date.now().toString().slice(-7)}`
   // Small delay to ensure unique timestamp
-  const phone2 = `+1555${(Date.now() + 1).toString().slice(-7)}`
+  const phone2 = `+1212${(Date.now() + 1).toString().slice(-7)}`
 
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()
   await page.getByLabel(/phone/i).fill(phone1)

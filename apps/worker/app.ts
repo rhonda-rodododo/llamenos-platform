@@ -167,6 +167,7 @@ authenticated.route('/geocoding', geocodingRoutes)
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
 hubScoped.use('*', hubContext)
+hubScoped.route('/users', usersRoutes)
 hubScoped.route('/shifts', shiftsRoutes)
 hubScoped.route('/bans', bansRoutes)
 hubScoped.route('/notes', notesRoutes)

@@ -327,11 +327,11 @@ export async function getMe() {
 // --- Users (admin only) ---
 
 export async function listUsers() {
-  return request<{ users: User[] }>('/users')
+  return request<{ users: User[] }>(hp('/users'))
 }
 
 export async function createUser(data: { name: string; phone: string; roleIds: string[]; pubkey: string }) {
-  return request<User>('/users', {
+  return request<User>(hp('/users'), {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -345,14 +345,14 @@ export async function updateUser(pubkey: string, data: Partial<{
   supportedMessagingChannels: string[]
   messagingEnabled: boolean
 }>) {
-  return request<User>(`/users/${pubkey}`, {
+  return request<User>(hp(`/users/${pubkey}`), {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
 
 export async function deleteUser(pubkey: string) {
-  return request<{ ok: true }>(`/users/${pubkey}`, { method: 'DELETE' })
+  return request<{ ok: true }>(hp(`/users/${pubkey}`), { method: 'DELETE' })
 }
 
 
@@ -389,13 +389,13 @@ export async function deleteShift(id: string) {
 }
 
 export async function getFallbackGroup() {
-  return request<{ volunteers: string[] }>(hp('/shifts/fallback'))
+  return request<{ userPubkeys: string[] }>(hp('/shifts/fallback'))
 }
 
 export async function setFallbackGroup(volunteers: string[]) {
   return request<{ ok: true }>(hp('/shifts/fallback'), {
     method: 'PUT',
-    body: JSON.stringify({ volunteers }),
+    body: JSON.stringify({ userPubkeys: volunteers }),
   })
 }
 

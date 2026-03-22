@@ -481,6 +481,11 @@ function SettingsPage() {
       >
         <CrashReportingSettings />
       </SettingsSection>
+
+      {/* App version */}
+      <p className="text-xs text-muted-foreground text-center pt-2">
+        v{__BUILD_VERSION__}
+      </p>
     </div>
   )
 }

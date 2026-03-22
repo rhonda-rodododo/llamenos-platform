@@ -62,9 +62,10 @@ users.post('/',
       ...(body.supervisorPubkey && { supervisorPubkey: body.supervisorPubkey }),
     })
 
-    await audit(services.audit, 'userAdded', pubkey, { target: body.pubkey, roles: body.roleIds || body.roles })
+    const hubId = c.get('hubId') || undefined
+    await audit(services.audit, 'userAdded', pubkey, { target: body.pubkey, roles: body.roleIds || body.roles }, undefined, hubId)
 
-    return c.json(result, 201)
+    return c.json(result.volunteer, 201)
   },
 )
 
@@ -94,14 +95,15 @@ users.patch('/:targetPubkey',
 
     const result = await services.identity.updateUser(targetPubkey, body, true)
 
-    if (body.roles) await audit(services.audit, 'rolesChanged', pubkey, { target: targetPubkey, roles: body.roles })
-    if (body.active === false) await audit(services.audit, 'userDeactivated', pubkey, { target: targetPubkey })
+    const hubId = c.get('hubId') || undefined
+    if (body.roles) await audit(services.audit, 'rolesChanged', pubkey, { target: targetPubkey, roles: body.roles }, undefined, hubId)
+    if (body.active === false) await audit(services.audit, 'userDeactivated', pubkey, { target: targetPubkey }, undefined, hubId)
     // Revoke all sessions when deactivating or changing roles
     if (body.active === false || body.roles) {
       await services.identity.revokeAllSessions(targetPubkey)
     }
 
-    return c.json(result)
+    return c.json(result.volunteer)
   },
 )
 
@@ -130,7 +132,8 @@ users.delete('/:targetPubkey',
     // (orphaned sessions will expire naturally via TTL)
     await services.identity.revokeAllSessions(targetPubkey).catch(() => {})
     await services.identity.deleteUser(targetPubkey)
-    await audit(services.audit, 'userRemoved', pubkey, { target: targetPubkey })
+    const hubId = c.get('hubId') || undefined
+    await audit(services.audit, 'userRemoved', pubkey, { target: targetPubkey }, undefined, hubId)
     return c.json({ ok: true })
   },
 )

@@ -18,12 +18,13 @@ export function createDatabase(databaseUrl: string): Database {
   if (db) return db
 
   const poolSize = parseInt(process.env.PG_POOL_SIZE || '10', 10)
+  const idleTimeout = parseInt(process.env.PG_IDLE_TIMEOUT || '60', 10)
 
   const client = new SQL({
     url: databaseUrl,
     max: poolSize,
-    idleTimeout: 20,
-    connectionTimeout: 10,
+    idleTimeout,
+    connectionTimeout: 30,
   })
 
   db = drizzle({ client, schema })

@@ -197,7 +197,7 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
         <div className="px-6 pt-6">
           <div className="flex items-center gap-2 mb-4">
             <LogoMark size="sm" />
-            <h1 className="text-xl font-bold">{t('setup.bootstrap.title', { defaultValue: 'Create Admin Account' })}</h1>
+            <h1 data-testid="page-title" className="text-xl font-bold">{t('setup.bootstrap.title', { defaultValue: 'Create Admin Account' })}</h1>
           </div>
         </div>
         <div className="px-6 py-6">
@@ -214,7 +214,7 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
         <div className="px-6 pt-6">
           <div className="flex items-center gap-2 mb-4">
             <LogoMark size="sm" />
-            <h1 className="text-xl font-bold">{t('setup.title')}</h1>
+            <h1 data-testid="page-title" className="text-xl font-bold">{t('setup.title')}</h1>
           </div>
         </div>
         <div className="px-6 py-6">
@@ -249,7 +249,7 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
       <div className="px-6 pt-6">
         <div className="flex items-center gap-2 mb-4">
           <LogoMark size="sm" />
-          <h1 className="text-xl font-bold">{t('setup.title')}</h1>
+          <h1 data-testid="page-title" className="text-xl font-bold">{t('setup.title')}</h1>
         </div>
         {/* Progress */}
         <div className="space-y-2">

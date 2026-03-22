@@ -39,6 +39,12 @@ When('I enter a valid 63-character nsec', async ({ page }) => {
   const sk = generateSecretKey()
   const nsec = nip19.nsecEncode(sk)
   await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
+  // The login form requires a PIN alongside the nsec — fill the PIN field if present
+  const pinField = page.locator('#nsec-pin')
+  const pinVisible = await pinField.isVisible({ timeout: 1000 }).catch(() => false)
+  if (pinVisible) {
+    await pinField.fill('123456')
+  }
 })
 
 // 'I start typing in the nsec field' is defined in key-import-steps.ts (shared)

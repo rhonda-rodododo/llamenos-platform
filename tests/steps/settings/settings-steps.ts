@@ -205,7 +205,7 @@ Then('the new display name should persist', async ({ page }) => {
 })
 
 When('I enter a valid phone number', async ({ page }) => {
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel(/phone/i).fill(phone)
   await page.getByLabel(/phone/i).blur()
 })
@@ -231,7 +231,7 @@ When('they update their name and phone', async ({ page }) => {
   await nameInput.fill(`Vol ${Date.now()}`)
   const phoneInput = page.getByLabel(/phone/i)
   await phoneInput.clear()
-  await phoneInput.fill(`+1555${Date.now().toString().slice(-7)}`)
+  await phoneInput.fill(`+1212${Date.now().toString().slice(-7)}`)
   await phoneInput.blur()
 })
 

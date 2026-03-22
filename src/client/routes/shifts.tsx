@@ -43,7 +43,7 @@ function ShiftsPage() {
     Promise.all([
       listShifts().then(r => setShifts(r.shifts)),
       listUsers().then(r => setUsers(r.users)),
-      getFallbackGroup().then(r => setFallback(r.volunteers)),
+      getFallbackGroup().then(r => setFallback(r.userPubkeys)),
     ]).catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
   }, [])

@@ -261,7 +261,7 @@ When('I select contact type {string}', async ({ page }, typeName: string) => {
 
 When('I fill in the first identifier value with a phone number', async ({ page }) => {
   const identifierInput = page.getByTestId('identifier-value-input').first()
-  await identifierInput.fill(`+1555${Date.now().toString().slice(-7)}`)
+  await identifierInput.fill(`+1212${Date.now().toString().slice(-7)}`)
 })
 
 Then('the primary checkbox for the first identifier should be checked', async ({ page }) => {

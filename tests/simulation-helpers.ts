@@ -130,7 +130,7 @@ async function postSimulation<T>(
  * @example
  * ```ts
  * const { callId } = await simulateIncomingCall(request, {
- *   callerNumber: `+1555${Date.now().toString().slice(-7)}`,
+ *   callerNumber: `+1212${Date.now().toString().slice(-7)}`,
  * })
  * ```
  */
@@ -214,7 +214,7 @@ export async function simulateVoicemail(
  * @example
  * ```ts
  * const { conversationId, messageId } = await simulateIncomingMessage(request, {
- *   senderNumber: `+1555${Date.now().toString().slice(-7)}`,
+ *   senderNumber: `+1212${Date.now().toString().slice(-7)}`,
  *   body: 'Help, I need assistance',
  *   channel: 'sms',
  * })
@@ -264,5 +264,5 @@ export async function simulateDeliveryStatus(
  */
 export function uniqueCallerNumber(): string {
   const suffix = Date.now().toString().slice(-7)
-  return `+1555${suffix}`
+  return `+1212${suffix}`
 }

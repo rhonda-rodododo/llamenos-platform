@@ -23,7 +23,7 @@ import { Navigation } from '../../pages/index'
 Given('an admin has created a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   const nsec = await createUserAndGetNsec(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_vol_nsec = n
@@ -39,7 +39,7 @@ When('the volunteer logs in with their nsec', async ({ page }) => {
 Given('a volunteer has logged in', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   const nsec = await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   await loginAsVolunteer(page, nsec)
@@ -53,7 +53,7 @@ When('they complete the profile setup', async ({ page }) => {
 Given('a volunteer is logged in and on the dashboard', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   const nsec = await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   await loginAsVolunteer(page, nsec)
@@ -63,7 +63,7 @@ Given('a volunteer is logged in', async ({ page }) => {
   await loginAsAdmin(page)
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   const nsec = await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   await loginAsVolunteer(page, nsec)
@@ -72,7 +72,7 @@ Given('a volunteer is logged in', async ({ page }) => {
 Given('a volunteer exists', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   const nsec = await createUserAndGetNsec(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_vol_nsec = n
@@ -90,7 +90,7 @@ When('I create an invite for a new volunteer', async ({ page }) => {
   await page.getByTestId(TestIds.VOLUNTEER_ADD_BTN).click()
   const name = `InviteVol ${Date.now()}`
   await page.getByLabel('Name').fill(name)
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel('Phone Number').fill(phone)
   await page.getByLabel('Phone Number').blur()
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
@@ -180,8 +180,8 @@ When('I paste invalid phone numbers in the textarea', async ({ page }) => {
 })
 
 When('I paste two phone numbers in the textarea', async ({ page }) => {
-  const phone1 = `+1555${Date.now().toString().slice(-7)}`
-  const phone2 = `+1555${(Date.now() + 1).toString().slice(-7)}`
+  const phone1 = `+1212${Date.now().toString().slice(-7)}`
+  const phone2 = `+1212${(Date.now() + 1).toString().slice(-7)}`
   const bulkPhones = page.getByTestId('ban-bulk-phones')
   if (await bulkPhones.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
     await bulkPhones.fill(`${phone1}\n${phone2}`)
@@ -204,7 +204,7 @@ When('I paste two phone numbers in the textarea', async ({ page }) => {
 Given('I have created a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `AuditVol ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
 })
@@ -212,7 +212,7 @@ Given('I have created a volunteer', async ({ page }) => {
 Given('I have created and then deleted a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `DeleteVol ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   await createUserAndGetNsec(page, name, phone)
   await dismissNsecCard(page)
   // Delete the volunteer
@@ -236,7 +236,7 @@ Given('a reporter has been invited and onboarded', async ({ page }) => {
   // Create a reporter via volunteer creation flow
   await Navigation.goToVolunteers(page)
   const name = `Reporter ${Date.now()}`
-  const phone = `+1555${Date.now().toString().slice(-7)}`
+  const phone = `+1212${Date.now().toString().slice(-7)}`
   const nsec = await createUserAndGetNsec(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_reporter_nsec = n

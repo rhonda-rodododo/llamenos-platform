@@ -17,8 +17,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 3,
-  reporter: "html",
+  workers: 6,
+  reporter: [["dot"], ["html"], ["json"]],
   timeout: 30_000,
   globalSetup: './tests/global-setup.ts',
   expect: {

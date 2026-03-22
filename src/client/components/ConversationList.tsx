@@ -132,7 +132,7 @@ export function ConversationList({ conversations, onSelect, selectedId }: Conver
 
   if (conversations.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground">
+      <div data-testid="conversation-list" className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground">
         <MessageSquare className="mb-2 h-8 w-8 opacity-40" />
         <p>{t('conversations.noConversations', 'No conversations')}</p>
       </div>
