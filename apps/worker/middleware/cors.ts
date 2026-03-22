@@ -1,18 +1,38 @@
 import { createMiddleware } from 'hono/factory'
 import type { AppEnv } from '../types'
 
-/** Explicit origin allowlist — only these origins receive CORS headers. */
-const ALLOWED_ORIGINS = new Set([
-  'https://app.llamenos.org',
-  'https://demo.llamenos-hotline.com',
+/** Tauri origins are always allowed (desktop client). */
+const TAURI_ORIGINS = new Set([
   'tauri://localhost',
   'https://tauri.localhost',
 ])
 
-function isAllowedOrigin(origin: string, env: { ENVIRONMENT: string }): boolean {
-  if (ALLOWED_ORIGINS.has(origin)) return true
-  // Development origins
-  if (env.ENVIRONMENT === 'development') {
+/**
+ * Build the allowed origins set from env config.
+ *
+ * When CORS_ALLOWED_ORIGINS is set (comma-separated), those origins are used
+ * instead of the hardcoded production defaults. Tauri origins always included.
+ */
+function buildAllowedOrigins(env: { CORS_ALLOWED_ORIGINS?: string }): Set<string> {
+  const base = new Set(TAURI_ORIGINS)
+  if (env.CORS_ALLOWED_ORIGINS) {
+    for (const origin of env.CORS_ALLOWED_ORIGINS.split(',')) {
+      const trimmed = origin.trim()
+      if (trimmed) base.add(trimmed)
+    }
+  } else {
+    base.add('https://app.llamenos.org')
+    base.add('https://demo.llamenos-hotline.com')
+  }
+  return base
+}
+
+function isAllowedOrigin(
+  origin: string,
+  env: { ENVIRONMENT: string; CORS_ALLOWED_ORIGINS?: string },
+): boolean {
+  if (buildAllowedOrigins(env).has(origin)) return true
+  if (env.ENVIRONMENT === 'development' && !env.CORS_ALLOWED_ORIGINS) {
     if (origin === 'http://localhost:5173' || origin === 'http://localhost:1420') return true
   }
   return false
@@ -38,7 +58,6 @@ export const cors = createMiddleware<AppEnv>(async (c, next) => {
 
   if (allowedOrigin) {
     c.header('Access-Control-Allow-Origin', allowedOrigin)
-    // Expose version negotiation headers to client JS (Epic 288)
     c.header('Access-Control-Expose-Headers', 'X-Min-Version, X-Current-Version')
   }
   c.header('Vary', 'Origin')
