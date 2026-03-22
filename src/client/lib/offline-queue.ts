@@ -116,7 +116,7 @@ class OfflineQueue {
       lastError: null,
     }
     this.queue.push(op)
-    this.save()
+    void this.save()
     this.notifyListeners()
     return op.id
   }
@@ -126,7 +126,7 @@ class OfflineQueue {
    */
   remove(id: string): void {
     this.queue = this.queue.filter(op => op.id !== id)
-    this.save()
+    void this.save()
     this.notifyListeners()
   }
 
@@ -135,7 +135,7 @@ class OfflineQueue {
    */
   clear(): void {
     this.queue = []
-    this.save()
+    void this.save()
     this.notifyListeners()
   }
 
@@ -215,7 +215,7 @@ class OfflineQueue {
 
     // Remove successfully replayed operations
     this.queue = this.queue.filter(op => !toRemove.includes(op.id))
-    this.save()
+    void this.save()
     this.notifyListeners()
     this.replaying = false
 
@@ -280,21 +280,20 @@ class OfflineQueue {
     this._encryptedRaw = null
   }
 
-  private save(): void {
+  private async save(): Promise<void> {
+    const json = JSON.stringify(this.queue)
     try {
-      // Encrypt queue before persisting to localStorage
-      const json = JSON.stringify(this.queue)
-      // Fire-and-forget async encryption — save plaintext first for immediate reads,
-      // then overwrite with encrypted version
-      localStorage.setItem(STORAGE_KEY, json) // temporary plaintext
-      import('./platform').then(({ encryptDraft }) =>
-        encryptDraft(json).then(encrypted => {
-          if (encrypted) localStorage.setItem(STORAGE_KEY, encrypted)
-        }).catch(() => {})
-      ).catch(() => {})
+      const { encryptDraft } = await import('./platform')
+      const encrypted = await encryptDraft(json)
+      if (encrypted) {
+        localStorage.setItem(STORAGE_KEY, encrypted)
+      }
+      // If encryption returned null (key not loaded), do not persist —
+      // queue remains in memory only. It will be persisted on next
+      // save() call after crypto is unlocked.
     } catch {
-      // Storage full or unavailable — operations will be lost
-      console.warn('[offline-queue] Failed to persist queue to localStorage')
+      // encryptDraft unavailable (test build or crypto not initialized)
+      // Do not fall back to plaintext. Queue stays in memory.
     }
   }
 
