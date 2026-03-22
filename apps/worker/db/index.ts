@@ -45,7 +45,8 @@ export function getDb(): Database {
 export async function closeDb(): Promise<void> {
   if (db) {
     // Access the underlying Bun SQL client to close it
-    await (db as any).$client.close()
+    const bunDb = db as BunSQLDatabase<typeof schema> & { $client: SQL }
+    await bunDb.$client.close()
     db = null
     console.log('[db] Connection closed')
   }

@@ -17,9 +17,7 @@ export class RCSAdapter implements MessagingAdapter {
     this.config = config
     this.hmacSecret = hmacSecret
 
-    const serviceAccountKey = typeof config.serviceAccountKey === 'string'
-      ? JSON.parse(config.serviceAccountKey) as GoogleServiceAccountKey
-      : config.serviceAccountKey as unknown as GoogleServiceAccountKey
+    const serviceAccountKey = JSON.parse(config.serviceAccountKey) as GoogleServiceAccountKey
 
     this.client = new RBMClient(config.agentId, serviceAccountKey)
   }
