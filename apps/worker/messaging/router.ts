@@ -190,8 +190,8 @@ messaging.post('/:channel/webhook', async (c) => {
             channelType: conv.channelType,
           })
         }
-      } catch {
-        // Push dispatch failure should not affect webhook response
+      } catch (e) {
+        console.error('[messaging] Push dispatch failed for conversation:', convResult.conversationId, e)
       }
     })())
   }

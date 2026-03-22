@@ -24,8 +24,8 @@ export async function getTelephonyFromService(
   try {
     const config = await settingsService.getTelephonyProvider()
     if (config) return createAdapterFromConfig(config)
-  } catch {
-    // Fall through to env var defaults
+  } catch (e) {
+    console.warn('[service-factories] getTelephonyProvider failed, falling back to env vars:', e)
   }
 
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER) {
@@ -50,8 +50,8 @@ export async function getHubTelephonyFromService(
   try {
     const config = await settingsService.getHubTelephonyProvider(hubId)
     if (config) return createAdapterFromConfig(config)
-  } catch {
-    // Fall through to global
+  } catch (e) {
+    console.warn('[service-factories] getHubTelephonyProvider failed for hub, falling back to global:', e)
   }
   return getTelephonyFromService(env, settingsService)
 }

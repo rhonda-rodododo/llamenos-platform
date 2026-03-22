@@ -62,7 +62,8 @@ export async function authenticateRequest(
       if (!user) return null
       if (user.active === false) return null
       return { pubkey: session.pubkey, user }
-    } catch {
+    } catch (e) {
+      console.warn('[auth] Session token validation failed:', e)
       return null
     }
   }
@@ -79,7 +80,8 @@ export async function authenticateRequest(
     if (!user) return null
     if (user.active === false) return null
     return { pubkey: auth.pubkey, user }
-  } catch {
+  } catch (e) {
+    console.warn('[auth] User lookup failed:', e)
     return null
   }
 }

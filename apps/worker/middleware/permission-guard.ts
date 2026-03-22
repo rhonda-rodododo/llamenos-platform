@@ -70,7 +70,8 @@ export function requireEntityTypeAccess(action: 'read' | 'write') {
     let entityType: EntityTypeDefinition
     try {
       entityType = await services.settings.getEntityTypeById(entityTypeId)
-    } catch {
+    } catch (e) {
+      console.warn('[permission-guard] getEntityTypeById failed for', entityTypeId, e)
       return c.json({ error: 'Entity type not found' }, 404)
     }
 
