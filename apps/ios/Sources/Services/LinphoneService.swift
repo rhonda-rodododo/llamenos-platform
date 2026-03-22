@@ -138,8 +138,8 @@ final class LinphoneService: LinphoneServiceProtocol {
     /// Called by PushKit before Linphone fires `onCallStateChanged(.IncomingReceived)`.
     func handleVoipPush(callId: String, hubId: String) {
         pendingCallLock.lock()
+        defer { pendingCallLock.unlock() }
         pendingCallHubIds[callId] = hubId
-        pendingCallLock.unlock()
     }
 
     // MARK: - Core Delegate (Linphone)

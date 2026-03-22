@@ -63,16 +63,16 @@ final class PushRoutingTests: XCTestCase {
         hubId: String,
         title: String = "Incoming Call",
         body: String = "A caller needs assistance"
-    ) -> [AnyHashable: Any] {
-        var payloadDict: [String: String] = [
+    ) throws -> [AnyHashable: Any] {
+        let payloadDict: [String: String] = [
             "type": type,
             "callId": callId,
             "hubId": hubId,
             "title": title,
             "body": body,
         ]
-        let jsonData = try! JSONSerialization.data(withJSONObject: payloadDict)
-        let jsonString = String(data: jsonData, encoding: .utf8)!
+        let jsonData = try XCTUnwrap(try? JSONSerialization.data(withJSONObject: payloadDict))
+        let jsonString = try XCTUnwrap(String(data: jsonData, encoding: .utf8))
         return ["encrypted": "json:\(jsonString)"]
     }
 
@@ -80,8 +80,8 @@ final class PushRoutingTests: XCTestCase {
 
     /// Background push for Hub B must not switch the active hub away from Hub A.
     /// Multi-hub axiom: background handlers are never allowed to change UI context.
-    func testBackgroundPushForHubBDoesNotSwitchActiveHubFromHubA() {
-        let userInfo = makeUserInfo(type: "incoming_call", callId: "call-001", hubId: "hub-B")
+    func testBackgroundPushForHubBDoesNotSwitchActiveHubFromHubA() throws {
+        let userInfo = try makeUserInfo(type: "incoming_call", callId: "call-001", hubId: "hub-B")
         let expectation = XCTestExpectation(description: "completionHandler called")
 
         appDelegate.application(
@@ -101,9 +101,9 @@ final class PushRoutingTests: XCTestCase {
 
     /// Background push with type "incoming_call" must register the call→hub mapping
     /// in LinphoneService so it is available when onCallStateChanged fires.
-    func testBackgroundPushIncomingCallRoutesToLinphoneService() {
+    func testBackgroundPushIncomingCallRoutesToLinphoneService() throws {
         let callId = "call-test-\(UUID().uuidString)"
-        let userInfo = makeUserInfo(type: "incoming_call", callId: callId, hubId: "hub-B")
+        let userInfo = try makeUserInfo(type: "incoming_call", callId: callId, hubId: "hub-B")
         let expectation = XCTestExpectation(description: "completionHandler called")
 
         appDelegate.application(
@@ -122,9 +122,9 @@ final class PushRoutingTests: XCTestCase {
     // MARK: - Test 3: Non-call push does NOT register call→hub mapping
 
     /// A push with type other than "incoming_call" must not register anything in LinphoneService.
-    func testBackgroundPushNonCallTypeDoesNotRegisterLinphoneMapping() {
+    func testBackgroundPushNonCallTypeDoesNotRegisterLinphoneMapping() throws {
         let callId = "call-other-\(UUID().uuidString)"
-        let userInfo = makeUserInfo(type: "new_message", callId: callId, hubId: "hub-B")
+        let userInfo = try makeUserInfo(type: "new_message", callId: callId, hubId: "hub-B")
         let expectation = XCTestExpectation(description: "completionHandler called")
 
         appDelegate.application(
@@ -145,25 +145,19 @@ final class PushRoutingTests: XCTestCase {
     /// The user-initiated tap handler (userNotificationCenter(_:didReceive:)) must still
     /// call setActiveHub — it is the correct path for UI context switching.
     func testTapHandlerDoesSetActiveHub() throws {
-        // UNNotificationResponse cannot be instantiated directly in tests (it is a system type).
-        // We verify the intent by reading the tap handler code contract:
-        // if hubId is present in userInfo, appState?.hubContext.setActiveHub(hubId) is called.
-        //
-        // Since we can't create a real UNNotificationResponse without a running notification
-        // center, we call the hub switching directly to confirm the contract still holds.
         XCTAssertEqual(hubContext.activeHubId, "hub-A", "Precondition: active hub is A")
-        appState?.hubContext.setActiveHub("hub-B")
+        appDelegate.handleNotificationResponse(userInfo: ["hubId": "hub-B"])
         XCTAssertEqual(hubContext.activeHubId, "hub-B",
-                       "setActiveHub from tap handler must update activeHubId")
+                       "Notification tap handler must switch active hub via handleNotificationResponse")
     }
 
     // MARK: - Test 5: Active hub unchanged for push without hubId
 
     /// A push payload without a hubId field must not affect the active hub.
-    func testBackgroundPushWithoutHubIdLeavesActiveHubUnchanged() {
+    func testBackgroundPushWithoutHubIdLeavesActiveHubUnchanged() throws {
         let payloadDict: [String: String] = ["type": "incoming_call", "callId": "call-nohub"]
-        let jsonData = try! JSONSerialization.data(withJSONObject: payloadDict)
-        let jsonString = String(data: jsonData, encoding: .utf8)!
+        let jsonData = try XCTUnwrap(try? JSONSerialization.data(withJSONObject: payloadDict))
+        let jsonString = try XCTUnwrap(String(data: jsonData, encoding: .utf8))
         let userInfo: [AnyHashable: Any] = ["encrypted": "json:\(jsonString)"]
         let expectation = XCTestExpectation(description: "completionHandler called")
 

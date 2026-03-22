@@ -298,7 +298,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                     // For incoming calls, register the call→hub mapping so LinphoneService
                     // can switch context at call-answer time (onCallStateChanged).
                     if let type = payload["type"] as? String, type == "incoming_call",
-                       let callId = payload["callId"] as? String {
+                       let callId = payload["callId"] as? String, !callId.isEmpty,
+                       !hubId.isEmpty {
                         appState.linphoneService.handleVoipPush(callId: callId, hubId: hubId)
                     }
                 }
@@ -337,8 +338,13 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let userInfo = response.notification.request.content.userInfo
+        handleNotificationResponse(userInfo: response.notification.request.content.userInfo)
+        completionHandler()
+    }
 
+    /// Routing logic for notification tap responses. Extracted for testability.
+    /// Switches the active hub to match the notification's hubId, and handles deep link routing.
+    func handleNotificationResponse(userInfo: [AnyHashable: Any]) {
         if let hubId = userInfo["hubId"] as? String {
             appState?.hubContext.setActiveHub(hubId)
         }
@@ -351,8 +357,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
                 _ = (deepLinkType, entityId)
             }
         }
-
-        completionHandler()
     }
 
     /// Allow notifications to display as banners even when the app is in the foreground.
