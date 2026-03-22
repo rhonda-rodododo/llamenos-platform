@@ -140,8 +140,14 @@ export async function navigateAfterLogin(page: Page, url: string): Promise<void>
   }, { pathname: parsed.pathname, search: searchParams })
   await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: Timeouts.NAVIGATION })
 
-  // Wait for route component to mount and render the page title
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Wait for route component to mount — either the page title or an access-denied
+  // message (restricted pages have no page-title test ID).
+  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
+  const accessDenied = page.getByText('Access Denied', { exact: true })
+  await Promise.race([
+    pageTitle.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }),
+    accessDenied.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }),
+  ])
 }
 
 /**
@@ -245,8 +251,17 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await enterPin(page, TEST_PIN)
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
 
-  // New users land on /profile-setup — complete it to get to the main app
-  if (page.url().includes('profile-setup')) {
+  // New users land on /profile-setup, but the React useEffect redirect may fire
+  // slightly after the URL leaves /login (race condition with snapshot check).
+  // Use Promise.race to detect whichever appears first: profile-setup button or nav-sidebar.
+  const profileSetupBtn = page.getByRole('button', { name: /complete setup/i })
+  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+  const landedOnProfileSetup = await Promise.race([
+    profileSetupBtn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+    sidebar.waitFor({ state: 'visible', timeout: 5000 }).then(() => false),
+  ]).catch(() => false)
+
+  if (landedOnProfileSetup) {
     await completeProfileSetup(page)
   }
 
