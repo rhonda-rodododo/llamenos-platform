@@ -145,7 +145,7 @@ export class WebhookSender {
       const action = attrs.match(/action="([^"]*)"/)?.[1] ?? ''
 
       // Parse the action URL for path and params
-      const actionUrl = new URL(action, 'http://placeholder')
+      const actionUrl = new URL(action, this.config.workerWebhookUrl)
       const callbackPath = actionUrl.pathname
       const callbackParams: Record<string, string> = {}
       for (const [key, value] of actionUrl.searchParams) {
@@ -176,8 +176,8 @@ export class WebhookSender {
       const waitUrl = attrs.match(/waitUrl="([^"]*)"/)?.[1] ?? ''
       const action = attrs.match(/action="([^"]*)"/)?.[1] ?? ''
 
-      const waitUrlParsed = new URL(waitUrl, 'http://placeholder')
-      const actionUrlParsed = new URL(action, 'http://placeholder')
+      const waitUrlParsed = new URL(waitUrl, this.config.workerWebhookUrl)
+      const actionUrlParsed = new URL(action, this.config.workerWebhookUrl)
 
       const waitParams: Record<string, string> = {}
       for (const [key, value] of waitUrlParsed.searchParams) {
@@ -218,7 +218,7 @@ export class WebhookSender {
         let recordingCallbackParams: Record<string, string> | undefined
 
         if (recordingCallback) {
-          const cbUrl = new URL(recordingCallback, 'http://placeholder')
+          const cbUrl = new URL(recordingCallback, this.config.workerWebhookUrl)
           recordingCallbackPath = cbUrl.pathname
           recordingCallbackParams = {}
           for (const [key, value] of cbUrl.searchParams) {
@@ -245,8 +245,8 @@ export class WebhookSender {
       const action = attrs.match(/action="([^"]*)"/)?.[1] ?? ''
       const statusCallback = attrs.match(/recordingStatusCallback="([^"]*)"/)?.[1] ?? ''
 
-      const actionUrl = new URL(action, 'http://placeholder')
-      const statusUrl = new URL(statusCallback, 'http://placeholder')
+      const actionUrl = new URL(action, this.config.workerWebhookUrl)
+      const statusUrl = new URL(statusCallback, this.config.workerWebhookUrl)
 
       const callbackParams: Record<string, string> = {}
       for (const [key, value] of statusUrl.searchParams) {
@@ -268,7 +268,7 @@ export class WebhookSender {
     const redirectMatch = twiml.match(/<Redirect\s+[^>]*>([\s\S]*?)<\/Redirect>/)
     if (redirectMatch) {
       const redirectPath = redirectMatch[1].trim()
-      const redirectUrl = new URL(redirectPath, 'http://placeholder')
+      const redirectUrl = new URL(redirectPath, this.config.workerWebhookUrl)
       const params: Record<string, string> = {}
       for (const [key, value] of redirectUrl.searchParams) {
         params[key] = value
