@@ -8,20 +8,40 @@ status: approved
 
 ## Goal
 
-Harden the Llamenos codebase in all directions for production stability and readiness for new features. No merges to `main` — all work lands on the `desktop` branch (which will become a new repo). Two parallel tracks run concurrently: security remediation and architectural overhaul.
+Harden the Llamenos codebase in all directions for production stability and readiness for new features. No merges to `main` — all work lands on the `desktop` branch (which will become a new repo).
 
-## Overall Structure
+---
 
-Two tracks, both targeting the `desktop` branch:
+## Actual State as of 2026-03-21
 
-- **Track 1 — Security:** Five existing security plans dispatched as parallel subagents in isolated git worktrees. Merges back into `desktop` in defined order after each agent's verification gate passes.
-- **Track 2 — Overhaul:** Seven existing overhaul plans executed sequentially in the main worktree. Each plan commits before the next begins.
+### Track 2 — Architectural Overhaul: **COMPLETE**
 
-**Concurrency constraint:** Both tracks may run concurrently for steps 1–4 of Track 2. However, **Track 2 Step 5 (`user-pbac-alignment`) must not begin until all five Track 1 worktrees have merged back into `desktop`** — both tracks modify `apps/worker/routes/auth.ts`, `apps/worker/middleware/auth.ts`, and `apps/worker/lib/auth.ts`.
+All seven 2026-03-19 overhaul plans were already substantially implemented before this sequencing spec was written. The following are confirmed done in the codebase:
+
+- `backend-dead-code-cleanup` — dead code removed
+- `api-surface-simplification` — CRUD surface clean
+- `codegen-pipeline-overhaul` — TS codegen output removed; `z.infer<>` is canonical
+- `workflow-reform` — skill files + CLAUDE.md updated
+- `user-pbac-alignment` — volunteer→user rename complete across all layers
+- `type-system-unification` — `& {}` patterns eliminated
+- `test-infrastructure-overhaul` — test isolation clean
+
+No further work required on Track 2.
+
+### Recent Security Commits Already Applied
+
+The following security findings were fixed directly on `desktop` before Track 1 agents run:
+
+- `9a28418` — desktop Tauri IPC hardening (nsec/secretKeyHex removed from IPC boundary)
+- `3fd49a4` — hub from call record, opaque call tokens for callbacks (CRIT-W1/W2)
+
+Track 1 agents must read their respective plans carefully and skip items already addressed by these commits.
 
 ---
 
 ## Track 1: Security Remediation (Parallel Agents)
+
+**Status: Pending — needs to run.**
 
 Five plans dispatched simultaneously, each in an isolated git worktree branched from `desktop`.
 
@@ -42,12 +62,14 @@ Each agent works in its own directory. On completion, the branch is merged into 
 | Merge order | Branch | Plan | Key remaining work |
 |------------|--------|------|--------------------|
 | 1st | `sec/crypto` | `2026-03-21-security-crypto-rust-crate` | HIGH-C4 (doc comment + `debug_assert` on `xonly_to_compressed`), MED-C items, test vectors |
-| 2nd | `sec/worker` | `2026-03-21-security-worker-hub` | HIGH-W1 (serverEventKeyHex — implement `settings:manage` gate, flag for human review), HIGH-H5 (add `hubId` to `WakePayload` in `types/infra.ts`) |
-| 3rd | `sec/desktop` | `2026-03-21-security-desktop-tauri` | CSP hardening, Stronghold PIN counter migration, dead command cleanup from isolation allowlist. Note: nsec IPC boundary fix already committed (9a28418) — desktop agent reads the plan carefully and skips already-done items. |
+| 2nd | `sec/worker` | `2026-03-21-security-worker-hub` | HIGH-W1 (serverEventKeyHex — implement `settings:manage` gate, flag for human review), HIGH-H5 (add `hubId` to `WakePayload` in `types/infra.ts`). Note: CRIT-W1/W2 already committed (3fd49a4) — skip. |
+| 3rd | `sec/desktop` | `2026-03-21-security-desktop-tauri` | CSP hardening, Stronghold PIN counter migration, dead command cleanup from isolation allowlist. Note: nsec IPC boundary fix already committed (9a28418) — skip. |
 | 4th | `sec/mobile` | `2026-03-21-security-mobile-ios-android` | Plaintext push log removal, crash reporter fallback hardening. Note: Tasks 7 & 8 (hub switch race conditions) already fixed — skip. Wake label mismatch already resolved (`llamenos:push-wake` is consistent everywhere) — skip. |
 | 5th | `sec/cicd` | `2026-03-21-security-cicd-supply-chain` | Docker digest pins in `Dockerfile` + compose files, Dependabot Docker ecosystem entry, Helm/Ansible image refs, `load-test.yml` lockfile flag. Note: CRIT-CI1 and MED-CI3 already fixed — skip. |
 
 > **HIGH-W1 review gate:** The `sec-worker` agent implements the `settings:manage` permission gate for `serverEventKeyHex` as specified in the plan and marks the commit clearly with `[REVIEW-NEEDED: HIGH-W1]`. **Human review of this decision must occur before Track 1's final gate is run.** Do not proceed to the final BDD suite until the human has confirmed or revised the approach.
+
+> **Multi-hub axiom constraint:** No security fix may gate incoming call or notification handling on active hub state. Any user can be a member of multiple hubs simultaneously and must receive calls/notifications from ALL member hubs regardless of which hub is currently active in the UI. Active hub is a browsing-context-only concept.
 
 ### Per-agent verification gate (before merging back to `desktop`)
 
@@ -73,41 +95,59 @@ All suites must be green before Track 1 is declared complete.
 
 ---
 
-## Track 2: Architectural Overhaul (Sequential)
+## Phase 2: New Feature & Polish Specs (after Track 1 complete)
 
-Seven existing plans executed in strict dependency order, committing to `desktop` after each step. Steps 1–4 may run while Track 1 agents are working. **Step 5 must wait for all Track 1 merges.**
+Ten new specs written 2026-03-21, covering genuine gaps found during exhaustive codebase audit. Each spec needs an implementation plan written before execution.
 
-| Step | Plan | Rationale |
-|------|------|-----------|
-| 1 | `2026-03-19-backend-dead-code-cleanup` | Remove DO-era dead code — clears false signals for agents working the rename |
-| 2 | `2026-03-19-api-surface-simplification` | CRUD factory works best on a clean surface, before the rename touches all route files |
-| 3 | `2026-03-19-codegen-pipeline-overhaul` | Remove TS codegen output; makes `z.infer<>` canonical before type unification |
-| 4 | `2026-03-19-workflow-reform` | Update skill files + CLAUDE.md — zero risk, done before agents run the rename |
-| 5 ⚠️ | `2026-03-19-user-pbac-alignment` | **Wait for all Track 1 merges.** Rename volunteer→user across all layers |
-| 6 | `2026-03-19-type-system-unification` | Eliminate `& {}` patterns; benefits from rename being complete |
-| 7 | `2026-03-19-test-infrastructure-overhaul` | Test isolation cleanup last — benefits from all prior changes being stable |
+### Group A — Hardening / Infrastructure (no feature dependencies)
 
-Task counts in each plan are approximate (±1 due to counting methodology) — do not use them to verify completion. Use the plan's own checklist.
+These can be implemented independently and in parallel where possible.
 
-### Per-step verification gate
+| # | Spec | Summary |
+|---|------|---------|
+| A1 | `2026-03-21-hardening-final` | Hub key routing fix (use hubId to select correct hub key); CI codegen:check gate; delete generated/typescript/; env var startup validation; multi-hub axiom documented in CLAUDE.md + PROTOCOL.md |
+| A2 | `2026-03-21-code-quality` | Offline queue plaintext race condition fix; 280 empty catch blocks; CORS_ALLOWED_ORIGINS env var; Asterisk webhook URL fix; type assertion audit |
+| A3 | `2026-03-21-ios-polish` | Deep link navigation; semaphore → async/await; hardcoded keypair → XCTEST_VOLUNTEER_SECRET env var; print() → Logger |
+| A4 | `2026-03-21-events-architecture` | Fix Android events (wrong API, empty envelopes); add Desktop event API functions; consolidate around /events |
 
-- Steps 1–4: `bun run typecheck && bun run build` — must pass before committing and starting next plan
-- Steps 5–7: additionally `bun run test:backend:bdd` — these touch the API surface
+### Group B — CMS Completions (depend on existing CMS infrastructure)
+
+These build on the existing CMS system and can run in parallel within the group.
+
+| # | Spec | Summary |
+|---|------|---------|
+| B1 | `2026-03-21-cms-smart-assignment` | Specialization scoring fix; auto-assignment wired to record creation; user profile fields (maxCaseAssignments, specializations) |
+| B2 | `2026-03-21-cms-automation` | Contact notification client API + trigger; case assignment push dispatch; report-to-case conversion endpoint |
+| B3 | `2026-03-21-cms-field-types` | Location field rendering on all platforms + geocoding; file field on iOS + Android |
+| B4 | `2026-03-21-cms-contact-management` | Contact CRUD on mobile; relationships/groups write API; contact merge + case merge endpoints |
+| B5 | `2026-03-21-cms-advanced-ui` | Evidence custody chain UI; ReportTypeFieldsEditor; cross-hub case visibility (super-admin allHubs) |
+
+### Group C — Cross-Hub Network (largest scope, depends on A1)
+
+| # | Spec | Summary |
+|---|------|---------|
+| C1 | `2026-03-21-cross-hub-network-capabilities` | Architecture docs + PROTOCOL.md update; cross-hub ban propagation; user suspension suggestions; multi-hub SIP registration; mutual aid fallback ring groups; network emergency broadcast; cross-hub audit |
+
+### Ordering within Phase 2
+
+- A1 (hardening-final) must land first — it establishes the multi-hub axiom documentation and hub key routing fix that other features depend on
+- A2, A3, A4 can run concurrently with A1 (no conflicts)
+- B1–B5 can run concurrently (they touch different CMS subsystems)
+- C1 should start after A1 is complete (multi-hub axiom docs must exist before implementing cross-hub features)
 
 ---
 
-## Branch & Worktree Strategy
+## Branch Strategy
 
 - All work targets `desktop` branch (no merges to `main`)
-- Track 1 agents: each gets an isolated worktree (see naming convention above), merges back into `desktop` in merge order
-- Track 2: commits directly to `desktop` sequentially
+- Track 1 agents: each gets an isolated worktree, merges back into `desktop` in merge order
+- Phase 2: implementation plans will specify worktree or direct commit strategy per spec
 
 The `desktop` branch will become a new repository — `main` is not a target.
 
 ---
 
-## Out of scope
+## Out of Scope
 
 - Merging to `main`
-- The geocoding plan (2026-03-21) — already substantially committed, checkboxes only
-- Minor code stubs (location picker UI, file attachment on mobile, SSL pin placeholders) — tracked in code comments, not part of this effort
+- Minor code stubs (location picker UI, SSL pin placeholders) — tracked in code comments
