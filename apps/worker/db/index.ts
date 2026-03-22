@@ -18,7 +18,12 @@ export function createDatabase(databaseUrl: string): Database {
   if (db) return db
 
   const poolSize = parseInt(process.env.PG_POOL_SIZE || '10', 10)
-  const idleTimeout = parseInt(process.env.PG_IDLE_TIMEOUT || '60', 10)
+  // PG_IDLE_TIMEOUT=0 disables idle timeouts (connections live for the pool lifetime).
+  // Default is 0 so development and test runs don't crash when the pool goes quiet
+  // between parallel test batches. Production deployments can set PG_IDLE_TIMEOUT
+  // (e.g., 300) to reclaim connections during low-traffic windows.
+  const idleTimeoutRaw = process.env.PG_IDLE_TIMEOUT
+  const idleTimeout = idleTimeoutRaw !== undefined ? parseInt(idleTimeoutRaw, 10) : 0
 
   const client = new SQL({
     url: databaseUrl,
