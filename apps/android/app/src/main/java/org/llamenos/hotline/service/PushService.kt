@@ -118,11 +118,12 @@ class PushService : FirebaseMessagingService() {
                 val wakePayload = wakeKeyService.decryptWakePayload(wakeEncrypted, wakeEphemeral)
                 if (wakePayload != null) {
                     Log.d(TAG, "Wake payload decrypted: type=${wakePayload.type}")
-                    // Route to the active hub from wake payload when available
-                    val wakeHubId = wakePayload.hubId
-                    if (!wakeHubId.isNullOrEmpty()) {
-                        activeHubState.setActiveHub(wakeHubId)
-                    }
+                    val router = PushNotificationRouter(activeHubState, linphoneService)
+                    router.routeWakePayload(
+                        type = wakePayload.type,
+                        hubId = wakePayload.hubId ?: "",
+                        callId = wakePayload.callId,
+                    )
                     // Use wake payload for notification content when app is locked
                     if (!cryptoService.isUnlocked) {
                         showNotificationFromWakePayload(wakePayload.type, wakePayload.message)
