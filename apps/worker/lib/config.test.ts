@@ -1,0 +1,65 @@
+import { describe, it, expect } from 'bun:test'
+import { validateConfig } from './config'
+
+describe('validateConfig', () => {
+  const validEnv = {
+    DATABASE_URL: 'postgresql://llamenos:dev@localhost:5432/llamenos',
+    HMAC_SECRET: 'a'.repeat(64),
+    SERVER_NOSTR_SECRET: 'b'.repeat(64),
+    ADMIN_PUBKEY: 'c'.repeat(64),
+    HOTLINE_NAME: 'Test Hotline',
+    ENVIRONMENT: 'test',
+  }
+
+  it('passes with all required vars present', () => {
+    expect(() => validateConfig(validEnv)).not.toThrow()
+  })
+
+  it('throws if DATABASE_URL is missing', () => {
+    expect(() => validateConfig({ ...validEnv, DATABASE_URL: '' })).toThrow(/DATABASE_URL/)
+  })
+
+  it('throws if DATABASE_URL does not start with postgres', () => {
+    expect(() => validateConfig({ ...validEnv, DATABASE_URL: 'mysql://bad' })).toThrow(/DATABASE_URL/)
+  })
+
+  it('throws if HMAC_SECRET is missing', () => {
+    expect(() => validateConfig({ ...validEnv, HMAC_SECRET: '' })).toThrow(/HMAC_SECRET/)
+  })
+
+  it('throws if HMAC_SECRET is wrong length (32 chars)', () => {
+    expect(() => validateConfig({ ...validEnv, HMAC_SECRET: 'a'.repeat(32) })).toThrow(/HMAC_SECRET/)
+  })
+
+  it('throws if HMAC_SECRET contains non-hex chars', () => {
+    expect(() => validateConfig({ ...validEnv, HMAC_SECRET: 'z'.repeat(64) })).toThrow(/HMAC_SECRET/)
+  })
+
+  it('throws if SERVER_NOSTR_SECRET is missing', () => {
+    expect(() => validateConfig({ ...validEnv, SERVER_NOSTR_SECRET: '' })).toThrow(/SERVER_NOSTR_SECRET/)
+  })
+
+  it('throws if SERVER_NOSTR_SECRET is wrong length', () => {
+    expect(() => validateConfig({ ...validEnv, SERVER_NOSTR_SECRET: 'a'.repeat(63) })).toThrow(/SERVER_NOSTR_SECRET/)
+  })
+
+  it('throws if ADMIN_PUBKEY is missing', () => {
+    expect(() => validateConfig({ ...validEnv, ADMIN_PUBKEY: '' })).toThrow(/ADMIN_PUBKEY/)
+  })
+
+  it('throws if ADMIN_PUBKEY is wrong length', () => {
+    expect(() => validateConfig({ ...validEnv, ADMIN_PUBKEY: 'a'.repeat(32) })).toThrow(/ADMIN_PUBKEY/)
+  })
+
+  it('throws if HOTLINE_NAME is missing', () => {
+    expect(() => validateConfig({ ...validEnv, HOTLINE_NAME: '' })).toThrow(/HOTLINE_NAME/)
+  })
+
+  it('throws if ENVIRONMENT is missing', () => {
+    expect(() => validateConfig({ ...validEnv, ENVIRONMENT: '' })).toThrow(/ENVIRONMENT/)
+  })
+
+  it('does not throw if optional vars are absent', () => {
+    expect(() => validateConfig(validEnv)).not.toThrow()
+  })
+})

@@ -13,9 +13,13 @@ import { createTranscriptionService } from '../../apps/worker/lib/transcription-
 import { createNostrPublisher, NodeNostrPublisher } from '../../apps/worker/lib/nostr-publisher'
 import { EventOutbox } from '../../apps/worker/lib/nostr-outbox'
 import { startOutboxPoller, stopOutboxPoller } from '../../apps/worker/lib/nostr-outbox-poller'
+import { validateConfig } from '../../apps/worker/lib/config'
 import fs from 'node:fs'
 
 console.log('[llamenos] Starting Bun server...')
+
+// Validate required env vars before initializing any services.
+validateConfig()
 
 // --- Read secrets ---
 function readSecret(name: string, envKey?: string): string {
@@ -29,7 +33,7 @@ function readSecret(name: string, envKey?: string): string {
 }
 
 // --- Initialize database ---
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://llamenos:dev@localhost:5432/llamenos'
+const databaseUrl = process.env.DATABASE_URL!
 const db = createDatabase(databaseUrl)
 console.log('[llamenos] Database initialized')
 
