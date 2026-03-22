@@ -5,14 +5,14 @@ import type { AuditLogEntry } from '@worker/types'
 describe('Audit chain integrity', () => {
   function createEntry(
     id: string,
-    event: string,
+    action: string,
     previousEntryHash?: string,
   ): AuditLogEntry {
     return {
       id,
-      event,
+      action,
       actorPubkey: 'testpubkey123',
-      details: { action: event },
+      details: { action },
       createdAt: new Date().toISOString(),
       previousEntryHash,
     }
@@ -64,12 +64,12 @@ describe('Audit chain integrity', () => {
   })
 
   describe('tamper detection', () => {
-    it('detects tampered event field', () => {
+    it('detects tampered action field', () => {
       const entry = createEntry('audit-001', 'volunteer.login')
       const originalHash = hashAuditEntry(entry)
 
-      // Tamper with the event
-      const tampered = { ...entry, event: 'volunteer.logout' }
+      // Tamper with the action
+      const tampered = { ...entry, action: 'volunteer.logout' }
       const tamperedHash = hashAuditEntry(tampered)
 
       expect(tamperedHash).not.toBe(originalHash)
@@ -184,7 +184,7 @@ describe('Audit chain integrity', () => {
     it('tampered chain fails verification', () => {
       const e1 = createEntry('001', 'login')
       const h1 = hashAuditEntry(e1)
-      const e2 = { ...createEntry('002', 'action', h1), event: 'tampered' }
+      const e2 = { ...createEntry('002', 'action', h1), action: 'tampered' }
       const h2 = hashAuditEntry(e2)
       const e3 = createEntry('003', 'logout', 'wrong-hash')
 

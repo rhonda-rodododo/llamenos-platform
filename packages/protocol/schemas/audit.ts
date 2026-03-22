@@ -15,7 +15,7 @@ export const listAuditQuerySchema = paginationSchema.extend({
 
 export const auditEntryResponseSchema = z.object({
   id: z.string(),
-  event: z.string(),
+  action: z.string(),
   actorPubkey: z.string(),
   details: z.record(z.string(), z.unknown()),
   createdAt: z.string(),

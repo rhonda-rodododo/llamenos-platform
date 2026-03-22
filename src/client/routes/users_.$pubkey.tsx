@@ -275,7 +275,7 @@ function UserProfilePage() {
                     {new Date(entry.createdAt).toLocaleString()}
                   </span>
                   <Badge variant="secondary" className="text-[11px]">
-                    {t(`auditLog.events.${entry.event}`, { defaultValue: entry.event })}
+                    {t(`auditLog.events.${entry.action}`, { defaultValue: entry.action })}
                   </Badge>
                   <span className="flex-1 truncate text-xs text-muted-foreground">
                     {Object.entries(entry.details || {})

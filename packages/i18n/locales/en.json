@@ -938,7 +938,7 @@
     "theme": "Theme"
   },
   "common": {
-    "accessDenied": "Access denied",
+    "accessDenied": "Access Denied",
     "actions": "Actions",
     "add": "Add",
     "appName": "Llámenos",
@@ -1546,7 +1546,7 @@
     "contactLinking": "Link contacts to cases with roles like 'arrestee', 'attorney', or 'witness'. Contact data is encrypted separately from case data."
   },
   "hubs": {
-    "accessDenied": "Access denied",
+    "accessDenied": "Access Denied",
     "createHub": "Create Hub",
     "createHubDescription": "Create a new hub to organize your hotline operations.",
     "editHub": "Edit Hub",

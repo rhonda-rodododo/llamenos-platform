@@ -77,7 +77,7 @@ describe('hashIP', () => {
 describe('hashAuditEntry', () => {
   const baseEntry = {
     id: 'audit-001',
-    event: 'volunteer.login',
+    action: 'volunteer.login',
     actorPubkey: 'abc123',
     details: { ip: 'hashed-ip' },
     createdAt: '2024-01-01T00:00:00Z',
@@ -105,8 +105,8 @@ describe('hashAuditEntry', () => {
     const hashDiffId = hashAuditEntry({ ...baseEntry, id: 'audit-002' })
     expect(hashDiffId).not.toBe(hashOriginal)
 
-    const hashDiffEvent = hashAuditEntry({ ...baseEntry, event: 'volunteer.logout' })
-    expect(hashDiffEvent).not.toBe(hashOriginal)
+    const hashDiffAction = hashAuditEntry({ ...baseEntry, action: 'volunteer.logout' })
+    expect(hashDiffAction).not.toBe(hashOriginal)
 
     const hashDiffActor = hashAuditEntry({ ...baseEntry, actorPubkey: 'def456' })
     expect(hashDiffActor).not.toBe(hashOriginal)
@@ -129,7 +129,7 @@ describe('hashAuditEntry', () => {
 
   it('matches manual SHA-256 computation', () => {
     const entry = baseEntry
-    const content = `${entry.id}:${entry.event}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:`
+    const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:`
     const expected = bytesToHex(sha256(utf8ToBytes(content)))
     expect(hashAuditEntry(entry)).toBe(expected)
   })

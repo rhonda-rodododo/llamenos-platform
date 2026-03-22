@@ -25,18 +25,18 @@ const EVENT_CATEGORIES = [
   { value: 'notes', labelKey: 'auditLog.categoryNotes' },
 ] as const
 
-function getEventCategoryColor(event: string): string {
-  const authEvents = ['login', 'logout', 'sessionCreated', 'sessionExpired', 'passkeyRegistered', 'deviceLinked']
-  const volEvents = ['volunteerAdded', 'volunteerRemoved', 'volunteerRoleChanged', 'volunteerActivated', 'volunteerDeactivated', 'volunteerOnBreak', 'volunteerOffBreak', 'inviteCreated', 'inviteRedeemed']
-  const callEvents = ['callAnswered', 'callEnded', 'callMissed', 'spamReported', 'voicemailReceived']
-  const settingsEvents = ['settingsUpdated', 'telephonyConfigured', 'transcriptionToggled', 'ivrUpdated', 'customFieldsUpdated', 'spamSettingsUpdated', 'callSettingsUpdated']
+function getEventCategoryColor(action: string): string {
+  const authEvents = ['login', 'logout', 'sessionCreated', 'sessionExpired', 'passkeyRegistered', 'deviceLinked', 'volunteerOnBreak', 'volunteerAvailable']
+  const volEvents = ['userAdded', 'userRemoved', 'rolesChanged', 'userDeactivated', 'inviteCreated', 'inviteRevoked']
+  const callEvents = ['callAnswered', 'callEnded', 'callMissed', 'numberBanned', 'voicemailReceived']
+  const settingsEvents = ['transcriptionToggled', 'customFieldsUpdated', 'spamMitigationToggled', 'callSettingsUpdated', 'ivrLanguagesUpdated', 'webauthnSettingsUpdated', 'telephonyProviderChanged', 'messagingConfigUpdated', 'setupStateUpdated']
   const shiftEvents = ['shiftCreated', 'shiftUpdated', 'shiftDeleted']
 
-  if (authEvents.includes(event)) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-  if (volEvents.includes(event)) return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-  if (callEvents.includes(event)) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-  if (settingsEvents.includes(event)) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-  if (shiftEvents.includes(event)) return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
+  if (authEvents.includes(action)) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+  if (volEvents.includes(action)) return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+  if (callEvents.includes(action)) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+  if (settingsEvents.includes(action)) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+  if (shiftEvents.includes(action)) return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
   return 'bg-secondary text-secondary-foreground'
 }
 
@@ -192,8 +192,8 @@ function AuditPage() {
                   <span className="w-full text-xs text-muted-foreground whitespace-nowrap sm:w-36 sm:shrink-0">
                     {new Date(entry.createdAt).toLocaleString()}
                   </span>
-                  <Badge variant="secondary" className={getEventCategoryColor(entry.event)}>
-                    {t(`auditLog.events.${entry.event}`, { defaultValue: entry.event })}
+                  <Badge variant="secondary" className={getEventCategoryColor(entry.action)}>
+                    {t(`auditLog.events.${entry.action}`, { defaultValue: entry.action })}
                   </Badge>
                   <ActorDisplay pubkey={entry.actorPubkey} nameMap={nameMap} />
                   <AuditDetails entry={entry} />
@@ -263,8 +263,8 @@ function AuditDetails({ entry }: { entry: AuditLogEntry }) {
   const callerLast4 = details.callerLast4 as string | undefined
   const duration = details.duration as number | undefined
 
-  const isCallEvent = entry.event === 'callAnswered' || entry.event === 'callEnded' || entry.event === 'callMissed'
-  const isVoicemail = entry.event === 'voicemailReceived'
+  const isCallEvent = entry.action === 'callAnswered' || entry.action === 'callEnded' || entry.action === 'callMissed'
+  const isVoicemail = entry.action === 'voicemailReceived'
 
   if (isCallEvent) {
     return (
@@ -274,7 +274,7 @@ function AuditDetails({ entry }: { entry: AuditLogEntry }) {
             ***{callerLast4}
           </code>
         )}
-        {duration !== undefined && entry.event === 'callEnded' && (
+        {duration !== undefined && entry.action === 'callEnded' && (
           <span>{Math.floor(duration / 60)}:{String(duration % 60).padStart(2, '0')}</span>
         )}
       </span>

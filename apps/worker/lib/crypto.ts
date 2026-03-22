@@ -216,12 +216,12 @@ export function migrateContactIfNeeded(stored: string, hmacSecret: string): {
  */
 export function hashAuditEntry(entry: {
   id: string
-  event: string
+  action: string
   actorPubkey: string
   details: Record<string, unknown>
   createdAt: string
   previousEntryHash?: string
 }): string {
-  const content = `${entry.id}:${entry.event}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:${entry.previousEntryHash || ''}`
+  const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:${entry.previousEntryHash || ''}`
   return bytesToHex(sha256(utf8ToBytes(content)))
 }
