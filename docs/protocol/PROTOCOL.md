@@ -1972,7 +1972,7 @@ For incoming call notifications on iOS, a VoIP push is sent via APNs with a 30-s
 The `hubId` field in a decrypted wake payload identifies which hub the notification belongs to. Clients must dispatch the notification to the correct hub handler regardless of which hub is currently active in the UI.
 
 **Routing rules:**
-- `incoming_call`: Call `linphoneService.handleVoipPush(callId, hubId)` (iOS) or `linphoneService.storePendingCallHub(callId, hubId)` (Android) to register the call→hub mapping. Do NOT switch the active hub context.
+- `incoming_call`: iOS: call `linphoneService.handleVoipPush(callId:hubId:)`. Android: call `linphoneService.storePendingCallHub(callId, hubId)`. Do NOT switch the active hub context.
 - All other types (`shift_reminder`, `announcement`, `call_ended`): Store `hubId` in notification extras for navigation on tap. Do NOT switch the active hub context.
 
 **Active hub switching is permitted only when:**

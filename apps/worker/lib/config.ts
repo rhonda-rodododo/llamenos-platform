@@ -12,7 +12,7 @@
  * docs/superpowers/specs/2026-03-21-hardening-final.md Gap 4.
  */
 
-const HEX_RE = /^[0-9a-f]+$/i
+const HEX_RE = /^[0-9a-f]+$/
 
 type ConfigInput = Partial<Record<string, string | undefined>>
 
@@ -48,7 +48,7 @@ function assertDatabaseUrl(env: ConfigInput): void {
 }
 
 function warnIfAbsent(env: ConfigInput, key: string, featureNote: string): void {
-  if (!env[key]) {
+  if (!env[key]?.trim()) {
     console.warn(`[llamenos] Optional ${key} not set — ${featureNote}`)
   }
 }
@@ -71,7 +71,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   const adminPubkey = env['ADMIN_PUBKEY']!.trim()
   if (adminPubkey.length !== 64 || !HEX_RE.test(adminPubkey)) {
     throw new Error(
-      `[llamenos] ADMIN_PUBKEY must be exactly 64 hex characters (Nostr x-only pubkey). ` +
+      `[llamenos] ADMIN_PUBKEY must be exactly 64 hex characters (Nostr x-only pubkey). Got length ${adminPubkey.length}. ` +
       `Generate with: bun run bootstrap-admin`
     )
   }

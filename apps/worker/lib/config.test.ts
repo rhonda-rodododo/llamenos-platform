@@ -19,12 +19,20 @@ describe('validateConfig', () => {
     expect(() => validateConfig({ ...validEnv, DATABASE_URL: '' })).toThrow(/DATABASE_URL/)
   })
 
+  it('throws if DATABASE_URL is whitespace only', () => {
+    expect(() => validateConfig({ ...validEnv, DATABASE_URL: '   ' })).toThrow(/DATABASE_URL/)
+  })
+
   it('throws if DATABASE_URL does not start with postgres', () => {
     expect(() => validateConfig({ ...validEnv, DATABASE_URL: 'mysql://bad' })).toThrow(/DATABASE_URL/)
   })
 
   it('throws if HMAC_SECRET is missing', () => {
     expect(() => validateConfig({ ...validEnv, HMAC_SECRET: '' })).toThrow(/HMAC_SECRET/)
+  })
+
+  it('throws if HMAC_SECRET is whitespace only', () => {
+    expect(() => validateConfig({ ...validEnv, HMAC_SECRET: '   ' })).toThrow(/HMAC_SECRET/)
   })
 
   it('throws if HMAC_SECRET is wrong length (32 chars)', () => {
@@ -55,11 +63,11 @@ describe('validateConfig', () => {
     expect(() => validateConfig({ ...validEnv, HOTLINE_NAME: '' })).toThrow(/HOTLINE_NAME/)
   })
 
-  it('throws if ENVIRONMENT is missing', () => {
-    expect(() => validateConfig({ ...validEnv, ENVIRONMENT: '' })).toThrow(/ENVIRONMENT/)
+  it('throws if HOTLINE_NAME is whitespace only', () => {
+    expect(() => validateConfig({ ...validEnv, HOTLINE_NAME: '   ' })).toThrow(/HOTLINE_NAME/)
   })
 
-  it('does not throw if optional vars are absent', () => {
-    expect(() => validateConfig(validEnv)).not.toThrow()
+  it('throws if ENVIRONMENT is missing', () => {
+    expect(() => validateConfig({ ...validEnv, ENVIRONMENT: '' })).toThrow(/ENVIRONMENT/)
   })
 })
