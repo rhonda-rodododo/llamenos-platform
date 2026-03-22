@@ -126,6 +126,7 @@ docs/
 
 ## Key Technical Patterns
 
+- **Multi-hub routing axiom**: Any authenticated user — regardless of role — can be a member of multiple hubs simultaneously. The app must receive calls, push notifications, and relay events from ALL member hubs regardless of which hub is currently active in the UI. The active hub controls browsing context only. **Never gate incoming call or notification handling on active hub state.** Background push handlers must never call `setActiveHub` — only explicit user tap actions or the app-unlocked call answer path may switch the active hub.
 - **TelephonyAdapter**: Abstract interface for 5 voice providers (Twilio, SignalWire, Vonage, Plivo, Asterisk). All telephony logic goes through this adapter — never call provider APIs directly from business logic.
 - **MessagingAdapter**: Abstract interface for text messaging channels (SMS, WhatsApp, Signal). Inbound webhooks route to the conversation service.
 - **Parallel ringing**: All on-shift, non-busy volunteers ring simultaneously. First pickup terminates other calls.

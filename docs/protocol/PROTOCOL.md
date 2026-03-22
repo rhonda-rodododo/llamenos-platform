@@ -1967,6 +1967,20 @@ For incoming call notifications on iOS, a VoIP push is sent via APNs with a 30-s
 4. If the user answers, prompt for PIN to unlock the identity key.
 5. Use the identity key to authenticate and answer the call via REST API.
 
+### 5.5 Hub Routing for Push Notifications
+
+The `hubId` field in a decrypted wake payload identifies which hub the notification belongs to. Clients must dispatch the notification to the correct hub handler regardless of which hub is currently active in the UI.
+
+**Routing rules:**
+- `incoming_call`: Call `linphoneService.handleVoipPush(callId, hubId)` (iOS) or `linphoneService.storePendingCallHub(callId, hubId)` (Android) to register the call→hub mapping. Do NOT switch the active hub context.
+- All other types (`shift_reminder`, `announcement`, `call_ended`): Store `hubId` in notification extras for navigation on tap. Do NOT switch the active hub context.
+
+**Active hub switching is permitted only when:**
+1. The user explicitly taps a delivered notification (notification tap callback).
+2. The app is unlocked and the user initiates answering a call (the `handleIncomingCall` app-unlocked path).
+
+This constraint preserves the multi-hub axiom: a user browsing Hub A must not have their context silently switched to Hub B by a background notification.
+
 ---
 
 ## 6. Device Provisioning Protocol
