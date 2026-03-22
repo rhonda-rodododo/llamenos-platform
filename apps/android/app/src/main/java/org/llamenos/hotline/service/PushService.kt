@@ -118,7 +118,7 @@ class PushService : FirebaseMessagingService() {
                 val wakePayload = wakeKeyService.decryptWakePayload(wakeEncrypted, wakeEphemeral)
                 if (wakePayload != null) {
                     Log.d(TAG, "Wake payload decrypted: type=${wakePayload.type}")
-                    val router = PushNotificationRouter(activeHubState, linphoneService)
+                    val router = PushNotificationRouter(linphoneService)
                     router.routeWakePayload(
                         type = wakePayload.type,
                         hubId = wakePayload.hubId ?: "",
@@ -224,10 +224,10 @@ class PushService : FirebaseMessagingService() {
             linphoneService.storePendingCallHub(callId, hubId)
         }
 
-        // Route to the correct hub synchronously from plaintext FCM data.
-        // This covers the app-unlocked path where the async wake-payload coroutine
-        // may not have committed the hub switch before handleIncomingCall runs.
-        // Hub ID is not sensitive — no decryption needed.
+        // App-unlocked path: context switch is intentional here because the user
+        // is actively using the app and about to answer a call. This is distinct
+        // from the wake-payload coroutine above, which runs in the background
+        // for any notification type including non-call events.
         if (hubId.isNotEmpty()) {
             serviceScope.launch { activeHubState.setActiveHub(hubId) }
         }

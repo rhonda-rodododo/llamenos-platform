@@ -91,6 +91,11 @@ android {
 
     testOptions {
         unitTests {
+            // isReturnDefaultValues lets JVM unit tests call Android framework methods
+            // (e.g. android.util.Log) without throwing UnsupportedOperationException.
+            // Trade-off: framework calls that should be mocked will silently return
+            // 0/false/null instead of failing loudly. Long-term fix: wrap Log behind
+            // an abstraction. For now, this is the standard Android approach.
             isReturnDefaultValues = true
         }
     }

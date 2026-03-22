@@ -1,7 +1,6 @@
 package org.llamenos.hotline.service
 
 import android.util.Log
-import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.telephony.LinphoneService
 
 /**
@@ -19,7 +18,6 @@ import org.llamenos.hotline.telephony.LinphoneService
  *   (LinphoneService.onCallStateChanged via storePendingCallHub).
  */
 class PushNotificationRouter(
-    private val activeHubState: ActiveHubState,
     private val linphoneService: LinphoneService,
 ) {
     companion object {
