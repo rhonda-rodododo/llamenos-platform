@@ -138,21 +138,21 @@ jobs:
           exit-code: '0'
 
       - name: Upload Dockerfile.build scan results
-        uses: github/codeql-action/upload-sarif@45580472a5bb82c4681c4ac726cfdb60060c2ee1 # v3
+        uses: github/codeql-action/upload-sarif@38697555549f1db7851b81482ff19f1fa5c4fedc # v3
         if: always()
         with:
           sarif_file: 'dockerfile-build-results.sarif'
           category: 'dockerfile-build'
 
       - name: Upload deploy Dockerfile scan results
-        uses: github/codeql-action/upload-sarif@45580472a5bb82c4681c4ac726cfdb60060c2ee1 # v3
+        uses: github/codeql-action/upload-sarif@38697555549f1db7851b81482ff19f1fa5c4fedc # v3
         if: always()
         with:
           sarif_file: 'dockerfile-deploy-results.sarif'
           category: 'dockerfile-deploy'
 
       - name: Upload Docker Compose scan results
-        uses: github/codeql-action/upload-sarif@45580472a5bb82c4681c4ac726cfdb60060c2ee1 # v3
+        uses: github/codeql-action/upload-sarif@38697555549f1db7851b81482ff19f1fa5c4fedc # v3
         if: always()
         with:
           sarif_file: 'docker-compose-results.sarif'
@@ -206,7 +206,7 @@ jobs:
           exit-code: '0'
 
       - name: Upload image scan results
-        uses: github/codeql-action/upload-sarif@45580472a5bb82c4681c4ac726cfdb60060c2ee1 # v3
+        uses: github/codeql-action/upload-sarif@38697555549f1db7851b81482ff19f1fa5c4fedc # v3
         if: always()
         with:
           sarif_file: 'image-results.sarif'
