@@ -32,9 +32,20 @@ export default defineConfig({
   },
   projects: [
     {
+      // Bootstrap tests delete the admin user (test-reset-no-admin) and must run
+      // before all parallel tests to avoid corrupting shared DB state.
+      // The last bootstrap test restores normal state via resetTestState().
+      name: "bootstrap",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: ["**/bootstrap.spec.ts"],
+    },
+    {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**"],
+      // Exclude bootstrap tests — they run in the sequential "bootstrap" project above.
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts"],
+      // Wait for bootstrap tests to complete and restore admin before parallel tests run.
+      dependencies: ["bootstrap"],
     },
     {
       ...defineBddProject({

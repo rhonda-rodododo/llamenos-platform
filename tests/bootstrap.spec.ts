@@ -8,6 +8,12 @@ const resetHeaders = { 'X-Test-Secret': TEST_RESET_SECRET }
 test.describe.configure({ mode: 'serial' })
 
 test.describe('In-Browser Admin Bootstrap', () => {
+  // Always restore normal test state after the describe block, even on failure.
+  // These tests call test-reset-no-admin which deletes the admin user — without
+  // this cleanup, subsequent test runs or parallel projects would fail auth.
+  test.afterAll(async ({ request }) => {
+    await resetTestState(request)
+  })
   // =====================================================================
   // Test 1: Fresh deploy redirects to setup with bootstrap step
   // =====================================================================
@@ -120,10 +126,16 @@ test.describe('In-Browser Admin Bootstrap', () => {
     // Click continue to setup
     await page.getByRole('button', { name: /continue to setup/i }).click()
 
-    // Wait for bootstrap to complete and wizard to advance
-    // Should advance to the normal setup wizard
+    // After bootstrap, the setup wizard shows PIN entry to unlock the newly created key
     await expect(page.getByText('Setup Wizard')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText('Identity', { exact: true })).toBeVisible()
+    const wizardPinEntry = page.getByRole('heading', { name: /enter your pin/i })
+    const wizardPinVisible = await wizardPinEntry.isVisible({ timeout: 3000 }).catch(() => false)
+    if (wizardPinVisible) {
+      await enterPin(page, '123456')
+    }
+
+    // Should now show the wizard's Identity step
+    await expect(page.getByText('Identity', { exact: true })).toBeVisible({ timeout: 10000 })
 
     // A11y: progress bar should have proper ARIA attributes
     const progressbar = page.locator('[role="progressbar"]')

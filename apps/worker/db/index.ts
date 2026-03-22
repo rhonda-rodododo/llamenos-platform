@@ -2,6 +2,7 @@
  * Drizzle ORM database connection.
  * Uses Bun's native SQL driver via drizzle-orm/bun-sql.
  */
+import './pg-array-patch' // Must be first — patches PgArray before schema loads
 import { drizzle, type BunSQLDatabase } from 'drizzle-orm/bun-sql'
 import { SQL } from 'bun'
 import * as schema from './schema'

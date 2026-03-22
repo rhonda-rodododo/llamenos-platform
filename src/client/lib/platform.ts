@@ -128,6 +128,11 @@ export async function generateKeypairAndLoad(
   const kp = mod.generateKeypair()
   const rawResult = state.importKey(kp.nsec, pin)
   const result = fromWasmValue(rawResult) as { encryptedKeyData: EncryptedKeyData }
+  // Persist the encrypted key to the store so decryptWithPin can read it back later.
+  // (The Tauri path handles persistence via Stronghold; in browser mode we use localStorage.)
+  const store = await getStore()
+  await store.set(STORE_KEY, result.encryptedKeyData)
+  await store.save()
   return {
     publicKey: kp.pubkeyHex,
     npub: kp.npub,

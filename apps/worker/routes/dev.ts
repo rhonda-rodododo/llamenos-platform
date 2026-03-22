@@ -351,19 +351,14 @@ dev.post('/test-simulate/incoming-call', async (c) => {
     return c.json({ error: 'Caller is banned', banned: true }, 403)
   }
 
-  // Get on-shift volunteer pubkeys for the call record
+  // Get on-shift volunteer pubkeys (informational — simulation always creates the call)
   let volunteerPubkeys: string[] = []
   try {
     volunteerPubkeys = await services.shifts.getCurrentVolunteers(hubId)
   } catch {
     // Shifts not configured — proceed with empty list
   }
-
-  // If no volunteers are available, return a no-volunteers status
-  // (mirrors real telephony flow where the call cannot be routed)
-  if (volunteerPubkeys.length === 0) {
-    return c.json({ ok: false, callId, status: 'no-volunteers', error: 'No volunteers available' })
-  }
+  void volunteerPubkeys // Simulation creates calls regardless of shift state
 
   await services.calls.addCall(hubId, {
     callId,

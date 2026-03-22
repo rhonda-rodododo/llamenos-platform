@@ -1,8 +1,4 @@
 import { type Page, type APIRequestContext, expect } from '@playwright/test'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { getPublicKey, nip19 } from 'nostr-tools'
 import { TestIds, navTestIdMap } from './test-ids'
 
 export const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
@@ -30,59 +26,6 @@ export { TestIds, navTestIdMap } from './test-ids'
 export * from './pages/index'
 
 /**
- * Pre-compute an encrypted key blob in Node.js (Playwright runtime) and inject
- * it into the browser's localStorage. Uses the same PBKDF2 + XChaCha20-Poly1305
- * format as key-store.ts so the app can decrypt it with the test PIN.
- */
-async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promise<void> {
-  const encoder = new TextEncoder()
-  const pinBytes = encoder.encode(pin)
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-
-  const keyMaterial = await crypto.subtle.importKey('raw', pinBytes, 'PBKDF2', false, ['deriveBits'])
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 },
-    keyMaterial,
-    256,
-  )
-  const kek = new Uint8Array(derivedBits)
-
-  const nonce = crypto.getRandomValues(new Uint8Array(24))
-  const cipher = xchacha20poly1305(kek, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(nsec))
-
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  const pubkey = getPublicKey(decoded.data)
-  const hashInput = encoder.encode(`llamenos:keyid:${pubkey}`)
-  const pubkeyHashBuf = await crypto.subtle.digest('SHA-256', hashInput)
-  const pubkeyHash = bytesToHex(new Uint8Array(pubkeyHashBuf)).slice(0, 16)
-
-  const data = {
-    salt: bytesToHex(salt),
-    iterations: 600_000,
-    nonce: bytesToHex(nonce),
-    ciphertext: bytesToHex(ciphertext),
-    pubkey: pubkeyHash,
-  }
-
-  // Write to BOTH locations:
-  // - Legacy localStorage key (in case any test helper reads it directly)
-  // - Mock Tauri Store key (what platform.ts reads via mock Store)
-  await page.evaluate(
-    ({ legacyKey, storeKey, value }) => {
-      localStorage.setItem(legacyKey, value)
-      localStorage.setItem(storeKey, value)
-    },
-    {
-      legacyKey: 'llamenos-encrypted-key',
-      storeKey: 'tauri-store:keys.json:llamenos-encrypted-key',
-      value: JSON.stringify(data),
-    },
-  )
-}
-
-/**
  * Enter a PIN into the PinInput component.
  * Uses keyboard typing since the component auto-advances focus on each digit.
  */
@@ -104,8 +47,13 @@ export async function enterPin(page: Page, pin: string) {
  * Navigate to a URL after the user has already logged in.
  * If already authenticated (sidebar visible), does SPA navigation directly.
  * Otherwise, re-authenticates via PIN entry first.
+ *
+ * @param expectAccessDenied - Pass true when the destination is a restricted page
+ *   that should render "Access Denied" for the current user (no page-title testid).
+ *   By default, the helper asserts that page-title is visible — which catches bugs
+ *   where a page silently renders an access-denied response it shouldn't.
  */
-export async function navigateAfterLogin(page: Page, url: string): Promise<void> {
+export async function navigateAfterLogin(page: Page, url: string, expectAccessDenied = false): Promise<void> {
   // Check if we're already authenticated (sidebar visible)
   const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
   const isAuthenticated = await sidebar.isVisible({ timeout: 1000 }).catch(() => false)
@@ -140,14 +88,15 @@ export async function navigateAfterLogin(page: Page, url: string): Promise<void>
   }, { pathname: parsed.pathname, search: searchParams })
   await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: Timeouts.NAVIGATION })
 
-  // Wait for route component to mount — either the page title or an access-denied
-  // message (restricted pages have no page-title test ID).
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const accessDenied = page.getByText('Access Denied', { exact: true })
-  await Promise.race([
-    pageTitle.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }),
-    accessDenied.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }),
-  ])
+  // Wait for route component to mount.
+  if (expectAccessDenied) {
+    // Restricted page — assert "Access Denied" is shown (no page-title testid on these pages).
+    await expect(page.getByText('Access Denied', { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
+  } else {
+    // Normal page — assert page-title is visible. This catches bugs where a page
+    // silently renders an access-denied message it shouldn't.
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  }
 }
 
 /**
@@ -209,10 +158,18 @@ export async function loginAsAdmin(page: Page) {
   await enterPin(page, TEST_PIN)
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
-  // Wait for admin section in sidebar — confirms getMe() completed and permissions are set.
+  // Wait for admin section in sidebar or hamburger button (mobile) — confirms getMe() completed.
   // Without this, the brief window between isKeyUnlocked=true (onUnlock fires synchronously)
   // and getMe() completing (async) can cause isAdmin=false on the first admin-only route.
-  await expect(page.getByTestId(TestIds.NAV_ADMIN_SECTION)).toBeVisible({ timeout: Timeouts.AUTH })
+  // On mobile viewports, the sidebar is CSS-hidden (hamburger shows instead), so we check
+  // viewport width to determine which element to wait for.
+  const viewport = page.viewportSize()
+  const isMobile = viewport ? viewport.width < 768 : false
+  if (isMobile) {
+    await page.getByRole('button', { name: /open menu/i }).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+  } else {
+    await page.getByTestId(TestIds.NAV_ADMIN_SECTION).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+  }
 }
 
 /**
@@ -269,18 +226,6 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
 }
 
-/**
- * Login using direct nsec entry (recovery path).
- * Useful for first-time login tests when no stored key exists.
- */
-export async function loginWithNsec(page: Page, nsec: string) {
-  await page.goto('/login')
-  await page.evaluate(() => sessionStorage.clear())
-  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
-  await page.getByTestId(TestIds.LOGIN_SUBMIT_BTN).click()
-  await page.waitForURL(url => !url.toString().includes('/login'), { timeout: 15000 })
-}
-
 export async function logout(page: Page) {
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
 }
@@ -301,9 +246,6 @@ export async function createUserAndGetNsec(page: Page, name: string, phone: stri
   if (!nsec) throw new Error('Failed to get nsec')
   return nsec
 }
-
-/** @deprecated Use createUserAndGetNsec instead */
-export const createVolunteerAndGetNsec = createUserAndGetNsec
 
 /** Dismiss the nsec card shown after volunteer creation. */
 export async function dismissNsecCard(page: Page): Promise<void> {
