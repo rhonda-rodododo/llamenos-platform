@@ -7,7 +7,7 @@
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
-FROM oven/bun:1@sha256:0733e50325078969732ebe3b15ce4c4be5082f18c4ac1a0f0ca4839c2e4e42a7 AS deps
+FROM oven/bun:1@sha256:8956c7667fa17beb6e3c664115e66bdacfe502da5d99603626e74c197bdef160 AS deps
 # oven/bun:1 pinned 2026-03-21 — update via Dependabot or on new minor release
 WORKDIR /app
 COPY package.json bun.lockb ./
@@ -16,7 +16,7 @@ RUN bun -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf-8'
 RUN bun install --production --ignore-scripts
 
 # Stage 2: Production
-FROM oven/bun:1-slim@sha256:478281fdd196871c7e51ba6a820b7803a8ae97042ec86cdbc2e1c6b6626442d9
+FROM oven/bun:1-slim@sha256:d3c7094c144dd3975d183a4dbc4ec0a764223995bff73290d983edb47043a75f
 # oven/bun:1-slim pinned 2026-03-21 — update via Dependabot
 
 # Create non-root user
