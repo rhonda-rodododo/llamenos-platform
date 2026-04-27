@@ -847,6 +847,7 @@
     "status": {
       "cancelled": "Cancelled",
       "draft": "Draft",
+      "paused": "Paused",
       "scheduled": "Scheduled",
       "sending": "Sending",
       "sent": "Sent"
@@ -858,7 +859,13 @@
     "title": "Message Blasts",
     "totalSubscribers": "Total",
     "unsubscribeKeyword": "Unsubscribe Keyword",
-    "unsubscribeMsg": "Unsubscribe Message"
+    "unsubscribeMsg": "Unsubscribe Message",
+    "sendingProgress": "Sending in progress",
+    "deliveryComplete": "Delivery complete",
+    "liveUpdating": "Updating live...",
+    "optedOut": "Opted Out",
+    "deliveryDetails": "Delivery Details",
+    "noDeliveries": "No deliveries"
   },
   "callActions": {
     "banAndHangUp": "Ban & Hang Up",

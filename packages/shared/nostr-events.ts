@@ -40,6 +40,12 @@ export const KIND_RECORD_ASSIGNED = 1022
 /** Caller identified from contact directory during incoming call (Epic 326) */
 export const KIND_CONTACT_IDENTIFIED = 1023
 
+/** Blast delivery progress update (sent/delivered/failed counts) */
+export const KIND_BLAST_PROGRESS = 1030
+
+/** Blast status changed (sending → sent, scheduled → sending, etc.) */
+export const KIND_BLAST_STATUS = 1031
+
 // --- Ephemeral Events (not persisted, broadcast only) ---
 
 /** Volunteer presence update — online counts, availability */

@@ -231,12 +231,13 @@ export interface Blast {
   id: string
   name: string
   content: BlastContent
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+  status: 'draft' | 'scheduled' | 'sending' | 'paused' | 'sent' | 'cancelled'
   targetChannels: MessagingChannelType[]
   targetTags: string[]            // empty = all subscribers
   targetLanguages: string[]       // empty = all languages
   scheduledAt?: string
   sentAt?: string
+  completedAt?: string
   cancelledAt?: string
   createdBy: string               // pubkey
   createdAt: string
@@ -252,6 +253,24 @@ export interface BlastContent {
   smsText?: string
   whatsappTemplateId?: string
   rcsRichCard?: boolean
+}
+
+export type BlastDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'opted_out' | 'skipped'
+
+export interface BlastDelivery {
+  id: string
+  blastId: string
+  subscriberId: string
+  channel: MessagingChannelType
+  status: BlastDeliveryStatus
+  externalId?: string
+  attempts: number
+  lastAttemptAt?: string
+  nextRetryAt?: string
+  deliveredAt?: string
+  failedAt?: string
+  error?: string
+  createdAt: string
 }
 
 export interface BlastStats {

@@ -303,6 +303,14 @@ blasts.post('/:id/send',
     const services = c.get('services')
     const hubId = c.get('hubId')
     const blast = await services.blasts.send(id, hubId)
+
+    // Expand blast into delivery rows (background)
+    c.executionCtx.waitUntil(
+      services.blasts.expandBlast(id).catch((err) => {
+        console.error(`[blasts] Failed to expand blast ${id}:`, err)
+      })
+    )
+
     return c.json(blast)
   },
 )
@@ -356,6 +364,59 @@ blasts.post('/:id/cancel',
     const services = c.get('services')
     const blast = await services.blasts.cancel(id)
     return c.json(blast)
+  },
+)
+
+// --- Delivery tracking ---
+blasts.get('/:id/stats',
+  describeRoute({
+    tags: ['Blasts'],
+    summary: 'Get live delivery stats for a blast',
+    responses: {
+      200: {
+        description: 'Blast delivery stats',
+        content: { 'application/json': { schema: resolver(subscriberStatsResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('blasts:read'),
+  async (c) => {
+    const id = c.req.param('id')
+    const services = c.get('services')
+    const stats = await services.blasts.computeBlastStats(id)
+    return c.json(stats)
+  },
+)
+
+blasts.get('/:id/deliveries',
+  describeRoute({
+    tags: ['Blasts'],
+    summary: 'List deliveries for a blast (paginated)',
+    responses: {
+      200: {
+        description: 'Delivery list',
+        content: { 'application/json': { schema: resolver(blastListResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('blasts:read'),
+  async (c) => {
+    const id = c.req.param('id')
+    const services = c.get('services')
+    const url = new URL(c.req.url)
+    const status = url.searchParams.get('status') as import('@shared/types').BlastDeliveryStatus | undefined
+    const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+    const limit = parseInt(url.searchParams.get('limit') ?? '50', 10)
+
+    const result = await services.blasts.getDeliveries(id, {
+      status: status ?? undefined,
+      limit,
+      offset: (page - 1) * limit,
+    })
+
+    return c.json({ deliveries: result.deliveries, total: result.total, page, limit })
   },
 )
 

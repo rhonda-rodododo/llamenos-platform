@@ -14,6 +14,11 @@ import { createNostrPublisher, NodeNostrPublisher } from '../../apps/worker/lib/
 import { EventOutbox } from '../../apps/worker/lib/nostr-outbox'
 import { startOutboxPoller, stopOutboxPoller } from '../../apps/worker/lib/nostr-outbox-poller'
 import { validateConfig } from '../../apps/worker/lib/config'
+import { getMessagingAdapterFromService } from '../../apps/worker/lib/service-factories'
+import { publishNostrEvent } from '../../apps/worker/lib/nostr-events'
+import { KIND_BLAST_PROGRESS, KIND_BLAST_STATUS } from '../../packages/shared/nostr-events'
+import type { MessagingChannelType } from '../../packages/shared/types'
+import type { Env } from '../../apps/worker/types/infra'
 import fs from 'node:fs'
 
 console.log('[llamenos] Starting Bun server...')
@@ -85,8 +90,32 @@ if (serverNostrSecret && nostrRelayUrl) {
   env.NOSTR_PUBLISHER = publisher
 }
 
-// --- Start scheduled task poller ---
-services.scheduler.start()
+// --- Start scheduled task poller with blast delivery worker ---
+services.scheduler.start({
+  blastsService: services.blasts,
+  settingsService: services.settings,
+  resolveAdapter: async (channel: MessagingChannelType) => {
+    try {
+      return await getMessagingAdapterFromService(channel, services.settings, hmacSecret)
+    } catch {
+      return null
+    }
+  },
+  onBlastProgress: (blastId, stats) => {
+    publishNostrEvent(env as unknown as Env, KIND_BLAST_PROGRESS, {
+      type: 'blast:progress',
+      blastId,
+      ...stats,
+    }).catch(() => {})
+  },
+  onBlastStatusChange: (blastId, status) => {
+    publishNostrEvent(env as unknown as Env, KIND_BLAST_STATUS, {
+      type: 'blast:status',
+      blastId,
+      status,
+    }).catch(() => {})
+  },
+})
 
 // --- Build Hono app ---
 const { default: workerApp } = await import('../../apps/worker/app')

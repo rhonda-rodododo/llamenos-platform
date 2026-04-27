@@ -6,11 +6,12 @@
  * All state is stored in PostgreSQL via Drizzle ORM, unifying the
  * previously duplicated data stores from ConversationDO and BlastDO.
  */
-import { eq, and, desc, sql, count, inArray } from 'drizzle-orm'
+import { eq, and, desc, sql, count, inArray, lt, isNull } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   subscribers,
   blasts,
+  blastDeliveries,
   blastSettings as blastSettingsTable,
 } from '../db/schema'
 import type {
@@ -19,9 +20,12 @@ import type {
   Blast,
   BlastSettings,
   BlastContent,
+  BlastDeliveryStatus,
+  BlastStats,
   SubscriberChannel,
 } from '@shared/types'
 import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
+import { BLAST_MAX_RETRIES, BLAST_RETRY_BACKOFF_BASE_MS } from '../types'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
@@ -76,6 +80,7 @@ export interface SubscriberStats {
 // Infer row types from the schema
 type SubscriberRow = typeof subscribers.$inferSelect
 type BlastRow = typeof blasts.$inferSelect
+type BlastDeliveryRow = typeof blastDeliveries.$inferSelect
 
 // ---------------------------------------------------------------------------
 // Service
@@ -665,54 +670,363 @@ export class BlastsService {
     return result.count
   }
 
+  // --- Blast expansion: enumerate subscribers into delivery rows ---
+
   /**
-   * Process all active blasts — called from a scheduled job or cron.
-   * Transitions 'sending' blasts to 'sent' and triggers scheduled blasts.
+   * Expand a blast into individual delivery rows.
+   * Called after `send()` transitions a blast to 'sending'.
+   * Creates one delivery row per subscriber-channel pair.
+   * Returns the number of deliveries created.
    */
-  async processActiveBlasts(hubId?: string): Promise<void> {
-    // Find all blasts in 'sending' state
-    const sendingConditions = [eq(blasts.status, 'sending')]
-    if (hubId) sendingConditions.push(eq(blasts.hubId, hubId))
+  async expandBlast(blastId: string): Promise<number> {
+    const blast = await this.getBlast(blastId)
+    if (blast.status !== 'sending') {
+      throw new ServiceError(400, 'Can only expand blasts in sending state')
+    }
 
-    const sendingBlasts = await this.db
+    const targetChannels = (blast.targetChannels ?? []) as MessagingChannelType[]
+    if (targetChannels.length === 0) {
+      throw new ServiceError(400, 'Blast has no target channels')
+    }
+
+    // Build subscriber query conditions
+    const conditions = [eq(subscribers.status, 'active')]
+    if (blast.hubId) conditions.push(eq(subscribers.hubId, blast.hubId))
+
+    const targetTags = (blast.targetTags ?? []) as string[]
+    if (targetTags.length > 0) {
+      conditions.push(sql`${subscribers.tags} && ${sql`ARRAY[${sql.join(targetTags.map(t => sql`${t}`), sql`,`)}]::text[]`}`)
+    }
+
+    const targetLanguages = (blast.targetLanguages ?? []) as string[]
+    if (targetLanguages.length > 0) {
+      conditions.push(inArray(subscribers.language, targetLanguages))
+    }
+
+    // Fetch matching subscribers
+    const matchingSubscribers = await this.db
       .select()
-      .from(blasts)
-      .where(and(...sendingConditions))
+      .from(subscribers)
+      .where(and(...conditions))
 
-    for (const blast of sendingBlasts) {
-      const stats = (blast.stats ?? {}) as Record<string, number>
-      stats.sent = stats.totalRecipients ?? 0
+    // Create delivery rows — one per subscriber per matching verified channel
+    let deliveryCount = 0
+    const deliveryValues: (typeof blastDeliveries.$inferInsert)[] = []
+
+    for (const sub of matchingSubscribers) {
+      const subChannels = (sub.channels ?? []) as SubscriberChannel[]
+      for (const targetChannel of targetChannels) {
+        const hasVerifiedChannel = subChannels.some(
+          (ch) => ch.type === targetChannel && ch.verified,
+        )
+        if (hasVerifiedChannel) {
+          deliveryValues.push({
+            blastId,
+            subscriberId: sub.id,
+            channel: targetChannel,
+            status: 'pending',
+            attempts: 0,
+          })
+          deliveryCount++
+        }
+      }
+    }
+
+    // Batch insert deliveries (chunks of 500 to avoid query size limits)
+    const BATCH_SIZE = 500
+    for (let i = 0; i < deliveryValues.length; i += BATCH_SIZE) {
+      const batch = deliveryValues.slice(i, i + BATCH_SIZE)
+      await this.db.insert(blastDeliveries).values(batch)
+    }
+
+    // Update blast stats with actual delivery count
+    await this.db
+      .update(blasts)
+      .set({
+        stats: {
+          totalRecipients: deliveryCount,
+          sent: 0,
+          delivered: 0,
+          failed: 0,
+          optedOut: 0,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(blasts.id, blastId))
+
+    return deliveryCount
+  }
+
+  // --- Delivery draining: fetch pending deliveries for processing ---
+
+  /**
+   * Drain a batch of deliveries ready to send.
+   * Returns pending deliveries that are either:
+   *   - Never attempted (pending, no nextRetryAt)
+   *   - Due for retry (pending, nextRetryAt <= now)
+   * Also checks subscriber hasn't opted out mid-flight.
+   */
+  async drainDeliveryBatch(blastId: string, batchSize: number): Promise<BlastDeliveryRow[]> {
+    const now = new Date()
+
+    const rows = await this.db
+      .select()
+      .from(blastDeliveries)
+      .where(
+        and(
+          eq(blastDeliveries.blastId, blastId),
+          eq(blastDeliveries.status, 'pending'),
+          sql`(${blastDeliveries.nextRetryAt} IS NULL OR ${blastDeliveries.nextRetryAt} <= ${now})`,
+        ),
+      )
+      .limit(batchSize)
+
+    return rows
+  }
+
+  /**
+   * Check if a subscriber has opted out (mid-flight opt-out check).
+   */
+  async isSubscriberActive(subscriberId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ status: subscribers.status })
+      .from(subscribers)
+      .where(eq(subscribers.id, subscriberId))
+      .limit(1)
+
+    return row?.status === 'active'
+  }
+
+  /**
+   * Mark a delivery as sent (message accepted by provider).
+   */
+  async markDeliverySent(deliveryId: string, externalId?: string): Promise<void> {
+    await this.db
+      .update(blastDeliveries)
+      .set({
+        status: 'sent',
+        externalId: externalId ?? null,
+        lastAttemptAt: new Date(),
+        attempts: sql`${blastDeliveries.attempts} + 1`,
+      })
+      .where(eq(blastDeliveries.id, deliveryId))
+  }
+
+  /**
+   * Mark a delivery as delivered (confirmed by provider webhook).
+   */
+  async markDeliveryDelivered(deliveryId: string): Promise<void> {
+    await this.db
+      .update(blastDeliveries)
+      .set({
+        status: 'delivered',
+        deliveredAt: new Date(),
+      })
+      .where(eq(blastDeliveries.id, deliveryId))
+  }
+
+  /**
+   * Mark a delivery as failed with retry scheduling.
+   * If max retries exceeded, marks as permanently failed.
+   */
+  async markDeliveryFailed(deliveryId: string, error: string, currentAttempts: number): Promise<void> {
+    const newAttempts = currentAttempts + 1
+
+    if (newAttempts >= BLAST_MAX_RETRIES) {
+      // Permanently failed
+      await this.db
+        .update(blastDeliveries)
+        .set({
+          status: 'failed',
+          error,
+          failedAt: new Date(),
+          lastAttemptAt: new Date(),
+          attempts: newAttempts,
+        })
+        .where(eq(blastDeliveries.id, deliveryId))
+    } else {
+      // Schedule retry with exponential backoff
+      const backoffMs = BLAST_RETRY_BACKOFF_BASE_MS * Math.pow(2, newAttempts - 1)
+      const nextRetry = new Date(Date.now() + backoffMs)
 
       await this.db
-        .update(blasts)
+        .update(blastDeliveries)
         .set({
-          status: 'sent',
-          updatedAt: new Date(),
-          stats: (stats),
+          error,
+          lastAttemptAt: new Date(),
+          nextRetryAt: nextRetry,
+          attempts: newAttempts,
         })
-        .where(eq(blasts.id, blast.id))
+        .where(eq(blastDeliveries.id, deliveryId))
+    }
+  }
+
+  /**
+   * Mark a delivery as opted out (subscriber unsubscribed mid-flight).
+   */
+  async markDeliveryOptedOut(deliveryId: string): Promise<void> {
+    await this.db
+      .update(blastDeliveries)
+      .set({
+        status: 'opted_out',
+        lastAttemptAt: new Date(),
+      })
+      .where(eq(blastDeliveries.id, deliveryId))
+  }
+
+  // --- Blast stats from delivery rows ---
+
+  /**
+   * Compute live stats for a blast from its delivery rows.
+   */
+  async computeBlastStats(blastId: string): Promise<BlastStats> {
+    const rows = await this.db
+      .select({
+        status: blastDeliveries.status,
+        count: count(),
+      })
+      .from(blastDeliveries)
+      .where(eq(blastDeliveries.blastId, blastId))
+      .groupBy(blastDeliveries.status)
+
+    const stats: BlastStats = {
+      totalRecipients: 0,
+      sent: 0,
+      delivered: 0,
+      failed: 0,
+      optedOut: 0,
     }
 
-    // Check for scheduled blasts that are now due
-    const scheduledConditions = [
-      eq(blasts.status, 'scheduled'),
-      sql`${blasts.scheduledAt} <= NOW()`,
-    ]
-    if (hubId) scheduledConditions.push(eq(blasts.hubId, hubId))
+    for (const row of rows) {
+      stats.totalRecipients += row.count
+      switch (row.status) {
+        case 'sent':
+          stats.sent += row.count
+          break
+        case 'delivered':
+          stats.delivered += row.count
+          break
+        case 'failed':
+          stats.failed += row.count
+          break
+        case 'opted_out':
+          stats.optedOut += row.count
+          break
+        case 'skipped':
+          stats.optedOut += row.count
+          break
+        // 'pending' is implicitly tracked via totalRecipients - others
+      }
+    }
 
-    const dueBlasts = await this.db
+    return stats
+  }
+
+  /**
+   * Sync blast stats and check if blast is complete.
+   * Transitions blast to 'sent' when all deliveries are terminal.
+   */
+  async syncBlastStats(blastId: string): Promise<{ stats: BlastStats; completed: boolean }> {
+    const stats = await this.computeBlastStats(blastId)
+
+    // Check if any deliveries are still pending
+    const pendingCount = stats.totalRecipients - stats.sent - stats.delivered - stats.failed - stats.optedOut
+    const completed = pendingCount <= 0
+
+    // Update blast stats
+    const updates: Record<string, unknown> = {
+      stats,
+      updatedAt: new Date(),
+    }
+
+    if (completed) {
+      updates.status = 'sent'
+      updates.completedAt = new Date()
+    }
+
+    await this.db
+      .update(blasts)
+      .set(updates)
+      .where(eq(blasts.id, blastId))
+
+    return { stats, completed }
+  }
+
+  /**
+   * Get delivery details for a blast (paginated).
+   */
+  async getDeliveries(
+    blastId: string,
+    opts: { status?: BlastDeliveryStatus; limit?: number; offset?: number } = {},
+  ): Promise<{ deliveries: BlastDeliveryRow[]; total: number }> {
+    const conditions = [eq(blastDeliveries.blastId, blastId)]
+    if (opts.status) {
+      conditions.push(eq(blastDeliveries.status, opts.status))
+    }
+
+    const where = and(...conditions)
+    const limit = opts.limit ?? 50
+    const offset = opts.offset ?? 0
+
+    const [rows, [totalRow]] = await Promise.all([
+      this.db
+        .select()
+        .from(blastDeliveries)
+        .where(where)
+        .orderBy(blastDeliveries.createdAt)
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ count: count() })
+        .from(blastDeliveries)
+        .where(where),
+    ])
+
+    return { deliveries: rows, total: totalRow.count }
+  }
+
+  /**
+   * Find a delivery by external ID (for webhook correlation).
+   */
+  async findDeliveryByExternalId(externalId: string): Promise<BlastDeliveryRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(blastDeliveries)
+      .where(eq(blastDeliveries.externalId, externalId))
+      .limit(1)
+
+    return row ?? null
+  }
+
+  /**
+   * Get all blasts currently in 'sending' state.
+   */
+  async getSendingBlasts(): Promise<BlastRow[]> {
+    return this.db
       .select()
       .from(blasts)
-      .where(and(...scheduledConditions))
+      .where(eq(blasts.status, 'sending'))
+  }
 
-    for (const blast of dueBlasts) {
-      await this.send(blast.id, hubId)
-    }
+  /**
+   * Get scheduled blasts that are now due for sending.
+   */
+  async getDueScheduledBlasts(): Promise<BlastRow[]> {
+    return this.db
+      .select()
+      .from(blasts)
+      .where(
+        and(
+          eq(blasts.status, 'scheduled'),
+          sql`${blasts.scheduledAt} <= NOW()`,
+        ),
+      )
   }
 
   // --- Reset (demo/development only) ---
 
   async reset(): Promise<void> {
+    await this.db.delete(blastDeliveries)
     await this.db.delete(blastSettingsTable)
     await this.db.delete(blasts)
     await this.db.delete(subscribers)
