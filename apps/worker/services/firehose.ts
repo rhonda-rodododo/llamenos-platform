@@ -4,7 +4,7 @@
  * Manages the lifecycle of firehose connections (Signal group → inference agent),
  * encrypted message buffer, window keys for forward secrecy, and notification opt-outs.
  */
-import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   firehoseConnections,
@@ -315,10 +315,9 @@ export class FirehoseService {
           lt(firehoseWindowKeys.windowStart, now),
         ),
       )
-      .orderBy(firehoseWindowKeys.windowStart)
+      .orderBy(desc(firehoseWindowKeys.windowStart))
       .limit(1)
     // Return the most recent window that started before now
-    // (even if windowEnd has passed, we still need the key for decryption)
     return rows[0] ?? null
   }
 

@@ -208,51 +208,83 @@ export class FirehoseAgentService {
     const bufferMessages = await this.firehose.getUnextractedMessages(connectionId)
     if (bufferMessages.length < MIN_CLUSTER_SIZE) return
 
-    // 2. Decrypt messages using the agent's pubkey to find its envelope
+    // 2. Decrypt messages — group by windowKeyId to unseal each key once
     const decrypted: DecryptedFirehoseMessage[] = []
+    const unsealedWindowKeys = new Map<string, Uint8Array>()
+
     for (const msg of bufferMessages) {
       try {
-        const parsed = bufferEnvelopeJsonSchema.parse(JSON.parse(msg.encryptedContent))
-        const senderParsed = bufferEnvelopeJsonSchema.parse(JSON.parse(msg.encryptedSenderInfo))
+        if (msg.windowKeyId) {
+          // Window-key path: decrypt with the unsealed window key
+          let windowKey = unsealedWindowKeys.get(msg.windowKeyId)
+          if (!windowKey) {
+            windowKey = await this.unsealWindowKey(msg.windowKeyId, agent.nsecBytes)
+            unsealedWindowKeys.set(msg.windowKeyId, windowKey)
+          }
 
-        // Find the agent's envelope
-        const contentEnvelope = parsed.envelopes.find((e) => e.pubkey === agent.agentPubkey)
-        const senderEnvelope = senderParsed.envelopes.find((e) => e.pubkey === agent.agentPubkey)
+          const content = this.decryptWithWindowKey(msg.encryptedContent, windowKey)
+          const senderJson = this.decryptWithWindowKey(msg.encryptedSenderInfo, windowKey)
 
-        if (!contentEnvelope || !senderEnvelope) {
-          log.warn('No agent envelope found for message', { messageId: msg.id })
-          continue
+          const sender = JSON.parse(senderJson) as {
+            identifier: string
+            identifierHash: string
+            username: string
+            timestamp: number
+          }
+
+          decrypted.push({
+            id: msg.id,
+            senderUsername: sender.username,
+            content,
+            timestamp: msg.signalTimestamp.toISOString(),
+          })
+        } else {
+          // Legacy envelope path (pre-window-key messages)
+          const parsed = bufferEnvelopeJsonSchema.parse(JSON.parse(msg.encryptedContent))
+          const senderParsed = bufferEnvelopeJsonSchema.parse(JSON.parse(msg.encryptedSenderInfo))
+
+          const contentEnvelope = parsed.envelopes.find((e) => e.pubkey === agent.agentPubkey)
+          const senderEnvelope = senderParsed.envelopes.find((e) => e.pubkey === agent.agentPubkey)
+
+          if (!contentEnvelope || !senderEnvelope) {
+            log.warn('No agent envelope found for message', { messageId: msg.id })
+            continue
+          }
+
+          const content = this.decryptEnvelope(
+            parsed.encrypted,
+            contentEnvelope as RecipientEnvelope,
+            agent.nsecBytes,
+          )
+
+          const senderJson = this.decryptEnvelope(
+            senderParsed.encrypted,
+            senderEnvelope as RecipientEnvelope,
+            agent.nsecBytes,
+          )
+
+          const sender = JSON.parse(senderJson) as {
+            identifier: string
+            identifierHash: string
+            username: string
+            timestamp: number
+          }
+
+          decrypted.push({
+            id: msg.id,
+            senderUsername: sender.username,
+            content,
+            timestamp: msg.signalTimestamp.toISOString(),
+          })
         }
-
-        // Decrypt content (using envelope pattern from lib/crypto)
-        const content = this.decryptEnvelope(
-          parsed.encrypted,
-          contentEnvelope as RecipientEnvelope,
-          agent.nsecBytes,
-        )
-
-        const senderJson = this.decryptEnvelope(
-          senderParsed.encrypted,
-          senderEnvelope as RecipientEnvelope,
-          agent.nsecBytes,
-        )
-
-        const sender = JSON.parse(senderJson) as {
-          identifier: string
-          identifierHash: string
-          username: string
-          timestamp: number
-        }
-
-        decrypted.push({
-          id: msg.id,
-          senderUsername: sender.username,
-          content,
-          timestamp: msg.signalTimestamp.toISOString(),
-        })
       } catch (err) {
         log.error('Failed to decrypt message', { messageId: msg.id, error: err instanceof Error ? err.message : String(err) })
       }
+    }
+
+    // Zero unsealed window keys from memory
+    for (const key of unsealedWindowKeys.values()) {
+      key.fill(0)
     }
 
     if (decrypted.length < MIN_CLUSTER_SIZE) return
@@ -446,7 +478,67 @@ export class FirehoseAgentService {
   }
 
   /**
-   * Decrypt an envelope-encrypted value using the agent's nsec.
+   * Unseal a window key by ECIES-decrypting it with the agent's nsec.
+   * The sealedKey is JSON: { wrappedKey, ephemeralPubkey }.
+   */
+  private async unsealWindowKey(
+    windowKeyId: string,
+    nsecBytes: Uint8Array,
+  ): Promise<Uint8Array> {
+    const { secp256k1 } = require('@noble/curves/secp256k1.js') as typeof import('@noble/curves/secp256k1.js')
+    const { xchacha20poly1305 } = require('@noble/ciphers/chacha.js') as typeof import('@noble/ciphers/chacha.js')
+    const { hkdf } = require('@noble/hashes/hkdf.js') as typeof import('@noble/hashes/hkdf.js')
+    const { sha256 } = require('@noble/hashes/sha2.js') as typeof import('@noble/hashes/sha2.js')
+    const { hexToBytes: htb } = require('@noble/hashes/utils.js') as typeof import('@noble/hashes/utils.js')
+    const { utf8ToBytes } = require('@noble/ciphers/utils.js') as typeof import('@noble/ciphers/utils.js')
+
+    const windowKeyRow = await this.firehose.getWindowKey(windowKeyId)
+    if (!windowKeyRow) throw new Error(`Window key ${windowKeyId} not found`)
+
+    const sealed = JSON.parse(windowKeyRow.sealedKey) as {
+      wrappedKey: string
+      ephemeralPubkey: string
+    }
+
+    // ECIES shared secret derivation
+    const ephemeralPubBytes = htb(sealed.ephemeralPubkey)
+    const sharedPoint = secp256k1.getSharedSecret(nsecBytes, ephemeralPubBytes)
+    const sharedX = sharedPoint.slice(1, 33)
+
+    const symKey = hkdf(
+      sha256,
+      sharedX,
+      new Uint8Array(0),
+      utf8ToBytes(LABEL_FIREHOSE_BUFFER_ENCRYPT),
+      32,
+    )
+
+    // Unwrap the window key: version(1) + nonce(24) + ciphertext
+    const wrappedKeyBytes = htb(sealed.wrappedKey)
+    const keyNonce = wrappedKeyBytes.slice(1, 25)
+    const keyCiphertext = wrappedKeyBytes.slice(25)
+    const keyCipher = xchacha20poly1305(symKey, keyNonce)
+    return keyCipher.decrypt(keyCiphertext)
+  }
+
+  /**
+   * Decrypt a value that was encrypted directly with a window key.
+   * Format: hex-encoded nonce(24) + ciphertext.
+   */
+  private decryptWithWindowKey(encryptedHex: string, windowKey: Uint8Array): string {
+    const { xchacha20poly1305 } = require('@noble/ciphers/chacha.js') as typeof import('@noble/ciphers/chacha.js')
+    const { hexToBytes: htb } = require('@noble/hashes/utils.js') as typeof import('@noble/hashes/utils.js')
+
+    const bytes = htb(encryptedHex)
+    const nonce = bytes.slice(0, 24)
+    const ciphertext = bytes.slice(24)
+    const cipher = xchacha20poly1305(windowKey, nonce)
+    const plaintext = cipher.decrypt(ciphertext)
+    return new TextDecoder().decode(plaintext)
+  }
+
+  /**
+   * Decrypt an envelope-encrypted value using the agent's nsec (legacy path).
    * Uses ECIES shared secret derivation + XChaCha20-Poly1305.
    */
   private decryptEnvelope(
@@ -478,9 +570,9 @@ export class FirehoseAgentService {
 
     // Unwrap the per-message key
     const wrappedKeyBytes = htb(envelope.wrappedKey)
-    // wrappedKey format: nonce(24) + ciphertext
-    const keyNonce = wrappedKeyBytes.slice(0, 24)
-    const keyCiphertext = wrappedKeyBytes.slice(24)
+    // wrappedKey format: version(1) + nonce(24) + ciphertext
+    const keyNonce = wrappedKeyBytes.slice(1, 25)
+    const keyCiphertext = wrappedKeyBytes.slice(25)
     const keyCipher = xchacha20poly1305(symKey, keyNonce)
     const messageKey = keyCipher.decrypt(keyCiphertext)
 
