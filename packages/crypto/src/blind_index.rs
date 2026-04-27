@@ -14,17 +14,19 @@ use hkdf::Hkdf;
 use unicode_normalization::UnicodeNormalization;
 use chrono::NaiveDate;
 
+use crate::labels::{LABEL_BLIND_INDEX_KEY, LABEL_BLIND_INDEX_FIELD};
+
 type HmacSha256 = Hmac<Sha256>;
 
 /// Derive a field-specific blind index key from the hub key.
 /// Each field gets its own key to prevent cross-field correlation.
 pub fn derive_blind_index_key(hub_key: &[u8; 32], field_name: &str) -> [u8; 32] {
     let hkdf = Hkdf::<Sha256>::new(
-        Some(b"llamenos:blind-index-key"),
+        Some(LABEL_BLIND_INDEX_KEY.as_bytes()),
         hub_key,
     );
     let mut okm = [0u8; 32];
-    let info = format!("llamenos:blind-idx:{}", field_name);
+    let info = format!("{}{}", LABEL_BLIND_INDEX_FIELD, field_name);
     hkdf.expand(info.as_bytes(), &mut okm)
         .expect("HKDF expand failed");
     okm

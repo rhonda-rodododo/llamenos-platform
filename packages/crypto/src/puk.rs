@@ -28,11 +28,11 @@ use aes_gcm::{
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{hpke_seal, HpkeEnvelope};
-use crate::labels::{LABEL_PUK_DH, LABEL_PUK_SECRETBOX, LABEL_PUK_SIGN, LABEL_PUK_WRAP_TO_DEVICE};
+use crate::labels::{LABEL_PUK_DH, LABEL_PUK_PREVIOUS_GEN, LABEL_PUK_SECRETBOX, LABEL_PUK_SIGN, LABEL_PUK_WRAP_TO_DEVICE};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -87,15 +87,15 @@ fn derive_subkey(seed: &[u8; 32], label: &str, generation: u32) -> [u8; 32] {
 
 /// Derive PUK subkeys and compute public keys for a given seed + generation.
 pub fn derive_puk_subkeys(seed: &[u8; 32], generation: u32) -> PukState {
-    let sign_seed = derive_subkey(seed, LABEL_PUK_SIGN, generation);
-    let dh_seed = derive_subkey(seed, LABEL_PUK_DH, generation);
+    let sign_seed = Zeroizing::new(derive_subkey(seed, LABEL_PUK_SIGN, generation));
+    let dh_seed = Zeroizing::new(derive_subkey(seed, LABEL_PUK_DH, generation));
 
     // Ed25519 pubkey from sign subkey
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&sign_seed);
     let sign_pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
     // X25519 pubkey from DH subkey
-    let dh_secret = x25519_dalek::StaticSecret::from(dh_seed);
+    let dh_secret = x25519_dalek::StaticSecret::from(*dh_seed);
     let dh_pubkey = x25519_dalek::PublicKey::from(&dh_secret);
     let dh_pubkey_hex = hex::encode(dh_pubkey.to_bytes());
 
@@ -189,7 +189,7 @@ fn encrypt_clkr_link(
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     // Include generation in AAD to prevent replay
-    let aad_str = format!("clkr:{generation}");
+    let aad_str = format!("{}:{generation}", LABEL_PUK_PREVIOUS_GEN);
 
     let cipher = Aes256Gcm::new_from_slice(secretbox_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
@@ -225,7 +225,7 @@ pub fn decrypt_clkr_link(
     let nonce = Nonce::from_slice(&data[..12]);
     let ciphertext = &data[12..];
 
-    let aad_str = format!("clkr:{generation}");
+    let aad_str = format!("{}:{generation}", LABEL_PUK_PREVIOUS_GEN);
 
     let cipher = Aes256Gcm::new_from_slice(secretbox_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;

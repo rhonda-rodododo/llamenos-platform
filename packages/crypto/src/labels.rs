@@ -18,6 +18,9 @@
 
 // --- ECIES / HPKE Key Wrapping ---
 
+/// Domain-specific HKDF salt for ECIES v2 key derivation
+pub const LABEL_ECIES_V2_SALT: &str = "llamenos:ecies:v2";
+
 /// Per-note symmetric key wrapping
 pub const LABEL_NOTE_KEY: &str = "llamenos:note-key";
 
@@ -65,6 +68,9 @@ pub const LABEL_HUB_EVENT: &str = "llamenos:hub-event";
 
 /// Device provisioning shared key derivation
 pub const LABEL_DEVICE_PROVISION: &str = "llamenos:device-provision";
+
+/// HKDF salt for provisioning key derivation
+pub const LABEL_PROVISIONING_SALT: &str = "llamenos:provisioning:v1";
 
 // --- SAS Verification ---
 
@@ -137,8 +143,11 @@ pub const LABEL_CASE_FIELDS: &str = "llamenos:case-fields";
 /// Event details encryption
 pub const LABEL_EVENT_DETAILS: &str = "llamenos:event-details";
 
-/// Blind index key derivation
+/// Blind index key derivation (HKDF salt)
 pub const LABEL_BLIND_INDEX_KEY: &str = "llamenos:blind-index-key";
+
+/// Blind index field-level HKDF info prefix
+pub const LABEL_BLIND_INDEX_FIELD: &str = "llamenos:blind-idx:";
 
 /// Cross-hub share encryption
 pub const LABEL_CROSS_HUB_SHARE: &str = "llamenos:cross-hub-share";
@@ -183,6 +192,9 @@ pub const LABEL_ITEMS_KEY_EXPORT: &str = "llamenos:items-key-export:v1";
 pub const LABEL_NOTE_EPOCH_KEY: &str = "llamenos:note-epoch-key:v1";
 
 // --- NEW: Hub PTK ---
+
+/// Hub PTK derivation from MLS export secret
+pub const LABEL_HUB_PTK: &str = "llamenos:hub-ptk:v1";
 
 /// Hub PTK previous generation wrap
 pub const LABEL_HUB_PTK_PREV_GEN: &str = "llamenos:hub-ptk:prev-gen:v1";
@@ -282,6 +294,11 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SFRAME_BASE_KEY,     // 51
     // 52: MLS
     LABEL_MLS_PROVISION,        // 52
+    // 53-56: Salt/derivation labels
+    LABEL_ECIES_V2_SALT,        // 53
+    LABEL_PROVISIONING_SALT,    // 54
+    LABEL_BLIND_INDEX_FIELD,    // 55
+    LABEL_HUB_PTK,              // 56
 ];
 
 /// Look up a label string by its numeric ID.
@@ -350,6 +367,10 @@ mod tests {
         assert_eq!(LABEL_SFRAME_CALL_SECRET, "llamenos:sframe-call-secret:v1");
         assert_eq!(LABEL_SFRAME_BASE_KEY, "llamenos:sframe-base-key:v1");
         assert_eq!(LABEL_MLS_PROVISION, "llamenos:mls-provision:v1");
+        assert_eq!(LABEL_ECIES_V2_SALT, "llamenos:ecies:v2");
+        assert_eq!(LABEL_PROVISIONING_SALT, "llamenos:provisioning:v1");
+        assert_eq!(LABEL_BLIND_INDEX_FIELD, "llamenos:blind-idx:");
+        assert_eq!(LABEL_HUB_PTK, "llamenos:hub-ptk:v1");
     }
 
     /// Verify registry index stability.
@@ -362,6 +383,10 @@ mod tests {
         assert_eq!(id_to_label(41), Some(LABEL_PUK_SIGN));
         assert_eq!(id_to_label(46), Some(LABEL_DEVICE_AUTH));
         assert_eq!(id_to_label(52), Some(LABEL_MLS_PROVISION));
+        assert_eq!(id_to_label(53), Some(LABEL_ECIES_V2_SALT));
+        assert_eq!(id_to_label(54), Some(LABEL_PROVISIONING_SALT));
+        assert_eq!(id_to_label(55), Some(LABEL_BLIND_INDEX_FIELD));
+        assert_eq!(id_to_label(56), Some(LABEL_HUB_PTK));
     }
 
     /// Verify bidirectional lookup.

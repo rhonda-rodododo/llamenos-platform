@@ -72,14 +72,15 @@ pub fn create_auth_token_from_signing_key(
     method: &str,
     path: &str,
 ) -> Result<AuthToken, CryptoError> {
-    let sk_bytes = hex::decode(signing_key_hex).map_err(CryptoError::HexError)?;
+    use zeroize::Zeroizing;
+
+    let sk_bytes = Zeroizing::new(hex::decode(signing_key_hex).map_err(CryptoError::HexError)?);
     if sk_bytes.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
     }
 
-    let sk_arr: [u8; 32] = sk_bytes
-        .try_into()
-        .map_err(|_| CryptoError::InvalidSecretKey)?;
+    let sk_arr = Zeroizing::new(<[u8; 32]>::try_from(sk_bytes.as_slice())
+        .map_err(|_| CryptoError::InvalidSecretKey)?);
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_arr);
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 

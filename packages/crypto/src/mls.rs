@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
 use crate::errors::CryptoError;
+use crate::labels::LABEL_HUB_PTK;
 
 /// The ciphersuite used for all MLS groups.
 const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
@@ -245,10 +246,13 @@ impl MlsManager {
     /// Export a secret from the current epoch.
     ///
     /// Used to derive hub PTK and SFrame keys.
+    /// `context` is passed as the MLS exporter context for domain separation
+    /// (typically the hub_id bytes).
     pub fn export_secret(
         &self,
         group_id: &[u8],
         label: &str,
+        context: &[u8],
         length: usize,
     ) -> Result<Vec<u8>, CryptoError> {
         let groups = self.groups.lock().unwrap();
@@ -258,7 +262,7 @@ impl MlsManager {
             .ok_or_else(|| CryptoError::InvalidInput("group not found".into()))?;
 
         let secret = group
-            .export_secret(self.provider.crypto(), label, &[], length)
+            .export_secret(self.provider.crypto(), label, context, length)
             .map_err(|e| CryptoError::EncryptionFailed(format!("MLS export: {e:?}")))?;
 
         Ok(secret)
@@ -314,12 +318,12 @@ impl MlsManager {
 
 /// Derive hub PTK from MLS export secret.
 ///
-/// `hub_ptk = HKDF-Expand(export_secret, "llamenos:hub-ptk:" + hub_id_hex, 32)`
+/// `hub_ptk = HKDF-Expand(export_secret, LABEL_HUB_PTK + ":" + hub_id_hex, 32)`
 pub fn derive_hub_ptk(export_secret: &[u8], hub_id: &[u8]) -> [u8; 32] {
     use hkdf::Hkdf;
     use sha2::Sha256;
 
-    let info = format!("llamenos:hub-ptk:{}", hex::encode(hub_id));
+    let info = format!("{}:{}", LABEL_HUB_PTK, hex::encode(hub_id));
     let hk = Hkdf::<Sha256>::new(None, export_secret);
     let mut ptk = [0u8; 32];
     hk.expand(info.as_bytes(), &mut ptk)
@@ -396,10 +400,10 @@ mod tests {
 
         // Both members should derive the same export secret
         let secret1 = manager1
-            .export_secret(b"export-hub", "test-label", 32)
+            .export_secret(b"export-hub", "test-label", b"export-hub", 32)
             .unwrap();
         let secret2 = manager2
-            .export_secret(b"export-hub", "test-label", 32)
+            .export_secret(b"export-hub", "test-label", b"export-hub", 32)
             .unwrap();
         assert_eq!(secret1, secret2);
         assert_eq!(secret1.len(), 32);

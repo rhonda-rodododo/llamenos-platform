@@ -25,12 +25,10 @@ use sha2::Sha256;
 use zeroize::Zeroize;
 
 use crate::errors::CryptoError;
+use crate::labels::LABEL_ECIES_V2_SALT;
 
 /// ECIES version byte for HKDF-based key derivation (v2).
 const ECIES_VERSION_V2: u8 = 0x02;
-
-/// Domain-specific HKDF salt for ECIES v2 key derivation.
-const ECIES_V2_HKDF_SALT: &[u8] = b"llamenos:ecies:v2";
 
 /// A symmetric key wrapped via ECIES for a single recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,7 +72,7 @@ pub fn random_bytes_32() -> [u8; 32] {
 ///
 /// symmetric_key = HKDF-Expand(HKDF-Extract(salt=ECIES_V2_HKDF_SALT, ikm=shared_x), info=label, len=32)
 fn derive_ecies_key_v2(label: &str, shared_x: &[u8]) -> [u8; 32] {
-    let hk = Hkdf::<Sha256>::new(Some(ECIES_V2_HKDF_SALT), shared_x);
+    let hk = Hkdf::<Sha256>::new(Some(LABEL_ECIES_V2_SALT.as_bytes()), shared_x);
     let mut okm = [0u8; 32];
     hk.expand(label.as_bytes(), &mut okm)
         .expect("HKDF expand should not fail for 32-byte output");
