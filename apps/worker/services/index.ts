@@ -17,6 +17,10 @@ import { BlastsService } from './blasts'
 import { ContactsService } from './contacts'
 import { CasesService } from './cases'
 import { TaskScheduler } from './scheduler'
+import { SignalContactsService } from './signal-contacts'
+import { SecurityPrefsService } from './security-prefs'
+import { UserNotificationsService } from './user-notifications'
+import { DigestCronService } from './digest-cron'
 
 export interface Services {
   identity: IdentityService
@@ -30,10 +34,27 @@ export interface Services {
   contacts: ContactsService
   cases: CasesService
   scheduler: TaskScheduler
+  signalContacts: SignalContactsService
+  securityPrefs: SecurityPrefsService
+  userNotifications: UserNotificationsService
+  digestCron: DigestCronService
 }
 
-export function createServices(db: Database, opts?: { hmacSecret?: string }): Services {
+export interface ServicesOpts {
+  hmacSecret?: string
+  notifierUrl?: string
+  notifierApiKey?: string
+}
+
+export function createServices(db: Database, opts?: ServicesOpts): Services {
   const audit = new AuditService(db)
+  const signalContacts = new SignalContactsService(db, opts?.hmacSecret ?? '')
+  const securityPrefs = new SecurityPrefsService(db)
+  const userNotifications = new UserNotificationsService(signalContacts, securityPrefs, audit, {
+    notifierUrl: opts?.notifierUrl ?? '',
+    notifierApiKey: opts?.notifierApiKey ?? '',
+  })
+  const digestCron = new DigestCronService(db, userNotifications, securityPrefs)
   return {
     identity: new IdentityService(db),
     settings: new SettingsService(db),
@@ -46,6 +67,10 @@ export function createServices(db: Database, opts?: { hmacSecret?: string }): Se
     contacts: new ContactsService(db),
     cases: new CasesService(db),
     scheduler: new TaskScheduler(db),
+    signalContacts,
+    securityPrefs,
+    userNotifications,
+    digestCron,
   }
 }
 
@@ -62,4 +87,8 @@ export {
   ContactsService,
   CasesService,
   TaskScheduler,
+  SignalContactsService,
+  SecurityPrefsService,
+  UserNotificationsService,
+  DigestCronService,
 }

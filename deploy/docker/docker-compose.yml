@@ -60,6 +60,9 @@ services:
       - NOSTR_RELAY_URL=${NOSTR_RELAY_URL:-ws://strfry:7777}
       # Optional: GlitchTip/Sentry DSN for client crash reporting (profile: monitoring)
       - GLITCHTIP_DSN=${GLITCHTIP_DSN:-}
+      # Signal notification sidecar (profile: signal)
+      - NOTIFIER_URL=${NOTIFIER_URL:-http://signal-notifier:3100}
+      - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-}
     networks:
       - web
       - internal
@@ -279,7 +282,7 @@ services:
       retries: 5
       start_period: 5s
 
-  # ── Optional: Signal Messaging ───────────────────────────
+  # ── Optional: Signal Messaging + Notifications ──────────
   signal-cli:
     image: bbernhard/signal-cli-rest-api:0.92@sha256:702db336aa1a87611595e66755c9ccf65b24c25589857301eabef1d46056b3c5
     profiles: ["signal"]
@@ -298,6 +301,33 @@ services:
       retries: 3
       start_period: 20s
 
+  signal-notifier:
+    profiles: ["signal"]
+    build:
+      context: ../..
+      dockerfile: signal-notifier/Dockerfile
+    restart: unless-stopped
+    environment:
+      - PORT=3100
+      - "NOTIFIER_API_KEY=${NOTIFIER_API_KEY:?NOTIFIER_API_KEY is required when signal profile is active — generate with openssl rand -hex 32}"
+      - SIGNAL_BRIDGE_URL=http://signal-cli:8080
+      - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
+      - "SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:?SIGNAL_REGISTERED_NUMBER is required — your registered Signal phone number}"
+      - NOTIFIER_DB_PATH=/app/data/notifier.db
+    volumes:
+      - signal-notifier-data:/app/data
+    networks:
+      - internal
+    depends_on:
+      signal-cli:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 volumes:
   postgres-data:
   caddy-data:
@@ -306,6 +336,7 @@ volumes:
   nostr-data:
   asterisk-config:
   signal-data:
+  signal-notifier-data:
 
 networks:
   web:

@@ -55,6 +55,10 @@ const EXCLUDED_SCHEMAS = new Set([
   'relationshipDirectionSchema',
   'directoryContactTypeSchema',
   'entityCategorySchema',
+
+  // Signal notification — bare enum schemas used as building blocks
+  'digestCadenceSchema',
+  'notificationChannelSchema',
 ])
 
 export interface SchemaRegistryEntry {

@@ -43,7 +43,9 @@ const serverNostrSecret = readSecret('server-nostr-secret', 'SERVER_NOSTR_SECRET
 const nostrRelayUrl = process.env.NOSTR_RELAY_URL || ''
 
 // --- Create services (pass HMAC secret for encryption operations) ---
-const services: Services = createServices(db, { hmacSecret })
+const notifierUrl = process.env.NOTIFIER_URL || ''
+const notifierApiKey = readSecret('notifier-api-key', 'NOTIFIER_API_KEY')
+const services: Services = createServices(db, { hmacSecret, notifierUrl, notifierApiKey })
 console.log('[llamenos] Services initialized')
 
 const env: Record<string, unknown> = {

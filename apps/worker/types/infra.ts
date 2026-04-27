@@ -68,6 +68,10 @@ export interface Env {
   // Falls back to /nostr (reverse-proxied via Caddy) if not set but relay is configured
   NOSTR_RELAY_PUBLIC_URL?: string
 
+  // Signal notifier sidecar (signal notification service)
+  NOTIFIER_URL?: string          // HTTP base URL of the signal-notifier sidecar
+  NOTIFIER_API_KEY?: string      // Shared bearer token for sidecar auth
+
   // GlitchTip/Sentry DSN for client-side crash reporting (Epic 293)
   GLITCHTIP_DSN?: string
 
