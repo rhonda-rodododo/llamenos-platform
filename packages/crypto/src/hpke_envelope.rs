@@ -221,7 +221,9 @@ pub fn hpke_open_key(
     expected_label: &str,
     aad: &[u8],
 ) -> Result<[u8; 32], CryptoError> {
-    let plaintext = hpke_open(envelope, recipient_secret_hex, expected_label, aad)?;
+    let plaintext = Zeroizing::new(
+        hpke_open(envelope, recipient_secret_hex, expected_label, aad)?
+    );
     if plaintext.len() != 32 {
         return Err(CryptoError::InvalidFormat(format!(
             "expected 32-byte key, got {} bytes",

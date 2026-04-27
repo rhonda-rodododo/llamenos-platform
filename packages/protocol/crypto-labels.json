@@ -56,6 +56,10 @@
     "LABEL_HUB_PTK_PREV_GEN": "llamenos:hub-ptk:prev-gen:v1",
     "LABEL_SFRAME_CALL_SECRET": "llamenos:sframe-call-secret:v1",
     "LABEL_SFRAME_BASE_KEY": "llamenos:sframe-base-key:v1",
-    "LABEL_MLS_PROVISION": "llamenos:mls-provision:v1"
+    "LABEL_MLS_PROVISION": "llamenos:mls-provision:v1",
+    "LABEL_ECIES_V2_SALT": "llamenos:ecies:v2",
+    "LABEL_PROVISIONING_SALT": "llamenos:provisioning:v1",
+    "LABEL_BLIND_INDEX_FIELD": "llamenos:blind-idx:",
+    "LABEL_HUB_PTK": "llamenos:hub-ptk:v1"
   }
 }
