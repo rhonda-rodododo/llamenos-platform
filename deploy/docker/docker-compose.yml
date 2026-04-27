@@ -210,6 +210,7 @@ services:
       - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — do NOT use the default}
       - WORKER_WEBHOOK_URL=http://app:3000
       - BRIDGE_SECRET=${BRIDGE_SECRET:?BRIDGE_SECRET is required — generate a random value}
+      - BRIDGE_HOST=0.0.0.0
     networks:
       - internal
     depends_on:
@@ -217,6 +218,12 @@ services:
         condition: service_healthy
       app:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ── Optional: GlitchTip Error Tracking ────────────────────
   # Sentry-compatible error tracking. Clients send crash reports here.

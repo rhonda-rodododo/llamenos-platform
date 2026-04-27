@@ -117,10 +117,21 @@ autoscaling:
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
 
-# Monitoring (Prometheus)
+# Prometheus metrics scraping
+# metrics.enabled gates the ServiceMonitor; set metrics.scrapeTokenSecret to the K8s
+# Secret name containing a "metrics-scrape-token" key matching METRICS_SCRAPE_TOKEN env var.
+metrics:
+  enabled: false
+  interval: 30s
+  path: /api/metrics/prometheus
+  # Name of an existing K8s Secret with key "metrics-scrape-token" (METRICS_SCRAPE_TOKEN)
+  # Leave empty to require authenticated admin access instead of a bearer token.
+  scrapeTokenSecret: ""
+
+# Monitoring (Prometheus Operator ServiceMonitor additional config)
 monitoring:
   serviceMonitor:
-    enabled: false
+    enabled: false  # deprecated — use metrics.enabled
     interval: 30s
     scrapeTimeout: 10s
     additionalLabels: {}
