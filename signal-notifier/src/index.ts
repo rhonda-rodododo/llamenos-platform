@@ -1,51 +1,41 @@
-/**
- * Signal Notifier Sidecar
- *
- * HTTP service that bridges the Llamenos app to signal-cli-rest-api.
- * Receives notification requests from the main app (authenticated via BEARER_TOKEN),
- * queues them in SQLite for durability, and delivers them to signal-cli.
- *
- * Actual notification logic is implemented by the notification service feature.
- * This skeleton sets up the HTTP server, health endpoint, and auth middleware.
- */
+import { Hono } from 'hono'
+import { IdentifierStore } from './store'
+import { buildRoutes } from './routes'
+import type { BridgeConfig } from './signal-client'
 
-import { Hono } from "hono";
+const port = Number(process.env.PORT ?? 3100)
+const apiKey = process.env.NOTIFIER_API_KEY ?? ''
+const tokenSecret = process.env.NOTIFIER_TOKEN_SECRET ?? ''
+const dbPath = process.env.NOTIFIER_DB_PATH ?? './data/notifier.db'
+const bridgeUrl = process.env.SIGNAL_BRIDGE_URL ?? 'http://signal-cli-rest-api:8080'
+const bridgeApiKey = process.env.SIGNAL_BRIDGE_API_KEY ?? ''
+const registeredNumber = process.env.SIGNAL_REGISTERED_NUMBER ?? ''
 
-const port = parseInt(process.env.PORT ?? "3100", 10);
-const bearerToken = process.env.BEARER_TOKEN;
-const signalCliUrl = process.env.SIGNAL_CLI_URL ?? "http://signal-cli:8080";
-
-if (!bearerToken) {
-  console.error("FATAL: BEARER_TOKEN environment variable is required");
-  process.exit(1);
+if (!apiKey) {
+  console.error('[signal-notifier] NOTIFIER_API_KEY is required')
+  process.exit(1)
+}
+if (!tokenSecret) {
+  console.error('[signal-notifier] NOTIFIER_TOKEN_SECRET is required')
+  process.exit(1)
+}
+if (!registeredNumber) {
+  console.warn('[signal-notifier] SIGNAL_REGISTERED_NUMBER not set — notifications will fail')
 }
 
-const app = new Hono();
+const store = new IdentifierStore(dbPath)
 
-// Health check — unauthenticated, used by Docker health check
-app.get("/health", (c) => {
-  return c.json({ status: "ok", signalCliUrl });
-});
+const bridgeCfg: BridgeConfig = { bridgeUrl, bridgeApiKey, registeredNumber }
 
-// Auth middleware for all other routes
-app.use("/*", async (c, next) => {
-  const auth = c.req.header("Authorization");
-  if (auth !== `Bearer ${bearerToken}`) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-  return next();
-});
+const app = new Hono()
 
-// Placeholder: notification delivery endpoint
-// Full implementation added by the notification service feature
-app.post("/notify", async (c) => {
-  return c.json({ error: "Not implemented" }, 501);
-});
+// Health check — no auth, available to probes before the notifier routes
+app.get('/health', (c) => c.json({ ok: true, registeredCount: store.count() }))
 
-console.log(`signal-notifier listening on port ${port}`);
-console.log(`signal-cli endpoint: ${signalCliUrl}`);
+// Notifier endpoints: /api/register-client (token-auth), rest are bearer-protected
+const notifierRoutes = buildRoutes(apiKey, tokenSecret, store, bridgeCfg)
+app.route('/api', notifierRoutes)
 
-export default {
-  port,
-  fetch: app.fetch,
-};
+console.log(`[signal-notifier] starting on port ${port}`)
+
+export default { port, fetch: app.fetch }

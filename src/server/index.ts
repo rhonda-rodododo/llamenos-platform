@@ -49,12 +49,23 @@ const nostrRelayUrl = process.env.NOSTR_RELAY_URL || ''
 const firehoseSealKey = readSecret('firehose-agent-seal-key', 'FIREHOSE_AGENT_SEAL_KEY') || undefined
 
 // --- Create services (pass HMAC secret for encryption operations) ---
-const services: Services = createServices(db, { hmacSecret, firehoseSealKey, env: {
-  ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
-  ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
-  SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
-  NOSTR_RELAY_URL: nostrRelayUrl || undefined,
-} })
+const notifierUrl = process.env.NOTIFIER_URL || ''
+const notifierApiKey = readSecret('notifier-api-key', 'NOTIFIER_API_KEY')
+// notifierTokenSecret: defaults to hmacSecret so existing deployments require no config change
+const notifierTokenSecret = readSecret('notifier-token-secret', 'NOTIFIER_TOKEN_SECRET') || hmacSecret
+const services: Services = createServices(db, {
+  hmacSecret,
+  firehoseSealKey,
+  notifierUrl,
+  notifierApiKey,
+  notifierTokenSecret,
+  env: {
+    ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
+    ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
+    SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
+    NOSTR_RELAY_URL: nostrRelayUrl || undefined,
+  },
+})
 console.log('[llamenos] Services initialized')
 
 const env: Record<string, unknown> = {

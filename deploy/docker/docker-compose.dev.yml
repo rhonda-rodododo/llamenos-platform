@@ -1,6 +1,6 @@
 # Llamenos Dev Services
 #
-# Starts backing services (PostgreSQL, MinIO, strfry, signal-notifier) without the app.
+# Starts only the backing services (PostgreSQL, MinIO, strfry) without the app.
 # The app runs locally via `bun run dev:server`.
 #
 # Usage:
@@ -64,31 +64,53 @@ services:
       retries: 5
       start_period: 10s
 
-  # ── Signal Notifier Sidecar ──────────────────────────────
-  # Bridges the app to signal-cli-rest-api. Runs on port 3100.
-  # BEARER_TOKEN defaults to "dev-token" for local dev.
-  # Point SIGNAL_CLI_URL at a running signal-cli instance if needed.
+  # ── Optional: Signal notifications (for local dev with Signal)
+  # Start with: docker compose -f deploy/docker/docker-compose.dev.yml --profile signal up -d
+  signal-cli:
+    image: bbernhard/signal-cli-rest-api:0.92
+    profiles: ["signal"]
+    ports:
+      - "8090:8080"
+    environment:
+      - MODE=json-rpc
+      - AUTO_RECEIVE_SCHEDULE=0 * * * *
+    volumes:
+      - signal-data:/home/.local/share/signal-cli
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/about"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   signal-notifier:
+    profiles: ["signal"]
     build:
       context: ../..
       dockerfile: signal-notifier/Dockerfile
     ports:
       - "3100:3100"
     environment:
-      - BEARER_TOKEN=${SIGNAL_NOTIFIER_BEARER_TOKEN:-dev-token}
-      - SIGNAL_CLI_URL=${SIGNAL_CLI_URL:-http://localhost:8080}
-      - PORT=3100
+      - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-dev-notifier-key}
+      - SIGNAL_BRIDGE_URL=http://signal-cli:8080
+      - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
+      - SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-}
+      - NOTIFIER_DB_PATH=/app/data/notifier.db
     volumes:
       - signal-notifier-data:/app/data
+    depends_on:
+      signal-cli:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
-      interval: 30s
+      interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 10s
 
 volumes:
   pgdata:
   miniodata:
   strfrydata:
+  signal-data:
   signal-notifier-data:

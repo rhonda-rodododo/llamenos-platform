@@ -43,6 +43,7 @@ import pukRoutes from './routes/puk'
 import mlsRoutes from './routes/mls'
 import signalRoutes from './routes/signal'
 import firehoseRoutes from './routes/firehose'
+import signalNotificationRoutes from './routes/signal-notification'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { openAPIRouteHandler } from 'hono-openapi'
@@ -176,6 +177,7 @@ authenticated.route('/users/:targetPubkey/sigchain', sigchainRoutes)
 authenticated.route('/puk', pukRoutes)
 authenticated.route('/messaging/signal', signalRoutes)
 authenticated.route('/firehose', firehoseRoutes)
+authenticated.route('/signal-notification', signalNotificationRoutes)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()

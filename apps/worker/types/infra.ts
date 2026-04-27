@@ -71,6 +71,11 @@ export interface Env {
   // Firehose inference agent seal key (hex 32 bytes — seals agent nsecs at rest)
   FIREHOSE_AGENT_SEAL_KEY?: string
 
+  // Signal notifier sidecar (signal notification service)
+  NOTIFIER_URL?: string           // HTTP base URL of the signal-notifier sidecar
+  NOTIFIER_API_KEY?: string       // Shared bearer token for server→sidecar API auth
+  NOTIFIER_TOKEN_SECRET?: string  // HMAC secret for signing client registration tokens (falls back to HMAC_SECRET)
+
   // GlitchTip/Sentry DSN for client-side crash reporting (Epic 293)
   GLITCHTIP_DSN?: string
 

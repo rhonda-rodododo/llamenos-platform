@@ -11,7 +11,7 @@ import {
 import * as keyManager from '@/lib/key-manager'
 import { nip19 } from 'nostr-tools'
 import { useToast } from '@/lib/toast'
-import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send } from 'lucide-react'
+import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare } from 'lucide-react'
 import { isWebAuthnAvailable, registerCredential, listCredentials, deleteCredential, type WebAuthnCredentialInfo } from '@/lib/webauthn'
 import { PhoneInput } from '@/components/phone-input'
 import {
@@ -40,6 +40,7 @@ import {
   uploadPendingReports,
   clearPendingReports,
 } from '@/lib/crash-reporting'
+import { SignalNotificationSection } from '@/components/signal-notification-section'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -468,6 +469,20 @@ function SettingsPage() {
           />
         </div>
         <NotificationPermissionStatus />
+      </SettingsSection>
+
+      {/* Signal Security Notifications */}
+      <SettingsSection
+        id="signal-notifications"
+        title={t('signalNotifications.title', { defaultValue: 'Signal security alerts' })}
+        description={t('signalNotifications.description', {
+          defaultValue: 'Receive security alerts via Signal when your account is accessed.',
+        })}
+        icon={<MessageSquare className="h-5 w-5 text-muted-foreground" />}
+        expanded={expanded.has('signal-notifications')}
+        onToggle={(open) => toggleSection('signal-notifications', open)}
+      >
+        <SignalNotificationSection />
       </SettingsSection>
 
       {/* Crash Reporting / Diagnostics */}

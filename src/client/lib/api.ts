@@ -2164,3 +2164,73 @@ export async function optoutFirehoseNotifications(id: string) {
 export async function optinFirehoseNotifications(id: string) {
   return request<{ ok: boolean }>(hp(`/firehose/${id}/optout`), { method: 'DELETE' })
 }
+// --- Signal Notification API ---
+
+export interface SecurityPrefs {
+  notificationChannel: 'web_push' | 'signal'
+  disappearingTimerDays: number
+  digestCadence: 'off' | 'daily' | 'weekly'
+  alertOnNewDevice: boolean
+  alertOnPasskeyChange: boolean
+  alertOnPinChange: boolean
+  updatedAt: string
+}
+
+export interface SignalContactRecord {
+  identifierHash: string
+  identifierCiphertext: string
+  identifierEnvelope: { recipientPubkey: string; encryptedKey: string }[]
+  identifierType: 'phone' | 'username'
+  verifiedAt: string | null
+  updatedAt: string
+}
+
+export async function getSignalContact(): Promise<SignalContactRecord | null> {
+  try {
+    return await request<SignalContactRecord>('/signal-notification/contact')
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null
+    throw err
+  }
+}
+
+export async function registerSignalContact(body: {
+  identifierHash: string
+  identifierCiphertext: string
+  identifierEnvelope: { recipientPubkey: string; encryptedKey: string }[]
+  identifierType: 'phone' | 'username'
+}) {
+  return request<{ ok: boolean }>('/signal-notification/contact', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function registerSignalContactWithSidecar(body: {
+  plaintextIdentifier: string
+  identifierType: 'phone' | 'username'
+}) {
+  return request<{ ok: boolean }>('/signal-notification/contact/sidecar-register', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteSignalContact() {
+  return request<null>('/signal-notification/contact', { method: 'DELETE' })
+}
+
+export async function getSignalHmacKey(): Promise<{ hmacKey: string }> {
+  return request<{ hmacKey: string }>('/signal-notification/hmac-key')
+}
+
+export async function getSecurityPrefs(): Promise<SecurityPrefs> {
+  return request<SecurityPrefs>('/signal-notification/security-prefs')
+}
+
+export async function updateSecurityPrefs(patch: Partial<Omit<SecurityPrefs, 'updatedAt'>>) {
+  return request<SecurityPrefs>('/signal-notification/security-prefs', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+}
