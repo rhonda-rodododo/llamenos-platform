@@ -1,0 +1,11 @@
+# Kamailio dispatcher destination list for Llamenos
+#
+# Format: <set_id> <destination_uri> [flags] [priority] [attrs]
+#
+# Group 1: Asterisk PBX backends
+# Add one line per Asterisk instance for load balancing / failover.
+#
+# In Docker Compose, asterisk resolves to the asterisk container.
+# SIP UDP on port 5060.
+
+1 sip:asterisk:5060 0 0
