@@ -338,7 +338,7 @@ export const DEFAULT_BLAST_SETTINGS: BlastSettings = {
   optOutFooter: '\nReply STOP to unsubscribe.',
   maxBlastsPerDay: 10,
   rateLimitPerSecond: 10,
-  rateLimits: { sms: 10, whatsapp: 25, signal: 15, rcs: 10 },
+  rateLimits: { sms: 10, whatsapp: 25, signal: 15, rcs: 10, telegram: 20 },
 }
 
 // --- Setup State ---
