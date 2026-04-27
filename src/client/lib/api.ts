@@ -1944,3 +1944,93 @@ export async function verifyEvidenceIntegrity(evidenceId: string, currentHash: s
     body: JSON.stringify({ currentHash }),
   })
 }
+
+// --- Signal Registration & Management ---
+
+export interface SignalRegistrationState {
+  step: 'idle' | 'pending_verification' | 'verified' | 'failed'
+  number?: string
+  error?: string
+  bridgeUrl?: string
+  startedAt?: string
+}
+
+export async function signalRegister(data: {
+  bridgeUrl: string
+  bridgeApiKey: string
+  phoneNumber: string
+  useVoice?: boolean
+  captcha?: string
+}) {
+  return request<SignalRegistrationState>('/setup/signal/register', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function signalVerify(data: {
+  bridgeUrl: string
+  bridgeApiKey: string
+  phoneNumber: string
+  verificationCode: string
+}) {
+  return request<SignalRegistrationState>('/setup/signal/verify', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function signalUnregister(data: {
+  bridgeUrl: string
+  bridgeApiKey: string
+  registeredNumber: string
+}) {
+  return request<{ ok: boolean; error?: string }>('/setup/signal/unregister', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export interface SignalAccountInfo {
+  registered: boolean
+  number: string
+  uuid?: string
+  devices?: Array<{ id: number; name?: string }>
+  error?: string
+}
+
+export async function getSignalAccountInfo() {
+  return request<SignalAccountInfo>('/setup/signal/account')
+}
+
+export interface SignalIdentityRecord {
+  id: string
+  number: string
+  uuid: string
+  trustLevel: string
+  keyChangeCount: number
+  lastSeenAt: string
+}
+
+export async function getSignalIdentities() {
+  return request<{ identities: SignalIdentityRecord[] }>(hp('/messaging/signal/identities'))
+}
+
+export async function updateSignalIdentityTrust(uuid: string, trustLevel: string) {
+  return request<{ success: boolean }>(hp('/messaging/signal/identities/trust'), {
+    method: 'POST',
+    body: JSON.stringify({ uuid, trustLevel }),
+  })
+}
+
+export interface SignalQueueStats {
+  pending: number
+  processing: number
+  failed: number
+  dead: number
+  sent: number
+}
+
+export async function getSignalQueueStats() {
+  return request<SignalQueueStats>(hp('/messaging/signal/queue/stats'))
+}
