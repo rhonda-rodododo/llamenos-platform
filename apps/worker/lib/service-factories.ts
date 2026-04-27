@@ -143,7 +143,7 @@ function createAdapterFromConfig(config: TelephonyProviderConfig): TelephonyAdap
         config.ariPassword!,
         config.phoneNumber,
         config.bridgeCallbackUrl!,
-        config.ariPassword!, // Bridge secret uses ARI password as shared secret
+        config.bridgeSecret!,
       )
     default:
       return new TwilioAdapter(config.accountSid!, config.authToken!, config.phoneNumber)

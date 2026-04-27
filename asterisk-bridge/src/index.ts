@@ -273,19 +273,16 @@ async function main(): Promise<void> {
   console.log(`[bridge] Stasis app: ${config.stasisApp}`)
 
   // Handle graceful shutdown
-  process.on('SIGINT', () => {
+  const shutdown = () => {
     console.log('[bridge] Shutting down...')
+    handler.dispose()
     ari.disconnect()
     server.stop()
     process.exit(0)
-  })
+  }
 
-  process.on('SIGTERM', () => {
-    console.log('[bridge] Shutting down...')
-    ari.disconnect()
-    server.stop()
-    process.exit(0)
-  })
+  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', shutdown)
 }
 
 main().catch(err => {
