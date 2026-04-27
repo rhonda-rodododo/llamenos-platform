@@ -28,6 +28,7 @@ const defaultChannels: EnabledChannels = {
   whatsapp: false,
   signal: false,
   rcs: false,
+  telegram: false,
   reports: false,
 }
 

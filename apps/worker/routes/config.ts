@@ -30,7 +30,7 @@ config.get('/',
 
     // Fetch enabled channels to include in config
     let channels: import('@shared/types').EnabledChannels = {
-      voice: false, sms: false, whatsapp: false, signal: false, rcs: false, reports: false,
+      voice: false, sms: false, whatsapp: false, signal: false, rcs: false, telegram: false, reports: false,
     }
     try {
       channels = await services.settings.getEnabledChannels(c.env)

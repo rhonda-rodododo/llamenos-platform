@@ -107,6 +107,7 @@ describe('MessagingAdapter types', () => {
         whatsapp: { integrationMode: 'twilio' },
         signal: null,
         rcs: null,
+        telegram: null,
         autoAssign: true,
         inactivityTimeout: 60,
         maxConcurrentPerUser: 3,
@@ -115,6 +116,7 @@ describe('MessagingAdapter types', () => {
       expect(config.enabledChannels).toContain('whatsapp')
       expect(config.signal).toBeNull()
       expect(config.rcs).toBeNull()
+      expect(config.telegram).toBeNull()
     })
   })
 

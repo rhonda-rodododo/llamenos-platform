@@ -764,6 +764,7 @@ export class SettingsService {
       whatsapp: messagingConfig?.enabledChannels.includes('whatsapp') ?? false,
       signal: messagingConfig?.enabledChannels.includes('signal') ?? false,
       rcs: messagingConfig?.enabledChannels.includes('rcs') ?? false,
+      telegram: messagingConfig?.enabledChannels.includes('telegram') ?? false,
       reports: setupState?.selectedChannels.includes('reports') ?? false,
     }
   }
