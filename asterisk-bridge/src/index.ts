@@ -54,9 +54,12 @@ async function main(): Promise<void> {
   })
 
   // Start HTTP server for Worker commands
+  // Binds to BRIDGE_HOST (default 0.0.0.0 so Docker health checks and inter-container
+  // calls work). Never expose this port externally — security relies on BRIDGE_SECRET
+  // signature verification, not network isolation.
   const server = Bun.serve({
     port: config.bridgePort,
-    hostname: '127.0.0.1', // Bind to localhost only — must not be internet-facing
+    hostname: process.env.BRIDGE_HOST ?? '0.0.0.0',
     async fetch(request: Request): Promise<Response> {
       const url = new URL(request.url)
       const path = url.pathname
