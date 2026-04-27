@@ -16,6 +16,7 @@ import {
   LABEL_FIREHOSE_AGENT_SEAL,
   LABEL_FIREHOSE_BUFFER_ENCRYPT,
   LABEL_FIREHOSE_REPORT_WRAP,
+  LABEL_MESSAGE,
 } from '@shared/crypto-labels'
 import { KIND_FIREHOSE_REPORT } from '@shared/nostr-events'
 import { bufferEnvelopeJsonSchema } from '@protocol/schemas/firehose'
@@ -25,6 +26,7 @@ import { unsealAgentNsec } from '../lib/agent-identity'
 import { encryptMessageForStorage } from '../lib/crypto'
 import { CircuitBreaker, type CircuitBreakerOptions } from '../lib/circuit-breaker'
 import { createLogger } from '../lib/logger'
+import { clearWindowKeyCache } from '../messaging/firehose-observer'
 import { getNostrPublisher } from '../lib/service-factories'
 import type { ConversationsService } from './conversations'
 import type { FirehoseService } from './firehose'
@@ -190,6 +192,7 @@ export class FirehoseAgentService {
       this.stopAgent(connectionId)
     }
     this.inferenceClients.clear()
+    clearWindowKeyCache()
   }
 
   isRunning(connectionId: string): boolean {
@@ -539,7 +542,8 @@ export class FirehoseAgentService {
 
   /**
    * Decrypt an envelope-encrypted value using the agent's nsec (legacy path).
-   * Uses ECIES shared secret derivation + XChaCha20-Poly1305.
+   * Pre-window-key messages were encrypted with encryptMessageForStorage's
+   * default label (LABEL_MESSAGE), NOT LABEL_FIREHOSE_BUFFER_ENCRYPT.
    */
   private decryptEnvelope(
     encryptedHex: string,
@@ -559,12 +563,12 @@ export class FirehoseAgentService {
     const sharedPoint = secp256k1.getSharedSecret(nsecBytes, ephemeralPubBytes)
     const sharedX = sharedPoint.slice(1, 33)
 
-    // Derive symmetric key via HKDF
+    // Legacy messages used LABEL_MESSAGE (encryptMessageForStorage default)
     const symKey = hkdf(
       sha256,
       sharedX,
       new Uint8Array(0),
-      utf8ToBytes(LABEL_FIREHOSE_BUFFER_ENCRYPT),
+      utf8ToBytes(LABEL_MESSAGE),
       32,
     )
 
