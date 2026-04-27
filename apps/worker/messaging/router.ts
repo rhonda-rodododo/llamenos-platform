@@ -114,13 +114,13 @@ messaging.post('/:channel/webhook', async (c) => {
               console.error('[messaging] Failed to publish status update:', e)
             })
           }
-        }
 
-        // Also correlate with blast deliveries (non-blocking)
-        if (statusUpdate.externalId) {
-          c.executionCtx.waitUntil(
-            correlateBlastDeliveryStatus(services, statusUpdate.externalId, statusUpdate.status, statusUpdate.failureReason)
-          )
+          // Also correlate with blast deliveries (non-blocking)
+          if (statusUpdate.externalId) {
+            c.executionCtx.waitUntil(
+              correlateBlastDeliveryStatus(services, statusUpdate.externalId, statusUpdate.status, statusUpdate.failureReason)
+            )
+          }
         }
 
         return c.json({ ok: true })
