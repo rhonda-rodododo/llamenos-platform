@@ -32,6 +32,8 @@ pub mod auth;
 pub mod device_keys;
 pub mod hpke_envelope;
 pub mod labels;
+pub mod puk;
+pub mod sigchain;
 
 // === Stable modules (curve-independent) ===
 pub mod blind_index;
@@ -62,6 +64,8 @@ pub use device_keys::{DeviceKeyState, EncryptedDeviceKeys};
 pub use errors::CryptoError;
 pub use hpke_envelope::HpkeEnvelope;
 pub use labels::*;
+pub use puk::PukState;
+pub use sigchain::{SigchainLink, SigchainVerifiedState};
 
 // Re-export legacy types for backward compatibility during transition
 pub use ecies::{KeyEnvelope, RecipientKeyEnvelope};
