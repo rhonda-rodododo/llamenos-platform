@@ -16,6 +16,7 @@
 
 use hkdf::Hkdf;
 use sha2::Sha256;
+use zeroize::Zeroizing;
 
 use crate::errors::CryptoError;
 use crate::labels::{LABEL_SFRAME_BASE_KEY, LABEL_SFRAME_CALL_SECRET};
@@ -23,11 +24,11 @@ use crate::labels::{LABEL_SFRAME_BASE_KEY, LABEL_SFRAME_CALL_SECRET};
 /// Derive the SFrame base key for a specific call.
 ///
 /// `base_key = HKDF-Expand(exporter_secret, "llamenos:sframe-base-key:v1:" + call_id, 32)`
-pub fn derive_sframe_base_key(exporter_secret: &[u8], call_id: &str) -> [u8; 32] {
+pub fn derive_sframe_base_key(exporter_secret: &[u8], call_id: &str) -> Zeroizing<[u8; 32]> {
     let info = format!("{LABEL_SFRAME_BASE_KEY}:{call_id}");
     let hk = Hkdf::<Sha256>::new(None, exporter_secret);
-    let mut key = [0u8; 32];
-    hk.expand(info.as_bytes(), &mut key)
+    let mut key = Zeroizing::new([0u8; 32]);
+    hk.expand(info.as_bytes(), key.as_mut())
         .expect("HKDF expand should not fail for 32 bytes");
     key
 }
@@ -35,10 +36,10 @@ pub fn derive_sframe_base_key(exporter_secret: &[u8], call_id: &str) -> [u8; 32]
 /// Derive a per-participant send key from the base key.
 ///
 /// `send_key = HKDF-Expand(base_key, participant_index_be32, 32)`
-pub fn derive_sframe_send_key(base_key: &[u8; 32], participant_index: u32) -> [u8; 32] {
+pub fn derive_sframe_send_key(base_key: &[u8; 32], participant_index: u32) -> Zeroizing<[u8; 32]> {
     let hk = Hkdf::<Sha256>::new(None, base_key);
-    let mut key = [0u8; 32];
-    hk.expand(&participant_index.to_be_bytes(), &mut key)
+    let mut key = Zeroizing::new([0u8; 32]);
+    hk.expand(&participant_index.to_be_bytes(), key.as_mut())
         .expect("HKDF expand should not fail for 32 bytes");
     key
 }
@@ -47,11 +48,11 @@ pub fn derive_sframe_send_key(base_key: &[u8; 32], participant_index: u32) -> [u
 ///
 /// This is the top-level derivation when MLS is the key source.
 /// `call_secret = HKDF-Expand(mls_export, "llamenos:sframe-call-secret:v1:" + call_id, 32)`
-pub fn derive_call_secret_from_mls(mls_export_secret: &[u8], call_id: &str) -> [u8; 32] {
+pub fn derive_call_secret_from_mls(mls_export_secret: &[u8], call_id: &str) -> Zeroizing<[u8; 32]> {
     let info = format!("{LABEL_SFRAME_CALL_SECRET}:{call_id}");
     let hk = Hkdf::<Sha256>::new(None, mls_export_secret);
-    let mut key = [0u8; 32];
-    hk.expand(info.as_bytes(), &mut key)
+    let mut key = Zeroizing::new([0u8; 32]);
+    hk.expand(info.as_bytes(), key.as_mut())
         .expect("HKDF expand should not fail for 32 bytes");
     key
 }
@@ -59,7 +60,7 @@ pub fn derive_call_secret_from_mls(mls_export_secret: &[u8], call_id: &str) -> [
 /// Derive a call secret from hub PTK (fallback when MLS is unavailable).
 ///
 /// Same derivation as MLS but using hub PTK as the IKM.
-pub fn derive_call_secret_from_ptk(hub_ptk: &[u8; 32], call_id: &str) -> [u8; 32] {
+pub fn derive_call_secret_from_ptk(hub_ptk: &[u8; 32], call_id: &str) -> Zeroizing<[u8; 32]> {
     derive_call_secret_from_mls(hub_ptk, call_id)
 }
 
@@ -70,7 +71,7 @@ pub fn derive_sframe_key(
     exporter_secret: &[u8],
     call_id: &str,
     participant_index: u32,
-) -> Result<[u8; 32], CryptoError> {
+) -> Result<Zeroizing<[u8; 32]>, CryptoError> {
     if exporter_secret.is_empty() {
         return Err(CryptoError::InvalidInput(
             "exporter_secret must not be empty".into(),
@@ -115,7 +116,7 @@ mod tests {
     fn full_derivation_chain() {
         let secret = [99u8; 32];
         let key = derive_sframe_key(&secret, "call-abc", 0).unwrap();
-        assert_ne!(key, [0u8; 32]);
+        assert_ne!(*key, [0u8; 32]);
         assert_eq!(key.len(), 32);
     }
 

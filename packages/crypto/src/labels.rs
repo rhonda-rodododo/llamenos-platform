@@ -212,6 +212,11 @@ pub const LABEL_SFRAME_BASE_KEY: &str = "llamenos:sframe-base-key:v1";
 /// MLS key package provisioning
 pub const LABEL_MLS_PROVISION: &str = "llamenos:mls-provision:v1";
 
+// --- Nostr ---
+
+/// Nostr event tag type used to identify Llamenos hub events
+pub const NOSTR_EVENT_TAG: &str = "llamenos:event";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //

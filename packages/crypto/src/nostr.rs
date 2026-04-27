@@ -85,6 +85,7 @@ pub fn finalize_nostr_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::labels::NOSTR_EVENT_TAG;
     use k256::ecdsa::signature::hazmat::PrehashVerifier;
     use k256::schnorr::VerifyingKey;
 
@@ -97,7 +98,7 @@ mod tests {
             1700000000,
             vec![
                 vec!["d".into(), "test-hub".into()],
-                vec!["t".into(), "llamenos:event".into()],
+                vec!["t".into(), NOSTR_EVENT_TAG.into()],
             ],
             "encrypted-content-here",
             sk,
@@ -141,7 +142,7 @@ mod tests {
             "abc123",
             1700000000u64,
             20001u32,
-            [["d", "hub"], ["t", "llamenos:event"]],
+            [["d", "hub"], ["t", NOSTR_EVENT_TAG]],
             "content",
         ]))
         .unwrap();
