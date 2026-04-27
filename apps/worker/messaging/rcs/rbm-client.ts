@@ -9,6 +9,7 @@ import type {
   RBMSendMessageRequest,
   RBMApiResponse,
   RBMContentMessage,
+  RBMCapabilityResponse,
 } from './types'
 
 const RBM_API_BASE = 'https://rcsbusinessmessaging.googleapis.com/v1'
@@ -124,18 +125,43 @@ export class RBMClient {
   }
 
   /**
-   * Check if the RBM agent is reachable.
+   * Check RCS capabilities for a phone number.
+   * Returns whether the user supports RCS and which features are available.
    */
-  async checkStatus(): Promise<{ connected: boolean; error?: string }> {
+  async checkCapabilities(phoneNumber: string): Promise<RBMCapabilityResponse> {
     try {
       const token = await this.getAccessToken()
-      // Try listing agent — if token works, we're connected
+      const msisdn = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber
+      const res = await fetch(`${RBM_API_BASE}/phones/${msisdn}/capabilities?agentId=${this.agentId}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+
+      if (!res.ok) {
+        return { supported: false }
+      }
+
+      return await res.json() as RBMCapabilityResponse
+    } catch {
+      return { supported: false }
+    }
+  }
+
+  /**
+   * Check if the RBM agent is reachable.
+   */
+  async checkStatus(): Promise<{ connected: boolean; error?: string; details?: Record<string, unknown> }> {
+    try {
+      const token = await this.getAccessToken()
       const res = await fetch(`${RBM_API_BASE}/phones/+0/agentMessages?agentId=${this.agentId}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       })
-      // 404 is fine (no messages) — it means auth worked
-      return { connected: res.status !== 401 && res.status !== 403 }
+      const connected = res.status !== 401 && res.status !== 403
+      return {
+        connected,
+        details: connected ? { agentId: this.agentId } : undefined,
+      }
     } catch (err) {
       return { connected: false, error: String(err) }
     }
