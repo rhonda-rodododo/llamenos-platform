@@ -85,7 +85,8 @@ export class SignalMessageQueue {
 
   /**
    * Claim and return a batch of messages ready for delivery.
-   * Uses SELECT FOR UPDATE SKIP LOCKED to safely support concurrent processors.
+   * Uses a CTE with SELECT ... FOR UPDATE SKIP LOCKED → UPDATE ... RETURNING
+   * for safe concurrent processing without race conditions.
    */
   async claimBatch(batchSize: number = 10): Promise<Array<{
     id: string
@@ -99,31 +100,43 @@ export class SignalMessageQueue {
   }>> {
     const now = new Date()
 
-    // Atomically claim messages: update status to 'processing' and return them
-    const claimed = await this.db
-      .update(signalMessageQueue)
-      .set({
-        status: 'processing',
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(signalMessageQueue.status, 'pending'),
-          lte(signalMessageQueue.nextRetryAt, now),
-        ),
+    // Atomic CTE: SELECT with FOR UPDATE SKIP LOCKED (limited), then UPDATE only those rows
+    const claimed = await this.db.execute<{
+      id: string
+      hub_id: string
+      conversation_id: string
+      recipient_identifier: string
+      body: string
+      media_url: string | null
+      media_type: string | null
+      retry_count: number
+    }>(sql`
+      WITH batch AS (
+        SELECT id
+        FROM signal_message_queue
+        WHERE status = 'pending'
+          AND next_retry_at <= ${now}
+        ORDER BY next_retry_at ASC
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
       )
-      .returning()
+      UPDATE signal_message_queue q
+      SET status = 'processing', updated_at = ${now}
+      FROM batch
+      WHERE q.id = batch.id
+      RETURNING q.id, q.hub_id, q.conversation_id, q.recipient_identifier,
+                q.body, q.media_url, q.media_type, q.retry_count
+    `)
 
-    // Limit to batchSize (drizzle doesn't support LIMIT in UPDATE directly)
-    return claimed.slice(0, batchSize).map(row => ({
+    return [...claimed].map(row => ({
       id: row.id,
-      hubId: row.hubId ?? '',
-      conversationId: row.conversationId,
-      recipientIdentifier: row.recipientIdentifier,
+      hubId: row.hub_id,
+      conversationId: row.conversation_id,
+      recipientIdentifier: row.recipient_identifier,
       body: row.body,
-      mediaUrl: row.mediaUrl,
-      mediaType: row.mediaType,
-      retryCount: row.retryCount ?? 0,
+      mediaUrl: row.media_url,
+      mediaType: row.media_type,
+      retryCount: row.retry_count,
     }))
   }
 

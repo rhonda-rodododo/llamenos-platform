@@ -91,22 +91,28 @@ messaging.post('/:channel/webhook', async (c) => {
   // Try to parse as status update first (if adapter supports it)
   if (adapter.parseStatusWebhook) {
     try {
-      const statusUpdate = await adapter.parseStatusWebhook(c.req.raw)
-      if (statusUpdate) {
-        // This is a status update, not a new message
-        const result = await services.conversations.updateMessageStatus(statusUpdate)
+      const rawStatusUpdate = await adapter.parseStatusWebhook(c.req.raw)
+      // Normalize to array (Signal can batch multiple timestamps per receipt)
+      const statusUpdates = rawStatusUpdate
+        ? Array.isArray(rawStatusUpdate) ? rawStatusUpdate : [rawStatusUpdate]
+        : []
 
-        if ('conversationId' in result && result.conversationId && 'messageId' in result && result.messageId) {
-          // Publish status update to Nostr relay
-          publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
-            type: 'message:status',
-            conversationId: result.conversationId,
-            messageId: result.messageId,
-            status: statusUpdate.status,
-            timestamp: statusUpdate.timestamp,
-          }).catch((e) => {
-            console.error('[messaging] Failed to publish status update:', e)
-          })
+      if (statusUpdates.length > 0) {
+        for (const statusUpdate of statusUpdates) {
+          const result = await services.conversations.updateMessageStatus(statusUpdate)
+
+          if ('conversationId' in result && result.conversationId && 'messageId' in result && result.messageId) {
+            // Publish status update to Nostr relay
+            publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+              type: 'message:status',
+              conversationId: result.conversationId,
+              messageId: result.messageId,
+              status: statusUpdate.status,
+              timestamp: statusUpdate.timestamp,
+            }).catch((e) => {
+              console.error('[messaging] Failed to publish status update:', e)
+            })
+          }
         }
 
         return c.json({ ok: true })

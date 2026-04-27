@@ -18,13 +18,15 @@ describe('SignalFailoverService', () => {
     autoResponse: 'Thank you for your message',
   }
 
+  const key = primaryConfig.registeredNumber
+
   beforeEach(() => {
     resetFailoverState()
   })
 
   describe('getFailoverState', () => {
     it('starts with primary active', () => {
-      const state = getFailoverState()
+      const state = getFailoverState(key)
       expect(state.activeTarget).toBe('primary')
       expect(state.consecutiveFailures).toBe(0)
     })
@@ -32,9 +34,9 @@ describe('SignalFailoverService', () => {
 
   describe('resetFailoverState', () => {
     it('resets all state fields', () => {
-      setActiveTarget('backup')
-      resetFailoverState()
-      const state = getFailoverState()
+      setActiveTarget(key, 'backup')
+      resetFailoverState(key)
+      const state = getFailoverState(key)
       expect(state.activeTarget).toBe('primary')
       expect(state.lastFailoverAt).toBeNull()
     })
@@ -42,27 +44,36 @@ describe('SignalFailoverService', () => {
 
   describe('setActiveTarget', () => {
     it('sets target to backup and records failover time', () => {
-      setActiveTarget('backup')
-      const state = getFailoverState()
+      setActiveTarget(key, 'backup')
+      const state = getFailoverState(key)
       expect(state.activeTarget).toBe('backup')
       expect(state.lastFailoverAt).not.toBeNull()
       expect(state.consecutiveFailures).toBe(0)
     })
 
     it('sets target to primary and records recovery time', () => {
-      setActiveTarget('backup')
-      setActiveTarget('primary')
-      const state = getFailoverState()
+      setActiveTarget(key, 'backup')
+      setActiveTarget(key, 'primary')
+      const state = getFailoverState(key)
       expect(state.activeTarget).toBe('primary')
       expect(state.lastRecoveryAt).not.toBeNull()
     })
 
     it('does not record failover when already on backup', () => {
-      setActiveTarget('backup')
-      const afterFirst = getFailoverState().lastFailoverAt
-      setActiveTarget('backup')
-      const afterSecond = getFailoverState().lastFailoverAt
+      setActiveTarget(key, 'backup')
+      const afterFirst = getFailoverState(key).lastFailoverAt
+      setActiveTarget(key, 'backup')
+      const afterSecond = getFailoverState(key).lastFailoverAt
       expect(afterSecond).toBe(afterFirst)
+    })
+
+    it('isolates state between different keys', () => {
+      const otherKey = '+15553333333'
+      setActiveTarget(key, 'backup')
+      const state1 = getFailoverState(key)
+      const state2 = getFailoverState(otherKey)
+      expect(state1.activeTarget).toBe('backup')
+      expect(state2.activeTarget).toBe('primary')
     })
   })
 
@@ -90,7 +101,7 @@ describe('SignalFailoverService', () => {
     })
 
     it('returns backup config when active target is backup', () => {
-      setActiveTarget('backup')
+      setActiveTarget(key, 'backup')
       const config = getActiveSignalConfig(primaryConfig, failoverConfig)
       expect(config.bridgeUrl).toBe('http://backup:8080')
       expect(config.bridgeApiKey).toBe('backup-key')
@@ -100,7 +111,7 @@ describe('SignalFailoverService', () => {
     })
 
     it('returns primary config when failover config is undefined', () => {
-      setActiveTarget('backup')
+      setActiveTarget(key, 'backup')
       const config = getActiveSignalConfig(primaryConfig, undefined)
       expect(config.bridgeUrl).toBe(primaryConfig.bridgeUrl)
     })

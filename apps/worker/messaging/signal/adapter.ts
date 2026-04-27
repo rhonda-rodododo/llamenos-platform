@@ -17,6 +17,7 @@ import type {
   SignalReaction,
 } from './types'
 import { hashPhone } from '../../lib/crypto'
+import { timingSafeEqual } from 'node:crypto'
 
 /**
  * SignalAdapter — MessagingAdapter implementation for the Signal channel.
@@ -117,7 +118,10 @@ export class SignalAdapter implements MessagingAdapter {
     }
 
     const token = parts[1]
-    return constantTimeEqual(token, this.webhookSecret)
+    const tokenBuf = Buffer.from(token)
+    const secretBuf = Buffer.from(this.webhookSecret)
+    if (tokenBuf.length !== secretBuf.length) return false
+    return timingSafeEqual(tokenBuf, secretBuf)
   }
 
   /**
@@ -261,8 +265,10 @@ export class SignalAdapter implements MessagingAdapter {
    * Parse Signal receipt messages (delivered, read) into normalized status updates.
    * signal-cli-rest-api sends receiptMessage webhooks when the recipient's device
    * acknowledges delivery or read status.
+   *
+   * Returns an array since Signal receipts can batch-acknowledge multiple messages.
    */
-  async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate | null> {
+  async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate[]> {
     try {
       const payload: SignalWebhookPayload = await request.clone().json()
       const { envelope } = payload
@@ -270,7 +276,7 @@ export class SignalAdapter implements MessagingAdapter {
       // Handle receipt messages (delivery/read receipts)
       if (envelope.receiptMessage) {
         const { type, timestamps } = envelope.receiptMessage
-        if (!timestamps || timestamps.length === 0) return null
+        if (!timestamps || timestamps.length === 0) return []
 
         // Map Signal receipt type to normalized status
         const statusMap: Record<string, MessageDeliveryStatus> = {
@@ -279,21 +285,20 @@ export class SignalAdapter implements MessagingAdapter {
         }
 
         const normalizedStatus = statusMap[type.toUpperCase()]
-        if (!normalizedStatus) return null
+        if (!normalizedStatus) return []
 
-        // Signal receipts can contain multiple timestamps (batch acknowledgment).
-        // We return the first one; the router will handle each webhook separately.
-        const targetTimestamp = timestamps[0]
-        return {
-          externalId: String(targetTimestamp),
+        const webhookTimestamp = new Date(envelope.timestamp).toISOString()
+
+        return timestamps.map(ts => ({
+          externalId: String(ts),
           status: normalizedStatus,
-          timestamp: new Date(envelope.timestamp).toISOString(),
-        }
+          timestamp: webhookTimestamp,
+        }))
       }
 
-      return null
+      return []
     } catch {
-      return null
+      return []
     }
   }
 
@@ -309,7 +314,7 @@ export class SignalAdapter implements MessagingAdapter {
       emoji: reaction.emoji,
       targetAuthor: reaction.targetAuthor,
       targetTimestamp: reaction.targetTimestamp,
-      isRemove: false, // signal-cli-rest-api uses a separate removal payload
+      isRemove: reaction.remove ?? false,
     }
   }
 
@@ -413,30 +418,6 @@ export class SignalAdapter implements MessagingAdapter {
       }
     }
   }
-}
-
-/**
- * Constant-time string comparison to prevent timing attacks on webhook secrets.
- * Both strings are compared byte-by-byte; the total time is always proportional
- * to the length of the expected string regardless of where a mismatch occurs.
- */
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    // Still perform a comparison to avoid leaking length via timing,
-    // but we know the result will be false.
-    const dummy = b
-    let result = a.length ^ b.length
-    for (let i = 0; i < dummy.length; i++) {
-      result |= (a.charCodeAt(i % a.length) ?? 0) ^ dummy.charCodeAt(i)
-    }
-    return result === 0
-  }
-
-  let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  }
-  return result === 0
 }
 
 /**

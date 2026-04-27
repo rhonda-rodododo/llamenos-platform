@@ -21,6 +21,7 @@ export interface SignalWebhookPayload {
         emoji: string
         targetAuthor: string
         targetTimestamp: number
+        remove?: boolean
       }
     }
     receiptMessage?: {

@@ -11,6 +11,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
+import { hubs } from './settings'
 
 // ---------------------------------------------------------------------------
 // signal_message_queue
@@ -22,7 +23,7 @@ export const signalMessageQueue = pgTable(
     id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    hubId: text('hub_id'),
+    hubId: text('hub_id').notNull().references(() => hubs.id, { onDelete: 'cascade' }),
     conversationId: text('conversation_id').notNull(),
     recipientIdentifier: text('recipient_identifier').notNull(),
     body: text('body').notNull(),
@@ -71,7 +72,7 @@ export const signalIdentities = pgTable(
     id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    hubId: text('hub_id'),
+    hubId: text('hub_id').notNull().references(() => hubs.id, { onDelete: 'cascade' }),
     number: text('number').notNull(),
     uuid: text('uuid').notNull(),
     fingerprint: text('fingerprint'),

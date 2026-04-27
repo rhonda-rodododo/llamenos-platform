@@ -58,32 +58,14 @@ const DEFAULT_FAILOVER_CONFIG: FailoverConfig = {
 }
 
 /**
- * In-memory failover state. Reset on server restart — health checks will
- * quickly re-detect the correct state. This avoids DB writes on every
- * health check while still providing fast failover.
+ * Per-hub failover state. Each hub (keyed by registered number) has its own
+ * independent failover state. Reset on server restart — health checks will
+ * quickly re-detect the correct state per hub.
  */
-let failoverState: FailoverState = {
-  activeTarget: 'primary',
-  consecutiveFailures: 0,
-  lastHealthCheck: null,
-  lastFailoverAt: null,
-  lastRecoveryAt: null,
-  primaryStatus: null,
-  backupStatus: null,
-}
+const failoverStates = new Map<string, FailoverState>()
 
-/**
- * Get the current failover state.
- */
-export function getFailoverState(): Readonly<FailoverState> {
-  return { ...failoverState }
-}
-
-/**
- * Reset failover state (e.g., on config change or admin override).
- */
-export function resetFailoverState(): void {
-  failoverState = {
+function createDefaultState(): FailoverState {
+  return {
     activeTarget: 'primary',
     consecutiveFailures: 0,
     lastHealthCheck: null,
@@ -95,24 +77,54 @@ export function resetFailoverState(): void {
 }
 
 /**
+ * Get the failover state for a specific hub (keyed by registered number).
+ */
+export function getFailoverState(key: string): Readonly<FailoverState> {
+  const state = failoverStates.get(key)
+  return state ? { ...state } : createDefaultState()
+}
+
+/**
+ * Reset failover state for a specific hub, or all hubs if no key provided.
+ */
+export function resetFailoverState(key?: string): void {
+  if (key) {
+    failoverStates.delete(key)
+  } else {
+    failoverStates.clear()
+  }
+}
+
+function getOrCreateState(key: string): FailoverState {
+  let state = failoverStates.get(key)
+  if (!state) {
+    state = createDefaultState()
+    failoverStates.set(key, state)
+  }
+  return state
+}
+
+/**
  * Manually set the active target (admin override).
  */
-export function setActiveTarget(target: 'primary' | 'backup'): void {
-  const previous = failoverState.activeTarget
-  failoverState.activeTarget = target
-  failoverState.consecutiveFailures = 0
+export function setActiveTarget(key: string, target: 'primary' | 'backup'): void {
+  const state = getOrCreateState(key)
+  const previous = state.activeTarget
+  state.activeTarget = target
+  state.consecutiveFailures = 0
 
   if (target === 'backup' && previous === 'primary') {
-    failoverState.lastFailoverAt = new Date().toISOString()
+    state.lastFailoverAt = new Date().toISOString()
   } else if (target === 'primary' && previous === 'backup') {
-    failoverState.lastRecoveryAt = new Date().toISOString()
+    state.lastRecoveryAt = new Date().toISOString()
   }
 
-  logger.info('Active target manually set', { target, previous })
+  logger.info('Active target manually set', { key, target, previous })
 }
 
 /**
  * Run a health check cycle. Called periodically by the scheduler.
+ * State is keyed by the primary config's registered number.
  *
  * Logic:
  * 1. Check primary health
@@ -124,41 +136,44 @@ export async function runHealthCheck(
   primaryConfig: SignalConfig,
   failoverConfig: FailoverConfig,
 ): Promise<FailoverState> {
+  const key = primaryConfig.registeredNumber
   if (!failoverConfig.enabled) {
-    return failoverState
+    return getFailoverState(key)
   }
 
+  const state = getOrCreateState(key)
   const now = new Date().toISOString()
-  failoverState.lastHealthCheck = now
+  state.lastHealthCheck = now
 
   // Check primary
   const primaryHealth = await checkBridgeHealth(primaryConfig)
-  failoverState.primaryStatus = primaryHealth
+  state.primaryStatus = primaryHealth
 
   if (primaryHealth.connected) {
     // Primary is healthy
-    if (failoverState.activeTarget === 'backup' && failoverConfig.autoRecover) {
+    if (state.activeTarget === 'backup' && failoverConfig.autoRecover) {
       // Switch back to primary
-      failoverState.activeTarget = 'primary'
-      failoverState.lastRecoveryAt = now
-      failoverState.consecutiveFailures = 0
-      logger.info('Primary Signal bridge recovered, switching back')
+      state.activeTarget = 'primary'
+      state.lastRecoveryAt = now
+      state.consecutiveFailures = 0
+      logger.info('Primary Signal bridge recovered, switching back', { key })
     } else {
-      failoverState.consecutiveFailures = 0
+      state.consecutiveFailures = 0
     }
   } else {
     // Primary is down
-    failoverState.consecutiveFailures++
+    state.consecutiveFailures++
 
     logger.warn('Primary Signal bridge health check failed', {
-      failures: failoverState.consecutiveFailures,
+      key,
+      failures: state.consecutiveFailures,
       threshold: failoverConfig.failoverThreshold,
       error: primaryHealth.error,
     })
 
     if (
-      failoverState.activeTarget === 'primary' &&
-      failoverState.consecutiveFailures >= failoverConfig.failoverThreshold
+      state.activeTarget === 'primary' &&
+      state.consecutiveFailures >= failoverConfig.failoverThreshold
     ) {
       // Check backup before failing over
       const backupConfig: SignalConfig = {
@@ -168,17 +183,19 @@ export async function runHealthCheck(
         webhookSecret: failoverConfig.backupWebhookSecret,
       }
       const backupHealth = await checkBridgeHealth(backupConfig)
-      failoverState.backupStatus = backupHealth
+      state.backupStatus = backupHealth
 
       if (backupHealth.connected) {
-        failoverState.activeTarget = 'backup'
-        failoverState.lastFailoverAt = now
+        state.activeTarget = 'backup'
+        state.lastFailoverAt = now
         logger.warn('Failing over to backup Signal bridge', {
+          key,
           primaryError: primaryHealth.error,
           backupNumber: failoverConfig.backupRegisteredNumber.slice(-4),
         })
       } else {
         logger.error('Both primary and backup Signal bridges are down', {
+          key,
           primaryError: primaryHealth.error,
           backupError: backupHealth.error,
         })
@@ -186,7 +203,7 @@ export async function runHealthCheck(
     }
   }
 
-  return failoverState
+  return { ...state }
 }
 
 /**
@@ -197,9 +214,13 @@ export function getActiveSignalConfig(
   primaryConfig: SignalConfig,
   failoverConfig?: FailoverConfig,
 ): SignalConfig {
+  const key = primaryConfig.registeredNumber
+  const state = failoverStates.get(key)
+
   if (
     !failoverConfig?.enabled ||
-    failoverState.activeTarget === 'primary'
+    !state ||
+    state.activeTarget === 'primary'
   ) {
     return primaryConfig
   }

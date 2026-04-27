@@ -17,7 +17,7 @@
 import { eq, and, desc } from 'drizzle-orm'
 import type { Database } from '../../db'
 import { signalIdentities } from '../../db/schema'
-import type { SignalConfig } from '@shared/types'
+import type { SignalConfig, SignalTrustMode } from '@shared/types'
 import { createLogger } from '../../lib/logger'
 
 const logger = createLogger('signal-identity')
@@ -54,15 +54,22 @@ export class SignalIdentityService {
   /**
    * Record or update an identity from a Signal webhook.
    * Called when we receive a message from a contact — tracks their identity state.
+   *
+   * Trust mode determines behavior:
+   * - 'auto': Always trust identity keys (TRUSTED_UNVERIFIED), even on change
+   * - 'tofu': Trust on first contact, mark UNTRUSTED on key change (default)
+   * - 'manual': Always queue new identities for admin review (UNTRUSTED)
    */
   async recordIdentity(params: {
     hubId: string
     number: string
     uuid: string
     fingerprint?: string
+    trustMode?: SignalTrustMode
   }): Promise<{ isNew: boolean; keyChanged: boolean }> {
     const { hubId, number, uuid } = params
     const fingerprint = params.fingerprint ?? ''
+    const trustMode: SignalTrustMode = params.trustMode ?? 'tofu'
     const now = new Date()
 
     // Check for existing identity
@@ -78,20 +85,22 @@ export class SignalIdentityService {
       .limit(1)
 
     if (existing.length === 0) {
-      // New identity — trust as unverified by default
+      // New identity — trust level depends on trustMode
+      const initialTrustLevel: TrustLevel = trustMode === 'manual' ? 'UNTRUSTED' : 'TRUSTED_UNVERIFIED'
+
       await this.db.insert(signalIdentities).values({
         id: crypto.randomUUID(),
         hubId,
         number,
         uuid,
         fingerprint,
-        trustLevel: 'TRUSTED_UNVERIFIED',
+        trustLevel: initialTrustLevel,
         firstSeenAt: now,
         lastSeenAt: now,
         keyChangeCount: 0,
       })
 
-      logger.info('New Signal identity recorded', { uuid: uuid.slice(0, 8), hubId })
+      logger.info('New Signal identity recorded', { uuid: uuid.slice(0, 8), hubId, trustMode, trustLevel: initialTrustLevel })
       return { isNew: true, keyChanged: false }
     }
 
@@ -99,12 +108,14 @@ export class SignalIdentityService {
 
     // Check if the identity key (fingerprint) changed
     if (fingerprint && record.fingerprint && fingerprint !== record.fingerprint) {
-      // Identity key changed — reset trust to UNTRUSTED
+      // Trust level after key change depends on trustMode
+      const trustLevelAfterChange: TrustLevel = trustMode === 'auto' ? 'TRUSTED_UNVERIFIED' : 'UNTRUSTED'
+
       await this.db
         .update(signalIdentities)
         .set({
           fingerprint,
-          trustLevel: 'UNTRUSTED',
+          trustLevel: trustLevelAfterChange,
           lastSeenAt: now,
           keyChangeCount: (record.keyChangeCount ?? 0) + 1,
           verifiedBy: null,
@@ -115,6 +126,8 @@ export class SignalIdentityService {
       logger.warn('Signal identity key changed', {
         uuid: uuid.slice(0, 8),
         hubId,
+        trustMode,
+        newTrustLevel: trustLevelAfterChange,
         changes: (record.keyChangeCount ?? 0) + 1,
       })
 
@@ -140,7 +153,7 @@ export class SignalIdentityService {
     trustLevel: TrustLevel
     verifierPubkey?: string
   }): Promise<boolean> {
-    const updateData: Record<string, unknown> = {
+    const updateData: Partial<typeof signalIdentities.$inferInsert> = {
       trustLevel: params.trustLevel,
     }
 
@@ -238,7 +251,7 @@ export class SignalIdentityService {
 
     return rows.map(row => ({
       id: row.id,
-      hubId: row.hubId ?? '',
+      hubId: row.hubId,
       number: row.number,
       uuid: row.uuid,
       fingerprint: row.fingerprint ?? '',
@@ -279,7 +292,7 @@ export class SignalIdentityService {
     const row = rows[0]
     return {
       id: row.id,
-      hubId: row.hubId ?? '',
+      hubId: row.hubId,
       number: row.number,
       uuid: row.uuid,
       fingerprint: row.fingerprint ?? '',

@@ -38,13 +38,13 @@ describe('SignalAdapter', () => {
       })
 
       const result = await adapter.parseStatusWebhook(request)
-      expect(result).not.toBeNull()
-      expect(result!.externalId).toBe('1699999990000')
-      expect(result!.status).toBe('delivered')
-      expect(result!.timestamp).toBeTruthy()
+      expect(result).toHaveLength(1)
+      expect(result[0].externalId).toBe('1699999990000')
+      expect(result[0].status).toBe('delivered')
+      expect(result[0].timestamp).toBeTruthy()
     })
 
-    it('parses read receipts', async () => {
+    it('parses read receipts with multiple timestamps', async () => {
       const payload: SignalWebhookPayload = {
         envelope: {
           source: '+15559876543',
@@ -63,13 +63,13 @@ describe('SignalAdapter', () => {
       })
 
       const result = await adapter.parseStatusWebhook(request)
-      expect(result).not.toBeNull()
-      expect(result!.status).toBe('read')
-      // Returns the first timestamp from batch
-      expect(result!.externalId).toBe('1699999990000')
+      expect(result).toHaveLength(2)
+      expect(result[0].status).toBe('read')
+      expect(result[0].externalId).toBe('1699999990000')
+      expect(result[1].externalId).toBe('1699999995000')
     })
 
-    it('returns null for unknown receipt types', async () => {
+    it('returns empty array for unknown receipt types', async () => {
       const payload: SignalWebhookPayload = {
         envelope: {
           source: '+15559876543',
@@ -88,10 +88,10 @@ describe('SignalAdapter', () => {
       })
 
       const result = await adapter.parseStatusWebhook(request)
-      expect(result).toBeNull()
+      expect(result).toHaveLength(0)
     })
 
-    it('returns null for non-receipt webhooks', async () => {
+    it('returns empty array for non-receipt webhooks', async () => {
       const payload: SignalWebhookPayload = {
         envelope: {
           source: '+15559876543',
@@ -110,10 +110,10 @@ describe('SignalAdapter', () => {
       })
 
       const result = await adapter.parseStatusWebhook(request)
-      expect(result).toBeNull()
+      expect(result).toHaveLength(0)
     })
 
-    it('returns null for empty timestamps', async () => {
+    it('returns empty array for empty timestamps', async () => {
       const payload: SignalWebhookPayload = {
         envelope: {
           source: '+15559876543',
@@ -132,7 +132,7 @@ describe('SignalAdapter', () => {
       })
 
       const result = await adapter.parseStatusWebhook(request)
-      expect(result).toBeNull()
+      expect(result).toHaveLength(0)
     })
   })
 
@@ -192,6 +192,28 @@ describe('SignalAdapter', () => {
 
       const result = adapter.parseReaction(payload)
       expect(result).toBeNull()
+    })
+
+    it('detects reaction removal', () => {
+      const payload: SignalWebhookPayload = {
+        envelope: {
+          source: '+15559876543',
+          timestamp: 1700000000000,
+          dataMessage: {
+            timestamp: 1700000000000,
+            reaction: {
+              emoji: '\u{1F44D}',
+              targetAuthor: '+15551234567',
+              targetTimestamp: 1699999990000,
+              remove: true,
+            },
+          },
+        },
+      }
+
+      const result = adapter.parseReaction(payload)
+      expect(result).not.toBeNull()
+      expect(result!.isRemove).toBe(true)
     })
   })
 
