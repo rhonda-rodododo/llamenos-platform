@@ -1,10 +1,10 @@
 [package]
 name = "llamenos-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Shared cryptographic core for Llamenos — ECIES, XChaCha20-Poly1305, BIP-340, HKDF, PBKDF2"
+description = "Shared cryptographic core for Llamenos — Ed25519/X25519, HPKE (RFC 9180), AES-256-GCM, sigchain"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/rhonda-rodododo/llamenos-core"
+repository = "https://github.com/rhonda-rodododo/llamenos-platform"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
@@ -13,12 +13,17 @@ wasm-opt = false
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
-# Elliptic curve cryptography (secp256k1 ECDH + Schnorr BIP-340)
-k256 = { version = "0.13", features = ["ecdh", "schnorr", "serde"] }
-elliptic-curve = { version = "0.13", features = ["sec1"] }
+# Ed25519 signing
+ed25519-dalek = { version = "2", features = ["rand_core"] }
 
-# Symmetric encryption
-chacha20poly1305 = "0.10"
+# X25519 key agreement
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+
+# HPKE: DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM
+hpke = { version = "0.13", default-features = false, features = ["x25519", "alloc"] }
+
+# AES-256-GCM (standalone symmetric operations — PIN encryption, items_key)
+aes-gcm = "0.10"
 
 # Key derivation
 hkdf = "0.12"
@@ -52,16 +57,19 @@ serde_json = "1"
 # Error handling
 thiserror = "2"
 
-# Nostr bech32 encoding (nsec/npub)
-bech32 = "0.11"
-
-# UniFFI for Swift/Kotlin bindings (React Native)
+# UniFFI for Swift/Kotlin bindings
 uniffi = { version = "0.28", optional = true }
 
 # WASM bindings for web browser
 wasm-bindgen = { version = "0.2", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 js-sys = { version = "0.3", optional = true }
+
+# Legacy dependencies (kept for legacy.rs during transition — removed in Phase 6)
+k256 = { version = "0.13", features = ["ecdh", "schnorr", "serde"] }
+elliptic-curve = { version = "0.13", features = ["sec1"] }
+bech32 = "0.11"
+chacha20poly1305 = "0.10"
 
 [features]
 default = []
