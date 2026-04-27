@@ -1,6 +1,6 @@
 # Build and push Docker images to GitHub Container Registry.
 # Triggered by release.yml via workflow_dispatch, or manually.
-# Builds both the main app and asterisk-bridge images with
+# Builds both the main app and sip-bridge images with
 # SBOM attestation, SLSA provenance, cosign signing, and Trivy scan.
 name: Docker Build
 
@@ -96,7 +96,7 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-  # Build asterisk bridge image
+  # Build sip-bridge image
   bridge:
     runs-on: ubuntu-latest
     permissions:
@@ -121,21 +121,19 @@ jobs:
 
       - name: Compute Docker tags
         id: meta
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          {
-            echo "tags<<EOF"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-asterisk-bridge:${VERSION}"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-asterisk-bridge:sha-${GITHUB_SHA::7}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
 
       - name: Build and push
         id: build-push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198571cfb76f00 # v6.12.0
         with:
-          context: ./asterisk-bridge
+          context: ./sip-bridge
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
@@ -144,7 +142,7 @@ jobs:
       - name: Generate SBOM attestation
         uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v2.1.0
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-asterisk-bridge
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge
           subject-digest: ${{ steps.build-push.outputs.digest }}
           push-to-registry: true
 
@@ -156,4 +154,4 @@ jobs:
           DIGEST: ${{ steps.build-push.outputs.digest }}
         run: |
           cosign sign --yes \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-asterisk-bridge@${DIGEST}"
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge@${DIGEST}"

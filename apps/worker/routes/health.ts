@@ -7,47 +7,95 @@ declare const __BUILD_VERSION__: string
 
 const health = new Hono<AppEnv>()
 
-interface HealthResult {
-  status: 'ok' | 'degraded'
-  checks: Record<string, 'ok' | 'failing'>
-  details: Record<string, string>
+interface CheckResult {
+  status: 'ok' | 'failing'
+  latencyMs?: number
+  detail?: string
 }
 
-async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
-  const checks: Record<string, 'ok' | 'failing'> = {}
-  const details: Record<string, string> = {}
+interface HealthResult {
+  status: 'ok' | 'degraded'
+  checks: Record<string, CheckResult>
+}
 
-  // PostgreSQL check via Drizzle
+async function checkPostgres(): Promise<CheckResult> {
+  const t0 = Date.now()
   try {
     const { getDb } = await import('../db')
     const db = getDb()
     const { sql } = await import('drizzle-orm')
     await db.execute(sql`SELECT 1`)
-    checks.postgres = 'ok'
+    return { status: 'ok', latencyMs: Date.now() - t0 }
   } catch (err) {
-    checks.postgres = 'failing'
-    details.postgres = err instanceof Error ? err.message : 'Connection failed'
+    return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Connection failed' }
   }
+}
 
-  // Blob storage check (R2 on CF, MinIO on Node.js)
-  if (env.R2_BUCKET) {
-    checks.storage = 'ok'
-  } else {
-    checks.storage = 'failing'
-    details.storage = 'Blob storage not configured'
+async function checkMinio(env: Record<string, unknown>): Promise<CheckResult> {
+  const endpoint = env.MINIO_ENDPOINT as string | undefined
+  if (!endpoint) return { status: 'failing', detail: 'MINIO_ENDPOINT not configured' }
+  const t0 = Date.now()
+  try {
+    const url = `${endpoint.replace(/\/$/, '')}/minio/health/live`
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
+    if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
+    return { status: 'ok', latencyMs: Date.now() - t0 }
+  } catch (err) {
+    return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
   }
+}
 
-  // Nostr relay configuration check
-  // Actual connectivity is verified by strfry's own healthcheck in Docker/K8s
-  if (env.NOSTR_RELAY_URL) {
-    checks.relay = 'ok'
-  } else {
-    checks.relay = 'failing'
-    details.relay = 'NOSTR_RELAY_URL not configured'
+async function checkNostrRelay(env: Record<string, unknown>): Promise<CheckResult> {
+  const relayUrl = env.NOSTR_RELAY_URL as string | undefined
+  if (!relayUrl) return { status: 'failing', detail: 'NOSTR_RELAY_URL not configured' }
+  // Convert ws(s):// → http(s):// and probe the HTTP health endpoint
+  const httpUrl = relayUrl.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://')
+  const t0 = Date.now()
+  try {
+    const res = await fetch(httpUrl, { signal: AbortSignal.timeout(3000) })
+    // strfry returns 200 on HTTP for the relay info endpoint
+    if (!res.ok && res.status !== 400 && res.status !== 404) {
+      return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
+    }
+    return { status: 'ok', latencyMs: Date.now() - t0 }
+  } catch (err) {
+    return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
   }
+}
 
-  const status = Object.values(checks).every(v => v === 'ok') ? 'ok' : 'degraded'
-  return { status, checks, details }
+async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult | null> {
+  const bridgeUrl = env.SIP_BRIDGE_URL as string | undefined
+  if (!bridgeUrl) return null  // Not configured — skip
+  const t0 = Date.now()
+  try {
+    const res = await fetch(`${bridgeUrl.replace(/\/$/, '')}/health`, { signal: AbortSignal.timeout(3000) })
+    if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
+    return { status: 'ok', latencyMs: Date.now() - t0 }
+  } catch (err) {
+    return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
+  }
+}
+
+async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
+  const [postgres, minio, relay, sipBridge] = await Promise.all([
+    checkPostgres(),
+    checkMinio(env),
+    checkNostrRelay(env),
+    checkSipBridge(env),
+  ])
+
+  const checks: Record<string, CheckResult> = { postgres, minio, relay }
+  if (sipBridge !== null) checks.sipBridge = sipBridge
+
+  const status = Object.values(checks).every(v => v.status === 'ok') ? 'ok' : 'degraded'
+  return { status, checks }
+}
+
+function measureEventLoopLag(): Promise<number> {
+  return new Promise(resolve => {
+    const start = performance.now()
+    setImmediate(() => resolve(performance.now() - start))
+  })
 }
 
 // Full health check — dependency status
@@ -68,19 +116,26 @@ health.get('/',
     },
   }),
   async (c) => {
-  const { status, checks, details } = await runChecks(c.env as unknown as Record<string, unknown>)
-  const hasDetails = Object.keys(details).length > 0
+    const { status, checks } = await runChecks(c.env as unknown as Record<string, unknown>)
+    const mem = typeof process !== 'undefined' ? process.memoryUsage() : null
 
-  return c.json({
-    status,
-    checks,
-    ...(hasDetails && { details }),
-    version: typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev',
-    uptime: typeof process !== 'undefined' ? Math.floor(process.uptime()) : undefined,
-  }, status === 'ok' ? 200 : 503)
-})
+    return c.json({
+      status,
+      checks,
+      version: typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev',
+      uptime: typeof process !== 'undefined' ? Math.floor(process.uptime()) : undefined,
+      ...(mem && {
+        memory: {
+          heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+          heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+          rssMb: Math.round(mem.rss / 1024 / 1024),
+        },
+      }),
+    }, status === 'ok' ? 200 : 503)
+  },
+)
 
-// Kubernetes liveness probe — process is alive, always returns 200
+// Kubernetes liveness probe — lightweight process check (memory + event loop lag)
 health.get('/live',
   describeRoute({
     tags: ['Health'],
@@ -96,10 +151,22 @@ health.get('/live',
       },
     },
   }),
-  (c) => c.json({ status: 'ok' }),
+  async (c) => {
+    const lagMs = await measureEventLoopLag()
+    const mem = typeof process !== 'undefined' ? process.memoryUsage() : null
+
+    return c.json({
+      status: 'ok',
+      eventLoopLagMs: Math.round(lagMs),
+      ...(mem && {
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+      }),
+    })
+  },
 )
 
-// Kubernetes readiness probe — verifies all dependencies
+// Kubernetes readiness probe — verifies all dependencies are reachable
 health.get('/ready',
   describeRoute({
     tags: ['Health'],
@@ -117,15 +184,14 @@ health.get('/ready',
     },
   }),
   async (c) => {
-  const { status, checks, details } = await runChecks(c.env as unknown as Record<string, unknown>)
-  const hasDetails = Object.keys(details).length > 0
+    const { status, checks } = await runChecks(c.env as unknown as Record<string, unknown>)
 
-  return c.json({
-    status,
-    checks,
-    ...(hasDetails && { details }),
-    version: typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev',
-  }, status === 'ok' ? 200 : 503)
-})
+    return c.json({
+      status,
+      checks,
+      version: typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : 'dev',
+    }, status === 'ok' ? 200 : 503)
+  },
+)
 
 export default health

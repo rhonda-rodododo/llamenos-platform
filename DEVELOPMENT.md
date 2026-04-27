@@ -77,7 +77,7 @@ src/
     languages.ts       # Language config (codes, labels, voice IDs)
 tests/                 # Playwright E2E tests (214+ tests)
 site/                  # Marketing site (Astro + Tailwind)
-asterisk-bridge/       # ARI bridge service (standalone Bun service)
+sip-bridge/            # PBX bridge service (Asterisk/FreeSWITCH/Kamailio)
 ```
 
 ## Path Aliases
