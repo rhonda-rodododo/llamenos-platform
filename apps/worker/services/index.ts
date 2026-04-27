@@ -44,6 +44,8 @@ export interface ServicesOpts {
   hmacSecret?: string
   notifierUrl?: string
   notifierApiKey?: string
+  /** Secret shared with the sidecar for signing client registration tokens. Falls back to hmacSecret. */
+  notifierTokenSecret?: string
 }
 
 export function createServices(db: Database, opts?: ServicesOpts): Services {
@@ -53,6 +55,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
   const userNotifications = new UserNotificationsService(signalContacts, securityPrefs, audit, {
     notifierUrl: opts?.notifierUrl ?? '',
     notifierApiKey: opts?.notifierApiKey ?? '',
+    tokenSecret: opts?.notifierTokenSecret ?? opts?.hmacSecret ?? '',
   })
   const digestCron = new DigestCronService(db, userNotifications, securityPrefs)
   return {

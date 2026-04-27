@@ -17,11 +17,6 @@ import {
   signalContactRegistrationSchema,
   securityPrefsPatchSchema,
 } from '@protocol/schemas/signal-notification'
-import { normalizeSignalIdentifier } from '../services/signal-identifier-normalize'
-import { createLogger } from '../lib/logger'
-
-const log = createLogger('routes.signal-notification')
-
 const signalNotificationRoutes = new Hono<AppEnv>()
 
 // ---------------------------------------------------------------------------
@@ -95,22 +90,21 @@ signalNotificationRoutes.put('/contact',
 )
 
 // ---------------------------------------------------------------------------
-// POST /contact/sidecar-register — proxy plaintext to sidecar (server-side only)
-// This is called by the client AFTER PUT /contact to register the plaintext.
-// We keep the plaintext route separate so the server's auth validates the user
-// before forwarding to the sidecar.
+// POST /contact/sidecar-token — issue a short-lived registration token
+// The client uses this token to register the plaintext identifier directly
+// with the sidecar, so the app server never sees the plaintext.
 // ---------------------------------------------------------------------------
 
-signalNotificationRoutes.post('/contact/sidecar-register',
+signalNotificationRoutes.post('/contact/sidecar-token',
   describeRoute({
     tags: ['Signal Notifications'],
-    summary: 'Register plaintext identifier with the sidecar (server-proxied)',
+    summary: 'Issue a sidecar registration token for direct client→sidecar registration',
     description:
-      'The client sends the plaintext Signal identifier here. The server validates ' +
-      'the user owns this contact (checks hash matches), then proxies to the sidecar.',
+      'Returns a short-lived HMAC-signed token (5 min) and the sidecar URL. ' +
+      'The client calls POST {sidecarUrl}/api/register-client directly with the token ' +
+      'and plaintext identifier. The app server never sees the plaintext.',
     responses: {
-      200: { description: 'Registered with sidecar' },
-      502: { description: 'Sidecar unreachable' },
+      200: { description: 'Token issued' },
       ...authErrors,
     },
   }),
@@ -118,45 +112,15 @@ signalNotificationRoutes.post('/contact/sidecar-register',
     const pubkey = c.get('pubkey')
     const services = c.get('services')
 
-    let body: { plaintextIdentifier: string; identifierType: 'phone' | 'username' }
-    try {
-      body = await c.req.json()
-    } catch {
-      return c.json({ error: 'Invalid JSON body' }, 400)
-    }
-
-    if (!body.plaintextIdentifier || !body.identifierType) {
-      return c.json({ error: 'plaintextIdentifier and identifierType are required' }, 400)
-    }
-    if (body.identifierType !== 'phone' && body.identifierType !== 'username') {
-      return c.json({ error: 'identifierType must be phone or username' }, 400)
-    }
-
-    // Verify the user has a registered contact to prevent unauthorized sidecar writes
     const contact = await services.signalContacts.findByUser(pubkey)
     if (!contact) {
       return c.json({ error: 'No Signal contact registered for this user' }, 400)
     }
 
-    // Re-derive the hash to verify the plaintext matches what's stored
-    const normalized = normalizeSignalIdentifier(body.plaintextIdentifier, body.identifierType)
-    const expectedHash = services.signalContacts.hashIdentifierForUser(normalized, pubkey)
-    if (expectedHash !== contact.identifierHash) {
-      return c.json({ error: 'Plaintext does not match stored hash' }, 400)
-    }
+    const token = services.userNotifications.issueRegistrationToken(contact.identifierHash)
+    const sidecarUrl = services.userNotifications.getSidecarUrl()
 
-    const result = await services.userNotifications.registerWithSidecar(
-      contact.identifierHash,
-      body.plaintextIdentifier,
-      body.identifierType
-    )
-
-    if (!result.ok) {
-      log.warn('Sidecar registration failed', { userPubkey: pubkey, error: result.error })
-      return c.json({ error: 'Sidecar registration failed', detail: result.error }, 502)
-    }
-
-    return c.json({ ok: true })
+    return c.json({ token, sidecarUrl })
   }
 )
 

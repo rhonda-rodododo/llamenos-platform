@@ -13,7 +13,8 @@
  */
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
 import { eq } from 'drizzle-orm'
 import type { Database } from '../db'
 import { userSignalContacts, type UserSignalContactRow } from '../db/schema/signal-notifications'
@@ -31,15 +32,18 @@ export function hashSignalIdentifier(normalized: string, perUserKey: string): st
 
 /**
  * Derive a per-user HMAC key from the server secret and user pubkey.
+ * Uses HKDF(SHA-256, serverSecret, salt=pubkey, info="signal-contact", 32).
  * This is the key returned to the client so it can hash locally before sending.
  */
 export function derivePerUserHmacKey(serverHmacSecret: string, userPubkey: string): string {
-  const userKey = hmac(
+  const derived = hkdf(
     sha256,
-    utf8ToBytes(serverHmacSecret),
-    utf8ToBytes(`signal-contact:${userPubkey}`)
+    hexToBytes(serverHmacSecret),
+    utf8ToBytes(userPubkey),
+    utf8ToBytes('signal-contact'),
+    32
   )
-  return bytesToHex(userKey)
+  return bytesToHex(derived)
 }
 
 export interface UpsertSignalContactInput {

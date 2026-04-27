@@ -7,6 +7,7 @@
  *
  * Retry logic: up to 3 attempts with exponential backoff (200ms × 2^attempt).
  */
+import { createHmac } from 'node:crypto'
 import { createLogger } from '../lib/logger'
 import type { SignalContactsService } from './signal-contacts'
 import type { SecurityPrefsService } from './security-prefs'
@@ -97,6 +98,8 @@ async function sendToNotifier(
 export interface UserNotificationsConfig {
   notifierUrl: string
   notifierApiKey: string
+  /** Secret used to HMAC-sign client registration tokens (shared with the sidecar). */
+  tokenSecret: string
 }
 
 // ---------------------------------------------------------------------------
@@ -165,33 +168,26 @@ export class UserNotificationsService {
   }
 
   /**
-   * Register the user's plaintext identifier with the sidecar.
-   * Called by the API route after the contact is upserted in the main DB.
+   * Issue a short-lived HMAC-signed registration token authorizing the client
+   * to register their plaintext identifier directly with the sidecar.
+   *
+   * Token format: base64url(payload) + '.' + hex-HMAC-SHA256
+   * Payload: JSON {identifierHash, expiresAt}
+   * Expiry: 5 minutes from now.
+   *
+   * The sidecar validates the token using the shared tokenSecret, then stores
+   * the hash → plaintext mapping. The app server never sees the plaintext.
    */
-  async registerWithSidecar(
-    identifierHash: string,
-    plaintextIdentifier: string,
-    identifierType: 'phone' | 'username'
-  ): Promise<{ ok: boolean; error?: string }> {
-    try {
-      const res = await fetch(
-        `${this.config.notifierUrl.replace(/\/+$/, '')}/api/register`,
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${this.config.notifierApiKey}`,
-          },
-          body: JSON.stringify({ identifierHash, plaintextIdentifier, identifierType }),
-        }
-      )
-      if (!res.ok) {
-        return { ok: false, error: `Notifier ${res.status}` }
-      }
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : 'notifier error' }
-    }
+  issueRegistrationToken(identifierHash: string): string {
+    const expiresAt = Date.now() + 5 * 60 * 1000
+    const payload = Buffer.from(JSON.stringify({ identifierHash, expiresAt })).toString('base64url')
+    const sig = createHmac('sha256', this.config.tokenSecret).update(payload).digest('hex')
+    return `${payload}.${sig}`
+  }
+
+  /** Base URL of the signal-notifier sidecar (for returning to clients). */
+  getSidecarUrl(): string {
+    return this.config.notifierUrl.replace(/\/+$/, '')
   }
 
   /**

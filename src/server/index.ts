@@ -45,7 +45,9 @@ const nostrRelayUrl = process.env.NOSTR_RELAY_URL || ''
 // --- Create services (pass HMAC secret for encryption operations) ---
 const notifierUrl = process.env.NOTIFIER_URL || ''
 const notifierApiKey = readSecret('notifier-api-key', 'NOTIFIER_API_KEY')
-const services: Services = createServices(db, { hmacSecret, notifierUrl, notifierApiKey })
+// notifierTokenSecret: defaults to hmacSecret so existing deployments require no config change
+const notifierTokenSecret = readSecret('notifier-token-secret', 'NOTIFIER_TOKEN_SECRET') || hmacSecret
+const services: Services = createServices(db, { hmacSecret, notifierUrl, notifierApiKey, notifierTokenSecret })
 console.log('[llamenos] Services initialized')
 
 const env: Record<string, unknown> = {

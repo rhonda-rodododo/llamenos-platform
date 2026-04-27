@@ -5,6 +5,7 @@ import type { BridgeConfig } from './signal-client'
 
 const port = Number(process.env.PORT ?? 3100)
 const apiKey = process.env.NOTIFIER_API_KEY ?? ''
+const tokenSecret = process.env.NOTIFIER_TOKEN_SECRET ?? ''
 const dbPath = process.env.NOTIFIER_DB_PATH ?? './data/notifier.db'
 const bridgeUrl = process.env.SIGNAL_BRIDGE_URL ?? 'http://signal-cli-rest-api:8080'
 const bridgeApiKey = process.env.SIGNAL_BRIDGE_API_KEY ?? ''
@@ -12,6 +13,10 @@ const registeredNumber = process.env.SIGNAL_REGISTERED_NUMBER ?? ''
 
 if (!apiKey) {
   console.error('[signal-notifier] NOTIFIER_API_KEY is required')
+  process.exit(1)
+}
+if (!tokenSecret) {
+  console.error('[signal-notifier] NOTIFIER_TOKEN_SECRET is required')
   process.exit(1)
 }
 if (!registeredNumber) {
@@ -27,8 +32,8 @@ const app = new Hono()
 // Health check — no auth, available to probes before the notifier routes
 app.get('/health', (c) => c.json({ ok: true, registeredCount: store.count() }))
 
-// All notifier endpoints under /api — bearer token protected
-const notifierRoutes = buildRoutes(apiKey, store, bridgeCfg)
+// Notifier endpoints: /api/register-client (token-auth), rest are bearer-protected
+const notifierRoutes = buildRoutes(apiKey, tokenSecret, store, bridgeCfg)
 app.route('/api', notifierRoutes)
 
 console.log(`[signal-notifier] starting on port ${port}`)
