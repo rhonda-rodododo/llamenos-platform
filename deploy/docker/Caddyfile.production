@@ -1,0 +1,141 @@
+# Production Caddyfile for Llamenos — Tier 4 split-origin layout.
+#
+# Requires these env vars (set in .env and passed into the caddy container):
+#   APP_DOMAIN    — e.g. app.llamenos.example     (SPA static files)
+#   API_DOMAIN    — e.g. api.llamenos.example     (Bun/Hono backend + /nostr)
+#   CRYPTO_DOMAIN — e.g. crypto.llamenos.example  (sandboxed crypto iframe)
+#   ACME_EMAIL    — contact for Let's Encrypt
+#
+# The caddy container is built from deploy/docker/Dockerfile with
+# `target: static` so the `frontend` build stage bakes
+# /srv/app/ and /srv/crypto/ into the image. Only api.* proxies to app:3000;
+# app.* and crypto.* are pure file_servers on distinct origins.
+{
+	email {$ACME_EMAIL}
+}
+
+# ─── SPA origin — app.<parent> ─────────────────────────────────────
+{$APP_DOMAIN} {
+	root * /srv/app
+	encode gzip zstd
+	file_server
+	try_files {path} /index.html
+
+	# Immutable assets (content-hashed filenames from Vite build)
+	@immutable {
+		path /assets/*
+	}
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	# HTML — always revalidate
+	@html {
+		path *.html /
+	}
+	header @html Cache-Control "no-cache"
+
+	header {
+		# Tier 4 PR-A: SPA CSP is strict — only self-hosted JS/CSS + the
+		# crypto iframe (from crypto.*) + API connections to api.*.
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://{$API_DOMAIN} wss://{$API_DOMAIN}; media-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'; frame-src https://{$CRYPTO_DOMAIN}; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types llamenos default; report-uri https://{$API_DOMAIN}/api/csp-report; upgrade-insecure-requests"
+
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "require-corp"
+		Cross-Origin-Resource-Policy "same-origin"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		X-Permitted-Cross-Domain-Policies "none"
+		Permissions-Policy "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+		-Server
+	}
+}
+
+# ─── API origin — api.<parent> ──────────────────────────────────────
+{$API_DOMAIN} {
+	encode gzip zstd
+
+	# Auth endpoint rate limiting — strict (login, register, WebAuthn)
+	rate_limit /api/auth/* 10r/m
+	rate_limit /api/register 5r/m
+
+	# Nostr relay WebSocket proxy lives on the API origin so the SPA only
+	# needs one allowed WSS host in its CSP.
+	handle /nostr {
+		reverse_proxy strfry:7777
+	}
+
+	# CORS enforcement — allow only the SPA origin for credentialed requests.
+	# Hono middleware sets the final CORS headers for actual requests;
+	# Caddy handles the OPTIONS preflight to fail-fast on disallowed origins.
+	@cors-preflight {
+		method OPTIONS
+	}
+	handle @cors-preflight {
+		header Access-Control-Allow-Origin "https://{$APP_DOMAIN}"
+		header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+		header Access-Control-Allow-Headers "Content-Type, Authorization, X-Request-ID"
+		header Access-Control-Allow-Credentials "true"
+		header Access-Control-Max-Age "3600"
+		respond 204
+	}
+
+	# Everything else → Hono backend
+	handle {
+		reverse_proxy app:3000
+	}
+
+	header {
+		# The Hono securityHeaders middleware already emits a hard
+		# `default-src 'none'; script-src 'none'` CSP on every response.
+		# Caddy-level headers here are belt-and-suspenders for routes
+		# that bypass middleware (e.g. health probes served by Caddy).
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "cross-origin"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}
+
+# ─── Crypto sandbox origin — crypto.<parent> ────────────────────────
+{$CRYPTO_DOMAIN} {
+	root * /srv/crypto
+	encode gzip zstd
+	file_server
+	try_files {path} /sandbox.html
+
+	# Immutable assets (content-hashed filenames from Vite build)
+	@immutable {
+		path /assets/*
+	}
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	header {
+		# Iframe-only CSP. HARD INVARIANT: `connect-src 'none'` — the crypto
+		# sandbox is an offline oracle. Ciphertext flows in via postMessage,
+		# plaintext flows out via postMessage. ZERO network. Never widen this
+		# to 'self' or api.*; doing so would break the Tier 4 threat model.
+		# `style-src 'self'` matches the sandbox.html meta CSP (no inline
+		# styles are used, but `'none'` forbids even the <link rel=stylesheet>
+		# we ship in the bundle). `script-src` adds 'wasm-unsafe-eval' so
+		# noble/whisper WASM modules can instantiate once crypto wiring lands.
+		Content-Security-Policy "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors https://{$APP_DOMAIN}; require-trusted-types-for 'script'; trusted-types llamenos-sandbox default; report-uri https://{$API_DOMAIN}/api/csp-report"
+
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "require-corp"
+		# CORP must be 'cross-origin' — the SPA host sets COEP: require-corp,
+		# which means the iframe fetch must opt in via CORP: cross-origin.
+		# frame-ancestors restricts who can embed; CORP allows the fetch to
+		# succeed. 'same-origin' would block the cross-origin iframe load.
+		Cross-Origin-Resource-Policy "cross-origin"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		# frame-ancestors (above) replaces X-Frame-Options — we MUST allow
+		# app.* to iframe this origin, so X-Frame-Options:DENY would be wrong.
+		Referrer-Policy "no-referrer"
+		X-Permitted-Cross-Domain-Policies "none"
+		-Server
+	}
+}

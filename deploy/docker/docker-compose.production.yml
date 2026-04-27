@@ -1,0 +1,275 @@
+# Production overrides for Llamenos Docker deployment
+#
+# Adds: production Caddyfile (real domain + TLS), resource limits, log rotation,
+# hardened container options (read-only rootfs, no-new-privileges), and
+# Watchtower for automated image updates.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+#
+# Required env vars (set in .env):
+#   APP_DOMAIN      — e.g. app.hotline.example
+#   API_DOMAIN      — e.g. api.hotline.example
+#   CRYPTO_DOMAIN   — e.g. crypto.hotline.example
+#   ACME_EMAIL      — Let's Encrypt contact email
+#   BUILD_VERSION   — image tag to deploy (set by CI)
+#   BUILD_COMMIT    — git SHA (set by CI)
+#   GHCR_USERNAME   — GitHub username for GHCR pull auth
+#   GHCR_TOKEN      — GitHub PAT with packages:read
+
+services:
+  app:
+    environment:
+      - ENVIRONMENT=production
+      # Tier 4 PR-A: API enforces cross-site CORS/cookies scoped to the SPA origin.
+      - APP_ORIGIN=https://${APP_DOMAIN:?APP_DOMAIN is required}
+      - API_COOKIE_DOMAIN=${API_DOMAIN:?API_DOMAIN is required}
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "llamenos-app"
+    healthcheck:
+      # Tighter production intervals (vs dev defaults)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  caddy:
+    # Tier 4 PR-A: override the base caddy:2-alpine image with a local
+    # build that bakes dist/client + dist/crypto-sandbox into /srv/app and
+    # /srv/crypto. The same Caddy process still terminates TLS and
+    # handles all three origins via Caddyfile.production site blocks.
+    image: llamenos-static:local
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: static
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-dev}
+        BUILD_COMMIT: ${BUILD_COMMIT:-local}
+        BUILD_TIME: ${BUILD_TIME:-}
+    volumes:
+      - ./Caddyfile.production:/etc/caddy/Caddyfile:ro
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:?APP_DOMAIN is required — e.g. app.hotline.example}
+      - API_DOMAIN=${API_DOMAIN:?API_DOMAIN is required — e.g. api.hotline.example}
+      - CRYPTO_DOMAIN=${CRYPTO_DOMAIN:?CRYPTO_DOMAIN is required — e.g. crypto.hotline.example}
+      - ACME_EMAIL=${ACME_EMAIL:?ACME_EMAIL is required}
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "llamenos-caddy"
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "llamenos-postgres"
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  minio:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "llamenos-minio"
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  strfry:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "llamenos-strfry"
+    healthcheck:
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Optional profiles: resource limits ─────────────────────
+
+  whisper:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  asterisk:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  asterisk-bridge:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  signal-cli:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  signal-notifier:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  glitchtip:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  glitchtip-worker:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Watchtower: automated image update checks ─────────────
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Only watch containers with the watchtower.enable=true label
+      - WATCHTOWER_LABEL_ENABLE=true
+      # Cron schedule for update checks (default: 04:00 UTC daily)
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 0 4 * * *}
+      # Remove old images after updating
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LOG_LEVEL=${WATCHTOWER_LOG_LEVEL:-info}
+      # GHCR authentication (if image is private)
+      - REPO_USER=${GHCR_USERNAME:-}
+      - REPO_PASS=${GHCR_TOKEN:-}
+      # Optional: shoutrrr URL for update notifications
+      # e.g. slack://token-a/token-b/token-c or discord://token@id
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
