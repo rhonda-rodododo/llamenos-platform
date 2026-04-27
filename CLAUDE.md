@@ -34,8 +34,8 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 - **Backend**: Bun + PostgreSQL (self-hosted), Cloudflare Workers (marketing site only)
 - **Shared Crypto**: `packages/crypto/` Rust crate — single auditable implementation for all platforms (native, WASM, UniFFI)
 - **Protocol**: `packages/protocol/` JSON Schema → codegen (TypeScript, Swift, Kotlin via quicktype-core)
-- **Telephony**: Twilio via a `TelephonyAdapter` interface (designed for future provider swaps, e.g. SIP trunks)
-- **Auth**: Nostr keypairs (BIP-340 Schnorr signatures) + WebAuthn session tokens for multi-device support
+- **Telephony**: 8 providers via `TelephonyAdapter` interface (Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk, FreeSWITCH). `SipBridgeAdapter` base class for ARI/ESL/Kamailio backends. `PBX_TYPE` env var selects backend for `sip-bridge/`.
+- **Auth**: Nostr keypairs (BIP-340 Schnorr signatures) + WebAuthn session tokens for multi-device support; Ed25519/X25519 per-device keys for E2EE
 - **i18n**: `packages/i18n/` — 13 locales + codegen for iOS `.strings` and Android `strings.xml`
 - **Deployment**: Docker Compose / Helm (VPS self-hosted), Cloudflare Tunnels for ingress. EU/GDPR-compatible.
 - **Testing**: E2E via Playwright (desktop), XCUITest (iOS), Compose UI tests (Android); Rust tests via `cargo test`
@@ -73,10 +73,12 @@ apps/
     routes/           # Hono route handlers
     db/               # Drizzle ORM schemas + migrations (bun-jsonb custom type)
     services/         # Business logic service classes
-    telephony/        # TelephonyAdapter interface + 5 adapters
-    messaging/        # MessagingAdapter interface + SMS, WhatsApp, Signal adapters
+    telephony/        # TelephonyAdapter interface + 8 adapters (incl. SipBridgeAdapter base)
+    messaging/        # MessagingAdapter interface + SMS, WhatsApp, Signal, Telegram, RCS adapters
     lib/              # Auth, crypto, webauthn utilities
     # (no wrangler.jsonc — see site/wrangler.jsonc for marketing site)
+  sip-bridge/         # Protocol-agnostic SIP bridge (replaces asterisk-bridge/); PBX_TYPE selects ARI/ESL/Kamailio
+  signal-notifier/    # Zero-knowledge Signal notification sidecar (port 3100; HMAC-hashed contact resolution)
   ios/                # Native SwiftUI iOS client
     Sources/          # Swift source (App/, Services/, Views/, ViewModels/)
     Tests/            # XCTest + XCUITest
@@ -86,7 +88,7 @@ apps/
     gradle/           # Version catalog (libs.versions.toml)
 packages/
   crypto/             # Shared Rust crypto crate (native + WASM + UniFFI)
-    src/              # Rust source (ECIES, Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305)
+    src/              # Rust source (HPKE/X25519-HKDF-SHA256-AES256-GCM, Ed25519/Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305, SFrame, MLS)
     scripts/          # Build scripts (build-mobile.sh for iOS/Android)
     Cargo.toml        # Crate config
   shared/             # Cross-boundary TypeScript types and config
@@ -98,7 +100,7 @@ packages/
     tools/schema-registry.ts  # Maps 85+ Zod schemas to named JSON Schemas
     openapi-snapshot.json     # OpenAPI spec snapshot (written by dev server on startup)
     generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
-    crypto-labels.json # 28 domain separation constants (source of truth)
+    crypto-labels.json # 57 domain separation constants (source of truth)
   i18n/               # Localization package
     locales/          # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
     languages.ts      # Language config (codes, labels, Twilio voice IDs)
@@ -127,35 +129,45 @@ docs/
 ## Key Technical Patterns
 
 - **Multi-hub routing axiom**: Any authenticated user — regardless of role — can be a member of multiple hubs simultaneously. The app must receive calls, push notifications, and relay events from ALL member hubs regardless of which hub is currently active in the UI. The active hub controls browsing context only. **Never gate incoming call or notification handling on active hub state.** Background push handlers must never call `setActiveHub` — only explicit user tap actions or the app-unlocked call answer path may switch the active hub.
-- **TelephonyAdapter**: Abstract interface for 5 voice providers (Twilio, SignalWire, Vonage, Plivo, Asterisk). All telephony logic goes through this adapter — never call provider APIs directly from business logic.
-- **MessagingAdapter**: Abstract interface for text messaging channels (SMS, WhatsApp, Signal). Inbound webhooks route to the conversation service.
+- **TelephonyAdapter**: Abstract interface for 8 voice providers (Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk, FreeSWITCH). `SipBridgeAdapter` is a shared base class for Asterisk and FreeSWITCH. `PBX_TYPE` env var selects ARI/ESL/Kamailio for `sip-bridge/`. All telephony logic goes through this adapter — never call provider APIs directly from business logic.
+- **MessagingAdapter**: Abstract interface for text messaging channels (SMS, WhatsApp, Signal, Telegram, RCS/Google RBM). Signal adapter is complete (receipts, reactions, typing, registration, retry queue, identity trust, failover). Inbound webhooks route to the conversation service.
 - **Parallel ringing**: All on-shift, non-busy volunteers ring simultaneously. First pickup terminates other calls.
 - **Shift routing**: Automated, recurring schedule with ring groups. Fallback group if no schedule is defined.
-- **Blast service**: Handles message broadcast queues and delivery tracking. Manages batched delivery of bulk messages (SMS/WhatsApp/Signal) with per-recipient status tracking and retry logic (PostgreSQL-backed).
-- **E2EE notes**: Per-note forward secrecy — unique random key per note, wrapped via ECIES for each reader. Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
-- **E2EE messaging**: Per-message envelope encryption — random symmetric key, ECIES-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
-- **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. The nsec NEVER enters the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.
-- **packages/crypto**: Shared Rust crypto crate (formerly separate `llamenos-core` repo). All crypto operations (ECIES, Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305) implemented once in Rust, compiled to native (Tauri), WASM (browser), and UniFFI (mobile). Desktop links via `apps/desktop/Cargo.toml` path dep to `../../packages/crypto`.
+- **E2EE notes**: Per-note forward secrecy — unique random key per note, HPKE-wrapped for each reader via PUK (Per-User Key). PUK → items_key → per-note content key (cascading lazy key rotation). Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
+- **E2EE messaging**: Per-message envelope encryption — random symmetric key, HPKE-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
+- **HPKE crypto**: RFC 9180 X25519-HKDF-SHA256-AES256-GCM replaces secp256k1 ECIES everywhere. Ed25519/X25519 per-device keys (no more single nsec per user). Label enforcement at decrypt (Albrecht defense — 57 domain separation labels).
+- **User sigchain**: Append-only hash-chained, Ed25519-signed device authorization records. PUK (Per-User Key) with Cascading Lazy Key Rotation. MLS via OpenMLS (behind `mls` feature flag) for hub state.
+- **SFrame voice E2EE**: Key derivation integrated into `packages/crypto` for encrypted voice channel media.
+- **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. Device private keys NEVER enter the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.
+- **packages/crypto**: Shared Rust crypto crate (formerly separate `llamenos-core` repo). All crypto operations (HPKE, Ed25519/Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305, SFrame, MLS) implemented once in Rust, compiled to native (Tauri), WASM (browser), and UniFFI (mobile). Desktop links via `apps/desktop/Cargo.toml` path dep to `../../packages/crypto`.
+- **Signal notification sidecar**: `signal-notifier/` at port 3100. Zero-knowledge: resolves contacts via HMAC-hashed identifiers, never stores plaintext phone numbers. Shared `SIGNAL_NOTIFIER_BEARER_TOKEN` between app and sidecar.
+- **Firehose inference agent**: LLM-powered message extraction using OpenAI-compatible SDK. Processes incoming message streams for structured data extraction.
 - **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates Swift Codable structs and Kotlin @Serializable data classes from Zod schemas (via `toJSONSchema()` + quicktype). Also generates crypto label constants from `crypto-labels.json`. Zod schemas in `packages/protocol/schemas/` are the single source of truth (moved from `apps/worker/schemas/`). Schema registry in `packages/protocol/tools/schema-registry.ts` maps 85+ Zod schemas to named types. Kotlin post-processor injects `@Serializable` defaults for `.optional().default()` fields. Swift post-processor strips convenience extensions, adds `Sendable`, renames 15 types that shadow builtins. Run `bun run codegen` after schema changes. Generated output is gitignored — codegen runs as a build prerequisite.
-- **Key management**: PIN-encrypted keys stored in Tauri Store (desktop), iOS Keychain, or Android Keystore (EncryptedSharedPreferences). Rust CryptoState holds the nsec; UI only sees pubkey. Device linking via ephemeral ECDH provisioning rooms.
+- **Key management**: PIN-encrypted per-device Ed25519/X25519 keys stored in Tauri Store (desktop), iOS Keychain, or Android Keystore (EncryptedSharedPreferences). Rust CryptoState holds device private key; UI only sees pubkey. Device linking via ephemeral ECDH provisioning rooms. User sigchain authorizes new devices.
 - **Tauri IPC mock for tests**: Playwright tests run in a regular browser. `PLAYWRIGHT_TEST=true` triggers Vite aliases that route `@tauri-apps/api/core` and `@tauri-apps/plugin-store` to JS mock implementations in `tests/mocks/`. The mock maintains a CryptoState that mirrors the Rust side.
-- **Mobile crypto**: iOS uses UniFFI XCFramework from `packages/crypto/`, Android uses JNI `.so` files. Both wrap CryptoService as a singleton — `nsecHex` is private and never leaves the service layer.
+- **Mobile crypto**: iOS uses UniFFI XCFramework from `packages/crypto/`, Android uses JNI `.so` files. Both wrap CryptoService as a singleton — device private key is private and never leaves the service layer.
 - **Nostr relay real-time**: Ephemeral kind 20001 events via strfry (self-hosted) or Nosflare (CF). All event content encrypted with hub key. Generic tags (`["t", "llamenos:event"]`) — relay cannot distinguish event types.
-- **Hub key distribution**: Random 32 bytes (`crypto.getRandomValues`), ECIES-wrapped individually per member via `LABEL_HUB_KEY_WRAP`. Rotation on member departure excludes departed member.
+- **Hub key distribution**: Random 32 bytes (`crypto.getRandomValues`), HPKE-wrapped individually per member via `LABEL_HUB_KEY_WRAP`. Rotation on member departure excludes departed member.
 - **Client-side transcription**: WASM Whisper via `@huggingface/transformers` ONNX runtime. AudioWorklet ring buffer → Web Worker isolation. Audio never leaves the browser.
-- **Reproducible builds**: `Dockerfile.build` with `SOURCE_DATE_EPOCH`, content-hashed filenames. `CHECKSUMS.txt` in GitHub Releases. SLSA provenance. Verification via `scripts/verify-build.sh`.
+- **Reproducible builds**: `Dockerfile.build` with `SOURCE_DATE_EPOCH`, content-hashed filenames. `CHECKSUMS.txt` in GitHub Releases. SLSA provenance + SBOM + cosign. knope manages release PRs automatically — never manually bump versions. Verification via `scripts/verify-build.sh`.
 - **Hash-chained audit log**: SHA-256 chain with `previousEntryHash` + `entryHash` for tamper detection (Epic 77).
-- **Domain separation**: All 28 crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts.
+- **Domain separation**: All 57 crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts. Label enforced at decrypt (Albrecht defense).
+- **Blast/Broadcast service**: PostgreSQL-backed delivery queue with per-channel rate limiting. Manages batched delivery of bulk messages (SMS/WhatsApp/Signal/Telegram/RCS) with per-recipient status tracking and retry logic.
+- **Kubernetes health probes**: `/health/ready` and `/health/live` endpoints. Prometheus ServiceMonitor configured. Caddyfile.production with security headers. Ansible preflight + smoke-check playbooks.
 
 ## Gotchas
 
 - `@noble/ciphers` and `@noble/hashes` require `.js` extension in imports (e.g., `@noble/ciphers/chacha.js`)
 - `schnorr` is a separate named export: `import { schnorr } from '@noble/curves/secp256k1.js'`
 - Nostr pubkeys are x-only (32 bytes) — prepend `"02"` for ECDH compressed format
-- `secp256k1.getSharedSecret()` returns 33 bytes; extract x-coord with `.slice(1, 33)`
 - Nostr relay (strfry) is a core service, not optional — always runs with Docker Compose and Helm
 - `SERVER_NOSTR_SECRET` must be exactly 64 hex chars; server derives its Nostr keypair via HKDF
 - Hub key is random bytes, NOT derived from any identity key — see `hub-key-manager.ts`
+- **`asterisk-bridge/` no longer exists** — replaced by `sip-bridge/`. Use `PBX_TYPE` env var to select ARI/ESL/Kamailio backend.
+- **HPKE replaces ECIES**: All new key-wrapping code must use HPKE (RFC 9180 X25519-HKDF-SHA256-AES256-GCM). No secp256k1 ECIES for new features.
+- **Per-device keys, not nsec**: Users have Ed25519/X25519 device keys authorized via sigchain. `nsec` is no longer the identity primitive.
+- **Signal notifier auth**: `SIGNAL_NOTIFIER_BEARER_TOKEN` must match between app config and `signal-notifier/` sidecar config.
+- **knope manages versions**: Never manually bump `package.json`, `Cargo.toml`, or platform version files. knope auto-maintains release PRs with changelogs.
 - **Tauri-only desktop**: No browser/PWA fallback. `platform.ts` always routes through Tauri IPC. Use `PLAYWRIGHT_TEST=true` for test builds that mock the IPC layer.
 - **packages/crypto path dep**: `apps/desktop/Cargo.toml` references `../../packages/crypto`. No external repo needed.
 - **wrangler.jsonc**: Only exists at `site/wrangler.jsonc` (Cloudflare Pages, marketing site). No wrangler config in `apps/worker/` — the backend is Bun+PostgreSQL, not a Cloudflare Worker.
@@ -174,14 +186,20 @@ docs/
 # 1. Start backing services (PostgreSQL, MinIO, strfry)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
+# Optional profiles: --profile signal  --profile telephony  --profile inference  --profile monitoring
+# telephony profile adds Kamailio + CoTURN; signal adds signal-notifier sidecar
+
 # 2. Start app locally (auto-reloads on code changes via --watch)
 bun run dev:server
 
 # 3. Run backend BDD tests
 bun run test:backend:bdd
+
+# 4. Full sidecar integration tests (signal-notifier, inference agent, etc.)
+scripts/test-integration-full.sh
 ```
 
-**NEVER use the production compose** (`deploy/docker/docker-compose.yml`) for local development or testing. It bundles the app into a Docker image that won't reflect code changes until rebuilt. The `docker-compose.test.yml` overlay is for CI only.
+**NEVER use the production compose** (`deploy/docker/docker-compose.yml`) for local development or testing. It bundles the app into a Docker image that won't reflect code changes until rebuilt. The `docker-compose.ci.yml` overlay is for CI; `docker-compose.production.yml` overlay is for production.
 
 ```bash
 # iOS (runs locally on Mac M4)
@@ -245,8 +263,8 @@ bun run deploy:site                      # Deploy marketing site only
 bun run test:android                     # Unit tests + lint + build androidTest APK
 bun run test:android:e2e                 # Cucumber BDD E2E on connected device/emulator
 
-# Version Management
-bun run version:bump <major|minor|patch> [description]     # Bump version across ALL platforms
+# Version Management (managed by knope — do NOT manually edit version files)
+bun run version:bump <major|minor|patch> [description]     # Bump version across ALL platforms via knope
 
 # Utilities
 bun run bootstrap-admin                  # Generate admin keypair
