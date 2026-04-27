@@ -58,7 +58,7 @@ serde_json = "1"
 thiserror = "2"
 
 # UniFFI for Swift/Kotlin bindings
-uniffi = { version = "0.28", optional = true }
+uniffi = { version = "0.31", optional = true }
 
 # WASM bindings for web browser
 wasm-bindgen = { version = "0.2", optional = true }
