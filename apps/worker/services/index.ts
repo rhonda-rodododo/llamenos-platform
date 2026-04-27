@@ -17,6 +17,7 @@ import { BlastsService } from './blasts'
 import { ContactsService } from './contacts'
 import { CasesService } from './cases'
 import { TaskScheduler } from './scheduler'
+import { CryptoKeysService } from './crypto-keys'
 
 export interface Services {
   identity: IdentityService
@@ -30,6 +31,8 @@ export interface Services {
   contacts: ContactsService
   cases: CasesService
   scheduler: TaskScheduler
+  /** Phase 6: sigchain, PUK envelope, and MLS message operations */
+  cryptoKeys: CryptoKeysService
 }
 
 export function createServices(db: Database, opts?: { hmacSecret?: string }): Services {
@@ -46,6 +49,7 @@ export function createServices(db: Database, opts?: { hmacSecret?: string }): Se
     contacts: new ContactsService(db),
     cases: new CasesService(db),
     scheduler: new TaskScheduler(db),
+    cryptoKeys: new CryptoKeysService(db),
   }
 }
 
@@ -62,4 +66,5 @@ export {
   ContactsService,
   CasesService,
   TaskScheduler,
+  CryptoKeysService,
 }

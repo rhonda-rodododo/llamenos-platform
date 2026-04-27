@@ -38,6 +38,9 @@ import entitySchemaRoutes from './routes/entity-schema'
 import evidenceRoutes from './routes/evidence'
 import geocodingRoutes from './routes/geocoding'
 import analyticsRoutes from './routes/analytics'
+import sigchainRoutes from './routes/sigchain'
+import pukRoutes from './routes/puk'
+import mlsRoutes from './routes/mls'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { openAPIRouteHandler } from 'hono-openapi'
@@ -165,6 +168,10 @@ authenticated.route('/', evidenceRoutes)
 authenticated.route('/system', systemRoutes)
 authenticated.route('/geocoding', geocodingRoutes)
 authenticated.route('/analytics', analyticsRoutes)
+// Phase 6: per-user sigchain (mounted at /users/:targetPubkey/sigchain via nested router)
+authenticated.route('/users/:targetPubkey/sigchain', sigchainRoutes)
+// Phase 6: PUK envelope distribution and retrieval
+authenticated.route('/puk', pukRoutes)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
@@ -185,6 +192,8 @@ hubScoped.route('/events', eventsRoutes)
 hubScoped.route('/settings/cms', entitySchemaRoutes)
 hubScoped.route('/analytics', analyticsRoutes)
 hubScoped.route('/', evidenceRoutes)
+// Phase 6: MLS handshake message routing (hub-scoped)
+hubScoped.route('/mls', mlsRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

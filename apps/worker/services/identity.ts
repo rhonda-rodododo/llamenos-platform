@@ -792,6 +792,10 @@ export class IdentityService {
     platform: 'ios' | 'android'
     pushToken: string
     wakeKeyPublic: string
+    /** Phase 6: Ed25519 signing public key (hex, optional for legacy clients) */
+    ed25519Pubkey?: string
+    /** Phase 6: X25519 key-agreement public key (hex, optional for legacy clients) */
+    x25519Pubkey?: string
   }): Promise<void> {
     const now = new Date()
 
@@ -813,6 +817,8 @@ export class IdentityService {
         .update(devices)
         .set({
           wakeKeyPublic: data.wakeKeyPublic,
+          ...(data.ed25519Pubkey !== undefined && { ed25519Pubkey: data.ed25519Pubkey }),
+          ...(data.x25519Pubkey !== undefined && { x25519Pubkey: data.x25519Pubkey }),
           lastSeenAt: now,
         })
         .where(eq(devices.id, existing[0].id))
@@ -841,9 +847,49 @@ export class IdentityService {
       platform: data.platform,
       pushToken: data.pushToken,
       wakeKeyPublic: data.wakeKeyPublic,
+      ed25519Pubkey: data.ed25519Pubkey,
+      x25519Pubkey: data.x25519Pubkey,
       registeredAt: now,
       lastSeenAt: now,
     })
+  }
+
+  /**
+   * List all registered devices for a user.
+   */
+  async listDevices(pubkey: string): Promise<Array<{
+    id: string
+    platform: string
+    wakeKeyPublic: string | null
+    ed25519Pubkey: string | null
+    x25519Pubkey: string | null
+    registeredAt: Date
+    lastSeenAt: Date | null
+  }>> {
+    return this.db
+      .select({
+        id: devices.id,
+        platform: devices.platform,
+        wakeKeyPublic: devices.wakeKeyPublic,
+        ed25519Pubkey: devices.ed25519Pubkey,
+        x25519Pubkey: devices.x25519Pubkey,
+        registeredAt: devices.registeredAt,
+        lastSeenAt: devices.lastSeenAt,
+      })
+      .from(devices)
+      .where(eq(devices.pubkey, pubkey))
+  }
+
+  /**
+   * Deregister a single device by ID (owner-only — caller must verify ownership).
+   * Returns true if a device was deleted, false if not found.
+   */
+  async deleteDeviceById(pubkey: string, deviceId: string): Promise<boolean> {
+    const deleted = await this.db
+      .delete(devices)
+      .where(and(eq(devices.pubkey, pubkey), eq(devices.id, deviceId)))
+      .returning({ id: devices.id })
+    return deleted.length > 0
   }
 
   /**

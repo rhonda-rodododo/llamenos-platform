@@ -152,6 +152,9 @@ export const devices = pgTable(
     pushToken: text('push_token'),
     voipToken: text('voip_token'),
     wakeKeyPublic: text('wake_key_public'),
+    // Phase 6 crypto: per-device key material for HPKE/PUK distribution
+    ed25519Pubkey: text('ed25519_pubkey'),   // hex-encoded Ed25519 signing public key
+    x25519Pubkey: text('x25519_pubkey'),     // hex-encoded X25519 key agreement public key
     registeredAt: timestamp('registered_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
