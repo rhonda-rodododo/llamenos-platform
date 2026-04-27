@@ -5,8 +5,24 @@ import { requirePermission } from '../middleware/permission-guard'
 import { audit } from '../services/audit'
 import { validateExternalUrl } from '../lib/ssrf-guard'
 import { setupStateSchema, setupCompleteBodySchema } from '@protocol/schemas/settings'
-import { setupStateResponseSchema, connectionTestResponseSchema, testSignalBodySchema, testWhatsAppBodySchema } from '@protocol/schemas/setup'
+import {
+  setupStateResponseSchema,
+  connectionTestResponseSchema,
+  testSignalBodySchema,
+  testWhatsAppBodySchema,
+  signalRegisterBodySchema,
+  signalVerifyBodySchema,
+  signalUnregisterBodySchema,
+  signalRegistrationResponseSchema,
+  signalAccountInfoResponseSchema,
+} from '@protocol/schemas/setup'
 import { authErrors } from '../openapi/helpers'
+import {
+  startRegistration,
+  verifyRegistration,
+  unregisterNumber,
+  getAccountInfo,
+} from '../messaging/signal/registration'
 
 const setup = new Hono<AppEnv>()
 
@@ -202,6 +218,172 @@ setup.post('/test/whatsapp', requirePermission('settings:manage-messaging'),
       const message = err instanceof Error ? err.message : 'Connection failed'
       return c.json({ ok: false, error: message }, 400)
     }
+  })
+
+// --- Signal Registration ---
+
+// Start Signal registration (request verification code)
+setup.post('/signal/register', requirePermission('settings:manage-messaging'),
+  describeRoute({
+    tags: ['Setup', 'Signal'],
+    summary: 'Start Signal number registration',
+    description: 'Initiates Signal registration via the bridge. Signal will send a verification code via SMS or voice call.',
+    responses: {
+      200: {
+        description: 'Registration state',
+        content: {
+          'application/json': {
+            schema: resolver(signalRegistrationResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  validator('json', signalRegisterBodySchema),
+  async (c) => {
+    const body = c.req.valid('json')
+
+    const bridgeError = validateExternalUrl(body.bridgeUrl, 'Bridge URL')
+    if (bridgeError) {
+      return c.json({ step: 'failed' as const, error: bridgeError }, 400)
+    }
+
+    const result = await startRegistration({
+      bridgeUrl: body.bridgeUrl,
+      bridgeApiKey: body.bridgeApiKey,
+      phoneNumber: body.phoneNumber,
+      useVoice: body.useVoice,
+      captcha: body.captcha,
+    })
+
+    const services = c.get('services')
+    await audit(services.audit, 'signalRegistrationStarted', c.get('user').pubkey, {
+      numberLast4: body.phoneNumber.slice(-4),
+      step: result.step,
+    })
+
+    return c.json(result)
+  })
+
+// Verify Signal registration code
+setup.post('/signal/verify', requirePermission('settings:manage-messaging'),
+  describeRoute({
+    tags: ['Setup', 'Signal'],
+    summary: 'Verify Signal registration code',
+    description: 'Completes Signal registration by verifying the code received via SMS or voice call.',
+    responses: {
+      200: {
+        description: 'Verification result',
+        content: {
+          'application/json': {
+            schema: resolver(signalRegistrationResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  validator('json', signalVerifyBodySchema),
+  async (c) => {
+    const body = c.req.valid('json')
+
+    const bridgeError = validateExternalUrl(body.bridgeUrl, 'Bridge URL')
+    if (bridgeError) {
+      return c.json({ step: 'failed' as const, error: bridgeError }, 400)
+    }
+
+    const result = await verifyRegistration({
+      bridgeUrl: body.bridgeUrl,
+      bridgeApiKey: body.bridgeApiKey,
+      phoneNumber: body.phoneNumber,
+      verificationCode: body.verificationCode,
+    })
+
+    const services = c.get('services')
+    await audit(services.audit, 'signalRegistrationVerified', c.get('user').pubkey, {
+      numberLast4: body.phoneNumber.slice(-4),
+      step: result.step,
+    })
+
+    return c.json(result)
+  })
+
+// Unregister Signal number
+setup.post('/signal/unregister', requirePermission('settings:manage-messaging'),
+  describeRoute({
+    tags: ['Setup', 'Signal'],
+    summary: 'Unregister Signal number',
+    description: 'Unregisters the phone number from Signal. Use when decommissioning a number.',
+    responses: {
+      200: {
+        description: 'Unregistration result',
+        content: {
+          'application/json': {
+            schema: resolver(connectionTestResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  validator('json', signalUnregisterBodySchema),
+  async (c) => {
+    const body = c.req.valid('json')
+
+    const bridgeError = validateExternalUrl(body.bridgeUrl, 'Bridge URL')
+    if (bridgeError) {
+      return c.json({ ok: false, error: bridgeError }, 400)
+    }
+
+    const result = await unregisterNumber({
+      bridgeUrl: body.bridgeUrl,
+      bridgeApiKey: body.bridgeApiKey,
+      webhookSecret: '',
+      registeredNumber: body.registeredNumber,
+    })
+
+    const services = c.get('services')
+    await audit(services.audit, 'signalNumberUnregistered', c.get('user').pubkey, {
+      numberLast4: body.registeredNumber.slice(-4),
+      success: result.success,
+    })
+
+    return c.json({ ok: result.success, error: result.error })
+  })
+
+// Get Signal account info
+setup.get('/signal/account', requirePermission('settings:manage-messaging'),
+  describeRoute({
+    tags: ['Setup', 'Signal'],
+    summary: 'Get Signal account information',
+    description: 'Returns registration status, UUID, and linked devices for the configured Signal number.',
+    responses: {
+      200: {
+        description: 'Account information',
+        content: {
+          'application/json': {
+            schema: resolver(signalAccountInfoResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const services = c.get('services')
+    const config = await services.settings.getMessagingConfig()
+
+    if (!config?.signal) {
+      return c.json({
+        registered: false,
+        number: '',
+        error: 'Signal is not configured',
+      })
+    }
+
+    const info = await getAccountInfo(config.signal)
+    return c.json(info)
   })
 
 export default setup
