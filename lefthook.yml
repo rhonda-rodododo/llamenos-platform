@@ -9,7 +9,8 @@ pre-commit:
       run: bun run codegen && git diff --exit-code packages/protocol/generated/
     block-env-files:
       run: |
-        staged=$(git diff --cached --name-only | grep -E 'deploy/docker/\.env' || true)
+        # Block actual .env files (which may contain secrets) but allow .env.example (template)
+        staged=$(git diff --cached --name-only | grep -E 'deploy/docker/\.env' | grep -v '\.example$' || true)
         if [ -n "$staged" ]; then
           echo "ERROR: Refusing to commit deploy/docker/.env files."
           echo "These files contain secrets. Provision via orchestration layer instead."

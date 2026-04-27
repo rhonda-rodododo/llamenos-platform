@@ -1,6 +1,6 @@
 # Llamenos Dev Services
 #
-# Starts only the backing services (PostgreSQL, MinIO, strfry) without the app.
+# Starts backing services (PostgreSQL, MinIO, strfry, signal-notifier) without the app.
 # The app runs locally via `bun run dev:server`.
 #
 # Usage:
@@ -64,7 +64,31 @@ services:
       retries: 5
       start_period: 10s
 
+  # ── Signal Notifier Sidecar ──────────────────────────────
+  # Bridges the app to signal-cli-rest-api. Runs on port 3100.
+  # BEARER_TOKEN defaults to "dev-token" for local dev.
+  # Point SIGNAL_CLI_URL at a running signal-cli instance if needed.
+  signal-notifier:
+    build:
+      context: ../..
+      dockerfile: signal-notifier/Dockerfile
+    ports:
+      - "3100:3100"
+    environment:
+      - BEARER_TOKEN=${SIGNAL_NOTIFIER_BEARER_TOKEN:-dev-token}
+      - SIGNAL_CLI_URL=${SIGNAL_CLI_URL:-http://localhost:8080}
+      - PORT=3100
+    volumes:
+      - signal-notifier-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   pgdata:
   miniodata:
   strfrydata:
+  signal-notifier-data:

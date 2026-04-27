@@ -1,30 +1,36 @@
 # Llamenos Self-Hosted Docker Compose
 #
 # Core services (always start):
-#   app      - Llamenos application (Bun)
-#   postgres - PostgreSQL database
-#   caddy    - Reverse proxy with automatic TLS
-#   minio    - S3-compatible blob storage
-#   strfry   - Nostr relay for real-time events
+#   app               - Llamenos application (Bun)
+#   postgres          - PostgreSQL database
+#   caddy             - Reverse proxy with automatic TLS
+#   minio             - S3-compatible blob storage
+#   strfry            - Nostr relay for real-time events
+#   signal-notifier   - Signal notification sidecar (SQLite-backed queue)
 #
 # Optional services (via --profile):
-#   whisper   - Self-hosted transcription (profile: transcription)
-#   asterisk  - Self-hosted PBX (profile: asterisk)
+#   whisper         - Self-hosted transcription (profile: transcription)
+#   asterisk        - Self-hosted PBX (profile: asterisk)
 #   asterisk-bridge - ARI-to-webhook translator (profile: asterisk)
-#   signal-cli - Signal messaging bridge (profile: signal)
-#   glitchtip  - Sentry-compatible error tracking (profile: monitoring)
+#   signal-cli      - Signal messaging bridge (profile: signal)
+#   glitchtip       - Sentry-compatible error tracking (profile: monitoring)
+#   ollama          - Local LLM inference for firehose agent, CPU/GPU (profile: inference)
+#   vllm            - GPU-accelerated LLM inference, requires NVIDIA (profile: inference-gpu)
 #
 # Usage:
 #   cp .env.example .env && edit .env
-#   docker compose up -d                               # Core (includes relay)
-#   docker compose --profile transcription up -d        # + Whisper
-#   docker compose --profile asterisk up -d             # + Asterisk
-#   docker compose --profile signal up -d               # + Signal
-#   docker compose --profile monitoring up -d            # + GlitchTip
+#   docker compose up -d                                       # Core (includes relay)
+#   docker compose --profile transcription up -d               # + Whisper
+#   docker compose --profile asterisk up -d                    # + Asterisk
+#   docker compose --profile signal up -d                      # + Signal
+#   docker compose --profile monitoring up -d                  # + GlitchTip
+#   docker compose --profile inference up -d                   # + Ollama
+#   docker compose --profile inference-gpu up -d               # + vLLM (GPU required)
 #   COMPOSE_PROFILES=transcription,signal docker compose up -d
 #
 # IMPORTANT: You MUST set PG_PASSWORD, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
-# and BRIDGE_SECRET (if using Asterisk) in your .env file before starting.
+# SIGNAL_NOTIFIER_BEARER_TOKEN, and BRIDGE_SECRET (if using Asterisk) in
+# your .env file before starting.
 
 name: llamenos
 
@@ -279,6 +285,39 @@ services:
       retries: 5
       start_period: 5s
 
+  # ── Core: Signal Notifier Sidecar ────────────────────────
+  # Bridges the Llamenos app to signal-cli-rest-api.
+  # Queues outbound Signal messages in SQLite for durability and delivers
+  # them to signal-cli. Runs on port 3100 (internal only).
+  # Requires SIGNAL_NOTIFIER_BEARER_TOKEN — shared secret with the main app.
+  # Connects to signal-cli via SIGNAL_CLI_URL (only functional when signal profile active).
+  signal-notifier:
+    build:
+      context: ../..
+      dockerfile: signal-notifier/Dockerfile
+    restart: unless-stopped
+    environment:
+      - "NOTIFIER_API_KEY=${SIGNAL_NOTIFIER_BEARER_TOKEN:?SIGNAL_NOTIFIER_BEARER_TOKEN is required — generate with openssl rand -hex 32}"
+      - "NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-${HMAC_SECRET:?HMAC_SECRET is required}}"
+      - SIGNAL_CLI_URL=${SIGNAL_CLI_URL:-http://signal-cli:8080}
+      - PORT=3100
+    volumes:
+      - signal-notifier-data:/app/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "llamenos-signal-notifier"
+
   # ── Optional: Signal Messaging ───────────────────────────
   signal-cli:
     image: bbernhard/signal-cli-rest-api:0.92@sha256:702db336aa1a87611595e66755c9ccf65b24c25589857301eabef1d46056b3c5
@@ -298,6 +337,63 @@ services:
       retries: 3
       start_period: 20s
 
+  # ── Optional: Ollama (Local LLM Inference) ───────────────
+  # Local LLM inference for the firehose agent. Runs on port 11434 (internal).
+  # CPU-only by default. Enable GPU passthrough by uncommenting the deploy section.
+  # Enable with: docker compose --profile inference up -d
+  # Pull a model after starting: docker compose exec ollama ollama pull llama3.2
+  ollama:
+    image: ollama/ollama:0.21.2
+    profiles: ["inference"]
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Uncomment to enable NVIDIA GPU passthrough (requires nvidia-container-toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ── Optional: vLLM (GPU-Accelerated LLM Inference) ───────
+  # OpenAI-compatible LLM inference server. NVIDIA GPU required.
+  # Enable with: docker compose --profile inference-gpu up -d
+  # Set VLLM_MODEL_NAME in .env to choose the model (HuggingFace model ID).
+  vllm:
+    image: vllm/vllm-openai:v0.20.0
+    profiles: ["inference-gpu"]
+    restart: unless-stopped
+    command: ["--model", "${VLLM_MODEL_NAME:-meta-llama/Meta-Llama-3-8B-Instruct}"]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - vllm-data:/root/.cache/huggingface
+    networks:
+      - internal
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 volumes:
   postgres-data:
   caddy-data:
@@ -306,6 +402,9 @@ volumes:
   nostr-data:
   asterisk-config:
   signal-data:
+  signal-notifier-data:
+  ollama-data:
+  vllm-data:
 
 networks:
   web:
