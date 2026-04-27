@@ -348,7 +348,7 @@ pub fn ecies_decrypt_content(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::labels::LABEL_NOTE_KEY;
+    use crate::labels::{LABEL_NOTE_KEY, LABEL_TRANSCRIPTION};
 
     #[test]
     fn roundtrip_ecies_wrap_unwrap() {
@@ -508,7 +508,7 @@ mod tests {
         let recipient_sk_hex = hex::encode(recipient_sk.to_bytes());
 
         let content = "This is a transcription of the call";
-        let label = "llamenos:transcription";
+        let label = LABEL_TRANSCRIPTION;
 
         // Encrypt with v2
         let (packed_hex, ephemeral_hex) =
@@ -531,7 +531,7 @@ mod tests {
         let recipient_pk_encoded = recipient_pk.to_encoded_point(true);
         let recipient_xonly_hex = hex::encode(&recipient_pk_encoded.as_bytes()[1..]);
         let recipient_sk_hex = hex::encode(recipient_sk.to_bytes());
-        let label = "llamenos:transcription";
+        let label = LABEL_TRANSCRIPTION;
 
         let ephemeral_secret = EphemeralSecret::random(&mut OsRng);
         let ephemeral_public = ephemeral_secret.public_key();

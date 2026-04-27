@@ -319,7 +319,9 @@ impl MlsManager {
 /// Derive hub PTK from MLS export secret.
 ///
 /// `hub_ptk = HKDF-Expand(export_secret, LABEL_HUB_PTK + ":" + hub_id_hex, 32)`
-pub fn derive_hub_ptk(export_secret: &[u8], hub_id: &[u8]) -> [u8; 32] {
+///
+/// Returns `Zeroizing<[u8; 32]>` to ensure the PTK is zeroed on drop.
+pub fn derive_hub_ptk(export_secret: &[u8], hub_id: &[u8]) -> zeroize::Zeroizing<[u8; 32]> {
     use hkdf::Hkdf;
     use sha2::Sha256;
 
@@ -328,7 +330,7 @@ pub fn derive_hub_ptk(export_secret: &[u8], hub_id: &[u8]) -> [u8; 32] {
     let mut ptk = [0u8; 32];
     hk.expand(info.as_bytes(), &mut ptk)
         .expect("HKDF expand should not fail for 32 bytes");
-    ptk
+    zeroize::Zeroizing::new(ptk)
 }
 
 #[cfg(test)]
@@ -428,10 +430,10 @@ mod tests {
         let hub_id = b"hub-123";
         let ptk1 = derive_hub_ptk(&secret, hub_id);
         let ptk2 = derive_hub_ptk(&secret, hub_id);
-        assert_eq!(ptk1, ptk2);
-        assert_ne!(ptk1, [0u8; 32]);
+        assert_eq!(*ptk1, *ptk2);
+        assert_ne!(*ptk1, [0u8; 32]);
 
         let ptk3 = derive_hub_ptk(&secret, b"hub-456");
-        assert_ne!(ptk1, ptk3);
+        assert_ne!(*ptk1, *ptk3);
     }
 }
