@@ -37,6 +37,7 @@ pub mod sigchain;
 
 #[cfg(feature = "mls")]
 pub mod mls;
+pub mod sframe;
 
 // === Stable modules (curve-independent) ===
 pub mod blind_index;
