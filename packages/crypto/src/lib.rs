@@ -35,6 +35,9 @@ pub mod labels;
 pub mod puk;
 pub mod sigchain;
 
+#[cfg(feature = "mls")]
+pub mod mls;
+
 // === Stable modules (curve-independent) ===
 pub mod blind_index;
 pub mod errors;
