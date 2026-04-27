@@ -127,3 +127,8 @@ export interface RBMApiResponse {
     status: string
   }
 }
+
+export interface RBMCapabilityResponse {
+  features?: string[]
+  supported?: boolean
+}
