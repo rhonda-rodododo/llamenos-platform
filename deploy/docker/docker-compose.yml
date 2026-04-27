@@ -342,7 +342,7 @@ services:
   # Enable with: docker compose --profile inference up -d
   # Pull a model after starting: docker compose exec ollama ollama pull llama3.2
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.21.2
     profiles: ["inference"]
     restart: unless-stopped
     volumes:
@@ -369,7 +369,7 @@ services:
   # Enable with: docker compose --profile inference-gpu up -d
   # Set VLLM_MODEL_NAME in .env to choose the model (HuggingFace model ID).
   vllm:
-    image: vllm/vllm-openai:latest
+    image: vllm/vllm-openai:v0.20.0
     profiles: ["inference-gpu"]
     restart: unless-stopped
     command: ["--model", "${VLLM_MODEL_NAME:-meta-llama/Meta-Llama-3-8B-Instruct}"]
