@@ -115,6 +115,13 @@ messaging.post('/:channel/webhook', async (c) => {
           }
         }
 
+        // Also correlate with blast deliveries (non-blocking)
+        if (statusUpdate.externalId) {
+          c.executionCtx.waitUntil(
+            correlateBlastDeliveryStatus(services, statusUpdate.externalId, statusUpdate.status, statusUpdate.failureReason)
+          )
+        }
+
         return c.json({ ok: true })
       }
     } catch {
@@ -339,6 +346,42 @@ async function tryAutoAssign(
     logger.info('Auto-assigned conversation', { conversationId, assignedTo: bestCandidate.slice(0, 8) })
   } catch (err) {
     console.error('[messaging] Auto-assignment failed:', err)
+  }
+}
+
+/**
+ * Correlate a messaging provider delivery status with blast deliveries.
+ * If the externalId matches a blast delivery, update its status accordingly.
+ */
+async function correlateBlastDeliveryStatus(
+  services: Services,
+  externalId: string,
+  status: import('../types').MessageDeliveryStatus,
+  failureReason?: string,
+): Promise<void> {
+  try {
+    const delivery = await services.blasts.findDeliveryByExternalId(externalId)
+    if (!delivery) return // Not a blast delivery
+
+    switch (status) {
+      case 'delivered':
+      case 'read':
+        await services.blasts.markDeliveryDelivered(delivery.id)
+        break
+      case 'failed':
+        await services.blasts.markDeliveryFailed(
+          delivery.id,
+          failureReason ?? 'Delivery failed (provider)',
+          delivery.attempts,
+        )
+        break
+      // 'sent' and 'pending' are already tracked at send time
+    }
+
+    // Sync blast stats (non-blocking)
+    await services.blasts.syncBlastStats(delivery.blastId)
+  } catch (err) {
+    console.error('[messaging] Blast delivery correlation failed:', err)
   }
 }
 

@@ -235,12 +235,13 @@ export interface Blast {
   id: string
   name: string
   content: BlastContent
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled'
+  status: 'draft' | 'scheduled' | 'sending' | 'paused' | 'sent' | 'cancelled'
   targetChannels: MessagingChannelType[]
   targetTags: string[]            // empty = all subscribers
   targetLanguages: string[]       // empty = all languages
   scheduledAt?: string
   sentAt?: string
+  completedAt?: string
   cancelledAt?: string
   createdBy: string               // pubkey
   createdAt: string
@@ -256,6 +257,24 @@ export interface BlastContent {
   smsText?: string
   whatsappTemplateId?: string
   rcsRichCard?: boolean
+}
+
+export type BlastDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'opted_out' | 'skipped'
+
+export interface BlastDelivery {
+  id: string
+  blastId: string
+  subscriberId: string
+  channel: MessagingChannelType
+  status: BlastDeliveryStatus
+  externalId?: string
+  attempts: number
+  lastAttemptAt?: string
+  nextRetryAt?: string
+  deliveredAt?: string
+  failedAt?: string
+  error?: string
+  createdAt: string
 }
 
 export interface BlastStats {
@@ -274,7 +293,8 @@ export interface BlastSettings {
   doubleOptIn: boolean
   optOutFooter: string            // appended to every blast message
   maxBlastsPerDay: number
-  rateLimitPerSecond: number      // sending rate
+  rateLimitPerSecond: number      // global fallback sending rate
+  rateLimits: Record<MessagingChannelType, number>  // per-channel rates
 }
 
 export const DEFAULT_BLAST_SETTINGS: BlastSettings = {
@@ -286,6 +306,7 @@ export const DEFAULT_BLAST_SETTINGS: BlastSettings = {
   optOutFooter: '\nReply STOP to unsubscribe.',
   maxBlastsPerDay: 10,
   rateLimitPerSecond: 10,
+  rateLimits: { sms: 10, whatsapp: 25, signal: 15, rcs: 10 },
 }
 
 // --- Setup State ---

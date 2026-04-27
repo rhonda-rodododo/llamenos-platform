@@ -1363,8 +1363,8 @@ export async function seedDemoData() {
 
 // --- Blasts ---
 
-import type { Subscriber, Blast, BlastContent, BlastSettings } from '@shared/types'
-export type { Subscriber, Blast, BlastContent, BlastSettings }
+import type { Subscriber, Blast, BlastContent, BlastSettings, BlastStats, BlastDelivery, BlastDeliveryStatus } from '@shared/types'
+export type { Subscriber, Blast, BlastContent, BlastSettings, BlastStats, BlastDelivery, BlastDeliveryStatus }
 
 export async function listSubscribers(params?: { tag?: string; channel?: string; status?: string }) {
   const searchParams = new URLSearchParams()
@@ -1425,6 +1425,21 @@ export async function scheduleBlast(id: string, scheduledAt: string) {
 
 export async function cancelBlast(id: string) {
   return request<{ blast: Blast }>(hp(`/blasts/${id}/cancel`), { method: 'POST' })
+}
+
+export async function getBlastStats(id: string) {
+  return request<BlastStats>(hp(`/blasts/${id}/stats`))
+}
+
+export async function getBlastDeliveries(id: string, opts?: { status?: BlastDeliveryStatus; page?: number; limit?: number }) {
+  const params = new URLSearchParams()
+  if (opts?.status) params.set('status', opts.status)
+  if (opts?.page) params.set('page', String(opts.page))
+  if (opts?.limit) params.set('limit', String(opts.limit))
+  const qs = params.toString()
+  return request<{ deliveries: BlastDelivery[]; total: number; page: number; limit: number }>(
+    hp(`/blasts/${id}/deliveries${qs ? `?${qs}` : ''}`)
+  )
 }
 
 export async function getBlastSettings() {
