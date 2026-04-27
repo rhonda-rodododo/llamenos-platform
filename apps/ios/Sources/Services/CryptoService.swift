@@ -4,50 +4,73 @@ import Foundation
 // Needed because CryptoService method names shadow some global function names.
 // At file scope there is no `self`, so these unambiguously refer to the UniFFI functions.
 
-private func ffiGenerateKeypair() -> KeyPair {
-    generateKeypair()
+// V3 device key management (stateful — secrets held in Rust memory)
+private func ffiMobileGenerateAndLoad(deviceId: String, pin: String) throws -> EncryptedDeviceKeys {
+    try mobileGenerateAndLoad(deviceId: deviceId, pin: pin)
 }
 
-private func ffiKeypairFromNsec(_ nsec: String) throws -> KeyPair {
-    try keypairFromNsec(nsec: nsec)
+private func ffiMobileUnlock(data: EncryptedDeviceKeys, pin: String) throws -> DeviceKeyState {
+    try mobileUnlock(data: data, pin: pin)
 }
 
-private func ffiKeypairFromSecretKeyHex(_ hex: String) throws -> KeyPair {
-    try keypairFromSecretKeyHex(secretKeyHex: hex)
+private func ffiMobileLock() {
+    mobileLock()
 }
 
-private func ffiIsValidPin(_ pin: String) -> Bool {
-    isValidPin(pin: pin)
+private func ffiMobileIsUnlocked() -> Bool {
+    mobileIsUnlocked()
 }
 
-private func ffiEncryptWithPin(nsec: String, pin: String, pubkeyHex: String) throws -> EncryptedKeyData {
-    try encryptWithPin(nsec: nsec, pin: pin, pubkeyHex: pubkeyHex)
+private func ffiMobileGetDeviceState() throws -> DeviceKeyState {
+    try mobileGetDeviceState()
 }
 
-private func ffiDecryptWithPin(data: EncryptedKeyData, pin: String) throws -> String {
-    try decryptWithPin(data: data, pin: pin)
+private func ffiMobileIsValidPin(_ pin: String) -> Bool {
+    mobileIsValidPin(pin: pin)
 }
 
-private func ffiCreateAuthToken(secretKeyHex: String, timestamp: UInt64, method: String, path: String) throws -> AuthToken {
-    try createAuthToken(secretKeyHex: secretKeyHex, timestamp: timestamp, method: method, path: path)
+// V3 auth (Ed25519, stateful)
+private func ffiMobileCreateAuthToken(timestamp: UInt64, method: String, path: String) throws -> AuthToken {
+    try mobileCreateAuthToken(timestamp: timestamp, method: method, path: path)
 }
 
-private func ffiEncryptNoteForRecipients(payloadJson: String, authorPubkey: String, adminPubkeys: [String]) throws -> EncryptedNote {
-    try encryptNoteForRecipients(payloadJson: payloadJson, authorPubkey: authorPubkey, adminPubkeys: adminPubkeys)
+// V3 HPKE (stateless seal, stateful open)
+private func ffiMobileHpkeSeal(plaintextHex: String, recipientPubkeyHex: String, label: String, aadHex: String) throws -> HpkeEnvelope {
+    try mobileHpkeSeal(plaintextHex: plaintextHex, recipientPubkeyHex: recipientPubkeyHex, label: label, aadHex: aadHex)
 }
 
-private func ffiDecryptNote(encryptedContent: String, envelope: KeyEnvelope, secretKeyHex: String) throws -> String {
-    try decryptNote(encryptedContent: encryptedContent, envelope: envelope, secretKeyHex: secretKeyHex)
+private func ffiMobileHpkeOpen(envelope: HpkeEnvelope, expectedLabel: String, aadHex: String) throws -> String {
+    try mobileHpkeOpen(envelope: envelope, expectedLabel: expectedLabel, aadHex: aadHex)
 }
 
-private func ffiEncryptMessageForReaders(plaintext: String, readerPubkeys: [String]) throws -> EncryptedMessage {
-    try encryptMessageForReaders(plaintext: plaintext, readerPubkeys: readerPubkeys)
+private func ffiMobileHpkeSealKey(keyHex: String, recipientPubkeyHex: String, label: String, aadHex: String) throws -> HpkeEnvelope {
+    try mobileHpkeSealKey(keyHex: keyHex, recipientPubkeyHex: recipientPubkeyHex, label: label, aadHex: aadHex)
 }
 
-private func ffiDecryptMessageForReader(encryptedContent: String, readerEnvelopes: [RecipientKeyEnvelope], secretKeyHex: String, readerPubkey: String) throws -> String {
-    try decryptMessageForReader(encryptedContent: encryptedContent, readerEnvelopes: readerEnvelopes, secretKeyHex: secretKeyHex, readerPubkey: readerPubkey)
+private func ffiMobileHpkeOpenKey(envelope: HpkeEnvelope, expectedLabel: String, aadHex: String) throws -> String {
+    try mobileHpkeOpenKey(envelope: envelope, expectedLabel: expectedLabel, aadHex: aadHex)
 }
 
+// V3 symmetric encryption (AES-256-GCM)
+private func ffiMobileSymmetricEncrypt(plaintextHex: String) throws -> [String] {
+    try mobileSymmetricEncrypt(plaintextHex: plaintextHex)
+}
+
+private func ffiMobileSymmetricDecrypt(ciphertextHex: String, keyHex: String) throws -> String {
+    try mobileSymmetricDecrypt(ciphertextHex: ciphertextHex, keyHex: keyHex)
+}
+
+// V3 PUK
+private func ffiMobilePukCreate() throws -> String {
+    try mobilePukCreate()
+}
+
+// V3 Sigchain (stateful)
+private func ffiMobileSigchainCreateLink(id: String, seq: UInt64, prevHash: String?, timestamp: String, payloadJson: String) throws -> SigchainLink {
+    try mobileSigchainCreateLink(id: id, seq: seq, prevHash: prevHash, timestamp: timestamp, payloadJson: payloadJson)
+}
+
+// Legacy functions still needed for device linking and server events
 private func ffiComputeSharedXHex(ourSecretHex: String, theirPubkeyHex: String) throws -> String {
     try computeSharedXHex(ourSecretHex: ourSecretHex, theirPubkeyHex: theirPubkeyHex)
 }
@@ -64,11 +87,19 @@ private func ffiDecryptServerEventHex(encryptedHex: String, keyHex: String) thro
     try decryptServerEventHex(encryptedHex: encryptedHex, keyHex: keyHex)
 }
 
+private func ffiMobileRandomBytesHex() -> String {
+    mobileRandomBytesHex()
+}
+
+// Legacy keypair generation still needed for device linking ephemeral ECDH
+private func ffiGenerateKeypair() -> KeyPair {
+    generateKeypair()
+}
+
 // MARK: - CryptoService
 
 enum CryptoServiceError: LocalizedError {
     case noKeyLoaded
-    case invalidNsec
     case invalidPin
     case encryptionFailed(String)
     case decryptionFailed(String)
@@ -77,8 +108,6 @@ enum CryptoServiceError: LocalizedError {
         switch self {
         case .noKeyLoaded:
             return NSLocalizedString("error_no_key_loaded", comment: "No cryptographic key is loaded")
-        case .invalidNsec:
-            return NSLocalizedString("error_invalid_nsec", comment: "The provided nsec key is invalid")
         case .invalidPin:
             return NSLocalizedString("error_invalid_pin", comment: "PIN must be 6-8 digits")
         case .encryptionFailed(let detail):
@@ -89,203 +118,240 @@ enum CryptoServiceError: LocalizedError {
     }
 }
 
-/// Central cryptographic service. The nsec (private key) is held privately and NEVER
-/// exposed outside this class. Views and view models interact only with the pubkey/npub
-/// and high-level encrypt/decrypt/sign methods.
+/// Central cryptographic service using the v3 device key model.
+///
+/// Device secrets (Ed25519 signing + X25519 encryption) are held exclusively in
+/// Rust memory via the mobile FFI state. The Swift layer only sees public keys
+/// and operation results — secrets NEVER leave the Rust process.
 ///
 /// All crypto operations delegate to LlamenosCore (UniFFI FFI via the compiled
 /// LlamenosCoreFFI.xcframework). The generated Swift bindings in Sources/Generated/
 /// provide type-safe wrappers around the Rust crypto implementation.
 @Observable
 final class CryptoService: @unchecked Sendable {
-    private(set) var pubkey: String?
-    private(set) var npub: String?
+    /// Ed25519 signing public key (hex, 64 chars). Used to identify this device.
+    private(set) var signingPubkeyHex: String?
 
-    /// The secret key in hex. NEVER exposed outside this class.
-    private var nsecHex: String?
+    /// X25519 encryption public key (hex, 64 chars). Used for HPKE decapsulation.
+    private(set) var encryptionPubkeyHex: String?
 
-    /// The nsec bech32 string, stored for PIN encryption which needs it.
-    private var nsecBech32: String?
+    /// Unique device identifier (UUID).
+    private(set) var deviceId: String?
 
-    /// Whether a key is loaded and available for signing/decryption.
-    var isUnlocked: Bool { nsecHex != nil }
+    // Used by note/message envelope matching — must be encryption pubkey for HPKE.
+    var pubkey: String? { encryptionPubkeyHex }
 
-    /// Whether any identity has been loaded (even if locked).
-    var hasIdentity: Bool { pubkey != nil }
+    /// Whether device keys are loaded and available for signing/decryption.
+    var isUnlocked: Bool { ffiMobileIsUnlocked() }
 
-    // MARK: - Key Generation
+    /// Whether any device identity has been set (even if locked).
+    var hasIdentity: Bool { signingPubkeyHex != nil }
 
-    /// Generate a new secp256k1 keypair. Returns the nsec (for one-time backup display)
-    /// and npub. The nsec is stored internally; callers must NOT persist the returned nsec.
-    @discardableResult
-    func generateKeypair() -> (nsec: String, npub: String) {
-        let kp = ffiGenerateKeypair()
-        self.nsecHex = kp.secretKeyHex
-        self.nsecBech32 = kp.nsec
-        self.pubkey = kp.publicKey
-        self.npub = kp.npub
-        return (kp.nsec, kp.npub)
+    // MARK: - Device Key Generation
+
+    /// Generate new Ed25519 + X25519 device keys, encrypt with PIN, and load into state.
+    /// Returns the encrypted key blob for persistent storage in Keychain.
+    /// Device secrets stay in Rust memory — NEVER exposed to Swift.
+    func generateDeviceKeys(deviceId: String, pin: String) throws -> EncryptedDeviceKeys {
+        guard ffiMobileIsValidPin(pin) else { throw CryptoServiceError.invalidPin }
+        let encrypted = try ffiMobileGenerateAndLoad(deviceId: deviceId, pin: pin)
+        self.signingPubkeyHex = encrypted.state.signingPubkeyHex
+        self.encryptionPubkeyHex = encrypted.state.encryptionPubkeyHex
+        self.deviceId = encrypted.state.deviceId
+        return encrypted
     }
 
-    // MARK: - Key Import
+    // MARK: - Unlock / Lock
 
-    /// Import an existing nsec (bech32 `nsec1...` or 64-char hex).
-    func importNsec(_ input: String) throws {
-        let kp: KeyPair
-        if input.hasPrefix("nsec1") {
-            kp = try ffiKeypairFromNsec(input)
-        } else if input.count == 64, input.allSatisfy(\.isHexDigit) {
-            kp = try ffiKeypairFromSecretKeyHex(input)
-        } else {
-            throw CryptoError.InvalidNsec(message: "Enter a bech32 key (nsec1...) or 64-character hex key")
-        }
-        self.nsecHex = kp.secretKeyHex
-        self.nsecBech32 = kp.nsec
-        self.pubkey = kp.publicKey
-        self.npub = kp.npub
+    /// Decrypt device keys from PIN-encrypted storage and load into Rust state.
+    /// Returns the DeviceKeyState (public keys only).
+    func unlockWithPin(data: EncryptedDeviceKeys, pin: String) throws -> DeviceKeyState {
+        let ds = try ffiMobileUnlock(data: data, pin: pin)
+        self.signingPubkeyHex = ds.signingPubkeyHex
+        self.encryptionPubkeyHex = ds.encryptionPubkeyHex
+        self.deviceId = ds.deviceId
+        return ds
     }
 
-    // MARK: - PIN Encryption
-
-    /// Encrypt the nsec for persistent storage, protected by the user's PIN.
-    /// Returns opaque encrypted data suitable for Keychain storage.
-    func encryptForStorage(pin: String) throws -> EncryptedKeyData {
-        guard let pubkey else { throw CryptoServiceError.noKeyLoaded }
-        guard let nsecBech32 else { throw CryptoServiceError.noKeyLoaded }
-        guard ffiIsValidPin(pin) else { throw CryptoServiceError.invalidPin }
-        return try ffiEncryptWithPin(nsec: nsecBech32, pin: pin, pubkeyHex: pubkey)
+    /// Lock the crypto state — zeroize device secrets in Rust, clear hub keys.
+    /// Public keys are retained for locked-state UI display ("Locked as ...").
+    func lock() {
+        ffiMobileLock()
+        clearHubKeys()
     }
 
-    /// Decrypt nsec from storage using the user's PIN and load it into memory.
-    func decryptFromStorage(_ data: EncryptedKeyData, pin: String) throws {
-        let nsec = try ffiDecryptWithPin(data: data, pin: pin)
-        try importNsec(nsec)
-    }
+    // MARK: - Auth Token (Ed25519)
 
-    // MARK: - Auth Token
-
-    /// Create a Schnorr-signed auth token for API requests.
-    /// The nsec is used for signing but never leaves this service.
+    /// Create an Ed25519-signed auth token for API requests.
+    /// The device signing key is used; secrets never leave Rust.
     func createAuthToken(method: String, path: String) throws -> AuthToken {
-        guard let nsecHex else { throw CryptoServiceError.noKeyLoaded }
-        return try Self.createAuthTokenStatic(secretHex: nsecHex, method: method, path: path)
-    }
-
-    /// Create an auth token from a known secret key (no instance state needed).
-    /// Used by test infrastructure to create tokens for admin bootstrapping.
-    static func createAuthTokenStatic(secretHex: String, method: String, path: String) throws -> AuthToken {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
         let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
-        return try ffiCreateAuthToken(
-            secretKeyHex: secretHex,
-            timestamp: timestamp,
-            method: method,
-            path: path
-        )
+        return try ffiMobileCreateAuthToken(timestamp: timestamp, method: method, path: path)
     }
 
-    // MARK: - Note Encryption
+    // MARK: - Note Encryption (HPKE)
 
-    /// Encrypt a note payload with per-note forward secrecy. The note key is ECIES-wrapped
-    /// for the author and each admin pubkey.
-    func encryptNote(payload: String, adminPubkeys: [String]) throws -> EncryptedNote {
-        guard let pubkey else { throw CryptoServiceError.noKeyLoaded }
-        return try ffiEncryptNoteForRecipients(
-            payloadJson: payload,
-            authorPubkey: pubkey,
-            adminPubkeys: adminPubkeys
-        )
-    }
-
-    // MARK: - Note Decryption
-
-    /// Decrypt a note using the recipient envelope that matches our pubkey.
-    /// Finds our envelope, unwraps the note key via ECIES, then decrypts the content
-    /// with XChaCha20-Poly1305.
+    /// Encrypt a note payload with per-note forward secrecy using HPKE key wrapping.
+    ///
+    /// 1. Generate random 32-byte symmetric key
+    /// 2. AES-256-GCM encrypt the payload with that key
+    /// 3. HPKE-seal the key to each recipient's X25519 pubkey
     ///
     /// - Parameters:
-    ///   - encryptedContent: Hex-encoded encrypted note content.
-    ///   - wrappedKey: Hex-encoded ECIES-wrapped note symmetric key.
-    ///   - ephemeralPubkey: Hex-encoded ephemeral public key used in ECIES.
-    /// - Returns: Decrypted JSON string containing the `NotePayload`.
-    func decryptNoteContent(encryptedContent: String, wrappedKey: String, ephemeralPubkey: String) throws -> String {
-        guard let nsecHex else { throw CryptoServiceError.noKeyLoaded }
-        let envelope = KeyEnvelope(wrappedKey: wrappedKey, ephemeralPubkey: ephemeralPubkey)
-        return try ffiDecryptNote(
-            encryptedContent: encryptedContent,
-            envelope: envelope,
-            secretKeyHex: nsecHex
-        )
-    }
+    ///   - payload: JSON string of the note payload.
+    ///   - recipientPubkeys: X25519 public keys of all recipients (author device + admins).
+    /// - Returns: Ciphertext hex and per-recipient HPKE envelopes.
+    func encryptNote(payload: String, recipientPubkeys: [String]) throws -> (ciphertextHex: String, envelopes: [(pubkey: String, envelope: HpkeEnvelope)]) {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
 
-    // MARK: - Message Encryption
+        let plaintextHex = payload.data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
+        let result = try ffiMobileSymmetricEncrypt(plaintextHex: plaintextHex)
+        let ciphertextHex = result[0]
+        let keyHex = result[1]
 
-    /// Encrypt a message for multiple readers with per-message forward secrecy.
-    /// A random symmetric key is generated, the plaintext is encrypted with XChaCha20-Poly1305,
-    /// and the key is ECIES-wrapped for each reader pubkey.
-    ///
-    /// - Parameters:
-    ///   - plaintext: The message text to encrypt.
-    ///   - readerPubkeys: Public keys of all recipients (assigned volunteer + admins).
-    /// - Returns: Encrypted content and recipient envelopes.
-    func encryptMessage(plaintext: String, readerPubkeys: [String]) throws -> (encryptedContent: String, envelopes: [NoteRecipientEnvelope]) {
-        guard let pubkey else { throw CryptoServiceError.noKeyLoaded }
-        let allReaders = Array(Set([pubkey] + readerPubkeys))
-        let result = try ffiEncryptMessageForReaders(
-            plaintext: plaintext,
-            readerPubkeys: allReaders
-        )
-        let envelopes = result.readerEnvelopes.map { env in
-            NoteRecipientEnvelope(ephemeralPubkey: env.ephemeralPubkey, pubkey: env.pubkey, wrappedKey: env.wrappedKey)
+        var envelopes: [(pubkey: String, envelope: HpkeEnvelope)] = []
+        for pubkey in recipientPubkeys {
+            let envelope = try ffiMobileHpkeSealKey(
+                keyHex: keyHex,
+                recipientPubkeyHex: pubkey,
+                label: CryptoLabels.LABEL_NOTE_KEY,
+                aadHex: ""
+            )
+            envelopes.append((pubkey: pubkey, envelope: envelope))
         }
-        return (result.encryptedContent, envelopes)
+
+        return (ciphertextHex, envelopes)
     }
 
-    // MARK: - Message Decryption
+    // MARK: - Note Decryption (HPKE)
 
-    /// Decrypt a message using our private key and the ECIES envelope addressed to us.
+    /// Decrypt a note using an HPKE envelope addressed to this device.
+    ///
+    /// 1. HPKE-open the key envelope using device X25519 key
+    /// 2. AES-256-GCM decrypt the content with the recovered key
     ///
     /// - Parameters:
-    ///   - encryptedContent: Hex-encoded encrypted message content.
-    ///   - wrappedKey: Hex-encoded ECIES-wrapped symmetric key.
-    ///   - ephemeralPubkey: Hex-encoded ephemeral public key used in ECIES.
-    /// - Returns: Decrypted plaintext string.
-    func decryptMessage(encryptedContent: String, wrappedKey: String, ephemeralPubkey: String) throws -> String {
-        guard let nsecHex else { throw CryptoServiceError.noKeyLoaded }
-        guard let pubkey else { throw CryptoServiceError.noKeyLoaded }
-        let envelope = RecipientKeyEnvelope(pubkey: pubkey, wrappedKey: wrappedKey, ephemeralPubkey: ephemeralPubkey)
-        return try ffiDecryptMessageForReader(
-            encryptedContent: encryptedContent,
-            readerEnvelopes: [envelope],
-            secretKeyHex: nsecHex,
-            readerPubkey: pubkey
+    ///   - ciphertextHex: Hex-encoded AES-256-GCM ciphertext (nonce || ct || tag).
+    ///   - envelope: The HPKE envelope containing the wrapped note key.
+    /// - Returns: Decrypted JSON string containing the NotePayload.
+    func decryptNote(ciphertextHex: String, envelope: HpkeEnvelope) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let keyHex = try ffiMobileHpkeOpenKey(
+            envelope: envelope,
+            expectedLabel: CryptoLabels.LABEL_NOTE_KEY,
+            aadHex: ""
+        )
+        let plaintextHex = try ffiMobileSymmetricDecrypt(ciphertextHex: ciphertextHex, keyHex: keyHex)
+        guard let data = hexToData(plaintextHex), let result = String(data: data, encoding: .utf8) else {
+            throw CryptoServiceError.decryptionFailed("Invalid UTF-8 in decrypted note")
+        }
+        return result
+    }
+
+    // MARK: - Message Encryption (HPKE)
+
+    /// Encrypt a message for multiple readers with per-message forward secrecy using HPKE.
+    func encryptMessage(plaintext: String, readerPubkeys: [String]) throws -> (encryptedContent: String, envelopes: [NoteRecipientEnvelope]) {
+        guard let encPubkey = encryptionPubkeyHex else { throw CryptoServiceError.noKeyLoaded }
+        let allReaders = Array(Set([encPubkey] + readerPubkeys))
+
+        let plaintextHex = plaintext.data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
+        let result = try ffiMobileSymmetricEncrypt(plaintextHex: plaintextHex)
+        let ciphertextHex = result[0]
+        let keyHex = result[1]
+
+        var envelopes: [NoteRecipientEnvelope] = []
+        for pubkey in allReaders {
+            let hpkeEnv = try ffiMobileHpkeSealKey(
+                keyHex: keyHex,
+                recipientPubkeyHex: pubkey,
+                label: CryptoLabels.LABEL_MESSAGE,
+                aadHex: ""
+            )
+            // Map HPKE envelope to the protocol RecipientEnvelope format
+            envelopes.append(NoteRecipientEnvelope(
+                ephemeralPubkey: hpkeEnv.enc,
+                pubkey: pubkey,
+                wrappedKey: hpkeEnv.ct
+            ))
+        }
+
+        return (ciphertextHex, envelopes)
+    }
+
+    // MARK: - Message Decryption (HPKE)
+
+    /// Decrypt a message using an HPKE envelope addressed to this device.
+    func decryptMessage(encryptedContent: String, envelope: HpkeEnvelope) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let keyHex = try ffiMobileHpkeOpenKey(
+            envelope: envelope,
+            expectedLabel: CryptoLabels.LABEL_MESSAGE,
+            aadHex: ""
+        )
+        let plaintextHex = try ffiMobileSymmetricDecrypt(ciphertextHex: encryptedContent, keyHex: keyHex)
+        guard let data = hexToData(plaintextHex), let result = String(data: data, encoding: .utf8) else {
+            throw CryptoServiceError.decryptionFailed("Invalid UTF-8 in decrypted message")
+        }
+        return result
+    }
+
+    // MARK: - PUK Operations
+
+    /// Create the initial Per-User Key (generation 1).
+    /// Returns JSON with pukState, seedHex, and device envelope.
+    func createInitialPuk() throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobilePukCreate()
+    }
+
+    /// Unwrap a PUK seed from an HPKE envelope addressed to this device.
+    func unwrapPukSeed(envelope: HpkeEnvelope, aad: String) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let aadHex = aad.data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
+        return try ffiMobileHpkeOpenKey(
+            envelope: envelope,
+            expectedLabel: CryptoLabels.LABEL_PUK_WRAP_TO_DEVICE,
+            aadHex: aadHex
         )
     }
 
-    // MARK: - Device Linking ECDH
+    // MARK: - Sigchain Operations
+
+    /// Create a new sigchain link signed by this device.
+    func createSigchainLink(
+        id: String,
+        seq: UInt64,
+        prevHash: String?,
+        timestamp: String,
+        payloadJson: String
+    ) throws -> SigchainLink {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobileSigchainCreateLink(
+            id: id,
+            seq: seq,
+            prevHash: prevHash,
+            timestamp: timestamp,
+            payloadJson: payloadJson
+        )
+    }
+
+    // MARK: - Device Linking ECDH (legacy secp256k1 — for provisioning protocol)
 
     /// Generate an ephemeral secp256k1 keypair for the ECDH key exchange
-    /// during device linking. Uses the main keypair generator since ephemeral
-    /// keys are the same secp256k1 type.
-    ///
-    /// - Returns: Tuple of (secretKeyHex, publicKeyHex).
+    /// during device linking.
     func generateEphemeralKeypair() -> (secretHex: String, publicHex: String) {
         let kp = ffiGenerateKeypair()
         return (kp.secretKeyHex, kp.publicKey)
     }
 
-    /// Compute an ECDH shared secret from our ephemeral secret and their ephemeral public key.
-    /// Used in the device linking protocol to establish a shared encryption key.
-    ///
-    /// - Parameters:
-    ///   - ourSecret: Our ephemeral private key in hex.
-    ///   - theirPublic: Their ephemeral public key in hex (x-only or compressed).
-    /// - Returns: The shared x-coordinate in hex (32 bytes).
+    /// Compute an ECDH shared secret for device linking.
     func deriveSharedSecret(ourSecret: String, theirPublic: String) throws -> String {
         try ffiComputeSharedXHex(ourSecretHex: ourSecret, theirPubkeyHex: theirPublic)
     }
 
-    /// Decrypt data encrypted with a shared secret (XChaCha20-Poly1305 with HKDF-derived key).
-    /// Used during device linking to decrypt the nsec sent from the desktop.
+    /// Decrypt data encrypted with a provisioning shared secret.
     func decryptWithSharedSecret(encrypted: String, sharedSecret: String) throws -> String {
         guard !encrypted.isEmpty else {
             throw CryptoServiceError.decryptionFailed("Empty ciphertext")
@@ -295,9 +361,7 @@ final class CryptoService: @unchecked Sendable {
 
     // MARK: - SAS Code
 
-    /// Derive a 6-digit Short Authentication String from the ECDH shared secret.
-    /// Both devices derive the same SAS code independently; the user visually confirms
-    /// the codes match to prevent MITM attacks during device linking.
+    /// Derive a 6-digit Short Authentication String for device linking verification.
     func deriveSASCode(sharedSecret: String) throws -> String {
         try ffiComputeSasCode(sharedXHex: sharedSecret)
     }
@@ -305,13 +369,6 @@ final class CryptoService: @unchecked Sendable {
     // MARK: - Server Event Decryption
 
     /// Decrypt a server-encrypted event payload (XChaCha20-Poly1305).
-    /// The server encrypts all Nostr relay event content with a symmetric key
-    /// returned as `serverEventKeyHex` in `GET /api/auth/me`.
-    ///
-    /// - Parameters:
-    ///   - encryptedHex: Hex-encoded ciphertext (nonce || ciphertext || tag).
-    ///   - keyHex: 64-char hex server event encryption key.
-    /// - Returns: Decrypted plaintext JSON string, or nil on failure.
     static func decryptServerEvent(encryptedHex: String, keyHex: String) -> String? {
         return try? ffiDecryptServerEventHex(encryptedHex: encryptedHex, keyHex: keyHex)
     }
@@ -343,27 +400,31 @@ final class CryptoService: @unchecked Sendable {
         return hubKeyCache
     }
 
-    /// Unwrap a hub key envelope using the user's nsec and store in the in-memory cache.
-    /// Uses eciesUnwrapKeyHex with the CryptoLabels.LABEL_HUB_KEY_WRAP domain separation label.
-    /// Requires the user's nsec to be loaded (app unlocked).
+    /// Unwrap a hub key envelope using HPKE and store in the in-memory cache.
+    /// Uses the device's X25519 key via the Rust mobile state.
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws {
         hubKeyCacheLock.lock()
         let alreadyCached = hubKeyCache[hubId] != nil
         hubKeyCacheLock.unlock()
         guard !alreadyCached else { return }
 
-        guard let nsecHex else { throw CryptoServiceError.noKeyLoaded }
-        let ffiEnvelope = KeyEnvelope(
-            wrappedKey: envelope.envelope.wrappedKey,
-            ephemeralPubkey: envelope.envelope.ephemeralPubkey
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+
+        // Build HPKE envelope from the hub key response
+        let hpkeEnvelope = HpkeEnvelope(
+            v: 3,
+            labelId: 0,  // Will be validated by the Rust HPKE open
+            enc: envelope.envelope.wrappedKey,
+            ct: envelope.envelope.ephemeralPubkey
         )
-        // FFI call happens before acquiring the lock — no point holding the lock
-        // during decryption, which may be slow and does not access hubKeyCache.
-        let keyHex = try eciesUnwrapKeyHex(
-            envelope: ffiEnvelope,
-            secretKeyHex: nsecHex,
-            label: CryptoLabels.LABEL_HUB_KEY_WRAP
+
+        // Use HPKE to unwrap the hub key
+        let keyHex = try ffiMobileHpkeOpenKey(
+            envelope: hpkeEnvelope,
+            expectedLabel: CryptoLabels.LABEL_HUB_KEY_WRAP,
+            aadHex: ""
         )
+
         hubKeyCacheLock.lock()
         defer { hubKeyCacheLock.unlock() }
         hubKeyCache[hubId] = keyHex
@@ -376,23 +437,28 @@ final class CryptoService: @unchecked Sendable {
         hubKeyCache.removeAll()
     }
 
-    // MARK: - Lock
-
-    /// Clear the nsec from memory. The pubkey and npub remain so the UI can show
-    /// which identity is locked ("Locked as npub1...").
-    func lock() {
-        nsecHex = nil
-        nsecBech32 = nil
-        clearHubKeys()
-    }
-
-    /// Store a server event encryption key directly for a hub (no ECIES unwrapping needed —
-    /// the key is provided in plaintext by `GET /api/auth/me` as `serverEventKeyHex`).
-    /// This is distinct from `loadHubKey(hubId:envelope:)` which unwraps hub membership keys.
+    /// Store a server event encryption key directly for a hub.
     func storeServerEventKey(hubId: String, keyHex: String) {
         hubKeyCacheLock.lock()
         defer { hubKeyCacheLock.unlock() }
         hubKeyCache[hubId] = keyHex
+    }
+
+    // MARK: - Hex Utility
+
+    private func hexToData(_ hex: String) -> Data? {
+        var data = Data(capacity: hex.count / 2)
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let nextIndex = hex.index(index, offsetBy: 2)
+            guard nextIndex <= hex.endIndex,
+                  let byte = UInt8(hex[index..<nextIndex], radix: 16) else {
+                return nil
+            }
+            data.append(byte)
+            index = nextIndex
+        }
+        return data
     }
 
     // MARK: - Test Support
@@ -405,43 +471,25 @@ final class CryptoService: @unchecked Sendable {
         hubKeyCache[hubId] = keyHex
     }
 
-    /// Set a deterministic test identity for XCUITest automation.
-    /// Uses the same admin secret key as the desktop Playwright tests,
-    /// Uses the admin key from XCTEST_ADMIN_SECRET env var (set by test runner).
+    /// Set up a test identity by generating device keys with a known PIN.
+    /// Used by XCUITest automation.
     func setMockIdentity() {
-        // Read from XCTEST_ADMIN_SECRET env var — set by test runner from CI secrets.
-        // Never hardcode this value in source.
-        let secretHex = ProcessInfo.processInfo.environment["XCTEST_ADMIN_SECRET"] ?? ""
-        guard !secretHex.isEmpty else {
-            print("[DEBUG] XCTEST_ADMIN_SECRET not set — mock identity not loaded")
-            return
-        }
-        setIdentity(secretHex: secretHex)
-    }
-
-    /// Set a mock volunteer identity (different keypair from admin).
-    /// Used by API-connected tests that need to test volunteer-specific behavior.
-    ///
-    /// Volunteer nsec hex: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
-    /// Pubkey:             5877220aaae6e54a6f974602d5995c0fe24a3ea7ddabd8644bec795b9da00743
-    func setMockVolunteerIdentity() {
-        let secretHex = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
-        setIdentity(secretHex: secretHex)
-    }
-
-    private func setIdentity(secretHex: String) {
+        let pin = ProcessInfo.processInfo.environment["XCTEST_MOCK_PIN"] ?? "123456"
+        let deviceId = "xctest-device-\(UUID().uuidString)"
         do {
-            let kp = try ffiKeypairFromSecretKeyHex(secretHex)
-            self.nsecHex = kp.secretKeyHex
-            self.nsecBech32 = kp.nsec
-            self.pubkey = kp.publicKey
-            self.npub = kp.npub
+            _ = try generateDeviceKeys(deviceId: deviceId, pin: pin)
         } catch {
-            // Should never fail — this is a known-valid secp256k1 scalar
-            self.nsecHex = secretHex
-            self.nsecBech32 = nil
-            self.pubkey = nil
-            self.npub = nil
+            print("[DEBUG] Mock identity generation failed: \(error)")
+        }
+    }
+
+    /// Set a mock volunteer identity (generates a separate device keypair).
+    func setMockVolunteerIdentity() {
+        let deviceId = "xctest-volunteer-\(UUID().uuidString)"
+        do {
+            _ = try generateDeviceKeys(deviceId: deviceId, pin: "654321")
+        } catch {
+            print("[DEBUG] Mock volunteer identity generation failed: \(error)")
         }
     }
     #endif

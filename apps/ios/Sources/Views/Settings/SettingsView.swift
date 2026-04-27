@@ -140,19 +140,19 @@ struct SettingsView: View {
     private var identityCardSection: some View {
         Section {
             HStack(spacing: 14) {
-                if let npub = appState.cryptoService.npub {
-                    GeneratedAvatar(hash: npub, size: 48)
+                if let signingPubkey = appState.cryptoService.signingPubkeyHex {
+                    GeneratedAvatar(hash: signingPubkey, size: 48)
                 } else {
                     GeneratedAvatar(hash: "unknown", size: 48)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    if let npub = appState.cryptoService.npub {
-                        Text(npub.truncatedNpub())
+                    if let signingPubkey = appState.cryptoService.signingPubkeyHex {
+                        Text(signingPubkey.truncatedPubkey())
                             .font(.brandMono(.subheadline))
                             .foregroundStyle(Color.brandForeground)
                             .lineLimit(1)
-                            .accessibilityIdentifier("settings-npub")
+                            .accessibilityIdentifier("settings-signing-pubkey")
                     }
 
                     HStack(spacing: 8) {

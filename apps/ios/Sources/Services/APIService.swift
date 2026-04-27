@@ -58,8 +58,8 @@ struct AppConfig: Decodable {
 // MARK: - APIService
 
 /// URLSession-based REST client for the Llamenos hub API. Injects CryptoService to
-/// generate Schnorr auth tokens for each request. The auth token is sent as a Bearer
-/// header containing a JSON object with pubkey, timestamp, and BIP-340 signature.
+/// generate Ed25519 auth tokens for each request. The auth token is sent as a Bearer
+/// header containing a JSON object with pubkey, timestamp, and Ed25519 signature.
 final class APIService: @unchecked Sendable {
     /// The API version this client is compiled against.
     /// Must match the server's `CURRENT_API_VERSION` in `apps/worker/lib/api-versions.ts`.
@@ -176,7 +176,7 @@ final class APIService: @unchecked Sendable {
         var urlRequest = URLRequest(url: fullURL)
         urlRequest.httpMethod = method.uppercased()
 
-        // Attach Schnorr auth token as Bearer header
+        // Attach Ed25519 auth token as Bearer header
         if cryptoService.isUnlocked {
             do {
                 let token = try cryptoService.createAuthToken(method: method.uppercased(), path: path)
@@ -260,7 +260,7 @@ final class APIService: @unchecked Sendable {
         var urlRequest = URLRequest(url: fullURL)
         urlRequest.httpMethod = method.uppercased()
 
-        // Attach Schnorr auth token as Bearer header
+        // Attach Ed25519 auth token as Bearer header
         if cryptoService.isUnlocked {
             do {
                 let token = try cryptoService.createAuthToken(method: method.uppercased(), path: path)
@@ -342,7 +342,7 @@ final class APIService: @unchecked Sendable {
 
     // MARK: - Hub Key
 
-    /// Fetch the ECIES-wrapped hub key envelope for the given hub.
+    /// Fetch the HPKE-wrapped hub key envelope for the given hub.
     /// Path is NOT wrapped with hp() — it uses the explicit hubId parameter.
     func getHubKey(_ hubId: String) async throws -> HubKeyEnvelopeResponse {
         return try await request(

@@ -37,14 +37,19 @@ enum AuthError: LocalizedError {
 // MARK: - AuthService
 
 /// Coordinates CryptoService and KeychainService to implement the full auth lifecycle:
-/// key generation, nsec import, PIN-based encryption/storage, PIN unlock, and biometric
+/// device key generation, PIN-based encryption/storage, PIN unlock, and biometric
 /// unlock. This is the single point of truth for auth state transitions.
+///
+/// ## V3 Device Key Model
+/// Device keys (Ed25519 signing + X25519 encryption) are generated once per device.
+/// The PIN encrypts the device key blob which is stored in the Keychain.
+/// Secrets are held exclusively in Rust memory and never exposed to Swift.
 @Observable
 final class AuthService {
     let cryptoService: CryptoService
     let keychainService: KeychainService
 
-    /// Whether encrypted keys exist in the Keychain (user has completed onboarding).
+    /// Whether encrypted device keys exist in the Keychain (user has completed onboarding).
     private(set) var hasStoredKeys: Bool = false
 
     /// Whether biometric unlock is enabled for this identity.
@@ -87,30 +92,26 @@ final class AuthService {
         hubURL = trimmed
     }
 
-    // MARK: - Onboarding (New Identity)
+    // MARK: - Onboarding (New Device Identity)
 
-    /// Generate a new keypair. Returns the nsec for one-time display to the user.
-    /// The nsec is held in CryptoService memory; it is NOT yet persisted.
-    /// Call `completeOnboarding(pin:)` after the user confirms their backup.
-    func createNewIdentity() -> (nsec: String, npub: String) {
-        return cryptoService.generateKeypair()
-    }
-
-    /// Import an existing nsec. The key is loaded into CryptoService memory.
-    /// Call `completeOnboarding(pin:)` after to set a PIN and persist.
-    func importExistingIdentity(nsec: String) throws {
-        try cryptoService.importNsec(nsec)
-    }
-
-    /// Finalize onboarding by encrypting the nsec with the user's PIN and storing
-    /// it in the Keychain. After this, the identity is persisted and the user can
-    /// unlock with their PIN on subsequent launches.
-    func completeOnboarding(pin: String, enableBiometric: Bool = false) throws {
+    /// Generate new device keys and persist them, protected by the user's PIN.
+    /// In the v3 model, key generation and PIN encryption happen atomically —
+    /// there is no separate "show nsec" step. Device keys are non-exportable;
+    /// multi-device support uses device linking via sigchain + PUK.
+    ///
+    /// Returns the DeviceKeyState (public keys) for display/registration.
+    func createNewIdentity(pin: String, enableBiometric: Bool = false) throws -> DeviceKeyState {
         try validatePIN(pin)
 
-        let encrypted = try cryptoService.encryptForStorage(pin: pin)
+        let deviceId = UUID().uuidString
+        let encrypted = try cryptoService.generateDeviceKeys(deviceId: deviceId, pin: pin)
+
+        // Persist the encrypted device key blob
         let jsonData = try JSONEncoder().encode(encrypted)
         try keychainService.store(key: KeychainKey.encryptedKeys, data: jsonData)
+
+        // Store device ID for sigchain
+        try keychainService.storeString(deviceId, key: KeychainKey.deviceID)
 
         // Store biometric preference
         let biometricByte: Data = enableBiometric ? Data([1]) : Data([0])
@@ -119,24 +120,27 @@ final class AuthService {
         // Store PIN length for unlock screen
         keychainService.storePINLength(pin.count)
 
+        if enableBiometric {
+            try keychainService.storePINForBiometric(pin)
+        }
+
         hasStoredKeys = true
         isBiometricEnabled = enableBiometric
+
+        return encrypted.state
     }
 
     // MARK: - PIN Unlock
 
-    /// Unlock the stored identity using the user's PIN. Decrypts the nsec from the
-    /// Keychain and loads it into CryptoService memory.
+    /// Unlock the stored device identity using the user's PIN.
+    /// Decrypts device keys from Keychain and loads them into Rust crypto state.
     func unlockWithPIN(_ pin: String) throws {
         guard let jsonData = try keychainService.retrieve(key: KeychainKey.encryptedKeys) else {
             throw AuthError.noStoredKeys
         }
 
-        let encrypted = try JSONDecoder().decode(EncryptedKeyData.self, from: jsonData)
-        try cryptoService.decryptFromStorage(encrypted, pin: pin)
-
-        // On successful unlock, set pubkey-related state from the stored data
-        // (CryptoService.decryptFromStorage already calls importNsec internally)
+        let encrypted = try JSONDecoder().decode(EncryptedDeviceKeys.self, from: jsonData)
+        _ = try cryptoService.unlockWithPin(data: encrypted, pin: pin)
     }
 
     // MARK: - Biometric Unlock
@@ -150,8 +154,6 @@ final class AuthService {
         isBiometricEnabled = enabled
 
         if enabled, let pin {
-            // Store the PIN behind biometric protection so biometric unlock can
-            // retrieve it and use it to decrypt the nsec (C5).
             try keychainService.storePINForBiometric(pin)
         } else if !enabled {
             keychainService.deleteBiometricPIN()
@@ -160,8 +162,8 @@ final class AuthService {
 
     // MARK: - Lock
 
-    /// Lock the app by clearing the nsec from CryptoService memory.
-    /// The pubkey/npub remain for display.
+    /// Lock the app by zeroizing device secrets in Rust memory.
+    /// Public keys remain for display ("Locked as ...").
     func lock() {
         cryptoService.lock()
     }
@@ -169,7 +171,7 @@ final class AuthService {
     // MARK: - Logout / Reset
 
     /// Completely remove all stored identity data. This is destructive — the user
-    /// must re-import or generate a new key.
+    /// must generate new device keys or link from another device.
     func logout() {
         cryptoService.lock()
         keychainService.delete(key: KeychainKey.encryptedKeys)

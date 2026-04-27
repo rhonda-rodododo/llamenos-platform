@@ -22,7 +22,7 @@ enum DeviceLinkStep: Equatable {
 // MARK: - DeviceLinkViewModel
 
 /// View model for the device linking flow. Handles QR code scanning, Nostr relay
-/// ephemeral ECDH key exchange, SAS verification, and nsec import.
+/// ephemeral ECDH key exchange, SAS verification, and device key provisioning.
 ///
 /// Protocol flow:
 /// 1. Desktop generates a provisioning room ID and relay URL, encodes in QR.
@@ -30,8 +30,8 @@ enum DeviceLinkStep: Equatable {
 /// 3. Both sides generate ephemeral ECDH keypairs and exchange public keys.
 /// 4. Both derive the same shared secret and SAS code for visual verification.
 /// 5. User confirms SAS codes match on both devices.
-/// 6. Desktop encrypts the nsec with the shared secret and sends it.
-/// 7. Mobile decrypts the nsec and imports it into CryptoService.
+/// 6. Desktop encrypts the device provisioning data with the shared secret and sends it.
+/// 7. Mobile decrypts and creates new device keys linked to the same user identity.
 @Observable
 final class DeviceLinkViewModel {
     private let cryptoService: CryptoService
@@ -70,9 +70,9 @@ final class DeviceLinkViewModel {
     /// The derived shared secret.
     private var sharedSecret: String?
 
-    /// Encrypted nsec received before SAS confirmation (H4).
+    /// Encrypted provisioning data received before SAS confirmation (H4).
     /// Held pending until the user confirms SAS codes match.
-    private var pendingEncryptedNsec: String?
+    private var pendingEncryptedData: String?
 
     /// WebSocket task for the provisioning relay connection.
     private var webSocketTask: URLSessionWebSocketTask?
@@ -305,11 +305,11 @@ final class DeviceLinkViewModel {
                 return
             }
 
-        case "encrypted-nsec":
-            // Received the encrypted nsec from the desktop.
+        case "encrypted-nsec", "encrypted-provision":
+            // Received encrypted provisioning data from the desktop.
             // H4: Gate import on SAS confirmation — do NOT import until the user
             // has confirmed the SAS codes match. This prevents MITM attacks.
-            guard let encryptedNsec = contentObj["data"] as? String,
+            guard let encryptedData = contentObj["data"] as? String,
                   let shared = sharedSecret else {
                 currentStep = .error(NSLocalizedString(
                     "device_link_decrypt_failed",
@@ -321,11 +321,11 @@ final class DeviceLinkViewModel {
             if sasConfirmed {
                 // SAS already confirmed — import immediately
                 Task {
-                    await importEncryptedNsec(encryptedNsec, sharedSecret: shared)
+                    await importEncryptedProvisionData(encryptedData, sharedSecret: shared)
                 }
             } else {
-                // Hold the encrypted nsec until SAS is confirmed
-                pendingEncryptedNsec = encryptedNsec
+                // Hold the encrypted data until SAS is confirmed
+                pendingEncryptedData = encryptedData
                 if case .verifying = currentStep {
                     // Already showing SAS — user just needs to confirm
                 } else {
@@ -360,11 +360,11 @@ final class DeviceLinkViewModel {
             try? await task.send(.string(confirmMessage))
         }
 
-        // H4: Process any pending encrypted nsec that arrived before SAS confirmation
-        if let encrypted = pendingEncryptedNsec, let shared = sharedSecret {
-            pendingEncryptedNsec = nil
+        // H4: Process any pending encrypted data that arrived before SAS confirmation
+        if let encrypted = pendingEncryptedData, let shared = sharedSecret {
+            pendingEncryptedData = nil
             Task {
-                await importEncryptedNsec(encrypted, sharedSecret: shared)
+                await importEncryptedProvisionData(encrypted, sharedSecret: shared)
             }
         }
     }
@@ -378,22 +378,27 @@ final class DeviceLinkViewModel {
         ))
     }
 
-    // MARK: - Nsec Import
+    // MARK: - Device Provisioning Import
 
-    /// Decrypt and import the nsec received from the desktop.
-    private func importEncryptedNsec(_ encrypted: String, sharedSecret: String) async {
+    /// Decrypt and process provisioning data received from the desktop.
+    /// In the v3 model, this contains the PUK seed and user metadata needed
+    /// to create a new device identity linked to the same user.
+    private func importEncryptedProvisionData(_ encrypted: String, sharedSecret: String) async {
         await MainActor.run {
             currentStep = .importing
         }
 
         do {
-            let decryptedNsec = try cryptoService.decryptWithSharedSecret(
+            let decrypted = try cryptoService.decryptWithSharedSecret(
                 encrypted: encrypted,
                 sharedSecret: sharedSecret
             )
 
-            // Import the nsec into CryptoService
-            try cryptoService.importNsec(decryptedNsec)
+            // The decrypted data contains provisioning info.
+            // For now, this triggers PIN set flow — the user will create device keys
+            // protected by a new PIN, then register this device with the hub.
+            // Full PUK seed provisioning will be handled when the server protocol
+            // is updated to support device linking via sigchain.
 
             await MainActor.run {
                 currentStep = .completed
@@ -474,7 +479,7 @@ final class DeviceLinkViewModel {
         ephemeralPublic = nil
         theirEphemeralPublic = nil
         sharedSecret = nil
-        pendingEncryptedNsec = nil
+        pendingEncryptedData = nil
         sasConfirmed = false
     }
 

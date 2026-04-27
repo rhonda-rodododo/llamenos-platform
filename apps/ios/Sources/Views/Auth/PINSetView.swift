@@ -16,7 +16,7 @@ struct PINSetView: View {
         let vm = resolvedPINViewModel
 
         VStack(spacing: 24) {
-            StepIndicator(totalSteps: 3, currentStep: 3)
+            StepIndicator(totalSteps: 2, currentStep: 2)
                 .padding(.top, 8)
 
             // Header

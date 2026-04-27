@@ -144,8 +144,8 @@ final class ConversationsViewModel {
             let conversation = allConversations.first { $0.id == conversationId }
             var readerPubkeys: [String] = []
 
-            // Include our own pubkey for self-decryption
-            if let ourPubkey = cryptoService.pubkey {
+            // Include our own encryption pubkey for self-decryption
+            if let ourPubkey = cryptoService.encryptionPubkeyHex {
                 readerPubkeys.append(ourPubkey)
             }
 
@@ -254,9 +254,9 @@ final class ConversationsViewModel {
 
     // MARK: - Message Decryption
 
-    /// Decrypt a conversation message using the recipient envelope for our pubkey.
+    /// Decrypt a conversation message using the HPKE envelope for our encryption pubkey.
     private func decryptConversationMessage(_ message: ConversationMessage) -> DecryptedMessage? {
-        guard let ourPubkey = cryptoService.pubkey else { return nil }
+        guard let ourPubkey = cryptoService.encryptionPubkeyHex else { return nil }
 
         // Find our envelope
         guard let ourEnvelope = message.recipientEnvelopes.first(where: { $0.pubkey == ourPubkey }) else {
@@ -264,10 +264,17 @@ final class ConversationsViewModel {
         }
 
         do {
+            // Reconstruct HPKE envelope from the protocol wire format
+            let hpkeEnvelope = HpkeEnvelope(
+                v: 3,
+                labelId: 0,
+                enc: ourEnvelope.ephemeralPubkey,
+                ct: ourEnvelope.wrappedKey
+            )
+
             let decryptedText = try cryptoService.decryptMessage(
                 encryptedContent: message.encryptedContent,
-                wrappedKey: ourEnvelope.wrappedKey,
-                ephemeralPubkey: ourEnvelope.ephemeralPubkey
+                envelope: hpkeEnvelope
             )
 
             return DecryptedMessage(

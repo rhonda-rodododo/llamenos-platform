@@ -149,24 +149,42 @@ final class ReportsViewModel {
         errorMessage = nil
 
         do {
-            // Encrypt the body with E2EE envelope (same as notes)
-            let encryptedNote = try cryptoService.encryptNote(payload: body, adminPubkeys: adminPubkeys)
+            // Encrypt the body with HPKE envelope encryption (same pattern as notes)
+            var recipientPubkeys: [String] = []
+            if let ourPubkey = cryptoService.encryptionPubkeyHex {
+                recipientPubkeys.append(ourPubkey)
+            }
+            for adminPubkey in adminPubkeys where !recipientPubkeys.contains(adminPubkey) {
+                recipientPubkeys.append(adminPubkey)
+            }
+
+            let result = try cryptoService.encryptNote(payload: body, recipientPubkeys: recipientPubkeys)
+
+            let authorEnvelope: ProtocolKeyEnvelope?
+            if let ourPubkey = cryptoService.encryptionPubkeyHex,
+               let ours = result.envelopes.first(where: { $0.pubkey == ourPubkey }) {
+                authorEnvelope = ProtocolKeyEnvelope(
+                    wrappedKey: ours.envelope.ct,
+                    ephemeralPubkey: ours.envelope.enc
+                )
+            } else {
+                authorEnvelope = nil
+            }
 
             let request = CreateReportRequest(
                 title: title,
                 category: category,
-                encryptedContent: encryptedNote.encryptedContent,
-                authorEnvelope: NoteKeyEnvelope(
-                    ephemeralPubkey: encryptedNote.authorEnvelope.ephemeralPubkey,
-                    wrappedKey: encryptedNote.authorEnvelope.wrappedKey
-                ),
-                adminEnvelopes: encryptedNote.adminEnvelopes.map { env in
-                    NoteRecipientEnvelope(
-                        ephemeralPubkey: env.ephemeralPubkey,
-                        pubkey: env.pubkey,
-                        wrappedKey: env.wrappedKey
-                    )
-                }
+                encryptedContent: result.ciphertextHex,
+                authorEnvelope: authorEnvelope,
+                adminEnvelopes: result.envelopes
+                    .filter { $0.pubkey != cryptoService.encryptionPubkeyHex }
+                    .map { env in
+                        RecipientEnvelope(
+                            pubkey: env.pubkey,
+                            wrappedKey: env.envelope.ct,
+                            ephemeralPubkey: env.envelope.enc
+                        )
+                    }
             )
 
             let _: ClientReportResponse = try await apiService.request(
@@ -262,12 +280,12 @@ final class ReportsViewModel {
 
     /// Claim a waiting report by assigning it to the current user.
     func claimReport(id: String) async {
-        guard let pubkey = cryptoService.pubkey else { return }
+        guard let signingPubkey = cryptoService.signingPubkeyHex else { return }
         isActionInProgress = true
         errorMessage = nil
 
         do {
-            let request = ReportAssignRequest(assignTo: pubkey)
+            let request = ReportAssignRequest(assignTo: signingPubkey)
             let _: ClientReportResponse = try await apiService.request(
                 method: "POST",
                 path: apiService.hp("/api/reports/\(id)/assign"),

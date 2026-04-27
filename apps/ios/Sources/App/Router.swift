@@ -4,13 +4,9 @@ import SwiftUI
 
 /// All navigable destinations in the app.
 enum Route: Hashable {
-    /// Login screen: hub URL entry, create/import identity.
+    /// Login screen: hub URL entry, create identity or link device.
     case login
-    /// Onboarding: shows generated nsec for backup confirmation.
-    case onboarding(nsec: String, npub: String)
-    /// Nsec import: user pastes their existing nsec.
-    case importKey
-    /// PIN set: user creates a new PIN (enter + confirm).
+    /// PIN set: user creates a new PIN (generates device keys atomically).
     case pinSet
     /// PIN unlock: user enters their PIN to unlock stored identity.
     case pinUnlock
@@ -105,19 +101,14 @@ final class Router {
 
     // MARK: - Auth Flow Navigation
 
-    /// Navigate to onboarding after creating a new identity.
-    func showOnboarding(nsec: String, npub: String) {
-        navigate(to: .onboarding(nsec: nsec, npub: npub))
-    }
-
-    /// Navigate to nsec import.
-    func showImportKey() {
-        navigate(to: .importKey)
-    }
-
-    /// Navigate to PIN set after onboarding or import.
+    /// Navigate to PIN set (creates device keys atomically with PIN encryption).
     func showPINSet() {
         navigate(to: .pinSet)
+    }
+
+    /// Navigate to device linking flow.
+    func showDeviceLink() {
+        navigate(to: .deviceLink)
     }
 
     /// Navigate to dashboard after successful unlock or onboarding.

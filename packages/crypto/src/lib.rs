@@ -58,6 +58,8 @@ pub use keys_legacy as keys;
 
 #[cfg(feature = "mobile")]
 mod ffi;
+#[cfg(feature = "mobile")]
+mod ffi_v3;
 
 #[cfg(feature = "wasm")]
 mod wasm;

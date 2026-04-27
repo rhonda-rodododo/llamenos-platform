@@ -285,32 +285,28 @@ final class DashboardViewModel {
 
             recentNoteCount = response.total
 
-            // Decrypt the recent notes for preview
+            // Decrypt the recent notes for preview using HPKE envelopes
             recentNotes = response.notes.prefix(3).compactMap { encrypted -> RecentNotePreview? in
-                guard let ourPubkey = cryptoService.pubkey else { return nil }
+                guard let ourPubkey = cryptoService.encryptionPubkeyHex else { return nil }
 
-                var wrappedKey: String?
-                var ephemeralPubkey: String?
+                var hpkeEnvelope: HpkeEnvelope?
 
                 if encrypted.authorPubkey == ourPubkey, let authorEnv = encrypted.authorEnvelope {
-                    wrappedKey = authorEnv.wrappedKey
-                    ephemeralPubkey = authorEnv.ephemeralPubkey
+                    hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: authorEnv.ephemeralPubkey, ct: authorEnv.wrappedKey)
                 }
 
-                if wrappedKey == nil, let adminEnvs = encrypted.adminEnvelopes {
+                if hpkeEnvelope == nil, let adminEnvs = encrypted.adminEnvelopes {
                     if let ourEnv = adminEnvs.first(where: { $0.pubkey == ourPubkey }) {
-                        wrappedKey = ourEnv.wrappedKey
-                        ephemeralPubkey = ourEnv.ephemeralPubkey
+                        hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: ourEnv.ephemeralPubkey, ct: ourEnv.wrappedKey)
                     }
                 }
 
-                guard let wk = wrappedKey, let epk = ephemeralPubkey else { return nil }
+                guard let envelope = hpkeEnvelope else { return nil }
 
                 do {
-                    let json = try cryptoService.decryptNoteContent(
-                        encryptedContent: encrypted.encryptedContent,
-                        wrappedKey: wk,
-                        ephemeralPubkey: epk
+                    let json = try cryptoService.decryptNote(
+                        ciphertextHex: encrypted.encryptedContent,
+                        envelope: envelope
                     )
                     let decoder = JSONDecoder()
                     decoder.keyDecodingStrategy = .convertFromSnakeCase

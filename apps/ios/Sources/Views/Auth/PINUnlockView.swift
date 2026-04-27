@@ -35,16 +35,16 @@ struct PINUnlockView: View {
                     .font(.brand(.title2))
                     .fontWeight(.bold)
 
-                // Show which identity is locked (truncated npub)
-                if let npub = appState.cryptoService.npub {
+                // Show which identity is locked (truncated signing pubkey)
+                if let signingPubkey = appState.cryptoService.signingPubkeyHex {
                     BrandCard {
                         CopyableField(
                             label: NSLocalizedString("identity_label", comment: "Identity"),
-                            value: npub,
+                            value: signingPubkey,
                             truncated: true
                         )
                     }
-                    .accessibilityIdentifier("locked-npub")
+                    .accessibilityIdentifier("locked-identity")
                 }
 
                 Text(vm.subtitleText)
