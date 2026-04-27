@@ -41,9 +41,15 @@ console.log('[llamenos] Database initialized')
 const hmacSecret = readSecret('hmac-secret', 'HMAC_SECRET')
 const serverNostrSecret = readSecret('server-nostr-secret', 'SERVER_NOSTR_SECRET')
 const nostrRelayUrl = process.env.NOSTR_RELAY_URL || ''
+const firehoseSealKey = readSecret('firehose-agent-seal-key', 'FIREHOSE_AGENT_SEAL_KEY') || undefined
 
 // --- Create services (pass HMAC secret for encryption operations) ---
-const services: Services = createServices(db, { hmacSecret })
+const services: Services = createServices(db, { hmacSecret, firehoseSealKey, env: {
+  ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
+  ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
+  SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
+  NOSTR_RELAY_URL: nostrRelayUrl || undefined,
+} })
 console.log('[llamenos] Services initialized')
 
 const env: Record<string, unknown> = {
@@ -64,6 +70,7 @@ const env: Record<string, unknown> = {
   GLITCHTIP_DSN: process.env.GLITCHTIP_DSN || undefined,
   DEV_RESET_SECRET: process.env.DEV_RESET_SECRET || undefined,
   E2E_TEST_SECRET: process.env.E2E_TEST_SECRET || undefined,
+  FIREHOSE_AGENT_SEAL_KEY: firehoseSealKey,
 }
 
 // --- Nostr publisher with persistent outbox ---
@@ -87,6 +94,14 @@ if (serverNostrSecret && nostrRelayUrl) {
 
 // --- Start scheduled task poller ---
 services.scheduler.start()
+
+// --- Initialize firehose agents (if seal key is configured) ---
+if (services.firehoseAgent) {
+  services.firehoseAgent.init().catch((err) => {
+    console.error('[llamenos] Firehose agent init failed:', err)
+  })
+  console.log('[llamenos] Firehose agent service initialized')
+}
 
 // --- Build Hono app ---
 const { default: workerApp } = await import('../../apps/worker/app')
@@ -129,6 +144,7 @@ if (process.env.ENVIRONMENT === 'development') {
 // --- Graceful shutdown ---
 const shutdown = async () => {
   console.log('[llamenos] Shutting down...')
+  services.firehoseAgent?.shutdown()
   services.scheduler.stop()
   stopOutboxPoller()
   await closeDb()

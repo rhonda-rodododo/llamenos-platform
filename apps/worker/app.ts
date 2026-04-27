@@ -37,6 +37,7 @@ import systemRoutes from './routes/system'
 import entitySchemaRoutes from './routes/entity-schema'
 import evidenceRoutes from './routes/evidence'
 import geocodingRoutes from './routes/geocoding'
+import firehoseRoutes from './routes/firehose'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { openAPIRouteHandler } from 'hono-openapi'
@@ -163,6 +164,7 @@ authenticated.route('/events', eventsRoutes)
 authenticated.route('/', evidenceRoutes)
 authenticated.route('/system', systemRoutes)
 authenticated.route('/geocoding', geocodingRoutes)
+authenticated.route('/firehose', firehoseRoutes)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
@@ -182,6 +184,7 @@ hubScoped.route('/records', recordsRoutes)
 hubScoped.route('/events', eventsRoutes)
 hubScoped.route('/settings/cms', entitySchemaRoutes)
 hubScoped.route('/', evidenceRoutes)
+hubScoped.route('/firehose', firehoseRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

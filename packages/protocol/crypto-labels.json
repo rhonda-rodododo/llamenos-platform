@@ -44,6 +44,9 @@
     "HMAC_CASE_STATUS": "llamenos:case-status",
     "HMAC_CASE_SEVERITY": "llamenos:case-severity",
     "HMAC_CASE_CATEGORY": "llamenos:case-category",
-    "HMAC_EVENT_TYPE": "llamenos:event-type"
+    "HMAC_EVENT_TYPE": "llamenos:event-type",
+    "LABEL_FIREHOSE_AGENT_SEAL": "llamenos:firehose:agent-seal",
+    "LABEL_FIREHOSE_BUFFER_ENCRYPT": "llamenos:firehose:buffer-encrypt",
+    "LABEL_FIREHOSE_REPORT_WRAP": "llamenos:firehose:report-wrap"
   }
 }

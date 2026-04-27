@@ -68,6 +68,9 @@ export interface Env {
   // Falls back to /nostr (reverse-proxied via Caddy) if not set but relay is configured
   NOSTR_RELAY_PUBLIC_URL?: string
 
+  // Firehose inference agent seal key (hex 32 bytes — seals agent nsecs at rest)
+  FIREHOSE_AGENT_SEAL_KEY?: string
+
   // GlitchTip/Sentry DSN for client-side crash reporting (Epic 293)
   GLITCHTIP_DSN?: string
 
