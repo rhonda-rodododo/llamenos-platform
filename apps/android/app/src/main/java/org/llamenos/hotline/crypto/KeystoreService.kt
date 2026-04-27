@@ -35,14 +35,14 @@ sealed class PinLockoutState {
  * Requests StrongBox hardware backing where available (graceful fallback on unsupported devices).
  *
  * Storage layout:
- * - "encrypted-keys"  — PIN-encrypted nsec JSON (EncryptedKeyData serialized)
- * - "hub-url"         — Server endpoint URL
- * - "device-id"       — Unique device identifier
- * - "pubkey"          — Public key hex (for display when locked)
- * - "npub"            — Nostr npub (for display when locked)
- * - "biometric-enabled" — Whether biometric unlock is configured
- * - "failed_attempts" — PIN brute-force attempt counter
- * - "lockout_until"   — Epoch millis when lockout expires
+ * - "encrypted-keys"      — PIN-encrypted device keys JSON (EncryptedDeviceKeys serialized)
+ * - "hub-url"             — Server endpoint URL
+ * - "device-id"           — Unique device identifier
+ * - "signing-pubkey"      — Ed25519 signing public key hex (for display when locked)
+ * - "encryption-pubkey"   — X25519 encryption public key hex (for display when locked)
+ * - "biometric-enabled"   — Whether biometric unlock is configured
+ * - "failed_attempts"     — PIN brute-force attempt counter
+ * - "lockout_until"       — Epoch millis when lockout expires
  */
 @Singleton
 class KeystoreService @Inject constructor(
@@ -111,12 +111,12 @@ class KeystoreService @Inject constructor(
     /**
      * Clear non-essential cached data while preserving identity keys and core settings.
      * Removes preferences like notification toggles, theme, profile info, etc.
-     * Does NOT remove encrypted keys, hub URL, device ID, pubkey, npub, or biometric config.
+     * Does NOT remove encrypted keys, hub URL, device ID, pubkeys, or biometric config.
      */
     fun clearCache() {
         val protectedKeys = setOf(
             KEY_ENCRYPTED_KEYS, KEY_HUB_URL, KEY_DEVICE_ID,
-            KEY_PUBKEY, KEY_NPUB, KEY_BIOMETRIC_ENABLED,
+            KEY_SIGNING_PUBKEY, KEY_ENCRYPTION_PUBKEY, KEY_BIOMETRIC_ENABLED,
         )
         val editor = prefs.edit()
         prefs.all.keys.filter { it !in protectedKeys }.forEach { key ->
@@ -218,8 +218,8 @@ class KeystoreService @Inject constructor(
         const val KEY_ENCRYPTED_KEYS = "encrypted-keys"
         const val KEY_HUB_URL = "hub-url"
         const val KEY_DEVICE_ID = "device-id"
-        const val KEY_PUBKEY = "pubkey"
-        const val KEY_NPUB = "npub"
+        const val KEY_SIGNING_PUBKEY = "signing-pubkey"
+        const val KEY_ENCRYPTION_PUBKEY = "encryption-pubkey"
         const val KEY_BIOMETRIC_ENABLED = "biometric-enabled"
 
         // PIN lockout keys

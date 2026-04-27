@@ -17,14 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -51,7 +49,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -59,19 +56,19 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.ui.components.LoadingOverlay
 
 /**
- * Login screen with logo, hub URL input, nsec import, and new identity creation.
+ * Login screen with logo, hub URL input, and identity creation.
  *
  * Two entry paths:
- * 1. "Create New Identity" -> generates a keypair -> OnboardingScreen
- * 2. "Import Key" -> validates nsec -> PINSetScreen
+ * 1. "Create New Identity" -> PINSetScreen (device keys generated with PIN)
+ * 2. "Link from Another Device" -> DeviceLinkScreen (QR scan)
  *
  * Also includes demo mode buttons for testing.
  */
 @Composable
 fun LoginScreen(
     viewModel: AuthViewModel,
-    onNavigateToOnboarding: () -> Unit,
     onNavigateToPinSet: () -> Unit,
+    onNavigateToDeviceLink: () -> Unit = {},
     onDemoLogin: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -170,43 +167,12 @@ fun LoginScreen(
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Uri,
-                                    imeAction = ImeAction.Next,
+                                    imeAction = ImeAction.Done,
                                 ),
                                 shape = MaterialTheme.shapes.small,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("hub-url-input"),
-                            )
-
-                            Spacer(Modifier.height(12.dp))
-
-                            // nsec import field
-                            OutlinedTextField(
-                                value = uiState.nsecInput,
-                                onValueChange = viewModel::updateNsecInput,
-                                label = { Text(stringResource(R.string.nsec_label)) },
-                                placeholder = { Text(stringResource(R.string.nsec_placeholder)) },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Password,
-                                    imeAction = ImeAction.Done,
-                                ),
-                                keyboardActions = KeyboardActions(
-                                    onDone = {
-                                        focusManager.clearFocus()
-                                        if (uiState.nsecInput.isNotBlank()) {
-                                            viewModel.importKey()
-                                            if (viewModel.uiState.value.error == null) {
-                                                onNavigateToPinSet()
-                                            }
-                                        }
-                                    },
-                                ),
-                                shape = MaterialTheme.shapes.small,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("nsec-input"),
                             )
 
                             // Error message
@@ -222,30 +188,30 @@ fun LoginScreen(
 
                             Spacer(Modifier.height(20.dp))
 
-                            // Import Key button (primary action)
-                            Button(
+                            // Create New Identity button (primary action)
+                            FilledTonalButton(
                                 onClick = {
                                     focusManager.clearFocus()
-                                    viewModel.importKey()
+                                    viewModel.createNewIdentity()
                                     if (viewModel.uiState.value.error == null) {
                                         onNavigateToPinSet()
                                     }
                                 },
-                                enabled = uiState.nsecInput.isNotBlank() && !uiState.isLoading,
+                                enabled = !uiState.isLoading,
                                 shape = MaterialTheme.shapes.small,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(52.dp)
-                                    .testTag("import-key"),
+                                    .testTag("create-identity"),
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.Key,
+                                    imageVector = Icons.Filled.PersonAdd,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource(R.string.import_key),
+                                    text = stringResource(R.string.create_new_identity),
                                     style = MaterialTheme.typography.labelLarge,
                                 )
                             }
@@ -269,30 +235,28 @@ fun LoginScreen(
 
                             Spacer(Modifier.height(12.dp))
 
-                            // Create New Identity button
-                            FilledTonalButton(
+                            // Link from Another Device button
+                            OutlinedButton(
                                 onClick = {
                                     focusManager.clearFocus()
-                                    viewModel.createNewIdentity()
-                                    if (viewModel.uiState.value.error == null) {
-                                        onNavigateToOnboarding()
-                                    }
+                                    viewModel.createNewIdentity() // save hub URL
+                                    onNavigateToDeviceLink()
                                 },
                                 enabled = !uiState.isLoading,
                                 shape = MaterialTheme.shapes.small,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(52.dp)
-                                    .testTag("create-identity"),
+                                    .testTag("link-device"),
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.PersonAdd,
+                                    imageVector = Icons.Filled.Link,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource(R.string.create_new_identity),
+                                    text = stringResource(R.string.settings_link_device),
                                     style = MaterialTheme.typography.labelLarge,
                                 )
                             }

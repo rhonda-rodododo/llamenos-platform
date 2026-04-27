@@ -71,7 +71,7 @@ data class ConversationsUiState(
  *
  * Manages fetching, decrypting, and sending E2EE messages within conversations.
  * Each message is encrypted with per-message forward secrecy: a unique random
- * symmetric key per message, ECIES-wrapped for the assigned volunteer and admins.
+ * symmetric key per message, HPKE-wrapped for the assigned volunteer and admins.
  *
  * Subscribes to WebSocket events for real-time message delivery and conversation
  * status updates.
@@ -262,9 +262,9 @@ class ConversationsViewModel @Inject constructor(
             try {
                 // Collect reader pubkeys: self + assigned volunteer (if different) + admins
                 val readerPubkeys = buildList {
-                    cryptoService.pubkey?.let { add(it) }
+                    cryptoService.encryptionPubkeyHex?.let { add(it) }
                     conversation.assignedVolunteerPubkey?.let { volunteerPub ->
-                        if (volunteerPub != cryptoService.pubkey) add(volunteerPub)
+                        if (volunteerPub != cryptoService.encryptionPubkeyHex) add(volunteerPub)
                     }
                     // Include admin pubkeys so admins can decrypt messages
                     sessionState.adminPubkeys.forEach { adminPub ->
@@ -283,7 +283,7 @@ class ConversationsViewModel @Inject constructor(
                 }
 
                 val request = SendMessageRequest(
-                    encryptedContent = encrypted.ciphertext,
+                    encryptedContent = encrypted.ciphertextHex,
                     readerEnvelopes = envelopes,
                 )
 
@@ -467,19 +467,26 @@ class ConversationsViewModel @Inject constructor(
     }
 
     /**
-     * Decrypt a single message by finding our envelope and calling CryptoService.
+     * Decrypt a single message by finding our HPKE envelope and calling CryptoService.
      */
     private suspend fun decryptMessage(message: ConversationMessage): DecryptedMessage? {
-        val ourPubkey = cryptoService.pubkey ?: return null
+        val ourPubkey = cryptoService.encryptionPubkeyHex ?: return null
 
         val envelope = message.recipientEnvelopes.find { it.pubkey == ourPubkey }
             ?: return null
 
+        // Build HpkeEnvelope from wire format fields
+        val hpkeEnvelope = org.llamenos.hotline.crypto.HpkeEnvelope(
+            v = 3,
+            labelId = 0,
+            enc = envelope.ephemeralPubkey,
+            ct = envelope.wrappedKey,
+        )
+
         return try {
             val plaintext = cryptoService.decryptMessage(
                 encryptedContent = message.encryptedContent,
-                wrappedKey = envelope.wrappedKey,
-                ephemeralPubkey = envelope.ephemeralPubkey,
+                envelope = hpkeEnvelope,
             )
 
             if (plaintext != null) {

@@ -23,7 +23,7 @@ enum class DeviceLinkStep {
     CONNECTING,
     /** SAS verification code displayed for user confirmation. */
     VERIFYING,
-    /** Receiving and decrypting the nsec from the desktop. */
+    /** Receiving and decrypting provisioning data from the desktop. */
     IMPORTING,
     /** Device link completed successfully. */
     COMPLETE,
@@ -50,8 +50,8 @@ data class DeviceLinkUiState(
  * 2. Generate ephemeral keypair and join the provisioning room
  * 3. Derive shared secret via ECDH with the desktop's ephemeral key
  * 4. Display SAS verification code for user to compare
- * 5. Receive encrypted nsec, decrypt with shared secret
- * 6. Import nsec into CryptoService
+ * 5. Receive encrypted provisioning data, decrypt with shared secret
+ * 6. Create device keys linked to the same user identity
  */
 @HiltViewModel
 class DeviceLinkViewModel @Inject constructor(
@@ -217,9 +217,9 @@ class DeviceLinkViewModel @Inject constructor(
                 // Simulate import delay
                 delay(2000)
 
-                // Mock: simulate successful nsec import
-                // In production: val nsec = cryptoService.decryptWithSharedSecret(encryptedNsec, secret)
-                // cryptoService.importNsec(nsec)
+                // In production: decrypt provisioning data with shared secret,
+                // then create device keys linked to the same user identity.
+                // val provision = cryptoService.decryptWithSharedSecret(encryptedData, secret)
 
                 _uiState.update {
                     it.copy(step = DeviceLinkStep.COMPLETE)

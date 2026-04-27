@@ -28,7 +28,7 @@ import org.llamenos.hotline.model.ShiftStatusResponse
 import javax.inject.Inject
 
 data class DashboardUiState(
-    val npub: String = "",
+    val signingPubkey: String = "",
     val isOnShift: Boolean = false,
     val isOnBreak: Boolean = false,
     val shiftStartedAt: String? = null,
@@ -65,8 +65,8 @@ class DashboardViewModel @Inject constructor(
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     init {
-        val npub = cryptoService.npub ?: ""
-        _uiState.value = DashboardUiState(npub = npub)
+        val signingPubkey = cryptoService.signingPubkeyHex ?: ""
+        _uiState.value = DashboardUiState(signingPubkey = signingPubkey)
 
         // Fetch auth info (including server event key) before connecting WebSocket
         viewModelScope.launch {

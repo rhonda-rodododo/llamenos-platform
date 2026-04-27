@@ -664,7 +664,7 @@ fun DashboardScreen(
                 }
 
                 // Identity info
-                if (uiState.npub.isNotEmpty()) {
+                if (uiState.signingPubkey.isNotEmpty()) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -693,12 +693,12 @@ fun DashboardScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 )
                                 Text(
-                                    text = uiState.npub,
+                                    text = uiState.signingPubkey,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.testTag("dashboard-npub"),
+                                    modifier = Modifier.testTag("dashboard-identity"),
                                 )
                             }
                         }

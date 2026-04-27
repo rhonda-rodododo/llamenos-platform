@@ -9,7 +9,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Serialized wake payload delivered inside an ECIES-encrypted push envelope.
+ * Serialized wake payload delivered inside an encrypted push envelope.
  *
  * Wake-tier payloads are decryptable without user PIN unlock because the
  * wake key is stored without user authentication requirements. They carry
@@ -30,15 +30,18 @@ data class WakePayload(
  * Device-level wake key service for decrypting lock-screen push notifications.
  *
  * The wake keypair is generated once and stored in [KeystoreService] (backed by
- * Android Keystore / EncryptedSharedPreferences). Unlike the user's Nostr nsec,
+ * Android Keystore / EncryptedSharedPreferences). Unlike the user's device keys,
  * the wake key does NOT require PIN/biometric to access — it must be available
  * when [PushService] receives a message while the device is locked.
  *
  * Flow:
  * 1. On first use, [getOrCreateWakePublicKey] generates a secp256k1 keypair and stores it
- * 2. The wake public key is registered with the server (POST /api/v1/identity/device)
- * 3. Server encrypts push payloads with the device's wake public key via ECIES
- * 4. [PushService] calls [decryptWakePayload] to decrypt with llamenos-core
+ * 2. The wake public key is registered with the server (POST /api/devices/register)
+ * 3. Server encrypts push payloads with the device's wake public key via HPKE (or legacy ECIES)
+ * 4. [PushService] calls [decryptWakePayload] to decrypt
+ *
+ * V3 migration: The server will migrate from ECIES to HPKE for push envelopes.
+ * Both decryption paths are supported during the transition.
  */
 @Singleton
 class WakeKeyService @Inject constructor(
@@ -97,7 +100,39 @@ class WakeKeyService @Inject constructor(
     }
 
     /**
-     * Decrypt a wake-tier push notification payload.
+     * Decrypt a wake-tier push notification payload using HPKE.
+     * This is the v3 path — the server sends an HPKE envelope JSON.
+     */
+    suspend fun decryptWakePayloadHpke(envelopeJson: String): WakePayload? =
+        withContext(Dispatchers.Default) {
+            val secretHex = keystoreService.retrieve(KEY_WAKE_SECRET)
+                ?: return@withContext null
+
+            if (!nativeLibLoaded) return@withContext null
+
+            try {
+                val envelope = json.decodeFromString<HpkeEnvelopeJson>(envelopeJson)
+                val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
+                    v = envelope.v.toUByte(),
+                    labelId = envelope.labelId.toUByte(),
+                    enc = envelope.enc,
+                    ct = envelope.ct,
+                )
+                val plaintextHex = org.llamenos.core.mobileHpkeOpen(
+                    envelope = ffiEnvelope,
+                    expectedLabel = LABEL_PUSH_WAKE,
+                    aadHex = "",
+                )
+                val bytes = hexToBytes(plaintextHex)
+                val plaintext = String(bytes, Charsets.UTF_8)
+                json.decodeFromString<WakePayload>(plaintext)
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+    /**
+     * Decrypt a wake-tier push notification payload using legacy ECIES.
      *
      * The push data contains [packedHex] (nonce + ciphertext, hex) and
      * [ephemeralPubkeyHex] (the server's ephemeral ECIES public key, hex).
@@ -135,9 +170,27 @@ class WakeKeyService @Inject constructor(
             }
         }
 
+    private fun hexToBytes(hex: String): ByteArray {
+        require(hex.length % 2 == 0) { "Hex string has odd length" }
+        return ByteArray(hex.length / 2) { i ->
+            hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        }
+    }
+
     companion object {
         private const val KEY_WAKE_SECRET = "wake-secret"
         private const val KEY_WAKE_PUBKEY = "wake-pubkey"
         private const val LABEL_PUSH_WAKE = "llamenos:push-wake"
     }
 }
+
+/**
+ * HPKE envelope JSON structure for deserialization.
+ */
+@Serializable
+private data class HpkeEnvelopeJson(
+    val v: Int,
+    val labelId: Int,
+    val enc: String,
+    val ct: String,
+)

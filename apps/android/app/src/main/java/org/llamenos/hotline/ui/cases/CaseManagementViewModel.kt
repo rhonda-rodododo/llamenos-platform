@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.crypto.CryptoService
+import org.llamenos.hotline.crypto.HpkeEnvelope
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.model.AssignRecordRequest
 import org.llamenos.hotline.model.AssignResponse
@@ -177,9 +178,9 @@ class CaseManagementViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CaseUiState())
     val uiState: StateFlow<CaseUiState> = _uiState.asStateFlow()
 
-    /** The current user's pubkey, or null if no key is loaded. */
+    /** The current user's signing pubkey (identity), or null if no key is loaded. */
     val currentUserPubkey: String?
-        get() = cryptoService.pubkey
+        get() = cryptoService.signingPubkeyHex
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -432,13 +433,13 @@ class CaseManagementViewModel @Inject constructor(
                 val envelopes = encrypted.envelopes.map { env ->
                     CreateInteractionBodyContentEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.wrappedKey,
-                        ephemeralPubkey = env.ephemeralPubkey,
+                        wrappedKey = env.hpkeEnvelope.ct,
+                        ephemeralPubkey = env.hpkeEnvelope.enc,
                     )
                 }
                 val request = CreateInteractionBody(
                     interactionType = InteractionType.Comment,
-                    encryptedContent = encrypted.ciphertext,
+                    encryptedContent = encrypted.ciphertextHex,
                     contentEnvelopes = envelopes,
                     interactionTypeHash = "comment",
                 )
@@ -534,7 +535,7 @@ class CaseManagementViewModel @Inject constructor(
     fun assignToMe(recordId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAssigning = true, actionError = null) }
-            val pubkey = cryptoService.pubkey
+            val pubkey = cryptoService.signingPubkeyHex
             if (pubkey == null) {
                 _uiState.update {
                     it.copy(isAssigning = false, actionError = "No identity available")
@@ -576,7 +577,7 @@ class CaseManagementViewModel @Inject constructor(
     fun unassignFromMe(recordId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAssigning = true, actionError = null) }
-            val pubkey = cryptoService.pubkey
+            val pubkey = cryptoService.signingPubkeyHex
             if (pubkey == null) {
                 _uiState.update {
                     it.copy(isAssigning = false, actionError = "No identity available")
@@ -626,11 +627,8 @@ class CaseManagementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDecryptingSummary = true) }
             try {
-                val plaintext = cryptoService.decryptMessage(
-                    encryptedContent = record.encryptedSummary,
-                    wrappedKey = envelope.wrappedKey,
-                    ephemeralPubkey = envelope.ephemeralPubkey,
-                )
+                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                val plaintext = cryptoService.decryptMessage(record.encryptedSummary, hpkeEnv)
                 if (plaintext != null) {
                     val jsonObj = json.decodeFromString<JsonObject>(plaintext)
                     val summary = DecryptedSummary(
@@ -667,11 +665,8 @@ class CaseManagementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDecryptingFields = true) }
             try {
-                val plaintext = cryptoService.decryptMessage(
-                    encryptedContent = encryptedFields,
-                    wrappedKey = envelope.wrappedKey,
-                    ephemeralPubkey = envelope.ephemeralPubkey,
-                )
+                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                val plaintext = cryptoService.decryptMessage(encryptedFields, hpkeEnv)
                 if (plaintext != null) {
                     val jsonObj = json.decodeFromString<JsonObject>(plaintext)
                     val fields = jsonObj.mapValues { (_, value) ->
@@ -706,11 +701,8 @@ class CaseManagementViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val plaintext = cryptoService.decryptMessage(
-                    encryptedContent = encryptedContent,
-                    wrappedKey = envelope.wrappedKey,
-                    ephemeralPubkey = envelope.ephemeralPubkey,
-                )
+                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                val plaintext = cryptoService.decryptMessage(encryptedContent, hpkeEnv)
                 if (plaintext != null) {
                     _uiState.update {
                         it.copy(
@@ -737,11 +729,8 @@ class CaseManagementViewModel @Inject constructor(
 
                 val envelope = record.summaryEnvelopes.find { it.pubkey == pubkey } ?: continue
                 try {
-                    val plaintext = cryptoService.decryptMessage(
-                        encryptedContent = record.encryptedSummary,
-                        wrappedKey = envelope.wrappedKey,
-                        ephemeralPubkey = envelope.ephemeralPubkey,
-                    )
+                    val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                    val plaintext = cryptoService.decryptMessage(record.encryptedSummary, hpkeEnv)
                     if (plaintext != null) {
                         val jsonObj = json.decodeFromString<JsonObject>(plaintext)
                         val title = jsonObj["title"]?.jsonPrimitive?.contentOrNull
