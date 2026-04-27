@@ -1,0 +1,49 @@
+[package]
+versioned_files = ["package.json", "apps/desktop/tauri.conf.json"]
+changelog = "CHANGELOG.md"
+extra_changelog_sections = [
+    { name = "Security", types = ["security"] },
+    { name = "Performance", types = ["perf"] },
+]
+
+# Rust crates are versioned separately — knope manages the JS/Tauri version.
+# packages/crypto has its own semver (0.x) and apps/desktop/Cargo.toml
+# tracks the Tauri shell version independently.
+
+[[workflows]]
+name = "prepare-release"
+
+[[workflows.steps]]
+type = "Command"
+command = "git switch -c release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "git commit -m \"chore: prepare release $version\""
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --force --set-upstream origin release"
+
+[[workflows.steps]]
+type = "CreatePullRequest"
+base = "main"
+
+[workflows.steps.title]
+template = "chore: prepare release $version"
+
+[workflows.steps.body]
+template = "Merging this PR will release $version with the following changes:\n\n$changelog"
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "Release"
+
+[github]
+owner = "rhonda-rodododo"
+repo = "llamenos-platform"
