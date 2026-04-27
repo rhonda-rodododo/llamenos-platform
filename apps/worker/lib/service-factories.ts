@@ -8,6 +8,9 @@ import { SignalWireAdapter } from '../telephony/signalwire'
 import { VonageAdapter } from '../telephony/vonage'
 import { PlivoAdapter } from '../telephony/plivo'
 import { AsteriskAdapter } from '../telephony/asterisk'
+import { TelnyxAdapter } from '../telephony/telnyx'
+import { BandwidthAdapter } from '../telephony/bandwidth'
+import { FreeSwitchAdapter } from '../telephony/freeswitch'
 import { createSMSAdapter } from '../messaging/sms/factory'
 import { createWhatsAppAdapter } from '../messaging/whatsapp/factory'
 import { createSignalAdapter } from '../messaging/signal/factory'
@@ -124,7 +127,7 @@ export function getNostrPublisher(env: Env): NostrPublisher {
 
 /**
  * Create adapter from saved config.
- * Supports Twilio, SignalWire, Vonage, Plivo, and Asterisk (self-hosted).
+ * Supports Twilio, SignalWire, Vonage, Plivo, Asterisk, Telnyx, Bandwidth, and FreeSWITCH.
  */
 function createAdapterFromConfig(config: TelephonyProviderConfig): TelephonyAdapter {
   switch (config.type) {
@@ -144,6 +147,23 @@ function createAdapterFromConfig(config: TelephonyProviderConfig): TelephonyAdap
         config.phoneNumber,
         config.bridgeCallbackUrl!,
         config.ariPassword!, // Bridge secret uses ARI password as shared secret
+      )
+    case 'telnyx':
+      return new TelnyxAdapter(config.apiKey!, config.connectionId!, config.phoneNumber)
+    case 'bandwidth':
+      return new BandwidthAdapter(
+        config.authId!, // accountId
+        config.authToken!, // apiToken
+        config.authToken!, // apiSecret (reused)
+        config.bandwidthAppId!,
+        config.phoneNumber,
+      )
+    case 'freeswitch':
+      return new FreeSwitchAdapter(
+        config.phoneNumber,
+        config.freeswitchBridgeUrl!,
+        config.freeswitchBridgeSecret!,
+        config.freeswitchBridgeUrl!.replace(/\/?$/, ''), // callback base URL without trailing slash
       )
     default:
       return new TwilioAdapter(config.accountSid!, config.authToken!, config.phoneNumber)
