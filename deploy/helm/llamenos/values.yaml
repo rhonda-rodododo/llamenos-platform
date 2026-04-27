@@ -71,13 +71,15 @@ asterisk:
     repository: andrius/asterisk
     tag: "20.11"
 
-# Asterisk bridge
-asteriskBridge:
+# SIP bridge (supports Asterisk, FreeSWITCH, Kamailio via PBX_TYPE)
+sipBridge:
   enabled: false
   image:
-    repository: ghcr.io/your-org/llamenos-asterisk-bridge
+    repository: ghcr.io/your-org/llamenos-sip-bridge
     tag: ""
-  # REQUIRED if using Asterisk: set a strong random secret
+  # PBX backend: asterisk, freeswitch, or kamailio
+  pbxType: "asterisk"
+  # REQUIRED: set a strong random secret
   bridgeSecret: ""
 
 # Nostr relay (strfry) — required for all real-time events

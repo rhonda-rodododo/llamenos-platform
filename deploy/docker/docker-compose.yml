@@ -10,7 +10,7 @@
 # Optional services (via --profile):
 #   whisper   - Self-hosted transcription (profile: transcription)
 #   asterisk  - Self-hosted PBX (profile: asterisk)
-#   asterisk-bridge - ARI-to-webhook translator (profile: asterisk)
+#   sip-bridge - PBX-to-webhook translator (profile: asterisk)
 #   signal-cli - Signal messaging bridge (profile: signal)
 #   glitchtip  - Sentry-compatible error tracking (profile: monitoring)
 #
@@ -197,13 +197,14 @@ services:
       retries: 3
       start_period: 15s
 
-  asterisk-bridge:
+  sip-bridge:
     profiles: ["asterisk"]
     build:
       context: ../..
-      dockerfile: asterisk-bridge/Dockerfile
+      dockerfile: sip-bridge/Dockerfile
     restart: unless-stopped
     environment:
+      - PBX_TYPE=${PBX_TYPE:-asterisk}
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_USERNAME=${ARI_USERNAME:-llamenos}
       - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — do NOT use the default}

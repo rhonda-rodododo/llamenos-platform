@@ -178,10 +178,11 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  asterisk-bridge:
-    image: {{ llamenos_image }}-asterisk-bridge
+  sip-bridge:
+    image: {{ llamenos_image }}-sip-bridge
     restart: unless-stopped
     environment:
+      - PBX_TYPE=${PBX_TYPE:-asterisk}
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_USERNAME=${ARI_USERNAME}
       - ARI_PASSWORD=${ARI_PASSWORD}

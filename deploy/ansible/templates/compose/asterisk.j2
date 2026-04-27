@@ -21,8 +21,8 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  asterisk-bridge:
-    image: {{ llamenos_app_image }}-asterisk-bridge
+  sip-bridge:
+    image: {{ llamenos_app_image }}-sip-bridge
     restart: unless-stopped
     env_file:
       - .env.asterisk
