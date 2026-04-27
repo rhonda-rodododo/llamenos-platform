@@ -44,6 +44,18 @@
     "HMAC_CASE_STATUS": "llamenos:case-status",
     "HMAC_CASE_SEVERITY": "llamenos:case-severity",
     "HMAC_CASE_CATEGORY": "llamenos:case-category",
-    "HMAC_EVENT_TYPE": "llamenos:event-type"
+    "HMAC_EVENT_TYPE": "llamenos:event-type",
+    "LABEL_PUK_SEED_WRAP": "llamenos:puk-seed-wrap",
+    "LABEL_PUK_EPOCH_KEY": "llamenos:puk-epoch-key",
+    "LABEL_PUK_ROTATION": "llamenos:puk-rotation",
+    "LABEL_SIGCHAIN_LINK": "llamenos:sigchain-link",
+    "LABEL_SIGCHAIN_EPOCH": "llamenos:sigchain-epoch",
+    "LABEL_MLS_COMMIT": "llamenos:mls-commit",
+    "LABEL_MLS_WELCOME": "llamenos:mls-welcome",
+    "LABEL_MLS_APPLICATION": "llamenos:mls-application",
+    "LABEL_MLS_KEY_PACKAGE": "llamenos:mls-key-package",
+    "LABEL_SFRAME_SENDER_KEY": "llamenos:sframe-sender-key",
+    "LABEL_SFRAME_EPOCH_KEY": "llamenos:sframe-epoch-key",
+    "LABEL_DEVICE_CRYPTO_BIND": "llamenos:device-crypto-bind"
   }
 }
