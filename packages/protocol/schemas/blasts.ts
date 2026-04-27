@@ -76,6 +76,29 @@ export const blastListResponseSchema = z.object({
   ...paginatedMeta,
 })
 
+export const blastDeliveryResponseSchema = z.object({
+  id: z.string(),
+  blastId: z.string(),
+  subscriberId: z.string(),
+  channel: z.string(),
+  status: z.enum(['pending', 'sending', 'sent', 'delivered', 'failed', 'opted_out', 'skipped', 'cancelled']),
+  externalId: z.string().nullable().optional(),
+  attempts: z.number(),
+  lastAttemptAt: z.string().nullable().optional(),
+  nextRetryAt: z.string().nullable().optional(),
+  deliveredAt: z.string().nullable().optional(),
+  failedAt: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+  createdAt: z.string(),
+})
+
+export type BlastDelivery = z.infer<typeof blastDeliveryResponseSchema>
+
+export const blastDeliveryListResponseSchema = z.object({
+  deliveries: z.array(blastDeliveryResponseSchema),
+  ...paginatedMeta,
+})
+
 export const importSubscribersResponseSchema = z.object({
   imported: z.number(),
   skipped: z.number(),

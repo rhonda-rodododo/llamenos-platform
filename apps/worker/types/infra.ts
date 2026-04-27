@@ -324,24 +324,14 @@ export interface EncryptedMessage {
 export type MessageKeyEnvelope = RecipientEnvelope
 
 // ---------------------------------------------------------------------------
-// Blast Queue — server-internal delivery tracking
+// Blast Delivery — server-internal delivery tracking (DB-backed)
 // ---------------------------------------------------------------------------
 
-export interface BlastQueueItem {
-  subscriberId: string
-  channel: MessagingChannelType
-  identifier: string            // actual phone/contact (server-only, not stored)
-  status: 'pending' | 'sent' | 'failed'
-  error?: string
-  sentAt?: string
-}
+/** Max retry attempts before marking delivery as permanently failed */
+export const BLAST_MAX_RETRIES = 3
 
-export interface BlastDeliveryQueue {
-  blastId: string
-  items: BlastQueueItem[]
-  processedCount: number
-  totalCount: number
-}
+/** Base backoff in milliseconds — actual delay = base * 2^(attempt-1) */
+export const BLAST_RETRY_BACKOFF_BASE_MS = 30_000
 
 // ---------------------------------------------------------------------------
 // Hono typed context

@@ -2,13 +2,65 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, importSubscribersResponseSchema } from '@protocol/schemas/blasts'
+import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, blastDeliveryListResponseSchema, importSubscribersResponseSchema } from '@protocol/schemas/blasts'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 
 const blasts = new Hono<AppEnv>()
 
-// --- Subscribers ---
+// --- Subscribers (static paths BEFORE parameterized) ---
+blasts.get('/subscribers/stats',
+  describeRoute({
+    tags: ['Blasts'],
+    summary: 'Get subscriber statistics',
+    responses: {
+      200: {
+        description: 'Subscriber stats',
+        content: {
+          'application/json': {
+            schema: resolver(subscriberStatsResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('blasts:read'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId')
+    const stats = await services.blasts.getSubscriberStats(hubId)
+    return c.json(stats)
+  },
+)
+
+blasts.post('/subscribers/import',
+  describeRoute({
+    tags: ['Blasts'],
+    summary: 'Import subscribers in bulk',
+    responses: {
+      200: {
+        description: 'Import results',
+        content: {
+          'application/json': {
+            schema: resolver(importSubscribersResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('blasts:manage'),
+  validator('json', importSubscribersBodySchema),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const body = c.req.valid('json')
+    const result = await services.blasts.importBulk(hubId, body.subscribers)
+    return c.json(result)
+  },
+)
+
 blasts.get('/subscribers',
   describeRoute({
     tags: ['Blasts'],
@@ -74,16 +126,17 @@ blasts.delete('/subscribers/:id',
   },
 )
 
-blasts.get('/subscribers/stats',
+// --- Settings (BEFORE /:id wildcard) ---
+blasts.get('/settings',
   describeRoute({
     tags: ['Blasts'],
-    summary: 'Get subscriber statistics',
+    summary: 'Get blast settings',
     responses: {
       200: {
-        description: 'Subscriber stats',
+        description: 'Blast settings',
         content: {
           'application/json': {
-            schema: resolver(subscriberStatsResponseSchema),
+            schema: resolver(blastSettingsResponseSchema),
           },
         },
       },
@@ -93,22 +146,22 @@ blasts.get('/subscribers/stats',
   requirePermission('blasts:read'),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.get('hubId')
-    const stats = await services.blasts.getSubscriberStats(hubId)
-    return c.json(stats)
+    const hubId = c.get('hubId') ?? ''
+    const settings = await services.blasts.getBlastSettings(hubId)
+    return c.json(settings)
   },
 )
 
-blasts.post('/subscribers/import',
+blasts.patch('/settings',
   describeRoute({
     tags: ['Blasts'],
-    summary: 'Import subscribers in bulk',
+    summary: 'Update blast settings',
     responses: {
       200: {
-        description: 'Import results',
+        description: 'Blast settings updated',
         content: {
           'application/json': {
-            schema: resolver(importSubscribersResponseSchema),
+            schema: resolver(blastSettingsResponseSchema),
           },
         },
       },
@@ -116,13 +169,13 @@ blasts.post('/subscribers/import',
     },
   }),
   requirePermission('blasts:manage'),
-  validator('json', importSubscribersBodySchema),
+  validator('json', updateBlastSettingsBodySchema),
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId') ?? ''
     const body = c.req.valid('json')
-    const result = await services.blasts.importBulk(hubId, body.subscribers)
-    return c.json(result)
+    const settings = await services.blasts.updateBlastSettings(hubId, body)
+    return c.json(settings)
   },
 )
 
@@ -200,6 +253,7 @@ blasts.post('/',
   },
 )
 
+// --- Parameterized blast routes (/:id AFTER static paths) ---
 blasts.get('/:id',
   describeRoute({
     tags: ['Blasts'],
@@ -303,6 +357,14 @@ blasts.post('/:id/send',
     const services = c.get('services')
     const hubId = c.get('hubId')
     const blast = await services.blasts.send(id, hubId)
+
+    // Expand blast into delivery rows (background)
+    c.executionCtx.waitUntil(
+      services.blasts.expandBlast(id).catch((err) => {
+        console.error(`[blasts] Failed to expand blast ${id}:`, err)
+      })
+    )
+
     return c.json(blast)
   },
 )
@@ -359,56 +421,56 @@ blasts.post('/:id/cancel',
   },
 )
 
-// --- Settings ---
-blasts.get('/settings',
+// --- Delivery tracking ---
+blasts.get('/:id/stats',
   describeRoute({
     tags: ['Blasts'],
-    summary: 'Get blast settings',
+    summary: 'Get live delivery stats for a blast',
     responses: {
       200: {
-        description: 'Blast settings',
-        content: {
-          'application/json': {
-            schema: resolver(blastSettingsResponseSchema),
-          },
-        },
+        description: 'Blast delivery stats',
+        content: { 'application/json': { schema: resolver(subscriberStatsResponseSchema) } },
       },
       ...authErrors,
     },
   }),
   requirePermission('blasts:read'),
   async (c) => {
+    const id = c.req.param('id')
     const services = c.get('services')
-    const hubId = c.get('hubId') ?? ''
-    const settings = await services.blasts.getBlastSettings(hubId)
-    return c.json(settings)
+    const stats = await services.blasts.computeBlastStats(id)
+    return c.json(stats)
   },
 )
 
-blasts.patch('/settings',
+blasts.get('/:id/deliveries',
   describeRoute({
     tags: ['Blasts'],
-    summary: 'Update blast settings',
+    summary: 'List deliveries for a blast (paginated)',
     responses: {
       200: {
-        description: 'Blast settings updated',
-        content: {
-          'application/json': {
-            schema: resolver(blastSettingsResponseSchema),
-          },
-        },
+        description: 'Delivery list',
+        content: { 'application/json': { schema: resolver(blastDeliveryListResponseSchema) } },
       },
       ...authErrors,
     },
   }),
-  requirePermission('blasts:manage'),
-  validator('json', updateBlastSettingsBodySchema),
+  requirePermission('blasts:read'),
   async (c) => {
+    const id = c.req.param('id')
     const services = c.get('services')
-    const hubId = c.get('hubId') ?? ''
-    const body = c.req.valid('json')
-    const settings = await services.blasts.updateBlastSettings(hubId, body)
-    return c.json(settings)
+    const url = new URL(c.req.url)
+    const status = url.searchParams.get('status') as import('@shared/types').BlastDeliveryStatus | undefined
+    const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+    const limit = parseInt(url.searchParams.get('limit') ?? '50', 10)
+
+    const result = await services.blasts.getDeliveries(id, {
+      status: status ?? undefined,
+      limit,
+      offset: (page - 1) * limit,
+    })
+
+    return c.json({ deliveries: result.deliveries, total: result.total, page, limit })
   },
 )
 
