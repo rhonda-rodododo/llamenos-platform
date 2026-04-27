@@ -62,3 +62,53 @@ export interface SignalAboutResponse {
   mode: string
   number?: string
 }
+
+// ---------------------------------------------------------------------------
+// Registration & provisioning types
+// ---------------------------------------------------------------------------
+
+export interface SignalRegisterRequest {
+  number: string
+  use_voice?: boolean       // true = voice verification call instead of SMS
+  captcha?: string          // captcha token if required
+}
+
+export interface SignalVerifyRequest {
+  number: string
+  token: string             // verification code from SMS/voice
+}
+
+export interface SignalAccountInfo {
+  number: string
+  uuid?: string
+  registered: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Identity trust types
+// ---------------------------------------------------------------------------
+
+export interface SignalIdentity {
+  number: string
+  uuid: string
+  fingerprint: string       // safety number fingerprint
+  trustLevel: 'UNTRUSTED' | 'TRUSTED_UNVERIFIED' | 'TRUSTED_VERIFIED'
+  addedDate: number
+}
+
+export interface SignalTrustRequest {
+  number: string
+  verified_safety_number?: string
+  trust_all_known_keys?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Reaction types
+// ---------------------------------------------------------------------------
+
+export interface SignalReaction {
+  emoji: string
+  targetAuthor: string      // phone number or UUID of the message author
+  targetTimestamp: number   // timestamp of the message being reacted to
+  isRemove?: boolean        // true if this is a reaction removal
+}

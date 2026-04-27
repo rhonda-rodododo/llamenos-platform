@@ -5,13 +5,16 @@ import type {
   SendMediaParams,
   SendResult,
   ChannelStatus,
+  MessageStatusUpdate,
 } from '../adapter'
 import type { SignalConfig } from '@shared/types'
+import type { MessageDeliveryStatus } from '../../types'
 import type {
   SignalWebhookPayload,
   SignalSendRequest,
   SignalSendResponse,
   SignalAboutResponse,
+  SignalReaction,
 } from './types'
 import { hashPhone } from '../../lib/crypto'
 
@@ -250,6 +253,163 @@ export class SignalAdapter implements MessagingAdapter {
       return {
         connected: false,
         error: `Signal bridge unreachable: ${err instanceof Error ? err.message : String(err)}`,
+      }
+    }
+  }
+
+  /**
+   * Parse Signal receipt messages (delivered, read) into normalized status updates.
+   * signal-cli-rest-api sends receiptMessage webhooks when the recipient's device
+   * acknowledges delivery or read status.
+   */
+  async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate | null> {
+    try {
+      const payload: SignalWebhookPayload = await request.clone().json()
+      const { envelope } = payload
+
+      // Handle receipt messages (delivery/read receipts)
+      if (envelope.receiptMessage) {
+        const { type, timestamps } = envelope.receiptMessage
+        if (!timestamps || timestamps.length === 0) return null
+
+        // Map Signal receipt type to normalized status
+        const statusMap: Record<string, MessageDeliveryStatus> = {
+          'DELIVERY': 'delivered',
+          'READ': 'read',
+        }
+
+        const normalizedStatus = statusMap[type.toUpperCase()]
+        if (!normalizedStatus) return null
+
+        // Signal receipts can contain multiple timestamps (batch acknowledgment).
+        // We return the first one; the router will handle each webhook separately.
+        const targetTimestamp = timestamps[0]
+        return {
+          externalId: String(targetTimestamp),
+          status: normalizedStatus,
+          timestamp: new Date(envelope.timestamp).toISOString(),
+        }
+      }
+
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Parse a reaction from a Signal webhook payload.
+   * Returns null if the webhook is not a reaction message.
+   */
+  parseReaction(payload: SignalWebhookPayload): SignalReaction | null {
+    const reaction = payload.envelope.dataMessage?.reaction
+    if (!reaction) return null
+
+    return {
+      emoji: reaction.emoji,
+      targetAuthor: reaction.targetAuthor,
+      targetTimestamp: reaction.targetTimestamp,
+      isRemove: false, // signal-cli-rest-api uses a separate removal payload
+    }
+  }
+
+  /**
+   * Check if a webhook payload is a typing indicator.
+   * Returns typing state info or null if not a typing message.
+   */
+  parseTypingIndicator(payload: SignalWebhookPayload): {
+    sender: string
+    isTyping: boolean
+    timestamp: string
+  } | null {
+    const typing = payload.envelope.typingMessage
+    if (!typing) return null
+
+    return {
+      sender: payload.envelope.sourceUuid ?? payload.envelope.source,
+      isTyping: typing.action.toUpperCase() === 'STARTED',
+      timestamp: new Date(typing.timestamp).toISOString(),
+    }
+  }
+
+  /**
+   * Send a reaction to a message via the signal-cli-rest-api bridge.
+   */
+  async sendReaction(params: {
+    recipientIdentifier: string
+    emoji: string
+    targetAuthor: string
+    targetTimestamp: number
+    remove?: boolean
+  }): Promise<SendResult> {
+    try {
+      const response = await fetch(`${this.bridgeUrl}/v1/reactions/${encodeURIComponent(this.registeredNumber)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.bridgeApiKey}`,
+        },
+        body: JSON.stringify({
+          recipient: params.recipientIdentifier,
+          reaction: params.emoji,
+          target_author: params.targetAuthor,
+          timestamp: params.targetTimestamp,
+          remove: params.remove ?? false,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        return {
+          success: false,
+          error: `Signal bridge returned ${response.status}: ${errorText}`,
+        }
+      }
+
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: `Signal reaction send failed: ${err instanceof Error ? err.message : String(err)}`,
+      }
+    }
+  }
+
+  /**
+   * Send a read receipt to the sender, acknowledging message reception.
+   */
+  async sendReceipt(params: {
+    recipientIdentifier: string
+    targetTimestamps: number[]
+    type?: 'read' | 'viewed'
+  }): Promise<SendResult> {
+    try {
+      const response = await fetch(`${this.bridgeUrl}/v1/receipts/${encodeURIComponent(this.registeredNumber)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.bridgeApiKey}`,
+        },
+        body: JSON.stringify({
+          recipient: params.recipientIdentifier,
+          timestamps: params.targetTimestamps,
+          receipt_type: params.type ?? 'read',
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        return {
+          success: false,
+          error: `Signal bridge returned ${response.status}: ${errorText}`,
+        }
+      }
+
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: `Signal receipt send failed: ${err instanceof Error ? err.message : String(err)}`,
       }
     }
   }
