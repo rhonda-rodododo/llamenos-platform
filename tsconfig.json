@@ -12,7 +12,6 @@
     "isolatedModules": true,
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/client/*"],
       "@worker/*": ["./apps/worker/*"],
@@ -22,8 +21,7 @@
       "@llamenos/i18n/*": ["./packages/i18n/*"],
       "cloudflare:workers": ["./src/platform/index.ts"]
     },
-    "types": ["@types/bun"],
-    "ignoreDeprecations": "6.0"
+    "types": ["@types/bun"]
   },
   "include": ["src/**/*", "apps/**/*", "packages/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist", "packages/i18n/tools/add-cms-translations.ts"]
