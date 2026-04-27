@@ -41,6 +41,23 @@ pub struct PublicKeyPair {
     pub npub: String,
 }
 
+/// Ephemeral secp256k1 keypair for device-linking ECDH provisioning.
+///
+/// Unlike identity keys, the secret IS exposed — provisioning is a one-shot
+/// flow where the new device must perform ECDH with the primary device, and
+/// the ephemeral secret only lives in client memory for the duration of the
+/// linking handshake. Callers must zero or drop the secret immediately after
+/// the SAS verification step.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+pub struct EphemeralKeyPair {
+    /// hex-encoded 32-byte secret key (caller is responsible for clearing)
+    pub secret_key_hex: String,
+    /// hex-encoded 32-byte x-only public key
+    pub public_key: String,
+}
+
 /// Internal: generate a new random secp256k1 keypair (full KeyPair with secret material).
 pub fn generate_keypair() -> KeyPair {
     let sk = SecretKey::random(&mut OsRng);
@@ -135,6 +152,22 @@ pub fn generate_keypair_mobile() -> PublicKeyPair {
     PublicKeyPair {
         public_key: kp.public_key,
         npub: kp.npub,
+    }
+}
+
+/// Generate an ephemeral secp256k1 keypair for device-linking ECDH.
+///
+/// The secret IS returned across the FFI boundary because the new device
+/// needs it to compute the shared ECDH secret with the primary. This is
+/// safe because the keypair is ephemeral — used only during the linking
+/// handshake — and unrelated to any persistent identity key.
+#[cfg(feature = "mobile")]
+#[uniffi::export]
+pub fn generate_ephemeral_keypair_mobile() -> EphemeralKeyPair {
+    let kp = generate_keypair();
+    EphemeralKeyPair {
+        secret_key_hex: kp.secret_key_hex.to_string(),
+        public_key: kp.public_key,
     }
 }
 

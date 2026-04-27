@@ -340,59 +340,8 @@ final class SecurityHardeningTests: XCTestCase {
         )
     }
 
-    // MARK: - M27: nsecInput Cleared After Import
-
-    func testAuthViewModelClearsNsecOnCancel() {
-        let cryptoService = CryptoService()
-        let keychainService = KeychainService()
-        let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
-        let authService = AuthService(
-            cryptoService: cryptoService,
-            keychainService: keychainService
-        )
-
-        let viewModel = AuthViewModel(
-            authService: authService,
-            apiService: apiService
-        )
-
-        // Simulate entering an nsec and being on the import step
-        viewModel.nsecInput = "nsec1test_fake_key_data_here_not_real"
-        viewModel.currentStep = .importingKey
-
-        XCTAssertEqual(viewModel.currentStep, .importingKey)
-        XCTAssertFalse(viewModel.nsecInput.isEmpty, "nsecInput should have data before cancel")
-
-        // Cancel should clear nsecInput (M27)
-        viewModel.cancelImport()
-
-        XCTAssertTrue(
-            viewModel.nsecInput.isEmpty,
-            "nsecInput should be cleared after cancelImport (M27)"
-        )
-        XCTAssertEqual(viewModel.currentStep, .login)
-    }
-
-    func testAuthViewModelResetsNsecOnFullReset() {
-        let cryptoService = CryptoService()
-        let keychainService = KeychainService()
-        let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
-        let authService = AuthService(
-            cryptoService: cryptoService,
-            keychainService: keychainService
-        )
-
-        let viewModel = AuthViewModel(
-            authService: authService,
-            apiService: apiService
-        )
-
-        viewModel.nsecInput = "nsec1some_key_material"
-        viewModel.reset()
-
-        XCTAssertTrue(
-            viewModel.nsecInput.isEmpty,
-            "nsecInput should be cleared on reset"
-        )
-    }
+    // The pre-V3 nsec import flow (and the AuthViewModel.nsecInput / .importingKey state
+    // that mediated it) was removed when device keys replaced single-nsec identity.
+    // The equivalent V3 flow is sigchain-authorized device linking, which has its own
+    // tests in DeviceLinkViewModel coverage.
 }

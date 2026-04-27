@@ -86,16 +86,6 @@ enum LocationError: LocalizedError {
     }
 }
 
-// MARK: - LocationResult (mirrors protocol codegen output)
-
-struct LocationResult: Codable, Sendable {
-    let address: String
-    let displayName: String?
-    let lat: Double
-    let lon: Double
-    let countryCode: String?
-}
-
 // MARK: - Open in Maps
 
 /// Opens the location in Organic Maps if installed, otherwise Apple Maps.
