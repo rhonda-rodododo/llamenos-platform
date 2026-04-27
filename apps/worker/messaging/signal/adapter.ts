@@ -5,15 +5,19 @@ import type {
   SendMediaParams,
   SendResult,
   ChannelStatus,
+  MessageStatusUpdate,
 } from '../adapter'
 import type { SignalConfig } from '@shared/types'
+import type { MessageDeliveryStatus } from '../../types'
 import type {
   SignalWebhookPayload,
   SignalSendRequest,
   SignalSendResponse,
   SignalAboutResponse,
+  SignalReaction,
 } from './types'
 import { hashPhone } from '../../lib/crypto'
+import { timingSafeEqual } from 'node:crypto'
 
 /**
  * SignalAdapter — MessagingAdapter implementation for the Signal channel.
@@ -114,7 +118,10 @@ export class SignalAdapter implements MessagingAdapter {
     }
 
     const token = parts[1]
-    return constantTimeEqual(token, this.webhookSecret)
+    const tokenBuf = Buffer.from(token)
+    const secretBuf = Buffer.from(this.webhookSecret)
+    if (tokenBuf.length !== secretBuf.length) return false
+    return timingSafeEqual(tokenBuf, secretBuf)
   }
 
   /**
@@ -253,30 +260,164 @@ export class SignalAdapter implements MessagingAdapter {
       }
     }
   }
-}
 
-/**
- * Constant-time string comparison to prevent timing attacks on webhook secrets.
- * Both strings are compared byte-by-byte; the total time is always proportional
- * to the length of the expected string regardless of where a mismatch occurs.
- */
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    // Still perform a comparison to avoid leaking length via timing,
-    // but we know the result will be false.
-    const dummy = b
-    let result = a.length ^ b.length
-    for (let i = 0; i < dummy.length; i++) {
-      result |= (a.charCodeAt(i % a.length) ?? 0) ^ dummy.charCodeAt(i)
+  /**
+   * Parse Signal receipt messages (delivered, read) into normalized status updates.
+   * signal-cli-rest-api sends receiptMessage webhooks when the recipient's device
+   * acknowledges delivery or read status.
+   *
+   * Returns an array since Signal receipts can batch-acknowledge multiple messages.
+   */
+  async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate[]> {
+    try {
+      const payload: SignalWebhookPayload = await request.clone().json()
+      const { envelope } = payload
+
+      // Handle receipt messages (delivery/read receipts)
+      if (envelope.receiptMessage) {
+        const { type, timestamps } = envelope.receiptMessage
+        if (!timestamps || timestamps.length === 0) return []
+
+        // Map Signal receipt type to normalized status
+        const statusMap: Record<string, MessageDeliveryStatus> = {
+          'DELIVERY': 'delivered',
+          'READ': 'read',
+        }
+
+        const normalizedStatus = statusMap[type.toUpperCase()]
+        if (!normalizedStatus) return []
+
+        const webhookTimestamp = new Date(envelope.timestamp).toISOString()
+
+        return timestamps.map(ts => ({
+          externalId: String(ts),
+          status: normalizedStatus,
+          timestamp: webhookTimestamp,
+        }))
+      }
+
+      return []
+    } catch {
+      return []
     }
-    return result === 0
   }
 
-  let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  /**
+   * Parse a reaction from a Signal webhook payload.
+   * Returns null if the webhook is not a reaction message.
+   */
+  parseReaction(payload: SignalWebhookPayload): SignalReaction | null {
+    const reaction = payload.envelope.dataMessage?.reaction
+    if (!reaction) return null
+
+    return {
+      emoji: reaction.emoji,
+      targetAuthor: reaction.targetAuthor,
+      targetTimestamp: reaction.targetTimestamp,
+      isRemove: reaction.remove ?? false,
+    }
   }
-  return result === 0
+
+  /**
+   * Check if a webhook payload is a typing indicator.
+   * Returns typing state info or null if not a typing message.
+   */
+  parseTypingIndicator(payload: SignalWebhookPayload): {
+    sender: string
+    isTyping: boolean
+    timestamp: string
+  } | null {
+    const typing = payload.envelope.typingMessage
+    if (!typing) return null
+
+    return {
+      sender: payload.envelope.sourceUuid ?? payload.envelope.source,
+      isTyping: typing.action.toUpperCase() === 'STARTED',
+      timestamp: new Date(typing.timestamp).toISOString(),
+    }
+  }
+
+  /**
+   * Send a reaction to a message via the signal-cli-rest-api bridge.
+   */
+  async sendReaction(params: {
+    recipientIdentifier: string
+    emoji: string
+    targetAuthor: string
+    targetTimestamp: number
+    remove?: boolean
+  }): Promise<SendResult> {
+    try {
+      const response = await fetch(`${this.bridgeUrl}/v1/reactions/${encodeURIComponent(this.registeredNumber)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.bridgeApiKey}`,
+        },
+        body: JSON.stringify({
+          recipient: params.recipientIdentifier,
+          reaction: params.emoji,
+          target_author: params.targetAuthor,
+          timestamp: params.targetTimestamp,
+          remove: params.remove ?? false,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        return {
+          success: false,
+          error: `Signal bridge returned ${response.status}: ${errorText}`,
+        }
+      }
+
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: `Signal reaction send failed: ${err instanceof Error ? err.message : String(err)}`,
+      }
+    }
+  }
+
+  /**
+   * Send a read receipt to the sender, acknowledging message reception.
+   */
+  async sendReceipt(params: {
+    recipientIdentifier: string
+    targetTimestamps: number[]
+    type?: 'read' | 'viewed'
+  }): Promise<SendResult> {
+    try {
+      const response = await fetch(`${this.bridgeUrl}/v1/receipts/${encodeURIComponent(this.registeredNumber)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.bridgeApiKey}`,
+        },
+        body: JSON.stringify({
+          recipient: params.recipientIdentifier,
+          timestamps: params.targetTimestamps,
+          receipt_type: params.type ?? 'read',
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        return {
+          success: false,
+          error: `Signal bridge returned ${response.status}: ${errorText}`,
+        }
+      }
+
+      return { success: true }
+    } catch (err) {
+      return {
+        success: false,
+        error: `Signal receipt send failed: ${err instanceof Error ? err.message : String(err)}`,
+      }
+    }
+  }
 }
 
 /**

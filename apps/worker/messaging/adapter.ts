@@ -25,7 +25,8 @@ export interface MessagingAdapter {
   getChannelStatus(): Promise<ChannelStatus>
 
   // Parse status webhook callback (delivery receipts, read receipts)
-  parseStatusWebhook?(request: Request): Promise<MessageStatusUpdate | null>
+  // May return a single update, an array (Signal batches), or null
+  parseStatusWebhook?(request: Request): Promise<MessageStatusUpdate | MessageStatusUpdate[] | null>
 }
 
 export interface IncomingMessage {
