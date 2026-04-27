@@ -15,7 +15,6 @@ use crate::labels::AUTH_PREFIX;
 
 /// A signed authentication token.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
 pub struct AuthToken {
     pub pubkey: String,
     pub timestamp: u64,
@@ -26,7 +25,7 @@ pub struct AuthToken {
 ///
 /// The message is bound to the specific request method + path to prevent
 /// cross-endpoint replay attacks.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Legacy: UniFFI export removed — new auth.rs provides the canonical mobile API
 pub fn create_auth_token(
     secret_key_hex: &str,
     timestamp: u64,
@@ -73,7 +72,7 @@ pub fn create_auth_token(
 ///
 /// Rejects tokens older than `max_age_ms` or more than 30s in the future.
 /// Use `max_age_ms: 300_000` (5 minutes) for standard API authentication.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Legacy: UniFFI export removed — new auth.rs provides the canonical mobile API
 pub fn verify_auth_token_with_expiry(
     token: &AuthToken,
     method: &str,
@@ -95,7 +94,7 @@ pub fn verify_auth_token_with_expiry(
 /// Verify a Schnorr auth token.
 ///
 /// Returns true if the signature is valid for the given method + path.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Legacy: UniFFI export removed — new auth.rs provides the canonical mobile API
 pub fn verify_auth_token(token: &AuthToken, method: &str, path: &str) -> Result<bool, CryptoError> {
     let pubkey_bytes = hex::decode(&token.pubkey).map_err(CryptoError::HexError)?;
     if pubkey_bytes.len() != 32 {
@@ -134,7 +133,7 @@ pub fn verify_auth_token(token: &AuthToken, method: &str, path: &str) -> Result<
 /// Verify a raw Schnorr signature over a pre-hashed message.
 ///
 /// The message must be exactly 32 bytes (SHA-256 hash) for BIP-340 compliance.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Legacy: UniFFI export removed — new auth.rs provides the canonical mobile API
 pub fn verify_schnorr(
     message_hex: &str,
     signature_hex: &str,
