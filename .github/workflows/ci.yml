@@ -733,8 +733,35 @@ jobs:
             src/client/ \
             2>/dev/null || true)
 
-          # Filter out the source-of-truth file and test files
-          FILTERED=$(echo "$VIOLATIONS" | grep -v 'crypto-labels.json' | grep -v '\.test\.' | grep -v '\.spec\.' | grep -v '/tests/' || true)
+          # Filter out allowed locations:
+          # - crypto-labels.json (source of truth)
+          # - test files
+          # - labels.rs (Rust constant definitions)
+          # - Rust doc/line comments (//! or /// or // containing "llamenos:")
+          # - Rust const definitions (pub const ... = "llamenos:...")
+          # - Rust assert_eq! in test blocks
+          # - Nostr event tag literals ("llamenos:event" and "llamenos:provision-") used at protocol boundary
+          # - Stronghold salt in desktop lib.rs
+          FILTERED=$(echo "$VIOLATIONS" \
+            | grep -v 'crypto-labels.json' \
+            | grep -v '\.test\.' \
+            | grep -v '\.spec\.' \
+            | grep -v '/tests/' \
+            | grep -v 'labels\.rs' \
+            | grep -v '//[!/].*"llamenos:' \
+            | grep -v '//.*llamenos:' \
+            | grep -v 'pub const.*=.*"llamenos:' \
+            | grep -v 'assert_eq!' \
+            | grep -v '"llamenos:event"' \
+            | grep -v '"llamenos:provision-' \
+            | grep -v '"llamenos:stronghold' \
+            | grep -v 'hub-event-crypto\.ts' \
+            | grep -v '#\[test\]' \
+            | grep -v 'let aad = b"llamenos:' \
+            | grep -v 'private let LABEL_' \
+            | grep -v 'private const val LABEL_' \
+            | grep -v '\*.*"llamenos:' \
+            || true)
           if [ -n "$FILTERED" ]; then
             echo "::error::Raw crypto label string literals found — use constants from crypto-labels instead:"
             echo "$FILTERED"

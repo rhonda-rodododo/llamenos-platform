@@ -2832,11 +2832,20 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
             return FfiConverterTypePublicKeyPair.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
     UniffiLib.uniffi_llamenos_core_fn_func_keypair_from_secret_key_hex_mobile(
-    
+
         FfiConverterString.lower(`secretKeyHex`),_status)
 }
     )
     }
-    
+
+
+    /**
+     * Check if the mobile crypto state is unlocked (device secrets loaded in Rust memory).
+     *
+     * Placeholder stub — returns false until native libs are linked.
+     */
+    fun `mobileIsUnlocked`(): kotlin.Boolean {
+        return false
+    }
 
 
