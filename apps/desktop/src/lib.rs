@@ -15,7 +15,7 @@ pub fn run() {
                 use pbkdf2::pbkdf2;
                 use sha2::Sha256;
 
-                let salt = b"llamenos:stronghold:v1";
+                let salt = llamenos_core::labels::LABEL_STRONGHOLD.as_bytes();
                 let mut kek = vec![0u8; 32];
                 pbkdf2::<Hmac<Sha256>>(password.as_bytes(), salt, 600_000, &mut kek)
                     .expect("PBKDF2 derivation failed");

@@ -717,9 +717,17 @@ jobs:
       - name: Check for raw crypto label string literals
         run: |
           # All crypto context strings must use constants from crypto-labels,
-          # never raw "llamenos:" string literals in non-test source files.
+          # never raw "llamenos:" string literals in non-definition source files.
+          #
+          # Exclusions:
+          #   --exclude='labels.rs'        definition file (Rust constants)
+          #   --exclude='crypto-labels.ts' definition file (TS re-exports)
+          #   comment-line filter           //, ///, //!, * (doc/block comments)
+          #   test-file filter              .test., .spec., /__tests__/
           VIOLATIONS=$(grep -rn '"llamenos:' \
             --include='*.ts' --include='*.rs' --include='*.swift' --include='*.kt' \
+            --exclude='labels.rs' \
+            --exclude='crypto-labels.ts' \
             --exclude-dir='node_modules' \
             --exclude-dir='dist' \
             --exclude-dir='target' \
@@ -733,8 +741,15 @@ jobs:
             src/client/ \
             2>/dev/null || true)
 
-          # Filter out the source-of-truth file and test files
-          FILTERED=$(echo "$VIOLATIONS" | grep -v 'crypto-labels.json' | grep -v '\.test\.' | grep -v '\.spec\.' | grep -v '/tests/' || true)
+          # Filter: source-of-truth JSON, test files, and comment lines
+          FILTERED=$(echo "$VIOLATIONS" \
+            | grep -v 'crypto-labels.json' \
+            | grep -v '\.test\.' \
+            | grep -v '\.spec\.' \
+            | grep -Ev '/__tests__/' \
+            | grep -Ev ':[0-9]+:[[:space:]]*/[/!]' \
+            | grep -Ev ':[0-9]+:[[:space:]]*\*' \
+            || true)
           if [ -n "$FILTERED" ]; then
             echo "::error::Raw crypto label string literals found — use constants from crypto-labels instead:"
             echo "$FILTERED"

@@ -149,7 +149,10 @@ mod tests {
         // Must be compact JSON (serde_json::to_string, not to_string_pretty)
         assert_eq!(
             canonical,
-            r#"[0,"abc123",1700000000,20001,[["d","hub"],["t","llamenos:event"]],"content"]"#
+            format!(
+                r#"[0,"abc123",1700000000,20001,[["d","hub"],["t","{}"]],"content"]"#,
+                NOSTR_EVENT_TAG
+            )
         );
     }
 

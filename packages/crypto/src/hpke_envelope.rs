@@ -260,7 +260,8 @@ mod tests {
         let (sk_hex, pk_hex) = gen_keypair();
         let plaintext = b"secret note content here";
         let label = LABEL_NOTE_KEY;
-        let aad = b"llamenos:note-key:record-123:content";
+        let aad_str = format!("{}:record-123:content", LABEL_NOTE_KEY);
+        let aad = aad_str.as_bytes();
 
         let envelope = hpke_seal(plaintext, &pk_hex, label, aad).unwrap();
         assert_eq!(envelope.v, 3);

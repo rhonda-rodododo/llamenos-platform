@@ -194,7 +194,7 @@ final class DeviceLinkViewModel {
 
         let subscriptionId = "link-\(UUID().uuidString.prefix(8))"
         let reqMessage = """
-        ["REQ","\(subscriptionId)",{"kinds":[20001],"#t":["llamenos:provision-\(roomId)"]}]
+        ["REQ","\(subscriptionId)",{"kinds":[20001],"#t":["\(CryptoLabels.LABEL_PROVISION_PREFIX)\(roomId)"]}]
         """
 
         do {
@@ -213,7 +213,7 @@ final class DeviceLinkViewModel {
         {"type":"ephemeral-pubkey","pubkey":"\(pubKey)"}
         """
         let eventMessage = """
-        ["EVENT",{"kind":20001,"content":"\(eventContent.replacingOccurrences(of: "\"", with: "\\\""))","tags":[["t","llamenos:provision-\(roomId)"]],"created_at":\(Int(Date().timeIntervalSince1970))}]
+        ["EVENT",{"kind":20001,"content":"\(eventContent.replacingOccurrences(of: "\"", with: "\\\""))","tags":[["t","\(CryptoLabels.LABEL_PROVISION_PREFIX)\(roomId)"]],"created_at":\(Int(Date().timeIntervalSince1970))}]
         """
 
         do {
@@ -353,7 +353,7 @@ final class DeviceLinkViewModel {
 
         let confirmContent = "{\"type\":\"sas-confirmed\"}"
         let confirmMessage = """
-        ["EVENT",{"kind":20001,"content":"\(confirmContent.replacingOccurrences(of: "\"", with: "\\\""))","tags":[["t","llamenos:provision-\(roomId)"]],"created_at":\(Int(Date().timeIntervalSince1970))}]
+        ["EVENT",{"kind":20001,"content":"\(confirmContent.replacingOccurrences(of: "\"", with: "\\\""))","tags":[["t","\(CryptoLabels.LABEL_PROVISION_PREFIX)\(roomId)"]],"created_at":\(Int(Date().timeIntervalSince1970))}]
         """
 
         Task {
