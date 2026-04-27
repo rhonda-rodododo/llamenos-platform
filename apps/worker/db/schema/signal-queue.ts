@@ -1,6 +1,6 @@
 /**
- * Signal message queue table: PostgreSQL-backed retry queue for
- * Signal message delivery with exponential backoff.
+ * Signal domain tables: message queue (retry with exponential backoff)
+ * and identity trust tracking (safety number verification).
  */
 import { sql } from 'drizzle-orm'
 import {
@@ -58,5 +58,40 @@ export const signalMessageQueue = pgTable(
     // Hub-scoped stats queries
     index('signal_queue_hub_status_idx')
       .on(table.hubId, table.status),
+  ],
+)
+
+// ---------------------------------------------------------------------------
+// signal_identities — Signal contact identity trust tracking
+// ---------------------------------------------------------------------------
+
+export const signalIdentities = pgTable(
+  'signal_identities',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    hubId: text('hub_id'),
+    number: text('number').notNull(),
+    uuid: text('uuid').notNull(),
+    fingerprint: text('fingerprint'),
+    trustLevel: text('trust_level').notNull().default('TRUSTED_UNVERIFIED'),
+    verifiedBy: text('verified_by'),       // pubkey of admin who verified
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    keyChangeCount: integer('key_change_count').notNull().default(0),
+  },
+  (table) => [
+    // Lookup by hub + uuid (unique per hub)
+    uniqueIndex('signal_identities_hub_uuid_idx')
+      .on(table.hubId, table.uuid),
+    // Find untrusted identities for admin review
+    index('signal_identities_trust_idx')
+      .on(table.hubId, table.trustLevel),
   ],
 )
