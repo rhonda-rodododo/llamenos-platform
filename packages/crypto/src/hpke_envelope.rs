@@ -249,7 +249,7 @@ pub fn generate_x25519_keypair() -> (Zeroizing<String>, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::labels::LABEL_NOTE_KEY;
+    use crate::labels::{LABEL_FILE_KEY, LABEL_NOTE_KEY};
 
     fn gen_keypair() -> (Zeroizing<String>, String) {
         generate_x25519_keypair()
@@ -279,7 +279,7 @@ mod tests {
         let envelope = hpke_seal(plaintext, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
 
         // Try to open with wrong expected label
-        let result = hpke_open(&envelope, &sk_hex, "llamenos:file-key", aad);
+        let result = hpke_open(&envelope, &sk_hex, LABEL_FILE_KEY, aad);
         assert!(
             matches!(result, Err(CryptoError::InvalidFormat(_))),
             "expected label mismatch error, got: {result:?}"
