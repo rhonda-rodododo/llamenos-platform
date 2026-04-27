@@ -1,5 +1,34 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test'
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { KamailioClient } from './kamailio-client'
+
+function mockFetch(handler: (url: string, init?: RequestInit) => Response | Promise<Response>) {
+  const original = globalThis.fetch
+  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    return Promise.resolve(handler(url, init))
+  }) as typeof fetch
+  return original
+}
+
+function mockFetchReject(error: Error) {
+  const original = globalThis.fetch
+  globalThis.fetch = ((_input: string | URL | Request, _init?: RequestInit) => Promise.reject(error)) as typeof fetch
+  return original
+}
+
+function jsonRpcResponse<T>(result: T): Response {
+  return new Response(
+    JSON.stringify({ jsonrpc: '2.0', id: 1, result }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
+function jsonRpcError(code: number, message: string): Response {
+  return new Response(
+    JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code, message } }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )
+}
 
 describe('KamailioClient', () => {
   let client: KamailioClient
@@ -72,18 +101,7 @@ describe('KamailioClient', () => {
 
   describe('healthCheck', () => {
     it('returns ok when JSONRPC responds', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              result: { version: 'kamailio 5.7.0' },
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
-      ) as typeof fetch
+      mockFetch(() => jsonRpcResponse({ version: 'kamailio 5.7.0' }))
 
       const health = await client.healthCheck()
       expect(health.ok).toBe(true)
@@ -92,25 +110,14 @@ describe('KamailioClient', () => {
     })
 
     it('returns not-ok on fetch error', async () => {
-      globalThis.fetch = mock(() => Promise.reject(new Error('connection refused'))) as typeof fetch
+      mockFetchReject(new Error('connection refused'))
 
       const health = await client.healthCheck()
       expect(health.ok).toBe(false)
     })
 
     it('returns not-ok on JSONRPC error', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              error: { code: -32601, message: 'Method not found' },
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
-      ) as typeof fetch
+      mockFetch(() => jsonRpcError(-32601, 'Method not found'))
 
       const health = await client.healthCheck()
       expect(health.ok).toBe(false)
@@ -119,30 +126,21 @@ describe('KamailioClient', () => {
 
   describe('getDispatchers', () => {
     it('parses dispatcher list response', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              result: {
-                RECORDS: [
-                  {
-                    SET: {
-                      ID: 1,
-                      TARGETS: [
-                        { DEST: { URI: 'sip:10.0.0.1:5060', FLAGS: 'AP', PRIORITY: 0 } },
-                        { DEST: { URI: 'sip:10.0.0.2:5060', FLAGS: 'IP', PRIORITY: 1 } },
-                      ],
-                    },
-                  },
+      mockFetch(() =>
+        jsonRpcResponse({
+          RECORDS: [
+            {
+              SET: {
+                ID: 1,
+                TARGETS: [
+                  { DEST: { URI: 'sip:10.0.0.1:5060', FLAGS: 'AP', PRIORITY: 0 } },
+                  { DEST: { URI: 'sip:10.0.0.2:5060', FLAGS: 'IP', PRIORITY: 1 } },
                 ],
               },
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
-      ) as typeof fetch
+            },
+          ],
+        })
+      )
 
       const entries = await client.getDispatchers()
       expect(entries).toHaveLength(2)
@@ -152,20 +150,13 @@ describe('KamailioClient', () => {
     })
 
     it('returns empty array when no matching set', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              result: {
-                RECORDS: [{ SET: { ID: 99, TARGETS: [{ DEST: { URI: 'sip:x', FLAGS: 'AP', PRIORITY: 0 } }] } }],
-              },
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
-      ) as typeof fetch
+      mockFetch(() =>
+        jsonRpcResponse({
+          RECORDS: [
+            { SET: { ID: 99, TARGETS: [{ DEST: { URI: 'sip:x', FLAGS: 'AP', PRIORITY: 0 } }] } },
+          ],
+        })
+      )
 
       const entries = await client.getDispatchers()
       expect(entries).toHaveLength(0)
@@ -174,20 +165,13 @@ describe('KamailioClient', () => {
 
   describe('connect', () => {
     it('succeeds when health check passes', async () => {
-      globalThis.fetch = mock(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({ jsonrpc: '2.0', id: 1, result: { version: '5.7' } }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
-      ) as typeof fetch
+      mockFetch(() => jsonRpcResponse({ version: '5.7' }))
 
       await expect(client.connect()).resolves.toBeUndefined()
     })
 
     it('throws when health check fails', async () => {
-      globalThis.fetch = mock(() => Promise.reject(new Error('connection refused'))) as typeof fetch
+      mockFetchReject(new Error('connection refused'))
 
       await expect(client.connect()).rejects.toThrow('Cannot connect')
     })

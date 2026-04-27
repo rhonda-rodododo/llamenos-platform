@@ -20,6 +20,22 @@ const baseConfig: BridgeConfig = {
   connectionTimeoutMs: 300000,
 }
 
+/** Captures fetch calls for inspection */
+let capturedUrl = ''
+let capturedInit: RequestInit | undefined
+
+function mockFetch(response: Response) {
+  const originalFetch = globalThis.fetch
+  capturedUrl = ''
+  capturedInit = undefined
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    capturedUrl = typeof input === 'string' ? input : input.toString()
+    capturedInit = init
+    return response
+  }) as typeof fetch
+  return originalFetch
+}
+
 describe('WebhookSender', () => {
   let sender: WebhookSender
 
@@ -29,7 +45,6 @@ describe('WebhookSender', () => {
 
   describe('verifySignature', () => {
     it('verifies a valid signature', async () => {
-      // Generate a webhook to get a valid signature
       const payload: WebhookPayload = {
         event: 'incoming',
         channelId: 'ch-1',
@@ -37,28 +52,22 @@ describe('WebhookSender', () => {
         calledNumber: '+15559876543',
       }
 
-      const fetchMock = mock(() =>
-        Promise.resolve(new Response(JSON.stringify([]), {
+      const originalFetch = mockFetch(
+        new Response(JSON.stringify([]), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        }))
+        })
       )
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = fetchMock as typeof fetch
 
       try {
         await sender.sendWebhook('/api/telephony/incoming', payload)
 
-        // Extract the signature and timestamp from the fetch call
-        const callArgs = fetchMock.mock.calls[0]
-        const requestInit = callArgs[1] as RequestInit
-        const headers = requestInit.headers as Record<string, string>
+        const headers = capturedInit?.headers as Record<string, string>
         const signature = headers['X-Bridge-Signature']
         const timestamp = headers['X-Bridge-Timestamp']
-        const url = callArgs[0] as string
-        const body = requestInit.body as string
+        const body = capturedInit?.body as string
 
-        const isValid = sender.verifySignature(url, body, timestamp, signature)
+        const isValid = sender.verifySignature(capturedUrl, body, timestamp, signature)
         expect(isValid).toBe(true)
       } finally {
         globalThis.fetch = originalFetch
@@ -93,14 +102,12 @@ describe('WebhookSender', () => {
         { action: 'hangup', channelId: 'ch-1' },
       ]
 
-      const fetchMock = mock(() =>
-        Promise.resolve(new Response(JSON.stringify(commands), {
+      const originalFetch = mockFetch(
+        new Response(JSON.stringify(commands), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        }))
+        })
       )
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = fetchMock as typeof fetch
 
       try {
         const result = await sender.sendWebhookForCommands(
@@ -116,14 +123,12 @@ describe('WebhookSender', () => {
     })
 
     it('returns parsed commands from { commands: [...] } wrapper', async () => {
-      const fetchMock = mock(() =>
-        Promise.resolve(new Response(JSON.stringify({ commands: [{ action: 'hangup', channelId: 'ch-1' }] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }))
+      const originalFetch = mockFetch(
+        new Response(
+          JSON.stringify({ commands: [{ action: 'hangup', channelId: 'ch-1' }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
       )
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = fetchMock as typeof fetch
 
       try {
         const result = await sender.sendWebhookForCommands(
@@ -138,11 +143,7 @@ describe('WebhookSender', () => {
     })
 
     it('returns null for non-OK response', async () => {
-      const fetchMock = mock(() =>
-        Promise.resolve(new Response('error', { status: 500 }))
-      )
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = fetchMock as typeof fetch
+      const originalFetch = mockFetch(new Response('error', { status: 500 }))
 
       try {
         const result = await sender.sendWebhookForCommands(
@@ -156,14 +157,12 @@ describe('WebhookSender', () => {
     })
 
     it('appends query params to URL', async () => {
-      const fetchMock = mock(() =>
-        Promise.resolve(new Response('[]', {
+      const originalFetch = mockFetch(
+        new Response('[]', {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
-        }))
+        })
       )
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = fetchMock as typeof fetch
 
       try {
         await sender.sendWebhookForCommands(
@@ -172,9 +171,8 @@ describe('WebhookSender', () => {
           { parentCallSid: 'parent-1', pubkey: 'abc123' }
         )
 
-        const url = fetchMock.mock.calls[0][0] as string
-        expect(url).toContain('parentCallSid=parent-1')
-        expect(url).toContain('pubkey=abc123')
+        expect(capturedUrl).toContain('parentCallSid=parent-1')
+        expect(capturedUrl).toContain('pubkey=abc123')
       } finally {
         globalThis.fetch = originalFetch
       }
@@ -183,11 +181,7 @@ describe('WebhookSender', () => {
 
   describe('sendWebhook', () => {
     it('sends JSON content type', async () => {
-      const fetchMock = mock(() =>
-        Promise.resolve(new Response('ok', { status: 200 }))
-      )
-      const originalFetch = globalThis.fetch
-      globalThis.fetch = fetchMock as typeof fetch
+      const originalFetch = mockFetch(new Response('ok', { status: 200 }))
 
       try {
         await sender.sendWebhook(
@@ -195,8 +189,7 @@ describe('WebhookSender', () => {
           { event: 'incoming', channelId: 'ch-1', callerNumber: '+1555' }
         )
 
-        const requestInit = fetchMock.mock.calls[0][1] as RequestInit
-        const headers = requestInit.headers as Record<string, string>
+        const headers = capturedInit?.headers as Record<string, string>
         expect(headers['Content-Type']).toBe('application/json')
         expect(headers['X-Bridge-Signature']).toBeTruthy()
         expect(headers['X-Bridge-Timestamp']).toBeTruthy()
