@@ -9,6 +9,10 @@
 #   docker compose -f deploy/docker/docker-compose.dev.yml --profile inference up -d # + Ollama
 #   bun run dev:server
 #
+# Optional profiles:
+#   --profile signal      - Signal CLI + notifier sidecar
+#   --profile telephony   - Asterisk PBX + SIP bridge
+#
 # Stop:
 #   docker compose -f deploy/docker/docker-compose.dev.yml down
 #
@@ -126,6 +130,50 @@ services:
       retries: 3
       start_period: 30s
 
+  # ── Optional: Asterisk PBX for local SIP telephony dev ─────────────────
+  # Start with: docker compose -f deploy/docker/docker-compose.dev.yml --profile telephony up -d
+  asterisk:
+    image: andrius/asterisk@sha256:e30df5ec1b512827bf3cffc49b8000b07376a05c950736d028348eba80035015 # 20.x
+    profiles: ["telephony"]
+    ports:
+      - "5060:5060/udp"   # SIP
+      - "5060:5060/tcp"   # SIP TCP
+      - "8088:8088"       # ARI HTTP
+    volumes:
+      - asterisk-config:/etc/asterisk
+    healthcheck:
+      test: ["CMD", "asterisk", "-rx", "core show version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # SIP bridge — translates ARI events to Llamenos webhook format.
+  sip-bridge:
+    profiles: ["telephony"]
+    build:
+      context: ../..
+      dockerfile: sip-bridge/Dockerfile
+    ports:
+      - "3200:3000"
+    environment:
+      - PBX_TYPE=ari
+      - ARI_URL=ws://asterisk:8088/ari/events
+      - ARI_REST_URL=http://asterisk:8088/ari
+      - ARI_USERNAME=${ARI_USERNAME:-llamenos}
+      - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — set in .env}
+      - WORKER_WEBHOOK_URL=http://host.docker.internal:3000
+      - BRIDGE_SECRET=${BRIDGE_SECRET:?BRIDGE_SECRET is required — generate with openssl rand -hex 32}
+    depends_on:
+      asterisk:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   pgdata:
   miniodata:
@@ -133,3 +181,4 @@ volumes:
   signal-data:
   signal-notifier-data:
   ollama-data:
+  asterisk-config:

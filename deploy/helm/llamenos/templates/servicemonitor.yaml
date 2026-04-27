@@ -1,4 +1,4 @@
-{{- if .Values.monitoring.serviceMonitor.enabled }}
+{{- if .Values.metrics.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -15,7 +15,12 @@ spec:
       app.kubernetes.io/component: app
   endpoints:
     - port: http
-      path: /api/metrics
-      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      path: {{ .Values.metrics.path }}
+      interval: {{ .Values.metrics.interval }}
       scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      {{- if .Values.metrics.scrapeTokenSecret }}
+      bearerTokenSecret:
+        name: {{ .Values.metrics.scrapeTokenSecret }}
+        key: metrics-scrape-token
+      {{- end }}
 {{- end }}

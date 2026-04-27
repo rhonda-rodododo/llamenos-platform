@@ -1,0 +1,347 @@
+# Release workflow — runs when the release PR (branch `release`,
+# maintained by knope-release-pr.yml) is merged to main. Knope creates
+# the tag + GitHub Release; this workflow attaches signed artifacts
+# and dispatches platform-specific release workflows.
+#
+# Steps:
+#   1. Gate on release-PR merge (head_ref == 'release', merged == true)
+#   2. Read the new version from package.json (knope already bumped it)
+#   3. Build the app (needed for CHECKSUMS and attestation)
+#   4. Generate SBOM, sign with cosign keyless, GPG sign checksums
+#   5. Create git tag, then a **draft** GitHub Release with artifacts
+#      (draft-first avoids GitHub's immutable-release upload rejection)
+#   6. Publish the release (draft -> published)
+#   7. Dispatch downstream workflows (docker, desktop, mobile)
+#
+# release.yml explicitly dispatches downstream workflows because
+# GitHub Releases created by GITHUB_TOKEN do NOT fire the `release: published`
+# event for downstream workflows (anti-recursion rule).
+
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+# Never cancel a release in progress.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: "1.3.5"
+
+jobs:
+  # --- Gate + version read ---
+  check:
+    # github.head_ref is used only in this Actions expression (not shell).
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.head_ref == 'release'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Read new version from package.json
+        id: read
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$VERSION"
+
+  # --- Build (needed for CHECKSUMS and attestation) ---
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run codegen
+        run: bun run codegen
+
+      - name: Set build-time constants
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+
+      - name: Build frontend
+        run: bun run build
+
+      - name: Compute build checksums
+        run: |
+          cd dist
+          find client -type f -exec sha256sum {} \; | sort > ../CHECKSUMS.txt
+          cd ..
+          sha256sum bun.lock >> CHECKSUMS.txt
+          echo "$(wc -l < CHECKSUMS.txt) files checksummed"
+
+      - name: Upload app build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: app-build
+          path: dist/
+          retention-days: 1
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: checksums
+          path: CHECKSUMS.txt
+          retention-days: 7
+
+  # --- Tag + GitHub Release, then attach signed artifacts ---
+  release:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write       # OIDC for cosign keyless + attestations
+      attestations: write
+
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Download checksums
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: checksums
+
+      - name: Download app build (for attestation)
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: app-build
+          path: dist/
+
+      - name: Generate SLSA build provenance attestation
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v2.1.0
+        with:
+          subject-path: |
+            CHECKSUMS.txt
+            dist/client/**/*.js
+            dist/client/**/*.css
+
+      - name: Generate provenance metadata JSON
+        env:
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          cat > provenance.json <<PROVEOF
+          {
+            "builder": { "id": "https://github.com/actions/runner" },
+            "buildType": "https://github.com/slsa-framework/slsa/blob/main/docs/spec/v1.0/levels.md",
+            "invocation": {
+              "configSource": {
+                "uri": "git+https://github.com/${REPO}@refs/tags/v${NEW_VERSION}",
+                "digest": { "sha1": "${MERGE_SHA}" },
+                "entryPoint": ".github/workflows/release.yml"
+              },
+              "parameters": {
+                "SOURCE_DATE_EPOCH": "$(git log -1 --format=%ct)",
+                "bunVersion": "${BUN_VERSION}"
+              }
+            },
+            "buildConfig": {
+              "dockerfile": "deploy/docker/Dockerfile",
+              "steps": ["bun install --frozen-lockfile", "bun run codegen", "bun run build"]
+            },
+            "metadata": {
+              "buildStartedOn": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "buildFinishedOn": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "completeness": { "parameters": true, "environment": false, "materials": false },
+              "reproducible": true
+            },
+            "materials": [
+              {
+                "uri": "git+https://github.com/${REPO}@refs/tags/v${NEW_VERSION}",
+                "digest": { "sha1": "${MERGE_SHA}" }
+              }
+            ]
+          }
+          PROVEOF
+          python3 -c "
+          import json
+          with open('provenance.json') as f:
+              data = json.load(f)
+          with open('provenance.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          "
+          echo "--- provenance.json ---"
+          cat provenance.json
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          npx --yes @cyclonedx/cdxgen -o sbom.cdx.json --spec-version 1.5
+          echo "SBOM generated: $(jq '.components | length' sbom.cdx.json) components"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+
+      - name: Attest SBOM
+        run: |
+          cosign attest-blob --yes \
+            --predicate sbom.cdx.json \
+            --type cyclonedx \
+            --output-file sbom.cdx.json.att \
+            CHECKSUMS.txt
+          echo "SBOM attestation attached to CHECKSUMS.txt"
+
+      - name: Sign release artifacts (keyless)
+        run: |
+          for f in CHECKSUMS.txt provenance.json; do
+            [ -f "$f" ] || continue
+            cosign sign-blob --yes \
+              --output-signature "${f}.cosign.sig" \
+              --output-certificate "${f}.cosign.pem" \
+              "$f"
+            echo "Signed: $f"
+          done
+
+      - name: GPG sign CHECKSUMS.txt
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.RELEASE_GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ] || [ -z "$GPG_KEY_ID" ]; then
+            echo "GPG signing secrets not configured — skipping signature"
+            exit 0
+          fi
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --armor --local-user "$GPG_KEY_ID" --detach-sign CHECKSUMS.txt
+          echo "GPG signature generated: CHECKSUMS.txt.asc"
+          gpg --verify CHECKSUMS.txt.asc CHECKSUMS.txt
+          echo "GPG signature verified successfully"
+
+      - name: Create git tag (idempotent for retries)
+        env:
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          if git rev-parse "v${NEW_VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${NEW_VERSION} already exists locally — skipping"
+          else
+            git tag "v${NEW_VERSION}"
+          fi
+          git push origin "v${NEW_VERSION}" --force
+
+      - name: Extract changelog section for this version
+        id: changelog
+        env:
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          BODY=$(awk -v ver="$NEW_VERSION" '
+            /^## / {
+              if (found) exit
+              if (index($0, ver)) { found=1; next }
+            }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            echo "::warning::No changelog section found for v${NEW_VERSION}"
+          fi
+          echo "$BODY" > release-notes.md
+          echo "--- Release notes ---"
+          cat release-notes.md
+
+      - name: Create draft GitHub Release and upload artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          # Clean up any broken release from a prior failed run
+          if gh release view "v${NEW_VERSION}" >/dev/null 2>&1; then
+            echo "Deleting stale release v${NEW_VERSION} from previous attempt"
+            gh release delete "v${NEW_VERSION}" --yes
+          fi
+          ARTIFACTS=()
+          for f in \
+            CHECKSUMS.txt \
+            CHECKSUMS.txt.asc \
+            CHECKSUMS.txt.cosign.sig \
+            CHECKSUMS.txt.cosign.pem \
+            provenance.json \
+            provenance.json.cosign.sig \
+            provenance.json.cosign.pem \
+            sbom.cdx.json \
+            sbom.cdx.json.att; do
+            [ -f "$f" ] && ARTIFACTS+=("$f")
+          done
+          gh release create "v${NEW_VERSION}" \
+            --draft \
+            --title "v${NEW_VERSION}" \
+            --notes-file release-notes.md \
+            "${ARTIFACTS[@]}"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: gh release edit "v${NEW_VERSION}" --draft=false
+
+  # --- Dispatch downstream release workflows ---
+  dispatch:
+    needs: [check, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Docker build
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          gh workflow run docker.yml \
+            --repo "${{ github.repository }}" \
+            --ref main \
+            -f version="$NEW_VERSION"
+          echo "Dispatched docker.yml for v${NEW_VERSION}"
+
+      - name: Dispatch Desktop release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          gh workflow run tauri-release.yml \
+            --repo "${{ github.repository }}" \
+            --ref "v${NEW_VERSION}" \
+            -f version="$NEW_VERSION"
+          echo "Dispatched tauri-release.yml for v${NEW_VERSION}"
+
+      - name: Dispatch Mobile release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          gh workflow run mobile-release.yml \
+            --repo "${{ github.repository }}" \
+            --ref "v${NEW_VERSION}" \
+            -f version="$NEW_VERSION"
+          echo "Dispatched mobile-release.yml for v${NEW_VERSION}"

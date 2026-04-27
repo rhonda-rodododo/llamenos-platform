@@ -8,13 +8,13 @@
 #   strfry   - Nostr relay for real-time events
 #
 # Optional services (via --profile):
-#   whisper         - Self-hosted transcription (profile: transcription)
-#   asterisk        - Self-hosted PBX (profile: asterisk)
-#   asterisk-bridge - ARI-to-webhook translator (profile: asterisk)
-#   kamailio        - SIP proxy / load balancer (profile: telephony)
-#   coturn          - STUN/TURN relay for WebRTC (profile: telephony)
-#   signal-cli      - Signal messaging bridge (profile: signal)
-#   glitchtip       - Sentry-compatible error tracking (profile: monitoring)
+#   whisper    - Self-hosted transcription (profile: transcription)
+#   asterisk   - Self-hosted PBX (profile: asterisk)
+#   sip-bridge - PBX-to-webhook translator (profile: asterisk)
+#   kamailio   - SIP proxy / load balancer (profile: telephony)
+#   coturn     - STUN/TURN relay for WebRTC (profile: telephony)
+#   signal-cli - Signal messaging bridge (profile: signal)
+#   glitchtip  - Sentry-compatible error tracking (profile: monitoring)
 #
 # Usage:
 #   cp .env.example .env && edit .env
@@ -200,18 +200,20 @@ services:
       retries: 3
       start_period: 15s
 
-  asterisk-bridge:
+  sip-bridge:
     profiles: ["asterisk"]
     build:
       context: ../..
-      dockerfile: asterisk-bridge/Dockerfile
+      dockerfile: sip-bridge/Dockerfile
     restart: unless-stopped
     environment:
+      - PBX_TYPE=${PBX_TYPE:-asterisk}
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_USERNAME=${ARI_USERNAME:-llamenos}
       - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — do NOT use the default}
       - WORKER_WEBHOOK_URL=http://app:3000
       - BRIDGE_SECRET=${BRIDGE_SECRET:?BRIDGE_SECRET is required — generate a random value}
+      - BRIDGE_HOST=0.0.0.0
     networks:
       - internal
     depends_on:
@@ -220,7 +222,7 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 15s
       timeout: 5s
       retries: 3

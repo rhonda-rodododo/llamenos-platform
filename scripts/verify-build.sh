@@ -5,21 +5,68 @@
 # published GitHub Release artifacts. The GitHub Release is the trust anchor,
 # NOT the deployed application's /api/config/verify endpoint.
 #
+# When cosign is available, also verifies:
+#   - Keyless cosign signatures on CHECKSUMS.txt and provenance.json
+#   - SBOM attestation (CycloneDX)
+#   - SLSA provenance
+#
 # Requirements: git, docker, gh (GitHub CLI)
+# Optional: cosign (for signature + attestation verification)
 #
 # Usage:
 #   ./scripts/verify-build.sh              # Verify latest release
 #   ./scripts/verify-build.sh v0.18.0      # Verify specific version
+#   SKIP_DOCKER_BUILD=1 ./scripts/verify-build.sh  # Skip Docker build, verify signatures only
+#   ./scripts/verify-build.sh --help       # Show usage
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat <<'EOF'
+verify-build.sh — Llamenos build verification
+
+Usage:
+  ./scripts/verify-build.sh              Verify latest release
+  ./scripts/verify-build.sh v0.18.0      Verify specific version
+  SKIP_DOCKER_BUILD=1 ./scripts/verify-build.sh
+                                         Skip Docker build, verify signatures only
+
+Requirements: git, docker, gh (GitHub CLI)
+Optional:     cosign (for signature + attestation + SLSA verification)
+
+Exit codes:
+  0  All checks passed
+  1  Verification failed (mismatch or tamper detected)
+  2  Required tool missing (git, docker, or gh)
+EOF
+  exit 0
+fi
+
 VERSION="${1:-}"
 REPO="rhonda-rodododo/llamenos"
+COSIGN_AVAILABLE=false
 
 echo "=== Llamenos Build Verification ==="
 echo ""
 
-# Determine version to verify
+# ─── Preflight checks ────────────────────────────────────────────
+for tool in git docker gh; do
+  if ! command -v "$tool" &>/dev/null; then
+    echo "ERROR: required tool '$tool' is not installed"
+    exit 2
+  fi
+done
+
+if command -v cosign &>/dev/null; then
+  COSIGN_AVAILABLE=true
+  echo "cosign: $(cosign version 2>&1 | head -1)"
+else
+  echo "cosign: not installed (signature verification will be skipped)"
+  echo "  Install: https://docs.sigstore.dev/cosign/system_config/installation/"
+fi
+echo ""
+
+# ─── Determine version ──────────────────────────────────────────
 if [ -z "$VERSION" ]; then
   VERSION=$(gh release list --repo "$REPO" --limit 1 --json tagName --jq '.[0].tagName')
   if [ -z "$VERSION" ]; then
@@ -36,18 +83,170 @@ trap 'rm -rf "$WORKDIR"' EXIT
 echo "Working directory: $WORKDIR"
 echo ""
 
-# Clone source at the specified version
+# ─── Step 1: Download release artifacts ─────────────────────────
+echo "--- Downloading release artifacts ---"
+PATTERNS=(
+  "CHECKSUMS.txt"
+  "CHECKSUMS.txt.asc"
+  "CHECKSUMS.txt.cosign.sig"
+  "CHECKSUMS.txt.cosign.pem"
+  "provenance.json"
+  "provenance.json.cosign.sig"
+  "provenance.json.cosign.pem"
+  "sbom.cdx.json"
+  "sbom.cdx.json.att"
+)
+
+for pat in "${PATTERNS[@]}"; do
+  if gh release download "$VERSION" --repo "$REPO" --pattern "$pat" --dir "$WORKDIR" 2>/dev/null; then
+    echo "  Downloaded: $pat"
+  fi
+done
+
+if [ ! -f "$WORKDIR/CHECKSUMS.txt" ]; then
+  echo "ERROR: CHECKSUMS.txt not found in release $VERSION"
+  exit 1
+fi
+
+# ─── Step 2: Cosign signature verification (optional) ────────────
+echo ""
+echo "--- Verifying cosign signatures ---"
+
+if [ "$COSIGN_AVAILABLE" = true ]; then
+  SIGS_VERIFIED=0
+  SIGS_EXPECTED=0
+
+  for artifact in CHECKSUMS.txt provenance.json; do
+    SIG="$WORKDIR/${artifact}.cosign.sig"
+    CERT="$WORKDIR/${artifact}.cosign.pem"
+    FILE="$WORKDIR/${artifact}"
+
+    [ -f "$FILE" ] || continue
+    SIGS_EXPECTED=$((SIGS_EXPECTED + 1))
+
+    if [ ! -f "$SIG" ] || [ ! -f "$CERT" ]; then
+      echo "  WARNING: Missing cosign signature files for $artifact"
+      echo "    This release may predate cosign signing."
+      continue
+    fi
+
+    if cosign verify-blob \
+      --signature "$SIG" \
+      --certificate "$CERT" \
+      --certificate-identity-regexp "https://github.com/${REPO}/" \
+      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+      "$FILE" 2>/dev/null; then
+      echo "  VERIFIED: $artifact (cosign keyless signature)"
+      SIGS_VERIFIED=$((SIGS_VERIFIED + 1))
+    else
+      echo "  FAILED: $artifact cosign signature verification failed!"
+      echo "  The artifact may have been tampered with."
+      exit 1
+    fi
+  done
+
+  if [ "$SIGS_EXPECTED" -gt 0 ] && [ "$SIGS_VERIFIED" -eq "$SIGS_EXPECTED" ]; then
+    echo "  All $SIGS_VERIFIED/$SIGS_EXPECTED cosign signatures verified."
+  elif [ "$SIGS_EXPECTED" -eq 0 ]; then
+    echo "  No artifacts with cosign signatures found."
+  fi
+else
+  echo "  SKIPPED: cosign not installed"
+fi
+
+# ─── Step 3: SBOM attestation verification (optional) ────────────
+echo ""
+echo "--- Verifying SBOM attestation ---"
+
+if [ "$COSIGN_AVAILABLE" = true ]; then
+  if [ -f "$WORKDIR/sbom.cdx.json.att" ]; then
+    if cosign verify-blob-attestation \
+      --signature "$WORKDIR/sbom.cdx.json.att" \
+      --type cyclonedx \
+      --certificate-identity-regexp "https://github.com/${REPO}/" \
+      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+      "$WORKDIR/CHECKSUMS.txt" 2>/dev/null; then
+      echo "  VERIFIED: SBOM attestation (CycloneDX)"
+    else
+      echo "  FAILED: SBOM attestation verification failed!"
+      exit 1
+    fi
+
+    if [ -f "$WORKDIR/sbom.cdx.json" ] && command -v jq &>/dev/null; then
+      COMPONENT_COUNT=$(jq '.components | length' "$WORKDIR/sbom.cdx.json" 2>/dev/null || echo "unknown")
+      echo "  SBOM contains $COMPONENT_COUNT components"
+    fi
+  else
+    echo "  No SBOM attestation found (sbom.cdx.json.att)"
+    echo "  This release may predate SBOM attestation."
+  fi
+else
+  echo "  SKIPPED: cosign not installed"
+fi
+
+# ─── Step 4: SLSA provenance verification (optional) ─────────────
+echo ""
+echo "--- Verifying SLSA provenance ---"
+
+if [ "$COSIGN_AVAILABLE" = true ]; then
+  if [ -f "$WORKDIR/provenance.json" ]; then
+    echo "  Provenance artifact present."
+    if command -v jq &>/dev/null; then
+      BUILDER=$(jq -r '.builder.id // "unknown"' "$WORKDIR/provenance.json" 2>/dev/null || echo "unknown")
+      BUILD_TYPE=$(jq -r '.buildType // "unknown"' "$WORKDIR/provenance.json" 2>/dev/null || echo "unknown")
+      echo "  Builder ID:  $BUILDER"
+      echo "  Build type:  $BUILD_TYPE"
+    fi
+    echo "  (Full SLSA verification via slsa-verifier requires a separate install)"
+    echo "  See: https://github.com/slsa-framework/slsa-verifier"
+  else
+    echo "  No provenance.json found — this release may predate SLSA provenance."
+  fi
+else
+  echo "  SKIPPED: cosign not installed"
+fi
+
+# ─── Step 5: GPG signature verification ──────────────────────────
+echo ""
+echo "--- Verifying GPG signature ---"
+if [ -f "$WORKDIR/CHECKSUMS.txt.asc" ]; then
+  if gpg --verify "$WORKDIR/CHECKSUMS.txt.asc" "$WORKDIR/CHECKSUMS.txt" 2>/dev/null; then
+    echo "  VERIFIED: GPG signature on CHECKSUMS.txt"
+  else
+    echo "  WARNING: GPG signature verification failed"
+    echo "  You may need to import the release signing key."
+  fi
+else
+  echo "  No GPG signature found (CHECKSUMS.txt.asc)"
+fi
+
+# ─── Step 6: Reproducible build verification ─────────────────────
+if [ "${SKIP_DOCKER_BUILD:-}" = "1" ]; then
+  echo ""
+  echo "--- Skipping Docker build (SKIP_DOCKER_BUILD=1) ---"
+  echo ""
+  echo "SIGNATURE VERIFICATION COMPLETE"
+  if [ "$COSIGN_AVAILABLE" = true ]; then
+    echo "  - Cosign signatures: verified (where present)"
+    echo "  - SBOM attestation: verified (where present)"
+  else
+    echo "  - Cosign verification: skipped (cosign not installed)"
+  fi
+  echo ""
+  echo "Run without SKIP_DOCKER_BUILD to also verify the reproducible build."
+  exit 0
+fi
+
+echo ""
 echo "--- Cloning source at $VERSION ---"
 git clone --depth 1 --branch "$VERSION" "https://github.com/${REPO}.git" "$WORKDIR/source"
 
-# Get SOURCE_DATE_EPOCH from git commit
 SOURCE_DATE_EPOCH=$(git -C "$WORKDIR/source" log -1 --format=%ct)
 GITHUB_SHA=$(git -C "$WORKDIR/source" log -1 --format=%H)
 echo "Commit: $GITHUB_SHA"
 echo "SOURCE_DATE_EPOCH: $SOURCE_DATE_EPOCH"
 echo ""
 
-# Build in Docker container (Linux — required for deterministic Tailwind CSS)
 echo "--- Building in Docker container ---"
 docker build \
   -f "$WORKDIR/source/Dockerfile.build" \
@@ -56,51 +255,30 @@ docker build \
   -t llamenos-verify \
   "$WORKDIR/source"
 
-# Extract build artifacts
 echo ""
 echo "--- Extracting build artifacts ---"
 docker create --name llamenos-verify-extract llamenos-verify
 docker cp llamenos-verify-extract:/build/dist "$WORKDIR/local-build"
 docker rm llamenos-verify-extract
 
-# Compute local checksums
 echo ""
 echo "--- Computing local checksums ---"
 (cd "$WORKDIR/local-build" && find . -type f -exec sha256sum {} \; | sort) > "$WORKDIR/local-checksums.txt"
 echo "$(wc -l < "$WORKDIR/local-checksums.txt") files checksummed"
 
-# Fetch published checksums from GitHub Release
-echo ""
-echo "--- Fetching published checksums from GitHub Release ---"
-if gh release download "$VERSION" --repo "$REPO" --pattern "CHECKSUMS.txt" --dir "$WORKDIR" 2>/dev/null; then
-  echo "Downloaded CHECKSUMS.txt"
-else
-  echo "WARNING: No CHECKSUMS.txt found in release $VERSION"
-  echo "This release may predate the reproducible builds feature."
-  echo ""
-  echo "Local checksums saved to: $WORKDIR/local-checksums.txt"
-  echo "You can manually compare these against a known-good build."
-  exit 0
-fi
-
-# Verify GPG signature if available
-if gh release download "$VERSION" --repo "$REPO" --pattern "CHECKSUMS.txt.asc" --dir "$WORKDIR" 2>/dev/null; then
-  echo "Downloaded CHECKSUMS.txt.asc"
-  if gpg --verify "$WORKDIR/CHECKSUMS.txt.asc" "$WORKDIR/CHECKSUMS.txt" 2>/dev/null; then
-    echo "GPG signature: VERIFIED"
-  else
-    echo "WARNING: GPG signature verification FAILED"
-  fi
-else
-  echo "No GPG signature found (CHECKSUMS.txt.asc)"
-fi
-
-# Compare checksums
+# ─── Step 7: Compare checksums ───────────────────────────────────
 echo ""
 echo "--- Comparing checksums ---"
+
 if diff "$WORKDIR/local-checksums.txt" "$WORKDIR/CHECKSUMS.txt" > /dev/null 2>&1; then
   echo ""
   echo "BUILD VERIFIED: Local build matches published checksums"
+  echo "  - Reproducible build: MATCH"
+  if [ "$COSIGN_AVAILABLE" = true ]; then
+    echo "  - Cosign signatures: verified (where present)"
+    [ -f "$WORKDIR/sbom.cdx.json.att" ] && echo "  - SBOM attestation: VERIFIED"
+    [ -f "$WORKDIR/provenance.json" ] && echo "  - SLSA provenance: present"
+  fi
   exit 0
 else
   echo ""

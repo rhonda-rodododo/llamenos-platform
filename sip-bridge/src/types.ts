@@ -100,7 +100,18 @@ export type AnyAriEvent =
 export interface AriChannel {
   id: string
   name: string
-  state: 'Down' | 'Rsrved' | 'OffHook' | 'Dialing' | 'Ring' | 'Ringing' | 'Up' | 'Busy' | 'Dialing Offhook' | 'Pre-ring' | 'Unknown'
+  state:
+    | 'Down'
+    | 'Rsrved'
+    | 'OffHook'
+    | 'Dialing'
+    | 'Ring'
+    | 'Ringing'
+    | 'Up'
+    | 'Busy'
+    | 'Dialing Offhook'
+    | 'Pre-ring'
+    | 'Unknown'
   caller: { name: string; number: string }
   connected: { name: string; number: string }
   accountcode: string
@@ -138,37 +149,43 @@ export interface AriRecording {
   cause?: string
 }
 
-// ---- Webhook Types (sent to CF Worker) ----
+// ---- Webhook Types (sent to Worker) ----
 
-/** Webhook payload sent to the CF Worker, mimicking Twilio's format */
+/** Webhook payload sent to the Worker in JSON format */
 export interface WebhookPayload {
-  /** Event type, maps to Twilio's webhook URL paths */
-  event: 'incoming' | 'language-selected' | 'captcha' | 'call-status' | 'wait-music' | 'queue-exit' | 'volunteer-answer' | 'call-recording' | 'voicemail-recording' | 'voicemail-complete'
-  /** Channel ID (equivalent to Twilio CallSid) */
-  CallSid: string
-  /** Caller phone number in E.164 (equivalent to Twilio From) */
-  From: string
-  /** Called number (equivalent to Twilio To) */
-  To: string
-  /** DTMF digits pressed (for gather responses) */
-  Digits?: string
-  /** Call status for status callbacks */
-  CallStatus?: 'initiated' | 'ringing' | 'in-progress' | 'completed' | 'busy' | 'no-answer' | 'failed'
-  /** Queue time in seconds */
-  QueueTime?: string
-  /** Queue exit result */
-  QueueResult?: 'leave' | 'queue-full' | 'error' | 'bridged' | 'hangup'
-  /** Recording status */
-  RecordingStatus?: 'completed' | 'failed'
-  /** Recording identifier */
-  RecordingSid?: string
-  /** Additional query params passed through */
-  [key: string]: string | undefined
+  event:
+    | 'incoming'
+    | 'language-selected'
+    | 'captcha'
+    | 'call-status'
+    | 'wait-music'
+    | 'queue-exit'
+    | 'volunteer-answer'
+    | 'call-recording'
+    | 'voicemail-recording'
+    | 'voicemail-complete'
+  channelId: string
+  callerNumber: string
+  calledNumber?: string
+  digits?: string
+  callStatus?:
+    | 'initiated'
+    | 'ringing'
+    | 'in-progress'
+    | 'completed'
+    | 'busy'
+    | 'no-answer'
+    | 'failed'
+  queueTime?: number
+  queueResult?: 'leave' | 'queue-full' | 'error' | 'bridged' | 'hangup'
+  recordingStatus?: 'completed' | 'failed'
+  recordingName?: string
+  metadata?: Record<string, string>
 }
 
-// ---- Command Types (received from CF Worker) ----
+// ---- Command Types (received from Worker) ----
 
-/** Commands the CF Worker can send back to the bridge */
+/** Commands the Worker can send back to the bridge */
 export type BridgeCommand =
   | PlaybackCommand
   | GatherCommand
@@ -183,116 +200,81 @@ export type BridgeCommand =
 export interface PlaybackCommand {
   action: 'playback'
   channelId: string
-  /** Media URI — sound:filename for Asterisk sounds, or a URL */
   media: string
-  /** TTS text (if no media URI, use Asterisk TTS or Festival) */
   text?: string
-  /** Language for TTS */
   language?: string
 }
 
 export interface GatherCommand {
   action: 'gather'
   channelId: string
-  /** Maximum number of digits to collect */
   numDigits: number
-  /** Timeout in seconds waiting for input */
   timeout: number
-  /** Media to play while gathering */
   media?: string
-  /** TTS text to play while gathering */
   text?: string
-  /** Language for TTS */
   language?: string
-  /** URL to send gathered digits to (relative path on worker) */
   callbackPath: string
-  /** Additional query params for the callback */
   callbackParams?: Record<string, string>
 }
 
 export interface BridgeCallCommand {
   action: 'bridge'
-  /** Caller channel to bridge */
   callerChannelId: string
-  /** Volunteer channel to bridge */
   volunteerChannelId: string
-  /** Whether to record the bridge */
   record?: boolean
-  /** Callback path for recording status */
+  /** Bridge type for SFrame E2EE: 'passthrough' disables media termination */
+  bridgeType?: 'mixing' | 'passthrough'
   recordingCallbackPath?: string
-  /** Additional params for recording callback */
   recordingCallbackParams?: Record<string, string>
 }
 
 export interface HangupCommand {
   action: 'hangup'
   channelId: string
-  /** SIP cause code (default 16 = Normal Clearing) */
   cause?: number
 }
 
 export interface RecordCommand {
   action: 'record'
   channelId: string
-  /** Recording name (used to retrieve later) */
   name: string
-  /** Max recording duration in seconds */
   maxDuration: number
-  /** Whether to play a beep before recording */
   beep: boolean
-  /** Callback path when recording finishes */
   callbackPath: string
-  /** Additional params for the callback */
   callbackParams?: Record<string, string>
 }
 
 export interface RingCommand {
   action: 'ring'
-  /** Endpoint to call (e.g., PJSIP/volunteer1) */
   endpoint: string
-  /** Caller ID to show */
   callerId: string
-  /** Timeout in seconds */
   timeout: number
-  /** Callback path when volunteer answers */
   answerCallbackPath: string
-  /** Additional params for the callback */
   answerCallbackParams?: Record<string, string>
-  /** Callback path for status changes */
   statusCallbackPath: string
-  /** Additional params for the status callback */
   statusCallbackParams?: Record<string, string>
 }
 
 export interface QueueCommand {
   action: 'queue'
   channelId: string
-  /** Hold music (Asterisk MOH class or media URI) */
   musicOnHold?: string
-  /** Callback path for periodic wait updates */
   waitCallbackPath?: string
-  /** Interval in seconds for wait callbacks */
   waitCallbackInterval?: number
-  /** Callback path when caller leaves queue */
   exitCallbackPath?: string
-  /** Additional params for callbacks */
   callbackParams?: Record<string, string>
 }
 
 export interface RejectCommand {
   action: 'reject'
   channelId: string
-  /** SIP cause code (default 21 = Call Rejected) */
   cause?: number
 }
 
 export interface RedirectCommand {
   action: 'redirect'
-  /** New webhook path to call on the worker */
   path: string
-  /** Query params */
   params?: Record<string, string>
-  /** Channel context */
   channelId: string
 }
 
@@ -305,13 +287,15 @@ export interface ActiveCall {
   calledNumber: string
   startedAt: number
   language?: string
-  /** Bridge ID if this call is bridged */
+  /**
+   * Tier 5 voice E2EE call mode.
+   * - `sframe`: entered via `[volunteers-sframe]` dialplan context — MUST NOT record.
+   * - `pstn`: regular carrier leg — normal recording semantics.
+   */
+  mode: 'sframe' | 'pstn'
   bridgeId?: string
-  /** Volunteer channel IDs ringing for this call */
   ringingChannels: string[]
-  /** DTMF digits collected so far (for gather) */
   dtmfBuffer: string
-  /** Active gather config */
   activeGather?: {
     numDigits: number
     timeout: number
@@ -319,7 +303,6 @@ export interface ActiveCall {
     callbackParams?: Record<string, string>
     timeoutTimer?: ReturnType<typeof setTimeout>
   }
-  /** Queue state */
   queue?: {
     waitTimer?: ReturnType<typeof setTimeout>
     exitCallbackPath?: string
@@ -328,15 +311,50 @@ export interface ActiveCall {
   }
 }
 
+/** Recording callback with creation timestamp for TTL pruning */
+export interface RecordingCallbackEntry {
+  callbackPath: string
+  callbackParams: Record<string, string>
+  channelId: string
+  createdAt: number
+}
+
 /** Configuration for the bridge service */
 export interface BridgeConfig {
+  /** PBX type: asterisk, freeswitch, or kamailio */
+  pbxType: 'asterisk' | 'freeswitch' | 'kamailio'
+  /** ARI WebSocket URL (asterisk only) */
   ariUrl: string
+  /** ARI REST API URL (asterisk only) */
   ariRestUrl: string
+  /** ARI username (asterisk only) */
   ariUsername: string
+  /** ARI password (asterisk only) */
   ariPassword: string
+  /** ESL host (freeswitch only) */
+  eslHost: string
+  /** ESL port (freeswitch only) */
+  eslPort: number
+  /** ESL password (freeswitch only) */
+  eslPassword: string
+  /** Kamailio JSONRPC URL (kamailio only) */
+  kamailioJsonrpcUrl: string
+  /** Worker webhook URL */
   workerWebhookUrl: string
+  /** Shared HMAC secret for signing */
   bridgeSecret: string
+  /** HTTP server port */
   bridgePort: number
-  /** Stasis application name */
+  /** HTTP server bind address */
+  bridgeHost: string
+  /** Stasis application name (asterisk only) */
   stasisApp: string
+  /** SIP trunk provider hostname */
+  sipProvider?: string
+  /** SIP trunk username */
+  sipUsername?: string
+  /** SIP trunk password */
+  sipPassword?: string
+  /** Maximum time (ms) to wait for initial PBX connection. Default 5 minutes. */
+  connectionTimeoutMs: number
 }
