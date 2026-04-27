@@ -661,7 +661,7 @@ pub fn ecies_wrap_key(
     recipient_pubkey: String,
     label: String,
 ) -> Result<KeyEnvelope, String> {
-    let key_bytes = hex::decode(&key_hex).map_err(|e| err_str(e))?;
+    let key_bytes = hex::decode(&key_hex).map_err(err_str)?;
     if key_bytes.len() != 32 {
         return Err("Key must be 32 bytes".into());
     }

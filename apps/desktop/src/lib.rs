@@ -63,7 +63,7 @@ pub fn run() {
             let about = MenuItem::with_id(
                 app,
                 "about",
-                &format!("About Hotline v{}", env!("CARGO_PKG_VERSION")),
+                format!("About Hotline v{}", env!("CARGO_PKG_VERSION")),
                 true,
                 None::<&str>,
             )?;

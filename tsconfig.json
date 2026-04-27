@@ -22,7 +22,8 @@
       "@llamenos/i18n/*": ["./packages/i18n/*"],
       "cloudflare:workers": ["./src/platform/index.ts"]
     },
-    "types": ["@cloudflare/workers-types", "@types/bun"]
+    "types": ["@types/bun"],
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*", "apps/**/*", "packages/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "dist", "packages/i18n/tools/add-cms-translations.ts"]

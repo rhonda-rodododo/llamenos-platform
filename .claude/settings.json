@@ -4,6 +4,32 @@
     "context7@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
-    "terraform@claude-plugins-official": true
+    "terraform@claude-plugins-official": true,
+    "github@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); echo \"$f\" | grep -qE 'packages/protocol/schemas/' || exit 0; cd ~/projects/llamenos && bun run codegen:check || echo '{\"continue\":false,\"stopReason\":\"codegen:check failed after schema edit — run bun run codegen to regenerate types\"}'",
+            "statusMessage": "Checking protocol codegen..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); echo \"$f\" | grep -qE '(\\.env$|\\.dev\\.vars|\\.pem$|id_rsa$|id_ed25519$)' && echo '{\"continue\":false,\"stopReason\":\"Refusing to edit secret/env file. Edit manually if needed.\"}' || true"
+          }
+        ]
+      }
+    ]
   }
 }
