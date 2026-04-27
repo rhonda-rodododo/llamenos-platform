@@ -44,13 +44,13 @@ pub mod blind_index;
 pub mod errors;
 
 // === Legacy modules (secp256k1 — kept during transition, removed in Phase 6) ===
+pub mod auth_legacy;
 pub mod ecies;
 pub mod encryption_legacy;
 pub mod keys_legacy;
+pub mod legacy;
 pub mod nostr;
 pub mod provisioning;
-pub mod auth_legacy;
-pub mod legacy;
 
 // Temporarily keep `encryption` and `keys` as pub aliases for existing imports
 pub use encryption_legacy as encryption;

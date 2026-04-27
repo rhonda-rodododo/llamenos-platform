@@ -79,8 +79,9 @@ pub fn create_auth_token_from_signing_key(
         return Err(CryptoError::InvalidSecretKey);
     }
 
-    let sk_arr = Zeroizing::new(<[u8; 32]>::try_from(sk_bytes.as_slice())
-        .map_err(|_| CryptoError::InvalidSecretKey)?);
+    let sk_arr = Zeroizing::new(
+        <[u8; 32]>::try_from(sk_bytes.as_slice()).map_err(|_| CryptoError::InvalidSecretKey)?,
+    );
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_arr);
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
@@ -120,11 +121,7 @@ pub fn verify_auth_token_with_expiry(
 /// Verify an Ed25519 auth token.
 ///
 /// Returns true if the signature is valid for the given method + path.
-pub fn verify_auth_token(
-    token: &AuthToken,
-    method: &str,
-    path: &str,
-) -> Result<bool, CryptoError> {
+pub fn verify_auth_token(token: &AuthToken, method: &str, path: &str) -> Result<bool, CryptoError> {
     let pubkey_bytes = hex::decode(&token.pubkey).map_err(CryptoError::HexError)?;
     if pubkey_bytes.len() != 32 {
         return Err(CryptoError::InvalidPublicKey);
@@ -249,7 +246,8 @@ mod tests {
         let old_timestamp = 1000000u64;
         let now = old_timestamp + 400_000;
         let token = create_auth_token(&secrets, old_timestamp, "GET", "/api/test").unwrap();
-        let valid = verify_auth_token_with_expiry(&token, "GET", "/api/test", now, 300_000).unwrap();
+        let valid =
+            verify_auth_token_with_expiry(&token, "GET", "/api/test", now, 300_000).unwrap();
         assert!(!valid);
     }
 
@@ -259,7 +257,8 @@ mod tests {
         let future_timestamp = 2000000u64;
         let now = 1000000u64;
         let token = create_auth_token(&secrets, future_timestamp, "GET", "/api/test").unwrap();
-        let valid = verify_auth_token_with_expiry(&token, "GET", "/api/test", now, 300_000).unwrap();
+        let valid =
+            verify_auth_token_with_expiry(&token, "GET", "/api/test", now, 300_000).unwrap();
         assert!(!valid);
     }
 
@@ -268,7 +267,8 @@ mod tests {
         let secrets = test_secrets();
         let now = 1708900000000u64;
         let token = create_auth_token(&secrets, now - 60_000, "GET", "/api/test").unwrap();
-        let valid = verify_auth_token_with_expiry(&token, "GET", "/api/test", now, 300_000).unwrap();
+        let valid =
+            verify_auth_token_with_expiry(&token, "GET", "/api/test", now, 300_000).unwrap();
         assert!(valid);
     }
 

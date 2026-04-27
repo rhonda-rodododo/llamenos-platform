@@ -138,8 +138,8 @@ pub fn unlock_device_keys(
 
     let mut kek = derive_kek(pin, &salt);
     let nonce = Nonce::from_slice(&nonce_bytes);
-    let cipher =
-        Aes256Gcm::new_from_slice(&kek).map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let cipher = Aes256Gcm::new_from_slice(&kek)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext.as_ref())
@@ -234,8 +234,8 @@ fn encrypt_device_secrets(
     getrandom::getrandom(&mut nonce_bytes).expect("getrandom failed");
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let cipher =
-        Aes256Gcm::new_from_slice(&kek).map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let cipher = Aes256Gcm::new_from_slice(&kek)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     // Concatenate signing_seed || encryption_seed
     let mut plaintext = Vec::with_capacity(64);
@@ -313,9 +313,12 @@ mod tests {
         assert!(valid);
 
         // Wrong message fails
-        let valid =
-            verify_signature(b"wrong message", &signature, &encrypted.state.signing_pubkey_hex)
-                .unwrap();
+        let valid = verify_signature(
+            b"wrong message",
+            &signature,
+            &encrypted.state.signing_pubkey_hex,
+        )
+        .unwrap();
         assert!(!valid);
     }
 

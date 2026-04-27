@@ -79,7 +79,6 @@ fn derive_ecies_key_v2(label: &str, shared_x: &[u8]) -> [u8; 32] {
     okm
 }
 
-
 /// Converts a 32-byte x-only (BIP-340) public key to SEC1 compressed form.
 ///
 /// # BIP-340 assumption
@@ -92,7 +91,11 @@ fn xonly_to_compressed(xonly_hex: &str) -> Result<Vec<u8>, CryptoError> {
     if x_bytes.len() != 32 {
         return Err(CryptoError::InvalidPublicKey);
     }
-    debug_assert_eq!(x_bytes.len(), 32, "BIP-340 x-only keys must be exactly 32 bytes");
+    debug_assert_eq!(
+        x_bytes.len(),
+        32,
+        "BIP-340 x-only keys must be exactly 32 bytes"
+    );
     let mut compressed = Vec::with_capacity(33);
     compressed.push(0x02); // BIP-340 canonical even-y
     compressed.extend_from_slice(&x_bytes);
@@ -188,8 +191,7 @@ pub fn ecies_unwrap_key(
     sk_bytes.zeroize();
 
     // Parse ephemeral public key (compressed SEC1, 33 bytes)
-    let ephemeral_bytes =
-        hex::decode(&envelope.ephemeral_pubkey).map_err(CryptoError::HexError)?;
+    let ephemeral_bytes = hex::decode(&envelope.ephemeral_pubkey).map_err(CryptoError::HexError)?;
     let ephemeral_pubkey = PublicKey::from_sec1_bytes(&ephemeral_bytes)
         .map_err(|_| CryptoError::InvalidEphemeralKey)?;
 
@@ -200,7 +202,9 @@ pub fn ecies_unwrap_key(
     let data = hex::decode(&envelope.wrapped_key).map_err(CryptoError::HexError)?;
     if data.is_empty() || data[0] != ECIES_VERSION_V2 {
         shared_x.zeroize();
-        return Err(CryptoError::InvalidFormat("unsupported ECIES version".into()));
+        return Err(CryptoError::InvalidFormat(
+            "unsupported ECIES version".into(),
+        ));
     }
     let payload = &data[1..];
 
@@ -319,7 +323,9 @@ pub fn ecies_decrypt_content(
     let data = hex::decode(packed_hex).map_err(CryptoError::HexError)?;
     if data.is_empty() || data[0] != ECIES_VERSION_V2 {
         shared_x.zeroize();
-        return Err(CryptoError::InvalidFormat("unsupported ECIES version".into()));
+        return Err(CryptoError::InvalidFormat(
+            "unsupported ECIES version".into(),
+        ));
     }
     let payload = &data[1..];
 
@@ -556,8 +562,7 @@ mod tests {
         let ephemeral_encoded = ephemeral_public.to_encoded_point(true);
         let ephemeral_hex = hex::encode(ephemeral_encoded.as_bytes());
 
-        let result =
-            ecies_decrypt_content(&packed_hex, &ephemeral_hex, &recipient_sk_hex, label);
+        let result = ecies_decrypt_content(&packed_hex, &ephemeral_hex, &recipient_sk_hex, label);
         assert!(
             matches!(result, Err(CryptoError::InvalidFormat(_))),
             "Expected InvalidFormat for v1 content, got: {:?}",

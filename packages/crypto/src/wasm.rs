@@ -22,7 +22,7 @@
 use wasm_bindgen::prelude::*;
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::{auth, blind_index, ecies, encryption, keys, labels, nostr, provisioning};
+use crate::{auth, auth_legacy, blind_index, ecies, encryption, keys, labels, nostr, provisioning};
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -42,7 +42,8 @@ fn sk_hex_from(secret_key: &Option<Zeroizing<Vec<u8>>>) -> Result<String, JsErro
 /// Convert a bech32 nsec to hex secret key.
 fn nsec_to_hex(nsec: &str) -> Result<String, JsError> {
     if nsec.starts_with("nsec1") {
-        let (_, data) = bech32::decode(nsec).map_err(|e| JsError::new(&format!("Invalid nsec: {e}")))?;
+        let (_, data) =
+            bech32::decode(nsec).map_err(|e| JsError::new(&format!("Invalid nsec: {e}")))?;
         Ok(hex::encode(data))
     } else {
         Ok(nsec.to_string())
@@ -97,11 +98,7 @@ impl WasmCryptoState {
     /// Import a key (nsec or hex), encrypt with PIN, store in state.
     /// Returns JSON: the EncryptedKeyData + pubkey.
     #[wasm_bindgen(js_name = "importKey")]
-    pub fn import_key(
-        &mut self,
-        nsec_or_hex: &str,
-        pin: &str,
-    ) -> Result<JsValue, JsError> {
+    pub fn import_key(&mut self, nsec_or_hex: &str, pin: &str) -> Result<JsValue, JsError> {
         let sk_hex = nsec_to_hex(nsec_or_hex)?;
         let pubkey = keys::get_public_key(&sk_hex).map_err(to_js_err)?;
 
@@ -156,24 +153,17 @@ impl WasmCryptoState {
 
     /// Create an auth token using the key in state.
     #[wasm_bindgen(js_name = "createAuthToken")]
-    pub fn create_auth_token(
-        &self,
-        method: &str,
-        path: &str,
-    ) -> Result<JsValue, JsError> {
+    pub fn create_auth_token(&self, method: &str, path: &str) -> Result<JsValue, JsError> {
         let sk_hex = sk_hex_from(&self.secret_key)?;
         let now = js_sys::Date::now() as u64;
-        let token = auth::create_auth_token(&sk_hex, now, method, path).map_err(to_js_err)?;
+        let token = auth::create_auth_token_from_signing_key(&sk_hex, now, method, path)
+            .map_err(to_js_err)?;
         serde_wasm_bindgen::to_value(&token).map_err(to_js_err)
     }
 
     /// ECIES unwrap a symmetric key using the key in state.
     #[wasm_bindgen(js_name = "eciesUnwrapKey")]
-    pub fn ecies_unwrap_key(
-        &self,
-        envelope_json: &str,
-        label: &str,
-    ) -> Result<String, JsError> {
+    pub fn ecies_unwrap_key(&self, envelope_json: &str, label: &str) -> Result<String, JsError> {
         let sk_hex = sk_hex_from(&self.secret_key)?;
         let envelope: ecies::KeyEnvelope =
             serde_json::from_str(envelope_json).map_err(to_js_err)?;
@@ -191,9 +181,8 @@ impl WasmCryptoState {
     ) -> Result<JsValue, JsError> {
         let admin_pubkeys: Vec<String> =
             serde_json::from_str(admin_pubkeys_json).map_err(to_js_err)?;
-        let encrypted =
-            encryption::encrypt_note(payload_json, author_pubkey, &admin_pubkeys)
-                .map_err(to_js_err)?;
+        let encrypted = encryption::encrypt_note(payload_json, author_pubkey, &admin_pubkeys)
+            .map_err(to_js_err)?;
         serde_wasm_bindgen::to_value(&encrypted).map_err(to_js_err)
     }
 
@@ -256,10 +245,7 @@ impl WasmCryptoState {
 
     /// Decrypt a legacy V1 note (HKDF-derived key, no forward secrecy).
     #[wasm_bindgen(js_name = "decryptLegacyNote")]
-    pub fn decrypt_legacy_note(
-        &self,
-        encrypted_content: &str,
-    ) -> Result<String, JsError> {
+    pub fn decrypt_legacy_note(&self, encrypted_content: &str) -> Result<String, JsError> {
         let sk_hex = sk_hex_from(&self.secret_key)?;
         encryption::decrypt_legacy_note(encrypted_content, &sk_hex).map_err(to_js_err)
     }
@@ -316,8 +302,7 @@ impl WasmCryptoState {
             content: String,
         }
 
-        let template: EventTemplate =
-            serde_json::from_str(event_json).map_err(to_js_err)?;
+        let template: EventTemplate = serde_json::from_str(event_json).map_err(to_js_err)?;
         let signed = nostr::finalize_nostr_event(
             template.kind,
             template.created_at,
@@ -386,9 +371,8 @@ impl WasmCryptoState {
         let sk_hex = sk_hex_from(&self.secret_key)?;
         let envelope: ecies::KeyEnvelope =
             serde_json::from_str(envelope_json).map_err(to_js_err)?;
-        let key =
-            ecies::ecies_unwrap_key(&envelope, &sk_hex, labels::LABEL_HUB_KEY_WRAP)
-                .map_err(to_js_err)?;
+        let key = ecies::ecies_unwrap_key(&envelope, &sk_hex, labels::LABEL_HUB_KEY_WRAP)
+            .map_err(to_js_err)?;
         Ok(hex::encode(key))
     }
 
@@ -405,9 +389,8 @@ impl WasmCryptoState {
             serde_json::from_str(envelope_json).map_err(to_js_err)?;
 
         // Unwrap with current user's key
-        let file_key =
-            ecies::ecies_unwrap_key(&envelope, &sk_hex, labels::LABEL_FILE_KEY)
-                .map_err(to_js_err)?;
+        let file_key = ecies::ecies_unwrap_key(&envelope, &sk_hex, labels::LABEL_FILE_KEY)
+            .map_err(to_js_err)?;
 
         // Re-wrap for new recipient
         let new_envelope =
@@ -433,12 +416,14 @@ impl WasmCryptoState {
         &self,
         ephemeral_pubkey_hex: &str,
     ) -> Result<JsValue, JsError> {
-        let sk_bytes = self.secret_key
+        let sk_bytes = self
+            .secret_key
             .as_ref()
             .ok_or_else(|| JsError::new("Key is locked. Enter PIN to unlock."))?;
 
-        let result = provisioning::encrypt_nsec_for_provisioning(sk_bytes.as_slice(), ephemeral_pubkey_hex)
-            .map_err(to_js_err)?;
+        let result =
+            provisioning::encrypt_nsec_for_provisioning(sk_bytes.as_slice(), ephemeral_pubkey_hex)
+                .map_err(to_js_err)?;
 
         let json = serde_json::json!({
             "encryptedHex": result.encrypted_hex,
@@ -475,18 +460,14 @@ impl WasmCryptoState {
         encrypted_hex: &str,
         primary_pubkey_hex: &str,
     ) -> Result<JsValue, JsError> {
-        let sk = self
-            .ephemeral_sk
-            .take()
-            .ok_or_else(|| JsError::new("No ephemeral key — call generateProvisioningEphemeral first"))?;
+        let sk = self.ephemeral_sk.take().ok_or_else(|| {
+            JsError::new("No ephemeral key — call generateProvisioningEphemeral first")
+        })?;
         let sk_bytes = zeroize::Zeroizing::new(sk.to_bytes().to_vec());
 
-        let result = provisioning::decrypt_provisioned_nsec(
-            encrypted_hex,
-            primary_pubkey_hex,
-            &sk_bytes,
-        )
-        .map_err(to_js_err)?;
+        let result =
+            provisioning::decrypt_provisioned_nsec(encrypted_hex, primary_pubkey_hex, &sk_bytes)
+                .map_err(to_js_err)?;
 
         let json = serde_json::json!({
             "nsec": *result.nsec,
@@ -553,7 +534,7 @@ pub fn verify_schnorr(
     sig_hex: &str,
     pubkey_hex: &str,
 ) -> Result<bool, JsError> {
-    auth::verify_schnorr(msg_hash_hex, sig_hex, pubkey_hex).map_err(to_js_err)
+    auth_legacy::verify_schnorr(msg_hash_hex, sig_hex, pubkey_hex).map_err(to_js_err)
 }
 
 /// Wrap a 32-byte symmetric key for a recipient using ECIES.
@@ -570,8 +551,7 @@ pub fn ecies_wrap_key(
     }
     let mut key = [0u8; 32];
     key.copy_from_slice(&key_bytes);
-    let envelope =
-        ecies::ecies_wrap_key(&key, recipient_pubkey_hex, label).map_err(to_js_err)?;
+    let envelope = ecies::ecies_wrap_key(&key, recipient_pubkey_hex, label).map_err(to_js_err)?;
     key.zeroize();
     serde_wasm_bindgen::to_value(&envelope).map_err(to_js_err)
 }
@@ -585,7 +565,8 @@ pub fn create_auth_token_stateless(
     path: &str,
 ) -> Result<JsValue, JsError> {
     let now = js_sys::Date::now() as u64;
-    let token = auth::create_auth_token(sk_hex, now, method, path).map_err(to_js_err)?;
+    let token =
+        auth::create_auth_token_from_signing_key(sk_hex, now, method, path).map_err(to_js_err)?;
     serde_wasm_bindgen::to_value(&token).map_err(to_js_err)
 }
 
@@ -593,10 +574,7 @@ pub fn create_auth_token_stateless(
 /// Input: hex(nonce_24 + ciphertext), 32-byte key as hex.
 /// Output: decrypted UTF-8 string (JSON).
 #[wasm_bindgen(js_name = "decryptServerEventHex")]
-pub fn decrypt_server_event_hex(
-    encrypted_hex: &str,
-    key_hex: &str,
-) -> Result<String, JsError> {
+pub fn decrypt_server_event_hex(encrypted_hex: &str, key_hex: &str) -> Result<String, JsError> {
     use chacha20poly1305::{
         aead::{Aead, KeyInit},
         XChaCha20Poly1305, XNonce,
@@ -613,8 +591,7 @@ pub fn decrypt_server_event_hex(
 
     let nonce = XNonce::from_slice(&data[..24]);
     let ciphertext = &data[24..];
-    let cipher =
-        XChaCha20Poly1305::new_from_slice(&key_bytes).map_err(to_js_err)?;
+    let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes).map_err(to_js_err)?;
     let plaintext = cipher
         .decrypt(nonce, ciphertext)
         .map_err(|_| JsError::new("Decryption failed"))?;
@@ -644,10 +621,7 @@ pub fn compute_blind_index(
 /// Compute date-bucketed blind indexes (day/week/month).
 /// Returns JSON: [{ key, hash }, ...]
 #[wasm_bindgen(js_name = "computeDateBucket")]
-pub fn compute_date_bucket(
-    date_str: &str,
-    key_hex: &str,
-) -> Result<JsValue, JsError> {
+pub fn compute_date_bucket(date_str: &str, key_hex: &str) -> Result<JsValue, JsError> {
     let key_bytes = hex::decode(key_hex).map_err(to_js_err)?;
     if key_bytes.len() != 32 {
         return Err(JsError::new("Hub key must be 32 bytes"));

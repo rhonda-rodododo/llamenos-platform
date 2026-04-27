@@ -529,8 +529,7 @@ mod tests {
 
         let (packed_hex, eph_hex) =
             ecies_encrypt_content(content.as_bytes(), &xonly_hex, label).unwrap();
-        let decrypted =
-            ecies_decrypt_content_hex(&packed_hex, &eph_hex, &sk_hex, label).unwrap();
+        let decrypted = ecies_decrypt_content_hex(&packed_hex, &eph_hex, &sk_hex, label).unwrap();
         assert_eq!(decrypted, content);
     }
 

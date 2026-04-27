@@ -21,7 +21,7 @@ use crate::auth;
 use crate::device_keys::{self, DeviceKeyState, DeviceSecrets, EncryptedDeviceKeys};
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{self, HpkeEnvelope};
-use crate::puk::{self, DevicePukEnvelope, PukState, RotatePukResult};
+use crate::puk::{self, PukState, RotatePukResult};
 use crate::sigchain::{self, SigchainLink, SigchainVerifiedState};
 use zeroize::Zeroize;
 
@@ -50,10 +50,9 @@ fn with_secrets<T>(
     f: impl FnOnce(&DeviceSecrets, &DeviceKeyState) -> Result<T, CryptoError>,
 ) -> Result<T, CryptoError> {
     let guard = state().lock().unwrap();
-    let secrets = guard
-        .secrets
-        .as_ref()
-        .ok_or_else(|| CryptoError::InvalidInput("Device is locked. Enter PIN to unlock.".into()))?;
+    let secrets = guard.secrets.as_ref().ok_or_else(|| {
+        CryptoError::InvalidInput("Device is locked. Enter PIN to unlock.".into())
+    })?;
     let ds = guard
         .device_state
         .as_ref()
@@ -192,8 +191,7 @@ pub fn mobile_hpke_open(
 ) -> Result<String, CryptoError> {
     let aad = hex::decode(&aad_hex).map_err(CryptoError::HexError)?;
     let secret_hex = encryption_secret_hex()?;
-    let plaintext =
-        hpke_envelope::hpke_open(&envelope, &secret_hex, &expected_label, &aad)?;
+    let plaintext = hpke_envelope::hpke_open(&envelope, &secret_hex, &expected_label, &aad)?;
     Ok(hex::encode(plaintext))
 }
 
@@ -212,8 +210,7 @@ pub fn mobile_hpke_seal_key(
     let mut key = [0u8; 32];
     key.copy_from_slice(&key_bytes);
     let aad = hex::decode(&aad_hex).map_err(CryptoError::HexError)?;
-    let envelope =
-        hpke_envelope::hpke_seal_key(&key, &recipient_pubkey_hex, &label, &aad)?;
+    let envelope = hpke_envelope::hpke_seal_key(&key, &recipient_pubkey_hex, &label, &aad)?;
     key.zeroize();
     Ok(envelope)
 }
@@ -227,8 +224,7 @@ pub fn mobile_hpke_open_key(
 ) -> Result<String, CryptoError> {
     let aad = hex::decode(&aad_hex).map_err(CryptoError::HexError)?;
     let secret_hex = encryption_secret_hex()?;
-    let mut key =
-        hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)?;
+    let mut key = hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)?;
     let hex_out = hex::encode(key);
     key.zeroize();
     Ok(hex_out)
@@ -338,9 +334,8 @@ pub fn mobile_puk_rotate(
     let mut old_seed = [0u8; 32];
     old_seed.copy_from_slice(&old_seed_bytes);
 
-    let remaining_devices: Vec<(String, String)> =
-        serde_json::from_str(&remaining_devices_json)
-            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+    let remaining_devices: Vec<(String, String)> = serde_json::from_str(&remaining_devices_json)
+        .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
 
     let result = puk::rotate_puk(&old_seed, old_gen, &remaining_devices)?;
     old_seed.zeroize();
@@ -356,8 +351,7 @@ pub fn mobile_puk_unwrap_seed(
 ) -> Result<String, CryptoError> {
     let aad = hex::decode(&aad_hex).map_err(CryptoError::HexError)?;
     let secret_hex = encryption_secret_hex()?;
-    let mut seed =
-        hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)?;
+    let mut seed = hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)?;
     let hex_out = hex::encode(seed);
     seed.zeroize();
     Ok(hex_out)
@@ -365,10 +359,7 @@ pub fn mobile_puk_unwrap_seed(
 
 /// Derive PUK subkeys for a given seed + generation (stateless).
 #[uniffi::export]
-pub fn mobile_puk_derive_state(
-    seed_hex: String,
-    generation: u32,
-) -> Result<PukState, CryptoError> {
+pub fn mobile_puk_derive_state(seed_hex: String, generation: u32) -> Result<PukState, CryptoError> {
     let seed_bytes = hex::decode(&seed_hex).map_err(CryptoError::HexError)?;
     if seed_bytes.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
@@ -467,7 +458,8 @@ mod tests {
     fn auth_token_roundtrip() {
         let _encrypted = mobile_generate_and_load("auth-dev".into(), "123456".into()).unwrap();
 
-        let token = mobile_create_auth_token(1708900000000, "GET".into(), "/api/test".into()).unwrap();
+        let token =
+            mobile_create_auth_token(1708900000000, "GET".into(), "/api/test".into()).unwrap();
         assert_eq!(token.pubkey.len(), 64);
         assert_eq!(token.token.len(), 128); // Ed25519 sig = 64 bytes = 128 hex
 

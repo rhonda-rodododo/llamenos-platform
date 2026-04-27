@@ -413,7 +413,10 @@ mod tests {
         )
         .unwrap();
 
-        let payload = format!(r#"{{"type":"device_add","devicePubkey":"{}","deviceId":"dev-2"}}"#, pubkey2);
+        let payload = format!(
+            r#"{{"type":"device_add","devicePubkey":"{}","deviceId":"dev-2"}}"#,
+            pubkey2
+        );
         let link2 = create_sigchain_link(
             &secrets1,
             "link-2",
@@ -438,22 +441,45 @@ mod tests {
         let pubkey2 = encrypted2.state.signing_pubkey_hex.clone();
 
         let link1 = create_sigchain_link(
-            &secrets1, "l1", "test-sig-dev", 1, None,
+            &secrets1,
+            "l1",
+            "test-sig-dev",
+            1,
+            None,
             "2026-04-27T00:00:00Z",
             r#"{"type":"user_init","deviceId":"test-sig-dev"}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
-        let add_payload = format!(r#"{{"type":"device_add","devicePubkey":"{}","deviceId":"dev-2"}}"#, pubkey2);
+        let add_payload = format!(
+            r#"{{"type":"device_add","devicePubkey":"{}","deviceId":"dev-2"}}"#,
+            pubkey2
+        );
         let link2 = create_sigchain_link(
-            &secrets1, "l2", "test-sig-dev", 2, Some(link1.entry_hash.clone()),
-            "2026-04-27T00:01:00Z", &add_payload,
-        ).unwrap();
+            &secrets1,
+            "l2",
+            "test-sig-dev",
+            2,
+            Some(link1.entry_hash.clone()),
+            "2026-04-27T00:01:00Z",
+            &add_payload,
+        )
+        .unwrap();
 
-        let remove_payload = format!(r#"{{"type":"device_remove","devicePubkey":"{}","deviceId":"dev-2"}}"#, pubkey2);
+        let remove_payload = format!(
+            r#"{{"type":"device_remove","devicePubkey":"{}","deviceId":"dev-2"}}"#,
+            pubkey2
+        );
         let link3 = create_sigchain_link(
-            &secrets1, "l3", "test-sig-dev", 3, Some(link2.entry_hash.clone()),
-            "2026-04-27T00:02:00Z", &remove_payload,
-        ).unwrap();
+            &secrets1,
+            "l3",
+            "test-sig-dev",
+            3,
+            Some(link2.entry_hash.clone()),
+            "2026-04-27T00:02:00Z",
+            &remove_payload,
+        )
+        .unwrap();
 
         let state = verify_sigchain(&[link1, link2, link3]).unwrap();
         assert_eq!(state.active_device_pubkeys.len(), 1);
@@ -465,10 +491,15 @@ mod tests {
     fn tampered_hash_rejected() {
         let (secrets, pubkey) = test_device();
         let mut link = create_sigchain_link(
-            &secrets, "l1", "test-sig-dev", 1, None,
+            &secrets,
+            "l1",
+            "test-sig-dev",
+            1,
+            None,
             "2026-04-27T00:00:00Z",
             r#"{"type":"user_init","deviceId":"test-sig-dev"}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Tamper with entry hash
         link.entry_hash = "0".repeat(64);
@@ -480,10 +511,15 @@ mod tests {
     fn wrong_signer_rejected() {
         let (secrets, _pubkey) = test_device();
         let link = create_sigchain_link(
-            &secrets, "l1", "test-sig-dev", 1, None,
+            &secrets,
+            "l1",
+            "test-sig-dev",
+            1,
+            None,
             "2026-04-27T00:00:00Z",
             r#"{"type":"user_init","deviceId":"test-sig-dev"}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Verify with wrong pubkey
         let wrong_pubkey = "a".repeat(64);
@@ -496,18 +532,27 @@ mod tests {
         let (secrets, _) = test_device();
 
         let link1 = create_sigchain_link(
-            &secrets, "l1", "test-sig-dev", 1, None,
+            &secrets,
+            "l1",
+            "test-sig-dev",
+            1,
+            None,
             "2026-04-27T00:00:00Z",
             r#"{"type":"user_init","deviceId":"test-sig-dev"}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Link2 with wrong prevHash
         let link2 = create_sigchain_link(
-            &secrets, "l2", "test-sig-dev", 2,
+            &secrets,
+            "l2",
+            "test-sig-dev",
+            2,
             Some("0".repeat(64)), // wrong!
             "2026-04-27T00:01:00Z",
             r#"{"type":"puk_rotate","generation":2}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = verify_sigchain(&[link1, link2]);
         assert!(matches!(result, Err(CryptoError::InvalidInput(_))));
@@ -518,18 +563,27 @@ mod tests {
         let (secrets, _) = test_device();
 
         let link1 = create_sigchain_link(
-            &secrets, "l1", "test-sig-dev", 1, None,
+            &secrets,
+            "l1",
+            "test-sig-dev",
+            1,
+            None,
             "2026-04-27T00:00:00Z",
             r#"{"type":"user_init","deviceId":"test-sig-dev"}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Skip seq 2
         let link3 = create_sigchain_link(
-            &secrets, "l3", "test-sig-dev", 3,
+            &secrets,
+            "l3",
+            "test-sig-dev",
+            3,
             Some(link1.entry_hash.clone()),
             "2026-04-27T00:02:00Z",
             r#"{"type":"puk_rotate","generation":2}"#,
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = verify_sigchain(&[link1, link3]);
         assert!(matches!(result, Err(CryptoError::InvalidInput(_))));
@@ -538,33 +592,69 @@ mod tests {
     #[test]
     fn entry_hash_is_deterministic() {
         let hash1 = compute_entry_hash(
-            1, &None, "2026-04-27T00:00:00Z", "dev-1", "aabb", r#"{"type":"user_init"}"#,
-        ).unwrap();
+            1,
+            &None,
+            "2026-04-27T00:00:00Z",
+            "dev-1",
+            "aabb",
+            r#"{"type":"user_init"}"#,
+        )
+        .unwrap();
         let hash2 = compute_entry_hash(
-            1, &None, "2026-04-27T00:00:00Z", "dev-1", "aabb", r#"{"type":"user_init"}"#,
-        ).unwrap();
+            1,
+            &None,
+            "2026-04-27T00:00:00Z",
+            "dev-1",
+            "aabb",
+            r#"{"type":"user_init"}"#,
+        )
+        .unwrap();
         assert_eq!(hash1, hash2);
     }
 
     #[test]
     fn entry_hash_differs_on_any_field_change() {
         let base = compute_entry_hash(
-            1, &None, "2026-04-27T00:00:00Z", "dev-1", "aabb", r#"{"type":"user_init"}"#,
-        ).unwrap();
+            1,
+            &None,
+            "2026-04-27T00:00:00Z",
+            "dev-1",
+            "aabb",
+            r#"{"type":"user_init"}"#,
+        )
+        .unwrap();
 
         let diff_seq = compute_entry_hash(
-            2, &None, "2026-04-27T00:00:00Z", "dev-1", "aabb", r#"{"type":"user_init"}"#,
-        ).unwrap();
+            2,
+            &None,
+            "2026-04-27T00:00:00Z",
+            "dev-1",
+            "aabb",
+            r#"{"type":"user_init"}"#,
+        )
+        .unwrap();
         assert_ne!(base, diff_seq);
 
         let diff_ts = compute_entry_hash(
-            1, &None, "2026-04-27T01:00:00Z", "dev-1", "aabb", r#"{"type":"user_init"}"#,
-        ).unwrap();
+            1,
+            &None,
+            "2026-04-27T01:00:00Z",
+            "dev-1",
+            "aabb",
+            r#"{"type":"user_init"}"#,
+        )
+        .unwrap();
         assert_ne!(base, diff_ts);
 
         let diff_payload = compute_entry_hash(
-            1, &None, "2026-04-27T00:00:00Z", "dev-1", "aabb", r#"{"type":"device_add"}"#,
-        ).unwrap();
+            1,
+            &None,
+            "2026-04-27T00:00:00Z",
+            "dev-1",
+            "aabb",
+            r#"{"type":"device_add"}"#,
+        )
+        .unwrap();
         assert_ne!(base, diff_payload);
     }
 }
