@@ -17,6 +17,19 @@ import type {
   WebhookPayload,
 } from './types'
 
+/** Recording callback with creation timestamp for TTL pruning */
+interface RecordingCallbackEntry {
+  callbackPath: string
+  callbackParams: Record<string, string>
+  channelId: string
+  createdAt: number
+}
+
+/** TTL for recording callbacks — entries older than this are pruned */
+const RECORDING_CALLBACK_TTL_MS = 5 * 60 * 1000 // 5 minutes
+/** Interval for the TTL sweep timer */
+const RECORDING_CALLBACK_SWEEP_INTERVAL_MS = 60 * 1000 // 60 seconds
+
 /**
  * CommandHandler — the central orchestrator that:
  * 1. Receives ARI events and translates them into CF Worker webhooks
@@ -29,37 +42,123 @@ export class CommandHandler {
   private webhook: WebhookSender
   private config: BridgeConfig
 
-  /** Active calls indexed by channel ID */
+  /** Active calls indexed by channel ID.
+   *  Pruning: entries removed via cleanupCall() on StasisEnd/ChannelDestroyed. */
   private calls = new Map<string, ActiveCall>()
 
-  /** Map of queue name (= parentCallSid) → caller channel ID */
+  /** Map of queue name (= parentCallSid) → caller channel ID.
+   *  Pruning: entries removed via cleanupCall(). */
   private queues = new Map<string, string>()
 
-  /** Map of bridge ID → { callerChannelId, volunteerChannelId } */
+  /** Map of bridge ID → { callerChannelId, volunteerChannelId }.
+   *  Pruning: entries removed via cleanupCall() → cleanupBridge(). */
   private bridges = new Map<string, { callerChannelId: string; volunteerChannelId: string }>()
 
-  /** Map of recording name → callback info */
-  private recordingCallbacks = new Map<string, {
-    callbackPath: string
-    callbackParams: Record<string, string>
-    channelId: string
-  }>()
+  /** Map of recording name → callback info.
+   *  Pruning: event-driven on RecordingFinished/Failed, TTL sweep every 60s,
+   *  and bulk removal per-channel via cleanupCall(). */
+  private recordingCallbacks = new Map<string, RecordingCallbackEntry>()
 
-  /** Map of volunteer channel ID → parent call SID (for ringing coordination) */
+  /** Map of volunteer channel ID → parent call SID (for ringing coordination).
+   *  Pruning: entries removed via cleanupCall() and onStasisEnd volunteer path. */
   private ringingMap = new Map<string, string>()
 
   /** Configured hotline number (for the To field) */
   private hotlineNumber: string = ''
 
+  /** Handle for the recording callback TTL sweep interval */
+  private recordingCallbackSweepTimer: ReturnType<typeof setInterval>
+
   constructor(ari: AriClient, webhook: WebhookSender, config: BridgeConfig) {
     this.ari = ari
     this.webhook = webhook
     this.config = config
+
+    // Start periodic TTL sweep for stale recording callbacks
+    this.recordingCallbackSweepTimer = setInterval(() => {
+      this.pruneStaleRecordingCallbacks()
+    }, RECORDING_CALLBACK_SWEEP_INTERVAL_MS)
+  }
+
+  /** Stop background timers (for graceful shutdown) */
+  dispose(): void {
+    clearInterval(this.recordingCallbackSweepTimer)
   }
 
   /** Set the hotline phone number (for webhook payloads) */
   setHotlineNumber(number: string): void {
     this.hotlineNumber = number
+  }
+
+  // ================================================================
+  // Centralized Call Lifecycle Cleanup
+  // ================================================================
+
+  /**
+   * cleanupCall — single function that tears down ALL state for a call.
+   * Must be called unconditionally when a call ends (StasisEnd, ChannelDestroyed).
+   * Clears: gather timeout, queue interval, recording callbacks, bridges,
+   * ringing channels, and finally removes from the calls Map.
+   */
+  private cleanupCall(channelId: string): void {
+    const call = this.calls.get(channelId)
+    if (call) {
+      // 1. Clear gather timeout timer
+      if (call.activeGather?.timeoutTimer) {
+        clearTimeout(call.activeGather.timeoutTimer)
+        call.activeGather = undefined
+      }
+
+      // 2. Clear queue wait interval
+      if (call.queue?.waitTimer) {
+        clearInterval(call.queue.waitTimer)
+        call.queue = undefined
+      }
+
+      // 3. Clean up bridge (hang up other leg, destroy bridge)
+      this.cleanupBridge(channelId)
+
+      // 4. Cancel all ringing channels spawned by this call
+      this.cancelRingingForCall(channelId)
+
+      // 5. Remove recording callbacks associated with this channel
+      for (const [name, entry] of this.recordingCallbacks) {
+        if (entry.channelId === channelId) {
+          this.recordingCallbacks.delete(name)
+        }
+      }
+
+      // 6. Remove from calls map
+      this.calls.delete(channelId)
+    }
+
+    // 7. Remove from queues
+    this.queues.delete(channelId)
+
+    // 8. If this was a volunteer ringing channel, clean up ringing state
+    const parentSid = this.ringingMap.get(channelId)
+    if (parentSid) {
+      this.ringingMap.delete(channelId)
+      const parentCall = this.calls.get(parentSid)
+      if (parentCall) {
+        parentCall.ringingChannels = parentCall.ringingChannels.filter(id => id !== channelId)
+      }
+    }
+  }
+
+  /** Prune recording callbacks older than RECORDING_CALLBACK_TTL_MS */
+  private pruneStaleRecordingCallbacks(): void {
+    const now = Date.now()
+    let pruned = 0
+    for (const [name, entry] of this.recordingCallbacks) {
+      if (now - entry.createdAt > RECORDING_CALLBACK_TTL_MS) {
+        this.recordingCallbacks.delete(name)
+        pruned++
+      }
+    }
+    if (pruned > 0) {
+      console.log(`[handler] Pruned ${pruned} stale recording callback(s)`)
+    }
   }
 
   // ================================================================
@@ -153,29 +252,7 @@ export class CommandHandler {
   private async onStasisEnd(event: StasisEndEvent): Promise<void> {
     const channelId = event.channel.id
     console.log(`[handler] StasisEnd channel=${channelId}`)
-
-    const call = this.calls.get(channelId)
-    if (call) {
-      // Clean up queue
-      this.cleanupCallQueue(channelId)
-      // Clean up bridge
-      this.cleanupBridge(channelId)
-      // Clean up ringing
-      this.cancelRingingForCall(channelId)
-      // Remove call state
-      this.calls.delete(channelId)
-    }
-
-    // If this was a volunteer ringing channel
-    const parentSid = this.ringingMap.get(channelId)
-    if (parentSid) {
-      this.ringingMap.delete(channelId)
-      // Remove from parent call's ringing list
-      const parentCall = this.calls.get(parentSid)
-      if (parentCall) {
-        parentCall.ringingChannels = parentCall.ringingChannels.filter(id => id !== channelId)
-      }
-    }
+    this.cleanupCall(channelId)
   }
 
   /** DTMF digit received */
@@ -245,7 +322,7 @@ export class CommandHandler {
     const channelId = event.channel.id
     console.log(`[handler] ChannelDestroyed channel=${channelId} cause=${event.cause_txt}`)
 
-    // Send call-status webhook for volunteer calls
+    // Send call-status webhook for volunteer calls before cleanup
     const parentSid = this.ringingMap.get(channelId)
     if (parentSid) {
       const parentCall = this.calls.get(parentSid)
@@ -272,6 +349,9 @@ export class CommandHandler {
       const queryParams: Record<string, string> = { parentCallSid: parentSid }
       await this.webhook.sendWebhook('/api/telephony/call-status', payload, queryParams)
     }
+
+    // Unconditional cleanup — catches anything onStasisEnd might have missed
+    this.cleanupCall(channelId)
   }
 
   /** Recording finished */
@@ -558,6 +638,7 @@ export class CommandHandler {
             callbackPath: cmd.recordingCallbackPath,
             callbackParams: cmd.recordingCallbackParams ?? {},
             channelId: callerChannelId,
+            createdAt: Date.now(),
           })
         }
       } catch (err) {
@@ -595,6 +676,7 @@ export class CommandHandler {
         callbackPath: cmd.callbackPath,
         callbackParams: cmd.callbackParams ?? {},
         channelId: cmd.channelId,
+        createdAt: Date.now(),
       })
     } catch (err) {
       console.error(`[handler] Failed to start recording:`, err)
@@ -648,8 +730,7 @@ export class CommandHandler {
     }
 
     // Set up periodic wait callback
-    const waitInterval = (cmd.waitCallbackInterval ?? 10) * 1000
-    let queueStartTime = Date.now()
+    const queueStartTime = Date.now()
 
     call.queue = {
       startedAt: queueStartTime,
@@ -692,7 +773,7 @@ export class CommandHandler {
         } catch (err) {
           console.error(`[handler] Wait callback failed:`, err)
         }
-      }, waitInterval) as unknown as ReturnType<typeof setTimeout>
+      }, (cmd.waitCallbackInterval ?? 10) * 1000) as unknown as ReturnType<typeof setTimeout>
     }
   }
 
@@ -853,7 +934,7 @@ export class CommandHandler {
     }
   }
 
-  /** Clean up queue state for a call */
+  /** Clean up queue state for a call (used by queue leave logic) */
   private cleanupCallQueue(channelId: string): void {
     const call = this.calls.get(channelId)
     if (call?.queue?.waitTimer) {

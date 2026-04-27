@@ -2531,6 +2531,8 @@
     "authToken": "Auth Token",
     "bridgeCallbackUrl": "Bridge Callback URL",
     "bridgeCallbackUrlHelp": "URL where the ARI bridge sends webhooks to this app",
+    "bridgeSecret": "Bridge Secret",
+    "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
     "currentProvider": "Current provider",
     "description": "Configure the telephony provider used for handling calls",
     "enableWebrtc": "Enable WebRTC",

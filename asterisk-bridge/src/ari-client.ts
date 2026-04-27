@@ -17,10 +17,11 @@ type EventHandler = (event: AnyAriEvent) => void
 export class AriClient {
   private config: BridgeConfig
   private ws: WebSocket | null = null
-  private eventHandlers: EventHandler[] = []
+  private eventHandlers = new Set<EventHandler>()
   private reconnectDelay = 1000
   private maxReconnectDelay = 30000
   private shouldReconnect = true
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private authHeader: string
 
   constructor(config: BridgeConfig) {
@@ -30,7 +31,12 @@ export class AriClient {
 
   /** Register an event handler for all ARI events */
   onEvent(handler: EventHandler): void {
-    this.eventHandlers.push(handler)
+    this.eventHandlers.add(handler)
+  }
+
+  /** Unregister an event handler */
+  offEvent(handler: EventHandler): void {
+    this.eventHandlers.delete(handler)
   }
 
   /** Connect to the ARI WebSocket */
@@ -42,6 +48,10 @@ export class AriClient {
   /** Disconnect from ARI */
   disconnect(): void {
     this.shouldReconnect = false
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
     if (this.ws) {
       this.ws.close()
       this.ws = null
@@ -50,6 +60,14 @@ export class AriClient {
 
   private async doConnect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Close the old WebSocket before creating a new one — this removes
+      // all listeners attached to it, preventing listener accumulation
+      // across reconnects.
+      if (this.ws) {
+        this.ws.close()
+        this.ws = null
+      }
+
       const wsUrl = `${this.config.ariUrl}?app=${this.config.stasisApp}&api_key=${this.config.ariUsername}:${this.config.ariPassword}`
 
       console.log(`[ari] Connecting to ${this.config.ariUrl}...`)
@@ -66,7 +84,10 @@ export class AriClient {
       ws.addEventListener('message', (event) => {
         try {
           const data = JSON.parse(typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data as ArrayBuffer)) as AnyAriEvent
-          for (const handler of this.eventHandlers) {
+          // Snapshot-before-fanout: copy Set before iterating to prevent
+          // order-dependent issues if a handler adds/removes handlers.
+          const snapshot = [...this.eventHandlers]
+          for (const handler of snapshot) {
             try {
               handler(data)
             } catch (err) {
@@ -97,7 +118,8 @@ export class AriClient {
 
   private scheduleReconnect(): void {
     console.log(`[ari] Reconnecting in ${this.reconnectDelay}ms...`)
-    setTimeout(async () => {
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null
       try {
         await this.doConnect()
       } catch (err) {
@@ -119,7 +141,7 @@ export class AriClient {
       'Authorization': this.authHeader,
     }
 
-    const init: RequestInit = { method, headers }
+    const init: RequestInit = { method, headers, signal: AbortSignal.timeout(30_000) }
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json'
       init.body = JSON.stringify(body)
@@ -313,6 +335,7 @@ export class AriClient {
     const url = `${this.config.ariRestUrl}/recordings/stored/${recordingName}/file`
     const res = await fetch(url, {
       headers: { 'Authorization': this.authHeader },
+      signal: AbortSignal.timeout(30_000),
     })
     if (!res.ok) return null
     return res.arrayBuffer()

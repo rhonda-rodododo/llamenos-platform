@@ -65,6 +65,7 @@ export class WebhookSender {
         method: 'POST',
         headers,
         body,
+        signal: AbortSignal.timeout(30_000),
       })
 
       if (!response.ok) {

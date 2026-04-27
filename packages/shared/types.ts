@@ -40,6 +40,7 @@ export interface TelephonyProviderConfig {
   ariUsername?: string
   ariPassword?: string
   bridgeCallbackUrl?: string // URL the ARI bridge posts webhooks to
+  bridgeSecret?: string      // Separate HMAC secret for bridge<->worker auth (never reuse ariPassword)
 
   // WebRTC (Twilio/SignalWire require extra API keys; Vonage/Plivo use existing creds)
   webrtcEnabled?: boolean
@@ -69,7 +70,7 @@ export const PROVIDER_REQUIRED_FIELDS: Record<TelephonyProviderType, (keyof Tele
   signalwire: ['accountSid', 'authToken', 'signalwireSpace', 'phoneNumber'],
   vonage: ['apiKey', 'apiSecret', 'applicationId', 'phoneNumber'],
   plivo: ['authId', 'authToken', 'phoneNumber'],
-  asterisk: ['ariUrl', 'ariUsername', 'ariPassword', 'phoneNumber'],
+  asterisk: ['ariUrl', 'ariUsername', 'ariPassword', 'bridgeSecret', 'phoneNumber'],
 }
 
 // --- Custom Fields ---

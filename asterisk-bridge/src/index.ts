@@ -201,9 +201,16 @@ async function main(): Promise<void> {
       // Get recording audio
       if (path.startsWith('/recordings/') && method === 'GET') {
         const signature = request.headers.get('X-Bridge-Signature') ?? url.searchParams.get('sig') ?? ''
-        // Allow either header or query param for signature (for simple GET requests)
-        if (config.bridgeSecret && !signature) {
-          return new Response('Forbidden', { status: 403 })
+        // Verify signature — same as /command, /ring, /hangup.
+        // Strip the `sig` query param before verification so it isn't included
+        // in the signed string (the Worker never sees it when computing the signature).
+        if (config.bridgeSecret) {
+          const urlForSigning = new URL(url.toString())
+          urlForSigning.searchParams.delete('sig')
+          const isValid = await webhook.verifySignature(urlForSigning.toString(), '', signature)
+          if (!isValid) {
+            return new Response('Forbidden', { status: 403 })
+          }
         }
 
         const name = path.replace('/recordings/', '')
@@ -273,19 +280,16 @@ async function main(): Promise<void> {
   console.log(`[bridge] Stasis app: ${config.stasisApp}`)
 
   // Handle graceful shutdown
-  process.on('SIGINT', () => {
+  const shutdown = () => {
     console.log('[bridge] Shutting down...')
+    handler.dispose()
     ari.disconnect()
     server.stop()
     process.exit(0)
-  })
+  }
 
-  process.on('SIGTERM', () => {
-    console.log('[bridge] Shutting down...')
-    ari.disconnect()
-    server.stop()
-    process.exit(0)
-  })
+  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', shutdown)
 }
 
 main().catch(err => {

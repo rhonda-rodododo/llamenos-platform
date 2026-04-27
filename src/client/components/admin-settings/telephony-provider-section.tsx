@@ -215,6 +215,15 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                 onChange={e => updateDraft({ bridgeCallbackUrl: e.target.value })}
               />
             </div>
+            <div className="space-y-1">
+              <Label>{t('telephonyProvider.bridgeSecret')}</Label>
+              <p className="text-xs text-muted-foreground">{t('telephonyProvider.bridgeSecretHelp')}</p>
+              <Input
+                type="password"
+                value={draft.bridgeSecret || ''}
+                onChange={e => updateDraft({ bridgeSecret: e.target.value })}
+              />
+            </div>
           </>
         )}
 
