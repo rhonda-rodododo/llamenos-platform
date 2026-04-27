@@ -1,0 +1,439 @@
+/**
+ * Firehose routes — CRUD for firehose connections, buffer/health status,
+ * notification opt-outs, and agent lifecycle control.
+ */
+import { Hono } from 'hono'
+import type { AppEnv } from '../types'
+import { requirePermission } from '../middleware/permission-guard'
+import { LABEL_FIREHOSE_AGENT_SEAL } from '@shared/crypto-labels'
+import {
+  createFirehoseConnectionSchema,
+  updateFirehoseConnectionSchema,
+  firehoseConnectionStatusSchema,
+  type FirehoseConnectionStatus,
+} from '@protocol/schemas/firehose'
+import { generateAgentKeypair } from '../lib/agent-identity'
+import { createLogger } from '../lib/logger'
+import { audit } from '../services/audit'
+
+const log = createLogger('routes.firehose')
+
+type FirehoseConnectionRow = typeof import('../db/schema/firehose').firehoseConnections.$inferSelect
+
+/** Map a DB row to the API response shape (strips encryptedAgentNsec). */
+function mapConnection(row: FirehoseConnectionRow) {
+  return {
+    id: row.id,
+    hubId: row.hubId,
+    signalGroupId: row.signalGroupId,
+    displayName: row.displayName,
+    encryptedDisplayName: row.encryptedDisplayName ?? undefined,
+    reportTypeId: row.reportTypeId,
+    agentPubkey: row.agentPubkey,
+    geoContext: row.geoContext,
+    geoContextCountryCodes: row.geoContextCountryCodes,
+    inferenceEndpoint: row.inferenceEndpoint,
+    extractionIntervalSec: row.extractionIntervalSec,
+    systemPromptSuffix: row.systemPromptSuffix,
+    bufferTtlDays: row.bufferTtlDays,
+    notifyViaSignal: row.notifyViaSignal,
+    status: row.status as FirehoseConnectionStatus,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+  }
+}
+
+const firehose = new Hono<AppEnv>()
+
+// ---------------------------------------------------------------------------
+// GET /status — health status for all connections (BEFORE /:id)
+// ---------------------------------------------------------------------------
+
+firehose.get('/status',
+  requirePermission('firehose:read'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? 'global'
+
+    const connections = await services.firehose.listConnections(hubId)
+    const statuses = await Promise.all(
+      connections.map(async (conn) => {
+        const bufferSize = await services.firehose.getBufferSize(conn.id)
+        return {
+          id: conn.id,
+          status: conn.status as FirehoseConnectionStatus,
+          lastMessageReceived: null,
+          lastReportSubmitted: null,
+          bufferSize,
+          extractionCount: 0,
+          inferenceHealthMs: null,
+        }
+      }),
+    )
+
+    return c.json({ statuses })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// GET / — list connections for hub
+// ---------------------------------------------------------------------------
+
+firehose.get('/',
+  requirePermission('firehose:read'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? 'global'
+    const rows = await services.firehose.listConnections(hubId)
+    const connections = rows.map(mapConnection)
+    return c.json({ connections })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// POST / — create connection
+// ---------------------------------------------------------------------------
+
+firehose.post('/',
+  requirePermission('firehose:manage'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? 'global'
+    const pubkey = c.get('pubkey')
+
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    const parsed = createFirehoseConnectionSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Validation error', details: parsed.error.issues }, 400)
+    }
+    const data = parsed.data
+
+    // Seal key must be configured
+    const sealKey = c.env.FIREHOSE_AGENT_SEAL_KEY
+    if (!sealKey) {
+      return c.json({ error: 'Firehose agent seal key not configured' }, 503)
+    }
+
+    // Create connection with placeholder keypair, then generate real one
+    const raw = await services.firehose.createConnection(hubId, {
+      id: data.id,
+      displayName: data.displayName?.trim() ?? '',
+      encryptedDisplayName: data.encryptedDisplayName?.trim(),
+      reportTypeId: data.reportTypeId,
+      agentPubkey: 'pending',
+      encryptedAgentNsec: 'pending',
+      geoContext: data.geoContext ?? null,
+      geoContextCountryCodes: data.geoContextCountryCodes ?? null,
+      inferenceEndpoint: data.inferenceEndpoint ?? null,
+      extractionIntervalSec: data.extractionIntervalSec,
+      systemPromptSuffix: data.systemPromptSuffix ?? null,
+      bufferTtlDays: data.bufferTtlDays,
+      notifyViaSignal: data.notifyViaSignal,
+      status: 'pending',
+    })
+
+    // Generate keypair bound to the real connection ID
+    const { pubkey: agentPubkey, encryptedNsec } = generateAgentKeypair(
+      raw.id,
+      sealKey,
+      LABEL_FIREHOSE_AGENT_SEAL,
+    )
+
+    const updated = await services.firehose.setAgentKeypair(raw.id, agentPubkey, encryptedNsec)
+
+    c.executionCtx.waitUntil(
+      audit(services.audit, 'firehoseConnectionCreated', pubkey, {
+        connectionId: raw.id,
+      }, undefined, hubId),
+    )
+
+    return c.json({ connection: mapConnection(updated ?? raw) }, 201)
+  },
+)
+
+// ---------------------------------------------------------------------------
+// GET /:id — get connection by ID
+// ---------------------------------------------------------------------------
+
+firehose.get('/:id',
+  requirePermission('firehose:read'),
+  async (c) => {
+    const services = c.get('services')
+    const id = c.req.param('id')
+
+    const row = await services.firehose.getConnection(id)
+    if (!row) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+    return c.json({ connection: mapConnection(row) })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// PATCH /:id — update connection
+// ---------------------------------------------------------------------------
+
+firehose.patch('/:id',
+  requirePermission('firehose:manage'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? 'global'
+    const pubkey = c.get('pubkey')
+    const id = c.req.param('id')
+
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    const parsed = updateFirehoseConnectionSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Validation error', details: parsed.error.issues }, 400)
+    }
+    const data = parsed.data
+
+    const existing = await services.firehose.getConnection(id)
+    if (!existing) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    const row = await services.firehose.updateConnection(id, {
+      ...(data.displayName !== undefined && data.encryptedDisplayName === undefined
+        ? { displayName: data.displayName.trim() }
+        : {}),
+      ...(data.encryptedDisplayName !== undefined
+        ? { encryptedDisplayName: data.encryptedDisplayName.trim() }
+        : {}),
+      ...(data.reportTypeId !== undefined ? { reportTypeId: data.reportTypeId } : {}),
+      ...(data.geoContext !== undefined ? { geoContext: data.geoContext } : {}),
+      ...(data.geoContextCountryCodes !== undefined
+        ? { geoContextCountryCodes: data.geoContextCountryCodes }
+        : {}),
+      ...(data.inferenceEndpoint !== undefined
+        ? { inferenceEndpoint: data.inferenceEndpoint }
+        : {}),
+      ...(data.extractionIntervalSec !== undefined
+        ? { extractionIntervalSec: data.extractionIntervalSec }
+        : {}),
+      ...(data.systemPromptSuffix !== undefined
+        ? { systemPromptSuffix: data.systemPromptSuffix }
+        : {}),
+      ...(data.bufferTtlDays !== undefined ? { bufferTtlDays: data.bufferTtlDays } : {}),
+      ...(data.notifyViaSignal !== undefined ? { notifyViaSignal: data.notifyViaSignal } : {}),
+      ...(data.status !== undefined ? { status: data.status } : {}),
+    })
+
+    if (!row) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    // Stop/start agent based on status change
+    if (data.status === 'paused' || data.status === 'disabled') {
+      services.firehoseAgent?.stopAgent(id)
+    } else if (data.status === 'active' && existing.status !== 'active') {
+      services.firehoseAgent
+        ?.startAgent(id)
+        .catch((err) => log.error('Failed to start agent after update', {
+          connectionId: id,
+          error: err instanceof Error ? err.message : String(err),
+        }))
+    }
+
+    c.executionCtx.waitUntil(
+      audit(services.audit, 'firehoseConnectionUpdated', pubkey, {
+        connectionId: id,
+      }, undefined, hubId),
+    )
+
+    return c.json({ connection: mapConnection(row) })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// DELETE /:id — delete connection
+// ---------------------------------------------------------------------------
+
+firehose.delete('/:id',
+  requirePermission('firehose:manage'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? 'global'
+    const pubkey = c.get('pubkey')
+    const id = c.req.param('id')
+
+    const existing = await services.firehose.getConnection(id)
+    if (!existing) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    // Stop running agent if any
+    services.firehoseAgent?.stopAgent(id)
+
+    await services.firehose.deleteConnection(id)
+
+    c.executionCtx.waitUntil(
+      audit(services.audit, 'firehoseConnectionDeleted', pubkey, {
+        connectionId: id,
+      }, undefined, hubId),
+    )
+
+    return c.json({ ok: true })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// POST /:id/activate — activate a pending/paused connection
+// ---------------------------------------------------------------------------
+
+firehose.post('/:id/activate',
+  requirePermission('firehose:manage'),
+  async (c) => {
+    const services = c.get('services')
+    const id = c.req.param('id')
+
+    const conn = await services.firehose.getConnection(id)
+    if (!conn) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    if (conn.status === 'active') {
+      return c.json({ connection: mapConnection(conn) })
+    }
+
+    const updated = await services.firehose.updateConnection(id, { status: 'active' })
+
+    // Start the agent
+    try {
+      await services.firehoseAgent?.startAgent(id)
+    } catch (err) {
+      log.error('Failed to start agent on activate', {
+        connectionId: id,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+
+    return c.json({ connection: mapConnection(updated!) })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// POST /:id/pause — pause an active connection
+// ---------------------------------------------------------------------------
+
+firehose.post('/:id/pause',
+  requirePermission('firehose:manage'),
+  async (c) => {
+    const services = c.get('services')
+    const id = c.req.param('id')
+
+    const conn = await services.firehose.getConnection(id)
+    if (!conn) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    services.firehoseAgent?.stopAgent(id)
+    const updated = await services.firehose.updateConnection(id, { status: 'paused' })
+
+    return c.json({ connection: mapConnection(updated!) })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// GET /:id/buffer — get buffer stats for a connection
+// ---------------------------------------------------------------------------
+
+firehose.get('/:id/buffer',
+  requirePermission('firehose:read'),
+  async (c) => {
+    const services = c.get('services')
+    const id = c.req.param('id')
+
+    const conn = await services.firehose.getConnection(id)
+    if (!conn) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    const bufferSize = await services.firehose.getBufferSize(id)
+    const isAgentRunning = services.firehoseAgent?.isRunning(id) ?? false
+
+    return c.json({
+      connectionId: id,
+      bufferSize,
+      agentRunning: isAgentRunning,
+      extractionIntervalSec: conn.extractionIntervalSec,
+      bufferTtlDays: conn.bufferTtlDays,
+    })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// DELETE /:id/buffer — purge expired messages
+// ---------------------------------------------------------------------------
+
+firehose.delete('/:id/buffer',
+  requirePermission('firehose:manage'),
+  async (c) => {
+    const services = c.get('services')
+    const id = c.req.param('id')
+
+    const conn = await services.firehose.getConnection(id)
+    if (!conn) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    const purged = await services.firehose.purgeExpiredMessages()
+    return c.json({ purged })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// POST /:id/optout — opt out of Signal notifications
+// ---------------------------------------------------------------------------
+
+firehose.post('/:id/optout',
+  requirePermission('firehose:read'),
+  async (c) => {
+    const services = c.get('services')
+    const id = c.req.param('id')
+    const pubkey = c.get('pubkey')
+
+    const conn = await services.firehose.getConnection(id)
+    if (!conn) {
+      return c.json({ error: 'Firehose connection not found' }, 404)
+    }
+
+    const optout = await services.firehose.addOptout(id, pubkey)
+    return c.json({
+      id: optout.id,
+      connectionId: optout.connectionId,
+      userId: optout.userId,
+      optedOutAt: optout.optedOutAt instanceof Date ? optout.optedOutAt.toISOString() : optout.optedOutAt,
+    })
+  },
+)
+
+// ---------------------------------------------------------------------------
+// DELETE /:id/optout — re-enable Signal notifications
+// ---------------------------------------------------------------------------
+
+firehose.delete('/:id/optout',
+  requirePermission('firehose:read'),
+  async (c) => {
+    const services = c.get('services')
+    const id = c.req.param('id')
+    const pubkey = c.get('pubkey')
+
+    await services.firehose.removeOptout(id, pubkey)
+    return c.json({ ok: true })
+  },
+)
+
+export default firehose

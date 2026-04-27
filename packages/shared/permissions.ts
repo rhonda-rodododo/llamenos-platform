@@ -164,6 +164,10 @@ export const PERMISSION_CATALOG = {
   'hubs:manage-members': 'Add/remove members from hubs',
   'hubs:manage-keys': 'Manage hub key envelopes',
 
+  // Firehose
+  'firehose:read': 'View firehose connections and status',
+  'firehose:manage': 'Create/update/delete firehose connections',
+
   // Metrics
   'metrics:read': 'View system metrics (Prometheus, JSON)',
 
@@ -225,6 +229,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'bans:*', 'invites:*', 'notes:*',
       'reports:*', 'conversations:*', 'calls:*', 'blasts:*', 'files:*',
       'contacts:*', 'cases:*', 'events:*', 'evidence:*',
+      'firehose:*',
       'hubs:read', 'hubs:manage-members', 'hubs:manage-keys',
       'metrics:read', 'system:view-roles',
     ],

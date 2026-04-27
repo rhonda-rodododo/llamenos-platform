@@ -42,6 +42,7 @@ import sigchainRoutes from './routes/sigchain'
 import pukRoutes from './routes/puk'
 import mlsRoutes from './routes/mls'
 import signalRoutes from './routes/signal'
+import firehoseRoutes from './routes/firehose'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { openAPIRouteHandler } from 'hono-openapi'
@@ -174,6 +175,7 @@ authenticated.route('/users/:targetPubkey/sigchain', sigchainRoutes)
 // Phase 6: PUK envelope distribution and retrieval
 authenticated.route('/puk', pukRoutes)
 authenticated.route('/messaging/signal', signalRoutes)
+authenticated.route('/firehose', firehoseRoutes)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
@@ -197,6 +199,7 @@ hubScoped.route('/messaging/signal', signalRoutes)
 hubScoped.route('/', evidenceRoutes)
 // Phase 6: MLS handshake message routing (hub-scoped)
 hubScoped.route('/mls', mlsRoutes)
+hubScoped.route('/firehose', firehoseRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

@@ -49,6 +49,9 @@ export const KIND_BLAST_PROGRESS = 1030
 /** Blast status changed (sending → sent, scheduled → sending, etc.) */
 export const KIND_BLAST_STATUS = 1031
 
+/** Firehose agent extracted a structured report */
+export const KIND_FIREHOSE_REPORT = 1032
+
 // --- Ephemeral Events (not persisted, broadcast only) ---
 
 /** Volunteer presence update — online counts, availability */
