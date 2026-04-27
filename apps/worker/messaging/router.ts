@@ -10,6 +10,7 @@ import { publishNostrEvent } from '../lib/nostr-events'
 import { createPushDispatcherFromService } from '../lib/push-dispatch'
 import { createLogger } from '../lib/logger'
 import type { Services } from '../services'
+import { observeFirehoseMessage } from './firehose-observer'
 
 const logger = createLogger('messaging')
 
@@ -121,6 +122,21 @@ messaging.post('/:channel/webhook', async (c) => {
   } catch (err) {
     console.error(`[messaging] Failed to parse ${channel} webhook:`, err)
     return c.json({ error: 'Failed to parse message' }, 400)
+  }
+
+  // Firehose observer: buffer Signal group messages for inference agents
+  if (channel === 'signal' && incoming.metadata?.groupId && incoming.body) {
+    c.executionCtx.waitUntil(
+      observeFirehoseMessage(services.firehose, {
+        signalGroupId: incoming.metadata.groupId,
+        senderIdentifier: incoming.senderIdentifier,
+        senderIdentifierHash: incoming.senderIdentifierHash,
+        senderUsername: incoming.metadata?.sourceName ?? incoming.senderIdentifier.slice(-4),
+        content: incoming.body,
+        timestamp: new Date(incoming.timestamp),
+        hubId,
+      })
+    )
   }
 
   // Keyword interception for blast subscribe/unsubscribe
