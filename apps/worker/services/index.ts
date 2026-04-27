@@ -17,6 +17,8 @@ import { BlastsService } from './blasts'
 import { ContactsService } from './contacts'
 import { CasesService } from './cases'
 import { TaskScheduler } from './scheduler'
+import { FirehoseService } from './firehose'
+import { FirehoseAgentService } from './firehose-agent'
 
 export interface Services {
   identity: IdentityService
@@ -30,23 +32,45 @@ export interface Services {
   contacts: ContactsService
   cases: CasesService
   scheduler: TaskScheduler
+  firehose: FirehoseService
+  firehoseAgent?: FirehoseAgentService
 }
 
-export function createServices(db: Database, opts?: { hmacSecret?: string }): Services {
+export function createServices(db: Database, opts?: { hmacSecret?: string; firehoseSealKey?: string; env?: Record<string, string | undefined> }): Services {
   const audit = new AuditService(db)
-  return {
+  const settings = new SettingsService(db)
+  const conversations = new ConversationsService(db, opts?.hmacSecret)
+  const firehose = new FirehoseService(db)
+
+  const services: Services = {
     identity: new IdentityService(db),
-    settings: new SettingsService(db),
+    settings,
     records: new RecordsService(db, audit),
     audit,
     shifts: new ShiftsService(db),
     calls: new CallsService(db),
-    conversations: new ConversationsService(db, opts?.hmacSecret),
+    conversations,
     blasts: new BlastsService(db, opts?.hmacSecret),
     contacts: new ContactsService(db),
     cases: new CasesService(db),
     scheduler: new TaskScheduler(db),
+    firehose,
   }
+
+  // Only create firehose agent if seal key is configured
+  if (opts?.firehoseSealKey) {
+    services.firehoseAgent = new FirehoseAgentService(
+      db,
+      firehose,
+      conversations,
+      audit,
+      settings,
+      opts.firehoseSealKey,
+      opts.env ?? {},
+    )
+  }
+
+  return services
 }
 
 // Re-export service classes for direct import
@@ -62,4 +86,6 @@ export {
   ContactsService,
   CasesService,
   TaskScheduler,
+  FirehoseService,
+  FirehoseAgentService,
 }
