@@ -8,9 +8,11 @@
 #   strfry   - Nostr relay for real-time events
 #
 # Optional services (via --profile):
-#   whisper   - Self-hosted transcription (profile: transcription)
-#   asterisk  - Self-hosted PBX (profile: asterisk)
-#   asterisk-bridge - ARI-to-webhook translator (profile: asterisk)
+#   whisper    - Self-hosted transcription (profile: transcription)
+#   asterisk   - Self-hosted PBX (profile: asterisk)
+#   sip-bridge - PBX-to-webhook translator (profile: asterisk)
+#   kamailio   - SIP proxy / load balancer (profile: telephony)
+#   coturn     - STUN/TURN relay for WebRTC (profile: telephony)
 #   signal-cli - Signal messaging bridge (profile: signal)
 #   glitchtip  - Sentry-compatible error tracking (profile: monitoring)
 #
@@ -19,9 +21,10 @@
 #   docker compose up -d                               # Core (includes relay)
 #   docker compose --profile transcription up -d        # + Whisper
 #   docker compose --profile asterisk up -d             # + Asterisk
+#   docker compose --profile telephony up -d            # + Kamailio + CoTURN
 #   docker compose --profile signal up -d               # + Signal
 #   docker compose --profile monitoring up -d            # + GlitchTip
-#   COMPOSE_PROFILES=transcription,signal docker compose up -d
+#   COMPOSE_PROFILES=asterisk,telephony,signal docker compose up -d
 #
 # IMPORTANT: You MUST set PG_PASSWORD, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
 # and BRIDGE_SECRET (if using Asterisk) in your .env file before starting.
@@ -187,7 +190,7 @@ services:
     profiles: ["asterisk"]
     restart: unless-stopped
     volumes:
-      - asterisk-config:/etc/asterisk
+      - ./asterisk-config:/etc/asterisk:ro
     networks:
       - internal
     healthcheck:
@@ -197,18 +200,20 @@ services:
       retries: 3
       start_period: 15s
 
-  asterisk-bridge:
+  sip-bridge:
     profiles: ["asterisk"]
     build:
       context: ../..
-      dockerfile: asterisk-bridge/Dockerfile
+      dockerfile: sip-bridge/Dockerfile
     restart: unless-stopped
     environment:
+      - PBX_TYPE=${PBX_TYPE:-asterisk}
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_USERNAME=${ARI_USERNAME:-llamenos}
       - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — do NOT use the default}
       - WORKER_WEBHOOK_URL=http://app:3000
       - BRIDGE_SECRET=${BRIDGE_SECRET:?BRIDGE_SECRET is required — generate a random value}
+      - BRIDGE_HOST=0.0.0.0
     networks:
       - internal
     depends_on:
@@ -216,6 +221,60 @@ services:
         condition: service_healthy
       app:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Optional: Kamailio SIP Proxy (telephony profile) ──────
+  kamailio:
+    image: kamailio/kamailio:5.7
+    profiles: ["telephony"]
+    restart: unless-stopped
+    ports:
+      - "${SIP_UDP_PORT:-5060}:5060/udp"
+      - "${SIP_TCP_PORT:-5060}:5060/tcp"
+      - "${SIPS_PORT:-5061}:5061/tcp"
+    volumes:
+      - ./kamailio/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
+      - ./kamailio/dispatcher.list:/etc/kamailio/dispatcher.list:ro
+    networks:
+      - internal
+    depends_on:
+      asterisk:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "kamcmd", "core.version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Optional: CoTURN STUN/TURN relay (telephony profile) ──
+  coturn:
+    image: coturn/coturn:4
+    profiles: ["telephony"]
+    restart: unless-stopped
+    ports:
+      - "${TURN_UDP_PORT:-3478}:3478/udp"
+      - "${TURN_TCP_PORT:-3478}:3478/tcp"
+    command: >
+      --realm=${DOMAIN:-localhost}
+      --fingerprint
+      --lt-cred-mech
+      --user=llamenos:${TURN_SECRET:-changeme}
+      --no-tls
+      --no-dtls
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "turnutils_uclient", "-T", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # ── Optional: GlitchTip Error Tracking ────────────────────
   # Sentry-compatible error tracking. Clients send crash reports here.
@@ -334,7 +393,6 @@ volumes:
   caddy-config:
   minio-data:
   nostr-data:
-  asterisk-config:
   signal-data:
   signal-notifier-data:
 

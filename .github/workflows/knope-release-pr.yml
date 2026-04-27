@@ -1,0 +1,65 @@
+# Maintain the release PR by re-running `knope prepare-release` on every
+# push to main. Knope opens or force-updates a PR on the `release` branch
+# with the next version bump and a CHANGELOG.md entry. Merging that PR
+# triggers release.yml to cut the actual release.
+#
+# Uses GITHUB_TOKEN with explicit write permissions on contents and
+# pull-requests. Requires the repo setting "Allow GitHub Actions to
+# create and approve pull requests" to be enabled.
+#
+# Caveat: PRs opened by GITHUB_TOKEN do NOT trigger downstream
+# `pull_request` workflow runs (GitHub anti-recursion rule), so CI will
+# not run on the release PR automatically. That's OK for this workflow
+# because the release PR's only diffs are package.json + CHANGELOG.md
+# on top of main, so main's CI state IS the release PR's effective CI
+# state. Verify main is green before merging the release PR.
+
+name: Knope — Prepare Release PR
+
+on:
+  push:
+    branches: [main]
+
+# Rapid-fire main merges collapse into a single recomputation.
+concurrency:
+  group: knope-prepare
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    # Skip the merge commit produced by merging the release PR itself,
+    # otherwise we'd recursively try to prepare a release of the release.
+    # The head_commit.message is consumed only by the Actions expression
+    # engine, never by a shell, so this is safe from injection.
+    if: "!contains(github.event.head_commit.message, 'chore: prepare release')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install knope
+        uses: knope-dev/action@19617851f9f13ab2f27a05989c55efb18aca3675 # v2.1.2
+        with:
+          version: 0.22.4
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare release PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # continue-on-error so this job passes when there are no
+        # version-bumping commits since the last release (knope errors
+        # out when PrepareRelease finds nothing to release).
+        continue-on-error: true
+        run: knope prepare-release --verbose
