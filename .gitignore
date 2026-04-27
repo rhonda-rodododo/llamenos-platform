@@ -41,8 +41,11 @@ target/
 apps/desktop/gen/
 apps/desktop/target/
 
-# Crypto build outputs
-packages/crypto/dist/
+# Crypto build outputs (WASM, native libs)
+# Use content-level patterns (not trailing /) so we can track the type stub via negation.
+packages/crypto/dist/*
+packages/crypto/dist/wasm/*
+!packages/crypto/dist/wasm/llamenos_core.d.ts
 
 # Playwright-BDD generated test files
 .features-gen/

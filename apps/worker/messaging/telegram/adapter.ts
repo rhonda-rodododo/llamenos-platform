@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import { HMAC_PHONE_PREFIX } from '@shared/crypto-labels'
 import type { TelegramConfig } from '@shared/types'
 import { hashPhone } from '../../lib/crypto'
@@ -224,22 +225,13 @@ export class TelegramAdapter implements MessagingAdapter {
 
 /**
  * Constant-time string comparison to prevent timing attacks on webhook secrets.
- * Both strings are compared byte-by-byte; the total time is always proportional
- * to the length of the expected string regardless of where a mismatch occurs.
+ * Delegates to Node's built-in timingSafeEqual after encoding to UTF-8 buffers.
+ * Returns false immediately when lengths differ (the length itself is not secret here
+ * since HMAC outputs are always the same length for valid tokens).
  */
 function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    const dummy = b
-    let result = a.length ^ b.length
-    for (let i = 0; i < dummy.length; i++) {
-      result |= (a.charCodeAt(i % a.length) ?? 0) ^ dummy.charCodeAt(i)
-    }
-    return result === 0
-  }
-
-  let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  }
-  return result === 0
+  const ba = Buffer.from(a, 'utf8')
+  const bb = Buffer.from(b, 'utf8')
+  if (ba.length !== bb.length) return false
+  return timingSafeEqual(ba, bb)
 }
