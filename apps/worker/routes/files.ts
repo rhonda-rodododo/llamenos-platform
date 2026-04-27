@@ -9,6 +9,9 @@ import { incCounter } from './metrics'
 import { shareFileBodySchema, fileEnvelopesResponseSchema, fileMetadataResponseSchema } from '@protocol/schemas/files'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.files')
 
 const files = new Hono<AppEnv>()
 
@@ -62,7 +65,7 @@ files.get('/:id/content',
           maxDelayMs: 2000,
           isRetryable: isRetryableError,
           onRetry: (attempt, error) => {
-            console.warn(`[files] R2 get retry ${attempt} for ${fileId}:`, error)
+            logger.warn(`R2 get retry ${attempt} for ${fileId}`, { error })
             incCounter('llamenos_retry_attempts_total', { service: 'blob', operation: 'get' })
           },
         },

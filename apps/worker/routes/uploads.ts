@@ -10,6 +10,9 @@ import { audit } from '../services/audit'
 import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from './metrics'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.uploads')
 
 const MAX_UPLOAD_SIZE = 100 * 1024 * 1024  // 100 MB
 const MAX_CHUNK_SIZE = 10 * 1024 * 1024    // 10 MB
@@ -128,7 +131,7 @@ uploads.put('/:id/chunks/:chunkIndex',
           maxDelayMs: 2000,
           isRetryable: isRetryableError,
           onRetry: (attempt, error) => {
-            console.warn(`[uploads] R2 put retry ${attempt} for ${r2Key}:`, error)
+            logger.warn(`R2 put retry ${attempt} for ${r2Key}`, { error })
             incCounter('llamenos_retry_attempts_total', { service: 'blob', operation: 'put' })
           },
         },
@@ -216,7 +219,7 @@ uploads.post('/:id/complete',
           maxDelayMs: 3000,
           isRetryable: isRetryableError,
           onRetry: (attempt, error) => {
-            console.warn(`[uploads] R2 put content retry ${attempt}:`, error)
+            logger.warn(`R2 put content retry ${attempt}`, { error })
             incCounter('llamenos_retry_attempts_total', { service: 'blob', operation: 'put' })
           },
         },
@@ -235,8 +238,8 @@ uploads.post('/:id/complete',
         maxDelayMs: 2000,
         isRetryable: isRetryableError,
         onRetry: (attempt) => {
-          console.warn(`[uploads] R2 put envelopes/metadata retry ${attempt}`)
-          incCounter('llamenos_retry_attempts_total', { service: 'blob', operation: 'put' })
+            logger.warn(`R2 put envelopes/metadata retry ${attempt}`)
+            incCounter('llamenos_retry_attempts_total', { service: 'blob', operation: 'put' })
         },
       },
     )

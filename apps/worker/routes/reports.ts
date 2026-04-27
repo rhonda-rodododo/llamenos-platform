@@ -13,6 +13,9 @@ import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/nostr-even
 import { publishNostrEvent } from '../lib/nostr-events'
 import { verifyReportAccess, isReport } from '../lib/report-access'
 import { linkCaseToReportBodySchema } from '@protocol/schemas/report-links'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.reports')
 
 /**
  * Normalize conversation metadata — Drizzle bun-sql may double-serialize JSONB
@@ -159,7 +162,7 @@ reports.post('/',
       type: 'report:new',
       conversationId: conversation.id,
       category: body.category,
-    }).catch((e) => { console.error('[reports] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'reportCreated', pubkey, {
       conversationId: conversation.id,
@@ -386,7 +389,7 @@ reports.post('/:id/messages',
     publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'message:new',
       conversationId: id,
-    }).catch((e) => { console.error('[reports] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     return c.json(msg)
   },
@@ -430,7 +433,7 @@ reports.post('/:id/assign',
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: body.assignedTo,
-    }).catch((e) => { console.error('[reports] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     return c.json(updated)
   },

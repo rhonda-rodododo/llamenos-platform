@@ -16,6 +16,9 @@ import { createWhatsAppAdapter } from '../messaging/whatsapp/factory'
 import { createSignalAdapter } from '../messaging/signal/factory'
 import { createRCSAdapter } from '../messaging/rcs/factory'
 import { createTelegramAdapter } from '../messaging/telegram/factory'
+import { createLogger } from './logger'
+
+const logger = createLogger('service-factories')
 
 /**
  * Create a TelephonyAdapter from SettingsService (service-based version).
@@ -29,7 +32,7 @@ export async function getTelephonyFromService(
     const config = await settingsService.getTelephonyProvider()
     if (config) return createAdapterFromConfig(config)
   } catch (e) {
-    console.warn('[service-factories] getTelephonyProvider failed, falling back to env vars:', e)
+    logger.warn('getTelephonyProvider failed, falling back to env vars', { error: e })
   }
 
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER) {
@@ -55,7 +58,7 @@ export async function getHubTelephonyFromService(
     const config = await settingsService.getHubTelephonyProvider(hubId)
     if (config) return createAdapterFromConfig(config)
   } catch (e) {
-    console.warn('[service-factories] getHubTelephonyProvider failed for hub, falling back to global:', e)
+    logger.warn('getHubTelephonyProvider failed for hub, falling back to global', { error: e })
   }
   return getTelephonyFromService(env, settingsService)
 }

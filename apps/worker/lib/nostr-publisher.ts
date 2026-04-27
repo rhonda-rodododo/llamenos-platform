@@ -19,6 +19,9 @@ import { LABEL_SERVER_NOSTR_KEY, LABEL_SERVER_NOSTR_KEY_INFO } from '@shared/cry
 import { KIND_NIP42_AUTH } from '@shared/nostr-events'
 import { withRetry, isRetryableError, RetryableError } from './retry'
 import { getCircuitBreaker } from './circuit-breaker'
+import { createLogger } from './logger'
+
+const logger = createLogger('nostr-publisher')
 
 /**
  * Outbox interface for persistent event storage.
@@ -127,7 +130,7 @@ export class CFNostrPublisher implements NostrPublisher {
           maxDelayMs: 2000,
           isRetryable: isRetryableError,
           onRetry: (attempt, error) => {
-            console.warn(`[nostr-publisher] Relay publish retry ${attempt} (kind=${template.kind}):`, error)
+            logger.warn(`Relay publish retry ${attempt}`, { kind: template.kind, error })
           },
         },
       )
@@ -237,9 +240,9 @@ export class NodeNostrPublisher implements NostrPublisher {
           // Event is safe in the outbox — poller will retry
         })
       } else if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
-        this.connect().catch((err) => {
-          console.error('[nostr-publisher] Failed to connect:', err)
-        })
+          this.connect().catch((err) => {
+            logger.error('Failed to connect', err)
+          })
       }
       return
     }
@@ -252,9 +255,9 @@ export class NodeNostrPublisher implements NostrPublisher {
     // Queue and ensure connection
     this.pendingEvents.push(event)
     if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
-      this.connect().catch((err) => {
-        console.error('[nostr-publisher] Failed to connect:', err)
-      })
+          this.connect().catch((err) => {
+            logger.error('Failed to connect', err)
+          })
     }
   }
 
@@ -345,10 +348,10 @@ export class NodeNostrPublisher implements NostrPublisher {
                 pending.reject(new Error(`Relay rejected event ${eventId}: ${message}`))
               }
             } else if (!accepted) {
-              console.warn(`[nostr-publisher] Event ${eventId} rejected: ${message}`)
+              logger.warn(`Event ${eventId} rejected: ${message}`)
             }
           } else if (data[0] === 'NOTICE') {
-            console.warn(`[nostr-publisher] Relay notice: ${data[1]}`)
+            logger.warn(`Relay notice: ${data[1]}`)
           }
         }
       } catch {
@@ -369,7 +372,7 @@ export class NodeNostrPublisher implements NostrPublisher {
     })
 
     ws.addEventListener('error', (err) => {
-      console.error('[nostr-publisher] WebSocket error:', err)
+      logger.error('WebSocket error', err)
     })
 
     // If no AUTH challenge arrives within 2s, assume open relay
@@ -404,8 +407,8 @@ export class NodeNostrPublisher implements NostrPublisher {
 
     while (this.pendingEvents.length > 0) {
       const event = this.pendingEvents.shift()!
-      this.sendAndAwaitOk(event).catch((err) => {
-        console.error(`[nostr-publisher] Flushed event ${event.id} rejected:`, err)
+        this.sendAndAwaitOk(event).catch((err) => {
+        logger.error(`Flushed event ${event.id} rejected`, err)
       })
     }
   }
@@ -420,7 +423,7 @@ export class NodeNostrPublisher implements NostrPublisher {
     // When outbox is present, events are safe in PostgreSQL — never give up reconnecting.
     // Without outbox, cap reconnect attempts to avoid infinite retry with in-memory queue.
     if (!this.outbox && this.reconnectAttempts > NodeNostrPublisher.MAX_RECONNECT_ATTEMPTS) {
-      console.error(`[nostr-publisher] Max reconnect attempts (${NodeNostrPublisher.MAX_RECONNECT_ATTEMPTS}) reached, giving up`)
+      logger.error(`Max reconnect attempts (${NodeNostrPublisher.MAX_RECONNECT_ATTEMPTS}) reached, giving up`)
       return
     }
 
@@ -429,7 +432,7 @@ export class NodeNostrPublisher implements NostrPublisher {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
       this.connect().catch((err) => {
-        console.error('[nostr-publisher] Reconnect failed:', err)
+        logger.error('Reconnect failed', err)
       })
     }, delay)
   }

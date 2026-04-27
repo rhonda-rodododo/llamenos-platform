@@ -5,6 +5,9 @@ import { generateWebRtcToken, isWebRtcConfigured } from '../telephony/webrtc-tok
 import { generateSipParams, isSipConfigured } from '../telephony/sip-tokens'
 import { webrtcTokenResponseSchema, sipTokenResponseSchema, telephonyStatusResponseSchema } from '@protocol/schemas/webrtc'
 import { authErrors } from '../openapi/helpers'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.webrtc')
 
 const webrtc = new Hono<AppEnv>()
 
@@ -57,7 +60,7 @@ webrtc.get('/webrtc-token',
       const result = await generateWebRtcToken(config, identity)
       return c.json({ token: result.token, provider: result.provider, identity })
     } catch (err) {
-      console.error('[webrtc] Token generation failed:', err)
+      logger.error('Token generation failed', err)
       return c.json({ error: 'Failed to generate WebRTC token' }, 500)
     }
   })
@@ -110,7 +113,7 @@ webrtc.get('/sip-token',
       const sipParams = generateSipParams(config, identity)
       return c.json(sipParams)
     } catch (err) {
-      console.error('[sip] Token generation failed:', err)
+      logger.error('SIP token generation failed', err)
       return c.json({ error: 'Failed to generate SIP parameters' }, 500)
     }
   })

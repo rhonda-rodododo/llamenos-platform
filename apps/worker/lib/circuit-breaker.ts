@@ -13,6 +13,10 @@
  * - HALF_OPEN -> OPEN: if the probe request fails
  */
 
+import { createLogger } from './logger'
+
+const logger = createLogger('circuit-breaker')
+
 export type CircuitState = 'closed' | 'open' | 'half_open'
 
 export interface CircuitBreakerOptions {
@@ -140,7 +144,7 @@ export class CircuitBreaker {
     this.state = to
     this.lastStateChangeTime = Date.now()
     this.onStateChange(this.name, from, to)
-    console.debug(`[circuit-breaker] ${this.name}: ${from} -> ${to}`)
+    logger.debug(`State transition: ${from} -> ${to}`)
   }
 
   /** Get the current circuit state */

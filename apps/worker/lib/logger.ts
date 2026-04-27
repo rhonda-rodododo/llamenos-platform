@@ -6,54 +6,117 @@
  *
  * Features:
  * - Namespace filtering via LOG_NAMESPACES env var (glob patterns, comma-separated)
- *   e.g. LOG_NAMESPACES="auth.*,telephony" to enable only those components
- * - Correlation ID propagation via AsyncLocalStorage
- * - Automatic redaction of sensitive fields (phone numbers, keys, tokens)
- * - Per-level rate limiting to prevent log floods
+ *   e.g. LOG_NAMESPACES="services.*,telephony.*" to enable only those namespaces
+ * - Structured JSON output: { timestamp, level, namespace, message, correlationId, ...context }
+ * - Correlation ID propagation via AsyncLocalStorage (bound by request-logger middleware)
+ * - Automatic redaction of sensitive fields (phone numbers, emails, keys, secrets, tokens)
+ * - Per-level rate limiting via LOG_RATE_LIMITS env var (JSON, e.g. {"debug":100})
+ * - Log levels: trace, debug, info, warn, error, fatal
+ * - MIN_LOG_LEVEL env var (default: info)
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
+  trace: 0,
+  debug: 1,
+  info: 2,
+  warn: 3,
+  error: 4,
+  fatal: 5,
 }
 
 const isSelfHosted = typeof process !== 'undefined' && process.env?.PLATFORM === 'bun'
 
-// Minimum log level — configurable via LOG_LEVEL env var
-const minLevel: LogLevel = isSelfHosted
-  ? (process.env.LOG_LEVEL as LogLevel) || 'info'
-  : 'info'
-
 // ---------------------------------------------------------------------------
-// Namespace filtering (LOG_NAMESPACES="auth.*,telephony,crypto")
+// Configuration
 // ---------------------------------------------------------------------------
 
-type NamespaceFilter = RegExp[]
-
-function parseNamespaceFilters(): NamespaceFilter | null {
-  if (!isSelfHosted) return null
-  const raw = process.env.LOG_NAMESPACES
-  if (!raw || raw.trim() === '*' || raw.trim() === '') return null  // allow all
-  return raw.split(',').map(pattern => {
-    const escaped = pattern.trim()
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')  // escape regex special chars (except * and ?)
-      .replace(/\*/g, '.*')
-      .replace(/\?/g, '.')
-    return new RegExp(`^${escaped}$`)
-  })
+interface RateLimits {
+  trace?: number
+  debug?: number
+  info?: number
+  warn?: number
+  error?: number
+  fatal?: number
 }
 
-const namespaceFilters = parseNamespaceFilters()
+interface LoggerConfig {
+  minLevel: LogLevel
+  namespaces: string[]
+  rateLimits: Required<RateLimits>
+  stripStacks: boolean
+}
 
-function isNamespaceEnabled(component: string): boolean {
-  if (namespaceFilters === null) return true
-  return namespaceFilters.some(re => re.test(component))
+const DEFAULT_RATE_LIMITS: Required<RateLimits> = {
+  trace: 50,
+  debug: 100,
+  info: 200,
+  warn: 500,
+  error: Number.POSITIVE_INFINITY,
+  fatal: Number.POSITIVE_INFINITY,
+}
+
+function parseRateLimits(env: string | undefined): Required<RateLimits> {
+  if (!env) return DEFAULT_RATE_LIMITS
+  try {
+    const parsed = JSON.parse(env) as Partial<RateLimits>
+    return { ...DEFAULT_RATE_LIMITS, ...parsed }
+  } catch (err) {
+    process.stderr.write(
+      `{"level":"warn","namespace":"logger","message":"Invalid LOG_RATE_LIMITS JSON, using defaults","error":"${err instanceof Error ? err.message : String(err)}"}\n`
+    )
+    return DEFAULT_RATE_LIMITS
+  }
+}
+
+function loadConfig(): LoggerConfig {
+  const rawLevel = (isSelfHosted ? process.env.MIN_LOG_LEVEL : undefined) as LogLevel | undefined
+  const minLevel = rawLevel && LEVEL_PRIORITY[rawLevel] !== undefined ? rawLevel : 'info'
+
+  const namespaces = (isSelfHosted ? process.env.LOG_NAMESPACES : undefined) || '*'
+  const parsedNamespaces = namespaces
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  return {
+    minLevel,
+    namespaces: parsedNamespaces.length ? parsedNamespaces : ['*'],
+    rateLimits: parseRateLimits(isSelfHosted ? process.env.LOG_RATE_LIMITS : undefined),
+    stripStacks: isSelfHosted ? process.env.LOG_STACKS !== 'true' : true,
+  }
+}
+
+let config: LoggerConfig = loadConfig()
+
+/** Reset configuration and rate limiter — exposed for tests only. */
+export function _setLoggerConfigForTests(next: LoggerConfig): void {
+  config = next
+  rateLimiter = createRateLimiter(next.rateLimits)
+}
+
+// ---------------------------------------------------------------------------
+// Namespace filtering (glob patterns)
+// ---------------------------------------------------------------------------
+
+function globMatches(namespace: string, pattern: string): boolean {
+  if (pattern === '*') return true
+  if (pattern.endsWith('.*')) {
+    const prefix = pattern.slice(0, -2)
+    return namespace === prefix || namespace.startsWith(`${prefix}.`)
+  }
+  return namespace === pattern
+}
+
+function namespaceAllowed(ns: string): boolean {
+  return config.namespaces.some((p) => globMatches(ns, p))
+}
+
+function levelAllowed(level: LogLevel): boolean {
+  return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[config.minLevel]
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +136,7 @@ export function withCorrelation<T>(ctx: CorrelationContext, fn: () => T): T {
 }
 
 /** Get the current correlation context (returns empty object outside a request) */
-function getCorrelation(): CorrelationContext {
+export function getCorrelation(): CorrelationContext {
   return correlationStorage.getStore() ?? {}
 }
 
@@ -81,159 +144,210 @@ function getCorrelation(): CorrelationContext {
 // Sensitive field redaction
 // ---------------------------------------------------------------------------
 
-// Fields whose values should be redacted in log output
-const REDACTED_KEYS = new Set([
-  'password', 'passwd', 'secret', 'token', 'apiKey', 'api_key',
-  'authToken', 'auth_token', 'accessKey', 'access_key', 'secretKey', 'secret_key',
-  'privateKey', 'private_key', 'nsec', 'npub', 'seed', 'mnemonic',
-  'phone', 'phoneNumber', 'phone_number', 'callerNumber', 'caller_number',
-  'authorization', 'cookie', 'hmacSecret', 'hmac_secret',
-  'serverNostrSecret', 'server_nostr_secret',
-])
+const SENSITIVE_KEY_RE =
+  /phone|email|nsec|secret|token|ciphertext|encrypted|content|recovery|^pin$|password|credential|apikey|auth_token|access_key|secret_key|private_key|server_nostr_secret/i
 
-const PHONE_PATTERN = /\b(\+?1?\s?)?(\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})\b/g
-const HEX_KEY_PATTERN = /\b[0-9a-f]{64}\b/gi
+const NAME_KEY_RE = /^(first|last|full|display|user)?name$/i
 
-function redactValue(value: unknown): unknown {
-  if (typeof value === 'string') {
-    return value
-      .replace(PHONE_PATTERN, '[PHONE]')
-      .replace(HEX_KEY_PATTERN, '[KEY]')
-  }
-  return value
+const NSEC_RE = /nsec1[0-9a-z]{58}/g
+const HEX_KEY_RE = /\b[0-9a-f]{64}\b/gi
+const PHONE_RE = /\b(\+?1?\s?)?(\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})\b/g
+const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g
+const MAX_REDACT_DEPTH = 3
+
+function redactString(s: string): string {
+  return s
+    .replace(NSEC_RE, '[REDACTED:nsec]')
+    .replace(HEX_KEY_RE, '[REDACTED:hex64]')
+    .replace(PHONE_RE, '[REDACTED:PHONE]')
+    .replace(EMAIL_RE, '[REDACTED:EMAIL]')
 }
 
-function redactObject(obj: Record<string, unknown>, depth = 0): Record<string, unknown> {
-  if (depth > 4) return obj  // prevent deep recursion
-  const result: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(obj)) {
-    if (REDACTED_KEYS.has(key) || REDACTED_KEYS.has(key.toLowerCase())) {
-      result[key] = '[REDACTED]'
-    } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      result[key] = redactObject(value as Record<string, unknown>, depth + 1)
+function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEY_RE.test(key) || NAME_KEY_RE.test(key)
+}
+
+function redactInner(value: unknown, depth: number, seen: WeakSet<object>): unknown {
+  if (value === null || value === undefined) return value
+  if (typeof value === 'string') return redactString(value)
+  if (typeof value === 'number' || typeof value === 'boolean') return value
+  if (value instanceof Date) return value.toISOString()
+  if (value instanceof Error) {
+    return { errName: value.name, errMsg: redactString(value.message) }
+  }
+  if (typeof value !== 'object') return String(value)
+
+  if (seen.has(value as object)) return '[circular]'
+  seen.add(value as object)
+
+  if (depth > MAX_REDACT_DEPTH) return '[truncated:depth]'
+
+  if (Array.isArray(value)) {
+    return value.map((v) => redactInner(v, depth + 1, seen))
+  }
+
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value)) {
+    if (isSensitiveKey(k)) {
+      out[k] = '[REDACTED]'
     } else {
-      result[key] = redactValue(value)
+      try {
+        out[k] = redactInner(v, depth + 1, seen)
+      } catch {
+        out[k] = '[redact-error]'
+      }
     }
   }
-  return result
+  return out
+}
+
+/** Walks value up to depth 3, redacting sensitive keys and string patterns. */
+export function redact<T>(value: T): T {
+  return redactInner(value, 0, new WeakSet()) as T
 }
 
 // ---------------------------------------------------------------------------
-// Rate limiting (per component+level, sliding window)
+// Rate limiting (token bucket per namespace+level)
 // ---------------------------------------------------------------------------
 
-const RATE_LIMITS: Record<LogLevel, { maxPerSec: number; burstMs: number }> = {
-  debug: { maxPerSec: 100, burstMs: 1000 },
-  info:  { maxPerSec: 50,  burstMs: 1000 },
-  warn:  { maxPerSec: 20,  burstMs: 1000 },
-  error: { maxPerSec: 10,  burstMs: 1000 },
-}
-
-interface RateBucket {
-  count: number
+interface Bucket {
+  tokens: number
   windowStart: number
   suppressed: number
 }
 
-const rateBuckets: Map<string, RateBucket> = new Map()
-
-/**
- * Returns true if the log entry should be emitted, false if rate-limited.
- * When suppression ends, emits a summary of suppressed count.
- */
-function checkRateLimit(component: string, level: LogLevel): boolean {
-  if (!isSelfHosted) return true  // no rate limiting on CF Workers
-  const key = `${component}:${level}`
-  const limit = RATE_LIMITS[level]
-  const now = Date.now()
-
-  let bucket = rateBuckets.get(key)
-  if (!bucket) {
-    bucket = { count: 0, windowStart: now, suppressed: 0 }
-    rateBuckets.set(key, bucket)
-  }
-
-  const elapsed = now - bucket.windowStart
-  if (elapsed >= limit.burstMs) {
-    // Emit suppression summary if needed
-    if (bucket.suppressed > 0) {
-      const summaryLine = JSON.stringify({
-        level: 'warn',
-        ts: new Date().toISOString(),
-        component,
-        msg: `[rate-limit] suppressed ${bucket.suppressed} ${level} log entries in ${Math.round(elapsed / 1000)}s`,
-      })
-      process.stdout.write(summaryLine + '\n')
-    }
-    bucket.count = 0
-    bucket.windowStart = now
-    bucket.suppressed = 0
-  }
-
-  bucket.count++
-  if (bucket.count > limit.maxPerSec) {
-    bucket.suppressed++
-    return false
-  }
-  return true
-}
-
-// ---------------------------------------------------------------------------
-// Core emit function
-// ---------------------------------------------------------------------------
-
-interface LogEntry {
+interface OverflowSummary {
+  namespace: string
   level: LogLevel
-  ts: string
-  component: string
-  msg: string
-  [key: string]: unknown
+  suppressed: number
 }
 
-function shouldLog(level: LogLevel): boolean {
-  return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[minLevel]
+interface RateLimiter {
+  check(namespace: string, level: LogLevel): boolean
+  drainOverflows(): OverflowSummary[]
 }
 
-function emit(entry: LogEntry): void {
-  if (!shouldLog(entry.level)) return
-  if (!isNamespaceEnabled(entry.component)) return
-  if (!checkRateLimit(entry.component, entry.level)) return
+function createRateLimiter(limits: Required<RateLimits>, clock: () => number = Date.now): RateLimiter {
+  const buckets = new Map<string, Bucket>()
 
-  // Merge correlation context from AsyncLocalStorage
+  function key(ns: string, level: LogLevel) {
+    return `${ns}|${level}`
+  }
+
+  function getBucket(ns: string, level: LogLevel): Bucket {
+    const k = key(ns, level)
+    let b = buckets.get(k)
+    const now = clock()
+    if (!b) {
+      b = { tokens: limits[level], windowStart: now, suppressed: 0 }
+      buckets.set(k, b)
+    } else if (now - b.windowStart >= 1000) {
+      b.tokens = limits[level]
+      b.windowStart = now
+    }
+    return b
+  }
+
+  return {
+    check(namespace, level) {
+      const b = getBucket(namespace, level)
+      if (b.tokens === Number.POSITIVE_INFINITY) return true
+      if (b.tokens > 0) {
+        b.tokens -= 1
+        return true
+      }
+      b.suppressed += 1
+      return false
+    },
+    drainOverflows() {
+      const out: OverflowSummary[] = []
+      for (const [k, b] of buckets) {
+        if (b.suppressed > 0) {
+          const [namespace, level] = k.split('|') as [string, LogLevel]
+          out.push({ namespace, level, suppressed: b.suppressed })
+          b.suppressed = 0
+        }
+      }
+      return out
+    },
+  }
+}
+
+let rateLimiter: RateLimiter = createRateLimiter(config.rateLimits)
+
+// ---------------------------------------------------------------------------
+// Circular reference safe JSON stringify
+// ---------------------------------------------------------------------------
+
+function circularReplacer() {
+  const seen = new WeakSet<object>()
+  return (_: string, value: unknown) => {
+    if (value !== null && typeof value === 'object') {
+      if (seen.has(value as object)) return '[circular]'
+      seen.add(value as object)
+    }
+    return value
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Core emit
+// ---------------------------------------------------------------------------
+
+interface UnwrappedError {
+  errName: string
+  errMsg: string
+  stack?: string
+}
+
+function unwrapError(err: unknown, stripStacks: boolean): UnwrappedError {
+  if (err instanceof Error) {
+    const base: UnwrappedError = { errName: err.name, errMsg: err.message }
+    if (!stripStacks) base.stack = err.stack
+    return base
+  }
+  return { errName: 'Unknown', errMsg: String(err) }
+}
+
+function emit(entry: Record<string, unknown>, level: LogLevel): void {
+  try {
+    const line = `${JSON.stringify(entry, circularReplacer())}\n`
+    if (level === 'error' || level === 'fatal') process.stderr.write(line)
+    else process.stdout.write(line)
+  } catch (emitErr) {
+    const safeNamespace = typeof entry.namespace === 'string' ? entry.namespace : 'unknown'
+    const safeMsg = typeof entry.message === 'string' ? entry.message.slice(0, 100) : 'unknown'
+    process.stderr.write(
+      `{"level":"error","namespace":"logger","message":"emit failed","failedNamespace":"${safeNamespace}","failedMsg":"${safeMsg}","error":"${emitErr instanceof Error ? emitErr.message : String(emitErr)}"}\n`
+    )
+  }
+}
+
+function buildEntry(
+  level: LogLevel,
+  namespace: string,
+  message: string,
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
   const correlation = getCorrelation()
+  const redactedExtra = extra ? redact(extra) : {}
 
-  // Redact the extra fields before emitting
-  const { level, ts, component, msg, ...extra } = entry
-  const redacted = Object.keys(extra).length > 0 ? redactObject(extra as Record<string, unknown>) : {}
-
-  const finalEntry = {
+  return {
+    timestamp: new Date().toISOString(),
     level,
-    ts,
-    component,
-    msg,
+    namespace,
+    message,
     ...correlation,
-    ...redacted,
+    ...redactedExtra,
   }
+}
 
-  if (isSelfHosted) {
-    const line = JSON.stringify(finalEntry)
-    if (level === 'error') {
-      process.stderr.write(line + '\n')
-    } else {
-      process.stdout.write(line + '\n')
-    }
-  } else {
-    // CF Workers — use console methods (CF adds structure)
-    const prefix = `[${component}]`
-    const hasExtra = Object.keys(redacted).length > 0 || Object.keys(correlation).length > 0
-    const extra2 = hasExtra ? { ...correlation, ...redacted } : undefined
-    switch (level) {
-      case 'debug': console.debug(prefix, msg, ...(extra2 ? [extra2] : [])); break
-      case 'info':  console.log(prefix, msg, ...(extra2 ? [extra2] : [])); break
-      case 'warn':  console.warn(prefix, msg, ...(extra2 ? [extra2] : [])); break
-      case 'error': console.error(prefix, msg, ...(extra2 ? [extra2] : [])); break
-    }
-  }
+function write(level: LogLevel, namespace: string, message: string, extra?: Record<string, unknown>): void {
+  if (!levelAllowed(level)) return
+  if (!namespaceAllowed(namespace)) return
+  if (!rateLimiter.check(namespace, level)) return
+
+  emit(buildEntry(level, namespace, message, extra), level)
 }
 
 // ---------------------------------------------------------------------------
@@ -241,54 +355,110 @@ function emit(entry: LogEntry): void {
 // ---------------------------------------------------------------------------
 
 export interface Logger {
+  trace: (msg: string, extra?: Record<string, unknown>) => void
   debug: (msg: string, extra?: Record<string, unknown>) => void
   info: (msg: string, extra?: Record<string, unknown>) => void
   warn: (msg: string, extra?: Record<string, unknown>) => void
-  error: (msg: string, extra?: Record<string, unknown>) => void
-  /** Create a child logger with additional bound context fields */
+  error: (msg: string, errOrExtra?: Error | Record<string, unknown> | unknown, extra?: Record<string, unknown> | unknown) => void
+  fatal: (msg: string, errOrExtra?: Error | Record<string, unknown> | unknown, extra?: Record<string, unknown> | unknown) => void
   child: (context: Record<string, unknown>) => Logger
 }
 
-function buildLogger(component: string, boundContext: Record<string, unknown>): Logger {
+function buildLogger(namespace: string, boundContext: Record<string, unknown>): Logger {
   function log(level: LogLevel, msg: string, extra?: Record<string, unknown>) {
-    emit({
-      level,
-      ts: new Date().toISOString(),
-      component,
-      msg,
-      ...boundContext,
-      ...extra,
-    })
+    write(level, namespace, msg, { ...boundContext, ...extra })
   }
 
   return {
+    trace: (msg: string, extra?: Record<string, unknown>) => log('trace', msg, extra),
     debug: (msg: string, extra?: Record<string, unknown>) => log('debug', msg, extra),
-    info:  (msg: string, extra?: Record<string, unknown>) => log('info', msg, extra),
-    warn:  (msg: string, extra?: Record<string, unknown>) => log('warn', msg, extra),
-    error: (msg: string, extra?: Record<string, unknown>) => log('error', msg, extra),
-    child: (context: Record<string, unknown>) =>
-      buildLogger(component, { ...boundContext, ...context }),
-  }
+    info: (msg: string, extra?: Record<string, unknown>) => log('info', msg, extra),
+    warn: (msg: string, extra?: Record<string, unknown>) => log('warn', msg, extra),
+    error: (msg: string, errOrExtra?: unknown, maybeExtra?: Record<string, unknown> | unknown) => {
+      let errorFields: UnwrappedError | undefined
+      let extraFields: Record<string, unknown> = {} as Record<string, unknown>
+
+      if (errOrExtra instanceof Error) {
+        errorFields = unwrapError(errOrExtra, config.stripStacks)
+        extraFields = (maybeExtra as Record<string, unknown>) ?? ({} as Record<string, unknown>)
+      } else if (
+        errOrExtra !== null &&
+        errOrExtra !== undefined &&
+        typeof errOrExtra === 'object' &&
+        !Array.isArray(errOrExtra)
+      ) {
+        extraFields = errOrExtra as Record<string, unknown>
+      } else if (errOrExtra !== undefined && errOrExtra !== null) {
+        errorFields = unwrapError(errOrExtra, config.stripStacks)
+        extraFields = (maybeExtra as Record<string, unknown>) ?? ({} as Record<string, unknown>)
+      } else {
+        extraFields = (maybeExtra as Record<string, unknown>) ?? ({} as Record<string, unknown>)
+      }
+
+      log('error', msg, { ...extraFields, ...(errorFields ?? {}) })
+    },
+    fatal: (msg: string, errOrExtra?: unknown, maybeExtra?: Record<string, unknown> | unknown) => {
+      let errorFields: UnwrappedError | undefined
+      let extraFields: Record<string, unknown> = {} as Record<string, unknown>
+
+      if (errOrExtra instanceof Error) {
+        errorFields = unwrapError(errOrExtra, config.stripStacks)
+        extraFields = (maybeExtra as Record<string, unknown>) ?? ({} as Record<string, unknown>)
+      } else if (
+        errOrExtra !== null &&
+        errOrExtra !== undefined &&
+        typeof errOrExtra === 'object' &&
+        !Array.isArray(errOrExtra)
+      ) {
+        extraFields = errOrExtra as Record<string, unknown>
+      } else if (errOrExtra !== undefined && errOrExtra !== null) {
+        errorFields = unwrapError(errOrExtra, config.stripStacks)
+        extraFields = (maybeExtra as Record<string, unknown>) ?? ({} as Record<string, unknown>)
+      } else {
+        extraFields = (maybeExtra as Record<string, unknown>) ?? ({} as Record<string, unknown>)
+      }
+
+      log('fatal', msg, { ...extraFields, ...(errorFields ?? {}) })
+    },
+    child: (context: Record<string, unknown>) => buildLogger(namespace, { ...boundContext, ...context }),
+  } as Logger
 }
 
 /**
- * Create a component-scoped logger.
+ * Create a namespaced structured logger.
  *
  * @example
- * const log = createLogger('auth')
- * log.info('Token verified', { pubkey: '...' })
- * // -> {"level":"info","ts":"...","component":"auth","msg":"Token verified","pubkey":"..."}
- *
- * // With request context binding:
- * const reqLog = log.child({ requestId: 'abc-123' })
- * reqLog.info('Processing')
- * // -> {"level":"info","ts":"...","component":"auth","msg":"Processing","requestId":"abc-123"}
+ * const log = createLogger('services.blasts')
+ * log.info('Blast sent', { blastId: '123' })
+ * // -> {"timestamp":"...","level":"info","namespace":"services.blasts","message":"Blast sent","blastId":"123"}
  *
  * // With async correlation context (propagates automatically to all loggers in the request):
  * withCorrelation({ correlationId: 'xyz', requestId: 'abc' }, () => {
  *   log.info('Handling request')  // automatically includes correlationId + requestId
  * })
  */
-export function createLogger(component: string): Logger {
-  return buildLogger(component, {})
+export function createLogger(namespace: string): Logger {
+  return buildLogger(namespace, {})
+}
+
+// ---------------------------------------------------------------------------
+// Background overflow drain
+// ---------------------------------------------------------------------------
+
+if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+  const overflowInterval = setInterval(() => {
+    const summaries = rateLimiter.drainOverflows()
+    for (const s of summaries) {
+      emit(
+        {
+          timestamp: new Date().toISOString(),
+          level: 'warn',
+          namespace: 'logger',
+          message: `Suppressed ${s.suppressed} ${s.level} logs for ${s.namespace} in last 10s`,
+        },
+        'warn'
+      )
+    }
+  }, 10_000)
+  overflowInterval.unref?.()
 }

@@ -15,6 +15,9 @@
 import type { Env } from '../types'
 import type { IdentityService } from '../services/identity'
 import { FcmClient } from './fcm-client'
+import { createLogger } from './logger'
+
+const logger = createLogger('voip-push')
 
 const APNS_BUNDLE_ID = 'org.llamenos.mobile'
 
@@ -43,7 +46,7 @@ export async function dispatchVoipPushFromService(
   const { devices: deviceList } = await identityService.getVoipTokens(volunteerPubkeys)
   if (deviceList.length === 0) return
 
-  console.debug(`[voip-push] Dispatching to ${deviceList.length} devices for call ${callId}`)
+  logger.debug(`Dispatching to ${deviceList.length} devices for call ${callId}`)
 
   const promises: Promise<void>[] = []
 
@@ -97,7 +100,7 @@ async function sendApnsVoipPush(
 
     await client.send(notification)
   } catch (err) {
-    console.error(`[voip-push] APNs VoIP push failed for ${deviceToken.slice(0, 8)}...:`, err)
+    logger.error(`APNs VoIP push failed for ${deviceToken.slice(0, 8)}...`, { error: err })
   }
 }
 
@@ -127,6 +130,6 @@ async function sendFcmVoipPush(
       // No title/body — data-only message for native SIP stack handling
     })
   } catch (err) {
-    console.error(`[voip-push] FCM VoIP push failed for ${fcmToken.slice(0, 8)}...:`, err)
+    logger.error(`FCM VoIP push failed for ${fcmToken.slice(0, 8)}...`, { error: err })
   }
 }

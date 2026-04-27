@@ -6,6 +6,9 @@ import './pg-array-patch' // Must be first — patches PgArray before schema loa
 import { drizzle, type BunSQLDatabase } from 'drizzle-orm/bun-sql'
 import { SQL } from 'bun'
 import * as schema from './schema'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('db')
 
 export type Database = BunSQLDatabase<typeof schema>
 
@@ -55,7 +58,7 @@ export async function closeDb(): Promise<void> {
     const bunDb = db as BunSQLDatabase<typeof schema> & { $client: SQL }
     await bunDb.$client.close()
     db = null
-    console.log('[db] Connection closed')
+    logger.info('Connection closed')
   }
 }
 

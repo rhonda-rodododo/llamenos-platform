@@ -53,7 +53,7 @@ telephony.use('*', async (c, next) => {
   if (!isLocal) {
     const isValid = await adapter.validateWebhook(c.req.raw)
     if (!isValid) {
-      console.error(`[telephony] Webhook signature FAILED for ${url.pathname}`)
+      logger.error(`Webhook signature FAILED for ${url.pathname}`)
       return new Response('Forbidden', { status: 403 })
     }
   }
@@ -207,12 +207,12 @@ telephony.post('/user-answer', async (c) => {
     type: 'call:update',
     callId: parentCallSid,
     status: 'in-progress',
-  }).catch((e) => { console.error('[telephony] Failed to publish call update:', e) })
+  }).catch((e) => { logger.error('Failed to publish call update', e) })
 
   publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: parentCallSid,
-  }).catch((e) => { console.error('[telephony] Failed to publish presence update:', e) })
+  }).catch((e) => { logger.error('Failed to publish presence update', e) })
 
   const [, activeCallsForAnswer] = await Promise.all([
     services.identity.getUser(pubkey).catch(() => ({} as { name?: string })),
@@ -260,7 +260,7 @@ telephony.post('/call-status', async (c) => {
           type: 'call:update',
           callId: parentCallSid,
           status: 'completed',
-        }).catch((e) => { console.error('[telephony] Failed to publish call end:', e) })
+        }).catch((e) => { logger.error('Failed to publish call end', e) })
 
         const duration = preCall
           ? Math.floor((Date.now() - new Date(preCall.startedAt).getTime()) / 1000)
@@ -399,7 +399,7 @@ telephony.post('/voicemail-recording', async (c) => {
     publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
       type: 'voicemail:new',
       callId: callSid,
-    }).catch((e) => { console.error('[telephony] Failed to publish voicemail event:', e) })
+    }).catch((e) => { logger.error('Failed to publish voicemail event', e) })
 
     await audit(services.audit, 'voicemailReceived', 'system', { callSid }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
 

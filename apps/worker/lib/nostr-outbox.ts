@@ -13,6 +13,9 @@
 import { eq, sql } from 'drizzle-orm'
 import type { Database } from '../db'
 import { nostrEventOutbox } from '../db/schema'
+import { createLogger } from './logger'
+
+const logger = createLogger('nostr-outbox')
 
 /** Required fields for a valid signed Nostr event. */
 const REQUIRED_EVENT_FIELDS = ['id', 'pubkey', 'sig', 'kind', 'content', 'tags', 'created_at'] as const
@@ -74,7 +77,7 @@ export class EventOutbox {
   async enqueue(eventJson: Record<string, unknown>): Promise<void> {
     const error = validateNostrEvent(eventJson)
     if (error) {
-      console.error(`[outbox] Rejected invalid event at enqueue: ${error}`, {
+      logger.error(`Rejected invalid event at enqueue: ${error}`, {
         kind: eventJson.kind,
         hasId: 'id' in eventJson,
         hasSig: 'sig' in eventJson,
@@ -114,14 +117,14 @@ export class EventOutbox {
       const rawRow = row as Record<string, unknown>
       const parsed = parseJsonbValue(rawRow.event_json)
       if (!parsed) {
-        console.error(`[outbox] Skipping event ${rawRow.id}: event_json is not a valid object`)
+        logger.error(`Skipping event ${rawRow.id}: event_json is not a valid object`)
         await this.markPermanentlyFailed(rawRow.id as number)
         continue
       }
 
       const error = validateNostrEvent(parsed)
       if (error) {
-        console.error(`[outbox] Skipping event ${rawRow.id}: ${error}`)
+        logger.error(`Skipping event ${rawRow.id}: ${error}`)
         await this.markPermanentlyFailed(rawRow.id as number)
         continue
       }

@@ -6,6 +6,9 @@ import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { AUTH_PREFIX } from '@shared/crypto-labels'
 import type { IdentityService } from '../services/identity'
 import { ServiceError } from '../services/settings'
+import { createLogger } from './logger'
+
+const logger = createLogger('auth')
 
 const TOKEN_MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -63,7 +66,7 @@ export async function authenticateRequest(
       if (user.active === false) return null
       return { pubkey: session.pubkey, user }
     } catch (e) {
-      console.warn('[auth] Session token validation failed:', e)
+      logger.warn('Session token validation failed', { error: e })
       return null
     }
   }
@@ -81,7 +84,7 @@ export async function authenticateRequest(
     if (user.active === false) return null
     return { pubkey: auth.pubkey, user }
   } catch (e) {
-    console.warn('[auth] User lookup failed:', e)
+    logger.warn('User lookup failed', { error: e })
     return null
   }
 }
