@@ -2,8 +2,17 @@ import { z } from 'zod'
 
 // --- Inferred types ---
 
-/** The five supported telephony provider types */
-export const telephonyProviderTypeSchema = z.enum(['twilio', 'signalwire', 'vonage', 'plivo', 'asterisk'])
+/** The eight supported telephony provider types */
+export const telephonyProviderTypeSchema = z.enum([
+  'twilio',
+  'signalwire',
+  'vonage',
+  'plivo',
+  'asterisk',
+  'telnyx',
+  'bandwidth',
+  'freeswitch',
+])
 export type TelephonyProviderType = z.infer<typeof telephonyProviderTypeSchema>
 
 /** The five messaging channel types */

@@ -14,6 +14,9 @@ export const TELEPHONY_PROVIDER_LABELS: Record<TelephonyProviderType, string> = 
   vonage: 'Vonage',
   plivo: 'Plivo',
   asterisk: 'Asterisk (Self-Hosted)',
+  telnyx: 'Telnyx',
+  bandwidth: 'Bandwidth',
+  freeswitch: 'FreeSWITCH (Self-Hosted)',
 }
 
 export interface TelephonyProviderConfig {
@@ -41,6 +44,19 @@ export interface TelephonyProviderConfig {
   ariPassword?: string
   bridgeCallbackUrl?: string // URL the ARI bridge posts webhooks to
   bridgeSecret?: string      // Separate HMAC secret for bridge<->worker auth (never reuse ariPassword)
+
+  // Telnyx
+  connectionId?: string     // Telnyx Call Control App ID
+  // apiKey shared with Vonage field
+
+  // Bandwidth
+  // accountId shared with Plivo authId field
+  // apiToken shared with Plivo authToken field
+  bandwidthAppId?: string   // Bandwidth application ID
+
+  // FreeSWITCH (same bridge pattern as Asterisk)
+  freeswitchBridgeUrl?: string  // URL the FreeSWITCH bridge posts webhooks to
+  freeswitchBridgeSecret?: string // Shared secret for HMAC webhook validation
 
   // WebRTC (Twilio/SignalWire require extra API keys; Vonage/Plivo use existing creds)
   webrtcEnabled?: boolean
@@ -71,6 +87,9 @@ export const PROVIDER_REQUIRED_FIELDS: Record<TelephonyProviderType, (keyof Tele
   vonage: ['apiKey', 'apiSecret', 'applicationId', 'phoneNumber'],
   plivo: ['authId', 'authToken', 'phoneNumber'],
   asterisk: ['ariUrl', 'ariUsername', 'ariPassword', 'bridgeSecret', 'phoneNumber'],
+  telnyx: ['apiKey', 'connectionId', 'phoneNumber'],
+  bandwidth: ['authId', 'authToken', 'bandwidthAppId', 'phoneNumber'],
+  freeswitch: ['freeswitchBridgeUrl', 'freeswitchBridgeSecret', 'phoneNumber'],
 }
 
 // --- Custom Fields ---
