@@ -103,7 +103,7 @@ export class SignalMessageQueue {
     // Atomic CTE: SELECT with FOR UPDATE SKIP LOCKED (limited), then UPDATE only those rows
     const claimed = await this.db.execute<{
       id: string
-      hub_id: string | null
+      hub_id: string
       conversation_id: string
       recipient_identifier: string
       body: string
@@ -130,13 +130,13 @@ export class SignalMessageQueue {
 
     return [...claimed].map(row => ({
       id: row.id,
-      hubId: row.hub_id ?? '',
+      hubId: row.hub_id,
       conversationId: row.conversation_id,
       recipientIdentifier: row.recipient_identifier,
       body: row.body,
       mediaUrl: row.media_url,
       mediaType: row.media_type,
-      retryCount: row.retry_count ?? 0,
+      retryCount: row.retry_count,
     }))
   }
 
