@@ -297,7 +297,8 @@ services:
       dockerfile: signal-notifier/Dockerfile
     restart: unless-stopped
     environment:
-      - "BEARER_TOKEN=${SIGNAL_NOTIFIER_BEARER_TOKEN:?SIGNAL_NOTIFIER_BEARER_TOKEN is required — generate with openssl rand -hex 32}"
+      - "NOTIFIER_API_KEY=${SIGNAL_NOTIFIER_BEARER_TOKEN:?SIGNAL_NOTIFIER_BEARER_TOKEN is required — generate with openssl rand -hex 32}"
+      - "NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-${HMAC_SECRET:?HMAC_SECRET is required}}"
       - SIGNAL_CLI_URL=${SIGNAL_CLI_URL:-http://signal-cli:8080}
       - PORT=3100
     volumes:
