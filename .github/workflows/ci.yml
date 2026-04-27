@@ -243,20 +243,58 @@ jobs:
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
             "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "NOTIFIER_API_KEY=ci-test-notifier-key" \
+            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+            "PBX_TYPE=ari" \
             > deploy/docker/.env
 
-      - name: Build and start Docker Compose
+      - name: Build and start Docker Compose (core services)
         working-directory: deploy/docker
         run: |
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait app
+          docker compose --env-file .env \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            up -d --build --wait app
         timeout-minutes: 10
+
+      - name: Start sidecar profiles (signal + telephony)
+        working-directory: deploy/docker
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            up -d --build
+        timeout-minutes: 5
+
+      - name: Wait for signal-notifier health
+        run: |
+          echo "Waiting for signal-notifier..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100/health; then
+              echo "signal-notifier is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
+            fi
+            sleep 3
+          done
 
       - name: Show container status
         if: ${{ !cancelled() }}
         working-directory: deploy/docker
         run: |
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml ps || true
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml logs --tail=50 || true
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            ps || true
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            logs --tail=50 || true
 
       - name: Run E2E tests
         run: bunx playwright test
@@ -265,6 +303,15 @@ jobs:
         run: bun run test:backend:bdd --no-codegen
         env:
           TEST_HUB_URL: http://localhost:3000
+          SIGNAL_NOTIFIER_URL: http://localhost:3100
+          SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
+          PBX_TYPE: ari
+
+      - name: Smoke check sidecar health endpoints
+        if: ${{ !cancelled() }}
+        run: |
+          curl -sf http://localhost:3000/api/health/ready || echo "::warning::app health check failed"
+          curl -sf http://localhost:3100/health || echo "::warning::signal-notifier health check failed"
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -279,7 +326,12 @@ jobs:
       - name: Tear down Docker Compose
         if: always()
         working-directory: deploy/docker
-        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.test.yml down -v
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            down -v
 
   # ─── Node.js Integration Tests ──────────────────────────────
   integration-node:

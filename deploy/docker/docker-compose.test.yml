@@ -9,6 +9,7 @@
 #   - Sets ENVIRONMENT=development (enables /api/test-reset endpoint)
 #   - Disables read_only to allow SQLite WAL files in tmpfs
 #   - Fixes strfry NOFILES config for CI (default 1M exceeds GitHub Actions ulimit of 65536)
+#   - Configures signal-notifier and asterisk-bridge in test mode
 
 services:
   # Fix strfry for CI: mount config with nofiles=0 (don't attempt to set ulimit)
@@ -24,6 +25,9 @@ services:
       - ENVIRONMENT=development
       - DEMO_MODE=true
       - DEV_RESET_SECRET=test-reset-secret
+      # Wire up sidecar services so integration tests can reach them
+      - NOTIFIER_URL=http://signal-notifier:3100
+      - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-test-notifier-key}
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,3 +35,33 @@ services:
         condition: service_healthy
       strfry:
         condition: service_healthy
+
+  # ── Signal sidecar: test mode ──────────────────────────────────────
+  # signal-cli runs in json-rpc mode; AUTO_RECEIVE_SCHEDULE disabled in CI
+  # so the webhook-based tests control message flow entirely.
+  signal-cli:
+    environment:
+      - MODE=json-rpc
+      - AUTO_RECEIVE_SCHEDULE=
+
+  # signal-notifier: expose port so BDD tests can hit /health and /notify directly
+  signal-notifier:
+    ports:
+      - "3100:3100"
+    environment:
+      - PORT=3100
+      - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-test-notifier-key}
+      - SIGNAL_BRIDGE_URL=http://signal-cli:8080
+      - SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-+15550000000}
+      - NOTIFIER_DB_PATH=/tmp/notifier-test.db
+
+  # ── Asterisk sidecar: test mode ────────────────────────────────────
+  # asterisk-bridge points to the mock ARI endpoint; BRIDGE_SECRET and
+  # ARI_PASSWORD come from .env (set to ci-test-* values in CI).
+  asterisk-bridge:
+    environment:
+      - ARI_URL=ws://asterisk:8088/ari/events
+      - ARI_USERNAME=llamenos
+      - ARI_PASSWORD=${ARI_PASSWORD:-ci-test-ari-password}
+      - WORKER_WEBHOOK_URL=http://app:3000
+      - BRIDGE_SECRET=${BRIDGE_SECRET:-ci-test-bridge-secret}
