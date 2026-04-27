@@ -1,0 +1,322 @@
+---
+# Preflight Validation Playbook
+#
+# Validates all required variables before any server changes are made.
+# Fails fast with a descriptive error if any required var is missing or invalid.
+#
+# This playbook is imported by setup.yml before any deployment operations.
+# It is safe to run in --check mode (no changes made).
+#
+# Usage:
+#   ansible-playbook playbooks/preflight.yml --check --diff
+#   ansible-playbook playbooks/preflight.yml -e '@vars.yml'
+
+- name: Validate target distribution before any role runs
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Assert supported distribution
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family == 'Debian'
+          - >
+            (
+              ansible_facts.distribution == 'Debian'
+              and ansible_facts.distribution_major_version | int >= 12
+            )
+            or
+            (
+              ansible_facts.distribution == 'Ubuntu'
+              and ansible_facts.distribution_release in supported_ubuntu_releases
+            )
+        fail_msg: |
+          Unsupported target distribution.
+
+          Detected: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }} ({{ ansible_facts.distribution_release | default('unknown') }})
+
+          Supported targets:
+            - Debian 12 (bookworm) or newer
+            - Ubuntu 22.04 (jammy)
+            - Ubuntu 24.04 (noble)
+
+          RHEL-family support is planned but not yet implemented.
+          See deploy/ansible/README.md for the full supported list.
+        success_msg: "Target {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }} is supported."
+      vars:
+        supported_ubuntu_releases:
+          - jammy
+          - noble
+      tags: always
+
+    - name: Check SSH connectivity to target hosts
+      ansible.builtin.wait_for:
+        host: "{{ inventory_hostname }}"
+        port: "{{ ansible_port | default(22) }}"
+        timeout: 10
+      delegate_to: localhost
+      become: false
+      ignore_errors: true
+      register: ssh_check
+      tags: always
+
+    - name: Report SSH connectivity
+      ansible.builtin.debug:
+        msg: "SSH connectivity check: {{ 'PASSED' if ssh_check is succeeded else 'FAILED (may require VPN or different network)' }}"
+      tags: always
+
+    - name: Verify Docker is installed and running
+      ansible.builtin.command: docker version --format '{{ "{{" }}.Server.Version{{ "}}" }}'
+      register: docker_version
+      changed_when: false
+      ignore_errors: true
+      tags: always
+
+    - name: Report Docker status
+      ansible.builtin.debug:
+        msg: "Docker status: {{ docker_version.stdout if docker_version is succeeded else 'NOT INSTALLED (will be installed during hardening)' }}"
+      tags: always
+
+- name: Preflight variable validation
+  hosts: all
+  gather_facts: false
+  vars_files:
+    - ../vars.yml
+
+  tasks:
+    - name: Print deployment target summary
+      ansible.builtin.debug:
+        msg: |
+          ===========================================
+          Llamenos Deployment Preflight Check
+          ===========================================
+          Target: {{ inventory_hostname }}
+          Domain: {{ domain | default('NOT SET') }}
+          Environment: {{ environment | default('production') }}
+          Deploy User: {{ deploy_user | default('deploy') }}
+          App Directory: {{ app_dir | default('/opt/llamenos') }}
+          ===========================================
+      tags: always
+
+    - name: Assert domain is set
+      ansible.builtin.assert:
+        that:
+          - domain is defined
+          - domain | length > 0
+          - domain != "hotline.yourdomain.org"
+        fail_msg: |
+          REQUIRED: 'domain' must be set to your actual domain name.
+          
+          Current value: {{ domain | default('NOT SET') }}
+          
+          To fix:
+            1. Edit vars.yml
+            2. Set domain: your-actual-domain.org
+        success_msg: "domain: {{ domain }}"
+
+    - name: Assert acme_email is set
+      ansible.builtin.assert:
+        that:
+          - acme_email is defined
+          - acme_email | length > 0
+          - acme_email != "admin@yourdomain.org"
+        fail_msg: |
+          REQUIRED: 'acme_email' must be set to your actual email address for Let's Encrypt.
+          
+          Current value: {{ acme_email | default('NOT SET') }}
+          
+          To fix:
+            1. Edit vars.yml
+            2. Set acme_email: your-email@example.org
+        success_msg: "acme_email: {{ acme_email }}"
+
+    - name: Assert deploy_user is set
+      ansible.builtin.assert:
+        that:
+          - deploy_user is defined
+          - deploy_user | length > 0
+        fail_msg: |
+          REQUIRED: 'deploy_user' must be set to the non-root user that runs the application.
+          
+          Current value: {{ deploy_user | default('NOT SET') }}
+          
+          To fix:
+            1. Edit vars.yml
+            2. Set deploy_user: deploy
+        success_msg: "deploy_user: {{ deploy_user }}"
+
+    - name: Assert llamenos_app_image is set
+      ansible.builtin.assert:
+        that:
+          - llamenos_app_image is defined
+          - llamenos_app_image | length > 0
+        fail_msg: |
+          REQUIRED: 'llamenos_app_image' must be set to the Docker image for the Llamenos app.
+          
+          Current value: {{ llamenos_app_image | default('NOT SET') }}
+          
+          Example: llamenos_app_image: ghcr.io/llamenos/llamenos:0.1.0
+          
+          To fix:
+            1. Edit vars.yml
+            2. Set llamenos_app_image to a valid image reference
+        success_msg: "llamenos_app_image: {{ llamenos_app_image }}"
+
+    - name: Assert admin_pubkey is a valid 64-character hex string
+      ansible.builtin.assert:
+        that:
+          - admin_pubkey is defined
+          - admin_pubkey | length == 64
+          - admin_pubkey | regex_search('^[0-9a-f]{64}$') is truthy
+        fail_msg: |
+          REQUIRED: 'admin_pubkey' must be a 64-character lowercase hex string (Nostr public key).
+          
+          Current value: {{ admin_pubkey | default('NOT SET') }}
+          Length: {{ admin_pubkey | default('') | length }} chars (expected: 64)
+          
+          To fix:
+            1. Generate a keypair: bun run bootstrap-admin
+            2. Copy the hex public key to admin_pubkey in vars.yml
+        success_msg: "admin_pubkey: {{ admin_pubkey[:8] }}... (64 chars)"
+
+    - name: Assert hmac_secret meets minimum length
+      ansible.builtin.assert:
+        that:
+          - hmac_secret is defined
+          - hmac_secret | length >= 32
+        fail_msg: |
+          REQUIRED: 'hmac_secret' must be at least 32 characters long.
+          
+          Current value: {{ hmac_secret | default('NOT SET') }}
+          Length: {{ hmac_secret | default('') | length }} chars (expected: >= 32)
+          
+          To generate:
+            openssl rand -hex 32
+        success_msg: "hmac_secret: [set, {{ hmac_secret | length }} chars]"
+
+    - name: Assert server_nostr_secret is a valid 64-character hex string
+      ansible.builtin.assert:
+        that:
+          - server_nostr_secret is defined
+          - server_nostr_secret | length == 64
+          - server_nostr_secret | regex_search('^[0-9a-f]{64}$') is truthy
+        fail_msg: |
+          REQUIRED: 'server_nostr_secret' must be exactly 64 lowercase hex characters.
+          
+          Current value: {{ server_nostr_secret | default('NOT SET') }}
+          Length: {{ server_nostr_secret | default('') | length }} chars (expected: 64)
+          
+          To generate:
+            openssl rand -hex 32
+        success_msg: "server_nostr_secret: [set, 64 chars]"
+
+    - name: Assert pg_password meets minimum length
+      ansible.builtin.assert:
+        that:
+          - pg_password is defined
+          - pg_password | length >= 16
+        fail_msg: |
+          REQUIRED: 'pg_password' must be at least 16 characters long.
+          
+          Current value: {{ pg_password | default('NOT SET') }}
+          Length: {{ pg_password | default('') | length }} chars (expected: >= 16)
+          
+          To generate:
+            openssl rand -base64 24
+        success_msg: "pg_password: [set, {{ pg_password | length }} chars]"
+
+    - name: Assert minio_access_key is set
+      ansible.builtin.assert:
+        that:
+          - minio_access_key is defined
+          - minio_access_key | length > 0
+        fail_msg: |
+          REQUIRED: 'minio_access_key' must be set.
+          
+          Current value: {{ minio_access_key | default('NOT SET') }}
+          
+          To generate:
+            openssl rand -base64 24
+        success_msg: "minio_access_key: [set]"
+
+    - name: Assert minio_secret_key meets minimum length
+      ansible.builtin.assert:
+        that:
+          - minio_secret_key is defined
+          - minio_secret_key | length >= 16
+        fail_msg: |
+          REQUIRED: 'minio_secret_key' must be at least 16 characters long.
+          
+          Current value: {{ minio_secret_key | default('NOT SET') }}
+          Length: {{ minio_secret_key | default('') | length }} chars (expected: >= 16)
+          
+          To generate:
+            openssl rand -base64 24
+        success_msg: "minio_secret_key: [set, {{ minio_secret_key | length }} chars]"
+
+    - name: Assert bridge_secret is set when Asterisk is enabled
+      ansible.builtin.assert:
+        that:
+          - bridge_secret is defined
+          - bridge_secret | length > 0
+        fail_msg: |
+          REQUIRED: 'bridge_secret' must be set when Asterisk PBX is enabled.
+          
+          Current value: {{ bridge_secret | default('NOT SET') }}
+          
+          To generate:
+            openssl rand -hex 32
+        success_msg: "bridge_secret: [set, {{ bridge_secret | length }} chars]"
+      when: llamenos_asterisk_enabled | default(false) | bool
+
+    - name: Warn if bridge_secret is not set but Asterisk is disabled
+      ansible.builtin.debug:
+        msg: "Note: bridge_secret not set (Asterisk is disabled, so this is OK)"
+      when: not (llamenos_asterisk_enabled | default(false) | bool) and
+            (bridge_secret is not defined or bridge_secret | length == 0)
+
+    - name: Warn if SSH is open to the world
+      ansible.builtin.debug:
+        msg: |
+          WARNING: ssh_allowed_cidrs includes '0.0.0.0/0' — SSH is open to the entire internet.
+          
+          This is a security risk. Restrict to your admin IP addresses:
+            ssh_allowed_cidrs:
+              - "203.0.113.1/32"
+      when: "'0.0.0.0/0' in (ssh_allowed_cidrs | default([]))"
+
+    - name: Validate backup_age_public_key format (if set)
+      ansible.builtin.assert:
+        that:
+          - backup_age_public_key | length > 0
+          - backup_age_public_key | regex_search('^age1[0-9a-z]{58}$') is truthy
+        fail_msg: |
+          INVALID: 'backup_age_public_key' does not appear to be a valid age public key.
+          
+          Expected format: age1... (59 characters starting with 'age1')
+          Current value: {{ backup_age_public_key[:20] | default('NOT SET') }}...
+          
+          To generate a keypair:
+            age-keygen -o backup-key.txt
+          
+          Then copy the public key (starts with 'age1') to backup_age_public_key in vars.yml.
+          Store the private key somewhere safe (NOT on the server).
+        success_msg: "backup_age_public_key: [valid age key]"
+      when: backup_age_public_key | default('') | length > 0
+
+    - name: Preflight checks passed
+      ansible.builtin.debug:
+        msg: |
+          ===========================================
+          ALL PREFLIGHT CHECKS PASSED
+          ===========================================
+          Domain: {{ domain }}
+          Admin Pubkey: {{ admin_pubkey[:16] }}...
+          Server Nostr Secret: {{ server_nostr_secret[:8] }}...
+          PostgreSQL Password: [set, {{ pg_password | length }} chars]
+          MinIO Access Key: [set]
+          MinIO Secret Key: [set, {{ minio_secret_key | length }} chars]
+          HMAC Secret: [set, {{ hmac_secret | length }} chars]
+          Backup Encryption: {{ 'ENABLED' if backup_age_public_key | default('') | length > 0 else 'DISABLED (set backup_age_public_key to enable)' }}
+          ===========================================
+          Proceeding with deployment...
+          ===========================================

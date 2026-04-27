@@ -10,6 +10,12 @@
 #   ansible-playbook setup.yml --tags deploy       # Deploy only
 #   ansible-playbook setup.yml --ask-vault-pass    # If vars.yml is encrypted
 
+- name: Preflight validation
+  ansible.builtin.import_playbook: playbooks/preflight.yml
+  tags:
+    - always
+    - preflight
+
 - name: Load configuration variables
   hosts: llamenos_servers
   gather_facts: false
@@ -29,9 +35,27 @@
   tags:
     - deploy
 
+- name: Deploy Kamailio SIP Proxy
+  hosts: llamenos_servers
+  become: true
+  vars_files:
+    - vars.yml
+  roles:
+    - role: kamailio
+      tags:
+        - kamailio
+        - deploy
+      when: kamailio_enabled | default(false) | bool
+
 - name: Deploy Observability Stack
   ansible.builtin.import_playbook: playbooks/observability.yml
   when: observability_enabled | default(false) | bool
   tags:
     - observability
     - deploy
+
+- name: Smoke-check validation
+  ansible.builtin.import_playbook: playbooks/smoke-check.yml
+  tags:
+    - always
+    - smoke-check

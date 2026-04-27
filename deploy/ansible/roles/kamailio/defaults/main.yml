@@ -1,0 +1,63 @@
+---
+# Kamailio SIP Proxy Role Defaults
+#
+# Kamailio acts as a SIP proxy/load-balancer for multiple PBX backends.
+# It uses the dispatcher module for load balancing and JSONRPC for management.
+
+# Enable/disable Kamailio deployment
+kamailio_enabled: false
+
+# Docker image
+kamailio_image: kamailio/kamailio:5.8.2
+
+# Service configuration
+kamailio_service_name: llamenos-kamailio
+kamailio_http_port: 5060
+kamailio_tls_port: 5061
+kamailio_jsonrpc_port: 5065
+
+# Dispatcher configuration (PBX backends)
+# List of SIP URIs for PBX backends to load balance across
+kamailio_dispatcher_targets: []
+# Example:
+# kamailio_dispatcher_targets:
+#   - sip:asterisk1.internal:5060
+#   - sip:asterisk2.internal:5060
+#   - sip:freeswitch1.internal:5060
+
+# Dispatcher algorithm: 0=none, 4=weight-based, 8=call-load
+kamailio_dispatcher_alg: 4
+
+# Dispatcher probing: 0=disable, 1=enable
+kamailio_dispatcher_probe: 1
+
+# Dispatcher ping interval (seconds)
+kamailio_dispatcher_ping_interval: 30
+
+# TLS configuration
+kamailio_tls_enabled: true
+kamailio_tls_cert_path: "{{ app_dir }}/certs/kamailio.crt"
+kamailio_tls_key_path: "{{ app_dir }}/certs/kamailio.key"
+
+# Rate limiting
+kamailio_rate_limit_enabled: true
+kamailio_rate_limit_reqs_per_sec: 100
+
+# Logging
+kamailio_log_level: 2  # 0=alert, 1=crit, 2=err, 3=warn, 4=notice, 5=info, 6=debug
+
+# JSONRPC credentials (for sip-bridge integration)
+kamailio_jsonrpc_user: kamailio
+kamailio_jsonrpc_password: ""
+
+# SIP domain
+kamailio_sip_domain: "{{ domain }}"
+
+# Max call duration (seconds, 0=unlimited)
+kamailio_max_call_duration: 3600
+
+# Enable record routing for NAT traversal
+kamailio_record_route_enabled: true
+
+# NAT keepalive interval (seconds)
+kamailio_nat_keepalive: 60
