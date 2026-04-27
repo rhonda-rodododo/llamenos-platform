@@ -361,11 +361,6 @@ fun LlamenosNavigation(
         composable(LlamenosRoute.Login.route) {
             LoginScreen(
                 viewModel = authViewModel,
-                onNavigateToOnboarding = {
-                    navController.navigate(LlamenosRoute.Onboarding.route) {
-                        popUpTo(LlamenosRoute.Login.route) { inclusive = false }
-                    }
-                },
                 onNavigateToPinSet = {
                     navController.navigate(LlamenosRoute.PINSet.route) {
                         popUpTo(LlamenosRoute.Login.route) { inclusive = false }

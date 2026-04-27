@@ -50,13 +50,13 @@ class CryptoServiceHubKeyTest {
 
     @Test
     fun `hasHubKey returns true after key is injected`() {
-        cryptoService.injectHubKeyForTest("hub-abc", ByteArray(32) { it.toByte() })
+        cryptoService.injectHubKeyForTest("hub-abc", "0000000000000000000000000000000000000000000000000000000000000000")
         assertTrue(cryptoService.hasHubKey("hub-abc"))
     }
 
     @Test
     fun `hasHubKey is hub-specific — other hubs return false`() {
-        cryptoService.injectHubKeyForTest("hub-1", ByteArray(32))
+        cryptoService.injectHubKeyForTest("hub-1", "0000000000000000000000000000000000000000000000000000000000000000")
         assertFalse(cryptoService.hasHubKey("hub-2"))
     }
 
@@ -64,8 +64,8 @@ class CryptoServiceHubKeyTest {
 
     @Test
     fun `clearHubKeys removes all cached keys`() {
-        cryptoService.injectHubKeyForTest("hub-1", ByteArray(32))
-        cryptoService.injectHubKeyForTest("hub-2", ByteArray(32))
+        cryptoService.injectHubKeyForTest("hub-1", "0000000000000000000000000000000000000000000000000000000000000000")
+        cryptoService.injectHubKeyForTest("hub-2", "0000000000000000000000000000000000000000000000000000000000000000")
         cryptoService.clearHubKeys()
         assertFalse(cryptoService.hasHubKey("hub-1"))
         assertFalse(cryptoService.hasHubKey("hub-2"))
@@ -79,7 +79,7 @@ class CryptoServiceHubKeyTest {
 
     @Test
     fun `clearHubKeys is idempotent`() {
-        cryptoService.injectHubKeyForTest("hub-x", ByteArray(32))
+        cryptoService.injectHubKeyForTest("hub-x", "0000000000000000000000000000000000000000000000000000000000000000")
         cryptoService.clearHubKeys()
         cryptoService.clearHubKeys()
         assertFalse(cryptoService.hasHubKey("hub-x"))
@@ -89,7 +89,7 @@ class CryptoServiceHubKeyTest {
 
     @Test
     fun `lock evicts hub keys`() {
-        cryptoService.injectHubKeyForTest("hub-1", ByteArray(32))
+        cryptoService.injectHubKeyForTest("hub-1", "0000000000000000000000000000000000000000000000000000000000000000")
         cryptoService.lock()
         assertFalse(cryptoService.hasHubKey("hub-1"))
     }
@@ -103,24 +103,24 @@ class CryptoServiceHubKeyTest {
 
     @Test
     fun `allHubKeys returns all cached hubs`() {
-        val key1 = ByteArray(32) { 0x01 }
-        val key2 = ByteArray(32) { 0x02 }
+        val key1 = "0101010101010101010101010101010101010101010101010101010101010101"
+        val key2 = "0202020202020202020202020202020202020202020202020202020202020202"
         cryptoService.injectHubKeyForTest("hub-a", key1)
         cryptoService.injectHubKeyForTest("hub-b", key2)
 
         val all = cryptoService.allHubKeys()
         assertEquals(2, all.size)
-        assertArrayEquals(key1, all["hub-a"])
-        assertArrayEquals(key2, all["hub-b"])
+        assertEquals(key1, all["hub-a"])
+        assertEquals(key2, all["hub-b"])
     }
 
     @Test
     fun `allHubKeys returns a snapshot copy not the internal map`() {
-        cryptoService.injectHubKeyForTest("hub-snap", ByteArray(32))
+        cryptoService.injectHubKeyForTest("hub-snap", "0000000000000000000000000000000000000000000000000000000000000000")
 
         val snapshot = cryptoService.allHubKeys()
         // Mutate the snapshot — should not affect the service's internal cache
-        (snapshot as? MutableMap)?.put("hub-injected", ByteArray(32))
+        (snapshot as? MutableMap)?.put("hub-injected", "0000000000000000000000000000000000000000000000000000000000000000")
 
         // Internal cache is unchanged
         assertFalse(cryptoService.hasHubKey("hub-injected"))

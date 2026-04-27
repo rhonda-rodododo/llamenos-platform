@@ -468,8 +468,9 @@ class CryptoService @Inject constructor() {
     fun generateEphemeralKeypair(): Pair<String, String> {
         check(nativeLibLoaded) { "Native crypto library not loaded." }
         return try {
-            val kp = org.llamenos.core.generateKeypair()
-            Pair(kp.secretKeyHex, kp.publicKey)
+            val secretKeyHex = org.llamenos.core.mobileRandomBytesHex()
+            val publicKeyHex = org.llamenos.core.getPublicKey(secretKeyHex)
+            Pair(secretKeyHex, publicKeyHex)
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Ephemeral keypair generation failed: ${e.message}", e)
         }
