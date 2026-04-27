@@ -5,11 +5,13 @@ import type { MessagingAdapter, IncomingMessage, MessageStatusUpdate } from './a
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { audit } from '../services/audit'
 import { canClaimChannel } from '@shared/permissions'
-import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/nostr-events'
+import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED, KIND_MESSAGE_REACTION, KIND_TYPING_INDICATOR } from '@shared/nostr-events'
 import { publishNostrEvent } from '../lib/nostr-events'
 import { createPushDispatcherFromService } from '../lib/push-dispatch'
 import { createLogger } from '../lib/logger'
 import type { Services } from '../services'
+import { SignalAdapter } from './signal/adapter'
+import type { SignalWebhookPayload } from './signal/types'
 
 const logger = createLogger('messaging')
 
@@ -89,28 +91,81 @@ messaging.post('/:channel/webhook', async (c) => {
   // Try to parse as status update first (if adapter supports it)
   if (adapter.parseStatusWebhook) {
     try {
-      const statusUpdate = await adapter.parseStatusWebhook(c.req.raw)
-      if (statusUpdate) {
-        // This is a status update, not a new message
-        const result = await services.conversations.updateMessageStatus(statusUpdate)
+      const rawStatusUpdate = await adapter.parseStatusWebhook(c.req.raw)
+      // Normalize to array (Signal can batch multiple timestamps per receipt)
+      const statusUpdates = rawStatusUpdate
+        ? Array.isArray(rawStatusUpdate) ? rawStatusUpdate : [rawStatusUpdate]
+        : []
 
-        if ('conversationId' in result && result.conversationId && 'messageId' in result && result.messageId) {
-          // Publish status update to Nostr relay
-          publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
-            type: 'message:status',
-            conversationId: result.conversationId,
-            messageId: result.messageId,
-            status: statusUpdate.status,
-            timestamp: statusUpdate.timestamp,
-          }).catch((e) => {
-            console.error('[messaging] Failed to publish status update:', e)
-          })
+      if (statusUpdates.length > 0) {
+        for (const statusUpdate of statusUpdates) {
+          const result = await services.conversations.updateMessageStatus(statusUpdate)
+
+          if ('conversationId' in result && result.conversationId && 'messageId' in result && result.messageId) {
+            // Publish status update to Nostr relay
+            publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+              type: 'message:status',
+              conversationId: result.conversationId,
+              messageId: result.messageId,
+              status: statusUpdate.status,
+              timestamp: statusUpdate.timestamp,
+            }).catch((e) => {
+              console.error('[messaging] Failed to publish status update:', e)
+            })
+          }
         }
 
         return c.json({ ok: true })
       }
     } catch {
       // Not a status update, continue to parse as message
+    }
+  }
+
+  // Signal-specific: handle reactions and typing indicators
+  if (channel === 'signal' && adapter instanceof SignalAdapter) {
+    try {
+      const signalPayload: SignalWebhookPayload = await c.req.raw.clone().json()
+
+      // Handle typing indicators — broadcast as ephemeral Nostr event
+      const typing = adapter.parseTypingIndicator(signalPayload)
+      if (typing) {
+        publishNostrEvent(c.env, KIND_TYPING_INDICATOR, {
+          type: 'typing',
+          sender: typing.sender,
+          isTyping: typing.isTyping,
+          channelType: 'signal',
+          timestamp: typing.timestamp,
+        }).catch((e) => {
+          logger.error('Failed to publish typing indicator', { error: e })
+        })
+        return c.json({ ok: true })
+      }
+
+      // Handle reactions — store and broadcast
+      const reaction = adapter.parseReaction(signalPayload)
+      if (reaction) {
+        publishNostrEvent(c.env, KIND_MESSAGE_REACTION, {
+          type: 'message:reaction',
+          emoji: reaction.emoji,
+          targetAuthor: reaction.targetAuthor,
+          targetTimestamp: reaction.targetTimestamp,
+          isRemove: reaction.isRemove ?? false,
+          sender: signalPayload.envelope.sourceUuid ?? signalPayload.envelope.source,
+          channelType: 'signal',
+        }).catch((e) => {
+          logger.error('Failed to publish reaction event', { error: e })
+        })
+        return c.json({ ok: true })
+      }
+
+      // If this is a receipt-only message (no dataMessage), skip message parsing
+      if (!signalPayload.envelope.dataMessage) {
+        // Already handled by parseStatusWebhook above, or it's an unknown envelope type
+        return c.json({ ok: true })
+      }
+    } catch {
+      // Failed to parse as JSON for Signal-specific handling; fall through to normal parsing
     }
   }
 

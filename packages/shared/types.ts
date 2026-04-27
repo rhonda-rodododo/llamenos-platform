@@ -167,11 +167,14 @@ export interface WhatsAppConfig {
   afterHoursResponse?: string
 }
 
+export type SignalTrustMode = 'auto' | 'tofu' | 'manual'
+
 export interface SignalConfig {
   bridgeUrl: string            // e.g., "https://signal-bridge.internal:8080"
   bridgeApiKey: string
   webhookSecret: string
   registeredNumber: string
+  trustMode?: SignalTrustMode  // 'auto' = always trust, 'tofu' = trust first contact (default), 'manual' = admin review
   autoResponse?: string
   afterHoursResponse?: string
 }

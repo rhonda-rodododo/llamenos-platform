@@ -28,6 +28,9 @@ export const KIND_MESSAGE_NEW = 1010
 /** Conversation assignment changed */
 export const KIND_CONVERSATION_ASSIGNED = 1011
 
+/** Message reaction (emoji) received or removed */
+export const KIND_MESSAGE_REACTION = 1012
+
 /** New case record created */
 export const KIND_RECORD_CREATED = 1020
 
@@ -44,6 +47,9 @@ export const KIND_CONTACT_IDENTIFIED = 1023
 
 /** Volunteer presence update — online counts, availability */
 export const KIND_PRESENCE_UPDATE = 20000
+
+/** Typing indicator from external messaging channel */
+export const KIND_TYPING_INDICATOR = 20001
 
 // --- NIP-42 Auth (standard) ---
 
