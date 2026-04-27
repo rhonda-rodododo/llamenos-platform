@@ -43,7 +43,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
     builder
-        // Register CryptoState as managed state
+        // Register CryptoState as managed state (v3: Ed25519 + X25519 device keys)
         .manage(CryptoState::new())
         .setup(|app| {
             // System tray setup
@@ -142,39 +142,32 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Stateful commands (nsec stays in Rust — preferred on desktop)
+            // Device key management (secrets stay in Rust)
+            crypto::device_generate_and_load,
             crypto::unlock_with_pin,
-            crypto::import_key_to_state,
             crypto::lock_crypto,
             crypto::is_crypto_unlocked,
-            crypto::get_public_key_from_state,
+            crypto::get_device_pubkeys,
+            // Auth (Ed25519)
             crypto::create_auth_token_from_state,
-            crypto::ecies_unwrap_key_from_state,
-            crypto::decrypt_note_from_state,
-            crypto::decrypt_message_from_state,
-            crypto::decrypt_call_record_from_state,
-            crypto::decrypt_legacy_note_from_state,
-            crypto::decrypt_transcription_from_state,
-            crypto::encrypt_draft_from_state,
-            crypto::decrypt_draft_from_state,
-            crypto::encrypt_export_from_state,
-            crypto::sign_nostr_event_from_state,
-            crypto::decrypt_file_metadata_from_state,
-            crypto::unwrap_file_key_from_state,
-            crypto::unwrap_hub_key_from_state,
-            crypto::rewrap_file_key_from_state,
-            crypto::encrypt_nsec_for_provisioning,
-            crypto::decrypt_provisioned_nsec,
-            crypto::generate_keypair_and_load,
-            crypto::generate_backup_from_state,
-            crypto::generate_ephemeral_keypair,
-            // Stateless commands — public-key-only, validation, or sign-in flow only
-            crypto::ecies_wrap_key,
-            crypto::encrypt_note,
-            crypto::encrypt_message,
-            crypto::pubkey_from_nsec,
-            crypto::verify_schnorr,
-            crypto::is_valid_nsec,
+            // Ed25519 signing/verification
+            crypto::ed25519_sign_from_state,
+            crypto::ed25519_verify,
+            // HPKE envelope encryption
+            crypto::hpke_seal,
+            crypto::hpke_open_from_state,
+            crypto::hpke_seal_key,
+            crypto::hpke_open_key_from_state,
+            // PUK (Per-User Key)
+            crypto::puk_create_from_state,
+            crypto::puk_rotate,
+            crypto::puk_unwrap_seed_from_state,
+            // Sigchain
+            crypto::sigchain_create_link_from_state,
+            crypto::sigchain_verify,
+            crypto::sigchain_verify_link,
+            // SFrame key derivation
+            crypto::sframe_derive_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
