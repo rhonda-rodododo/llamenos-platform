@@ -1,0 +1,117 @@
+# Llamenos CI Overlay
+#
+# Extends docker-compose.yml for full integration testing on CI runners.
+#
+# Changes from production:
+#   - Disables the app service (CI runs the app on the runner, not in Docker)
+#   - Exposes all service ports to the host for test assertions
+#   - Enables signal + telephony profiles automatically
+#   - Mounts test strfry config (suppresses ulimit that exceeds GitHub Actions limit)
+#   - Sets test-friendly environment (shorter timeouts, debug logging)
+#   - Applies health checks compatible with `docker compose up --wait`
+#
+# Usage:
+#   docker compose \
+#     -f deploy/docker/docker-compose.yml \
+#     -f deploy/docker/docker-compose.ci.yml \
+#     --profile signal --profile telephony \
+#     up -d --wait
+#
+# The app is started separately on the runner:
+#   bun run dev:server &
+#   bun run test:backend:bdd
+
+name: llamenos-ci
+
+services:
+  # ── Disable in-container app and reverse proxy — CI runs the app on the runner ──
+  app:
+    profiles: ["_disabled"]
+
+  caddy:
+    profiles: ["_disabled"]
+
+  # ── Expose core services to host ──────────────────────────
+  postgres:
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_PASSWORD=${PG_PASSWORD:-ci-pg-password}
+
+  minio:
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  strfry:
+    ports:
+      - "${STRFRY_PORT:-7777}:7777"
+    volumes:
+      - ./strfry-test.conf:/etc/strfry.conf:ro
+
+  # ── Signal profile services ────────────────────────────────
+  signal-cli:
+    ports:
+      - "${SIGNAL_CLI_PORT:-8080}:8080"
+    environment:
+      - MODE=json-rpc
+      - AUTO_RECEIVE_SCHEDULE=0 * * * *
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/about"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  signal-notifier:
+    ports:
+      - "${SIGNAL_NOTIFIER_PORT:-3100}:3100"
+    environment:
+      - PORT=3100
+      - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-notifier-key}
+      - SIGNAL_BRIDGE_URL=http://signal-cli:8080
+      - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
+      - SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-+15005550006}
+      - NOTIFIER_DB_PATH=/app/data/notifier.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Telephony profile services ─────────────────────────────
+  asterisk:
+    environment:
+      - ASTERISK_CORE_DEBUG=1
+
+  asterisk-bridge:
+    environment:
+      - ARI_URL=ws://asterisk:8088/ari/events
+      - ARI_USERNAME=${ARI_USERNAME:-llamenos}
+      - ARI_PASSWORD=${ARI_PASSWORD:-ci-ari-password}
+      - WORKER_WEBHOOK_URL=http://host.docker.internal:3000
+      - BRIDGE_SECRET=${BRIDGE_SECRET:-ci-bridge-secret}
+      - LOG_LEVEL=debug
+    ports:
+      - "${BRIDGE_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  kamailio:
+    environment:
+      - KAMAILIO_DEBUG=2
+
+  coturn:
+    command: >
+      --realm=${DOMAIN:-localhost}
+      --fingerprint
+      --lt-cred-mech
+      --user=llamenos:${TURN_SECRET:-ci-turn-secret}
+      --no-tls
+      --no-dtls
+      --verbose
