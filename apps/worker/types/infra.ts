@@ -71,6 +71,9 @@ export interface Env {
   // Firehose inference agent seal key (hex 32 bytes — seals agent nsecs at rest)
   FIREHOSE_AGENT_SEAL_KEY?: string
 
+  // Asterisk SIP bridge (optional — only when using Asterisk telephony adapter)
+  SIP_BRIDGE_URL?: string         // HTTP base URL of the asterisk-bridge sidecar (e.g. http://asterisk-bridge:3000)
+
   // Signal notifier sidecar (signal notification service)
   NOTIFIER_URL?: string           // HTTP base URL of the signal-notifier sidecar
   NOTIFIER_API_KEY?: string       // Shared bearer token for server→sidecar API auth

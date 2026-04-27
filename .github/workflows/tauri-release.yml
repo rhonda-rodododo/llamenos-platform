@@ -8,9 +8,6 @@
 name: Desktop Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -85,17 +82,12 @@ jobs:
         run: bun install --frozen-lockfile
 
       # Sync version from tag into tauri.conf.json and package.json
-      - name: Sync version from tag
+      - name: Sync version from dispatch input
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
           RELEASE_VERSION: ${{ env.INPUT_VERSION }}
         run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            VERSION="$RELEASE_VERSION"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
+          VERSION="$RELEASE_VERSION"
           echo "Building version: ${VERSION}"
           echo "RELEASE_VERSION=${VERSION}" >> "$GITHUB_ENV"
 
@@ -213,6 +205,8 @@ jobs:
     name: Publish Release
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     # Run even if Flatpak fails (it's a new build target, may have issues)
     if: always() && needs.build.result == 'success'
@@ -237,6 +231,17 @@ jobs:
           find artifacts -type f \( -name '*.tar.gz' -o -name '*.tar.gz.sig' -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' -o -name '*.AppImage' -o -name '*.AppImage.sig' -o -name '*.dmg' -o -name '*.deb' -o -name '*.flatpak' \) -exec cp {} flat-artifacts/ \;
           ls -la flat-artifacts/
 
+      # Generate SBOM for desktop artifacts
+      - name: Generate CycloneDX SBOM
+        run: |
+          npx --yes @cyclonedx/cdxgen -o sbom-desktop.cdx.json --spec-version 1.5
+          echo "SBOM generated: $(jq '.components | length' sbom-desktop.cdx.json) components"
+
+      - name: Generate SLSA build provenance attestation
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v2.1.0
+        with:
+          subject-path: flat-artifacts/*
+
       # Generate update manifest
       - name: Generate latest.json
         run: ./scripts/generate-update-manifest.sh flat-artifacts
@@ -247,15 +252,9 @@ jobs:
       - name: Determine version
         id: version
         env:
-          EVENT_NAME: ${{ github.event_name }}
           INPUT_VER: ${{ env.INPUT_VERSION }}
         run: |
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
 
       # Create GitHub Release (or add to existing release from ci.yml)
       - name: Upload desktop artifacts to release
@@ -271,6 +270,7 @@ jobs:
             gh release upload "${TAG}" \
               flat-artifacts/* \
               latest.json \
+              sbom-desktop.cdx.json \
               --clobber
           else
             echo "Creating new release ${TAG}..."
@@ -278,5 +278,6 @@ jobs:
               --title "v${VERSION}" \
               --generate-notes \
               flat-artifacts/* \
-              latest.json
+              latest.json \
+              sbom-desktop.cdx.json
           fi

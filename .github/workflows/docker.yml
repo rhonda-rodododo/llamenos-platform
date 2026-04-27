@@ -1,11 +1,15 @@
-# Build and push Docker image to GitHub Container Registry
+# Build and push Docker images to GitHub Container Registry.
+# Triggered by release.yml via workflow_dispatch, or manually.
+# Builds both the main app and sip-bridge images with
+# SBOM attestation, SLSA provenance, cosign signing, and Trivy scan.
 name: Docker Build
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to tag (e.g., 1.0.0)'
+        required: true
 
 env:
   REGISTRY: ghcr.io
@@ -18,10 +22,12 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      id-token: write       # OIDC for cosign keyless + attestations
+      attestations: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -33,26 +39,48 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Compute Docker tags
         id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+          {
+            echo "tags<<EOF"
+            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}"
+            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${MAJOR_MINOR}"
+            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${GITHUB_SHA::7}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build and push
+        id: build-push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198571cfb76f00 # v6.12.0
         with:
           context: .
           file: deploy/docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Generate SBOM attestation
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v2.1.0
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+
+      - name: Sign container image (keyless)
+        env:
+          DIGEST: ${{ steps.build-push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
+          echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e7f3b01b8e110e21 # v0.28.0
@@ -68,16 +96,18 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-  # Build asterisk bridge image
+  # Build sip-bridge image
   bridge:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
@@ -89,22 +119,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
+      - name: Compute Docker tags
         id: meta
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-asterisk-bridge
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
 
       - name: Build and push
+        id: build-push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198571cfb76f00 # v6.12.0
         with:
-          context: ./asterisk-bridge
+          context: ./sip-bridge
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Generate SBOM attestation
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v2.1.0
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge
+          subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+
+      - name: Sign container image (keyless)
+        env:
+          DIGEST: ${{ steps.build-push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge@${DIGEST}"

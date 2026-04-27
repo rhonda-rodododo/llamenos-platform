@@ -46,6 +46,7 @@ import firehoseRoutes from './routes/firehose'
 import signalNotificationRoutes from './routes/signal-notification'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
+import { recordHttpRequest } from './routes/metrics'
 import { openAPIRouteHandler } from 'hono-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
 import { openAPIConfig } from './openapi/config'
@@ -66,6 +67,17 @@ const api = new Hono<AppEnv>()
 
 // Request ID middleware — first in chain for full correlation coverage
 api.use('*', requestId)
+
+// HTTP metrics middleware — records request duration and counts for Prometheus
+api.use('*', async (c, next) => {
+  const t0 = performance.now()
+  await next()
+  const durationSec = (performance.now() - t0) / 1000
+  const method = c.req.method
+  // Normalize path: strip query params and collapse IDs for cardinality control
+  const path = c.req.path.replace(/\/[0-9a-f-]{8,}(\/|$)/gi, '/:id$1')
+  recordHttpRequest(method, path, c.res.status, durationSec)
+})
 
 // Health check — before CORS middleware (internal probes only, no external access needed)
 api.route('/health', healthRoutes)
