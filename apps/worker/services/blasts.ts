@@ -869,6 +869,7 @@ export class BlastsService {
       await this.db
         .update(blastDeliveries)
         .set({
+          status: 'pending',
           error,
           lastAttemptAt: new Date(),
           nextRetryAt: nextRetry,
