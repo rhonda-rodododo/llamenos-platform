@@ -21,6 +21,7 @@ export class AriClient {
   private reconnectDelay = 1000
   private maxReconnectDelay = 30000
   private shouldReconnect = true
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private authHeader: string
 
   constructor(config: BridgeConfig) {
@@ -47,6 +48,10 @@ export class AriClient {
   /** Disconnect from ARI */
   disconnect(): void {
     this.shouldReconnect = false
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
     if (this.ws) {
       this.ws.close()
       this.ws = null
@@ -113,7 +118,8 @@ export class AriClient {
 
   private scheduleReconnect(): void {
     console.log(`[ari] Reconnecting in ${this.reconnectDelay}ms...`)
-    setTimeout(async () => {
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null
       try {
         await this.doConnect()
       } catch (err) {

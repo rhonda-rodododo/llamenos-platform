@@ -201,9 +201,12 @@ async function main(): Promise<void> {
       // Get recording audio
       if (path.startsWith('/recordings/') && method === 'GET') {
         const signature = request.headers.get('X-Bridge-Signature') ?? url.searchParams.get('sig') ?? ''
-        // Allow either header or query param for signature (for simple GET requests)
-        if (config.bridgeSecret && !signature) {
-          return new Response('Forbidden', { status: 403 })
+        // Verify signature — same as /command, /ring, /hangup
+        if (config.bridgeSecret) {
+          const isValid = await webhook.verifySignature(url.toString(), '', signature)
+          if (!isValid) {
+            return new Response('Forbidden', { status: 403 })
+          }
         }
 
         const name = path.replace('/recordings/', '')
