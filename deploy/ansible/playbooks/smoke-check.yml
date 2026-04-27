@@ -1,0 +1,210 @@
+---
+# Smoke-check Playbook
+#
+# Runs after deployment to validate that all hardening assertions hold
+# and that application services are healthy. Exits non-zero on the first
+# failure so CI/test scripts catch regressions.
+#
+# Usage:
+#   ansible-playbook playbooks/smoke-check.yml -e '@vars.yml'
+#   ansible-playbook playbooks/smoke-check.yml --check --diff
+
+- name: Smoke-check hardening and services on target host
+  hosts: llamenos_servers
+  gather_facts: true
+  become: true
+  vars_files:
+    - ../vars.yml
+
+  tasks:
+    - name: Initialize smoke-check results
+      ansible.builtin.set_fact:
+        smoke_results: []
+      tags: always
+
+    - name: Assert ufw is active with deny-incoming default
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ufw status verbose | grep -q "Status: active"
+        ufw status verbose | grep -q "Default: deny (incoming)"
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: ufw_check
+      ignore_errors: true
+      tags: always
+
+    - name: Record ufw result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'UFW active with deny-incoming', 'status': 'PASS' if ufw_check is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Assert fail2ban is active
+      ansible.builtin.command: systemctl is-active fail2ban
+      changed_when: false
+      register: fail2ban_check
+      ignore_errors: true
+      tags: always
+
+    - name: Record fail2ban result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'fail2ban running', 'status': 'PASS' if fail2ban_check is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Assert docker is active
+      ansible.builtin.command: systemctl is-active docker
+      changed_when: false
+      register: docker_check
+      ignore_errors: true
+      tags: always
+
+    - name: Record docker result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'Docker running', 'status': 'PASS' if docker_check is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Assert docker userns-remap is enabled
+      ansible.builtin.shell: |
+        set -euo pipefail
+        docker info --format '{{ "{{" }}.SecurityOptions{{ "}}" }}' | grep -q userns
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: userns_check
+      ignore_errors: true
+      tags: always
+
+    - name: Record userns-remap result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'Docker userns-remap enabled', 'status': 'PASS' if userns_check is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Assert sshd disables password + root login
+      ansible.builtin.shell: |
+        set -euo pipefail
+        count=$(sshd -T 2>/dev/null | grep -cE '^(passwordauthentication|permitrootlogin) no$')
+        test "$count" -eq 2
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: ssh_check
+      ignore_errors: true
+      tags: always
+
+    - name: Record SSH hardening result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'SSH password auth disabled + root login disabled', 'status': 'PASS' if ssh_check is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Assert tcp_syncookies is enabled
+      ansible.builtin.command: sysctl -n net.ipv4.tcp_syncookies
+      register: syncookies
+      changed_when: false
+      failed_when: syncookies.stdout | trim != "1"
+      ignore_errors: true
+      tags: always
+
+    - name: Record syncookies result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'TCP syncookies enabled', 'status': 'PASS' if syncookies is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Check app health endpoint responds 200
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/health"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: app_health
+      retries: 3
+      delay: 5
+      ignore_errors: true
+      tags: always
+
+    - name: Record app health result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'App health endpoint (200)', 'status': 'PASS' if app_health is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Check PostgreSQL is accepting connections
+      ansible.builtin.shell: |
+        set -euo pipefail
+        docker compose -f "{{ app_dir }}/docker-compose.yml" exec -T postgres \
+          pg_isready -U {{ backup_postgres_user | default('llamenos') }} -d {{ backup_postgres_db | default('llamenos') }}
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: postgres_check
+      ignore_errors: true
+      when: llamenos_postgres_enabled | default(true) | bool
+      tags: always
+
+    - name: Record PostgreSQL result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'PostgreSQL accepting connections', 'status': 'PASS' if postgres_check is succeeded else 'FAIL' if postgres_check is failed else 'SKIP'}] }}"
+      when: llamenos_postgres_enabled | default(true) | bool
+      tags: always
+
+    - name: Check Nostr relay is reachable
+      ansible.builtin.uri:
+        url: "http://localhost:{{ llamenos_strfry_port | default(7777) }}"
+        method: GET
+        status_code: [200, 426]
+      register: strfry_check
+      retries: 3
+      delay: 3
+      ignore_errors: true
+      when: llamenos_strfry_enabled | default(true) | bool
+      tags: always
+
+    - name: Record strfry result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'Nostr relay reachable', 'status': 'PASS' if strfry_check is succeeded else 'FAIL' if strfry_check is failed else 'SKIP'}] }}"
+      when: llamenos_strfry_enabled | default(true) | bool
+      tags: always
+
+    - name: Check Caddy is serving HTTPS
+      ansible.builtin.uri:
+        url: "https://{{ domain }}"
+        method: HEAD
+        status_code: [200, 301, 302, 307, 308]
+        validate_certs: false
+      register: caddy_check
+      retries: 3
+      delay: 5
+      ignore_errors: true
+      when: llamenos_caddy_enabled | default(true) | bool
+      tags: always
+
+    - name: Record Caddy result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'Caddy HTTPS serving', 'status': 'PASS' if caddy_check is succeeded else 'FAIL' if caddy_check is failed else 'SKIP'}] }}"
+      when: llamenos_caddy_enabled | default(true) | bool
+      tags: always
+
+    - name: Print pass/fail summary
+      ansible.builtin.debug:
+        msg: |
+          ===========================================
+          SMOKE CHECK SUMMARY
+          ===========================================
+          Host: {{ inventory_hostname }}
+          Distribution: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+          {% for result in smoke_results %}
+          [{{ result.status }}] {{ result.check }}
+          {% endfor %}
+          ===========================================
+          Total: {{ smoke_results | length }} checks
+          Passed: {{ smoke_results | selectattr('status', 'equalto', 'PASS') | list | length }}
+          Failed: {{ smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length }}
+          Skipped: {{ smoke_results | selectattr('status', 'equalto', 'SKIP') | list | length }}
+          ===========================================
+          Result: {{ 'PASSED' if (smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length) == 0 else 'FAILED' }}
+          ===========================================
+      tags: always
+
+    - name: Fail if any smoke check failed
+      ansible.builtin.fail:
+        msg: "Smoke check FAILED: {{ smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length }} check(s) failed."
+      when: (smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length) > 0
+      tags: always

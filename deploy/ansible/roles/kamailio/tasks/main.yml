@@ -1,0 +1,156 @@
+---
+# Kamailio SIP Proxy Role
+#
+# Deploys Kamailio as a SIP proxy/load-balancer for multiple PBX backends.
+# Uses the dispatcher module for load balancing across Asterisk/FreeSWITCH instances.
+# Provides JSONRPC management interface for sip-bridge integration.
+#
+# Conditional: only runs when kamailio_enabled: true
+
+- name: Skip if Kamailio not enabled
+  ansible.builtin.meta: end_play
+  when: not (kamailio_enabled | default(false))
+
+- name: Skip if not assigned to this host
+  ansible.builtin.meta: end_play
+  when: >
+    groups.get('llamenos_kamailio', []) | length > 0 and
+    inventory_hostname not in groups.get('llamenos_kamailio', [])
+
+- name: Assert dispatcher targets are configured
+  ansible.builtin.assert:
+    that:
+      - kamailio_dispatcher_targets | length > 0
+    fail_msg: |
+      REQUIRED: kamailio_dispatcher_targets must contain at least one PBX backend.
+      
+      Example:
+        kamailio_dispatcher_targets:
+          - sip:asterisk1.internal:5060
+          - sip:asterisk2.internal:5060
+    success_msg: "Dispatcher targets: {{ kamailio_dispatcher_targets | length }} backend(s)"
+
+- name: Create Kamailio service directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/kamailio"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Create Kamailio config directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/kamailio/config"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Create Kamailio TLS directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/kamailio/tls"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
+- name: Template Kamailio main configuration
+  ansible.builtin.template:
+    src: kamailio.cfg.j2
+    dest: "{{ app_dir }}/services/kamailio/config/kamailio.cfg"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart kamailio service
+
+- name: Template dispatcher list
+  ansible.builtin.template:
+    src: dispatcher.list.j2
+    dest: "{{ app_dir }}/services/kamailio/config/dispatcher.list"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart kamailio service
+
+- name: Template TLS configuration
+  ansible.builtin.template:
+    src: tls.cfg.j2
+    dest: "{{ app_dir }}/services/kamailio/config/tls.cfg"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  when: kamailio_tls_enabled | default(true) | bool
+  notify: Restart kamailio service
+
+- name: Template Kamailio compose file
+  ansible.builtin.template:
+    src: compose/kamailio.j2
+    dest: "{{ app_dir }}/services/kamailio/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0640"
+  notify: Restart kamailio service
+
+- name: Template Kamailio environment file
+  ansible.builtin.template:
+    src: env/kamailio.j2
+    dest: "{{ app_dir }}/services/kamailio/.env.kamailio"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  notify: Restart kamailio service
+
+- name: Generate self-signed TLS certificate (if no cert exists)
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -days 365
+    -subj "/CN={{ kamailio_sip_domain }}"
+    -keyout "{{ app_dir }}/services/kamailio/tls/kamailio.key"
+    -out "{{ app_dir }}/services/kamailio/tls/kamailio.crt"
+    -newkey rsa:2048
+  args:
+    creates: "{{ app_dir }}/services/kamailio/tls/kamailio.crt"
+  become_user: "{{ deploy_user }}"
+  when: kamailio_tls_enabled | default(true) | bool
+
+- name: Set TLS certificate permissions
+  ansible.builtin.file:
+    path: "{{ app_dir }}/services/kamailio/tls/{{ item }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+  loop:
+    - kamailio.crt
+    - kamailio.key
+  when: kamailio_tls_enabled | default(true) | bool
+
+- name: Pull Kamailio image
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/kamailio"
+    pull: always
+    state: present
+    recreate: never
+
+- name: Start Kamailio service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/kamailio"
+    state: present
+  register: kamailio_compose
+
+- name: Wait for Kamailio JSONRPC endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:{{ kamailio_jsonrpc_port }}/jsonrpc"
+    method: POST
+    body_format: json
+    body:
+      jsonrpc: "2.0"
+      method: "core.psx"
+      id: 1
+    status_code: 200
+  register: kamailio_health
+  retries: 10
+  delay: 3
+  ignore_errors: true
+
+- name: Report Kamailio status
+  ansible.builtin.debug:
+    msg: "Kamailio JSONRPC endpoint: {{ 'HEALTHY' if kamailio_health is succeeded else 'NOT READY' }}"

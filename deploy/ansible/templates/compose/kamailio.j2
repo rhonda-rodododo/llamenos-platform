@@ -1,0 +1,57 @@
+# Kamailio SIP Proxy — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+# Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
+
+name: {{ kamailio_service_name }}
+
+services:
+  kamailio:
+    image: {{ kamailio_image }}
+    restart: unless-stopped
+    hostname: kamailio
+    ports:
+      - "{{ kamailio_http_port }}:{{ kamailio_http_port }}/udp"
+      - "{{ kamailio_http_port }}:{{ kamailio_http_port }}/tcp"
+{% if kamailio_tls_enabled | default(true) | bool %}
+      - "{{ kamailio_tls_port }}:{{ kamailio_tls_port }}/tcp"
+{% endif %}
+      - "{{ kamailio_jsonrpc_port }}:{{ kamailio_jsonrpc_port }}/tcp"
+    volumes:
+      - {{ app_dir }}/services/kamailio/config/kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
+      - {{ app_dir }}/services/kamailio/config/dispatcher.list:/etc/kamailio/dispatcher.list:ro
+{% if kamailio_tls_enabled | default(true) | bool %}
+      - {{ app_dir }}/services/kamailio/config/tls.cfg:/etc/kamailio/tls.cfg:ro
+      - {{ app_dir }}/services/kamailio/tls:/etc/kamailio/tls:ro
+{% endif %}
+    networks:
+      - internal
+{% if llamenos_caddy_enabled | default(true) | bool %}
+      - web
+{% endif %}
+    env_file:
+      - .env.kamailio
+    healthcheck:
+      test: ["CMD", "kamcmd", "core.psx"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+networks:
+  internal:
+    driver: bridge
+    internal: true
+{% if llamenos_caddy_enabled | default(true) | bool %}
+  web:
+    driver: bridge
+{% endif %}

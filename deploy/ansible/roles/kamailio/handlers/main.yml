@@ -1,0 +1,7 @@
+---
+# Kamailio service handlers
+
+- name: Restart kamailio service
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/kamailio"
+    state: restarted

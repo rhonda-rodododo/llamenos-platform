@@ -1,0 +1,8 @@
+# Dispatcher List — managed by Ansible
+# Format: setid destination flags priority attributes
+# setid=1: PBX backends for Llamenos
+# flags: 2=inactive probing, 8=active probing
+# priority: lower = preferred
+{% for target in kamailio_dispatcher_targets %}
+1 {{ target }} 2 0
+{% endfor %}

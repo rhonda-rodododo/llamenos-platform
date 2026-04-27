@@ -1,0 +1,266 @@
+#!KAMAILIO
+#
+# Kamailio SIP Proxy Configuration — managed by Ansible
+# Role: SIP proxy/load-balancer for Llamenos PBX backends
+#
+# Features:
+#   - Dispatcher-based load balancing across Asterisk/FreeSWITCH
+#   - JSONRPC management interface for sip-bridge integration
+#   - TLS encryption for SIP signaling
+#   - Rate limiting and anti-flood protection
+#   - NAT traversal support
+
+# === Memory and Logging ===
+memdump=2
+memlog=2
+log_stderror=no
+log_facility=LOG_LOCAL0
+log_name="kamailio"
+debug={{ kamailio_log_level }}
+children=4
+
+# === Network Interfaces ===
+listen=udp:0.0.0.0:{{ kamailio_http_port }}
+listen=tcp:0.0.0.0:{{ kamailio_http_port }}
+{% if kamailio_tls_enabled | default(true) | bool %}
+listen=tls:0.0.0.0:{{ kamailio_tls_port }}
+{% endif %}
+
+# === Modules ===
+mpath="/usr/lib/x86_64-linux-gnu/kamailio/modules/"
+
+loadmodule "jsonrpcs.so"
+loadmodule "kex.so"
+loadmodule "corex.so"
+loadmodule "tm.so"
+loadmodule "tmx.so"
+loadmodule "sl.so"
+loadmodule "rr.so"
+loadmodule "pv.so"
+loadmodule "maxfwd.so"
+loadmodule "textops.so"
+loadmodule "siputils.so"
+loadmodule "xlog.so"
+loadmodule "sanity.so"
+loadmodule "ctl.so"
+loadmodule "dispatcher.so"
+loadmodule "htable.so"
+loadmodule "ipops.so"
+loadmodule "nathelper.so"
+{% if kamailio_tls_enabled | default(true) | bool %}
+loadmodule "tls.so"
+{% endif %}
+{% if kamailio_rate_limit_enabled | default(true) | bool %}
+loadmodule "pike.so"
+loadmodule "ratelimit.so"
+{% endif %}
+
+# === Module Parameters ===
+
+# JSONRPC
+modparam("jsonrpcs", "transport", 1)
+modparam("jsonrpcs", "pretty_format", 1)
+
+# Transaction module
+modparam("tm", "failure_reply_mode", 3)
+modparam("tm", "fr_timer", 30000)
+modparam("tm", "fr_inv_timer", 120000)
+
+# Record Route
+modparam("rr", "enable_full_lr", 0)
+modparam("rr", "append_fromtag", 1)
+
+# Dispatcher (load balancer)
+modparam("dispatcher", "list_file", "/etc/kamailio/dispatcher.list")
+modparam("dispatcher", "flags", 2)
+modparam("dispatcher", "force_dst", 1)
+modparam("dispatcher", "ds_ping_interval", {{ kamailio_dispatcher_ping_interval }})
+modparam("dispatcher", "ds_ping_method", "OPTIONS")
+modparam("dispatcher", "ds_probing_mode", {{ kamailio_dispatcher_probe }})
+modparam("dispatcher", "ds_ping_reply_codes", "class=2;code=403;code=484;code=488;code=408")
+
+# Hash table for rate limiting
+modparam("htable", "htable", "ipban=>size=8;autoexpire=300")
+
+# NAT helper
+modparam("nathelper", "natping_interval", {{ kamailio_nat_keepalive }})
+modparam("nathelper", "ping_nated_only", 1)
+modparam("nathelper", "sipping_bflag", 1)
+modparam("nathelper", "sipping_from", "sip:pinger@{{ kamailio_sip_domain }}")
+
+{% if kamailio_tls_enabled | default(true) | bool %}
+# TLS
+modparam("tls", "config", "/etc/kamailio/tls.cfg")
+modparam("tls", "force_run_as_root", 0)
+{% endif %}
+
+{% if kamailio_rate_limit_enabled | default(true) | bool %}
+# Rate limiting (pike)
+modparam("pike", "sampling_time_unit", 2)
+modparam("pike", "reqs_density_per_unit", {{ kamailio_rate_limit_reqs_per_sec }})
+modparam("pike", "remove_latency", 4)
+{% endif %}
+
+# === Routing Logic ===
+
+# Main request route
+request_route {
+    # Per request initial checks
+    route(REQINIT);
+
+    # NAT detection
+    route(NATDETECT);
+
+    # CANCEL processing
+    if (is_method("CANCEL")) {
+        if (t_check_trans()) {
+            t_relay();
+        }
+        exit;
+    }
+
+    # Handle retransmissions
+    if (!is_method("ACK")) {
+        if(t_precheck_trans()) {
+            t_check_trans();
+            exit;
+        }
+        t_check_trans();
+    }
+
+    # Record routing for dialog-forming requests
+    if (is_method("INVITE|SUBSCRIBE")) {
+        record_route();
+    }
+
+    # Route to dispatcher (PBX backends)
+    route(DISPATCH);
+}
+
+# Request initialization
+route[REQINIT] {
+{% if kamailio_rate_limit_enabled | default(true) | bool %}
+    # Pike rate limiting
+    if(src_ip!=myself) {
+        if($sht(ipban=$si)!=$null) {
+            xlog("L_ALERT","Banning IP $si\n");
+            exit;
+        }
+        if (!pike_check_req()) {
+            xlog("L_ALERT","ALERT: pike blocking $rm from $fu (IP:$si:$sp)\n");
+            $sht(ipban=$si) = 1;
+            exit;
+        }
+    }
+{% endif %}
+
+    # Sanity checks
+    if (!sanity_check("17895", "7")) {
+        xlog("Malformed SIP message from $si:$sp\n");
+        exit;
+    }
+
+    # Max forwards
+    if (!mf_process_maxfwd_header("70")) {
+        sl_send_reply("483","Too Many Hops");
+        exit;
+    }
+
+    # Loose route processing
+    if (has_totag()) {
+        if (loose_route()) {
+            route(RELAY);
+        } else {
+            if (is_method("SUBSCRIBE")) {
+                record_route();
+                route(RELAY);
+            } else if ( is_method("ACK") ) {
+                if ( t_check_trans() ) {
+                    route(RELAY);
+                    exit;
+                } else {
+                    exit;
+                }
+            } else {
+                sl_send_reply("404","Not here");
+            }
+        }
+        exit;
+    }
+
+    # Strict routing check
+    if (uri==myself) {
+        if(is_method("REGISTER")) {
+            # We don't handle registrations — pass to backends
+            route(DISPATCH);
+        }
+    }
+}
+
+# Dispatcher route — load balance to PBX backends
+route[DISPATCH] {
+    # Select backend using dispatcher
+    if(!ds_select_dst("1", "{{ kamailio_dispatcher_alg }}")) {
+        send_reply("503", "Service Unavailable - No backends");
+        exit;
+    }
+
+    xlog("L_INFO", "DISPATCH: $rm $ru -> $du (src: $si:$sp)\n");
+
+    # Add record-route for NAT traversal
+    if(is_method("INVITE|REFER")) {
+        record_route();
+    }
+
+    route(RELAY);
+}
+
+# Relay route
+route[RELAY] {
+    if (!t_relay()) {
+        sl_reply_error();
+    }
+    exit;
+}
+
+# NAT detection
+route[NATDETECT] {
+    force_rport();
+    if (nat_uac_test("19")) {
+        if (is_method("REGISTER")) {
+            fix_nated_register();
+        } else {
+            fix_nated_contact();
+        }
+        setflag(1);  # NAT flag
+    }
+    return;
+}
+
+# Onreply route
+onreply_route[MANAGE_REPLY] {
+    if (nat_uac_test("1")) {
+        fix_nated_contact();
+    }
+}
+
+# Failure route
+failure_route[MANAGE_FAILURE] {
+    if (t_is_canceled()) {
+        exit;
+    }
+
+    # Try next dispatcher target on failure
+    if (t_check_status("408|500|502|503|504")) {
+        if(ds_next_dst()) {
+            t_on_failure("MANAGE_FAILURE");
+            route(RELAY);
+            exit;
+        }
+    }
+}
+
+# Branch route
+branch_route[MANAGE_BRANCH] {
+    xlog("L_INFO", "BRANCH: $ru to $rd:$rp\n");
+}
