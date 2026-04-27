@@ -49,6 +49,7 @@ import {
   FolderOpen,
   Calendar,
   Inbox,
+  Radio,
 } from 'lucide-react'
 
 export const Route = createRootRoute({
@@ -344,6 +345,9 @@ function AuthenticatedLayout() {
               <NavLink to="/audit" icon={<ScrollText className="h-4 w-4" />}>{t('nav.auditLog')}</NavLink>
               <NavLink to="/admin/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.hubSettings', { defaultValue: 'Hub Settings' })}</NavLink>
               <NavLink to="/admin/case-management" icon={<Briefcase className="h-4 w-4" />}>{t('caseManagement.title')}</NavLink>
+              {hasPermission('firehose:read') && (
+                <NavLink to="/admin/firehose" icon={<Radio className="h-4 w-4" />}>Firehose</NavLink>
+              )}
               {hasPermission('system:manage-hubs') && (
                 <NavLink to="/admin/hubs" icon={<Building2 className="h-4 w-4" />}>{t('nav.hubs', { defaultValue: 'Hubs' })}</NavLink>
               )}

@@ -36,6 +36,7 @@ import { Route as UsersPubkeyRouteImport } from './routes/users_.$pubkey'
 import { Route as AdminSystemRouteImport } from './routes/admin/system'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminHubsRouteImport } from './routes/admin/hubs'
+import { Route as AdminFirehoseRouteImport } from './routes/admin/firehose'
 import { Route as AdminCaseManagementRouteImport } from './routes/admin/case-management'
 
 const UsersRoute = UsersRouteImport.update({
@@ -173,6 +174,11 @@ const AdminHubsRoute = AdminHubsRouteImport.update({
   path: '/admin/hubs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFirehoseRoute = AdminFirehoseRouteImport.update({
+  id: '/admin/firehose',
+  path: '/admin/firehose',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCaseManagementRoute = AdminCaseManagementRouteImport.update({
   id: '/admin/case-management',
   path: '/admin/case-management',
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/triage': typeof TriageRoute
   '/users': typeof UsersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
+  '/admin/firehose': typeof AdminFirehoseRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/triage': typeof TriageRoute
   '/users': typeof UsersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
+  '/admin/firehose': typeof AdminFirehoseRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
@@ -265,6 +273,7 @@ export interface FileRoutesById {
   '/triage': typeof TriageRoute
   '/users': typeof UsersRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
+  '/admin/firehose': typeof AdminFirehoseRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
@@ -297,6 +306,7 @@ export interface FileRouteTypes {
     | '/triage'
     | '/users'
     | '/admin/case-management'
+    | '/admin/firehose'
     | '/admin/hubs'
     | '/admin/settings'
     | '/admin/system'
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
     | '/triage'
     | '/users'
     | '/admin/case-management'
+    | '/admin/firehose'
     | '/admin/hubs'
     | '/admin/settings'
     | '/admin/system'
@@ -357,6 +368,7 @@ export interface FileRouteTypes {
     | '/triage'
     | '/users'
     | '/admin/case-management'
+    | '/admin/firehose'
     | '/admin/hubs'
     | '/admin/settings'
     | '/admin/system'
@@ -388,6 +400,7 @@ export interface RootRouteChildren {
   TriageRoute: typeof TriageRoute
   UsersRoute: typeof UsersRoute
   AdminCaseManagementRoute: typeof AdminCaseManagementRoute
+  AdminFirehoseRoute: typeof AdminFirehoseRoute
   AdminHubsRoute: typeof AdminHubsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSystemRoute: typeof AdminSystemRoute
@@ -585,6 +598,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHubsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/firehose': {
+      id: '/admin/firehose'
+      path: '/admin/firehose'
+      fullPath: '/admin/firehose'
+      preLoaderRoute: typeof AdminFirehoseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/case-management': {
       id: '/admin/case-management'
       path: '/admin/case-management'
@@ -620,6 +640,7 @@ const rootRouteChildren: RootRouteChildren = {
   TriageRoute: TriageRoute,
   UsersRoute: UsersRoute,
   AdminCaseManagementRoute: AdminCaseManagementRoute,
+  AdminFirehoseRoute: AdminFirehoseRoute,
   AdminHubsRoute: AdminHubsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSystemRoute: AdminSystemRoute,
