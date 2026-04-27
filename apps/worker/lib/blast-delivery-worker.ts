@@ -51,8 +51,8 @@ export interface BlastDeliveryWorkerDeps {
   blastsService: BlastsService
   settingsService: SettingsService
   resolveAdapter: AdapterResolver
-  /** Resolve subscriber identifier from identifierHash — needed to actually send messages */
-  resolveIdentifier?: (subscriberId: string) => Promise<string | null>
+  /** Resolve subscriber identifier from encryptedIdentifier — needed to actually send messages */
+  resolveIdentifier: (subscriberId: string) => Promise<string | null>
   onProgress?: BlastProgressCallback
   onStatusChange?: BlastStatusCallback
 }
@@ -61,14 +61,15 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 let deps: BlastDeliveryWorkerDeps | null = null
 let processing = false
 
-// Per-hub rate limiters (keyed by hubId or 'global')
+// Per-hub-per-channel rate limiters (keyed by hubId:channel)
 const rateLimiters = new Map<string, TokenBucketRateLimiter>()
 
-function getRateLimiter(hubId: string, settings: BlastSettings): TokenBucketRateLimiter {
-  const key = hubId || 'global'
+function getRateLimiter(hubId: string, channel: MessagingChannelType, settings: BlastSettings): TokenBucketRateLimiter {
+  const key = `${hubId || 'global'}:${channel}`
   let limiter = rateLimiters.get(key)
   if (!limiter) {
-    limiter = TokenBucketRateLimiter.create(settings.rateLimitPerSecond)
+    const rate = settings.rateLimits?.[channel] ?? settings.rateLimitPerSecond
+    limiter = TokenBucketRateLimiter.create(rate)
     rateLimiters.set(key, limiter)
   }
   return limiter
@@ -134,7 +135,6 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
 
   // Get blast settings for rate limit
   const settings = await deps.blastsService.getBlastSettings(hubId)
-  const limiter = getRateLimiter(hubId, settings)
 
   // Get the blast content + opt-out footer
   const blast = await deps.blastsService.getBlast(blastId)
@@ -182,21 +182,15 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
       continue
     }
 
-    // Rate limit
+    // Rate limit — per channel
+    const limiter = getRateLimiter(hubId, channel, settings)
     await limiter.waitForToken()
 
     // Build message body with opt-out footer
     const messageBody = buildMessageBody(content, channel, optOutFooter)
 
-    // We need the subscriber's actual identifier to send.
-    // The identifier is hashed in the DB for privacy. The resolveIdentifier
-    // function looks it up from the subscriber record.
-    // For now, we use the subscriberId to look up the subscriber and use
-    // whatever identifier resolution is available.
-    let recipientIdentifier: string | null = null
-    if (deps.resolveIdentifier) {
-      recipientIdentifier = await deps.resolveIdentifier(delivery.subscriberId)
-    }
+    // Resolve the subscriber's actual identifier (decrypted from encryptedIdentifier)
+    const recipientIdentifier = await deps.resolveIdentifier(delivery.subscriberId)
 
     if (!recipientIdentifier) {
       await deps.blastsService.markDeliveryFailed(

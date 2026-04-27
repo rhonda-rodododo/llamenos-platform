@@ -25,7 +25,7 @@ export interface TaskSchedulerDeps {
   blastsService: BlastsService
   settingsService: SettingsService
   resolveAdapter: AdapterResolver
-  resolveIdentifier?: (subscriberId: string) => Promise<string | null>
+  resolveIdentifier: (subscriberId: string) => Promise<string | null>
   onBlastProgress?: BlastProgressCallback
   onBlastStatusChange?: BlastStatusCallback
 }

@@ -101,6 +101,8 @@ services.scheduler.start({
       return null
     }
   },
+  resolveIdentifier: (subscriberId: string) =>
+    services.blasts.resolveSubscriberIdentifier(subscriberId),
   onBlastProgress: (blastId, stats) => {
     publishNostrEvent(env as unknown as Env, KIND_BLAST_PROGRESS, {
       type: 'blast:progress',

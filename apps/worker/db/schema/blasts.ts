@@ -25,6 +25,7 @@ export const subscribers = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     hubId: text('hub_id'),
     identifierHash: text('identifier_hash').notNull(),
+    encryptedIdentifier: text('encrypted_identifier'),
     channels: jsonb('channels').notNull().default(sql`'[]'::jsonb`),
     tags: text('tags').array().default(sql`'{}'::text[]`),
     language: text('language').notNull().default('en'),
@@ -107,7 +108,7 @@ export const blastDeliveries = pgTable(
   },
   (table) => [
     index('blast_deliveries_blast_status_idx').on(table.blastId, table.status),
-    index('blast_deliveries_next_retry_idx').on(table.nextRetryAt),
+    index('blast_deliveries_pending_idx').on(table.nextRetryAt).where(sql`status IN ('pending', 'sending')`),
     index('blast_deliveries_external_id_idx').on(table.externalId),
   ],
 )

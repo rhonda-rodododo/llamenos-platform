@@ -289,7 +289,8 @@ export interface BlastSettings {
   doubleOptIn: boolean
   optOutFooter: string            // appended to every blast message
   maxBlastsPerDay: number
-  rateLimitPerSecond: number      // sending rate
+  rateLimitPerSecond: number      // global fallback sending rate
+  rateLimits: Record<MessagingChannelType, number>  // per-channel rates
 }
 
 export const DEFAULT_BLAST_SETTINGS: BlastSettings = {
@@ -301,6 +302,7 @@ export const DEFAULT_BLAST_SETTINGS: BlastSettings = {
   optOutFooter: '\nReply STOP to unsubscribe.',
   maxBlastsPerDay: 10,
   rateLimitPerSecond: 10,
+  rateLimits: { sms: 10, whatsapp: 25, signal: 15, rcs: 10 },
 }
 
 // --- Setup State ---

@@ -31,6 +31,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { HMAC_PREFERENCE_TOKEN, HMAC_SUBSCRIBER } from '@shared/crypto-labels'
+import { encryptContactIdentifier } from '../lib/crypto'
 import { ServiceError } from './settings'
 
 // ---------------------------------------------------------------------------
@@ -255,11 +256,15 @@ export class BlastsService {
       }
 
       const preferenceToken = this.generatePreferenceToken(identifierHash)
+      const encrypted = this.hmacSecret
+        ? encryptContactIdentifier(entry.identifier, this.hmacSecret)
+        : null
       await this.db
         .insert(subscribers)
         .values({
           hubId,
           identifierHash,
+          encryptedIdentifier: encrypted,
           channels: [{ type: entry.channel, verified: false }],
           tags: entry.tags ?? [],
           language: entry.language ?? 'en',
@@ -395,11 +400,15 @@ export class BlastsService {
 
       // Create new subscriber
       const preferenceToken = this.generatePreferenceToken(data.identifierHash)
+      const encrypted = this.hmacSecret
+        ? encryptContactIdentifier(data.identifier, this.hmacSecret)
+        : null
       const [created] = await this.db
         .insert(subscribers)
         .values({
           hubId,
           identifierHash: data.identifierHash,
+          encryptedIdentifier: encrypted,
           channels: [{ type: data.channel, verified: true }],
           tags: [],
           language: 'en',
@@ -567,9 +576,6 @@ export class BlastsService {
       throw new ServiceError(429, 'Daily blast limit reached')
     }
 
-    // Count target subscribers
-    const targetCount = await this.countTargetSubscribers(blast, hubId)
-
     const [row] = await this.db
       .update(blasts)
       .set({
@@ -577,7 +583,7 @@ export class BlastsService {
         sentAt: new Date(),
         updatedAt: new Date(),
         stats: {
-          totalRecipients: targetCount,
+          totalRecipients: 0,
           sent: 0,
           delivered: 0,
           failed: 0,
@@ -619,6 +625,11 @@ export class BlastsService {
     if (blast.status !== 'scheduled' && blast.status !== 'sending') {
       throw new ServiceError(400, 'Can only cancel scheduled or sending blasts')
     }
+
+    // Cancel all pending/sending delivery rows
+    await this.db.execute(
+      sql`UPDATE blast_deliveries SET status = 'cancelled' WHERE blast_id = ${id} AND status IN ('pending', 'sending')`,
+    )
 
     const [row] = await this.db
       .update(blasts)
@@ -689,8 +700,11 @@ export class BlastsService {
       throw new ServiceError(400, 'Blast has no target channels')
     }
 
-    // Build subscriber query conditions
-    const conditions = [eq(subscribers.status, 'active')]
+    // Build subscriber query conditions — only active, double-opt-in confirmed subscribers
+    const conditions = [
+      eq(subscribers.status, 'active'),
+      eq(subscribers.doubleOptInConfirmed, true),
+    ]
     if (blast.hubId) conditions.push(eq(subscribers.hubId, blast.hubId))
 
     const targetTags = (blast.targetTags ?? []) as string[]
@@ -767,21 +781,24 @@ export class BlastsService {
    * Also checks subscriber hasn't opted out mid-flight.
    */
   async drainDeliveryBatch(blastId: string, batchSize: number): Promise<BlastDeliveryRow[]> {
-    const now = new Date()
-
-    const rows = await this.db
-      .select()
-      .from(blastDeliveries)
-      .where(
-        and(
-          eq(blastDeliveries.blastId, blastId),
-          eq(blastDeliveries.status, 'pending'),
-          sql`(${blastDeliveries.nextRetryAt} IS NULL OR ${blastDeliveries.nextRetryAt} <= ${now})`,
-        ),
+    // Use FOR UPDATE SKIP LOCKED to prevent concurrent pollers from double-sending
+    const rows = await this.db.execute(
+      sql`WITH claimed AS (
+        SELECT id FROM blast_deliveries
+        WHERE blast_id = ${blastId}
+          AND status = 'pending'
+          AND (next_retry_at IS NULL OR next_retry_at <= NOW())
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
       )
-      .limit(batchSize)
+      UPDATE blast_deliveries
+      SET status = 'sending'
+      WHERE id IN (SELECT id FROM claimed)
+      RETURNING *`,
+    )
 
-    return rows
+    // db.execute returns Record<string, any>[] — raw SQL results at system boundary
+    return rows as BlastDeliveryRow[]
   }
 
   /**
@@ -789,12 +806,12 @@ export class BlastsService {
    */
   async isSubscriberActive(subscriberId: string): Promise<boolean> {
     const [row] = await this.db
-      .select({ status: subscribers.status })
+      .select({ status: subscribers.status, doubleOptInConfirmed: subscribers.doubleOptInConfirmed })
       .from(subscribers)
       .where(eq(subscribers.id, subscriberId))
       .limit(1)
 
-    return row?.status === 'active'
+    return row?.status === 'active' && row.doubleOptInConfirmed === true
   }
 
   /**
@@ -852,6 +869,7 @@ export class BlastsService {
       await this.db
         .update(blastDeliveries)
         .set({
+          status: 'pending',
           error,
           lastAttemptAt: new Date(),
           nextRetryAt: nextRetry,
@@ -928,6 +946,7 @@ export class BlastsService {
    */
   async syncBlastStats(blastId: string): Promise<{ stats: BlastStats; completed: boolean }> {
     const stats = await this.computeBlastStats(blastId)
+    const blast = await this.getBlast(blastId)
 
     // Check if any deliveries are still pending
     const pendingCount = stats.totalRecipients - stats.sent - stats.delivered - stats.failed - stats.optedOut
@@ -939,7 +958,8 @@ export class BlastsService {
       updatedAt: new Date(),
     }
 
-    if (completed) {
+    // Only transition to 'sent' from 'sending' — never overwrite 'cancelled'
+    if (completed && blast.status === 'sending') {
       updates.status = 'sent'
       updates.completedAt = new Date()
     }
@@ -949,7 +969,7 @@ export class BlastsService {
       .set(updates)
       .where(eq(blasts.id, blastId))
 
-    return { stats, completed }
+    return { stats, completed: completed && blast.status === 'sending' }
   }
 
   /**
@@ -1021,6 +1041,27 @@ export class BlastsService {
           sql`${blasts.scheduledAt} <= NOW()`,
         ),
       )
+  }
+
+  // --- Subscriber identifier resolution ---
+
+  /**
+   * Resolve a subscriber's plaintext identifier from their encryptedIdentifier column.
+   * Returns null if the subscriber doesn't exist or has no encrypted identifier.
+   */
+  async resolveSubscriberIdentifier(subscriberId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ encryptedIdentifier: subscribers.encryptedIdentifier })
+      .from(subscribers)
+      .where(eq(subscribers.id, subscriberId))
+      .limit(1)
+
+    if (!row?.encryptedIdentifier) return null
+
+    // Delegate to crypto utility for decryption
+    const { decryptContactIdentifier } = await import('../lib/crypto')
+    if (!this.hmacSecret) return null
+    return decryptContactIdentifier(row.encryptedIdentifier, this.hmacSecret)
   }
 
   // --- Reset (demo/development only) ---
