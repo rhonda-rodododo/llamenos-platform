@@ -229,16 +229,11 @@ final class PINViewModel {
                 return
             }
 
-            // PINs match — complete onboarding with this PIN
+            // PINs match — generate device keys and encrypt with this PIN atomically
             isLoading = true
             do {
                 let enableBiometric = BiometricPrompt.isAvailable
-                try authService.completeOnboarding(pin: enteredPIN, enableBiometric: enableBiometric)
-
-                // Store PIN for biometric unlock if biometric is available (C5)
-                if enableBiometric {
-                    try? keychainService.storePINForBiometric(enteredPIN)
-                }
+                _ = try authService.createNewIdentity(pin: enteredPIN, enableBiometric: enableBiometric)
 
                 isLoading = false
                 onSuccess()
@@ -306,7 +301,7 @@ final class PINViewModel {
     // MARK: - Biometric Unlock (C5)
 
     /// Attempt biometric unlock. Retrieves the PIN from biometric-protected Keychain
-    /// and uses it to decrypt the nsec — no manual PIN entry needed.
+    /// and uses it to decrypt device keys — no manual PIN entry needed.
     func attemptBiometricUnlock() {
         guard isBiometricAvailable else { return }
 

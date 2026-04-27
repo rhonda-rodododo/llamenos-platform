@@ -39,13 +39,13 @@ struct AccountSettingsView: View {
 
     private var identitySection: some View {
         Section {
-            // Avatar + identity card header
-            if let npub = appState.cryptoService.npub {
+            // Avatar + identity card header (uses signing pubkey as identity)
+            if let signingPubkey = appState.cryptoService.signingPubkeyHex {
                 HStack(spacing: 14) {
-                    GeneratedAvatar(hash: npub, size: 56)
+                    GeneratedAvatar(hash: signingPubkey, size: 56)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(npub.truncatedNpub())
+                        Text(signingPubkey.truncatedPubkey())
                             .font(.brandMono(.subheadline))
                             .foregroundStyle(Color.brandForeground)
                             .lineLimit(1)
@@ -62,16 +62,17 @@ struct AccountSettingsView: View {
                 .accessibilityIdentifier("settings-role")
             }
 
-            if let npub = appState.cryptoService.npub {
+            // Signing pubkey (Ed25519 identity)
+            if let signingPubkey = appState.cryptoService.signingPubkeyHex {
                 LabeledContent {
                     HStack(spacing: 8) {
-                        Text(npub.truncatedNpub())
+                        Text(signingPubkey.truncatedPubkey())
                             .font(.brandMono(.body))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
 
                         Button {
-                            UIPasteboard.general.string = npub
+                            UIPasteboard.general.string = signingPubkey
                             showCopyFeedback()
                         } label: {
                             Image(systemName: "doc.on.doc")
@@ -79,30 +80,31 @@ struct AccountSettingsView: View {
                                 .foregroundStyle(Color.brandPrimary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier("copy-npub")
-                        .accessibilityLabel(NSLocalizedString("settings_copy_npub", comment: "Copy npub"))
+                        .accessibilityIdentifier("copy-signing-pubkey")
+                        .accessibilityLabel(NSLocalizedString("settings_copy_pubkey", comment: "Copy signing pubkey"))
                     }
                 } label: {
                     Label {
-                        Text(NSLocalizedString("settings_npub", comment: "Public Key"))
+                        Text(NSLocalizedString("settings_signing_pubkey", comment: "Signing Key"))
                     } icon: {
                         Image(systemName: "key.horizontal.fill")
                             .foregroundStyle(Color.brandPrimary)
                     }
                 }
-                .accessibilityIdentifier("settings-npub")
+                .accessibilityIdentifier("settings-signing-pubkey")
             }
 
-            if let pubkey = appState.cryptoService.pubkey {
+            // Encryption pubkey (X25519)
+            if let encPubkey = appState.cryptoService.encryptionPubkeyHex {
                 LabeledContent {
                     HStack(spacing: 8) {
-                        Text(pubkey.truncatedPubkey())
+                        Text(encPubkey.truncatedPubkey())
                             .font(.brandMono(.caption))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
 
                         Button {
-                            UIPasteboard.general.string = pubkey
+                            UIPasteboard.general.string = encPubkey
                             showCopyFeedback()
                         } label: {
                             Image(systemName: "doc.on.doc")
@@ -110,17 +112,35 @@ struct AccountSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier("copy-pubkey")
+                        .accessibilityIdentifier("copy-encryption-pubkey")
                     }
                 } label: {
                     Label {
-                        Text(NSLocalizedString("settings_pubkey", comment: "Hex Pubkey"))
+                        Text(NSLocalizedString("settings_encryption_pubkey", comment: "Encryption Key"))
                     } icon: {
-                        Image(systemName: "number")
+                        Image(systemName: "lock.fill")
                             .foregroundStyle(.secondary)
                     }
                 }
-                .accessibilityIdentifier("settings-pubkey")
+                .accessibilityIdentifier("settings-encryption-pubkey")
+            }
+
+            // Device ID
+            if let deviceId = appState.cryptoService.deviceId {
+                LabeledContent {
+                    Text(deviceId.prefix(8) + "...")
+                        .font(.brandMono(.caption))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                } label: {
+                    Label {
+                        Text(NSLocalizedString("settings_device_id", comment: "Device ID"))
+                    } icon: {
+                        Image(systemName: "iphone")
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .accessibilityIdentifier("settings-device-id")
             }
         } header: {
             Text(NSLocalizedString("settings_identity_header", comment: "Identity"))

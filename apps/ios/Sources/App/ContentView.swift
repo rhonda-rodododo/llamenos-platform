@@ -52,10 +52,6 @@ struct ContentView: View {
         switch route {
         case .login:
             LoginView()
-        case .onboarding(let nsec, let npub):
-            OnboardingView(nsec: nsec, npub: npub)
-        case .importKey:
-            ImportKeyView()
         case .pinSet:
             PINSetView()
         case .pinUnlock:

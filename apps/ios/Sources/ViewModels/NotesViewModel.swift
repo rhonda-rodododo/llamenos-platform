@@ -86,14 +86,14 @@ final class NotesViewModel {
 
     // MARK: - Note Creation
 
-    /// Encrypt and create a new note.
+    /// Encrypt and create a new note using HPKE envelope encryption.
     ///
     /// - Parameters:
     ///   - text: The note body text.
     ///   - fields: Custom field values keyed by field name.
     ///   - callId: Optional associated call ID.
     ///   - conversationId: Optional associated conversation ID.
-    ///   - adminPubkeys: Admin public keys for envelope encryption.
+    ///   - adminPubkeys: Admin encryption public keys (X25519) for envelope encryption.
     func createNote(
         text: String,
         fields: [String: AnyCodableValue]?,
@@ -106,23 +106,47 @@ final class NotesViewModel {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let payloadJSON = String(data: try encoder.encode(payload), encoding: .utf8) ?? "{}"
 
-        let encryptedNote = try cryptoService.encryptNote(payload: payloadJSON, adminPubkeys: adminPubkeys)
+        // Build full recipient list: our encryption key + admin encryption keys
+        var recipientPubkeys: [String] = []
+        if let ourPubkey = cryptoService.encryptionPubkeyHex {
+            recipientPubkeys.append(ourPubkey)
+        }
+        for adminPubkey in adminPubkeys where !recipientPubkeys.contains(adminPubkey) {
+            recipientPubkeys.append(adminPubkey)
+        }
+
+        let result = try cryptoService.encryptNote(payload: payloadJSON, recipientPubkeys: recipientPubkeys)
+
+        // Map HPKE envelopes to the protocol wire format
+        let authorEnvelope: ProtocolKeyEnvelope?
+        let adminEnvelopes: [RecipientEnvelope]?
+
+        if let ourPubkey = cryptoService.encryptionPubkeyHex,
+           let ours = result.envelopes.first(where: { $0.pubkey == ourPubkey }) {
+            authorEnvelope = ProtocolKeyEnvelope(
+                wrappedKey: ours.envelope.ct,
+                ephemeralPubkey: ours.envelope.enc
+            )
+        } else {
+            authorEnvelope = nil
+        }
+
+        adminEnvelopes = result.envelopes
+            .filter { $0.pubkey != cryptoService.encryptionPubkeyHex }
+            .map { env in
+                RecipientEnvelope(
+                    pubkey: env.pubkey,
+                    wrappedKey: env.envelope.ct,
+                    ephemeralPubkey: env.envelope.enc
+                )
+            }
 
         let request = CreateNoteRequest(
             callId: callId,
             conversationId: conversationId,
-            encryptedContent: encryptedNote.encryptedContent,
-            authorEnvelope: NoteKeyEnvelope(
-                ephemeralPubkey: encryptedNote.authorEnvelope.ephemeralPubkey,
-                wrappedKey: encryptedNote.authorEnvelope.wrappedKey
-            ),
-            adminEnvelopes: encryptedNote.adminEnvelopes.map { env in
-                NoteRecipientEnvelope(
-                    ephemeralPubkey: env.ephemeralPubkey,
-                    pubkey: env.pubkey,
-                    wrappedKey: env.wrappedKey
-                )
-            }
+            encryptedContent: result.ciphertextHex,
+            authorEnvelope: authorEnvelope,
+            adminEnvelopes: adminEnvelopes
         )
 
         let _: EncryptedNoteResponse = try await apiService.request(
@@ -141,37 +165,42 @@ final class NotesViewModel {
 
     // MARK: - Note Decryption
 
-    /// Find the matching envelope for our pubkey and decrypt the note.
+    /// Find the matching envelope for our pubkey and decrypt the note using HPKE.
     func decryptNote(_ encrypted: EncryptedNoteResponse) -> DecryptedNote? {
-        guard let ourPubkey = cryptoService.pubkey else { return nil }
+        guard let ourPubkey = cryptoService.encryptionPubkeyHex else { return nil }
 
         // Find our envelope — check author envelope first (volunteer's own note)
-        var wrappedKey: String?
-        var ephemeralPubkey: String?
+        var envelope: HpkeEnvelope?
 
         if encrypted.authorPubkey == ourPubkey, let authorEnv = encrypted.authorEnvelope {
-            wrappedKey = authorEnv.wrappedKey
-            ephemeralPubkey = authorEnv.ephemeralPubkey
+            envelope = HpkeEnvelope(
+                v: 3,
+                labelId: 0,
+                enc: authorEnv.ephemeralPubkey,
+                ct: authorEnv.wrappedKey
+            )
         }
 
         // Then check admin envelopes
-        if wrappedKey == nil, let adminEnvs = encrypted.adminEnvelopes {
+        if envelope == nil, let adminEnvs = encrypted.adminEnvelopes {
             if let ourEnvelope = adminEnvs.first(where: { $0.pubkey == ourPubkey }) {
-                wrappedKey = ourEnvelope.wrappedKey
-                ephemeralPubkey = ourEnvelope.ephemeralPubkey
+                envelope = HpkeEnvelope(
+                    v: 3,
+                    labelId: 0,
+                    enc: ourEnvelope.ephemeralPubkey,
+                    ct: ourEnvelope.wrappedKey
+                )
             }
         }
 
-        guard let wk = wrappedKey, let epk = ephemeralPubkey else {
-            // No envelope for us — we can't decrypt this note
+        guard let hpkeEnvelope = envelope else {
             return nil
         }
 
         do {
-            let decryptedJSON = try cryptoService.decryptNoteContent(
-                encryptedContent: encrypted.encryptedContent,
-                wrappedKey: wk,
-                ephemeralPubkey: epk
+            let decryptedJSON = try cryptoService.decryptNote(
+                ciphertextHex: encrypted.encryptedContent,
+                envelope: hpkeEnvelope
             )
 
             let decoder = JSONDecoder()
@@ -188,7 +217,6 @@ final class NotesViewModel {
                 updatedAt: DateFormatting.parseISO(encrypted.updatedAt)
             )
         } catch {
-            // Decryption failed — return nil (note won't appear in list)
             return nil
         }
     }

@@ -94,10 +94,10 @@ data class NotesUiState(
  *
  * Handles fetching, decrypting, and creating encrypted notes.
  * Each note is encrypted with per-note forward secrecy — a unique random key
- * per note, ECIES-wrapped for the author and each admin.
+ * per note, HPKE-wrapped for the author and each admin.
  *
- * Decryption: find the envelope matching our pubkey, unwrap the symmetric key
- * via ECIES, then decrypt the note ciphertext with XChaCha20-Poly1305.
+ * Decryption: find the HPKE envelope matching our encryption pubkey, unwrap the
+ * symmetric key via HPKE open, then decrypt the note ciphertext with AES-256-GCM.
  */
 @HiltViewModel
 class NotesViewModel @Inject constructor(
@@ -257,22 +257,22 @@ class NotesViewModel @Inject constructor(
 
                 val encrypted = cryptoService.encryptNote(payloadJson, sessionState.adminPubkeys)
 
-                // Separate author envelope from admin envelopes.
-                // The first envelope is always for the author (our pubkey).
+                // Map HPKE envelopes to wire format.
+                // The first envelope is always for the author (our encryption pubkey).
                 val authorEnv = encrypted.envelopes.first()
                 val adminEnvs = encrypted.envelopes.drop(1)
 
                 val request = CreateNoteBody(
-                    encryptedContent = encrypted.ciphertext,
+                    encryptedContent = encrypted.ciphertextHex,
                     authorEnvelope = CreateNoteBodyAuthorEnvelope(
-                        ephemeralPubkey = authorEnv.ephemeralPubkey,
-                        wrappedKey = authorEnv.wrappedKey,
+                        ephemeralPubkey = authorEnv.hpkeEnvelope.enc,
+                        wrappedKey = authorEnv.hpkeEnvelope.ct,
                     ),
                     adminEnvelopes = adminEnvs.map { env ->
                         CreateNoteBodyAdminEnvelope(
                             pubkey = env.recipientPubkey,
-                            wrappedKey = env.wrappedKey,
-                            ephemeralPubkey = env.ephemeralPubkey,
+                            wrappedKey = env.hpkeEnvelope.ct,
+                            ephemeralPubkey = env.hpkeEnvelope.enc,
                         )
                     },
                     conversationID = conversationId,
@@ -387,16 +387,16 @@ class NotesViewModel @Inject constructor(
                 val adminEnvs = encrypted.envelopes.drop(1)
 
                 val request = CreateNoteBody(
-                    encryptedContent = encrypted.ciphertext,
+                    encryptedContent = encrypted.ciphertextHex,
                     authorEnvelope = CreateNoteBodyAuthorEnvelope(
-                        ephemeralPubkey = authorEnv.ephemeralPubkey,
-                        wrappedKey = authorEnv.wrappedKey,
+                        ephemeralPubkey = authorEnv.hpkeEnvelope.enc,
+                        wrappedKey = authorEnv.hpkeEnvelope.ct,
                     ),
                     adminEnvelopes = adminEnvs.map { env ->
                         CreateNoteBodyAdminEnvelope(
                             pubkey = env.recipientPubkey,
-                            wrappedKey = env.wrappedKey,
-                            ephemeralPubkey = env.ephemeralPubkey,
+                            wrappedKey = env.hpkeEnvelope.ct,
+                            ephemeralPubkey = env.hpkeEnvelope.enc,
                         )
                     },
                 )
@@ -464,13 +464,13 @@ class NotesViewModel @Inject constructor(
                 val readerEnvelopes = encrypted.envelopes.map { env ->
                     CreateReplyBodyReaderEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.wrappedKey,
-                        ephemeralPubkey = env.ephemeralPubkey,
+                        wrappedKey = env.hpkeEnvelope.ct,
+                        ephemeralPubkey = env.hpkeEnvelope.enc,
                     )
                 }
 
                 val request = CreateReplyBody(
-                    encryptedContent = encrypted.ciphertext,
+                    encryptedContent = encrypted.ciphertextHex,
                     readerEnvelopes = readerEnvelopes,
                 )
 
@@ -503,13 +503,16 @@ class NotesViewModel @Inject constructor(
     }
 
     /**
-     * Decrypt a single reply by finding our envelope and calling CryptoService.
+     * Decrypt a single reply by finding our HPKE envelope and calling CryptoService.
      */
     private suspend fun decryptReply(reply: NoteReply): DecryptedReply? {
-        val ourPubkey = cryptoService.pubkey ?: return null
+        val ourPubkey = cryptoService.encryptionPubkeyHex ?: return null
         val envelope = reply.readerEnvelopes.find { it.pubkey == ourPubkey } ?: return null
+        val hpkeEnvelope = org.llamenos.hotline.crypto.HpkeEnvelope(
+            v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey,
+        )
         return try {
-            val payload = cryptoService.decryptNote(reply.encryptedContent, envelope)
+            val payload = cryptoService.decryptNote(reply.encryptedContent, hpkeEnvelope)
             if (payload != null) {
                 DecryptedReply(
                     id = reply.id,
@@ -526,31 +529,32 @@ class NotesViewModel @Inject constructor(
     }
 
     /**
-     * Decrypt a single note by finding our envelope and calling CryptoService.
+     * Decrypt a single note by finding our HPKE envelope and calling CryptoService.
      */
     private suspend fun decryptNote(note: NoteResponse): DecryptedNote? {
-        val ourPubkey = cryptoService.pubkey ?: return null
+        val ourPubkey = cryptoService.encryptionPubkeyHex ?: return null
 
-        // Find the envelope for our pubkey: check authorEnvelope first (if we're
+        // Build HPKE envelope from wire format: check authorEnvelope first (if we're
         // the author), then adminEnvelopes (if we're an admin reader).
-        val envelope: RecipientEnvelope = if (note.authorPubkey == ourPubkey && note.authorEnvelope != null) {
-            RecipientEnvelope(
-                pubkey = ourPubkey,
-                wrappedKey = note.authorEnvelope!!.wrappedKey,
-                ephemeralPubkey = note.authorEnvelope!!.ephemeralPubkey,
-            )
-        } else {
-            note.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
-                RecipientEnvelope(
-                    pubkey = adminEnv.pubkey,
-                    wrappedKey = adminEnv.wrappedKey,
-                    ephemeralPubkey = adminEnv.ephemeralPubkey,
+        val hpkeEnvelope: org.llamenos.hotline.crypto.HpkeEnvelope =
+            if (note.authorPubkey == ourPubkey && note.authorEnvelope != null) {
+                org.llamenos.hotline.crypto.HpkeEnvelope(
+                    v = 3, labelId = 0,
+                    enc = note.authorEnvelope!!.ephemeralPubkey,
+                    ct = note.authorEnvelope!!.wrappedKey,
                 )
-            } ?: return null
-        }
+            } else {
+                note.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
+                    org.llamenos.hotline.crypto.HpkeEnvelope(
+                        v = 3, labelId = 0,
+                        enc = adminEnv.ephemeralPubkey,
+                        ct = adminEnv.wrappedKey,
+                    )
+                } ?: return null
+            }
 
         return try {
-            val payload = cryptoService.decryptNote(note.encryptedContent, envelope)
+            val payload = cryptoService.decryptNote(note.encryptedContent, hpkeEnvelope)
             if (payload != null) {
                 DecryptedNote(
                     id = note.id,

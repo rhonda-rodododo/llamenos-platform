@@ -19,11 +19,11 @@ struct DashboardView: View {
                     // Offline queue banner
                     OfflineBanner()
 
-                    // Hidden npub for accessibility (BrandCard overlay blocks child identifiers)
-                    if let npub = appState.cryptoService.npub {
-                        Text(npub)
+                    // Hidden identity for accessibility (BrandCard overlay blocks child identifiers)
+                    if let signingPubkey = appState.cryptoService.signingPubkeyHex {
+                        Text(signingPubkey)
                             .font(.brandMono(.caption))
-                            .accessibilityIdentifier("dashboard-npub")
+                            .accessibilityIdentifier("dashboard-identity")
                             .frame(height: 0)
                             .clipped()
                     }
@@ -297,10 +297,10 @@ struct DashboardView: View {
     private var identityConnectionStrip: some View {
         BrandCard(padding: 12) {
             VStack(spacing: 8) {
-                if let npub = appState.cryptoService.npub {
+                if let signingPubkey = appState.cryptoService.signingPubkeyHex {
                     CopyableField(
                         label: NSLocalizedString("dashboard_identity", comment: "Identity"),
-                        value: npub
+                        value: signingPubkey
                     )
                 }
 

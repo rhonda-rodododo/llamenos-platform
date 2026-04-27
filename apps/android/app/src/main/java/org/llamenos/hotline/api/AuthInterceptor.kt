@@ -9,16 +9,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * OkHttp [Interceptor] that injects Schnorr authentication tokens into every request.
+ * OkHttp [Interceptor] that injects Ed25519-signed authentication tokens into every request.
  *
  * The Authorization header contains a Bearer token with a JSON payload:
  * ```
- * Authorization: Bearer {"pubkey":"<hex>","timestamp":<ms>,"token":"<schnorr_sig>"}
+ * Authorization: Bearer {"pubkey":"<hex>","timestamp":<ms>,"token":"<ed25519_sig>"}
  * ```
  *
  * The token is created synchronously via [CryptoService.createAuthTokenSync] because
  * OkHttp interceptors execute on OkHttp's thread pool and cannot use coroutines.
- * Schnorr signing is ~1ms so blocking the calling thread is acceptable.
+ * Ed25519 signing is ~1ms so blocking the calling thread is acceptable.
  *
  * Thread safety: The interceptor synchronizes on [cryptoService] to prevent a race
  * between the `isUnlocked` check and token creation if `lock()` is called concurrently

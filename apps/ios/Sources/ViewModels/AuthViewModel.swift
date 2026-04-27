@@ -3,14 +3,11 @@ import Foundation
 // MARK: - AuthStep
 
 /// Steps in the login/onboarding flow.
+/// V3 device key model: no nsec to show. Create identity → set PIN → done.
 enum AuthStep: Equatable {
     /// Initial login screen.
     case login
-    /// User is entering an nsec to import.
-    case importingKey
-    /// User is viewing their generated nsec for backup.
-    case showingNsec(nsec: String, npub: String)
-    /// User is setting their PIN.
+    /// User is setting their PIN (generates device keys atomically).
     case settingPIN
     /// Complete — ready to proceed to dashboard.
     case complete
@@ -19,8 +16,11 @@ enum AuthStep: Equatable {
 // MARK: - AuthViewModel
 
 /// View model for the login and onboarding flow. Manages the state machine for
-/// identity creation, nsec import, and hub URL configuration. PIN handling is
-/// delegated to PINViewModel.
+/// identity creation and hub URL configuration. PIN handling is delegated to PINViewModel.
+///
+/// V3: No more nsec display or import. Device keys are generated atomically with
+/// PIN encryption. Multi-device support uses device linking (QR + ECDH) instead of
+/// nsec backup/import.
 @Observable
 final class AuthViewModel {
     private let authService: AuthService
@@ -32,19 +32,11 @@ final class AuthViewModel {
     /// Hub URL text field value.
     var hubURL: String = ""
 
-    /// Nsec text field value for import flow.
-    var nsecInput: String = ""
-
     /// Error to display to the user.
     var errorMessage: String?
 
     /// Whether an async operation is in progress.
     var isLoading: Bool = false
-
-    /// The generated nsec (for display during onboarding).
-    /// Set only during the onboarding flow and cleared after PIN set.
-    private(set) var generatedNsec: String?
-    private(set) var generatedNpub: String?
 
     init(authService: AuthService, apiService: APIService) {
         self.authService = authService
@@ -54,63 +46,13 @@ final class AuthViewModel {
 
     // MARK: - Create New Identity
 
-    /// Generate a new keypair and show the nsec for backup confirmation.
-    /// Validates hub URL format and reachability first.
+    /// Validate hub URL and proceed to PIN set.
+    /// In the v3 model, device key generation happens atomically with PIN encryption
+    /// inside PINViewModel — no nsec display step.
     func createNewIdentity() async {
         errorMessage = nil
         guard await validateAndStoreHubURL() else { return }
-
-        let (nsec, npub) = authService.createNewIdentity()
-        generatedNsec = nsec
-        generatedNpub = npub
-        currentStep = .showingNsec(nsec: nsec, npub: npub)
-    }
-
-    /// User has confirmed they backed up their nsec. Proceed to PIN set.
-    func confirmBackup() {
         currentStep = .settingPIN
-    }
-
-    // MARK: - Import Existing Key
-
-    /// Begin the nsec import flow. Validates and persists the hub URL first
-    /// so that ImportKeyView (which creates its own AuthViewModel) can read it
-    /// back from authService.
-    func startImport() async -> Bool {
-        errorMessage = nil
-        guard await validateAndStoreHubURL() else { return false }
-        currentStep = .importingKey
-        return true
-    }
-
-    /// Submit the imported nsec.
-    /// M27: Clears nsecInput from memory on successful import to prevent
-    /// the sensitive key material from lingering in view model state.
-    func submitImport() {
-        errorMessage = nil
-
-        let trimmed = nsecInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            errorMessage = NSLocalizedString("error_nsec_empty", comment: "Please enter your nsec key")
-            return
-        }
-
-        do {
-            try authService.importExistingIdentity(nsec: trimmed)
-            // M27: Clear nsecInput after successful import — don't leave sensitive
-            // key material in the view model's observable state.
-            nsecInput = ""
-            currentStep = .settingPIN
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    /// Cancel the import and return to login.
-    func cancelImport() {
-        nsecInput = ""
-        errorMessage = nil
-        currentStep = .login
     }
 
     // MARK: - Hub URL
@@ -159,16 +101,7 @@ final class AuthViewModel {
     /// Reset the view model to the initial login state.
     func reset() {
         currentStep = .login
-        nsecInput = ""
         errorMessage = nil
         isLoading = false
-        generatedNsec = nil
-        generatedNpub = nil
-    }
-
-    /// Clear sensitive data (nsec display) after it's no longer needed.
-    func clearSensitiveData() {
-        generatedNsec = nil
-        generatedNpub = nil
     }
 }

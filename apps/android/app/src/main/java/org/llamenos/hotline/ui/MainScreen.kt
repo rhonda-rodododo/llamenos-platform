@@ -211,7 +211,8 @@ fun MainScreen(
 
                 MainTab.SETTINGS -> {
                     SettingsScreen(
-                        npub = cryptoService.npub ?: "",
+                        signingPubkey = cryptoService.signingPubkeyHex ?: "",
+                        encryptionPubkey = cryptoService.encryptionPubkeyHex ?: "",
                         hubUrl = keystoreService.retrieve(KeystoreService.KEY_HUB_URL) ?: "",
                         connectionState = connectionState,
                         displayName = keystoreService.retrieve("display_name") ?: "",

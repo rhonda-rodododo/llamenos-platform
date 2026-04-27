@@ -12,21 +12,24 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.llamenos.hotline.crypto.CryptoService
-import org.llamenos.hotline.crypto.EncryptedKeyData
+import org.llamenos.hotline.crypto.DeviceKeyState
+import org.llamenos.hotline.crypto.EncryptedDeviceKeys
 import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.crypto.PinLockoutState
 import javax.inject.Inject
 
 /**
- * Serializable representation of EncryptedKeyData for storage in KeystoreService.
+ * Serializable representation of EncryptedDeviceKeys for storage in KeystoreService.
  */
 @Serializable
 data class StoredKeyData(
     val ciphertext: String,
     val salt: String,
     val nonce: String,
-    val pubkeyHex: String,
+    val signingPubkeyHex: String,
+    val encryptionPubkeyHex: String,
+    val deviceId: String,
     val iterations: UInt = 600_000u,
 )
 
@@ -36,12 +39,6 @@ data class AuthUiState(
 
     // Login screen
     val hubUrl: String = "",
-    val nsecInput: String = "",
-
-    // Onboarding
-    val generatedNsec: String? = null,
-    val generatedNpub: String? = null,
-    val backupConfirmed: Boolean = false,
 
     // PIN
     val pin: String = "",
@@ -63,17 +60,17 @@ data class AuthUiState(
 /**
  * ViewModel for the authentication flow.
  *
- * Manages state for login, onboarding (keypair generation), and PIN setup/unlock.
+ * Manages state for login and PIN setup/unlock.
  * All crypto operations are delegated to [CryptoService] and key persistence
  * to [KeystoreService].
  *
- * Auth flow:
+ * Auth flow (v3 device key model):
  * 1. Check for stored keys -> PINUnlock if found, Login if not
- * 2. Login: Import existing nsec OR generate new keypair (-> Onboarding)
- * 3. Onboarding: Display generated nsec for backup
- * 4. PINSet: Set 6-8 digit PIN with confirmation
- * 5. PINUnlock: Enter PIN to decrypt stored key
- * 6. -> Dashboard
+ * 2. Login: Enter hub URL → PINSet (device keys generated atomically with PIN encryption)
+ * 3. PINUnlock: Enter PIN to decrypt stored device keys
+ * 4. -> Dashboard
+ *
+ * Multi-device support is via device linking (QR scan), not key import.
  */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -107,84 +104,19 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * Update the nsec input field.
-     */
-    fun updateNsecInput(nsec: String) {
-        _uiState.update { it.copy(nsecInput = nsec, error = null) }
-    }
-
-    /**
-     * Generate a new Nostr keypair and navigate to onboarding.
+     * Validate and save hub URL, then navigate to PIN set.
+     * Device keys are generated atomically with PIN encryption in [onPinSetComplete].
      */
     fun createNewIdentity() {
         _uiState.update { it.copy(isLoading = true, error = null) }
 
-        try {
-            val hubUrl = _uiState.value.hubUrl.trim()
-            if (hubUrl.isNotEmpty()) {
-                keystoreService.store(KeystoreService.KEY_HUB_URL, hubUrl)
-            }
-
-            val (nsec, npub) = cryptoService.generateKeypair()
-
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    generatedNsec = nsec,
-                    generatedNpub = npub,
-                )
-            }
-        } catch (e: Exception) {
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    error = e.message ?: "Failed to generate keypair",
-                )
-            }
-        }
-    }
-
-    /**
-     * Import an existing nsec and navigate to PIN setup.
-     */
-    fun importKey() {
-        val nsec = _uiState.value.nsecInput.trim()
-        if (nsec.isEmpty()) {
-            _uiState.update { it.copy(error = "Please enter your nsec") }
-            return
+        val hubUrl = _uiState.value.hubUrl.trim()
+        if (hubUrl.isNotEmpty()) {
+            keystoreService.store(KeystoreService.KEY_HUB_URL, hubUrl)
         }
 
-        _uiState.update { it.copy(isLoading = true, error = null) }
-
-        try {
-            val hubUrl = _uiState.value.hubUrl.trim()
-            if (hubUrl.isNotEmpty()) {
-                keystoreService.store(KeystoreService.KEY_HUB_URL, hubUrl)
-            }
-
-            cryptoService.importNsec(nsec)
-
-            // Clear nsec from UI state immediately after successful import
-            _uiState.update { it.copy(isLoading = false, nsecInput = "") }
-        } catch (e: Exception) {
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    error = e.message ?: "Failed to import key",
-                )
-            }
-        }
-    }
-
-    /**
-     * User confirmed they have backed up their nsec.
-     */
-    /**
-     * User confirmed they have backed up their nsec.
-     * Clear the generated nsec from UI state — it must never be displayed again.
-     */
-    fun confirmBackup() {
-        _uiState.update { it.copy(backupConfirmed = true, generatedNsec = null) }
+        // Navigate to PIN set — keys will be generated when PIN is confirmed
+        _uiState.update { it.copy(isLoading = false) }
     }
 
     /**
@@ -222,8 +154,8 @@ class AuthViewModel @Inject constructor(
         } else {
             // Second entry — check match
             if (enteredPin == state.pin) {
-                // PINs match — encrypt and store the key
-                encryptAndStoreKey(enteredPin)
+                // PINs match — generate device keys and encrypt with PIN
+                generateAndStoreDeviceKeys(enteredPin)
             } else {
                 // Mismatch — reset confirmation
                 _uiState.update {
@@ -238,35 +170,35 @@ class AuthViewModel @Inject constructor(
     }
 
     /**
-     * Encrypt the current key with the PIN and persist it.
+     * Generate new device keys, encrypt with PIN, and persist.
      */
-    private fun encryptAndStoreKey(pin: String) {
+    private fun generateAndStoreDeviceKeys(pin: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                val encryptedData = cryptoService.encryptForStorage(pin)
+                val newDeviceId = java.util.UUID.randomUUID().toString()
+                val encrypted = cryptoService.generateDeviceKeys(newDeviceId, pin)
 
                 // Serialize and store
                 val storedData = StoredKeyData(
-                    ciphertext = encryptedData.ciphertext,
-                    salt = encryptedData.salt,
-                    nonce = encryptedData.nonce,
-                    pubkeyHex = encryptedData.pubkeyHex,
-                    iterations = encryptedData.iterations,
+                    ciphertext = encrypted.ciphertext,
+                    salt = encrypted.salt,
+                    nonce = encrypted.nonce,
+                    signingPubkeyHex = encrypted.state.signingPubkeyHex,
+                    encryptionPubkeyHex = encrypted.state.encryptionPubkeyHex,
+                    deviceId = encrypted.state.deviceId,
+                    iterations = encrypted.iterations,
                 )
                 keystoreService.store(
                     KeystoreService.KEY_ENCRYPTED_KEYS,
                     json.encodeToString(storedData),
                 )
 
-                // Store pubkey/npub for display when locked
-                cryptoService.pubkey?.let { pk ->
-                    keystoreService.store(KeystoreService.KEY_PUBKEY, pk)
-                }
-                cryptoService.npub?.let { npub ->
-                    keystoreService.store(KeystoreService.KEY_NPUB, npub)
-                }
+                // Store pubkeys for display when locked
+                keystoreService.store(KeystoreService.KEY_SIGNING_PUBKEY, encrypted.state.signingPubkeyHex)
+                keystoreService.store(KeystoreService.KEY_ENCRYPTION_PUBKEY, encrypted.state.encryptionPubkeyHex)
+                keystoreService.store(KeystoreService.KEY_DEVICE_ID, encrypted.state.deviceId)
 
                 // Clear PIN from UI state after successful encryption
                 _uiState.update {
@@ -282,7 +214,7 @@ class AuthViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = e.message ?: "Failed to encrypt key",
+                        error = e.message ?: "Failed to generate device keys",
                     )
                 }
             }
@@ -335,15 +267,19 @@ class AuthViewModel @Inject constructor(
                     ?: throw IllegalStateException("No stored keys found")
 
                 val storedData = json.decodeFromString<StoredKeyData>(storedJson)
-                val encryptedData = EncryptedKeyData(
+                val encryptedData = EncryptedDeviceKeys(
                     ciphertext = storedData.ciphertext,
                     salt = storedData.salt,
                     nonce = storedData.nonce,
-                    pubkeyHex = storedData.pubkeyHex,
+                    state = DeviceKeyState(
+                        deviceId = storedData.deviceId,
+                        signingPubkeyHex = storedData.signingPubkeyHex,
+                        encryptionPubkeyHex = storedData.encryptionPubkeyHex,
+                    ),
                     iterations = storedData.iterations,
                 )
 
-                cryptoService.decryptFromStorage(encryptedData, pin)
+                cryptoService.unlockWithPin(encryptedData, pin)
 
                 // Success — reset failed attempts
                 ks?.resetFailedAttempts()

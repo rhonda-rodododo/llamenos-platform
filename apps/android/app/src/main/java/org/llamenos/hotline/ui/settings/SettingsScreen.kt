@@ -125,7 +125,8 @@ private enum class AutoLockOption(val minutes: Int, val labelRes: Int) {
  */
 @Composable
 fun SettingsScreen(
-    npub: String,
+    signingPubkey: String,
+    encryptionPubkey: String,
     hubUrl: String,
     connectionState: WebSocketService.ConnectionState,
     displayName: String,
@@ -168,7 +169,7 @@ fun SettingsScreen(
     val clipboardManager = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val copiedMessage = stringResource(R.string.settings_npub_copied)
+    val copiedMessage = stringResource(R.string.settings_npub_copied) // reuse existing string resource
     val profileUpdatedMessage = stringResource(R.string.profile_updated)
 
     // Profile form state
@@ -340,13 +341,18 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(8.dp))
 
-                // npub display
+                // Signing key display
+                Text(
+                    text = stringResource(R.string.settings_identity),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = npub,
+                        text = signingPubkey,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = FontFamily.Monospace,
                         ),
@@ -355,16 +361,16 @@ fun SettingsScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .weight(1f)
-                            .testTag("settings-npub"),
+                            .testTag("settings-signing-pubkey"),
                     )
                     IconButton(
                         onClick = {
-                            clipboardManager.setText(AnnotatedString(npub))
+                            clipboardManager.setText(AnnotatedString(signingPubkey))
                             scope.launch {
                                 snackbarHostState.showSnackbar(copiedMessage)
                             }
                         },
-                        modifier = Modifier.testTag("copy-npub-button"),
+                        modifier = Modifier.testTag("copy-signing-pubkey-button"),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.ContentCopy,
@@ -769,13 +775,14 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = npub,
+                        text = signingPubkey,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = FontFamily.Monospace,
                         ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("settings-identity-signing"),
                     )
                 }
             }

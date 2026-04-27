@@ -260,14 +260,14 @@ class ReportsViewModel @Inject constructor(
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.wrappedKey,
-                        ephemeralPubkey = env.ephemeralPubkey,
+                        wrappedKey = env.hpkeEnvelope.ct,
+                        ephemeralPubkey = env.hpkeEnvelope.enc,
                     )
                 }
                 val request = CreateReportRequest(
                     title = title,
                     category = category?.takeIf { it.isNotBlank() },
-                    encryptedContent = encrypted.ciphertext,
+                    encryptedContent = encrypted.ciphertextHex,
                     readerEnvelopes = envelopes,
                 )
                 apiService.request<Report>("POST", apiService.hp("/api/reports"), request)
@@ -312,8 +312,8 @@ class ReportsViewModel @Inject constructor(
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.wrappedKey,
-                        ephemeralPubkey = env.ephemeralPubkey,
+                        wrappedKey = env.hpkeEnvelope.ct,
+                        ephemeralPubkey = env.hpkeEnvelope.enc,
                     )
                 }
 
@@ -322,7 +322,7 @@ class ReportsViewModel @Inject constructor(
                     title = title,
                     category = reportType?.category?.value?.takeIf { it.isNotBlank() && it != "report" },
                     reportTypeId = reportTypeId,
-                    encryptedContent = encrypted.ciphertext,
+                    encryptedContent = encrypted.ciphertextHex,
                     readerEnvelopes = envelopes,
                 )
                 apiService.request<Report>("POST", apiService.hp("/api/reports"), request)
@@ -362,7 +362,7 @@ class ReportsViewModel @Inject constructor(
     fun claimReport(reportId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isClaiming = true, actionError = null) }
-            val pubkey = cryptoService.pubkey
+            val pubkey = cryptoService.signingPubkeyHex
             if (pubkey == null) {
                 _uiState.update {
                     it.copy(isClaiming = false, actionError = "No identity available")
