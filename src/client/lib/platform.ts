@@ -1,22 +1,17 @@
 /**
- * Platform abstraction layer — dual-backend crypto (Tauri IPC + WASM).
+ * Platform abstraction layer — v3 crypto API (Ed25519 / X25519 / HPKE).
  *
  * In Tauri desktop: all crypto operations route through native Rust via IPC.
- * In browser/test: all crypto operations route through the Rust-compiled WASM module.
+ * In browser/test: WASM or JS mock implementations.
  *
- * The nsec (secret key) never enters JavaScript in either mode — it lives in
- * Rust memory (native process or WASM linear memory).
+ * Device key material (Ed25519 signing seed + X25519 encryption seed) never
+ * enters JavaScript — it lives in Rust memory (native process or WASM).
  *
  * This module is the single entry point for all platform-specific behavior.
- * Import from here instead of directly from crypto.ts or @tauri-apps/*.
+ * Import from here instead of directly from @tauri-apps/*.
  */
 
-// Type re-exports from shared types
-export type { KeyEnvelope, RecipientEnvelope, RecipientKeyEnvelope } from '@shared/types'
-
 // ── Backend detection ────────────────────────────────────────────────
-// Tauri injects __TAURI_INTERNALS__ at startup. If present, use IPC.
-// Otherwise, use WASM (browser/test builds).
 
 const useTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -27,202 +22,153 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
   return invoke<T>(cmd, args)
 }
 
-// ── WASM backend (browser/test only) ─────────────────────────────────
+// ── Crypto types (v3) ───────────────────────────────────────────────
 
-type WasmModule = typeof import('../../../packages/crypto/dist/wasm/llamenos_core')
-type WasmState = import('../../../packages/crypto/dist/wasm/llamenos_core').WasmCryptoState
-
-let wasmModulePromise: Promise<WasmModule> | null = null
-let wasmState: WasmState | null = null
-
-async function getWasm(): Promise<WasmModule> {
-  if (!wasmModulePromise) {
-    wasmModulePromise = (async () => {
-      try {
-        const mod = await import('../../../packages/crypto/dist/wasm/llamenos_core')
-        await mod.default()
-        return mod
-      } catch (e) {
-        const msg = [
-          'FATAL: WASM crypto module not available.',
-          'Run: bun run crypto:wasm',
-          `Original error: ${e instanceof Error ? e.message : String(e)}`,
-        ].join('\n')
-        throw new Error(msg)
-      }
-    })()
-  }
-  return wasmModulePromise
+/** HPKE envelope — RFC 9180 sealed payload. */
+export interface HpkeEnvelope {
+  v: number       // Version (3)
+  labelId: number  // Label registry ID
+  enc: string     // Base64url-encoded encapsulated key (32 bytes)
+  ct: string      // Base64url-encoded ciphertext
 }
 
-async function getWasmState(): Promise<WasmState> {
-  const mod = await getWasm()
-  if (!wasmState) {
-    wasmState = new mod.WasmCryptoState()
-  }
-  return wasmState
+/** Device key state — public info only, no secrets. */
+export interface DeviceKeyState {
+  deviceId: string
+  signingPubkeyHex: string      // Ed25519 (64 hex chars)
+  encryptionPubkeyHex: string   // X25519 (64 hex chars)
 }
 
-// ── Crypto types ─────────────────────────────────────────────────────
-
-export interface SignedNostrEvent {
-  id: string
-  pubkey: string
-  created_at: number
-  kind: number
-  tags: string[][]
-  content: string
-  sig: string
-}
-
-export interface EncryptedNoteResult {
-  encryptedContent: string
-  authorEnvelope: import('@shared/types').KeyEnvelope
-  adminEnvelopes: import('@shared/types').RecipientEnvelope[]
-}
-
-export interface EncryptedMessageResult {
-  encryptedContent: string
-  readerEnvelopes: import('@shared/types').RecipientEnvelope[]
-}
-
-export interface EncryptedKeyData {
+/** PIN-encrypted device key blob for persistent storage. */
+export interface EncryptedDeviceKeys {
   salt: string
   iterations: number
   nonce: string
   ciphertext: string
-  pubkey: string
+  state: DeviceKeyState
 }
 
-// ── Keypair types (no secrets in the new types) ───────────────────────
-
-export interface PublicKeyPair {
-  publicKey: string
-  npub: string
+/** Ed25519 auth token. */
+export interface AuthToken {
+  pubkey: string     // Ed25519 (64 hex chars)
+  timestamp: number  // Unix timestamp ms
+  token: string      // Ed25519 signature (128 hex chars)
 }
 
-export interface GenerateAndLoadResult extends PublicKeyPair {
-  encryptedKeyData: EncryptedKeyData
+/** PUK state — per-user key public info. */
+export interface PukState {
+  generation: number
+  signPubkeyHex: string  // Ed25519 (64 hex chars)
+  dhPubkeyHex: string    // X25519 (64 hex chars)
 }
 
-export interface EphemeralKeyPair {
-  publicKey: string
-  npub: string
-  nsec: string  // Display once for admin-initiated user creation — not stored in CryptoState
+/** PUK creation result. */
+export interface PukCreateResult {
+  pukState: PukState
+  seedHex: string
+  envelope: HpkeEnvelope
 }
 
-// ── Keypair generation (atomic — nsec never leaves Rust/WASM) ─────────
+/** PUK rotation result. */
+export interface PukRotateResult {
+  state: PukState
+  deviceEnvelopes: Array<{ deviceId: string; envelope: HpkeEnvelope }>
+  clkrChainLinkHex: string
+}
+
+/** Sigchain link — append-only identity log entry. */
+export interface SigchainLink {
+  id: string
+  seq: number
+  prevHash: string | null
+  entryHash: string
+  signerDeviceId: string
+  signerPubkey: string   // Ed25519 (64 hex chars)
+  signature: string      // Ed25519 (128 hex chars)
+  timestamp: string      // ISO-8601
+  payloadJson: string    // Type-tagged JSON
+}
+
+/** Sigchain verification result. */
+export interface SigchainVerifiedState {
+  verifiedCount: number
+  headSeq: number
+  headHash: string
+  activeDevicePubkeys: string[]
+}
+
+// ── Device key management ───────────────────────────────────────────
 
 /**
- * Generate a new keypair, encrypt with PIN, and load into CryptoState atomically.
- * Returns only the public key and encrypted key blob — secret NEVER enters JS.
+ * Generate a new device keypair, encrypt with PIN, and load into CryptoState.
+ * Returns the encrypted key blob — secrets NEVER enter JS.
  */
-export async function generateKeypairAndLoad(
+export async function deviceGenerateAndLoad(
   pin: string,
-): Promise<GenerateAndLoadResult> {
+  deviceId: string,
+): Promise<EncryptedDeviceKeys> {
   if (useTauri) {
-    return tauriInvoke<GenerateAndLoadResult>('generate_keypair_and_load', { pin })
+    return tauriInvoke<EncryptedDeviceKeys>('device_generate_and_load', { pin, deviceId })
   }
-  const mod = await getWasm()
-  const state = await getWasmState()
-  const kp = mod.generateKeypair()
-  const rawResult = state.importKey(kp.nsec, pin)
-  const result = fromWasmValue(rawResult) as { encryptedKeyData: EncryptedKeyData }
-  // Persist the encrypted key to the store so decryptWithPin can read it back later.
-  // (The Tauri path handles persistence via Stronghold; in browser mode we use localStorage.)
-  const store = await getStore()
-  await store.set(STORE_KEY, result.encryptedKeyData)
-  await store.save()
-  return {
-    publicKey: kp.pubkeyHex,
-    npub: kp.npub,
-    encryptedKeyData: result.encryptedKeyData,
-  }
+  throw new Error('WASM device key generation not yet implemented')
 }
 
 /**
- * Get x-only public key hex from an nsec (stateless).
- * Returns only the pubkey — no secret, no full KeyPair.
+ * Decrypt device keys from PIN-encrypted storage, load into CryptoState.
+ * Returns only the device state (public keys) — secrets NEVER leave Rust.
+ * Throws on lockout or key wipe. Returns null only for wrong PIN.
  */
-export async function pubkeyFromNsec(nsec: string): Promise<string | null> {
+export async function unlockWithPin(
+  data: EncryptedDeviceKeys,
+  pin: string,
+): Promise<DeviceKeyState | null> {
   if (useTauri) {
     try {
-      return await tauriInvoke<string>('pubkey_from_nsec', { nsec })
+      return await tauriInvoke<DeviceKeyState>('unlock_with_pin', { data, pin })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('Locked out') || msg.includes('Keys wiped')) {
+        throw new Error(msg)
+      }
+      return null
+    }
+  }
+  throw new Error('WASM unlock not yet implemented')
+}
+
+/** Lock the crypto state — zeroizes device secrets. */
+export async function lockCrypto(): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('lock_crypto')
+    return
+  }
+  throw new Error('WASM lock not yet implemented')
+}
+
+/** Check if the crypto state is unlocked. */
+export async function isCryptoUnlocked(): Promise<boolean> {
+  if (useTauri) {
+    return tauriInvoke<boolean>('is_crypto_unlocked')
+  }
+  return false
+}
+
+/** Get the device public keys from CryptoState. */
+export async function getDevicePubkeys(): Promise<DeviceKeyState | null> {
+  if (useTauri) {
+    try {
+      return await tauriInvoke<DeviceKeyState>('get_device_pubkeys')
     } catch {
       return null
     }
   }
-  try {
-    const mod = await getWasm()
-    const kp = mod.keyPairFromNsec(nsec)
-    // serde_wasm_bindgen without json_compatible() serializes serde_json::Value::Object
-    // as a JS Map (not a plain object). Support both until WASM is rebuilt with json_compatible().
-    const pubkeyHex = (kp instanceof Map ? kp.get('pubkeyHex') : kp?.pubkeyHex) as string | undefined
-    return pubkeyHex ?? null
-  } catch {
-    return null
-  }
+  return null
 }
+
+// ── Auth tokens (Ed25519) ───────────────────────────────────────────
 
 /**
- * Create an encrypted backup blob using the nsec in CryptoState.
- * On Tauri: entire PBKDF2+encrypt operation happens in Rust — nsec never enters JS.
- * On WASM: delegates to backup.ts createBackup (nsec stays in WASM linear memory).
- */
-export async function generateBackupFromState(
-  pubkey: string,
-  pin: string,
-  recoveryKey: string,
-): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('generate_backup_from_state', {
-      pubkey,
-      pin,
-      recoveryKey,
-    })
-  }
-  // WASM path: get nsec from WASM state (still in-process, not over IPC)
-  const state = await getWasmState()
-  const nsecStr = (state as unknown as { getNsec?: (t: string) => string }).getNsec?.('__wasm_internal__') ?? ''
-  const { createBackup } = await import('./backup')
-  const backup = await createBackup(nsecStr, pin, pubkey, recoveryKey)
-  return JSON.stringify(backup)
-}
-
-/**
- * Generate an ephemeral keypair for admin-initiated user creation.
- * The nsec is returned for one-time display — it is NOT loaded into CryptoState.
- */
-export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
-  if (useTauri) {
-    return tauriInvoke<EphemeralKeyPair>('generate_ephemeral_keypair')
-  }
-  const mod = await getWasm()
-  const kp = mod.generateKeypair()
-  return { publicKey: kp.pubkeyHex, npub: kp.npub, nsec: kp.nsec }
-}
-
-/** Get public key from CryptoState (stateful). */
-export async function getPublicKeyFromState(): Promise<string | null> {
-  if (useTauri) {
-    try {
-      return await tauriInvoke<string>('get_public_key_from_state')
-    } catch {
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    return state.getPublicKey()
-  } catch {
-    return null
-  }
-}
-
-// ── Auth tokens ──────────────────────────────────────────────────────
-
-/**
- * Create a Schnorr auth token using CryptoState (nsec stays in Rust/WASM).
+ * Create an Ed25519 auth token using the device signing key in CryptoState.
  */
 export async function createAuthToken(
   timestamp: number,
@@ -236,493 +182,228 @@ export async function createAuthToken(
       path,
     })
   }
-  const state = await getWasmState()
-  return JSON.stringify(state.createAuthToken(method, path))
+  throw new Error('WASM auth token not yet implemented')
 }
 
-// ── ECIES operations ─────────────────────────────────────────────────
+// ── Ed25519 signing/verification ────────────────────────────────────
 
-/**
- * ECIES wrap a 32-byte key for a recipient (public-key-only, no nsec needed).
- */
-export async function eciesWrapKey(
-  keyHex: string,
-  recipientPubkey: string,
-  label: string,
-): Promise<import('@shared/types').KeyEnvelope> {
+/** Sign a hex-encoded message using the device's Ed25519 key. */
+export async function ed25519Sign(messageHex: string): Promise<string> {
   if (useTauri) {
-    return tauriInvoke<import('@shared/types').KeyEnvelope>('ecies_wrap_key', {
-      keyHex,
-      recipientPubkey,
-      label,
-    })
+    return tauriInvoke<string>('ed25519_sign_from_state', { messageHex })
   }
-  const mod = await getWasm()
-  return mod.eciesWrapKey(keyHex, recipientPubkey, label)
+  throw new Error('WASM ed25519 sign not yet implemented')
 }
 
-/**
- * ECIES unwrap a key from an envelope using CryptoState.
- */
-export async function eciesUnwrapKey(
-  envelope: import('@shared/types').KeyEnvelope,
-  label: string,
-): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('ecies_unwrap_key_from_state', {
-      envelope,
-      label,
-    })
-  }
-  const state = await getWasmState()
-  return state.eciesUnwrapKey(JSON.stringify(envelope), label)
-}
-
-// ── Note encryption/decryption ───────────────────────────────────────
-
-/**
- * Encrypt a note with per-note forward secrecy (public-key-only).
- */
-export async function encryptNote(
-  payloadJson: string,
-  authorPubkey: string,
-  adminPubkeys: string[],
-): Promise<EncryptedNoteResult> {
-  if (useTauri) {
-    return tauriInvoke<EncryptedNoteResult>('encrypt_note', {
-      payloadJson,
-      authorPubkey,
-      adminPubkeys,
-    })
-  }
-  const state = await getWasmState()
-  return state.encryptNote(payloadJson, authorPubkey, JSON.stringify(adminPubkeys))
-}
-
-/**
- * Decrypt a V2 note using the appropriate envelope via CryptoState.
- */
-export async function decryptNote(
-  encryptedContent: string,
-  envelope: import('@shared/types').KeyEnvelope,
-): Promise<string | null> {
-  if (useTauri) {
-    return tauriInvoke<string>('decrypt_note_from_state', {
-      encryptedContent,
-      envelope,
-    })
-  }
-  try {
-    const state = await getWasmState()
-    return state.decryptNote(encryptedContent, JSON.stringify(envelope))
-  } catch {
-    return null
-  }
-}
-
-/**
- * Decrypt a legacy V1 note via CryptoState.
- */
-export async function decryptLegacyNote(
-  packed: string,
-): Promise<import('@shared/types').NotePayload | null> {
-  if (useTauri) {
-    try {
-      const json = await tauriInvoke<string>('decrypt_legacy_note_from_state', { packed })
-      return JSON.parse(json)
-    } catch {
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    const json = state.decryptLegacyNote(packed)
-    return JSON.parse(json)
-  } catch {
-    return null
-  }
-}
-
-// ── Message encryption/decryption ────────────────────────────────────
-
-/**
- * Encrypt a message for multiple readers (public-key-only).
- */
-export async function encryptMessage(
-  plaintext: string,
-  readerPubkeys: string[],
-): Promise<EncryptedMessageResult> {
-  if (useTauri) {
-    return tauriInvoke<EncryptedMessageResult>('encrypt_message', {
-      plaintext,
-      readerPubkeys,
-    })
-  }
-  const state = await getWasmState()
-  return state.encryptMessage(plaintext, JSON.stringify(readerPubkeys))
-}
-
-/**
- * Decrypt a message using CryptoState (reader pubkey derived from state).
- */
-export async function decryptMessage(
-  encryptedContent: string,
-  readerEnvelopes: import('@shared/types').RecipientEnvelope[],
-): Promise<string | null> {
-  if (useTauri) {
-    try {
-      return await tauriInvoke<string>('decrypt_message_from_state', {
-        encryptedContent,
-        readerEnvelopes,
-      })
-    } catch {
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    return state.decryptMessage(encryptedContent, JSON.stringify(readerEnvelopes))
-  } catch {
-    return null
-  }
-}
-
-// ── Call record decryption ───────────────────────────────────────────
-
-/**
- * Decrypt a call record's encrypted metadata via CryptoState.
- */
-export async function decryptCallRecord(
-  encryptedContent: string,
-  adminEnvelopes: import('@shared/types').RecipientEnvelope[],
-): Promise<{ answeredBy: string | null; callerNumber: string } | null> {
-  if (useTauri) {
-    try {
-      const json = await tauriInvoke<string>('decrypt_call_record_from_state', {
-        encryptedContent,
-        adminEnvelopes,
-      })
-      return JSON.parse(json)
-    } catch {
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    const json = state.decryptCallRecord(encryptedContent, JSON.stringify(adminEnvelopes))
-    return JSON.parse(json)
-  } catch {
-    return null
-  }
-}
-
-// ── Transcription decryption ─────────────────────────────────────────
-
-/**
- * Decrypt a server-encrypted transcription via CryptoState.
- */
-export async function decryptTranscription(
-  packed: string,
-  ephemeralPubkeyHex: string,
-): Promise<string | null> {
-  if (useTauri) {
-    try {
-      return await tauriInvoke<string>('decrypt_transcription_from_state', {
-        packed,
-        ephemeralPubkeyHex,
-      })
-    } catch {
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    return state.decryptTranscription(packed, ephemeralPubkeyHex)
-  } catch {
-    return null
-  }
-}
-
-// ── Draft encryption/decryption ──────────────────────────────────────
-
-/**
- * Encrypt a draft for local auto-save via CryptoState.
- */
-export async function encryptDraft(
-  plaintext: string,
-): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('encrypt_draft_from_state', { plaintext })
-  }
-  const state = await getWasmState()
-  return state.encryptDraft(plaintext)
-}
-
-/**
- * Decrypt a locally-saved draft via CryptoState.
- */
-export async function decryptDraft(
-  packed: string,
-): Promise<string | null> {
-  if (useTauri) {
-    try {
-      return await tauriInvoke<string>('decrypt_draft_from_state', { packed })
-    } catch {
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    return state.decryptDraft(packed)
-  } catch {
-    return null
-  }
-}
-
-// ── Export encryption ────────────────────────────────────────────────
-
-/**
- * Encrypt a JSON export blob via CryptoState.
- * Returns a base64-encoded string.
- */
-export async function encryptExport(
-  jsonString: string,
-): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('encrypt_export_from_state', { jsonString })
-  }
-  const state = await getWasmState()
-  return state.encryptExport(jsonString)
-}
-
-// ── Nostr event signing ──────────────────────────────────────────────
-
-/**
- * Sign a Nostr event using CryptoState.
- */
-export async function signNostrEvent(
-  kind: number,
-  createdAt: number,
-  tags: string[][],
-  content: string,
-): Promise<SignedNostrEvent> {
-  if (useTauri) {
-    return tauriInvoke<SignedNostrEvent>('sign_nostr_event_from_state', {
-      kind,
-      createdAt,
-      tags,
-      content,
-    })
-  }
-  const state = await getWasmState()
-  const eventTemplate = { kind, created_at: createdAt, tags, content }
-  return state.signNostrEvent(JSON.stringify(eventTemplate))
-}
-
-// ── File crypto ──────────────────────────────────────────────────────
-
-/**
- * Decrypt file metadata via ECIES through CryptoState.
- */
-export async function decryptFileMetadata(
-  encryptedContentHex: string,
-  ephemeralPubkeyHex: string,
-): Promise<string | null> {
-  if (useTauri) {
-    try {
-      return await tauriInvoke<string>('decrypt_file_metadata_from_state', {
-        encryptedContentHex,
-        ephemeralPubkeyHex,
-      })
-    } catch {
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    const envelope = { wrappedKey: encryptedContentHex, ephemeralPubkey: ephemeralPubkeyHex }
-    return state.decryptFileMetadata(encryptedContentHex, JSON.stringify(envelope))
-  } catch {
-    return null
-  }
-}
-
-/**
- * Unwrap a file key envelope via CryptoState.
- */
-export async function unwrapFileKey(
-  envelope: import('@shared/types').KeyEnvelope,
-): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('unwrap_file_key_from_state', { envelope })
-  }
-  const state = await getWasmState()
-  return state.unwrapFileKey(JSON.stringify(envelope))
-}
-
-/**
- * Unwrap a hub key envelope via CryptoState.
- */
-export async function unwrapHubKey(
-  envelope: import('@shared/types').KeyEnvelope,
-): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('unwrap_hub_key_from_state', { envelope })
-  }
-  const state = await getWasmState()
-  return state.unwrapHubKey(JSON.stringify(envelope))
-}
-
-/**
- * Re-wrap a file key for a new recipient via CryptoState.
- */
-export async function rewrapFileKey(
-  encryptedFileKeyHex: string,
-  ephemeralPubkeyHex: string,
-  newRecipientPubkeyHex: string,
-): Promise<import('@shared/types').RecipientEnvelope> {
-  if (useTauri) {
-    return tauriInvoke<import('@shared/types').RecipientEnvelope>('rewrap_file_key_from_state', {
-      encryptedFileKeyHex,
-      ephemeralPubkeyHex,
-      newRecipientPubkeyHex,
-    })
-  }
-  const state = await getWasmState()
-  const envelope = { wrappedKey: encryptedFileKeyHex, ephemeralPubkey: ephemeralPubkeyHex }
-  return state.rewrapFileKey(JSON.stringify(envelope), newRecipientPubkeyHex)
-}
-
-// ── Device provisioning (nsec never enters JS) ──────────────────────
-
-export interface ProvisioningEncryptResult {
-  encryptedHex: string
-  sasCode: string
-}
-
-export interface ProvisioningDecryptResult {
-  nsec: string
-  sasCode: string
-}
-
-/**
- * Encrypt the nsec for device provisioning entirely in Rust/WASM.
- * The nsec NEVER enters JavaScript — ECDH, key derivation, encryption,
- * and SAS computation all happen inside the native/WASM crypto module.
- */
-export async function encryptNsecForProvisioning(
-  ephemeralPubkeyHex: string,
-): Promise<ProvisioningEncryptResult> {
-  if (useTauri) {
-    return tauriInvoke<ProvisioningEncryptResult>('encrypt_nsec_for_provisioning', {
-      ephemeralPubkeyHex,
-    })
-  }
-  const state = await getWasmState()
-  return state.encryptNsecForProvisioning(ephemeralPubkeyHex)
-}
-
-/**
- * Generate an ephemeral secp256k1 keypair for device provisioning.
- * The secret key is stored in Rust/WASM state and never exposed to JS.
- * Returns only the x-only public key hex for the QR code / pairing flow.
- */
-export async function generateProvisioningEphemeral(): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('generate_provisioning_ephemeral')
-  }
-  const state = await getWasmState()
-  return state.generateProvisioningEphemeral()
-}
-
-/**
- * Decrypt a provisioned nsec from the primary device entirely in Rust/WASM.
- * Used by the NEW device after receiving the encrypted payload.
- *
- * Requires `generateProvisioningEphemeral` to have been called first — the
- * ephemeral SK lives in Rust/WASM state and is consumed on use.
- */
-export async function decryptProvisionedNsec(
-  encryptedHex: string,
-  primaryPubkeyHex: string,
-): Promise<ProvisioningDecryptResult> {
-  if (useTauri) {
-    return tauriInvoke<ProvisioningDecryptResult>('decrypt_provisioned_nsec', {
-      encryptedHex,
-      primaryPubkeyHex,
-    })
-  }
-  const state = await getWasmState()
-  return state.decryptProvisionedNsec(encryptedHex, primaryPubkeyHex)
-}
-
-// ── Nsec validation & parsing (stateless) ────────────────────────────
-
-/**
- * Validate nsec format (stateless).
- */
-export async function isValidNsec(nsec: string): Promise<boolean> {
-  if (useTauri) {
-    try {
-      return await tauriInvoke<boolean>('is_valid_nsec', { nsec })
-    } catch {
-      return false
-    }
-  }
-  try {
-    const mod = await getWasm()
-    return mod.isValidNsec(nsec)
-  } catch {
-    return false
-  }
-}
-
-// ── Schnorr signature verification (stateless) ──────────────────────
-
-/**
- * Verify a Schnorr signature (stateless).
- */
-export async function verifySchnorr(
-  message: string,
-  signature: string,
-  pubkey: string,
+/** Verify an Ed25519 signature (stateless — no secrets needed). */
+export async function ed25519Verify(
+  messageHex: string,
+  signatureHex: string,
+  pubkeyHex: string,
 ): Promise<boolean> {
   if (useTauri) {
     try {
-      return await tauriInvoke<boolean>('verify_schnorr', { message, signature, pubkey })
+      return await tauriInvoke<boolean>('ed25519_verify', {
+        messageHex,
+        signatureHex,
+        pubkeyHex,
+      })
     } catch {
       return false
     }
   }
-  try {
-    const mod = await getWasm()
-    return mod.verifySchnorr(message, signature, pubkey)
-  } catch {
-    return false
-  }
+  return false
 }
 
-// ── WASM value conversion ────────────────────────────────────────────
+// ── HPKE envelope encryption ───────────────────────────────────────
 
 /**
- * Convert a value returned by serde_wasm_bindgen 0.6 (default serializer) to a plain JS object.
- * serde_wasm_bindgen 0.6 converts Rust/serde map types (including serde_json::Value::Object)
- * to JS Map objects, which serialize as {} with JSON.stringify. This recursively converts
- * Maps to plain objects so the result can be stored and retrieved correctly.
+ * HPKE seal: encrypt plaintext for a recipient's X25519 pubkey (stateless).
  */
-function fromWasmValue(val: unknown): unknown {
-  if (val instanceof Map) {
-    const obj: Record<string, unknown> = {}
-    val.forEach((v: unknown, k: unknown) => { obj[String(k)] = fromWasmValue(v) })
-    return obj
+export async function hpkeSeal(
+  plaintextHex: string,
+  recipientPubkeyHex: string,
+  label: string,
+  aadHex: string,
+): Promise<HpkeEnvelope> {
+  if (useTauri) {
+    return tauriInvoke<HpkeEnvelope>('hpke_seal', {
+      plaintextHex,
+      recipientPubkeyHex,
+      label,
+      aadHex,
+    })
   }
-  if (Array.isArray(val)) return val.map(fromWasmValue)
-  return val
+  throw new Error('WASM hpke seal not yet implemented')
+}
+
+/**
+ * HPKE open: decrypt an envelope using the device's X25519 key from CryptoState.
+ */
+export async function hpkeOpenFromState(
+  envelope: HpkeEnvelope,
+  expectedLabel: string,
+  aadHex: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('hpke_open_from_state', {
+      envelope,
+      expectedLabel,
+      aadHex,
+    })
+  }
+  throw new Error('WASM hpke open not yet implemented')
+}
+
+/**
+ * HPKE seal a 32-byte key for a recipient (convenience wrapper).
+ */
+export async function hpkeSealKey(
+  keyHex: string,
+  recipientPubkeyHex: string,
+  label: string,
+  aadHex: string,
+): Promise<HpkeEnvelope> {
+  if (useTauri) {
+    return tauriInvoke<HpkeEnvelope>('hpke_seal_key', {
+      keyHex,
+      recipientPubkeyHex,
+      label,
+      aadHex,
+    })
+  }
+  throw new Error('WASM hpke seal key not yet implemented')
+}
+
+/**
+ * HPKE open a 32-byte key from an envelope using CryptoState.
+ */
+export async function hpkeOpenKeyFromState(
+  envelope: HpkeEnvelope,
+  expectedLabel: string,
+  aadHex: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('hpke_open_key_from_state', {
+      envelope,
+      expectedLabel,
+      aadHex,
+    })
+  }
+  throw new Error('WASM hpke open key not yet implemented')
+}
+
+// ── PUK (Per-User Key) ─────────────────────────────────────────────
+
+/** Create the initial PUK (generation 1), wrapped to the device's X25519 pubkey. */
+export async function pukCreateFromState(): Promise<PukCreateResult> {
+  if (useTauri) {
+    return tauriInvoke<PukCreateResult>('puk_create_from_state')
+  }
+  throw new Error('WASM puk create not yet implemented')
+}
+
+/** Rotate the PUK to a new generation. */
+export async function pukRotate(
+  oldSeedHex: string,
+  oldGen: number,
+  remainingDevices: Array<[string, string]>,
+): Promise<PukRotateResult> {
+  if (useTauri) {
+    return tauriInvoke<PukRotateResult>('puk_rotate', {
+      oldSeedHex,
+      oldGen,
+      remainingDevicesJson: JSON.stringify(remainingDevices),
+    })
+  }
+  throw new Error('WASM puk rotate not yet implemented')
+}
+
+/** Unwrap a PUK seed from an HPKE envelope using CryptoState. */
+export async function pukUnwrapSeedFromState(
+  envelope: HpkeEnvelope,
+  expectedLabel: string,
+  aadHex: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('puk_unwrap_seed_from_state', {
+      envelope,
+      expectedLabel,
+      aadHex,
+    })
+  }
+  throw new Error('WASM puk unwrap seed not yet implemented')
+}
+
+// ── Sigchain ────────────────────────────────────────────────────────
+
+/** Sign a new sigchain link using the device's Ed25519 key from CryptoState. */
+export async function sigchainCreateLinkFromState(
+  id: string,
+  seq: number,
+  prevHash: string | null,
+  timestamp: string,
+  payloadJson: string,
+): Promise<SigchainLink> {
+  if (useTauri) {
+    return tauriInvoke<SigchainLink>('sigchain_create_link_from_state', {
+      id,
+      seq,
+      prevHash,
+      timestamp,
+      payloadJson,
+    })
+  }
+  throw new Error('WASM sigchain create link not yet implemented')
+}
+
+/** Verify a sigchain (stateless). */
+export async function sigchainVerify(
+  links: SigchainLink[],
+): Promise<SigchainVerifiedState> {
+  if (useTauri) {
+    return tauriInvoke<SigchainVerifiedState>('sigchain_verify', {
+      linksJson: JSON.stringify(links),
+    })
+  }
+  throw new Error('WASM sigchain verify not yet implemented')
+}
+
+/** Verify a single sigchain link (stateless). */
+export async function sigchainVerifyLink(
+  link: SigchainLink,
+  expectedSignerPubkey: string,
+): Promise<boolean> {
+  if (useTauri) {
+    return tauriInvoke<boolean>('sigchain_verify_link', {
+      linkJson: JSON.stringify(link),
+      expectedSignerPubkey,
+    })
+  }
+  return false
+}
+
+// ── SFrame key derivation ───────────────────────────────────────────
+
+/** Derive an SFrame key for a call participant (stateless). */
+export async function sframeDeriveKey(
+  exporterSecretHex: string,
+  callId: string,
+  participantIndex: number,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('sframe_derive_key', {
+      exporterSecretHex,
+      callId,
+      participantIndex,
+    })
+  }
+  throw new Error('WASM sframe derive key not yet implemented')
 }
 
 // ── Key persistence ─────────────────────────────────────────────────
 
-const STORE_KEY = 'llamenos-encrypted-key'
+const STORE_KEY = 'llamenos-encrypted-device-keys'
 
 /** Get the Tauri Store or a localStorage-based fallback for browser. */
 async function getStore() {
@@ -730,7 +411,6 @@ async function getStore() {
     const { Store } = await import('@tauri-apps/plugin-store')
     return Store.load('keys.json')
   }
-  // Browser/test: use localStorage with a prefix
   return {
     async get<T>(key: string): Promise<T | null> {
       const raw = localStorage.getItem(`llamenos:${key}`)
@@ -750,106 +430,38 @@ async function getStore() {
 }
 
 /**
- * Encrypt an nsec with a PIN and persist to store.
- * Also loads the key into CryptoState.
+ * Persist encrypted device keys to store and unlock.
+ * Used during onboarding after device_generate_and_load.
  */
-export async function encryptWithPin(
-  nsec: string,
+export async function persistAndUnlockDeviceKeys(
+  encrypted: EncryptedDeviceKeys,
   pin: string,
-  pubkeyHex: string,
-): Promise<void> {
-  let encryptedData: EncryptedKeyData
-  if (useTauri) {
-    encryptedData = await tauriInvoke<EncryptedKeyData>('import_key_to_state', {
-      nsec,
-      pin,
-      pubkeyHex,
-    })
-  } else {
-    const state = await getWasmState()
-    // importKey returns { encryptedKeyData: EncryptedKeyData, pubkey: string }.
-    // serde_wasm_bindgen 0.6 converts serde_json::Value::Object to JS Map (not plain object),
-    // so JSON.stringify gives {}. Use fromWasmValue to get plain objects, then extract the inner data.
-    const rawResult = state.importKey(nsec, pin)
-    const result = fromWasmValue(rawResult) as { encryptedKeyData: EncryptedKeyData }
-    encryptedData = result.encryptedKeyData
-  }
+): Promise<DeviceKeyState | null> {
   const store = await getStore()
-  await store.set(STORE_KEY, encryptedData)
+  await store.set(STORE_KEY, encrypted)
   await store.save()
+  return unlockWithPin(encrypted, pin)
 }
 
 /**
- * Decrypt an nsec from PIN-encrypted storage and load into CryptoState.
- * Returns ONLY the pubkey — the nsec NEVER leaves the Rust/WASM process.
- *
- * Throws on lockout or key wipe.
- * Returns null only for wrong PIN (no lockout).
+ * Load encrypted device keys from store and unlock with PIN.
+ * Returns null for wrong PIN, throws on lockout/wipe.
  */
-export async function decryptWithPin(pin: string): Promise<string | null> {
+export async function unlockStoredKeys(pin: string): Promise<DeviceKeyState | null> {
   const store = await getStore()
-  const data = await store.get<EncryptedKeyData>(STORE_KEY)
+  const data = await store.get<EncryptedDeviceKeys>(STORE_KEY)
   if (!data) return null
-  if (useTauri) {
-    try {
-      return await tauriInvoke<string>('unlock_with_pin', { data, pin })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('Locked out') || msg.includes('Keys wiped')) {
-        throw new Error(msg)
-      }
-      return null
-    }
-  }
-  try {
-    const state = await getWasmState()
-    const dataJson = JSON.stringify(data)
-    const result = state.unlockWithPin(dataJson, pin)
-    return result
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    if (msg.includes('Locked out') || msg.includes('Keys wiped')) {
-      throw new Error(msg)
-    }
-    return null
-  }
+  return unlockWithPin(data, pin)
 }
 
-/**
- * Lock the crypto state (zeros nsec).
- */
-export async function lockCrypto(): Promise<void> {
-  if (useTauri) {
-    await tauriInvoke<void>('lock_crypto')
-    return
-  }
-  const state = await getWasmState()
-  state.lock()
-}
-
-/**
- * Check if the crypto state is unlocked.
- */
-export async function isCryptoUnlocked(): Promise<boolean> {
-  if (useTauri) {
-    return tauriInvoke<boolean>('is_crypto_unlocked')
-  }
-  const state = await getWasmState()
-  return state.isUnlocked()
-}
-
-/**
- * Check if an encrypted key exists in store.
- */
+/** Check if encrypted device keys exist in store. */
 export async function hasStoredKey(): Promise<boolean> {
   const store = await getStore()
   const data = await store.get(STORE_KEY)
   return data !== null && data !== undefined
 }
 
-/**
- * Clear the encrypted key from store and lock CryptoState.
- */
+/** Clear encrypted keys from store and lock CryptoState. */
 export async function clearStoredKey(): Promise<void> {
   const store = await getStore()
   await store.delete(STORE_KEY)
@@ -857,3 +469,318 @@ export async function clearStoredKey(): Promise<void> {
   await lockCrypto()
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// Backward-compatibility layer — transitional exports for callers that
+// still use the v2 (secp256k1/ECIES/Schnorr) API names.
+//
+// These will be removed once all callers are migrated to the v3 API.
+// Functions that cannot be meaningfully mapped throw at runtime.
+// ══════════════════════════════════════════════════════════════════════
+
+// --- Legacy type re-exports ---
+
+import type {
+  KeyEnvelope as _KeyEnvelope,
+  RecipientEnvelope as _RecipientEnvelope,
+  RecipientKeyEnvelope as _RecipientKeyEnvelope,
+} from '@shared/types'
+
+/** @deprecated Use HpkeEnvelope instead. */
+export type KeyEnvelope = _KeyEnvelope
+/** @deprecated Use HpkeEnvelope instead. */
+export type RecipientEnvelope = _RecipientEnvelope
+/** @deprecated Use HpkeEnvelope instead. */
+export type RecipientKeyEnvelope = _RecipientKeyEnvelope
+
+/** @deprecated Use EncryptedDeviceKeys instead. */
+export interface EncryptedKeyData {
+  salt: string
+  iterations: number
+  nonce: string
+  ciphertext: string
+  pubkey: string
+}
+
+/** @deprecated Use DeviceKeyState instead. */
+export interface PublicKeyPair {
+  publicKey: string
+  npub: string
+}
+
+/** @deprecated Use EncryptedDeviceKeys instead. */
+export interface GenerateAndLoadResult extends PublicKeyPair {
+  encryptedKeyData: EncryptedKeyData
+}
+
+/** @deprecated Removed in v3 — no more Nostr nsec/npub. */
+export interface EphemeralKeyPair {
+  publicKey: string
+  npub: string
+  nsec: string
+}
+
+/** @deprecated Removed in v3 — use Ed25519 signing. */
+export interface SignedNostrEvent {
+  id: string
+  pubkey: string
+  created_at: number
+  kind: number
+  tags: string[][]
+  content: string
+  sig: string
+}
+
+/** @deprecated High-level encryption results. */
+export interface EncryptedNoteResult {
+  encryptedContent: string
+  authorEnvelope: KeyEnvelope
+  adminEnvelopes: RecipientEnvelope[]
+}
+
+/** @deprecated High-level encryption results. */
+export interface EncryptedMessageResult {
+  encryptedContent: string
+  readerEnvelopes: RecipientEnvelope[]
+}
+
+/** @deprecated Use HpkeEnvelope instead. */
+export interface FileKeyEnvelope {
+  wrappedKey: string
+  ephemeralPubkey: string
+}
+
+// --- Legacy function wrappers ---
+
+/** @deprecated Use deviceGenerateAndLoad instead. */
+export async function generateKeypairAndLoad(pin: string): Promise<GenerateAndLoadResult> {
+  const deviceId = crypto.randomUUID()
+  const encrypted = await deviceGenerateAndLoad(pin, deviceId)
+  // Map v3 result to v2 shape for callers
+  return {
+    publicKey: encrypted.state.signingPubkeyHex,
+    npub: '', // No more npub in v3
+    encryptedKeyData: {
+      salt: encrypted.salt,
+      iterations: encrypted.iterations,
+      nonce: encrypted.nonce,
+      ciphertext: encrypted.ciphertext,
+      pubkey: encrypted.state.signingPubkeyHex,
+    },
+  }
+}
+
+/** @deprecated Use unlockStoredKeys instead. */
+export async function decryptWithPin(pin: string): Promise<string | null> {
+  const state = await unlockStoredKeys(pin)
+  return state?.signingPubkeyHex ?? null
+}
+
+/** @deprecated No more nsec-based key import in v3. */
+export async function encryptWithPin(
+  _nsec: string,
+  _pin: string,
+  _pubkeyHex: string,
+): Promise<void> {
+  throw new Error('encryptWithPin removed in v3 — use deviceGenerateAndLoad instead')
+}
+
+/** @deprecated Use getDevicePubkeys instead. */
+export async function getPublicKeyFromState(): Promise<string | null> {
+  const state = await getDevicePubkeys()
+  return state?.signingPubkeyHex ?? null
+}
+
+/** @deprecated No more nsec in v3. */
+export async function pubkeyFromNsec(_nsec: string): Promise<string | null> {
+  throw new Error('pubkeyFromNsec removed in v3 — no more Nostr nsec/npub')
+}
+
+/** @deprecated No more nsec validation in v3. */
+export async function isValidNsec(_nsec: string): Promise<boolean> {
+  return false
+}
+
+/** @deprecated Use ed25519Verify instead. */
+export async function verifySchnorr(
+  message: string,
+  signature: string,
+  pubkey: string,
+): Promise<boolean> {
+  return ed25519Verify(message, signature, pubkey)
+}
+
+/** @deprecated Use hpkeSealKey instead. */
+export async function eciesWrapKey(
+  keyHex: string,
+  recipientPubkey: string,
+  label: string,
+): Promise<KeyEnvelope> {
+  const envelope = await hpkeSealKey(keyHex, recipientPubkey, label, '')
+  return { wrappedKey: envelope.ct, ephemeralPubkey: envelope.enc }
+}
+
+/** @deprecated Use hpkeOpenKeyFromState instead. */
+export async function eciesUnwrapKey(
+  _envelope: KeyEnvelope,
+  _label: string,
+): Promise<string> {
+  throw new Error('eciesUnwrapKey removed in v3 — use hpkeOpenKeyFromState with HpkeEnvelope')
+}
+
+/** @deprecated Use hpkeSealKey + hpke composition instead. */
+export async function encryptNote(
+  _payloadJson: string,
+  _authorPubkey: string,
+  _adminPubkeys: string[],
+): Promise<EncryptedNoteResult> {
+  throw new Error('encryptNote removed in v3 — compose with hpkeSealKey + AES-GCM')
+}
+
+/** @deprecated Use hpkeOpenKeyFromState + AES-GCM instead. */
+export async function decryptNote(
+  _encryptedContent: string,
+  _envelope: KeyEnvelope,
+): Promise<string | null> {
+  throw new Error('decryptNote removed in v3 — compose with hpkeOpenKeyFromState + AES-GCM')
+}
+
+/** @deprecated No more legacy note format. */
+export async function decryptLegacyNote(
+  _packed: string,
+): Promise<import('@shared/types').NotePayload | null> {
+  return null
+}
+
+/** @deprecated Use hpkeSealKey composition instead. */
+export async function encryptMessage(
+  _plaintext: string,
+  _readerPubkeys: string[],
+): Promise<EncryptedMessageResult> {
+  throw new Error('encryptMessage removed in v3 — compose with hpkeSealKey + AES-GCM')
+}
+
+/** @deprecated Use hpkeOpenKeyFromState composition instead. */
+export async function decryptMessage(
+  _encryptedContent: string,
+  _readerEnvelopes: RecipientEnvelope[],
+): Promise<string | null> {
+  throw new Error('decryptMessage removed in v3 — compose with hpkeOpenKeyFromState + AES-GCM')
+}
+
+/** @deprecated Use hpkeOpenFromState composition instead. */
+export async function decryptCallRecord(
+  _encryptedContent: string,
+  _adminEnvelopes: RecipientEnvelope[],
+): Promise<{ answeredBy: string | null; callerNumber: string } | null> {
+  throw new Error('decryptCallRecord removed in v3 — compose with hpkeOpenFromState')
+}
+
+/** @deprecated Use hpkeOpenFromState instead. */
+export async function decryptTranscription(
+  _packed: string,
+  _ephemeralPubkeyHex: string,
+): Promise<string | null> {
+  throw new Error('decryptTranscription removed in v3 — use hpkeOpenFromState')
+}
+
+/** @deprecated Drafts need v3 migration. */
+export async function encryptDraft(_plaintext: string): Promise<string> {
+  throw new Error('encryptDraft removed in v3 — needs migration to HPKE')
+}
+
+/** @deprecated Drafts need v3 migration. */
+export async function decryptDraft(_packed: string): Promise<string | null> {
+  return null
+}
+
+/** @deprecated Export encryption needs v3 migration. */
+export async function encryptExport(_jsonString: string): Promise<string> {
+  throw new Error('encryptExport removed in v3 — needs migration to HPKE')
+}
+
+/** @deprecated Nostr signing removed in v3. Use ed25519Sign. */
+export async function signNostrEvent(
+  _kind: number,
+  _createdAt: number,
+  _tags: string[][],
+  _content: string,
+): Promise<SignedNostrEvent> {
+  throw new Error('signNostrEvent removed in v3 — Nostr replaced with Ed25519/sigchain')
+}
+
+/** @deprecated Use hpkeOpenFromState with LABEL_FILE_METADATA. */
+export async function decryptFileMetadata(
+  _encryptedContentHex: string,
+  _ephemeralPubkeyHex: string,
+): Promise<string | null> {
+  throw new Error('decryptFileMetadata removed in v3 — use hpkeOpenFromState')
+}
+
+/** @deprecated Use hpkeOpenKeyFromState with LABEL_FILE_KEY. */
+export async function unwrapFileKey(
+  _envelope: KeyEnvelope,
+): Promise<string> {
+  throw new Error('unwrapFileKey removed in v3 — use hpkeOpenKeyFromState with LABEL_FILE_KEY')
+}
+
+/** @deprecated Use hpkeOpenKeyFromState with LABEL_HUB_KEY_WRAP. */
+export async function unwrapHubKey(
+  _envelope: KeyEnvelope,
+): Promise<string> {
+  throw new Error('unwrapHubKey removed in v3 — use hpkeOpenKeyFromState with LABEL_HUB_KEY_WRAP')
+}
+
+/** @deprecated Use hpkeOpenKeyFromState + hpkeSealKey composition. */
+export async function rewrapFileKey(
+  _encryptedFileKeyHex: string,
+  _ephemeralPubkeyHex: string,
+  _newRecipientPubkeyHex: string,
+): Promise<RecipientEnvelope> {
+  throw new Error('rewrapFileKey removed in v3 — compose hpkeOpenKeyFromState + hpkeSealKey')
+}
+
+/** @deprecated Backup generation needs v3 migration. */
+export async function generateBackupFromState(
+  _pubkey: string,
+  _pin: string,
+  _recoveryKey: string,
+): Promise<string> {
+  throw new Error('generateBackupFromState removed in v3 — needs device key backup migration')
+}
+
+/** @deprecated No more ephemeral Nostr keypairs. */
+export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
+  throw new Error('generateEphemeralKeypair removed in v3 — no more Nostr nsec/npub')
+}
+
+/** @deprecated Device provisioning needs v3 migration. */
+export interface ProvisioningEncryptResult {
+  encryptedHex: string
+  sasCode: string
+}
+
+/** @deprecated Device provisioning needs v3 migration. */
+export interface ProvisioningDecryptResult {
+  nsec: string
+  sasCode: string
+}
+
+/** @deprecated Device provisioning needs v3 migration. */
+export async function encryptNsecForProvisioning(
+  _ephemeralPubkeyHex: string,
+): Promise<ProvisioningEncryptResult> {
+  throw new Error('encryptNsecForProvisioning removed in v3')
+}
+
+/** @deprecated Device provisioning needs v3 migration. */
+export async function generateProvisioningEphemeral(): Promise<string> {
+  throw new Error('generateProvisioningEphemeral removed in v3')
+}
+
+/** @deprecated Device provisioning needs v3 migration. */
+export async function decryptProvisionedNsec(
+  _encryptedHex: string,
+  _primaryPubkeyHex: string,
+): Promise<ProvisioningDecryptResult> {
+  throw new Error('decryptProvisionedNsec removed in v3')
+}

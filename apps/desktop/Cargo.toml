@@ -28,12 +28,7 @@ llamenos-core = { path = "../../packages/crypto" }
 sha2 = "0.10"
 hmac = "0.12"
 pbkdf2 = "0.12"
-zeroize = { version = "1", features = ["derive"] }
-bech32 = "0.11"
 hex = "0.4"
-rand = "0.8"
-chacha20poly1305 = "0.10"
-getrandom = "0.2"
 tokio = { version = "1", features = ["full"] }
 
 [features]

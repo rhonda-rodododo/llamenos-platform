@@ -1,9 +1,8 @@
 /**
- * Mock @tauri-apps/api/core for Playwright test builds.
+ * Mock @tauri-apps/api/core for Playwright test builds (v3 crypto API).
  *
- * All crypto operations route through the Rust-compiled WasmCryptoState,
- * ensuring tests exercise the same crypto code as the native desktop app.
- * There is no JS/@noble fallback — WASM is required.
+ * Implements Ed25519/X25519/HPKE mock operations using @noble/curves
+ * and @noble/hashes for test-mode crypto that mirrors the Rust desktop IPC.
  *
  * Aliased via vite.config.ts when PLAYWRIGHT_TEST=true.
  */
@@ -13,17 +12,215 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
   throw new Error('FATAL: Tauri IPC mock loaded outside test environment.')
 }
 
-import { initWasmCrypto, getWasmState, getWasmModule } from './wasm-crypto-state'
+import { ed25519 } from '@noble/curves/ed25519'
+import { x25519 } from '@noble/curves/ed25519'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { sha256 } from '@noble/hashes/sha256.js'
+import { hmac } from '@noble/hashes/hmac.js'
+import { gcm } from '@noble/ciphers/aes.js'
+import { randomBytes } from '@noble/hashes/utils.js'
+import { utf8ToBytes, bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 
-// ── WASM initialization ──────────────────────────────────────────────
-// Every invoke() call awaits this before touching any WASM function.
-// initWasmCrypto() itself is idempotent (caches its own promise), so
-// we simply call it on every invoke — no separate cache needed.
-// This eliminates the double-promise-cache that could desync if the
-// bundler instantiates modules in an unexpected order.
+// ── Helpers ──────────────────────────────────────────────────────────
 
-async function ensureWasmReady(): Promise<void> {
-  await initWasmCrypto()
+function base64urlEncode(bytes: Uint8Array): string {
+  const b64 = btoa(String.fromCharCode(...bytes))
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function base64urlDecode(str: string): Uint8Array {
+  const padded = str.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - (str.length % 4)) % 4)
+  const binary = atob(padded)
+  return Uint8Array.from(binary, c => c.charCodeAt(0))
+}
+
+// ── Label registry (matches Rust labels.rs) ─────────────────────────
+
+const LABEL_MAP: Record<string, number> = {
+  'llamenos:note-key:v1': 0,
+  'llamenos:file-key:v1': 1,
+  'llamenos:file-metadata:v1': 2,
+  'llamenos:hub-key-wrap:v1': 3,
+  'llamenos:transcription:v1': 4,
+  'llamenos:message:v1': 5,
+  'llamenos:call-meta:v1': 6,
+  'llamenos:shift-schedule:v1': 7,
+  'llamenos:puk-sign:v1': 41,
+  'llamenos:puk-dh:v1': 42,
+  'llamenos:puk-secretbox:v1': 43,
+  'llamenos:puk-wrap-to-device:v1': 44,
+  'llamenos:device-auth:v1': 46,
+  'llamenos:sframe-call-secret:v1': 50,
+  'llamenos:sframe-base-key:v1': 51,
+  'llamenos:mls-provision:v1': 52,
+}
+
+function labelToId(label: string): number {
+  const id = LABEL_MAP[label]
+  if (id === undefined) throw new Error(`Unknown label: ${label}`)
+  return id
+}
+
+// ── Mock device key state ───────────────────────────────────────────
+
+interface MockDeviceSecrets {
+  signingSeed: Uint8Array    // 32 bytes
+  encryptionSeed: Uint8Array // 32 bytes
+}
+
+interface MockDeviceKeyState {
+  deviceId: string
+  signingPubkeyHex: string
+  encryptionPubkeyHex: string
+}
+
+let mockSecrets: MockDeviceSecrets | null = null
+let mockDeviceState: MockDeviceKeyState | null = null
+let mockEncryptedKeys: unknown = null
+
+function deriveEd25519Pubkey(seed: Uint8Array): Uint8Array {
+  return ed25519.getPublicKey(seed)
+}
+
+function deriveX25519Pubkey(seed: Uint8Array): Uint8Array {
+  return x25519.getPublicKey(seed)
+}
+
+function requireSecrets(): MockDeviceSecrets {
+  if (!mockSecrets) throw new Error('Device key is locked. Enter PIN to unlock.')
+  return mockSecrets
+}
+
+function requireDeviceState(): MockDeviceKeyState {
+  if (!mockDeviceState) throw new Error('Device key is locked. Enter PIN to unlock.')
+  return mockDeviceState
+}
+
+// ── PBKDF2 + AES-256-GCM for PIN encryption ────────────────────────
+
+async function deriveKek(pin: string, salt: Uint8Array): Promise<Uint8Array> {
+  // Use WebCrypto PBKDF2 (faster than pure JS for 600K iterations)
+  const pinKey = await crypto.subtle.importKey(
+    'raw', utf8ToBytes(pin), 'PBKDF2', false, ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 600_000, hash: 'SHA-256' },
+    pinKey,
+    256,
+  )
+  return new Uint8Array(bits)
+}
+
+async function encryptWithPin(
+  signingSeed: Uint8Array,
+  encryptionSeed: Uint8Array,
+  pin: string,
+): Promise<{ salt: string; iterations: number; nonce: string; ciphertext: string }> {
+  const salt = randomBytes(32)
+  const nonce = randomBytes(12)
+  const kek = await deriveKek(pin, salt)
+
+  const plaintext = new Uint8Array(64)
+  plaintext.set(signingSeed)
+  plaintext.set(encryptionSeed, 32)
+
+  const cipher = gcm(kek, nonce)
+  const encrypted = cipher.encrypt(plaintext)
+
+  return {
+    salt: bytesToHex(salt),
+    iterations: 600_000,
+    nonce: bytesToHex(nonce),
+    ciphertext: bytesToHex(encrypted),
+  }
+}
+
+async function decryptWithPin(
+  encrypted: { salt: string; nonce: string; ciphertext: string },
+  pin: string,
+): Promise<{ signingSeed: Uint8Array; encryptionSeed: Uint8Array }> {
+  const salt = hexToBytes(encrypted.salt)
+  const nonce = hexToBytes(encrypted.nonce)
+  const ciphertext = hexToBytes(encrypted.ciphertext)
+  const kek = await deriveKek(pin, salt)
+
+  const cipher = gcm(kek, nonce)
+  const plaintext = cipher.decrypt(ciphertext)
+
+  if (plaintext.length !== 64) throw new Error('Invalid decrypted device key blob')
+
+  return {
+    signingSeed: plaintext.slice(0, 32),
+    encryptionSeed: plaintext.slice(32),
+  }
+}
+
+// ── HPKE mock (X25519 + HKDF-SHA256 + AES-256-GCM) ─────────────────
+
+function hpkeSealMock(
+  plaintext: Uint8Array,
+  recipientPubkeyHex: string,
+  label: string,
+  aad: Uint8Array,
+): { v: number; labelId: number; enc: string; ct: string } {
+  const labelId = labelToId(label)
+
+  // Generate ephemeral X25519 keypair
+  const ephSeed = randomBytes(32)
+  const ephPub = x25519.getPublicKey(ephSeed)
+  const recipientPub = hexToBytes(recipientPubkeyHex)
+
+  // ECDH shared secret
+  const sharedSecret = x25519.getSharedSecret(ephSeed, recipientPub)
+
+  // HKDF extract + expand
+  const info = utf8ToBytes(`hpke-v3:${label}`)
+  const derived = hkdf(sha256, sharedSecret, new Uint8Array(0), info, 44)
+
+  const aesKey = derived.slice(0, 32)
+  const nonce = derived.slice(32, 44)
+
+  // AES-256-GCM encrypt with AAD
+  const cipher = gcm(aesKey, nonce, aad)
+  const ct = cipher.encrypt(plaintext)
+
+  return {
+    v: 3,
+    labelId,
+    enc: base64urlEncode(ephPub),
+    ct: base64urlEncode(ct),
+  }
+}
+
+function hpkeOpenMock(
+  envelope: { v: number; labelId: number; enc: string; ct: string },
+  recipientSecretHex: string,
+  expectedLabel: string,
+  aad: Uint8Array,
+): Uint8Array {
+  if (envelope.v !== 3) throw new Error(`Unsupported HPKE version: ${envelope.v}`)
+  const expectedId = labelToId(expectedLabel)
+  if (envelope.labelId !== expectedId) {
+    throw new Error(`Label mismatch: expected ${expectedId}, got ${envelope.labelId}`)
+  }
+
+  const ephPub = base64urlDecode(envelope.enc)
+  const ct = base64urlDecode(envelope.ct)
+  const recipientSecret = hexToBytes(recipientSecretHex)
+
+  // ECDH shared secret
+  const sharedSecret = x25519.getSharedSecret(recipientSecret, ephPub)
+
+  // HKDF extract + expand
+  const info = utf8ToBytes(`hpke-v3:${expectedLabel}`)
+  const derived = hkdf(sha256, sharedSecret, new Uint8Array(0), info, 44)
+
+  const aesKey = derived.slice(0, 32)
+  const nonce = derived.slice(32, 44)
+
+  // AES-256-GCM decrypt with AAD
+  const cipher = gcm(aesKey, nonce, aad)
+  return cipher.decrypt(ct)
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -33,254 +230,369 @@ type CommandHandler = (a: Args) => unknown | Promise<unknown>
 
 // ── Command handlers ──────────────────────────────────────────────────
 
-// Module-level storage for encrypted key (mock equivalent of Stronghold)
-let _mockEncryptedKey: unknown = null
-
 const commands: Record<string, CommandHandler> = {
-  // --- Atomic keypair operations (new — nsec never returned to caller) ---
+  // --- Device key management ---
 
-  generate_keypair_and_load: (a) => {
-    const mod = getWasmModule()
-    const state = getWasmState()
-    const kp = mod.generateKeypair()
-    const rawResult = state.importKey(kp.nsec, a.pin as string)
-    // serde_wasm_bindgen 0.6 returns Maps — convert to plain objects
-    const result = (function fromWasm(val: unknown): unknown {
-      if (val instanceof Map) {
-        const obj: Record<string, unknown> = {}
-        val.forEach((v: unknown, k: unknown) => { obj[String(k)] = fromWasm(v) })
-        return obj
-      }
-      if (Array.isArray(val)) return val.map(fromWasm)
-      return val
-    })(rawResult) as { encryptedKeyData: unknown }
-    _mockEncryptedKey = result.encryptedKeyData
-    return {
-      publicKey: kp.pubkeyHex,
-      npub: kp.npub,
-      encryptedKeyData: result.encryptedKeyData,
+  device_generate_and_load: async (a) => {
+    const pin = a.pin as string
+    const deviceId = a.deviceId as string
+
+    const signingSeed = randomBytes(32)
+    const encryptionSeed = randomBytes(32)
+    const signingPubkey = deriveEd25519Pubkey(signingSeed)
+    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
+
+    const state: MockDeviceKeyState = {
+      deviceId,
+      signingPubkeyHex: bytesToHex(signingPubkey),
+      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
     }
-  },
 
-  pubkey_from_nsec: (a) => {
-    try {
-      const result = getWasmModule().keyPairFromNsec(a.nsec as string)
-      return result.pubkeyHex
-    } catch {
-      return null
-    }
-  },
+    const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
 
-  generate_backup_from_state: () => {
-    // Return a minimal valid backup JSON for tests
-    return JSON.stringify({
-      v: 1,
-      id: 'test00',
-      t: Math.round(Date.now() / 3600000) * 3600,
-      d: { s: '00'.repeat(32), i: 600000, n: '00'.repeat(24), c: '00'.repeat(48), pubkey: 'test' },
-    })
-  },
+    const result = { ...encrypted, state }
+    mockSecrets = { signingSeed, encryptionSeed }
+    mockDeviceState = state
+    mockEncryptedKeys = result
 
-  generate_ephemeral_keypair: () => {
-    const kp = getWasmModule().generateKeypair()
-    return { publicKey: kp.pubkeyHex, npub: kp.npub, nsec: kp.nsec }
-  },
-
-  // --- Legacy keypair operations (still registered for backward compat during migration) ---
-
-  get_public_key_from_state: () =>
-    getWasmState().getPublicKey(),
-
-  is_valid_nsec: (a) =>
-    getWasmModule().isValidNsec(a.nsec as string),
-
-  // --- CryptoState management ---
-
-  import_key_to_state: (a) => {
-    const result = getWasmState().importKey(a.nsec as string, a.pin as string)
-    _mockEncryptedKey = result
     return result
   },
 
-  unlock_with_pin: (a) => {
-    // In tests, read encrypted key from mock storage (mirroring Stronghold behavior)
-    // Fall back to data arg if present (legacy callers)
-    const data = _mockEncryptedKey ?? a.data
+  unlock_with_pin: async (a) => {
+    const data = (mockEncryptedKeys ?? a.data) as {
+      salt: string; nonce: string; ciphertext: string; state: MockDeviceKeyState
+    }
     if (!data) throw new Error('No key stored. Complete onboarding first.')
-    return getWasmState().unlockWithPin(JSON.stringify(data), a.pin as string)
+
+    const pin = a.pin as string
+    const { signingSeed, encryptionSeed } = await decryptWithPin(data, pin)
+
+    mockSecrets = { signingSeed, encryptionSeed }
+    mockDeviceState = data.state
+    return data.state
   },
 
   lock_crypto: () => {
-    getWasmState().lock()
+    mockSecrets = null
+    mockDeviceState = null
   },
 
-  is_crypto_unlocked: () =>
-    getWasmState().isUnlocked(),
+  is_crypto_unlocked: () => mockSecrets !== null,
 
-  // --- Auth tokens ---
+  get_device_pubkeys: () => {
+    return requireDeviceState()
+  },
 
-  create_auth_token_from_state: (a) =>
-    JSON.stringify(getWasmState().createAuthToken(a.method as string, a.path as string)),
+  // --- Auth tokens (Ed25519) ---
 
-  verify_schnorr: (a) => {
+  create_auth_token_from_state: (a) => {
+    const secrets = requireSecrets()
+    const timestamp = a.timestamp as number
+    const method = a.method as string
+    const path = a.path as string
+
+    // Auth message: SHA-256("llamenos:device-auth:v1:" + timestamp + ":" + method + ":" + path)
+    const msgStr = `llamenos:device-auth:v1:${timestamp}:${method}:${path}`
+    const msgHash = sha256(utf8ToBytes(msgStr))
+
+    const sig = ed25519.sign(msgHash, secrets.signingSeed)
+
+    const token = {
+      pubkey: bytesToHex(deriveEd25519Pubkey(secrets.signingSeed)),
+      timestamp,
+      token: bytesToHex(sig),
+    }
+    return JSON.stringify(token)
+  },
+
+  // --- Ed25519 signing/verification ---
+
+  ed25519_sign_from_state: (a) => {
+    const secrets = requireSecrets()
+    const message = hexToBytes(a.messageHex as string)
+    const sig = ed25519.sign(message, secrets.signingSeed)
+    return bytesToHex(sig)
+  },
+
+  ed25519_verify: (a) => {
     try {
-      return getWasmModule().verifySchnorr(a.msgHashHex as string, a.signature as string, a.pubkey as string)
+      const message = hexToBytes(a.messageHex as string)
+      const signature = hexToBytes(a.signatureHex as string)
+      const pubkey = hexToBytes(a.pubkeyHex as string)
+      return ed25519.verify(signature, message, pubkey)
     } catch {
       return false
     }
   },
 
-  // --- ECIES operations ---
+  // --- HPKE envelope encryption ---
 
-  ecies_wrap_key: (a) =>
-    getWasmModule().eciesWrapKey(a.keyHex as string, a.recipientPubkey as string, a.label as string),
-
-  ecies_unwrap_key_from_state: (a) => {
-    const envelope = a.envelope as { wrappedKey: string; ephemeralPubkey: string }
-    return getWasmState().eciesUnwrapKey(JSON.stringify(envelope), a.label as string)
+  hpke_seal: (a) => {
+    const plaintext = hexToBytes(a.plaintextHex as string)
+    const recipientPubkeyHex = a.recipientPubkeyHex as string
+    const label = a.label as string
+    const aad = hexToBytes(a.aadHex as string)
+    return hpkeSealMock(plaintext, recipientPubkeyHex, label, aad)
   },
 
-  // --- Note encryption/decryption ---
-
-  encrypt_note: (a) =>
-    getWasmState().encryptNote(
-      a.payloadJson as string,
-      a.authorPubkey as string,
-      JSON.stringify(a.adminPubkeys),
-    ),
-
-  decrypt_note_from_state: (a) => {
-    const envelope = a.envelope as { wrappedKey: string; ephemeralPubkey: string }
-    return getWasmState().decryptNote(a.encryptedContent as string, JSON.stringify(envelope))
+  hpke_open_from_state: (a) => {
+    const secrets = requireSecrets()
+    const envelope = a.envelope as { v: number; labelId: number; enc: string; ct: string }
+    const expectedLabel = a.expectedLabel as string
+    const aad = hexToBytes(a.aadHex as string)
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+    const plaintext = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
+    return bytesToHex(plaintext)
   },
 
-  decrypt_legacy_note_from_state: (a) =>
-    getWasmState().decryptLegacyNote(a.packed as string),
+  hpke_seal_key: (a) => {
+    const keyBytes = hexToBytes(a.keyHex as string)
+    if (keyBytes.length !== 32) throw new Error('Key must be 32 bytes')
+    const recipientPubkeyHex = a.recipientPubkeyHex as string
+    const label = a.label as string
+    const aad = hexToBytes(a.aadHex as string)
+    return hpkeSealMock(keyBytes, recipientPubkeyHex, label, aad)
+  },
 
-  // --- Message encryption/decryption ---
+  hpke_open_key_from_state: (a) => {
+    const secrets = requireSecrets()
+    const envelope = a.envelope as { v: number; labelId: number; enc: string; ct: string }
+    const expectedLabel = a.expectedLabel as string
+    const aad = hexToBytes(a.aadHex as string)
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+    const plaintext = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
+    if (plaintext.length !== 32) throw new Error('Unwrapped key must be 32 bytes')
+    return bytesToHex(plaintext)
+  },
 
-  encrypt_message: (a) =>
-    getWasmState().encryptMessage(a.plaintext as string, JSON.stringify(a.readerPubkeys)),
+  // --- PUK (Per-User Key) ---
 
-  decrypt_message_from_state: (a) =>
-    getWasmState().decryptMessage(
-      a.encryptedContent as string,
-      JSON.stringify(a.readerEnvelopes),
-    ),
+  puk_create_from_state: () => {
+    const ds = requireDeviceState()
 
-  // --- Call record decryption ---
+    // Generate random seed
+    const seed = randomBytes(32)
 
-  decrypt_call_record_from_state: (a) =>
-    getWasmState().decryptCallRecord(
-      a.encryptedContent as string,
-      JSON.stringify(a.adminEnvelopes),
-    ),
+    // Derive PUK subkeys
+    const signSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk-sign:v1\x00\x00\x00\x01'))
+    const dhSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk-dh:v1\x00\x00\x00\x01'))
 
-  // --- Transcription decryption ---
-
-  decrypt_transcription_from_state: (a) =>
-    getWasmState().decryptTranscription(
-      a.packed as string,
-      a.ephemeralPubkeyHex as string,
-    ),
-
-  // --- Draft encryption/decryption ---
-
-  encrypt_draft_from_state: (a) =>
-    getWasmState().encryptDraft(a.plaintext as string),
-
-  decrypt_draft_from_state: (a) =>
-    getWasmState().decryptDraft(a.packed as string),
-
-  // --- Export encryption ---
-
-  encrypt_export_from_state: (a) =>
-    getWasmState().encryptExport(a.jsonString as string),
-
-  // --- Nostr event signing ---
-
-  sign_nostr_event_from_state: (a) => {
-    const eventTemplate = {
-      kind: a.kind as number,
-      created_at: a.createdAt as number,
-      tags: a.tags as string[][],
-      content: a.content as string,
+    const pukState = {
+      generation: 1,
+      signPubkeyHex: bytesToHex(deriveEd25519Pubkey(signSubkey)),
+      dhPubkeyHex: bytesToHex(deriveX25519Pubkey(dhSubkey)),
     }
-    return getWasmState().signNostrEvent(JSON.stringify(eventTemplate))
-  },
 
-  // --- File crypto ---
+    // HPKE seal the seed to the device's encryption pubkey
+    const envelope = hpkeSealMock(
+      seed,
+      ds.encryptionPubkeyHex,
+      'llamenos:puk-wrap-to-device:v1',
+      new Uint8Array(0),
+    )
 
-  decrypt_file_metadata_from_state: (a) => {
-    const envelope = {
-      wrappedKey: a.encryptedContentHex as string,
-      ephemeralPubkey: a.ephemeralPubkeyHex as string,
+    return {
+      pukState,
+      seedHex: bytesToHex(seed),
+      envelope,
     }
-    return getWasmState().decryptFileMetadata(a.encryptedContentHex as string, JSON.stringify(envelope))
   },
 
-  unwrap_file_key_from_state: (a) => {
-    const envelope = a.envelope as { wrappedKey: string; ephemeralPubkey: string }
-    return getWasmState().unwrapFileKey(JSON.stringify(envelope))
-  },
+  puk_rotate: (a) => {
+    const oldSeedBytes = hexToBytes(a.oldSeedHex as string)
+    const oldGen = a.oldGen as number
+    const remainingDevices = JSON.parse(a.remainingDevicesJson as string) as Array<[string, string]>
+    const newGen = oldGen + 1
 
-  unwrap_hub_key_from_state: (a) => {
-    const envelope = a.envelope as { wrappedKey: string; ephemeralPubkey: string }
-    return getWasmState().unwrapHubKey(JSON.stringify(envelope))
-  },
+    // Generate new seed
+    const newSeed = randomBytes(32)
 
-  rewrap_file_key_from_state: (a) => {
-    const envelope = {
-      wrappedKey: a.encryptedFileKeyHex as string,
-      ephemeralPubkey: a.ephemeralPubkeyHex as string,
+    // Derive new PUK subkeys
+    const genBuf = new Uint8Array(4)
+    new DataView(genBuf.buffer).setUint32(0, newGen, false) // big-endian
+
+    const signLabel = new Uint8Array([...utf8ToBytes('llamenos:puk-sign:v1'), ...genBuf])
+    const dhLabel = new Uint8Array([...utf8ToBytes('llamenos:puk-dh:v1'), ...genBuf])
+
+    const signSubkey = hmac(sha256, newSeed, signLabel)
+    const dhSubkey = hmac(sha256, newSeed, dhLabel)
+
+    const state = {
+      generation: newGen,
+      signPubkeyHex: bytesToHex(deriveEd25519Pubkey(signSubkey)),
+      dhPubkeyHex: bytesToHex(deriveX25519Pubkey(dhSubkey)),
     }
-    return getWasmState().rewrapFileKey(JSON.stringify(envelope), a.newRecipientPubkeyHex as string)
+
+    // HPKE seal new seed to each remaining device
+    const deviceEnvelopes = remainingDevices.map(([deviceId, encPubkeyHex]) => ({
+      deviceId,
+      envelope: hpkeSealMock(
+        newSeed,
+        encPubkeyHex,
+        'llamenos:puk-wrap-to-device:v1',
+        new Uint8Array(0),
+      ),
+    }))
+
+    // CLKR: encrypt old seed under new generation's secretbox key
+    const sbLabel = new Uint8Array([...utf8ToBytes('llamenos:puk-secretbox:v1'), ...genBuf])
+    const secretboxKey = hmac(sha256, newSeed, sbLabel)
+    const clkrNonce = randomBytes(12)
+    const clkrCipher = gcm(secretboxKey, clkrNonce)
+    const clkrCt = clkrCipher.encrypt(oldSeedBytes)
+
+    const clkrChainLinkHex = bytesToHex(new Uint8Array([...clkrNonce, ...clkrCt]))
+
+    return { state, deviceEnvelopes, clkrChainLinkHex }
   },
 
-  // --- Provisioning ---
-
-  generate_provisioning_ephemeral: () =>
-    getWasmState().generateProvisioningEphemeral(),
-
-  encrypt_nsec_for_provisioning: (a) =>
-    getWasmState().encryptNsecForProvisioning(a.ephemeralPubkeyHex as string),
-
-  decrypt_provisioned_nsec: (a) =>
-    getWasmState().decryptProvisionedNsec(
-      a.encryptedHex as string,
-      a.primaryPubkeyHex as string,
-    ),
-
-  // --- PIN lockout (WASM handles internally) ---
-
-  get_pin_lockout_state: () => ({
-    failedAttempts: 0,
-    lockoutUntil: 0,
-  }),
-
-  set_pin_failed_attempts: () => {
-    // No-op — lockout is handled internally by Rust
+  puk_unwrap_seed_from_state: (a) => {
+    const secrets = requireSecrets()
+    const envelope = a.envelope as { v: number; labelId: number; enc: string; ct: string }
+    const expectedLabel = a.expectedLabel as string
+    const aad = hexToBytes(a.aadHex as string)
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+    const seed = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
+    if (seed.length !== 32) throw new Error('PUK seed must be 32 bytes')
+    return bytesToHex(seed)
   },
 
-  reset_pin_lockout: () => {
-    // No-op — lockout is handled internally by Rust
+  // --- Sigchain ---
+
+  sigchain_create_link_from_state: (a) => {
+    const secrets = requireSecrets()
+    const ds = requireDeviceState()
+    const id = a.id as string
+    const seq = a.seq as number
+    const prevHash = a.prevHash as string | null
+    const timestamp = a.timestamp as string
+    const payloadJson = a.payloadJson as string
+
+    // Canonical hash: JSON with sorted keys
+    const canonical: Record<string, unknown> = {
+      payload: payloadJson,
+      prevHash: prevHash ?? null,
+      seq,
+      signerDeviceId: ds.deviceId,
+      signerPubkey: ds.signingPubkeyHex,
+      timestamp,
+    }
+    const canonicalJson = JSON.stringify(canonical, Object.keys(canonical).sort())
+    const entryHash = bytesToHex(sha256(utf8ToBytes(canonicalJson)))
+
+    // Ed25519 sign the entry hash
+    const sig = ed25519.sign(hexToBytes(entryHash), secrets.signingSeed)
+
+    return {
+      id,
+      seq,
+      prevHash: prevHash ?? null,
+      entryHash,
+      signerDeviceId: ds.deviceId,
+      signerPubkey: ds.signingPubkeyHex,
+      signature: bytesToHex(sig),
+      timestamp,
+      payloadJson,
+    }
+  },
+
+  sigchain_verify: (a) => {
+    const links = JSON.parse(a.linksJson as string) as Array<{
+      seq: number
+      prevHash: string | null
+      entryHash: string
+      signerDeviceId: string
+      signerPubkey: string
+      signature: string
+      timestamp: string
+      payloadJson: string
+    }>
+
+    if (links.length === 0) throw new Error('Empty sigchain')
+
+    const activeDevicePubkeys = new Set<string>()
+
+    for (let i = 0; i < links.length; i++) {
+      const link = links[i]
+      if (link.seq !== i + 1) throw new Error(`Sequence mismatch at index ${i}`)
+
+      if (i === 0 && link.prevHash !== null) throw new Error('First link must have null prevHash')
+      if (i > 0 && link.prevHash !== links[i - 1].entryHash) {
+        throw new Error(`prevHash mismatch at seq ${link.seq}`)
+      }
+
+      // Verify Ed25519 signature
+      const valid = ed25519.verify(
+        hexToBytes(link.signature),
+        hexToBytes(link.entryHash),
+        hexToBytes(link.signerPubkey),
+      )
+      if (!valid) throw new Error(`Invalid signature at seq ${link.seq}`)
+
+      // Process payload for device set
+      try {
+        const payload = JSON.parse(link.payloadJson)
+        if (payload.type === 'user_init' || payload.type === 'device_add') {
+          activeDevicePubkeys.add(payload.devicePubkey ?? link.signerPubkey)
+        } else if (payload.type === 'device_remove') {
+          activeDevicePubkeys.delete(payload.devicePubkey)
+        }
+      } catch { /* non-device payloads */ }
+    }
+
+    const last = links[links.length - 1]
+    return {
+      verifiedCount: links.length,
+      headSeq: last.seq,
+      headHash: last.entryHash,
+      activeDevicePubkeys: Array.from(activeDevicePubkeys),
+    }
+  },
+
+  sigchain_verify_link: (a) => {
+    try {
+      const link = JSON.parse(a.linkJson as string) as {
+        entryHash: string; signature: string
+      }
+      const expectedPubkey = a.expectedSignerPubkey as string
+      return ed25519.verify(
+        hexToBytes(link.signature),
+        hexToBytes(link.entryHash),
+        hexToBytes(expectedPubkey),
+      )
+    } catch {
+      return false
+    }
+  },
+
+  // --- SFrame key derivation ---
+
+  sframe_derive_key: (a) => {
+    const exporterSecret = hexToBytes(a.exporterSecretHex as string)
+    const callId = a.callId as string
+    const participantIndex = a.participantIndex as number
+
+    // derive_sframe_key: exporter → base_key → send_key
+    const baseKey = hkdf(sha256, exporterSecret, new Uint8Array(0),
+      utf8ToBytes(`llamenos:sframe-base-key:v1:${callId}`), 32)
+
+    const indexBuf = new Uint8Array(4)
+    new DataView(indexBuf.buffer).setUint32(0, participantIndex, false)
+    const sendKey = hkdf(sha256, baseKey, new Uint8Array(0), indexBuf, 32)
+
+    return bytesToHex(sendKey)
   },
 }
 
 // ── Public API ────────────────────────────────────────────────────────
 
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  await ensureWasmReady()
   const handler = commands[cmd]
   if (!handler) throw new Error(`Unknown Tauri command: ${cmd}`)
   return await handler(args || {}) as T
 }
 
 // Expose invoke on window using a Symbol key (not a guessable string).
-// IMPORTANT: Must use Symbol.for (global symbol registry), NOT Symbol() (module-scoped).
-// page.evaluate() runs in a separate VM context — module-scoped Symbols are not accessible
-// across that boundary. Symbol.for('llamenos_test_invoke') resolves to the same Symbol
-// in any VM context, making it accessible from page.evaluate() calls in Playwright tests.
 export const __TEST_INVOKE_SYMBOL = Symbol.for('llamenos_test_invoke')
 
 if (typeof window !== 'undefined' && import.meta.env.PLAYWRIGHT_TEST) {
