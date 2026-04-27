@@ -28,6 +28,9 @@ import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/nostr-events'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.records')
 import { publishNostrEvent } from '../lib/nostr-events'
 import { resolvePermissions } from '@shared/permissions'
 import { determineEnvelopeRecipients } from '../lib/envelope-recipients'
@@ -413,7 +416,7 @@ records.post('/',
       recordId: record.id,
       entityTypeId: record.entityTypeId,
       caseNumber: record.caseNumber,
-    }).catch((e) => { console.error('[records] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'recordCreated', pubkey, {
       recordId: record.id,
@@ -473,7 +476,7 @@ records.patch('/:id',
     publishNostrEvent(c.env, KIND_RECORD_UPDATED, {
       type: 'record:updated',
       recordId: id,
-    }).catch((e) => { console.error('[records] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'recordUpdated', pubkey, { recordId: id })
 
@@ -751,7 +754,7 @@ records.post('/:id/assign',
       type: 'record:assigned',
       recordId: id,
       pubkeys: body.pubkeys,
-    }).catch((e) => { console.error('[records] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'recordAssigned', pubkey, {
       recordId: id,
@@ -795,7 +798,7 @@ records.post('/:id/unassign',
       type: 'record:unassigned',
       recordId: id,
       pubkey: body.pubkey,
-    }).catch((e) => { console.error('[records] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'recordUnassigned', pubkey, {
       recordId: id,

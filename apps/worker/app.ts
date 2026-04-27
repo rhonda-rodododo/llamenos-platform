@@ -46,6 +46,7 @@ import firehoseRoutes from './routes/firehose'
 import signalNotificationRoutes from './routes/signal-notification'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
+import { requestLogger } from './middleware/request-logger'
 import { recordHttpRequest } from './routes/metrics'
 import { openAPIRouteHandler } from 'hono-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
@@ -67,6 +68,7 @@ const api = new Hono<AppEnv>()
 
 // Request ID middleware — first in chain for full correlation coverage
 api.use('*', requestId)
+api.use('*', requestLogger)
 
 // HTTP metrics middleware — records request duration and counts for Prometheus
 api.use('*', async (c, next) => {

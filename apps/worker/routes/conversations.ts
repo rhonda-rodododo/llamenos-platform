@@ -17,6 +17,9 @@ import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from './metrics'
 import type { Services } from '../services'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.conversations')
 
 const conversations = new Hono<AppEnv>()
 
@@ -31,7 +34,7 @@ function dispatchPushToUser(
   try {
     const dispatcher = createPushDispatcherFromService(env, services.identity, services.shifts)
     dispatcher.sendToVolunteer(userPubkey, wake, full).catch((e) => {
-      console.error('[conversations] Push dispatch to user failed:', e)
+      logger.error('Push dispatch to user failed', e)
     })
   } catch {
     // Push not configured
@@ -342,7 +345,7 @@ conversations.post('/:id/messages',
                 return isRetryableError(error)
               },
               onRetry: (attempt, error) => {
-                console.warn(`[conversations] sendMessage retry ${attempt} via ${conv.channelType}:`, error)
+                logger.warn(`sendMessage retry ${attempt} via ${conv.channelType}`, { error })
                 incCounter('llamenos_retry_attempts_total', { service: 'messaging', operation: 'sendMessage' })
               },
             },
@@ -358,7 +361,7 @@ conversations.post('/:id/messages',
           sendFailed = true
         }
       } catch (err) {
-        console.error(`[conversations] Failed to send outbound message via ${conv.channelType}:`, err)
+        logger.error(`Failed to send outbound message via ${conv.channelType}`, err)
         status = 'failed'
         failureReason = err instanceof Error ? err.message : 'Unknown error'
         sendFailed = true
@@ -385,7 +388,7 @@ conversations.post('/:id/messages',
       type: 'message:new',
       conversationId: id,
       channelType: 'outbound',
-    }).catch((e) => { console.error('[conversations] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     c.executionCtx.waitUntil(
       audit(c.get('services').audit, 'messageSent', pubkey, {
@@ -441,7 +444,7 @@ conversations.patch('/:id',
       type: convEventType,
       conversationId: id,
       assignedTo: body.assignedTo,
-    }).catch((e) => { console.error('[conversations] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     c.executionCtx.waitUntil(
       audit(c.get('services').audit, body.status === 'closed' ? 'conversationClosed' : 'conversationUpdated', pubkey, {
@@ -520,7 +523,7 @@ conversations.post('/:id/claim',
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: pubkey,
-    }).catch((e) => { console.error('[conversations] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     // Push notification to assigned user (Epic 86)
     dispatchPushToUser(c.env, services, pubkey, {

@@ -20,6 +20,9 @@ import {
   startScheduledBlastPoller,
   stopScheduledBlastPoller,
 } from '../lib/blast-scheduled-poller'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('services.scheduler')
 
 export interface TaskSchedulerDeps {
   blastsService: BlastsService
@@ -58,7 +61,7 @@ export class TaskScheduler {
       startScheduledBlastPoller(deps.blastsService)
     }
 
-    console.log('[scheduler] Started')
+    logger.info('Started')
   }
 
   /**
@@ -71,6 +74,6 @@ export class TaskScheduler {
     stopBlastWorker()
     stopScheduledBlastPoller()
 
-    console.log('[scheduler] Stopped')
+    logger.info('Stopped')
   }
 }

@@ -2,6 +2,9 @@ import type { Env } from '../types'
 import type { Services } from '../services'
 import { getTelephonyFromService } from '../lib/service-factories'
 import { encryptMessageForStorage } from '../lib/crypto'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('services.transcription')
 
 export async function maybeTranscribe(
   parentCallSid: string,
@@ -61,7 +64,7 @@ export async function maybeTranscribe(
       }
     }
   } catch (err) {
-    console.error('[transcription] maybeTranscribe failed:', err)
+    logger.error('maybeTranscribe failed', err)
   }
 }
 
@@ -105,6 +108,6 @@ export async function transcribeVoicemail(
       }
     }
   } catch (err) {
-    console.error('[transcription] transcribeVoicemail failed:', err)
+    logger.error('transcribeVoicemail failed', err)
   }
 }

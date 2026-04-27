@@ -7,6 +7,9 @@
  */
 import type { EventOutbox } from './nostr-outbox'
 import type { NodeNostrPublisher } from './nostr-publisher'
+import { createLogger } from './logger'
+
+const logger = createLogger('nostr-outbox-poller')
 
 const DRAIN_INTERVAL_MS = 30_000
 const CLEANUP_INTERVAL_MS = 5 * 60_000
@@ -34,7 +37,7 @@ export function startOutboxPoller(outbox: EventOutbox, publisher: NodeNostrPubli
   // Cleanup on a slower cadence
   cleanupTimer = setInterval(() => cleanupOutbox(), CLEANUP_INTERVAL_MS)
 
-  console.log(`[outbox-poller] Started (drain: ${DRAIN_INTERVAL_MS / 1000}s, cleanup: ${CLEANUP_INTERVAL_MS / 1000}s)`)
+  logger.info(`Started (drain: ${DRAIN_INTERVAL_MS / 1000}s, cleanup: ${CLEANUP_INTERVAL_MS / 1000}s)`)
 }
 
 /**
@@ -51,7 +54,7 @@ export function stopOutboxPoller(): void {
   }
   outboxInstance = null
   publisherInstance = null
-  console.log('[outbox-poller] Stopped')
+  logger.info('Stopped')
 }
 
 /**
@@ -66,19 +69,19 @@ async function drainOutbox(): Promise<void> {
     const events = await outboxInstance.drainBatch(BATCH_SIZE)
     if (events.length === 0) return
 
-    console.log(`[outbox-poller] Draining ${events.length} pending event(s)`)
+    logger.info(`Draining ${events.length} pending event(s)`)
 
     for (const event of events) {
       try {
         await publisherInstance.deliverSignedEvent(event.event_json)
         await outboxInstance.markDelivered(event.id)
       } catch (err) {
-        console.warn(`[outbox-poller] Failed to deliver event ${event.id} (attempt ${event.attempts + 1}):`, err)
+        logger.warn(`Failed to deliver event ${event.id}`, { attempt: event.attempts + 1, error: err })
         await outboxInstance.markFailed(event.id, event.attempts)
       }
     }
   } catch (err) {
-    console.error('[outbox-poller] Drain error:', err)
+    logger.error('Drain error', err)
   }
 }
 
@@ -91,6 +94,6 @@ async function cleanupOutbox(): Promise<void> {
   try {
     await outboxInstance.cleanup()
   } catch (err) {
-    console.error('[outbox-poller] Cleanup error:', err)
+    logger.error('Cleanup error', err)
   }
 }

@@ -47,9 +47,13 @@ function assertDatabaseUrl(env: ConfigInput): void {
   }
 }
 
+import { createLogger } from './logger'
+
+const logger = createLogger('config')
+
 function warnIfAbsent(env: ConfigInput, key: string, featureNote: string): void {
   if (!env[key]?.trim()) {
-    console.warn(`[llamenos] Optional ${key} not set — ${featureNote}`)
+    logger.warn(`Optional ${key} not set — ${featureNote}`)
   }
 }
 

@@ -85,7 +85,7 @@ messaging.post('/:channel/webhook', async (c) => {
   // Validate webhook signature
   const isValid = await adapter.validateWebhook(c.req.raw)
   if (!isValid) {
-    console.error(`[messaging] Webhook signature FAILED for ${channel}`)
+    logger.error(`Webhook signature FAILED for ${channel}`)
     return new Response('Forbidden', { status: 403 })
   }
 
@@ -111,7 +111,7 @@ messaging.post('/:channel/webhook', async (c) => {
               status: statusUpdate.status,
               timestamp: statusUpdate.timestamp,
             }).catch((e) => {
-              console.error('[messaging] Failed to publish status update:', e)
+              logger.error('Failed to publish status update', e)
             })
           }
 
@@ -182,7 +182,7 @@ messaging.post('/:channel/webhook', async (c) => {
   try {
     incoming = await adapter.parseIncomingMessage(c.req.raw)
   } catch (err) {
-    console.error(`[messaging] Failed to parse ${channel} webhook:`, err)
+    logger.error(`Failed to parse ${channel} webhook`, err)
     return c.json({ error: 'Failed to parse message' }, 400)
   }
 
@@ -238,7 +238,7 @@ messaging.post('/:channel/webhook', async (c) => {
     type: 'message:new',
     conversationId: convResult.conversationId,
     channelType: channel,
-  }).catch((e) => { console.error('[messaging] Failed to publish inbound message event:', e) })
+  }).catch((e) => { logger.error('Failed to publish inbound message event', e) })
 
   // Auto-assignment for new conversations
   if (convResult.isNew && convResult.status === 'waiting') {
@@ -269,7 +269,7 @@ messaging.post('/:channel/webhook', async (c) => {
           })
         }
       } catch (e) {
-        console.error('[messaging] Push dispatch failed for conversation:', convResult.conversationId, e)
+        logger.error('Push dispatch failed for conversation', { conversationId: convResult.conversationId, error: e })
       }
     })())
   }
@@ -356,12 +356,12 @@ async function tryAutoAssign(
       assignedTo: bestCandidate,
       autoAssigned: true,
     }).catch((e) => {
-      console.error('[messaging] Failed to publish auto-assignment:', e)
+      logger.error('Failed to publish auto-assignment', e)
     })
 
     logger.info('Auto-assigned conversation', { conversationId, assignedTo: bestCandidate.slice(0, 8) })
   } catch (err) {
-    console.error('[messaging] Auto-assignment failed:', err)
+    logger.error('Auto-assignment failed', err)
   }
 }
 
@@ -397,7 +397,7 @@ async function correlateBlastDeliveryStatus(
     // Sync blast stats (non-blocking)
     await services.blasts.syncBlastStats(delivery.blastId)
   } catch (err) {
-    console.error('[messaging] Blast delivery correlation failed:', err)
+    logger.error('Blast delivery correlation failed', err)
   }
 }
 

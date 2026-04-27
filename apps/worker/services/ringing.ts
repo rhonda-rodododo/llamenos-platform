@@ -76,7 +76,7 @@ export async function startParallelRinging(
     publishNostrEvent(env, KIND_CALL_RING, {
       type: 'call:ring',
       callId: callSid,
-    }).catch((e) => { console.error('[ringing] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     // Dispatch VoIP push notifications to mobile volunteers with registered VoIP tokens.
     // Skip VoIP push for global-scope (hubId='') calls — mobile clients require a real hub ID to route the call.
@@ -91,7 +91,7 @@ export async function startParallelRinging(
         services.identity,
       ).catch(err => {
         // VoIP push is best-effort — Nostr relay is the primary notification path
-        console.error('[ringing] VoIP push dispatch failed:', err)
+        logger.error('VoIP push dispatch failed', err)
       })
     }
 
@@ -136,7 +136,7 @@ export async function startParallelRinging(
             maxDelayMs: 3000,
             isRetryable: isRetryableError,
             onRetry: (attempt, error) => {
-              console.warn(`[ringing] ringVolunteers retry ${attempt} for callSid=${callSid}:`, error)
+              logger.warn(`ringVolunteers retry ${attempt} for callSid=${callSid}`, { error })
               incCounter('llamenos_retry_attempts_total', { service: 'telephony', operation: 'ringVolunteers' })
             },
           },
@@ -144,6 +144,6 @@ export async function startParallelRinging(
       )
     }
   } catch (err) {
-    console.error('[ringing] startParallelRinging failed:', err)
+    logger.error('startParallelRinging failed', err)
   }
 }

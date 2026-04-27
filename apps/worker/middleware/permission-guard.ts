@@ -2,6 +2,9 @@ import { createMiddleware } from 'hono/factory'
 import type { AppEnv } from '../types'
 import { permissionGranted } from '@shared/permissions'
 import type { EntityTypeDefinition } from '@protocol/schemas/entity-schema'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('middleware.permission-guard')
 
 /**
  * Middleware that requires the authenticated user to have ALL specified permissions.
@@ -71,7 +74,7 @@ export function requireEntityTypeAccess(action: 'read' | 'write') {
     try {
       entityType = await services.settings.getEntityTypeById(entityTypeId)
     } catch (e) {
-      console.warn('[permission-guard] getEntityTypeById failed for', entityTypeId, e)
+      logger.warn('getEntityTypeById failed', { entityTypeId, error: e })
       return c.json({ error: 'Entity type not found' }, 404)
     }
 

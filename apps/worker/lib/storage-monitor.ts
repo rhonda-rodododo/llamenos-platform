@@ -10,6 +10,10 @@
  */
 
 /** Maximum value size in bytes for a single DO storage key (128 KiB) */
+import { createLogger } from './logger'
+
+const logger = createLogger('storage-monitor')
+
 export const DO_STORAGE_VALUE_LIMIT = 128 * 1024
 
 /** Warn when a value exceeds this fraction of the limit */
@@ -94,11 +98,11 @@ export async function scanStorageHealth(
  */
 export function logStorageWarnings(report: StorageReport): void {
   for (const warning of report.warnings) {
-    console.warn(warning)
+    logger.warn(warning)
   }
   if (report.hotKeys.length > 0) {
-    console.warn(
-      `[storage-monitor] ${report.hotKeys.length} key(s) above ${(WARN_THRESHOLD * 100).toFixed(0)}% ` +
+    logger.warn(
+      `${report.hotKeys.length} key(s) above ${(WARN_THRESHOLD * 100).toFixed(0)}% ` +
       `of ${formatBytes(DO_STORAGE_VALUE_LIMIT)} limit`
     )
   }

@@ -18,6 +18,9 @@ import {
 } from '@protocol/schemas/events'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.events')
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/nostr-events'
 import { publishNostrEvent } from '../lib/nostr-events'
@@ -142,7 +145,7 @@ events.post('/',
       eventId: event.id,
       entityTypeId: event.entityTypeId,
       caseNumber: event.caseNumber,
-    }).catch((e) => { console.error('[events] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'eventCreated', pubkey, {
       eventId: event.id,
@@ -185,7 +188,7 @@ events.patch('/:id',
     publishNostrEvent(c.env, KIND_RECORD_UPDATED, {
       type: 'event:updated',
       eventId: id,
-    }).catch((e) => { console.error('[events] Failed to publish event:', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'eventUpdated', pubkey, { eventId: id })
 

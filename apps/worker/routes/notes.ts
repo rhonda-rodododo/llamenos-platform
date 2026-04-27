@@ -6,6 +6,9 @@ import { listNotesQuerySchema, createNoteBodySchema, updateNoteBodySchema, creat
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.notes')
 
 const notes = new Hono<AppEnv>()
 // Require at least notes:read-own to access any notes endpoint
@@ -98,7 +101,7 @@ notes.post('/',
         interactionType: 'note',
         sourceId: note.id,
         interactionTypeHash,
-      }).catch((e) => { console.error('[notes] Failed to create case interaction:', e) })
+      }).catch((e) => { logger.error('Failed to create case interaction', e) })
     }
 
     return c.json({ note }, 201)

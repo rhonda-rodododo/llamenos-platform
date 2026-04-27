@@ -5,6 +5,9 @@ import { requirePermission } from '../middleware/permission-guard'
 import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, blastDeliveryListResponseSchema, importSubscribersResponseSchema } from '@protocol/schemas/blasts'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('routes.blasts')
 
 const blasts = new Hono<AppEnv>()
 
@@ -361,7 +364,7 @@ blasts.post('/:id/send',
     // Expand blast into delivery rows (background)
     c.executionCtx.waitUntil(
       services.blasts.expandBlast(id).catch((err) => {
-        console.error(`[blasts] Failed to expand blast ${id}:`, err)
+        logger.error(`Failed to expand blast ${id}`, err)
       })
     )
 
