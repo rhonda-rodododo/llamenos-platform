@@ -56,6 +56,14 @@ function deriveEciesKeyV1(label: string, sharedX: Uint8Array): Uint8Array {
  * ECIES key wrapping for a single recipient (server-side, v2).
  * Uses HKDF for key derivation and prepends version byte.
  */
+export function eciesWrapKeyForRecipient(
+  key: Uint8Array,
+  recipientPubkeyHex: string,
+  label: string,
+): { wrappedKey: string; ephemeralPubkey: string } {
+  return eciesWrapKeyServer(key, recipientPubkeyHex, label)
+}
+
 function eciesWrapKeyServer(
   key: Uint8Array,
   recipientPubkeyHex: string,
@@ -103,6 +111,7 @@ function eciesWrapKeyServer(
 export function encryptMessageForStorage(
   plaintext: string,
   readerPubkeys: string[],
+  label: string = LABEL_MESSAGE,
 ): { encryptedContent: string; readerEnvelopes: RecipientEnvelope[] } {
   // Generate random per-message symmetric key
   const messageKey = new Uint8Array(32)
@@ -121,7 +130,7 @@ export function encryptMessageForStorage(
     encryptedContent: bytesToHex(packed),
     readerEnvelopes: readerPubkeys.map(pk => ({
       pubkey: pk,
-      ...eciesWrapKeyServer(messageKey, pk, LABEL_MESSAGE),
+      ...eciesWrapKeyServer(messageKey, pk, label),
     })),
   }
   // messageKey goes out of scope — never stored
