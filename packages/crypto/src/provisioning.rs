@@ -21,10 +21,7 @@ use sha2::Sha256;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::CryptoError;
-use crate::labels::{LABEL_DEVICE_PROVISION, SAS_INFO, SAS_SALT};
-
-/// Domain-specific HKDF salt for provisioning key derivation.
-const PROVISIONING_HKDF_SALT: &[u8] = b"llamenos:provisioning:v1";
+use crate::labels::{LABEL_DEVICE_PROVISION, LABEL_PROVISIONING_SALT, SAS_INFO, SAS_SALT};
 
 /// Result of encrypting the nsec for device provisioning.
 /// Contains the encrypted payload and the SAS code for verification.
@@ -81,7 +78,7 @@ fn compute_shared_x(sk: &SecretKey, their_pk: &PublicKey) -> Result<[u8; 32], Cr
 ///
 /// Uses PROVISIONING_HKDF_SALT and LABEL_DEVICE_PROVISION as the HKDF info parameter.
 pub(crate) fn derive_provisioning_key(shared_x: &[u8]) -> [u8; 32] {
-    let hk = Hkdf::<Sha256>::new(Some(PROVISIONING_HKDF_SALT), shared_x);
+    let hk = Hkdf::<Sha256>::new(Some(LABEL_PROVISIONING_SALT.as_bytes()), shared_x);
     let mut okm = [0u8; 32];
     hk.expand(LABEL_DEVICE_PROVISION.as_bytes(), &mut okm)
         .expect("HKDF expand should not fail for 32-byte output");

@@ -8,7 +8,7 @@
 //! Run with: cargo test --test interop
 
 use base64::{engine::general_purpose::STANDARD, Engine};
-use llamenos_core::auth::{create_auth_token, verify_auth_token, AuthToken};
+use llamenos_core::auth::{create_auth_token_from_signing_key, verify_auth_token, AuthToken};
 use llamenos_core::ecies::{ecies_unwrap_key, ecies_wrap_key, KeyEnvelope, RecipientKeyEnvelope};
 use llamenos_core::encryption::{
     decrypt_call_record, decrypt_draft, decrypt_message, decrypt_note, decrypt_with_pin,
@@ -18,6 +18,7 @@ use llamenos_core::encryption::{
 use llamenos_core::keys::{generate_keypair, get_public_key};
 use llamenos_core::labels::*;
 use llamenos_core::nostr::{finalize_nostr_event, SignedNostrEvent};
+use ed25519_dalek;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -353,7 +354,7 @@ fn generate_and_verify_test_vectors() {
     let timestamp = 1708900000000u64;
     let method = "POST";
     let path = "/api/notes";
-    let auth_token = create_auth_token(TEST_SECRET_KEY, timestamp, method, path).unwrap();
+    let auth_token = create_auth_token_from_signing_key(TEST_SECRET_KEY, timestamp, method, path).unwrap();
     let valid = verify_auth_token(&auth_token, method, path).unwrap();
     assert!(valid);
 
@@ -524,7 +525,7 @@ fn generate_and_verify_test_vectors() {
 
     // Auth adversarial: different method/path
     let adv_auth_token =
-        create_auth_token(TEST_SECRET_KEY, 1708900000000, "GET", "/api/notes").unwrap();
+        create_auth_token_from_signing_key(TEST_SECRET_KEY, 1708900000000, "GET", "/api/notes").unwrap();
     assert!(!verify_auth_token(&adv_auth_token, "POST", "/api/notes").unwrap());
     assert!(!verify_auth_token(&adv_auth_token, "GET", "/api/calls").unwrap());
 
@@ -777,9 +778,14 @@ fn ecies_cross_label_rejection() {
 
 #[test]
 fn auth_token_deterministic_verification() {
-    let token = create_auth_token(TEST_SECRET_KEY, 1708900000000, "GET", "/api/notes").unwrap();
+    let token = create_auth_token_from_signing_key(TEST_SECRET_KEY, 1708900000000, "GET", "/api/notes").unwrap();
 
-    let expected_pubkey = get_public_key(TEST_SECRET_KEY).unwrap();
+    // The auth token now uses Ed25519 — pubkey is the Ed25519 verifying key, NOT secp256k1 x-only.
+    // Derive Ed25519 pubkey from the same seed for comparison.
+    let sk_bytes = hex::decode(TEST_SECRET_KEY).unwrap();
+    let sk_arr: [u8; 32] = sk_bytes.try_into().unwrap();
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_arr);
+    let expected_pubkey = hex::encode(signing_key.verifying_key().to_bytes());
     assert_eq!(token.pubkey, expected_pubkey);
 
     assert!(verify_auth_token(&token, "GET", "/api/notes").unwrap());

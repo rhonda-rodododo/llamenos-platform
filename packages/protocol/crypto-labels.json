@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://llamenos.org/schemas/crypto-labels.json",
   "title": "Cryptographic Domain Separation Labels",
-  "description": "All domain separation constants used across llamenos crypto operations",
+  "description": "All domain separation constants used across llamenos crypto operations. Index order matches LABEL_REGISTRY in packages/crypto/src/labels.rs.",
   "labels": {
     "LABEL_NOTE_KEY": "llamenos:note-key",
     "LABEL_FILE_KEY": "llamenos:file-key",
@@ -44,6 +44,22 @@
     "HMAC_CASE_STATUS": "llamenos:case-status",
     "HMAC_CASE_SEVERITY": "llamenos:case-severity",
     "HMAC_CASE_CATEGORY": "llamenos:case-category",
-    "HMAC_EVENT_TYPE": "llamenos:event-type"
+    "HMAC_EVENT_TYPE": "llamenos:event-type",
+    "LABEL_PUK_SIGN": "llamenos:puk:sign:v1",
+    "LABEL_PUK_DH": "llamenos:puk:dh:v1",
+    "LABEL_PUK_SECRETBOX": "llamenos:puk:secretbox:v1",
+    "LABEL_PUK_WRAP_TO_DEVICE": "llamenos:puk:wrap:device:v1",
+    "LABEL_PUK_PREVIOUS_GEN": "llamenos:puk:prev-gen:v1",
+    "LABEL_DEVICE_AUTH": "llamenos:device-auth:v1",
+    "LABEL_ITEMS_KEY_EXPORT": "llamenos:items-key-export:v1",
+    "LABEL_NOTE_EPOCH_KEY": "llamenos:note-epoch-key:v1",
+    "LABEL_HUB_PTK_PREV_GEN": "llamenos:hub-ptk:prev-gen:v1",
+    "LABEL_SFRAME_CALL_SECRET": "llamenos:sframe-call-secret:v1",
+    "LABEL_SFRAME_BASE_KEY": "llamenos:sframe-base-key:v1",
+    "LABEL_MLS_PROVISION": "llamenos:mls-provision:v1",
+    "LABEL_ECIES_V2_SALT": "llamenos:ecies:v2",
+    "LABEL_PROVISIONING_SALT": "llamenos:provisioning:v1",
+    "LABEL_BLIND_INDEX_FIELD": "llamenos:blind-idx:",
+    "LABEL_HUB_PTK": "llamenos:hub-ptk:v1"
   }
 }
