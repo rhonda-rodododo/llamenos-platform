@@ -12,6 +12,7 @@ import { createSMSAdapter } from '../messaging/sms/factory'
 import { createWhatsAppAdapter } from '../messaging/whatsapp/factory'
 import { createSignalAdapter } from '../messaging/signal/factory'
 import { createRCSAdapter } from '../messaging/rcs/factory'
+import { createTelegramAdapter } from '../messaging/telegram/factory'
 
 /**
  * Create a TelephonyAdapter from SettingsService (service-based version).
@@ -91,6 +92,10 @@ export async function getMessagingAdapterFromService(
     case 'rcs': {
       if (!config.rcs) throw new Error('RCS is not configured')
       return createRCSAdapter(config.rcs, hmacSecret)
+    }
+    case 'telegram': {
+      if (!config.telegram) throw new Error('Telegram is not configured')
+      return createTelegramAdapter(config.telegram, hmacSecret)
     }
     default:
       throw new Error(`Unknown channel: ${channel}`)

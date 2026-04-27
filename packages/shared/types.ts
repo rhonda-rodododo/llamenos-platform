@@ -131,6 +131,7 @@ export const CHANNEL_SECURITY: Record<ChannelType, TransportSecurity> = {
   sms: 'none',
   whatsapp: 'provider-encrypted',
   signal: 'e2ee-to-bridge',
+  telegram: 'provider-encrypted',
   rcs: 'provider-encrypted',
   reports: 'e2ee',
 }
@@ -140,6 +141,7 @@ export const CHANNEL_LABELS: Record<ChannelType, string> = {
   sms: 'SMS',
   whatsapp: 'WhatsApp',
   signal: 'Signal',
+  telegram: 'Telegram',
   rcs: 'RCS',
   reports: 'Reports',
 }
@@ -184,12 +186,22 @@ export interface RCSConfig {
   afterHoursResponse?: string
 }
 
+export interface TelegramConfig {
+  enabled: boolean
+  botToken: string
+  webhookSecret?: string
+  botUsername?: string
+  autoResponse?: string
+  afterHoursResponse?: string
+}
+
 export interface MessagingConfig {
   enabledChannels: MessagingChannelType[]
   sms: SMSConfig | null
   whatsapp: WhatsAppConfig | null
   signal: SignalConfig | null
   rcs: RCSConfig | null
+  telegram: TelegramConfig | null
   autoAssign: boolean               // auto-assign to on-shift users
   inactivityTimeout: number         // minutes before auto-close
   maxConcurrentPerUser: number  // conversation limit per user
@@ -201,6 +213,7 @@ export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
   whatsapp: null,
   signal: null,
   rcs: null,
+  telegram: null,
   autoAssign: true,
   inactivityTimeout: 60,
   maxConcurrentPerUser: 3,
@@ -309,6 +322,7 @@ export interface EnabledChannels {
   sms: boolean
   whatsapp: boolean
   signal: boolean
+  telegram: boolean
   rcs: boolean
   reports: boolean
 }

@@ -6,12 +6,12 @@ import { z } from 'zod'
 export const telephonyProviderTypeSchema = z.enum(['twilio', 'signalwire', 'vonage', 'plivo', 'asterisk'])
 export type TelephonyProviderType = z.infer<typeof telephonyProviderTypeSchema>
 
-/** The four messaging channel types */
-export const messagingChannelTypeSchema = z.enum(['sms', 'whatsapp', 'signal', 'rcs'])
+/** The five messaging channel types */
+export const messagingChannelTypeSchema = z.enum(['sms', 'whatsapp', 'signal', 'rcs', 'telegram'])
 export type MessagingChannelType = z.infer<typeof messagingChannelTypeSchema>
 
 /** All channel types including voice and reports */
-export const channelTypeSchema = z.enum(['voice', 'sms', 'whatsapp', 'signal', 'rcs', 'reports'])
+export const channelTypeSchema = z.enum(['voice', 'sms', 'whatsapp', 'signal', 'rcs', 'telegram', 'reports'])
 export type ChannelType = z.infer<typeof channelTypeSchema>
 
 // --- Custom Field Definition (canonical storage type) ---
