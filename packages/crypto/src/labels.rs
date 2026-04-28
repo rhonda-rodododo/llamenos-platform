@@ -235,28 +235,28 @@ pub const LABEL_STRONGHOLD: &str = "llamenos:stronghold:v1";
 
 pub const LABEL_REGISTRY: &[&str] = &[
     // 0-3: Key wrapping
-    LABEL_NOTE_KEY,        // 0
-    LABEL_FILE_KEY,        // 1
-    LABEL_FILE_METADATA,   // 2
-    LABEL_HUB_KEY_WRAP,    // 3
+    LABEL_NOTE_KEY,      // 0
+    LABEL_FILE_KEY,      // 1
+    LABEL_FILE_METADATA, // 2
+    LABEL_HUB_KEY_WRAP,  // 3
     // 4-7: Content encryption
-    LABEL_TRANSCRIPTION,   // 4
-    LABEL_MESSAGE,         // 5
-    LABEL_CALL_META,       // 6
-    LABEL_SHIFT_SCHEDULE,  // 7
+    LABEL_TRANSCRIPTION,  // 4
+    LABEL_MESSAGE,        // 5
+    LABEL_CALL_META,      // 6
+    LABEL_SHIFT_SCHEDULE, // 7
     // 8-12: HKDF contexts
-    HKDF_SALT,             // 8
-    HKDF_CONTEXT_NOTES,    // 9
-    HKDF_CONTEXT_DRAFTS,   // 10
-    HKDF_CONTEXT_EXPORT,   // 11
-    LABEL_HUB_EVENT,       // 12
+    HKDF_SALT,           // 8
+    HKDF_CONTEXT_NOTES,  // 9
+    HKDF_CONTEXT_DRAFTS, // 10
+    HKDF_CONTEXT_EXPORT, // 11
+    LABEL_HUB_EVENT,     // 12
     // 13: Key agreement
     LABEL_DEVICE_PROVISION, // 13
     // 14-15: SAS
-    SAS_SALT,              // 14
-    SAS_INFO,              // 15
+    SAS_SALT, // 14
+    SAS_INFO, // 15
     // 16: Auth
-    AUTH_PREFIX,            // 16
+    AUTH_PREFIX, // 16
     // 17-21: HMAC prefixes
     HMAC_PHONE_PREFIX,     // 17
     HMAC_IP_PREFIX,        // 18
@@ -264,14 +264,14 @@ pub const LABEL_REGISTRY: &[&str] = &[
     HMAC_SUBSCRIBER,       // 20
     HMAC_PREFERENCE_TOKEN, // 21
     // 22-23: Recovery/backup
-    RECOVERY_SALT,         // 22
-    LABEL_BACKUP,          // 23
+    RECOVERY_SALT, // 22
+    LABEL_BACKUP,  // 23
     // 24-25: Server identity
     LABEL_SERVER_NOSTR_KEY,      // 24
     LABEL_SERVER_NOSTR_KEY_INFO, // 25
     // 26-27: Push
-    LABEL_PUSH_WAKE,       // 26
-    LABEL_PUSH_FULL,       // 27
+    LABEL_PUSH_WAKE, // 26
+    LABEL_PUSH_FULL, // 27
     // 28-34: CMS
     LABEL_CONTACT_ID,      // 28
     LABEL_CONTACT_PROFILE, // 29
@@ -281,35 +281,35 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_BLIND_INDEX_KEY, // 33
     LABEL_CROSS_HUB_SHARE, // 34
     // 35-40: CMS HMAC
-    HMAC_CONTACT_NAME,     // 35
-    HMAC_CONTACT_TAG,      // 36
-    HMAC_CASE_STATUS,      // 37
-    HMAC_CASE_SEVERITY,    // 38
-    HMAC_CASE_CATEGORY,    // 39
-    HMAC_EVENT_TYPE,       // 40
+    HMAC_CONTACT_NAME,  // 35
+    HMAC_CONTACT_TAG,   // 36
+    HMAC_CASE_STATUS,   // 37
+    HMAC_CASE_SEVERITY, // 38
+    HMAC_CASE_CATEGORY, // 39
+    HMAC_EVENT_TYPE,    // 40
     // 41-45: PUK
-    LABEL_PUK_SIGN,            // 41
-    LABEL_PUK_DH,              // 42
-    LABEL_PUK_SECRETBOX,       // 43
-    LABEL_PUK_WRAP_TO_DEVICE,  // 44
-    LABEL_PUK_PREVIOUS_GEN,    // 45
+    LABEL_PUK_SIGN,           // 41
+    LABEL_PUK_DH,             // 42
+    LABEL_PUK_SECRETBOX,      // 43
+    LABEL_PUK_WRAP_TO_DEVICE, // 44
+    LABEL_PUK_PREVIOUS_GEN,   // 45
     // 46: Device auth
-    LABEL_DEVICE_AUTH,          // 46
+    LABEL_DEVICE_AUTH, // 46
     // 47-48: Items key / note epoch
-    LABEL_ITEMS_KEY_EXPORT,     // 47
-    LABEL_NOTE_EPOCH_KEY,       // 48
+    LABEL_ITEMS_KEY_EXPORT, // 47
+    LABEL_NOTE_EPOCH_KEY,   // 48
     // 49: Hub PTK
-    LABEL_HUB_PTK_PREV_GEN,    // 49
+    LABEL_HUB_PTK_PREV_GEN, // 49
     // 50-51: SFrame
-    LABEL_SFRAME_CALL_SECRET,  // 50
-    LABEL_SFRAME_BASE_KEY,     // 51
+    LABEL_SFRAME_CALL_SECRET, // 50
+    LABEL_SFRAME_BASE_KEY,    // 51
     // 52: MLS
-    LABEL_MLS_PROVISION,        // 52
+    LABEL_MLS_PROVISION, // 52
     // 53-56: Salt/derivation labels
-    LABEL_ECIES_V2_SALT,        // 53
-    LABEL_PROVISIONING_SALT,    // 54
-    LABEL_BLIND_INDEX_FIELD,    // 55
-    LABEL_HUB_PTK,              // 56
+    LABEL_ECIES_V2_SALT,     // 53
+    LABEL_PROVISIONING_SALT, // 54
+    LABEL_BLIND_INDEX_FIELD, // 55
+    LABEL_HUB_PTK,           // 56
 ];
 
 /// Look up a label string by its numeric ID.
@@ -404,8 +404,16 @@ mod tests {
     #[test]
     fn label_id_roundtrip() {
         for (i, &label) in LABEL_REGISTRY.iter().enumerate() {
-            assert_eq!(label_to_id(label), Some(i as u8), "label_to_id failed for {label}");
-            assert_eq!(id_to_label(i as u8), Some(label), "id_to_label failed for index {i}");
+            assert_eq!(
+                label_to_id(label),
+                Some(i as u8),
+                "label_to_id failed for {label}"
+            );
+            assert_eq!(
+                id_to_label(i as u8),
+                Some(label),
+                "id_to_label failed for index {i}"
+            );
         }
     }
 

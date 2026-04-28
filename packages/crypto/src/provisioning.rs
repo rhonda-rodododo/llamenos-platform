@@ -119,8 +119,7 @@ pub fn encrypt_nsec_for_provisioning(
         return Err(CryptoError::InvalidSecretKey);
     }
 
-    let secret_key =
-        SecretKey::from_slice(sk_bytes).map_err(|_| CryptoError::InvalidSecretKey)?;
+    let secret_key = SecretKey::from_slice(sk_bytes).map_err(|_| CryptoError::InvalidSecretKey)?;
     let ephemeral_pk = parse_pubkey(ephemeral_pubkey_hex)?;
 
     // ECDH
@@ -133,11 +132,8 @@ pub fn encrypt_nsec_for_provisioning(
     let sas_code = compute_sas(&shared_x);
 
     // Get the nsec bech32 from the secret key bytes
-    let nsec = bech32::encode::<bech32::Bech32>(
-        bech32::Hrp::parse("nsec").unwrap(),
-        sk_bytes,
-    )
-    .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let nsec = bech32::encode::<bech32::Bech32>(bech32::Hrp::parse("nsec").unwrap(), sk_bytes)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     // Encrypt nsec
     let mut nonce_bytes = [0u8; 24];
@@ -215,8 +211,7 @@ pub fn decrypt_provisioned_nsec(
     symmetric_key.zeroize();
     shared_x.zeroize();
 
-    let nsec =
-        String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)?;
+    let nsec = String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)?;
 
     Ok(DecryptionResult {
         nsec: Zeroizing::new(nsec),
@@ -246,11 +241,9 @@ mod tests {
         let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
 
         // Primary encrypts nsec for provisioning
-        let result = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_hex,
-        )
-        .unwrap();
+        let result =
+            encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_hex)
+                .unwrap();
 
         // New device decrypts using same HKDF path
         let decrypted = decrypt_provisioned_nsec(
@@ -266,7 +259,10 @@ mod tests {
             primary_sk.to_bytes().as_slice(),
         )
         .unwrap();
-        assert_eq!(*decrypted.nsec, expected_nsec, "Recovered nsec must match original");
+        assert_eq!(
+            *decrypted.nsec, expected_nsec,
+            "Recovered nsec must match original"
+        );
     }
 
     /// Negative: HKDF-encrypted ciphertext must not decrypt with SHA-256 concat KDF
@@ -287,11 +283,9 @@ mod tests {
         let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
 
         // Encrypt using provisioning HKDF
-        let result = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_hex,
-        )
-        .unwrap();
+        let result =
+            encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_hex)
+                .unwrap();
 
         // Compute shared_x the mobile way (ephemeral SK × primary PK)
         let shared_x = compute_shared_x(&ephemeral_sk, &primary_pk).unwrap();
@@ -329,11 +323,9 @@ mod tests {
         let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
 
         // Primary encrypts its nsec for the new device
-        let result = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_hex,
-        )
-        .unwrap();
+        let result =
+            encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_hex)
+                .unwrap();
 
         // New device decrypts
         let decrypted = decrypt_provisioned_nsec(
@@ -367,11 +359,9 @@ mod tests {
         let ephemeral_pk_encoded = ephemeral_pk.to_encoded_point(true);
         let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
 
-        let result = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_hex,
-        )
-        .unwrap();
+        let result =
+            encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_hex)
+                .unwrap();
 
         // Try decrypting with a different ephemeral key
         let wrong_sk = SecretKey::random(&mut OsRng);
@@ -395,11 +385,9 @@ mod tests {
         let ephemeral_pk_encoded = ephemeral_pk.to_encoded_point(true);
         let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
 
-        let result = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_hex,
-        )
-        .unwrap();
+        let result =
+            encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_hex)
+                .unwrap();
 
         // Tamper with the ciphertext
         let mut bytes = hex::decode(&result.encrypted_hex).unwrap();
@@ -429,11 +417,9 @@ mod tests {
         // Use x-only (32 bytes) instead of compressed (33 bytes)
         let ephemeral_pk_xonly = hex::encode(&ephemeral_pk_encoded.as_bytes()[1..]);
 
-        let result = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_xonly,
-        )
-        .unwrap();
+        let result =
+            encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_xonly)
+                .unwrap();
 
         let primary_pk = primary_sk.public_key();
         let primary_pk_encoded = primary_pk.to_encoded_point(true);
@@ -464,16 +450,10 @@ mod tests {
         let ephemeral_pk_hex = hex::encode(ephemeral_pk_encoded.as_bytes());
 
         // Encrypt twice — SAS should be the same (deterministic from ECDH)
-        let r1 = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_hex,
-        )
-        .unwrap();
-        let r2 = encrypt_nsec_for_provisioning(
-            primary_sk.to_bytes().as_slice(),
-            &ephemeral_pk_hex,
-        )
-        .unwrap();
+        let r1 = encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_hex)
+            .unwrap();
+        let r2 = encrypt_nsec_for_provisioning(primary_sk.to_bytes().as_slice(), &ephemeral_pk_hex)
+            .unwrap();
 
         assert_eq!(r1.sas_code, r2.sas_code);
         // But encrypted payloads differ (different random nonces)

@@ -32,7 +32,10 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{hpke_seal, HpkeEnvelope};
-use crate::labels::{LABEL_PUK_DH, LABEL_PUK_PREVIOUS_GEN, LABEL_PUK_SECRETBOX, LABEL_PUK_SIGN, LABEL_PUK_WRAP_TO_DEVICE};
+use crate::labels::{
+    LABEL_PUK_DH, LABEL_PUK_PREVIOUS_GEN, LABEL_PUK_SECRETBOX, LABEL_PUK_SIGN,
+    LABEL_PUK_WRAP_TO_DEVICE,
+};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -128,7 +131,12 @@ pub fn create_initial_puk(
 
     // Seal seed to device
     let aad = format!("{}:{}", LABEL_PUK_WRAP_TO_DEVICE, device_id);
-    let envelope = hpke_seal(&seed, device_encryption_pubkey_hex, LABEL_PUK_WRAP_TO_DEVICE, aad.as_bytes())?;
+    let envelope = hpke_seal(
+        &seed,
+        device_encryption_pubkey_hex,
+        LABEL_PUK_WRAP_TO_DEVICE,
+        aad.as_bytes(),
+    )?;
 
     Ok((state, seed, envelope))
 }
@@ -160,7 +168,12 @@ pub fn rotate_puk(
     let mut device_envelopes = Vec::with_capacity(remaining_devices.len());
     for (device_id, pubkey_hex) in remaining_devices {
         let aad = format!("{}:{}", LABEL_PUK_WRAP_TO_DEVICE, device_id);
-        let envelope = hpke_seal(&new_seed, pubkey_hex, LABEL_PUK_WRAP_TO_DEVICE, aad.as_bytes())?;
+        let envelope = hpke_seal(
+            &new_seed,
+            pubkey_hex,
+            LABEL_PUK_WRAP_TO_DEVICE,
+            aad.as_bytes(),
+        )?;
         device_envelopes.push(DevicePukEnvelope {
             device_id: device_id.clone(),
             envelope,
@@ -336,7 +349,8 @@ mod tests {
 
         // Decrypt the envelope to recover the seed
         let aad = format!("{}:{}", LABEL_PUK_WRAP_TO_DEVICE, "device-1");
-        let recovered = hpke_open(&envelope, &sk_hex, LABEL_PUK_WRAP_TO_DEVICE, aad.as_bytes()).unwrap();
+        let recovered =
+            hpke_open(&envelope, &sk_hex, LABEL_PUK_WRAP_TO_DEVICE, aad.as_bytes()).unwrap();
         assert_eq!(recovered.len(), 32);
         assert_eq!(&recovered, &seed);
 
@@ -365,17 +379,25 @@ mod tests {
 
         // Decrypt new seed from device 1's envelope
         let aad = format!("{}:{}", LABEL_PUK_WRAP_TO_DEVICE, "dev-1");
-        let new_seed_bytes =
-            hpke_open(&result.device_envelopes[0].envelope, &sk1_hex, LABEL_PUK_WRAP_TO_DEVICE, aad.as_bytes())
-                .unwrap();
+        let new_seed_bytes = hpke_open(
+            &result.device_envelopes[0].envelope,
+            &sk1_hex,
+            LABEL_PUK_WRAP_TO_DEVICE,
+            aad.as_bytes(),
+        )
+        .unwrap();
         let mut new_seed = [0u8; 32];
         new_seed.copy_from_slice(&new_seed_bytes);
 
         // Decrypt new seed from device 2's envelope
         let aad2 = format!("{}:{}", LABEL_PUK_WRAP_TO_DEVICE, "dev-2");
-        let new_seed2 =
-            hpke_open(&result.device_envelopes[1].envelope, &sk2_hex, LABEL_PUK_WRAP_TO_DEVICE, aad2.as_bytes())
-                .unwrap();
+        let new_seed2 = hpke_open(
+            &result.device_envelopes[1].envelope,
+            &sk2_hex,
+            LABEL_PUK_WRAP_TO_DEVICE,
+            aad2.as_bytes(),
+        )
+        .unwrap();
         assert_eq!(new_seed_bytes, new_seed2);
 
         // Decrypt CLKR chain link to recover old seed

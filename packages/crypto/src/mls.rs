@@ -11,8 +11,10 @@
 //! - Epoch secret export for hub PTK derivation
 //! - Self-update for post-compromise security
 
+use openmls::prelude::tls_codec::{
+    Deserialize as TlsDeserializeTrait, Serialize as TlsSerializeTrait,
+};
 use openmls::prelude::*;
-use openmls::prelude::tls_codec::{Deserialize as TlsDeserializeTrait, Serialize as TlsSerializeTrait};
 use openmls_basic_credential::SignatureKeyPair;
 use openmls_rust_crypto::OpenMlsRustCrypto;
 use serde::{Deserialize, Serialize};
@@ -74,9 +76,8 @@ impl MlsManager {
     pub fn new(device_id: &str) -> Result<Self, CryptoError> {
         let provider = OpenMlsRustCrypto::default();
 
-        let signature_keypair =
-            SignatureKeyPair::new(CIPHERSUITE.signature_algorithm())
-                .map_err(|e| CryptoError::EncryptionFailed(format!("MLS keygen: {e:?}")))?;
+        let signature_keypair = SignatureKeyPair::new(CIPHERSUITE.signature_algorithm())
+            .map_err(|e| CryptoError::EncryptionFailed(format!("MLS keygen: {e:?}")))?;
 
         signature_keypair
             .store(provider.storage())
@@ -175,11 +176,7 @@ impl MlsManager {
             .ok_or_else(|| CryptoError::InvalidInput("group not found".into()))?;
 
         let (commit_out, welcome_out, _group_info) = group
-            .add_members(
-                &self.provider,
-                &self.signature_keypair,
-                &[key_package],
-            )
+            .add_members(&self.provider, &self.signature_keypair, &[key_package])
             .map_err(|e| CryptoError::EncryptionFailed(format!("MLS add member: {e:?}")))?;
 
         group

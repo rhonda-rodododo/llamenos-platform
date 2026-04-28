@@ -96,9 +96,8 @@ pub fn hpke_seal(
     label: &str,
     aad: &[u8],
 ) -> Result<HpkeEnvelope, CryptoError> {
-    let label_id = label_to_id(label).ok_or_else(|| {
-        CryptoError::InvalidInput(format!("unknown crypto label: {label}"))
-    })?;
+    let label_id = label_to_id(label)
+        .ok_or_else(|| CryptoError::InvalidInput(format!("unknown crypto label: {label}")))?;
 
     let pk_bytes = hex::decode(recipient_pubkey_hex).map_err(CryptoError::HexError)?;
     if pk_bytes.len() != 32 {
@@ -221,9 +220,12 @@ pub fn hpke_open_key(
     expected_label: &str,
     aad: &[u8],
 ) -> Result<[u8; 32], CryptoError> {
-    let plaintext = Zeroizing::new(
-        hpke_open(envelope, recipient_secret_hex, expected_label, aad)?
-    );
+    let plaintext = Zeroizing::new(hpke_open(
+        envelope,
+        recipient_secret_hex,
+        expected_label,
+        aad,
+    )?);
     if plaintext.len() != 32 {
         return Err(CryptoError::InvalidFormat(format!(
             "expected 32-byte key, got {} bytes",
