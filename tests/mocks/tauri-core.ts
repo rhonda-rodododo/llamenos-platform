@@ -12,10 +12,10 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
   throw new Error('FATAL: Tauri IPC mock loaded outside test environment.')
 }
 
-import { ed25519 } from '@noble/curves/ed25519'
-import { x25519 } from '@noble/curves/ed25519'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
-import { sha256 } from '@noble/hashes/sha256.js'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { hmac } from '@noble/hashes/hmac.js'
 import { gcm } from '@noble/ciphers/aes.js'
 import { randomBytes } from '@noble/hashes/utils.js'
