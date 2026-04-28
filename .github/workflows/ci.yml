@@ -434,7 +434,10 @@ jobs:
       - name: Collect @android feature files for this shard
         id: shard-features
         run: |
-          FEATURES=$(find packages/test-specs/features -name "*.feature" -exec grep -l "@android" {} \; | sort)
+          # Only collect features under platform/mobile/ — the Gradle copyFeatureFiles
+          # task only copies this subtree into androidTest assets. Features in admin/,
+          # core/, security/, platform/desktop/ have steps not implemented on Android.
+          FEATURES=$(find packages/test-specs/features/platform/mobile -name "*.feature" -exec grep -l "@android" {} \; | sort)
           TOTAL=$(echo "$FEATURES" | wc -l)
           echo "Total @android features: $TOTAL"
 
@@ -608,8 +611,11 @@ jobs:
       - name: Start Bun backend
         run: |
           nohup bun dist/server/index.js &>/tmp/backend.log &
+          # Use /api/health/live (always 200) — macOS CI has no Nostr relay,
+          # so /api/health returns 503 (relay check fails). The backend still
+          # serves API requests fine without the relay.
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3000/api/health; then
+            if curl -sf http://localhost:3000/api/health/live; then
               echo "Backend is ready"
               break
             fi
