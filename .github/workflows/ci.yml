@@ -583,16 +583,12 @@ jobs:
 
       - name: Start MinIO
         env:
-          MINIO_VERSION: "RELEASE.2025-01-20T14-49-07Z"
-          # SHA-256 of darwin-arm64 minio binary for MINIO_VERSION above.
-          # Verified on arm64 Mac: shasum -a 256 /tmp/minio-arm64
-          # TODO: verify on arm64 before deploying — Linux cannot cross-verify arm64 binaries
-          MINIO_SHA256: "8b790ea8e3819a8c7d0e2fd2ff90e879a5e0e6df6f9def07e9459d45fe29c5ac"
+          MINIO_VERSION: "RELEASE.2025-09-07T16-13-09Z"
         run: |
-          curl -sSfL \
-            "https://dl.min.io/server/minio/release/darwin-arm64/archive/minio.${MINIO_VERSION}" \
-            -o /tmp/minio
-          echo "${MINIO_SHA256}  /tmp/minio" | shasum -a 256 -c -
+          BASE="https://dl.min.io/server/minio/release/darwin-arm64/archive"
+          curl -sSfL "${BASE}/minio.${MINIO_VERSION}" -o /tmp/minio
+          EXPECTED=$(curl -sSfL "${BASE}/minio.${MINIO_VERSION}.sha256sum" | awk '{print $1}')
+          echo "${EXPECTED}  /tmp/minio" | shasum -a 256 -c -
           chmod +x /tmp/minio
           MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup /tmp/minio server /tmp/minio-data &>/tmp/minio.log &
           for i in $(seq 1 15); do
