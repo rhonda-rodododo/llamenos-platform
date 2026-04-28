@@ -83,7 +83,8 @@ services:
         max-file: "5"
         tag: "llamenos-app"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health/ready"]
+      # oven/bun:1-slim has no curl — use bun's built-in fetch
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 5
