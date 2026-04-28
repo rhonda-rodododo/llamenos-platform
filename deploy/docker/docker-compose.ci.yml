@@ -85,7 +85,7 @@ services:
     environment:
       - ASTERISK_CORE_DEBUG=1
 
-  asterisk-bridge:
+  sip-bridge:
     environment:
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_USERNAME=${ARI_USERNAME:-llamenos}
