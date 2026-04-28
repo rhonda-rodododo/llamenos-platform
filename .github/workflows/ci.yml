@@ -691,7 +691,7 @@ jobs:
           chmod +x /tmp/s3-compat-storage
           MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup /tmp/s3-compat-storage server /tmp/s3-compat-data &>/tmp/s3-compat.log &
           for i in $(seq 1 15); do
-            if curl -sf http://localhost:9000/minio/health/live; then
+            if curl -sf http://localhost:9000; then
               echo "S3-compatible storage is ready"
               break
             fi
