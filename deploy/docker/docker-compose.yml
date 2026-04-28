@@ -88,7 +88,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
 
   postgres:
     image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
@@ -223,7 +223,7 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -370,6 +370,7 @@ services:
     environment:
       - PORT=3100
       - "NOTIFIER_API_KEY=${NOTIFIER_API_KEY:?NOTIFIER_API_KEY is required when signal profile is active — generate with openssl rand -hex 32}"
+      - "NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-${HMAC_SECRET}}"
       - SIGNAL_BRIDGE_URL=http://signal-cli:8080
       - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
       - "SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:?SIGNAL_REGISTERED_NUMBER is required — your registered Signal phone number}"
@@ -382,7 +383,7 @@ services:
       signal-cli:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3

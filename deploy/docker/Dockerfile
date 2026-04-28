@@ -38,6 +38,14 @@ COPY packages/i18n/ packages/i18n/
 COPY packages/protocol/ packages/protocol/
 COPY tsconfig.json ./
 
+# Copy Drizzle SQL migrations + migration runner (applied at startup)
+COPY drizzle/migrations/ drizzle/migrations/
+COPY scripts/run-migrations.ts scripts/run-migrations.ts
+
+# Copy entrypoint (runs migrations then starts the app)
+COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Serve a minimal download page for browsers hitting the root URL
 COPY deploy/docker/download-page/ public/
 
@@ -53,7 +61,8 @@ ENV PLATFORM=bun \
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
   CMD bun -e "fetch('http://localhost:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))" || exit 1
 
-CMD ["bun", "src/server/index.ts"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD []
