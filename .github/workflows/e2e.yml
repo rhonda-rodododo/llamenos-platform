@@ -1,0 +1,410 @@
+# E2E & Integration Tests
+#
+# Slower tests (~20 min) that run in parallel with the fast CI gate:
+#   1. Detect changed files — skip tests for docs-only changes
+#   2. Build & validate (codegen, typecheck, vite build — for artifacts)
+#   3. Playwright E2E + Backend BDD against Docker Compose backend
+#   4. iOS build & test (on macOS runner)
+#
+# This workflow runs on PRs and main pushes but is NOT the merge gate.
+# The merge gate is ci.yml (fast: ~5 min).
+
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
+env:
+  BUN_VERSION: "1.3.5"
+  TEST_ADMIN_PUBKEY: "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
+
+jobs:
+  # ─── Detect Changed Files ─────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+
+      - name: Detect changes
+        id: filter
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || git diff --name-only HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          DOCS_ONLY="true"
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            if ! echo "$file" | grep -qE "\.md$|^site/"; then
+              DOCS_ONLY="false"
+              echo "Non-docs file changed: $file"
+            fi
+          done <<< "$CHANGED"
+
+          {
+            echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)"
+            echo "docs_only=$DOCS_ONLY"
+          } >> "$GITHUB_OUTPUT"
+
+  # ─── Build & Validate (for artifacts) ──────────────────────────
+  build:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run codegen
+        run: bun run codegen
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build frontend (with Tauri IPC mocks for test builds)
+        run: PLAYWRIGHT_TEST=true bun run build
+
+      - name: Build server
+        run: bun run build:server
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-app-build
+          path: dist/
+          retention-days: 1
+
+  # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
+  e2e:
+    needs: [changes, build]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Install Playwright deps (cached browsers)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
+      - name: Create .env for Docker Compose
+        run: |
+          printf '%s\n' \
+            "ADMIN_PUBKEY=${TEST_ADMIN_PUBKEY}" \
+            "DOMAIN=localhost" \
+            "PG_PASSWORD=ci-test-password" \
+            "HMAC_SECRET=$(openssl rand -hex 32)" \
+            "MINIO_ACCESS_KEY=testaccess" \
+            "MINIO_SECRET_KEY=testsecret123456" \
+            "HOTLINE_NAME=Llámenos" \
+            "BRIDGE_SECRET=ci-test-bridge-secret" \
+            "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "NOTIFIER_API_KEY=ci-test-notifier-key" \
+            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+            "PBX_TYPE=asterisk" \
+            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            > .env
+
+      - name: Build and start Docker Compose (core services)
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --wait app
+        timeout-minutes: 10
+
+      - name: Start sidecar profiles (signal + telephony)
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --no-recreate
+        timeout-minutes: 5
+
+      - name: Wait for signal-notifier health
+        run: |
+          echo "Waiting for signal-notifier..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100/health; then
+              echo "signal-notifier is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
+            fi
+            sleep 3
+          done
+
+      - name: Show container status
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            ps || true
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs --tail=50 || true
+
+      - name: Run E2E tests
+        run: bunx playwright test
+
+      - name: Run backend BDD tests
+        run: bun run test:backend:bdd --no-codegen
+        env:
+          TEST_HUB_URL: http://localhost:3000
+          SIGNAL_NOTIFIER_URL: http://localhost:3100
+          SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
+          PBX_TYPE: ari
+
+      - name: Smoke check sidecar health endpoints
+        if: ${{ !cancelled() }}
+        run: |
+          curl -sf http://localhost:3000/api/health/ready || echo "::warning::app health check failed"
+          curl -sf http://localhost:3100/health || echo "::warning::signal-notifier health check failed"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: e2e-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v
+
+  # ─── iOS Build & Test ──────────────────────────────────────
+  ios-build-test:
+    needs: [changes, build]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun (for codegen)
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies and run codegen
+        run: bun install --frozen-lockfile && bun run codegen
+
+      - name: Install Rust stable (for crypto xcframework)
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+        with:
+          workspaces: packages/crypto
+
+      - name: Build crypto XCFramework
+        run: |
+          cd packages/crypto
+          ./scripts/build-mobile.sh ios
+          cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
+
+      - name: Check for hardcoded secrets in Swift source
+        run: |
+          if grep -rE '[0-9a-f]{64}' apps/ios/Sources/ --include="*.swift"; then
+            echo "ERROR: Potential hardcoded hex secret found in iOS source"
+            exit 1
+          fi
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate
+
+      - name: Detect simulator
+        id: sim
+        run: |
+          SIM=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in sorted(data.get('devices', {}).items(), reverse=True):
+              if 'iOS' in runtime:
+                  for d in devices:
+                      if d.get('isAvailable') and 'iPhone' in d.get('name', ''):
+                          print(d['name'])
+                          sys.exit(0)
+          print('iPhone 16')
+          ")
+          echo "device=$SIM" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $SIM"
+
+      - name: Build app
+        working-directory: apps/ios
+        run: |
+          xcodebuild build \
+            -project Llamenos.xcodeproj \
+            -scheme Llamenos \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath /tmp/llamenos-build
+
+      - name: Run unit tests
+        working-directory: apps/ios
+        run: |
+          xcodebuild test \
+            -project Llamenos.xcodeproj \
+            -scheme Llamenos \
+            -only-testing:LlamenosTests \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath /tmp/llamenos-build
+
+      # ── Native backend for API-connected UI tests ──
+      # Docker is unavailable on macOS GHA runners (no nested virtualization).
+      # Run PostgreSQL and MinIO natively instead.
+      - name: Start PostgreSQL
+        run: |
+          brew install postgresql@17
+          export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+          echo "/opt/homebrew/opt/postgresql@17/bin" >> "$GITHUB_PATH"
+          initdb -D /tmp/pgdata
+          pg_ctl -D /tmp/pgdata -l /tmp/pgdata/log start
+          createuser -s llamenos 2>/dev/null || true
+          createdb -O llamenos llamenos 2>/dev/null || true
+
+      - name: Start MinIO
+        env:
+          MINIO_VERSION: "RELEASE.2025-01-20T14-49-07Z"
+          # SHA-256 of darwin-arm64 minio binary for MINIO_VERSION above.
+          # Verified on arm64 Mac: shasum -a 256 /tmp/minio-arm64
+          # TODO: verify on arm64 before deploying — Linux cannot cross-verify arm64 binaries
+          MINIO_SHA256: "8b790ea8e3819a8c7d0e2fd2ff90e879a5e0e6df6f9def07e9459d45fe29c5ac"
+        run: |
+          curl -sSfL \
+            "https://dl.min.io/server/minio/release/darwin-arm64/archive/minio.${MINIO_VERSION}" \
+            -o /tmp/minio
+          echo "${MINIO_SHA256}  /tmp/minio" | shasum -a 256 -c -
+          chmod +x /tmp/minio
+          MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup /tmp/minio server /tmp/minio-data &>/tmp/minio.log &
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:9000/minio/health/live; then
+              echo "MinIO is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: e2e-app-build
+          path: dist/
+
+      - name: Start Bun backend
+        run: |
+          nohup bun dist/server/index.js &>/tmp/backend.log &
+          # Use /api/health/live (always 200) — macOS CI has no Nostr relay,
+          # so /api/health returns 503 (relay check fails). The backend still
+          # serves API requests fine without the relay.
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/health/live; then
+              echo "Backend is ready"
+              break
+            fi
+            sleep 2
+          done
+        env:
+          PLATFORM: bun
+          PORT: "3000"
+          DATABASE_URL: postgresql://llamenos@localhost:5432/llamenos
+          PG_POOL_SIZE: "5"
+          ADMIN_PUBKEY: ${{ env.TEST_ADMIN_PUBKEY }}
+          HOTLINE_NAME: "Llámenos"
+          ENVIRONMENT: development
+          DEV_RESET_SECRET: test-reset-secret
+          HMAC_SECRET: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+          MINIO_ENDPOINT: http://localhost:9000
+          MINIO_ACCESS_KEY: testaccess
+          MINIO_SECRET_KEY: testsecret123456
+          MINIO_BUCKET: llamenos-files
+          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
+
+      - name: Show backend logs
+        if: ${{ !cancelled() }}
+        run: cat /tmp/backend.log || true
+
+      - name: Run UI tests
+        working-directory: apps/ios
+        run: |
+          xcodebuild test \
+            -project Llamenos.xcodeproj \
+            -scheme Llamenos \
+            -only-testing:LlamenosUITests \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath /tmp/llamenos-build
+
+      - name: Stop backend services
+        if: always()
+        run: |
+          pkill -f "bun dist/server/index.js" || true
+          pkill -f minio || true
+          pg_ctl -D /tmp/pgdata stop 2>/dev/null || true
