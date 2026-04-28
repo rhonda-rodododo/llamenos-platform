@@ -204,8 +204,8 @@ services:
   sip-bridge:
     profiles: ["asterisk"]
     build:
-      context: ../..
-      dockerfile: sip-bridge/Dockerfile
+      context: ../../sip-bridge
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       - PBX_TYPE=${PBX_TYPE:-asterisk}
@@ -223,7 +223,8 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      # oven/bun:1 has no curl — use bun's built-in fetch
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -364,8 +365,8 @@ services:
   signal-notifier:
     profiles: ["signal"]
     build:
-      context: ../..
-      dockerfile: signal-notifier/Dockerfile
+      context: ../../signal-notifier
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       - PORT=3100
@@ -382,7 +383,8 @@ services:
       signal-cli:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      # oven/bun:1-slim has no curl — use bun's built-in fetch
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
