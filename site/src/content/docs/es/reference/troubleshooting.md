@@ -16,8 +16,8 @@ Docker Compose valida todos los servicios al inicio, incluso los perfilados. Si 
 ```bash
 # Requerido en .env para Docker Compose
 PG_PASSWORD=tu_contraseña_postgres
-MINIO_ACCESS_KEY=tu_clave_de_acceso_minio
-MINIO_SECRET_KEY=tu_clave_secreta_minio
+STORAGE_ACCESS_KEY=tu_clave_de_acceso_rustfs
+STORAGE_SECRET_KEY=tu_clave_secreta_rustfs
 HMAC_SECRET=tu_secreto_hmac
 ARI_PASSWORD=tu_contraseña_ari       # Requerido incluso sin usar Asterisk
 BRIDGE_SECRET=tu_secreto_bridge     # Requerido incluso sin usar Asterisk
@@ -37,7 +37,7 @@ sudo lsof -i :8787
 # Verificar que esta usando el puerto 5432 (PostgreSQL)
 sudo lsof -i :5432
 
-# Verificar que esta usando el puerto 9000 (MinIO)
+# Verificar que esta usando el puerto 9000 (RustFS)
 sudo lsof -i :9000
 ```
 
@@ -65,11 +65,11 @@ docker compose restart strfry
 
 Si el relay no inicia, verifica conflictos en el puerto 7777 o permisos insuficientes en el directorio de datos.
 
-### Errores de almacenamiento MinIO / S3
+### Errores de almacenamiento RustFS / S3
 
-- Verifica que `MINIO_ACCESS_KEY` y `MINIO_SECRET_KEY` sean correctos
-- Verifica que el container de MinIO este ejecutandose: `docker compose ps minio`
-- Accede a la consola de MinIO en `http://localhost:9001` para verificar la creacion del bucket
+- Verifica que `STORAGE_ACCESS_KEY` y `STORAGE_SECRET_KEY` sean correctos
+- Verifica que el container de RustFS este ejecutandose: `docker compose ps rustfs`
+- Accede a la consola de RustFS en `http://localhost:9001` para verificar la creacion del bucket
 
 ## Problemas de despliegue Cloudflare
 
@@ -184,8 +184,8 @@ Causas comunes:
 Si las llamadas no se enrutan a los voluntarios:
 
 1. Verifica que las URLs de webhook esten correctas en la consola de Twilio:
-   - Webhook de voz: `https://tu-worker.tu-dominio.com/telephony/incoming` (POST)
-   - Status callback: `https://tu-worker.tu-dominio.com/telephony/status` (POST)
+   - Webhook de voz: `https://tu-worker.tu-dorustfs.com/telephony/incoming` (POST)
+   - Status callback: `https://tu-worker.tu-dorustfs.com/telephony/status` (POST)
 2. Verifica que las credenciales de Twilio en tu configuracion coincidan con la consola:
    - Account SID
    - Auth Token

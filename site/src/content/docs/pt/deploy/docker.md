@@ -9,14 +9,14 @@ Este guia orienta voce na implantacao do Llamenos com Docker Compose em um unico
 
 - Um servidor Linux (Ubuntu 22.04+, Debian 12+ ou similar)
 - [Docker Engine](https://docs.docker.com/engine/install/) v24+ com Docker Compose v2
-- Um nome de dominio com DNS apontando para o IP do seu servidor
+- Um nome de dorustfs com DNS apontando para o IP do seu servidor
 - [Bun](https://bun.sh/) instalado localmente (para gerar o par de chaves do administrador)
 
 ## 1. Clonar o repositorio
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/your-org/llamenos.git
+cd llamenos
 ```
 
 ## 2. Gerar o par de chaves do administrador
@@ -42,7 +42,7 @@ Edite o `.env` com seus valores:
 ```env
 # Obrigatorio
 ADMIN_PUBKEY=sua_chave_publica_hex_do_passo_2
-DOMAIN=hotline.seudominio.com
+DOMAIN=hotline.seudorustfs.com
 
 # Senha do PostgreSQL (gere uma forte)
 PG_PASSWORD=$(openssl rand -base64 24)
@@ -55,19 +55,19 @@ TWILIO_ACCOUNT_SID=seu_sid
 TWILIO_AUTH_TOKEN=seu_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Credenciais do MinIO (altere os valores padrao!)
-MINIO_ACCESS_KEY=sua-chave-de-acesso
-MINIO_SECRET_KEY=sua-chave-secreta-min-8-chars
+# Credenciais do RustFS (altere os valores padrao!)
+STORAGE_ACCESS_KEY=sua-chave-de-acesso
+STORAGE_SECRET_KEY=sua-chave-secreta-min-8-chars
 ```
 
-> **Importante**: Defina senhas fortes e unicas para `PG_PASSWORD`, `MINIO_ACCESS_KEY` e `MINIO_SECRET_KEY`.
+> **Importante**: Defina senhas fortes e unicas para `PG_PASSWORD`, `STORAGE_ACCESS_KEY` e `STORAGE_SECRET_KEY`.
 
-## 4. Configurar seu dominio
+## 4. Configurar seu dorustfs
 
-Edite o `Caddyfile` para definir seu dominio:
+Edite o `Caddyfile` para definir seu dorustfs:
 
 ```
-hotline.seudominio.com {
+hotline.seudorustfs.com {
     reverse_proxy app:3000
     encode gzip
     header {
@@ -79,7 +79,7 @@ hotline.seudominio.com {
 }
 ```
 
-O Caddy obtem e renova automaticamente os certificados TLS do Let's Encrypt para seu dominio. Certifique-se de que as portas 80 e 443 estejam abertas no seu firewall.
+O Caddy obtem e renova automaticamente os certificados TLS do Let's Encrypt para seu dorustfs. Certifique-se de que as portas 80 e 443 estejam abertas no seu firewall.
 
 ## 5. Iniciar os servicos
 
@@ -94,7 +94,7 @@ Isso inicia quatro servicos principais:
 | **app** | Aplicacao Llamenos | 3000 (interna) |
 | **postgres** | Banco de dados PostgreSQL | 5432 (interna) |
 | **caddy** | Proxy reverso + TLS | 80, 443 |
-| **minio** | Armazenamento de arquivos/gravacoes | 9000, 9001 (interna) |
+| **rustfs** | Armazenamento de arquivos/gravacoes | 9000, 9001 (interna) |
 
 Verifique se tudo esta em execucao:
 
@@ -106,13 +106,13 @@ docker compose logs app --tail 50
 Verifique o endpoint de saude:
 
 ```bash
-curl https://hotline.seudominio.com/api/health
+curl https://hotline.seudorustfs.com/api/health
 # → {"status":"ok"}
 ```
 
 ## 6. Primeiro login
 
-Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de administrador do passo 2. O assistente de configuracao ira guia-lo pelas etapas:
+Abra `https://hotline.seudorustfs.com` no seu navegador. Faca login com o nsec de administrador do passo 2. O assistente de configuracao ira guia-lo pelas etapas:
 
 1. **Nomear sua linha** -- nome de exibicao do aplicativo
 2. **Escolher canais** -- ativar Voz, SMS, WhatsApp, Signal e/ou Reportes
@@ -121,12 +121,12 @@ Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de
 
 ## 7. Configurar webhooks
 
-Aponte os webhooks do seu provedor de telefonia para o seu dominio. Consulte os guias especificos de cada provedor para detalhes:
+Aponte os webhooks do seu provedor de telefonia para o seu dorustfs. Consulte os guias especificos de cada provedor para detalhes:
 
-- **Voz** (todos os provedores): `https://hotline.seudominio.com/telephony/incoming`
-- **SMS**: `https://hotline.seudominio.com/api/messaging/sms/webhook`
-- **WhatsApp**: `https://hotline.seudominio.com/api/messaging/whatsapp/webhook`
-- **Signal**: Configure o bridge para encaminhar para `https://hotline.seudominio.com/api/messaging/signal/webhook`
+- **Voz** (todos os provedores): `https://hotline.seudorustfs.com/telephony/incoming`
+- **SMS**: `https://hotline.seudorustfs.com/api/messaging/sms/webhook`
+- **WhatsApp**: `https://hotline.seudorustfs.com/api/messaging/whatsapp/webhook`
+- **Signal**: Configure o bridge para encaminhar para `https://hotline.seudorustfs.com/api/messaging/signal/webhook`
 
 ## Opcional: Ativar transcricao
 
@@ -143,7 +143,7 @@ Isso inicia um container `faster-whisper-server` usando o modelo `base` em CPU. 
 
 ## Opcional: Ativar Asterisk
 
-Para telefonia SIP auto-hospedada (veja [configuracao do Asterisk](/docs/deploy/providers/asterisk)):
+Para telefonia SIP auto-hospedada (veja [configuracao do Asterisk](/docs/setup-asterisk)):
 
 ```bash
 # Definir o segredo compartilhado do bridge
@@ -154,13 +154,13 @@ docker compose --profile asterisk up -d
 
 ## Opcional: Ativar Signal
 
-Para mensagens Signal (veja [configuracao do Signal](/docs/deploy/providers/signal)):
+Para mensagens Signal (veja [configuracao do Signal](/docs/setup-signal)):
 
 ```bash
 docker compose --profile signal up -d
 ```
 
-Voce precisara registrar o numero do Signal pelo container signal-cli. Consulte o [guia de configuracao do Signal](/docs/deploy/providers/signal) para instrucoes.
+Voce precisara registrar o numero do Signal pelo container signal-cli. Consulte o [guia de configuracao do Signal](/docs/setup-signal) para instrucoes.
 
 ## Atualizacao
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Seus dados sao persistidos em volumes Docker (`postgres-data`, `minio-data`, etc.) e sobrevivem a reinicializacoes de containers e atualizacoes de imagens.
+Seus dados sao persistidos em volumes Docker (`postgres-data`, `rustfs-data`, etc.) e sobrevivem a reinicializacoes de containers e atualizacoes de imagens.
 
 ## Backups
 
@@ -189,15 +189,15 @@ Para restaurar:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Armazenamento MinIO
+### Armazenamento RustFS
 
-O MinIO armazena arquivos enviados, gravacoes e anexos:
+O RustFS armazena arquivos enviados, gravacoes e anexos:
 
 ```bash
-# Usando o cliente MinIO (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Usando o cliente RustFS (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Backups automatizados
@@ -259,24 +259,31 @@ O Caddy precisa das portas 80 e 443 abertas para os desafios ACME. Verifique com
 docker compose logs caddy
 
 # Verificar se as portas estao acessiveis
-curl -I http://hotline.seudominio.com
+curl -I http://hotline.seudorustfs.com
 ```
 
-### Erros de conexao com MinIO
+### Erros de conexao com RustFS
 
-Certifique-se de que o servico MinIO esteja saudavel antes de o aplicativo iniciar:
+Certifique-se de que o servico RustFS esteja saudavel antes de o aplicativo iniciar:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Arquitetura dos servicos
 
-![Docker Architecture](/diagrams/docker-architecture.svg)
+```mermaid
+flowchart TD
+    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, proxy reverso)"]
+    Caddy -->|":3000"| App["App<br/>(Node.js)"]
+    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
+    App --> RustFS[("RustFS<br/>:9000")]
+    App -.->|"opcional"| Whisper["Whisper<br/>:8080"]
+```
 
 ## Proximos passos
 
 - [Guia do administrador](/docs/admin-guide) -- configurar a linha
-- [Visao geral do auto-hospedagem](/docs/deploy/self-hosting) -- comparar opcoes de implantacao
-- [Implantacao no Kubernetes](/docs/deploy/kubernetes) -- migrar para Helm
+- [Visao geral do auto-hospedagem](/docs/self-hosting) -- comparar opcoes de implantacao
+- [Implantacao no Kubernetes](/docs/deploy-kubernetes) -- migrar para Helm

@@ -16,8 +16,8 @@ Docker Compose valide tout sèvis yo nan demarraj, menm ki gen pwofil. Si ou wè
 ```bash
 # Obligatwa nan .env pou Docker Compose
 PG_PASSWORD=your_postgres_password
-MINIO_ACCESS_KEY=your_minio_access_key
-MINIO_SECRET_KEY=your_minio_secret_key
+STORAGE_ACCESS_KEY=your_rustfs_access_key
+STORAGE_SECRET_KEY=your_rustfs_secret_key
 HMAC_SECRET=your_hmac_secret
 ARI_PASSWORD=your_ari_password       # Obligatwa menm si ou pa itilize Asterisk
 BRIDGE_SECRET=your_bridge_secret     # Obligatwa menm si ou pa itilize Asterisk
@@ -37,7 +37,7 @@ sudo lsof -i :8787
 # Verifye sa k ap itilize pò 5432 (PostgreSQL)
 sudo lsof -i :5432
 
-# Verifye sa k ap itilize pò 9000 (MinIO)
+# Verifye sa k ap itilize pò 9000 (RustFS)
 sudo lsof -i :9000
 ```
 
@@ -65,11 +65,11 @@ docker compose restart strfry
 
 Si relè a pa kòmanse, verifye konfli pò 7777 oswa pèmisyon ensifizans sou repertwa done a.
 
-### Erè estokaj MinIO / S3
+### Erè estokaj RustFS / S3
 
-- Verifye `MINIO_ACCESS_KEY` ak `MINIO_SECRET_KEY` kòrèk
-- Verifye konteyè MinIO a kouri : `docker compose ps minio`
-- Aksede konsòl MinIO a nan `http://localhost:9001` pou verifye kreyasyon seau
+- Verifye `STORAGE_ACCESS_KEY` ak `STORAGE_SECRET_KEY` kòrèk
+- Verifye konteyè RustFS a kouri : `docker compose ps rustfs`
+- Aksede konsòl RustFS a nan `http://localhost:9001` pou verifye kreyasyon seau
 
 ## Pwoblèm deplwaman Cloudflare
 

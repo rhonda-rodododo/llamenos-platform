@@ -166,7 +166,7 @@ docker run -d \
    - **ARI URL**: `https://tu-servidor-asterisk:8089/ari`
    - **ARI Username**: `llamenos`
    - **ARI Password**: tu contrasena ARI
-   - **Bridge Callback URL**: URL donde el bridge ARI recibe webhooks de Llamenos (por ejemplo, `https://bridge.tu-dominio.com/webhook`)
+   - **Bridge Callback URL**: URL donde el bridge ARI recibe webhooks de Llamenos (por ejemplo, `https://bridge.tu-dorustfs.com/webhook`)
    - **Numero de Telefono**: tu numero del trunk SIP (formato E.164)
 5. Haz clic en **Guardar**
 

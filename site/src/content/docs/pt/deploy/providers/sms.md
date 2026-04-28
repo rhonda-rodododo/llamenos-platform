@@ -28,7 +28,7 @@ Configure as opcoes de SMS:
 Aponte o webhook de SMS do seu provedor de telefonia para o seu Worker:
 
 ```
-POST https://seu-worker.seu-dominio.com/api/messaging/sms/webhook
+POST https://seu-worker.seu-dorustfs.com/api/messaging/sms/webhook
 ```
 
 ### Twilio / SignalWire

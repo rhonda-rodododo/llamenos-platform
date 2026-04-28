@@ -3,7 +3,7 @@ title: "النشر: Kubernetes (Helm)"
 description: نشر Llamenos على Kubernetes باستخدام مخطط Helm الرسمي.
 ---
 
-يغطي هذا الدليل نشر Llamenos على مجموعة Kubernetes باستخدام مخطط Helm الرسمي. يدير المخطط التطبيق وخدمات MinIO/Whisper الاختيارية كعمليات نشر منفصلة. أنت توفر قاعدة بيانات PostgreSQL.
+يغطي هذا الدليل نشر Llamenos على مجموعة Kubernetes باستخدام مخطط Helm الرسمي. يدير المخطط التطبيق وخدمات RustFS/Whisper الاختيارية كعمليات نشر منفصلة. أنت توفر قاعدة بيانات PostgreSQL.
 
 ## المتطلبات الأساسية
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -170,18 +170,18 @@ kubectl get ingress llamenos
 
 > **نصيحة**: للإنتاج، استخدم `secrets.existingSecret` للإشارة إلى Secret يُدار بواسطة External Secrets Operator أو Sealed Secrets أو Vault.
 
-### MinIO
+### RustFS
 
 | المعامل | الوصف | الافتراضي |
 |---------|--------|-----------|
-| `minio.enabled` | نشر MinIO | `true` |
-| `minio.image.repository` | صورة MinIO | `minio/minio` |
-| `minio.image.tag` | وسم MinIO | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | وحدة تخزين بيانات MinIO | `50Gi` |
-| `minio.persistence.storageClass` | فئة التخزين | `""` |
-| `minio.credentials.accessKey` | مستخدم MinIO الرئيسي | `""` (مطلوب) |
-| `minio.credentials.secretKey` | كلمة مرور MinIO الرئيسية | `""` (مطلوب) |
-| `minio.resources` | طلبات وحدود CPU/الذاكرة | `{}` |
+| `rustfs.enabled` | نشر RustFS | `true` |
+| `rustfs.image.repository` | صورة RustFS | `rustfs/rustfs` |
+| `rustfs.image.tag` | وسم RustFS | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | وحدة تخزين بيانات RustFS | `50Gi` |
+| `rustfs.persistence.storageClass` | فئة التخزين | `""` |
+| `rustfs.credentials.accessKey` | مستخدم RustFS الرئيسي | `""` (مطلوب) |
+| `rustfs.credentials.secretKey` | كلمة مرور RustFS الرئيسية | `""` (مطلوب) |
+| `rustfs.resources` | طلبات وحدود CPU/الذاكرة | `{}` |
 
 ### نسخ Whisper التلقائي
 
@@ -230,26 +230,26 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=rustfs-access-key=your_key \
+  --from-literal=rustfs-secret-key=your_key
 
 # أو باستخدام External Secrets Operator أو Sealed Secrets أو Vault، إلخ.
 ```
 
-## استخدام MinIO خارجي أو S3
+## استخدام RustFS خارجي أو S3
 
-إذا كان لديك MinIO أو خدمة متوافقة مع S3 بالفعل، عطّل MinIO المدمج ومرر نقطة النهاية:
+إذا كان لديك RustFS أو خدمة متوافقة مع S3 بالفعل، عطّل RustFS المدمج ومرر نقطة النهاية:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://your-rustfs.example.com"
+    STORAGE_ACCESS_KEY: "your-key"
+    STORAGE_SECRET_KEY: "your-secret"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## نسخ تلقائي بتسريع GPU
@@ -341,7 +341,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-الأسباب الشائعة: أسرار مفقودة، ADMIN_PUBKEY غير صحيح، PostgreSQL غير قابل للوصول، MinIO غير جاهز.
+الأسباب الشائعة: أسرار مفقودة، ADMIN_PUBKEY غير صحيح، PostgreSQL غير قابل للوصول، RustFS غير جاهز.
 
 ### أخطاء اتصال قاعدة البيانات
 

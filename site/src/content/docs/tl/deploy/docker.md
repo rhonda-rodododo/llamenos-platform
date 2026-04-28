@@ -15,8 +15,8 @@ Ang gabay na ito ay gagabay sa iyo sa pag-deploy ng Llamenos gamit ang Docker Co
 ## 1. I-clone ang repository
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/your-org/llamenos.git
+cd llamenos
 ```
 
 ## 2. Gumawa ng admin keypair
@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO credentials (palitan ang mga default!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# RustFS credentials (palitan ang mga default!)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Mahalaga**: Magtakda ng matibay at natatanging mga password para sa `PG_PASSWORD`, `MINIO_ACCESS_KEY`, at `MINIO_SECRET_KEY`.
+> **Mahalaga**: Magtakda ng matibay at natatanging mga password para sa `PG_PASSWORD`, `STORAGE_ACCESS_KEY`, at `STORAGE_SECRET_KEY`.
 
 ## 4. I-configure ang iyong domain
 
@@ -94,7 +94,7 @@ Magsisimula ito ng apat na pangunahing serbisyo:
 | **app** | Llamenos application | 3000 (internal) |
 | **postgres** | PostgreSQL database | 5432 (internal) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
-| **minio** | File/recording storage | 9000, 9001 (internal) |
+| **rustfs** | File/recording storage | 9000, 9001 (internal) |
 
 Suriin kung gumagana ang lahat:
 
@@ -143,7 +143,7 @@ Magsisimula ito ng `faster-whisper-server` container gamit ang `base` model sa C
 
 ## Opsyonal: I-enable ang Asterisk
 
-Para sa self-hosted SIP telephony (tingnan ang [Asterisk setup](/docs/deploy/providers/asterisk)):
+Para sa self-hosted SIP telephony (tingnan ang [Asterisk setup](/docs/setup-asterisk)):
 
 ```bash
 # Itakda ang bridge shared secret
@@ -154,13 +154,13 @@ docker compose --profile asterisk up -d
 
 ## Opsyonal: I-enable ang Signal
 
-Para sa Signal messaging (tingnan ang [Signal setup](/docs/deploy/providers/signal)):
+Para sa Signal messaging (tingnan ang [Signal setup](/docs/setup-signal)):
 
 ```bash
 docker compose --profile signal up -d
 ```
 
-Kakailanganin mong i-register ang Signal number sa pamamagitan ng signal-cli container. Tingnan ang [Signal setup guide](/docs/deploy/providers/signal) para sa mga tagubilin.
+Kakailanganin mong i-register ang Signal number sa pamamagitan ng signal-cli container. Tingnan ang [Signal setup guide](/docs/setup-signal) para sa mga tagubilin.
 
 ## Pag-update
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Ang iyong data ay naka-persist sa Docker volumes (`postgres-data`, `minio-data`, atbp.) at mananatili sa container restarts at image updates.
+Ang iyong data ay naka-persist sa Docker volumes (`postgres-data`, `rustfs-data`, atbp.) at mananatili sa container restarts at image updates.
 
 ## Mga backup
 
@@ -189,15 +189,15 @@ Para i-restore:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### MinIO storage
+### RustFS storage
 
-Iniimbak ng MinIO ang mga na-upload na file, recording, at attachment:
+Iniimbak ng RustFS ang mga na-upload na file, recording, at attachment:
 
 ```bash
-# Gamit ang MinIO client (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Gamit ang RustFS client (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Automated backups
@@ -262,21 +262,28 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Mga MinIO connection error
+### Mga RustFS connection error
 
-Siguraduhing healthy ang MinIO service bago magsimula ang app:
+Siguraduhing healthy ang RustFS service bago magsimula ang app:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Arkitektura ng serbisyo
 
-![Docker Architecture](/diagrams/docker-architecture.svg)
+```mermaid
+flowchart TD
+    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
+    Caddy -->|":3000"| App["App<br/>(Node.js)"]
+    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
+    App --> RustFS[("RustFS<br/>:9000")]
+    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
+```
 
 ## Mga susunod na hakbang
 
 - [Gabay para sa Admin](/docs/admin-guide) — i-configure ang hotline
-- [Pangkalahatang-tanaw ng Self-Hosting](/docs/deploy/self-hosting) — ihambing ang mga opsyon sa deployment
-- [Kubernetes Deployment](/docs/deploy/kubernetes) — lumipat sa Helm
+- [Pangkalahatang-tanaw ng Self-Hosting](/docs/self-hosting) — ihambing ang mga opsyon sa deployment
+- [Kubernetes Deployment](/docs/deploy-kubernetes) — lumipat sa Helm

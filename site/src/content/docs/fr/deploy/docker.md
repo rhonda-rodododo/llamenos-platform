@@ -15,8 +15,8 @@ Ce guide vous accompagne dans le déploiement de Llamenos avec Docker Compose su
 ## 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/your-org/llamenos.git
+cd llamenos
 ```
 
 ## 2. Générer la paire de clés administrateur
@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Identifiants MinIO (changez les valeurs par défaut !)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# Identifiants RustFS (changez les valeurs par défaut !)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Important** : Définissez des mots de passe forts et uniques pour `PG_PASSWORD`, `MINIO_ACCESS_KEY` et `MINIO_SECRET_KEY`.
+> **Important** : Définissez des mots de passe forts et uniques pour `PG_PASSWORD`, `STORAGE_ACCESS_KEY` et `STORAGE_SECRET_KEY`.
 
 ## 4. Configurer votre domaine
 
@@ -94,7 +94,7 @@ Cela démarre quatre services principaux :
 | **app** | Application Llamenos | 3000 (interne) |
 | **postgres** | Base de données PostgreSQL | 5432 (interne) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
-| **minio** | Stockage fichiers/enregistrements | 9000, 9001 (interne) |
+| **rustfs** | Stockage fichiers/enregistrements | 9000, 9001 (interne) |
 
 Vérifiez que tout fonctionne :
 
@@ -143,7 +143,7 @@ Cela démarre un conteneur `faster-whisper-server` utilisant le modèle `base` s
 
 ## Optionnel : Activer Asterisk
 
-Pour la téléphonie SIP auto-hébergée (voir [Configuration Asterisk](/docs/deploy/providers/asterisk)) :
+Pour la téléphonie SIP auto-hébergée (voir [Configuration Asterisk](/docs/setup-asterisk)) :
 
 ```bash
 # Définir le secret partagé du bridge
@@ -154,13 +154,13 @@ docker compose --profile asterisk up -d
 
 ## Optionnel : Activer Signal
 
-Pour la messagerie Signal (voir [Configuration Signal](/docs/deploy/providers/signal)) :
+Pour la messagerie Signal (voir [Configuration Signal](/docs/setup-signal)) :
 
 ```bash
 docker compose --profile signal up -d
 ```
 
-Vous devrez enregistrer le numéro Signal via le conteneur signal-cli. Consultez le [guide de configuration Signal](/docs/deploy/providers/signal) pour les instructions.
+Vous devrez enregistrer le numéro Signal via le conteneur signal-cli. Consultez le [guide de configuration Signal](/docs/setup-signal) pour les instructions.
 
 ## Mise à jour
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Vos données sont persistées dans les volumes Docker (`postgres-data`, `minio-data`, etc.) et survivent aux redémarrages de conteneurs et aux mises à jour d'images.
+Vos données sont persistées dans les volumes Docker (`postgres-data`, `rustfs-data`, etc.) et survivent aux redémarrages de conteneurs et aux mises à jour d'images.
 
 ## Sauvegardes
 
@@ -189,15 +189,15 @@ Pour restaurer :
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Stockage MinIO
+### Stockage RustFS
 
-MinIO stocke les fichiers téléchargés, les enregistrements et les pièces jointes :
+RustFS stocke les fichiers téléchargés, les enregistrements et les pièces jointes :
 
 ```bash
-# En utilisant le client MinIO (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# En utilisant le client RustFS (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Sauvegardes automatisées
@@ -262,21 +262,28 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Erreurs de connexion MinIO
+### Erreurs de connexion RustFS
 
-Assurez-vous que le service MinIO est sain avant le démarrage de l'application :
+Assurez-vous que le service RustFS est sain avant le démarrage de l'application :
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Architecture des services
 
-![Docker Architecture](/diagrams/docker-architecture.svg)
+```mermaid
+flowchart TD
+    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
+    Caddy -->|":3000"| App["App<br/>(Node.js)"]
+    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
+    App --> RustFS[("RustFS<br/>:9000")]
+    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
+```
 
 ## Étapes suivantes
 
 - [Guide administrateur](/docs/admin-guide) — configurer la ligne
-- [Vue d'ensemble de l'auto-hébergement](/docs/deploy/self-hosting) — comparer les options de déploiement
-- [Déploiement Kubernetes](/docs/deploy/kubernetes) — migrer vers Helm
+- [Vue d'ensemble de l'auto-hébergement](/docs/self-hosting) — comparer les options de déploiement
+- [Déploiement Kubernetes](/docs/deploy-kubernetes) — migrer vers Helm
