@@ -29,6 +29,7 @@ import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.hub.HubActivityService
 import org.llamenos.hotline.model.LlamenosEvent
 import org.llamenos.hotline.service.AttributedHubEvent
+import org.llamenos.protocol.CryptoLabels
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -174,7 +175,7 @@ class WebSocketService @Inject constructor(
     private fun subscribe(ws: WebSocket) {
         // Subscribe to Llamenos event kinds tagged for this hub
         val subscriptionId = "llamenos-${System.currentTimeMillis()}"
-        val filter = """{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["llamenos:event"]}"""
+        val filter = """{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["${CryptoLabels.NOSTR_EVENT_TAG}"]}"""
         val message = """["REQ","$subscriptionId",$filter]"""
         ws.send(message)
     }

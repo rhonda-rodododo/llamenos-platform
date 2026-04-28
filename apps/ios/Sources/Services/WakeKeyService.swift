@@ -1,10 +1,6 @@
 import Foundation
 import Security
 
-// MARK: - Crypto Label Constants
-// Source of truth: packages/protocol/crypto-labels.json (LABEL_PUSH_WAKE)
-private let LABEL_PUSH_WAKE = "llamenos:push-wake"
-
 // MARK: - WakeKeyError
 
 enum WakeKeyError: LocalizedError {
@@ -227,7 +223,7 @@ final class WakeKeyService: @unchecked Sendable {
     /// This is called by the notification service extension when a push arrives.
     ///
     /// The server encrypts the push payload using HPKE seal with the wake public key
-    /// and the LABEL_PUSH_WAKE label. The payload is a JSON-encoded HpkeEnvelope.
+    /// and the CryptoLabels.LABEL_PUSH_WAKE label. The payload is a JSON-encoded HpkeEnvelope.
     ///
     /// - Parameter envelopeJSON: JSON string of the HPKE envelope from the push payload.
     /// - Returns: The decrypted plaintext string (typically JSON).
@@ -247,7 +243,7 @@ final class WakeKeyService: @unchecked Sendable {
         // will use the HPKE open path.
         let plaintextHex = try mobileHpkeOpen(
             envelope: envelope,
-            expectedLabel: LABEL_PUSH_WAKE,
+            expectedLabel: CryptoLabels.LABEL_PUSH_WAKE,
             aadHex: ""
         )
 
@@ -274,7 +270,7 @@ final class WakeKeyService: @unchecked Sendable {
             packedHex: packedHex,
             ephemeralPubkeyHex: ephemeralPubkeyHex,
             secretKeyHex: privateKeyHex,
-            label: LABEL_PUSH_WAKE
+            label: CryptoLabels.LABEL_PUSH_WAKE
         )
     }
 

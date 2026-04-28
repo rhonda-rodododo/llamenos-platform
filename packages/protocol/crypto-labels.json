@@ -60,6 +60,9 @@
     "LABEL_ECIES_V2_SALT": "llamenos:ecies:v2",
     "LABEL_PROVISIONING_SALT": "llamenos:provisioning:v1",
     "LABEL_BLIND_INDEX_FIELD": "llamenos:blind-idx:",
-    "LABEL_HUB_PTK": "llamenos:hub-ptk:v1"
+    "LABEL_HUB_PTK": "llamenos:hub-ptk:v1",
+    "NOSTR_EVENT_TAG": "llamenos:event",
+    "LABEL_PROVISION_PREFIX": "llamenos:provision-",
+    "LABEL_STRONGHOLD": "llamenos:stronghold:v1"
   }
 }

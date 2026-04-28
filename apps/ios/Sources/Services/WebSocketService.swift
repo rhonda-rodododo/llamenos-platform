@@ -227,7 +227,7 @@ final class WebSocketService: @unchecked Sendable {
 
         // Send Nostr REQ subscription
         let reqMessage = """
-        ["REQ","\(subscriptionId)",{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["llamenos:event"]}]
+        ["REQ","\(subscriptionId)",{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["\(CryptoLabels.NOSTR_EVENT_TAG)"]}]
         """
         do {
             try await task.send(.string(reqMessage))
@@ -435,7 +435,7 @@ final class WebSocketService: @unchecked Sendable {
     /// not from tags — the tag only serves as a relay filter marker.
     static func isLlamenosEvent(_ event: NostrEvent) -> Bool {
         for tag in event.tags {
-            if tag.count >= 2, tag[0] == "t", tag[1] == "llamenos:event" {
+            if tag.count >= 2, tag[0] == "t", tag[1] == CryptoLabels.NOSTR_EVENT_TAG {
                 return true
             }
         }

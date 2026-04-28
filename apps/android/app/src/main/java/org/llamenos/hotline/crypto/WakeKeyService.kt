@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.llamenos.protocol.CryptoLabels
 import java.security.SecureRandom
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -181,7 +182,7 @@ class WakeKeyService @Inject constructor(
     companion object {
         private const val KEY_WAKE_SECRET = "wake-secret"
         private const val KEY_WAKE_PUBKEY = "wake-pubkey"
-        private const val LABEL_PUSH_WAKE = "llamenos:push-wake"
+        private val LABEL_PUSH_WAKE = CryptoLabels.LABEL_PUSH_WAKE
     }
 }
 

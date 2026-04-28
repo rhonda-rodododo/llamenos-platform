@@ -217,6 +217,12 @@ pub const LABEL_MLS_PROVISION: &str = "llamenos:mls-provision:v1";
 /// Nostr event tag type used to identify Llamenos hub events
 pub const NOSTR_EVENT_TAG: &str = "llamenos:event";
 
+/// Prefix for per-room Nostr event tags used in device provisioning flows
+pub const LABEL_PROVISION_PREFIX: &str = "llamenos:provision-";
+
+/// PBKDF2 salt for Tauri Stronghold key derivation (desktop only)
+pub const LABEL_STRONGHOLD: &str = "llamenos:stronghold:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
