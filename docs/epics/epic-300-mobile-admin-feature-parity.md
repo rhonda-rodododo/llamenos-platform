@@ -376,7 +376,7 @@ Read-only view of current telephony provider with ability to switch and update c
 
 ### Phase 3: Recording Playback
 
-Audio player component for playing back call recordings stored in MinIO.
+Audio player component for playing back call recordings stored in RustFS.
 
 **iOS**: `RecordingPlayerView.swift` — Uses `AVAudioPlayer` with standard transport controls (play/pause, seek, time display). Fetches recording via `GET /api/files/:id` with auth header. Streams directly without downloading to disk.
 

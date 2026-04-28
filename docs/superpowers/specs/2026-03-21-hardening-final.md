@@ -136,8 +136,8 @@ These are stale artifacts from when TypeScript codegen was removed. The project 
 The worker uses `process.env.VAR || 'localhost...'` fallback patterns in several files:
 
 - `apps/worker/db/index.ts` line ~20: `parseInt(process.env.PG_POOL_SIZE || '10', 10)` — benign (has a safe default)
-- `apps/worker/lib/blob-storage.ts` line ~20: `process.env.MINIO_ENDPOINT || 'http://localhost:9000'` — silently falls back to localhost in production
-- `apps/worker/lib/blob-storage.ts` line ~26: `process.env.MINIO_BUCKET || 'llamenos-files'` — bucket name fallback (less dangerous)
+- `apps/worker/lib/blob-storage.ts` line ~20: `process.env.STORAGE_ENDPOINT || 'http://localhost:9000'` — silently falls back to localhost in production
+- `apps/worker/lib/blob-storage.ts` line ~26: `process.env.STORAGE_BUCKET || 'llamenos-files'` — bucket name fallback (less dangerous)
 - `apps/worker/lib/transcription-client.ts` line ~37: `process.env.WHISPER_URL || 'http://localhost:8080/...'` — silently falls back
 
 Critical env vars (`DATABASE_URL`, `HMAC_SECRET`, `SERVER_NOSTR_SECRET`, `NOSTR_RELAY_URL`) are passed through the Hono `AppEnv.Bindings.Env` interface and used in routes, but there is **no startup assertion** that these are non-empty before the server begins serving traffic. A misconfigured deployment silently connects to wrong services.

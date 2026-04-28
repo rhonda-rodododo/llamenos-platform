@@ -109,7 +109,7 @@ Add a "Custody Chain" tab to the evidence detail dialog (alongside any existing 
 
 Content:
 - "Verify Integrity" button at the top of the custody tab
-  - Calls `verifyEvidenceIntegrity(evidenceId)` — the desktop calls `POST /evidence/:id/verify` WITHOUT a `currentHash` body. The server computes the hash of the stored file from MinIO and compares against the stored `fileHash`. The response includes `{ verified: boolean, storedHash: string, computedHash: string }`. The desktop displays a green checkmark or a red "Hash mismatch — file may have been tampered" message. No client-side hashing required.
+  - Calls `verifyEvidenceIntegrity(evidenceId)` — the desktop calls `POST /evidence/:id/verify` WITHOUT a `currentHash` body. The server computes the hash of the stored file from RustFS and compares against the stored `fileHash`. The response includes `{ verified: boolean, storedHash: string, computedHash: string }`. The desktop displays a green checkmark or a red "Hash mismatch — file may have been tampered" message. No client-side hashing required.
   - Show result as a green "Integrity verified" badge or red "Hash mismatch — file may have been tampered" badge with timestamps
   - `data-testid="evidence-verify-btn"`, `data-testid="evidence-verify-result"`
 - Chronological list of custody entries from `getEvidenceCustody(evidenceId)`

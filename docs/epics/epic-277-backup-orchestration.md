@@ -1,4 +1,6 @@
 # Epic 277: Backup Orchestration for Distributed Deployments
+> **Note**: MinIO has been replaced by RustFS as of PR #40. All references to MinIO in this document should be read as RustFS.
+
 
 **Status**: PENDING
 **Priority**: High
@@ -8,7 +10,7 @@
 
 ## Summary
 
-Extend the backup system from single-host PostgreSQL-only dumps to a distributed backup orchestration that handles PostgreSQL, MinIO, strfry (LMDB), and application config across multiple hosts. Add backup health monitoring with staleness alerts, centralized backup aggregation, and a cross-host restore playbook that can provision a fresh deployment from backups.
+Extend the backup system from single-host PostgreSQL-only dumps to a distributed backup orchestration that handles PostgreSQL, RustFS, strfry (LMDB), and application config across multiple hosts. Add backup health monitoring with staleness alerts, centralized backup aggregation, and a cross-host restore playbook that can provision a fresh deployment from backups.
 
 ## Problem Statement
 
@@ -16,7 +18,7 @@ The current `roles/backup/tasks/main.yml` has three limitations:
 
 1. **Single-host assumption.** The backup script runs `docker compose exec -T postgres pg_dump` on the same host. In a multi-host deployment (Epic 276), PostgreSQL may run on a different machine than the app. The backup script has no concept of which host holds which data.
 
-2. **Missing data sources.** Only PostgreSQL and MinIO are backed up. The strfry Nostr relay stores events in LMDB (`nostr-data` volume) which is not backed up. Application configuration (Caddyfile, compose files, non-secret settings) is not backed up, meaning a bare-metal restore requires re-running Ansible from scratch.
+2. **Missing data sources.** Only PostgreSQL and RustFS are backed up. The strfry Nostr relay stores events in LMDB (`nostr-data` volume) which is not backed up. Application configuration (Caddyfile, compose files, non-secret settings) is not backed up, meaning a bare-metal restore requires re-running Ansible from scratch.
 
 3. **No backup health monitoring.** If the cron job silently fails (disk full, Docker socket error, age encryption failure), operators have no way to know until they need a restore. For a crisis hotline serving vulnerable populations, undetected backup failure is unacceptable.
 
@@ -418,8 +420,8 @@ check_service "postgres"
 check_service "strfry"
 {% endif %}
 check_service "config"
-{% if llamenos_minio_enabled | default(true) %}
-check_service "minio"
+{% if llamenos_rustfs_enabled | default(true) %}
+check_service "rustfs"
 {% endif %}
 
 # Check disk space
@@ -537,7 +539,7 @@ For multi-host deployments, a designated backup host pulls backup status from al
       loop:
         - docker
         - llamenos-postgres
-        - llamenos-minio
+        - llamenos-rustfs
         - llamenos-strfry
         - llamenos-app
         - llamenos-caddy
@@ -699,9 +701,9 @@ backup_alert_webhook: ""
 # Only needed when running restore playbooks
 # backup_age_private_key_path: "/path/to/backup-key.txt"
 
-# ─── MinIO Backup ────────────────────────────────────────────
-# Back up MinIO files (can be large — disable for bandwidth-constrained hosts)
-backup_minio_enabled: true
+# ─── RustFS Backup ────────────────────────────────────────────
+# Back up RustFS files (can be large — disable for bandwidth-constrained hosts)
+backup_rustfs_enabled: true
 ```
 
 ## Files to Modify
@@ -710,14 +712,14 @@ backup_minio_enabled: true
 |------|--------|-------------|
 | `deploy/ansible/roles/backup/tasks/main.yml` | Deprecate | Replace with per-service backup roles |
 | `deploy/ansible/roles/backup-postgres/tasks/main.yml` | Create | PostgreSQL backup role |
-| `deploy/ansible/roles/backup-minio/tasks/main.yml` | Create | MinIO backup role |
+| `deploy/ansible/roles/backup-rustfs/tasks/main.yml` | Create | RustFS backup role |
 | `deploy/ansible/roles/backup-strfry/tasks/main.yml` | Create | strfry LMDB backup role |
 | `deploy/ansible/roles/backup-config/tasks/main.yml` | Create | Application config backup role |
 | `deploy/ansible/roles/backup-monitor/tasks/main.yml` | Create | Backup health monitoring role |
 | `deploy/ansible/roles/backup-aggregator/tasks/main.yml` | Create | Multi-host backup aggregation |
 | `deploy/ansible/templates/backup/postgres-backup.sh.j2` | Create | PostgreSQL backup script template |
 | `deploy/ansible/templates/backup/strfry-backup.sh.j2` | Create | strfry backup script template |
-| `deploy/ansible/templates/backup/minio-backup.sh.j2` | Create | MinIO backup script template |
+| `deploy/ansible/templates/backup/rustfs-backup.sh.j2` | Create | RustFS backup script template |
 | `deploy/ansible/templates/backup/config-backup.sh.j2` | Create | Config backup script template |
 | `deploy/ansible/templates/backup/backup-health-check.sh.j2` | Create | Health check script template |
 | `deploy/ansible/templates/backup/backup-aggregate.sh.j2` | Create | Aggregation script template |
@@ -729,7 +731,7 @@ backup_minio_enabled: true
 
 ## Testing
 
-1. **Single-host backup round-trip**: Run all backup scripts on single-host deployment. Verify `.backup-status-*.json` files exist for postgres, strfry, minio, and config. Run `full-restore.yml` on a fresh host and verify data integrity.
+1. **Single-host backup round-trip**: Run all backup scripts on single-host deployment. Verify `.backup-status-*.json` files exist for postgres, strfry, rustfs, and config. Run `full-restore.yml` on a fresh host and verify data integrity.
 
 2. **strfry backup consistency**: Create Nostr events, run strfry backup, restore to a fresh container, verify events are present via WebSocket query.
 
@@ -745,7 +747,7 @@ backup_minio_enabled: true
 
 - [ ] PostgreSQL backups run on the host where PostgreSQL is deployed
 - [ ] strfry LMDB backups produce consistent snapshots (via `mdb_copy` or pause-copy)
-- [ ] MinIO backups mirror the entire bucket with encryption
+- [ ] RustFS backups mirror the entire bucket with encryption
 - [ ] Application config is backed up (sanitized, no secrets)
 - [ ] Each backup script writes a `.backup-status-{service}.json` file
 - [ ] Health check script detects stale/failed/missing backups
@@ -764,4 +766,4 @@ backup_minio_enabled: true
 | Backup encryption key loss | Low | Critical | Document key backup procedure prominently; recommend printing age private key on paper |
 | Health check false positives | Medium | Low | Conservative 26-hour default threshold; operators can tune `backup_max_age_hours` |
 | rclone misconfiguration losing remote backups | Medium | Medium | Verify rclone config in setup playbook; test upload before relying on it |
-| Large MinIO buckets causing backup timeouts | Medium | Medium | `backup_minio_enabled` toggle allows disabling on bandwidth-constrained hosts |
+| Large RustFS buckets causing backup timeouts | Medium | Medium | `backup_rustfs_enabled` toggle allows disabling on bandwidth-constrained hosts |

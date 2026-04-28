@@ -478,7 +478,7 @@ Template structure (filled in after initial load test runs):
 
 - **Vertical first**: Increase RAM before adding CPUs. PostgreSQL benefits from buffer cache.
 - **Split PostgreSQL**: Use multi-host inventory (Epic 276) to put DB on dedicated VPS.
-- **Recording storage**: Use MinIO on separate disk/VPS if call recordings enabled.
+- **Recording storage**: Use RustFS on separate disk/VPS if call recordings enabled.
 ```
 
 ### Phase 4: CI Integration

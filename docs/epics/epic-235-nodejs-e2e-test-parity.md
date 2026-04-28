@@ -14,7 +14,7 @@ The architecture audit (2026-03-03) revealed:
 - **Node.js platform shim** (`src/platform/node/`) has no integration tests for:
   - PostgreSQL advisory lock contention under concurrent access
   - Alarm polling (`FOR UPDATE SKIP LOCKED`) with multiple replicas
-  - MinIO blob storage lifecycle (upload → retrieve → delete)
+  - RustFS blob storage lifecycle (upload → retrieve → delete)
   - WebSocket shim (CallRouterDO WebSocket tag management)
   - Migration framework execution on startup
 
@@ -49,7 +49,7 @@ Create `tests/integration/node/` with tests targeting the actual Node.js server:
 // Test connection cleanup on close
 ```
 
-#### 1.4 MinIO Blob Storage Tests
+#### 1.4 RustFS Blob Storage Tests
 ```typescript
 // Test put/get/delete lifecycle
 // Test large file upload (>5MB multipart)
@@ -83,8 +83,8 @@ e2e-node:
   services:
     postgres:
       image: postgres:17-alpine
-    minio:
-      image: minio/minio
+    rustfs:
+      image: rustfs/rustfs
   steps:
     - uses: actions/checkout@v4
     - name: Build Node.js server
@@ -112,9 +112,9 @@ Using `k6` or `autocannon`:
 
 ## Environment Requirements
 
-- Docker Compose with PostgreSQL 17, MinIO
+- Docker Compose with PostgreSQL 17, RustFS
 - Node.js 20+ runtime
-- `.env` with `PG_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `HMAC_SECRET`
+- `.env` with `PG_PASSWORD`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `HMAC_SECRET`
 
 ## Verification
 
@@ -133,4 +133,4 @@ Using `k6` or `autocannon`:
 
 - **Medium**: Docker Compose startup time may make CI slow (mitigate with health check polling)
 - **Low**: PostgreSQL advisory lock semantics may differ from CF DO single-writer guarantee under edge cases
-- **Low**: MinIO S3 API may have subtle differences from Cloudflare R2
+- **Low**: RustFS S3 API may have subtle differences from Cloudflare R2

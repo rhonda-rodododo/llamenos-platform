@@ -10,11 +10,11 @@ The desktop branch has 39 spec files with 355+ test cases, but only ~30 pass bec
 
 ### Current State
 - **playwright.config.ts** webServer command: `PLAYWRIGHT_TEST=true bun run build && bunx wrangler dev --config apps/worker/wrangler.jsonc --port 8788 --var ENVIRONMENT:development`
-- **Docker Compose**: `deploy/docker/docker-compose.yml` + `docker-compose.test.yml` — fully operational with PostgreSQL, MinIO, strfry, app server
+- **Docker Compose**: `deploy/docker/docker-compose.yml` + `docker-compose.test.yml` — fully operational with PostgreSQL, RustFS, strfry, app server
 - **Test override**: `docker-compose.test.yml` sets `ENVIRONMENT=development` and exposes port 3000
 
 ### Architecture Change
-- **Backend**: Docker Compose services (app, postgres, minio, strfry)
+- **Backend**: Docker Compose services (app, postgres, rustfs, strfry)
 - **Frontend**: Vite dev server (`PLAYWRIGHT_TEST=true bun run dev`) serving the SPA with Tauri IPC mocks
 - **Alternative**: Tauri dev mode (`bun run tauri:dev`) if it's possible to run Playwright against a Tauri webview — investigate feasibility
 
@@ -72,8 +72,8 @@ Create a `deploy/docker/.env.test` (or `deploy/docker/.env.example` update) with
 
 ```bash
 PG_PASSWORD=testpassword
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
+STORAGE_ACCESS_KEY=rustfsadmin
+STORAGE_SECRET_KEY=rustfsadmin
 HMAC_SECRET=$(openssl rand -hex 32)
 ADMIN_PUBKEY=<test-admin-pubkey>
 ENVIRONMENT=development

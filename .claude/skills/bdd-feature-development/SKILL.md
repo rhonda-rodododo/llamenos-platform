@@ -211,7 +211,7 @@ bun run crypto:clippy       # Linting
 ### Backend BDD Setup (dev compose + local app)
 
 ```bash
-# 1. Start backing services (PostgreSQL, MinIO, strfry)
+# 1. Start backing services (PostgreSQL, RustFS, strfry)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # 2. Start app locally (auto-reloads on code changes)
