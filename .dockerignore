@@ -11,4 +11,5 @@ docs
 data
 deploy
 !deploy/docker/download-page
+!deploy/docker/docker-entrypoint.sh
 CHANGELOG.md
