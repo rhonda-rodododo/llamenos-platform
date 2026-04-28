@@ -12,6 +12,8 @@ import {
   hubs as hubsTable,
   hubSettings as hubSettingsTable,
   hubKeys,
+  hubStorageSettings,
+  hubStorageCredentials,
   roles as rolesTable,
   customFieldDefinitions,
   entityTypeDefinitions,
@@ -1639,10 +1641,81 @@ export class SettingsService {
       await tx.delete(reportTypeDefinitions).where(eq(reportTypeDefinitions.hubId, id))
       await tx.delete(caseNumberSequences).where(eq(caseNumberSequences.hubId, id))
 
-      // 12. Delete hub (hub_settings and hub_keys cascade via FK)
+      // 12. Storage credentials and settings
+      await tx.delete(hubStorageCredentials).where(eq(hubStorageCredentials.hubId, id))
+      await tx.delete(hubStorageSettings).where(eq(hubStorageSettings.hubId, id))
+
+      // 13. Delete hub (hub_settings and hub_keys cascade via FK)
       await tx.delete(hubsTable).where(eq(hubsTable.id, id))
     })
 
+    return { ok: true }
+  }
+
+  // =========================================================================
+  // Hub Storage Credentials
+  // =========================================================================
+
+  async storeHubStorageCredentials(data: {
+    hubId: string
+    accessKeyId: string
+    encryptedSecretKey: string
+    policyName: string
+    userName: string
+  }): Promise<{ ok: true }> {
+    await this.db.insert(hubStorageCredentials).values({
+      hubId: data.hubId,
+      accessKeyId: data.accessKeyId,
+      encryptedSecretKey: data.encryptedSecretKey,
+      policyName: data.policyName,
+      userName: data.userName,
+    })
+    return { ok: true }
+  }
+
+  async getHubStorageCredentials(hubId: string): Promise<{
+    hubId: string
+    accessKeyId: string
+    encryptedSecretKey: string
+    policyName: string
+    userName: string
+    createdAt: Date
+  } | null> {
+    const [row] = await this.db
+      .select()
+      .from(hubStorageCredentials)
+      .where(eq(hubStorageCredentials.hubId, hubId))
+    return row ?? null
+  }
+
+  async deleteHubStorageCredentials(hubId: string): Promise<{ ok: true }> {
+    await this.db
+      .delete(hubStorageCredentials)
+      .where(eq(hubStorageCredentials.hubId, hubId))
+    return { ok: true }
+  }
+
+  async getHubStorageSettings(hubId: string, namespace: string): Promise<{ retentionDays: number | null }> {
+    const [row] = await this.db
+      .select()
+      .from(hubStorageSettings)
+      .where(
+        and(
+          eq(hubStorageSettings.hubId, hubId),
+          eq(hubStorageSettings.namespace, namespace)
+        )
+      )
+    return { retentionDays: row?.retentionDays ?? null }
+  }
+
+  async setHubStorageRetention(hubId: string, namespace: string, days: number | null): Promise<{ ok: true }> {
+    await this.db
+      .insert(hubStorageSettings)
+      .values({ hubId, namespace, retentionDays: days })
+      .onConflictDoUpdate({
+        target: [hubStorageSettings.hubId, hubStorageSettings.namespace],
+        set: { retentionDays: days },
+      })
     return { ok: true }
   }
 

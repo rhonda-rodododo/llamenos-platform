@@ -5,7 +5,7 @@ import { hmac } from '@noble/hashes/hmac.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
-import { LABEL_MESSAGE, LABEL_CALL_META, LABEL_CONTACT_ID, HMAC_PHONE_PREFIX, HMAC_IP_PREFIX } from '@shared/crypto-labels'
+import { LABEL_MESSAGE, LABEL_CALL_META, LABEL_CONTACT_ID, LABEL_STORAGE_CREDENTIAL_WRAP, HMAC_PHONE_PREFIX, HMAC_IP_PREFIX } from '@shared/crypto-labels'
 import type { RecipientEnvelope } from '@shared/types'
 
 /**
@@ -233,4 +233,34 @@ export function hashAuditEntry(entry: {
 }): string {
   const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:${entry.previousEntryHash || ''}`
   return bytesToHex(sha256(utf8ToBytes(content)))
+}
+
+// --- Storage Credential Encryption ---
+
+/**
+ * Encrypt a storage IAM secret key for at-rest protection.
+ * Uses HKDF(HMAC_SECRET) → XChaCha20-Poly1305.
+ */
+export function encryptStorageCredential(secretKey: string, hmacSecret: string): string {
+  const key = hkdf(sha256, hexToBytes(hmacSecret), new Uint8Array(0), utf8ToBytes(LABEL_STORAGE_CREDENTIAL_WRAP), 32)
+  const nonce = new Uint8Array(24)
+  crypto.getRandomValues(nonce)
+  const cipher = xchacha20poly1305(key, nonce)
+  const ct = cipher.encrypt(utf8ToBytes(secretKey))
+  const packed = new Uint8Array(24 + ct.length)
+  packed.set(nonce)
+  packed.set(ct, 24)
+  return bytesToHex(packed)
+}
+
+/**
+ * Decrypt a storage IAM secret key from at-rest storage.
+ */
+export function decryptStorageCredential(encrypted: string, hmacSecret: string): string {
+  const data = hexToBytes(encrypted)
+  const key = hkdf(sha256, hexToBytes(hmacSecret), new Uint8Array(0), utf8ToBytes(LABEL_STORAGE_CREDENTIAL_WRAP), 32)
+  const nonce = data.slice(0, 24)
+  const ct = data.slice(24)
+  const cipher = xchacha20poly1305(key, nonce)
+  return new TextDecoder().decode(cipher.decrypt(ct))
 }

@@ -63,6 +63,7 @@
     "LABEL_HUB_PTK": "llamenos:hub-ptk:v1",
     "NOSTR_EVENT_TAG": "llamenos:event",
     "LABEL_PROVISION_PREFIX": "llamenos:provision-",
-    "LABEL_STRONGHOLD": "llamenos:stronghold:v1"
+    "LABEL_STRONGHOLD": "llamenos:stronghold:v1",
+    "LABEL_STORAGE_CREDENTIAL_WRAP": "llamenos:storage-credential-wrap"
   }
 }

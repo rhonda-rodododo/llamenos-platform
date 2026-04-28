@@ -1,6 +1,8 @@
 /**
- * S3-compatible blob storage adapter for MinIO.
+ * S3-compatible blob storage adapter.
  * Implements the BlobStorage interface using @aws-sdk/client-s3.
+ *
+ * Supports both single-bucket mode (legacy) and hub-scoped mode via StorageManager.
  */
 import {
   S3Client,
@@ -9,6 +11,7 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3'
 import type { BlobStorage } from '../types'
+import { resolveStorageCredentials } from './storage-manager'
 
 export function createBlobStorage(opts?: {
   endpoint?: string
@@ -17,20 +20,20 @@ export function createBlobStorage(opts?: {
   bucket?: string
   region?: string
 }): BlobStorage {
-  const endpoint = opts?.endpoint || process.env.MINIO_ENDPOINT || 'http://localhost:9000'
-  const accessKeyId = opts?.accessKeyId || process.env.MINIO_ACCESS_KEY
-  const secretAccessKey = opts?.secretAccessKey || process.env.MINIO_SECRET_KEY
+  const endpoint = opts?.endpoint || process.env.STORAGE_ENDPOINT || process.env.MINIO_ENDPOINT || 'http://localhost:9000'
+  const accessKeyId = opts?.accessKeyId || process.env.STORAGE_ACCESS_KEY || process.env.MINIO_ACCESS_KEY
+  const secretAccessKey = opts?.secretAccessKey || process.env.STORAGE_SECRET_KEY || process.env.MINIO_SECRET_KEY
   if (!accessKeyId || !secretAccessKey) {
-    throw new Error('MinIO credentials required: set MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables')
+    throw new Error('Storage credentials required: set STORAGE_ACCESS_KEY and STORAGE_SECRET_KEY environment variables (or legacy MINIO_ACCESS_KEY/MINIO_SECRET_KEY)')
   }
-  const bucket = opts?.bucket || process.env.MINIO_BUCKET || 'llamenos-files'
+  const bucket = opts?.bucket || process.env.STORAGE_BUCKET || process.env.MINIO_BUCKET || 'llamenos-files'
   const region = opts?.region || 'us-east-1'
 
   const client = new S3Client({
     endpoint,
     region,
     credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true, // Required for MinIO
+    forcePathStyle: true,
   })
 
   return {
@@ -43,7 +46,6 @@ export function createBlobStorage(opts?: {
       } else if (typeof body === 'string') {
         bodyBytes = body
       } else {
-        // ReadableStream — collect into buffer
         const reader = body.getReader()
         const chunks: Uint8Array[] = []
         while (true) {
@@ -77,7 +79,6 @@ export function createBlobStorage(opts?: {
         if (!result.Body) return null
 
         const size = result.ContentLength ?? 0
-        // Convert the SDK stream to a web ReadableStream
         const bodyBytes = await result.Body.transformToByteArray()
 
         return {
