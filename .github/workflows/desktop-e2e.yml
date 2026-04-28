@@ -1,18 +1,14 @@
 # CI workflow for desktop (Tauri) E2E tests.
 # Runs WebdriverIO tests against the Tauri debug binary.
 #
-# Trigger: PRs touching apps/desktop/ or tests/desktop/, manual dispatch.
+# Trigger: manual dispatch only (not a PR gate — requires a running backend
+# at localhost:3000 which CI cannot provide, and builds the full Tauri binary
+# which takes ~20 min). Real Playwright E2E tests run in ci.yml via Docker Compose.
 # Epic 88: Desktop & Mobile E2E Tests.
 
 name: Desktop E2E Tests
 
 on:
-  pull_request:
-    paths:
-      - 'apps/desktop/**'
-      - 'packages/crypto/**'
-      - 'tests/desktop/**'
-      - 'src/client/**'
   workflow_dispatch:
 
 permissions:
