@@ -69,12 +69,13 @@ services:
     environment:
       - PORT=3100
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-notifier-key}
+      - NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-ci-test-token-secret}
       - SIGNAL_BRIDGE_URL=http://signal-cli:8080
       - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
       - SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-+15005550006}
       - NOTIFIER_DB_PATH=/app/data/notifier.db
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -94,9 +95,9 @@ services:
       - BRIDGE_SECRET=${BRIDGE_SECRET:-ci-bridge-secret}
       - LOG_LEVEL=debug
     ports:
-      - "${BRIDGE_PORT:-3001}:3001"
+      - "${BRIDGE_PORT:-3001}:3000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5

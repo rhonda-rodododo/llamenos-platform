@@ -98,6 +98,7 @@ services:
       - "3100:3100"
     environment:
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-dev-notifier-key}
+      - NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-dev-token-secret}
       - SIGNAL_BRIDGE_URL=http://signal-cli:8080
       - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
       - SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-}
@@ -108,7 +109,7 @@ services:
       signal-cli:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3100/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -168,7 +169,7 @@ services:
       asterisk:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 3
