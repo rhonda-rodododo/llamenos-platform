@@ -3,7 +3,7 @@ title: "Deploy: Kubernetes (Helm)"
 description: Deploy Llamenos to Kubernetes using the official Helm chart.
 ---
 
-This guide covers deploying Llamenos to a Kubernetes cluster using the official Helm chart. The chart manages the application and optional MinIO/Whisper services as separate deployments. You provide a PostgreSQL database.
+This guide covers deploying Llamenos to a Kubernetes cluster using the official Helm chart. The chart manages the application and optional RustFS/Whisper services as separate deployments. You provide a PostgreSQL database.
 
 ## Prerequisites
 
@@ -33,8 +33,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
   --set secrets.postgresPassword=YOUR_PG_PASSWORD \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -66,7 +66,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -169,18 +169,18 @@ Open `https://hotline.yourdomain.com` in your browser. Log in with the admin nse
 
 > **Tip**: For production, use `secrets.existingSecret` to reference a Secret managed by External Secrets Operator, Sealed Secrets, or Vault.
 
-### MinIO
+### RustFS
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `minio.enabled` | Deploy MinIO | `true` |
-| `minio.image.repository` | MinIO image | `minio/minio` |
-| `minio.image.tag` | MinIO tag | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | MinIO data volume | `50Gi` |
-| `minio.persistence.storageClass` | Storage class | `""` |
-| `minio.credentials.accessKey` | MinIO root user | `""` (required) |
-| `minio.credentials.secretKey` | MinIO root password | `""` (required) |
-| `minio.resources` | CPU/memory requests and limits | `{}` |
+| `rustfs.enabled` | Deploy RustFS | `true` |
+| `rustfs.image.repository` | RustFS image | `rustfs/rustfs` |
+| `rustfs.image.tag` | RustFS tag | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | RustFS data volume | `50Gi` |
+| `rustfs.persistence.storageClass` | Storage class | `""` |
+| `rustfs.credentials.accessKey` | RustFS root user | `""` (required) |
+| `rustfs.credentials.secretKey` | RustFS root password | `""` (required) |
+| `rustfs.resources` | CPU/memory requests and limits | `{}` |
 
 ### Whisper transcription
 
@@ -228,26 +228,26 @@ Create the Secret with your preferred tool:
 kubectl create secret generic llamenos-secrets \
   --from-literal=admin-pubkey=your_key \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=rustfs-access-key=your_key \
+  --from-literal=rustfs-secret-key=your_key
 
 # Or with External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
 
-## Using an external MinIO or S3
+## Using an external RustFS or S3
 
-If you already have MinIO or an S3-compatible service, disable the built-in MinIO and pass the endpoint:
+If you already have RustFS or an S3-compatible service, disable the built-in RustFS and pass the endpoint:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://your-rustfs.example.com"
+    STORAGE_ACCESS_KEY: "your-key"
+    STORAGE_SECRET_KEY: "your-secret"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## GPU transcription
@@ -340,7 +340,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Common causes: missing secrets, incorrect ADMIN_PUBKEY, PostgreSQL not reachable, MinIO not ready.
+Common causes: missing secrets, incorrect ADMIN_PUBKEY, PostgreSQL not reachable, RustFS not ready.
 
 ### Database connection errors
 

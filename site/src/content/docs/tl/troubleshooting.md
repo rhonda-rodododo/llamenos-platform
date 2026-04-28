@@ -16,8 +16,8 @@ Vine-validate ng Docker Compose ang lahat ng serbisyo sa startup, pati ang mga m
 ```bash
 # Kinakailangan sa .env para sa Docker Compose
 PG_PASSWORD=your_postgres_password
-MINIO_ACCESS_KEY=your_minio_access_key
-MINIO_SECRET_KEY=your_minio_secret_key
+STORAGE_ACCESS_KEY=your_rustfs_access_key
+STORAGE_SECRET_KEY=your_rustfs_secret_key
 HMAC_SECRET=your_hmac_secret
 ARI_PASSWORD=your_ari_password       # Kinakailangan kahit hindi gumagamit ng Asterisk
 BRIDGE_SECRET=your_bridge_secret     # Kinakailangan kahit hindi gumagamit ng Asterisk
@@ -57,11 +57,11 @@ docker compose restart strfry
 
 Kung nabigo ang pagsisimula ng relay, suriin ang port 7777 conflicts o kakulangan ng permissions sa data directory.
 
-### Mga error sa MinIO / S3 storage
+### Mga error sa RustFS / S3 storage
 
-- I-verify na tama ang `MINIO_ACCESS_KEY` at `MINIO_SECRET_KEY`
-- Suriin kung tumatakbo ang MinIO container: `docker compose ps minio`
-- I-access ang MinIO console sa `http://localhost:9001` para i-verify ang bucket creation
+- I-verify na tama ang `STORAGE_ACCESS_KEY` at `STORAGE_SECRET_KEY`
+- Suriin kung tumatakbo ang RustFS container: `docker compose ps rustfs`
+- I-access ang RustFS console sa `http://localhost:9001` para i-verify ang bucket creation
 
 ## Mga isyu sa Cloudflare deployment
 

@@ -3,7 +3,7 @@ title: "Bereitstellung: Kubernetes (Helm)"
 description: Stellen Sie Llamenos in Kubernetes mit dem offiziellen Helm-Chart bereit.
 ---
 
-Diese Anleitung behandelt die Bereitstellung von Llamenos in einem Kubernetes-Cluster mit dem offiziellen Helm-Chart. Das Chart verwaltet die Anwendung und optionale MinIO/Whisper-Dienste als separate Deployments. Sie stellen die PostgreSQL-Datenbank bereit.
+Diese Anleitung behandelt die Bereitstellung von Llamenos in einem Kubernetes-Cluster mit dem offiziellen Helm-Chart. Das Chart verwaltet die Anwendung und optionale RustFS/Whisper-Dienste als separate Deployments. Sie stellen die PostgreSQL-Datenbank bereit.
 
 ## Voraussetzungen
 
@@ -33,8 +33,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=IHR_HEX_OEFFENTLICHER_SCHLUESSEL \
   --set secrets.postgresPassword=IHR_PG_PASSWORT \
   --set postgres.host=IHR_PG_HOST \
-  --set minio.credentials.accessKey=ihr-zugangsschluessel \
-  --set minio.credentials.secretKey=ihr-geheimschluessel \
+  --set rustfs.credentials.accessKey=ihr-zugangsschluessel \
+  --set rustfs.credentials.secretKey=ihr-geheimschluessel \
   --set ingress.hosts[0].host=hotline.ihredomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.ihredomain.com
@@ -66,7 +66,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -169,18 +169,18 @@ Oeffnen Sie `https://hotline.ihredomain.com` in Ihrem Browser. Melden Sie sich m
 
 > **Tipp**: Verwenden Sie fuer den Produktivbetrieb `secrets.existingSecret`, um ein Secret zu referenzieren, das vom External Secrets Operator, Sealed Secrets oder Vault verwaltet wird.
 
-### MinIO
+### RustFS
 
 | Parameter | Beschreibung | Standard |
 |-----------|-------------|----------|
-| `minio.enabled` | MinIO bereitstellen | `true` |
-| `minio.image.repository` | MinIO-Image | `minio/minio` |
-| `minio.image.tag` | MinIO-Tag | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | MinIO-Datenvolumen | `50Gi` |
-| `minio.persistence.storageClass` | Speicherklasse | `""` |
-| `minio.credentials.accessKey` | MinIO-Root-Benutzer | `""` (erforderlich) |
-| `minio.credentials.secretKey` | MinIO-Root-Passwort | `""` (erforderlich) |
-| `minio.resources` | CPU/Speicher Requests und Limits | `{}` |
+| `rustfs.enabled` | RustFS bereitstellen | `true` |
+| `rustfs.image.repository` | RustFS-Image | `rustfs/rustfs` |
+| `rustfs.image.tag` | RustFS-Tag | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | RustFS-Datenvolumen | `50Gi` |
+| `rustfs.persistence.storageClass` | Speicherklasse | `""` |
+| `rustfs.credentials.accessKey` | RustFS-Root-Benutzer | `""` (erforderlich) |
+| `rustfs.credentials.secretKey` | RustFS-Root-Passwort | `""` (erforderlich) |
+| `rustfs.resources` | CPU/Speicher Requests und Limits | `{}` |
 
 ### Whisper-Transkription
 
@@ -228,26 +228,26 @@ Erstellen Sie das Secret mit Ihrem bevorzugten Werkzeug:
 kubectl create secret generic llamenos-secrets \
   --from-literal=admin-pubkey=ihr_schluessel \
   --from-literal=postgres-password=ihr_passwort \
-  --from-literal=minio-access-key=ihr_schluessel \
-  --from-literal=minio-secret-key=ihr_schluessel
+  --from-literal=rustfs-access-key=ihr_schluessel \
+  --from-literal=rustfs-secret-key=ihr_schluessel
 
 # Oder mit External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
 
-## Externes MinIO oder S3 verwenden
+## Externes RustFS oder S3 verwenden
 
-Wenn Sie bereits MinIO oder einen S3-kompatiblen Dienst haben, deaktivieren Sie das integrierte MinIO und uebergeben Sie den Endpunkt:
+Wenn Sie bereits RustFS oder einen S3-kompatiblen Dienst haben, deaktivieren Sie das integrierte RustFS und uebergeben Sie den Endpunkt:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://ihr-minio.beispiel.com"
-    MINIO_ACCESS_KEY: "ihr-schluessel"
-    MINIO_SECRET_KEY: "ihr-geheimnis"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://ihr-rustfs.beispiel.com"
+    STORAGE_ACCESS_KEY: "ihr-schluessel"
+    STORAGE_SECRET_KEY: "ihr-geheimnis"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## GPU-Transkription
@@ -340,7 +340,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Haeufige Ursachen: fehlende Secrets, falscher ADMIN_PUBKEY, PostgreSQL nicht erreichbar, MinIO nicht bereit.
+Haeufige Ursachen: fehlende Secrets, falscher ADMIN_PUBKEY, PostgreSQL nicht erreichbar, RustFS nicht bereit.
 
 ### Datenbankverbindungsfehler
 

@@ -3,7 +3,7 @@ title: "Desplegar: Kubernetes (Helm)"
 description: Despliega Llamenos en Kubernetes usando el chart oficial de Helm.
 ---
 
-Esta guia cubre el despliegue de Llamenos en un cluster de Kubernetes usando el chart oficial de Helm. El chart gestiona la aplicacion, almacenamiento de objetos MinIO y transcripcion Whisper opcional como despliegues separados.
+Esta guia cubre el despliegue de Llamenos en un cluster de Kubernetes usando el chart oficial de Helm. El chart gestiona la aplicacion, almacenamiento de objetos RustFS y transcripcion Whisper opcional como despliegues separados.
 
 ## Requisitos previos
 
@@ -30,11 +30,11 @@ Guarda el **nsec** de forma segura. Copia la **clave publica hex** para los valo
 ```bash
 helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=TU_CLAVE_PUBLICA_HEX \
-  --set secrets.minioAccessKey=tu-clave-acceso \
-  --set secrets.minioSecretKey=tu-clave-secreta \
-  --set ingress.hosts[0].host=linea.tudominio.com \
+  --set secrets.rustfsAccessKey=tu-clave-acceso \
+  --set secrets.rustfsSecretKey=tu-clave-secreta \
+  --set ingress.hosts[0].host=linea.tudorustfs.com \
   --set ingress.tls[0].secretName=llamenos-tls \
-  --set ingress.tls[0].hosts[0]=linea.tudominio.com
+  --set ingress.tls[0].hosts[0]=linea.tudorustfs.com
 ```
 
 O crea un archivo `values-production.yaml` para despliegues reproducibles:
@@ -52,10 +52,10 @@ app:
 
 secrets:
   adminPubkey: "tu_clave_publica_hex"
-  minioAccessKey: "tu-clave-acceso"
-  minioSecretKey: "tu-clave-secreta-cambiame"
+  rustfsAccessKey: "tu-clave-acceso"
+  rustfsSecretKey: "tu-clave-secreta-cambiame"
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -71,14 +71,14 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
-    - host: linea.tudominio.com
+    - host: linea.tudorustfs.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: llamenos-tls
       hosts:
-        - linea.tudominio.com
+        - linea.tudorustfs.com
 ```
 
 Luego instala:
@@ -97,7 +97,7 @@ curl http://localhost:3000/api/health
 
 ## 4. Configurar DNS
 
-Apunta tu dominio a la IP externa del controlador de ingress:
+Apunta tu dorustfs a la IP externa del controlador de ingress:
 
 ```bash
 kubectl get ingress llamenos
@@ -105,7 +105,7 @@ kubectl get ingress llamenos
 
 ## 5. Primer inicio de sesion
 
-Abre `https://linea.tudominio.com` en tu navegador. Inicia sesion con el nsec admin y completa el asistente de configuracion.
+Abre `https://linea.tudorustfs.com` en tu navegador. Inicia sesion con el nsec admin y completa el asistente de configuracion.
 
 ## Referencia de configuracion del chart
 
@@ -123,8 +123,8 @@ Abre `https://linea.tudominio.com` en tu navegador. Inicia sesion con el nsec ad
 | Parametro | Descripcion | Predeterminado |
 |-----------|-------------|----------------|
 | `secrets.adminPubkey` | Clave publica hex Nostr del admin | `""` |
-| `secrets.minioAccessKey` | Clave de acceso MinIO | `""` (requerido) |
-| `secrets.minioSecretKey` | Clave secreta MinIO | `""` (requerido) |
+| `secrets.rustfsAccessKey` | Clave de acceso RustFS | `""` (requerido) |
+| `secrets.rustfsSecretKey` | Clave secreta RustFS | `""` (requerido) |
 | `secrets.existingSecret` | Usar un Secret K8s existente | `""` |
 
 > **Consejo**: Para produccion, usa `secrets.existingSecret` para referenciar un Secret gestionado por External Secrets Operator, Sealed Secrets o Vault.
@@ -141,8 +141,8 @@ secrets:
 ```bash
 kubectl create secret generic llamenos-secrets \
   --from-literal=ADMIN_PUBKEY=tu_clave \
-  --from-literal=MINIO_ACCESS_KEY=tu_clave \
-  --from-literal=MINIO_SECRET_KEY=tu_clave
+  --from-literal=STORAGE_ACCESS_KEY=tu_clave \
+  --from-literal=STORAGE_SECRET_KEY=tu_clave
 ```
 
 ## Escalado

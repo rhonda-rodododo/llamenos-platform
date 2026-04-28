@@ -21,7 +21,7 @@ Llamenos Cloudflare Workers **या** आपके खुद के बुन�
 |-----------|------------|-------------|
 | **Backend runtime** | Cloudflare Workers | Node.js (Hono के माध्यम से) |
 | **Data storage** | Durable Objects (KV) | PostgreSQL |
-| **Blob storage** | R2 | MinIO (S3-compatible) |
+| **Blob storage** | R2 | RustFS (S3-compatible) |
 | **Transcription** | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
 | **Static files** | Workers Assets | Caddy / Hono serveStatic |
 | **Real-time events** | Nostr relay (Nosflare) | Nostr relay (strfry) |
@@ -64,7 +64,7 @@ Self-hosting आपको अधिक नियंत्रण देता ह
 - **Network security**: Access restrict करने के लिए firewall उपयोग करें। केवल ports 80/443 publicly accessible होने चाहिए।
 - **Secrets**: Docker Compose files या version control में कभी secrets न डालें। `.env` files (images से excluded) या Docker/Kubernetes secrets उपयोग करें।
 - **Updates**: नियमित रूप से नई images pull करें। Security fixes के लिए [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) देखें।
-- **Backups**: नियमित रूप से PostgreSQL database और MinIO storage का backup लें। प्रत्येक deployment guide में backup section देखें।
+- **Backups**: नियमित रूप से PostgreSQL database और RustFS storage का backup लें। प्रत्येक deployment guide में backup section देखें।
 
 ## अगले चरण
 

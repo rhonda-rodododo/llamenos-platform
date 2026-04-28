@@ -77,17 +77,17 @@ bunx wrangler secret put WHATSAPP_PHONE_NUMBER_ID
 Configura tus proveedores para enviar webhooks a tu Worker. Las URLs dependen de los canales que habilites:
 
 **Voz** (todos los proveedores):
-- **Llamada entrante**: `https://tu-worker.tu-dominio.com/telephony/incoming` (POST)
-- **Callback de estado**: `https://tu-worker.tu-dominio.com/telephony/status` (POST)
+- **Llamada entrante**: `https://tu-worker.tu-dorustfs.com/telephony/incoming` (POST)
+- **Callback de estado**: `https://tu-worker.tu-dorustfs.com/telephony/status` (POST)
 
 **SMS** (si esta habilitado):
-- **SMS entrante**: `https://tu-worker.tu-dominio.com/api/messaging/sms/webhook` (POST)
+- **SMS entrante**: `https://tu-worker.tu-dorustfs.com/api/messaging/sms/webhook` (POST)
 
 **WhatsApp** (si esta habilitado):
-- **Webhook**: `https://tu-worker.tu-dominio.com/api/messaging/whatsapp/webhook` (GET para verificacion, POST para mensajes)
+- **Webhook**: `https://tu-worker.tu-dorustfs.com/api/messaging/whatsapp/webhook` (GET para verificacion, POST para mensajes)
 
 **Signal** (si usas el bridge):
-- Configura el bridge signal-cli para reenviar a: `https://tu-worker.tu-dominio.com/api/messaging/signal/webhook`
+- Configura el bridge signal-cli para reenviar a: `https://tu-worker.tu-dorustfs.com/api/messaging/signal/webhook`
 
 Para configuracion especifica: [Twilio](/docs/setup-twilio), [SignalWire](/docs/setup-signalwire), [Vonage](/docs/setup-vonage), [Plivo](/docs/setup-plivo), [Asterisk](/docs/setup-asterisk), [SMS](/docs/setup-sms), [WhatsApp](/docs/setup-whatsapp), [Signal](/docs/setup-signal).
 

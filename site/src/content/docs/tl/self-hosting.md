@@ -21,7 +21,7 @@ Parehong deployment target ay nagpapatakbo ng **eksaktong parehong application c
 |--------|------------|-------------|
 | **Backend runtime** | Cloudflare Workers | Node.js (sa pamamagitan ng Hono) |
 | **Data storage** | Durable Objects (KV) | PostgreSQL |
-| **Blob storage** | R2 | MinIO (S3-compatible) |
+| **Blob storage** | R2 | RustFS (S3-compatible) |
 | **Transcription** | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
 | **Static files** | Workers Assets | Caddy / Hono serveStatic |
 | **Real-time events** | Nostr relay (Nosflare) | Nostr relay (strfry) |
@@ -64,7 +64,7 @@ Ang self-hosting ay nagbibigay ng mas maraming kontrol pero mas marami ring resp
 - **Network security**: Gumamit ng firewall para limitahan ang access. Tanging port 80/443 lang ang dapat na publicly accessible.
 - **Mga secret**: Huwag kailanman ilagay ang mga secret sa Docker Compose files o version control. Gumamit ng `.env` files (hindi kasama sa mga image) o Docker/Kubernetes secrets.
 - **Mga update**: Regular na mag-pull ng bagong mga image. Bantayan ang [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) para sa mga security fix.
-- **Mga backup**: Regular na i-backup ang PostgreSQL database at MinIO storage. Tingnan ang backup section sa bawat deployment guide.
+- **Mga backup**: Regular na i-backup ang PostgreSQL database at RustFS storage. Tingnan ang backup section sa bawat deployment guide.
 
 ## Mga susunod na hakbang
 

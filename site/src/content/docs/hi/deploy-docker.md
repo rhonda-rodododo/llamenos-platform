@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO credentials (change from defaults!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# RustFS credentials (change from defaults!)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **महत्वपूर्ण**: `PG_PASSWORD`, `MINIO_ACCESS_KEY`, और `MINIO_SECRET_KEY` के लिए मजबूत, अद्वितीय पासवर्ड सेट करें।
+> **महत्वपूर्ण**: `PG_PASSWORD`, `STORAGE_ACCESS_KEY`, और `STORAGE_SECRET_KEY` के लिए मजबूत, अद्वितीय पासवर्ड सेट करें।
 
 ## 4. अपना domain कॉन्फ़िगर करें
 
@@ -94,7 +94,7 @@ docker compose up -d
 | **app** | Llamenos एप्लिकेशन | 3000 (आंतरिक) |
 | **postgres** | PostgreSQL डेटाबेस | 5432 (आंतरिक) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
-| **minio** | फ़ाइल/रिकॉर्डिंग storage | 9000, 9001 (आंतरिक) |
+| **rustfs** | फ़ाइल/रिकॉर्डिंग storage | 9000, 9001 (आंतरिक) |
 
 सब कुछ चल रहा है यह जाँचें:
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-आपका डेटा Docker volumes (`postgres-data`, `minio-data`, आदि) में persist होता है और container restarts और image updates के बाद भी बना रहता है।
+आपका डेटा Docker volumes (`postgres-data`, `rustfs-data`, आदि) में persist होता है और container restarts और image updates के बाद भी बना रहता है।
 
 ## बैकअप
 
@@ -189,15 +189,15 @@ Restore करने के लिए:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### MinIO storage
+### RustFS storage
 
-MinIO अपलोड की गई फ़ाइलें, recordings, और attachments store करता है:
+RustFS अपलोड की गई फ़ाइलें, recordings, और attachments store करता है:
 
 ```bash
-# Using the MinIO client (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Using the RustFS client (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### स्वचालित बैकअप
@@ -262,13 +262,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### MinIO connection errors
+### RustFS connection errors
 
-ऐप शुरू होने से पहले सुनिश्चित करें कि MinIO service healthy है:
+ऐप शुरू होने से पहले सुनिश्चित करें कि RustFS service healthy है:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Service architecture
@@ -278,7 +278,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 
