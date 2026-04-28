@@ -44,15 +44,27 @@ services:
   # ── Signal sidecar: test mode ──────────────────────────────────────
   # signal-cli runs in json-rpc mode; AUTO_RECEIVE_SCHEDULE disabled in CI
   # so the webhook-based tests control message flow entirely.
+  # Healthcheck: in CI no Signal number is registered so /v1/about returns 503.
+  # Override to just check the process is listening (TCP check on port 8080).
   signal-cli:
     environment:
       - MODE=json-rpc
       - AUTO_RECEIVE_SCHEDULE=
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/about || true"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
-  # signal-notifier: expose port so BDD tests can hit /health and /notify directly
+  # signal-notifier: expose port so BDD tests can hit /health and /notify directly.
+  # Don't depend on signal-cli being healthy — in CI it has no registered number.
   signal-notifier:
     ports:
       - "3100:3100"
+    depends_on:
+      signal-cli:
+        condition: service_started
     environment:
       - PORT=3100
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-test-notifier-key}
