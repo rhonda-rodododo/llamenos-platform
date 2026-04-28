@@ -80,6 +80,9 @@ struct HubKeyEagerLoadTests {
     // MARK: - Eager Loading
 
     @Test func testEagerLoadFetchesKeysForAllHubs() async {
+        UserDefaults.standard.removeObject(forKey: "activeHubId")
+        defer { UserDefaults.standard.removeObject(forKey: "activeHubId") }
+
         let apiService = TrackingHubAPIService()
         let cryptoService = TrackingHubCryptoService()
         let ctx = HubContext()
@@ -97,11 +100,12 @@ struct HubKeyEagerLoadTests {
         #expect(Set(apiService.fetchedHubIds) == ["hub-001", "hub-002", "hub-003"])
         // loadHubKey must have been called for all three hubs
         #expect(Set(cryptoService.loadedHubIds) == ["hub-001", "hub-002", "hub-003"])
-
-        UserDefaults.standard.removeObject(forKey: "activeHubId")
     }
 
     @Test func testEagerLoadSkipsAlreadyCachedHubs() async {
+        UserDefaults.standard.removeObject(forKey: "activeHubId")
+        defer { UserDefaults.standard.removeObject(forKey: "activeHubId") }
+
         let apiService = TrackingHubAPIService()
         let cryptoService = TrackingHubCryptoService()
         // Pre-seed hub-001 as already cached
@@ -120,11 +124,12 @@ struct HubKeyEagerLoadTests {
         // Only hub-002 should have been fetched — hub-001 was already cached
         #expect(apiService.fetchedHubIds == ["hub-002"])
         #expect(cryptoService.loadedHubIds == ["hub-002"])
-
-        UserDefaults.standard.removeObject(forKey: "activeHubId")
     }
 
     @Test func testEagerLoadIndividualFailuresDoNotPropagateOrFailOthers() async {
+        UserDefaults.standard.removeObject(forKey: "activeHubId")
+        defer { UserDefaults.standard.removeObject(forKey: "activeHubId") }
+
         let apiService = TrackingHubAPIService()
         // Inject a fetch error — ALL fetches will fail
         apiService.hubKeyError = URLError(.badServerResponse)
@@ -147,13 +152,14 @@ struct HubKeyEagerLoadTests {
         #expect(cryptoService.loadedHubIds.isEmpty)
         // The vm-level error must NOT be set — failures are per-key, not global
         #expect(vm.error == nil)
-
-        UserDefaults.standard.removeObject(forKey: "activeHubId")
     }
 
     // MARK: - Cache-miss fallback in switchHub
 
     @Test func testSwitchHubFetchesMissingKeyOnDemand() async {
+        UserDefaults.standard.removeObject(forKey: "activeHubId")
+        defer { UserDefaults.standard.removeObject(forKey: "activeHubId") }
+
         let apiService = TrackingHubAPIService()
         let cryptoService = TrackingHubCryptoService()
         // No keys pre-cached — cache miss guaranteed
@@ -174,11 +180,12 @@ struct HubKeyEagerLoadTests {
         // Hub context must have been updated
         #expect(ctx.activeHubId == "hub-on-demand")
         #expect(vm.error == nil)
-
-        UserDefaults.standard.removeObject(forKey: "activeHubId")
     }
 
     @Test func testSwitchHubSkipsFetchIfKeyCached() async {
+        UserDefaults.standard.removeObject(forKey: "activeHubId")
+        defer { UserDefaults.standard.removeObject(forKey: "activeHubId") }
+
         let apiService = TrackingHubAPIService()
         let cryptoService = TrackingHubCryptoService()
         // Pre-cache the hub key
@@ -200,7 +207,5 @@ struct HubKeyEagerLoadTests {
         // Hub context must still be updated
         #expect(ctx.activeHubId == "hub-cached")
         #expect(vm.error == nil)
-
-        UserDefaults.standard.removeObject(forKey: "activeHubId")
     }
 }
