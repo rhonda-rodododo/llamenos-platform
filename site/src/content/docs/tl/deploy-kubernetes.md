@@ -3,7 +3,7 @@ title: "Deploy: Kubernetes (Helm)"
 description: I-deploy ang Llamenos sa Kubernetes gamit ang opisyal na Helm chart.
 ---
 
-Saklaw ng gabay na ito ang pag-deploy ng Llamenos sa isang Kubernetes cluster gamit ang opisyal na Helm chart. Pinamamahalaan ng chart ang application at mga opsyonal na MinIO/Whisper service bilang mga hiwalay na deployment. Kailangan mong magbigay ng PostgreSQL database.
+Saklaw ng gabay na ito ang pag-deploy ng Llamenos sa isang Kubernetes cluster gamit ang opisyal na Helm chart. Pinamamahalaan ng chart ang application at mga opsyonal na RustFS/Whisper service bilang mga hiwalay na deployment. Kailangan mong magbigay ng PostgreSQL database.
 
 ## Mga kinakailangan
 
@@ -33,8 +33,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
   --set secrets.postgresPassword=YOUR_PG_PASSWORD \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -66,7 +66,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -169,18 +169,18 @@ Buksan ang `https://hotline.yourdomain.com` sa iyong browser. Mag-login gamit an
 
 > **Tip**: Para sa production, gamitin ang `secrets.existingSecret` para mag-reference ng Secret na pinamamahalaan ng External Secrets Operator, Sealed Secrets, o Vault.
 
-### MinIO
+### RustFS
 
 | Parameter | Paglalarawan | Default |
 |-----------|-------------|---------|
-| `minio.enabled` | I-deploy ang MinIO | `true` |
-| `minio.image.repository` | MinIO image | `minio/minio` |
-| `minio.image.tag` | MinIO tag | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | MinIO data volume | `50Gi` |
-| `minio.persistence.storageClass` | Storage class | `""` |
-| `minio.credentials.accessKey` | MinIO root user | `""` (kinakailangan) |
-| `minio.credentials.secretKey` | MinIO root password | `""` (kinakailangan) |
-| `minio.resources` | CPU/memory requests at limits | `{}` |
+| `rustfs.enabled` | I-deploy ang RustFS | `true` |
+| `rustfs.image.repository` | RustFS image | `rustfs/rustfs` |
+| `rustfs.image.tag` | RustFS tag | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | RustFS data volume | `50Gi` |
+| `rustfs.persistence.storageClass` | Storage class | `""` |
+| `rustfs.credentials.accessKey` | RustFS root user | `""` (kinakailangan) |
+| `rustfs.credentials.secretKey` | RustFS root password | `""` (kinakailangan) |
+| `rustfs.resources` | CPU/memory requests at limits | `{}` |
 
 ### Whisper transcription
 
@@ -228,26 +228,26 @@ Gumawa ng Secret gamit ang napiling tool:
 kubectl create secret generic llamenos-secrets \
   --from-literal=admin-pubkey=your_key \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=rustfs-access-key=your_key \
+  --from-literal=rustfs-secret-key=your_key
 
 # O gamit ang External Secrets Operator, Sealed Secrets, Vault, atbp.
 ```
 
-## Paggamit ng external MinIO o S3
+## Paggamit ng external RustFS o S3
 
-Kung mayroon ka nang MinIO o S3-compatible service, i-disable ang built-in MinIO at ipasa ang endpoint:
+Kung mayroon ka nang RustFS o S3-compatible service, i-disable ang built-in RustFS at ipasa ang endpoint:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://your-rustfs.example.com"
+    STORAGE_ACCESS_KEY: "your-key"
+    STORAGE_SECRET_KEY: "your-secret"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## GPU transcription
@@ -340,7 +340,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Mga karaniwang sanhi: kulang na mga secret, maling ADMIN_PUBKEY, hindi maabot ang PostgreSQL, hindi pa handa ang MinIO.
+Mga karaniwang sanhi: kulang na mga secret, maling ADMIN_PUBKEY, hindi maabot ang PostgreSQL, hindi pa handa ang RustFS.
 
 ### Mga error sa database connection
 

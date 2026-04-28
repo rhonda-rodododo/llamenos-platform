@@ -9,7 +9,7 @@ Esta guia te lleva paso a paso a traves del despliegue de Llamenos con Docker Co
 
 - Un servidor Linux (Ubuntu 22.04+, Debian 12+ o similar)
 - [Docker Engine](https://docs.docker.com/engine/install/) v24+ con Docker Compose v2
-- Un nombre de dominio con DNS apuntando a la IP de tu servidor
+- Un nombre de dorustfs con DNS apuntando a la IP de tu servidor
 - [Bun](https://bun.sh/) instalado localmente (para generar el par de claves admin)
 
 ## 1. Clonar el repositorio
@@ -42,7 +42,7 @@ Edita `.env` con tus valores:
 ```env
 # Requerido
 ADMIN_PUBKEY=tu_clave_publica_hex_del_paso_2
-DOMAIN=linea.tudominio.com
+DOMAIN=linea.tudorustfs.com
 
 # Nombre mostrado de la linea (aparece en mensajes IVR)
 HOTLINE_NAME=Tu Linea de Ayuda
@@ -52,19 +52,19 @@ TWILIO_ACCOUNT_SID=tu_sid
 TWILIO_AUTH_TOKEN=tu_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Credenciales MinIO (cambia los valores por defecto!)
-MINIO_ACCESS_KEY=tu-clave-de-acceso
-MINIO_SECRET_KEY=tu-clave-secreta-min-8-caracteres
+# Credenciales RustFS (cambia los valores por defecto!)
+STORAGE_ACCESS_KEY=tu-clave-de-acceso
+STORAGE_SECRET_KEY=tu-clave-secreta-min-8-caracteres
 ```
 
-> **Importante**: Cambia las credenciales de MinIO de los valores por defecto. Estas controlan el acceso a archivos subidos y grabaciones.
+> **Importante**: Cambia las credenciales de RustFS de los valores por defecto. Estas controlan el acceso a archivos subidos y grabaciones.
 
-## 4. Configurar tu dominio
+## 4. Configurar tu dorustfs
 
-Edita el `Caddyfile` para establecer tu dominio:
+Edita el `Caddyfile` para establecer tu dorustfs:
 
 ```
-linea.tudominio.com {
+linea.tudorustfs.com {
     reverse_proxy app:3000
     encode gzip
     header {
@@ -76,7 +76,7 @@ linea.tudominio.com {
 }
 ```
 
-Caddy obtiene y renueva automaticamente los certificados TLS de Let's Encrypt para tu dominio. Asegurate de que los puertos 80 y 443 esten abiertos en tu firewall.
+Caddy obtiene y renueva automaticamente los certificados TLS de Let's Encrypt para tu dorustfs. Asegurate de que los puertos 80 y 443 esten abiertos en tu firewall.
 
 ## 5. Iniciar los servicios
 
@@ -90,7 +90,7 @@ Esto inicia tres servicios principales:
 |----------|-----------|--------|
 | **app** | Aplicacion Llamenos | 3000 (interno) |
 | **caddy** | Proxy inverso + TLS | 80, 443 |
-| **minio** | Almacenamiento de archivos/grabaciones | 9000, 9001 (interno) |
+| **rustfs** | Almacenamiento de archivos/grabaciones | 9000, 9001 (interno) |
 
 Verifica que todo este funcionando:
 
@@ -102,13 +102,13 @@ docker compose logs app --tail 50
 Verifica el endpoint de salud:
 
 ```bash
-curl https://linea.tudominio.com/api/health
+curl https://linea.tudorustfs.com/api/health
 # → {"status":"ok","platform":"node","timestamp":"...","uptime":...}
 ```
 
 ## 6. Primer inicio de sesion
 
-Abre `https://linea.tudominio.com` en tu navegador. Inicia sesion con el nsec admin del paso 2. El asistente de configuracion te guiara a traves de:
+Abre `https://linea.tudorustfs.com` en tu navegador. Inicia sesion con el nsec admin del paso 2. El asistente de configuracion te guiara a traves de:
 
 1. **Nombrar tu linea** — nombre para mostrar en la app
 2. **Elegir canales** — habilitar Voz, SMS, WhatsApp, Signal y/o Reportes
@@ -117,12 +117,12 @@ Abre `https://linea.tudominio.com` en tu navegador. Inicia sesion con el nsec ad
 
 ## 7. Configurar webhooks
 
-Apunta los webhooks de tu proveedor de telefonia a tu dominio. Consulta las guias especificas del proveedor para detalles:
+Apunta los webhooks de tu proveedor de telefonia a tu dorustfs. Consulta las guias especificas del proveedor para detalles:
 
-- **Voz** (todos los proveedores): `https://linea.tudominio.com/telephony/incoming`
-- **SMS**: `https://linea.tudominio.com/api/messaging/sms/webhook`
-- **WhatsApp**: `https://linea.tudominio.com/api/messaging/whatsapp/webhook`
-- **Signal**: Configura el bridge para reenviar a `https://linea.tudominio.com/api/messaging/signal/webhook`
+- **Voz** (todos los proveedores): `https://linea.tudorustfs.com/telephony/incoming`
+- **SMS**: `https://linea.tudorustfs.com/api/messaging/sms/webhook`
+- **WhatsApp**: `https://linea.tudorustfs.com/api/messaging/whatsapp/webhook`
+- **Signal**: Configura el bridge para reenviar a `https://linea.tudorustfs.com/api/messaging/signal/webhook`
 
 ## Opcional: Habilitar transcripcion
 
@@ -158,7 +158,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Tus datos se mantienen en volumenes Docker (`app-data`, `minio-data`, etc.) y sobreviven a reinicios de contenedores y actualizaciones de imagenes.
+Tus datos se mantienen en volumenes Docker (`app-data`, `rustfs-data`, etc.) y sobreviven a reinicios de contenedores y actualizaciones de imagenes.
 
 ## Respaldos
 
@@ -176,14 +176,14 @@ Para restaurar:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Almacenamiento MinIO
+### Almacenamiento RustFS
 
-MinIO almacena archivos subidos, grabaciones y adjuntos:
+RustFS almacena archivos subidos, grabaciones y adjuntos:
 
 ```bash
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ## Solucion de problemas
@@ -202,7 +202,7 @@ Caddy necesita los puertos 80 y 443 abiertos para los desafios ACME:
 
 ```bash
 docker compose logs caddy
-curl -I http://linea.tudominio.com
+curl -I http://linea.tudorustfs.com
 ```
 
 ## Arquitectura del servicio
@@ -211,7 +211,7 @@ curl -I http://linea.tudominio.com
 flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, proxy inverso)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"opcional"| Whisper["Whisper<br/>:8080"]
 ```
 

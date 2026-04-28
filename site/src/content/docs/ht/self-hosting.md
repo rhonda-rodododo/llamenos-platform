@@ -21,7 +21,7 @@ Tou de sib depoze yo kouri **menm kòd aplikasyon egzak la**. Diferans lan se na
 |-----------|------------|-------------|
 | **Ekzekisyon backend** | Cloudflare Workers | Node.js (via Hono) |
 | **Depo done** | Durable Objects (KV) | PostgreSQL |
-| **Depo blob** | R2 | MinIO (konpatib S3) |
+| **Depo blob** | R2 | RustFS (konpatib S3) |
 | **Trankskripsyon** | Whisper bò kliyan (WASM) | Whisper bò kliyan (WASM) |
 | **Fichye estatik** | Workers Assets | Caddy / Hono serveStatic |
 | **Evènman an tan reyèl** | Relè Nostr (Nosflare) | Relè Nostr (strfry) |
@@ -64,7 +64,7 @@ Otojere ba ou plis kontwòl men tou plis responsablite:
 - **Sekirite rezo**: Itilize yon firewall pou restriksyon aksè. Sèlman pò 80/443 ta dwe aksesib piblikman.
 - **Sekrè**: Pa janm mete sekrè nan fichye Docker Compose oswa kontwòl vèsyon. Itilize fichye `.env` (ekskli soti nan imaj) oswa sekrè Docker/Kubernetes.
 - **Mizajou**: Tire nouvo imaj regilyèman. Gade [jounal chanjman](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) pou kòrèksyon sekirite.
-- **Backup**: Fè backup baz done PostgreSQL ak depo MinIO regilyèman. Gade seksyon backup nan chak gid depoze.
+- **Backup**: Fè backup baz done PostgreSQL ak depo RustFS regilyèman. Gade seksyon backup nan chak gid depoze.
 
 ## Etap pwochen yo
 

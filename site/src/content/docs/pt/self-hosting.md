@@ -21,7 +21,7 @@ Ambos os alvos de implantacao executam o **mesmo codigo do aplicativo**. A difer
 |------------|------------|----------------|
 | **Runtime do backend** | Cloudflare Workers | Node.js (via Hono) |
 | **Armazenamento de dados** | Durable Objects (KV) | PostgreSQL |
-| **Armazenamento de blobs** | R2 | MinIO (compativel com S3) |
+| **Armazenamento de blobs** | R2 | RustFS (compativel com S3) |
 | **Transcricao** | Whisper no lado do cliente (WASM) | Whisper no lado do cliente (WASM) |
 | **Arquivos estaticos** | Workers Assets | Caddy / Hono serveStatic |
 | **Eventos em tempo real** | Nostr relay (Nosflare) | Nostr relay (strfry) |
@@ -34,7 +34,7 @@ Ambos os alvos de implantacao executam o **mesmo codigo do aplicativo**. A difer
 
 - Um servidor Linux (2 nucleos de CPU, 2 GB de RAM no minimo)
 - Docker e Docker Compose v2 (ou um cluster Kubernetes para Helm)
-- Um nome de dominio apontando para seu servidor
+- Um nome de dorustfs apontando para seu servidor
 - Um par de chaves de administrador (gerado com `bun run bootstrap-admin`)
 - Pelo menos um canal de comunicacao (provedor de voz, SMS, etc.)
 
@@ -64,7 +64,7 @@ O auto-hospedagem oferece mais controle, mas tambem mais responsabilidade:
 - **Seguranca de rede**: Use um firewall para restringir o acesso. Apenas as portas 80/443 devem ser acessiveis publicamente.
 - **Secrets**: Nunca coloque secrets em arquivos Docker Compose ou controle de versao. Use arquivos `.env` (excluidos das imagens) ou secrets do Docker/Kubernetes.
 - **Atualizacoes**: Baixe novas imagens regularmente. Acompanhe o [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) para correcoes de seguranca.
-- **Backups**: Faca backup do banco de dados PostgreSQL e do armazenamento MinIO regularmente. Veja a secao de backup em cada guia de implantacao.
+- **Backups**: Faca backup do banco de dados PostgreSQL e do armazenamento RustFS regularmente. Veja a secao de backup em cada guia de implantacao.
 
 ## Proximos passos
 

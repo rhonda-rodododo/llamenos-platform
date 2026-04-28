@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO 자격 증명 (기본값에서 변경하세요!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# RustFS 자격 증명 (기본값에서 변경하세요!)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **중요**: `PG_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`에 강력하고 고유한 비밀번호를 설정하세요.
+> **중요**: `PG_PASSWORD`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`에 강력하고 고유한 비밀번호를 설정하세요.
 
 ## 4. 도메인 설정
 
@@ -94,7 +94,7 @@ docker compose up -d
 | **app** | Llamenos 애플리케이션 | 3000 (내부) |
 | **postgres** | PostgreSQL 데이터베이스 | 5432 (내부) |
 | **caddy** | 리버스 프록시 + TLS | 80, 443 |
-| **minio** | 파일/녹음 저장소 | 9000, 9001 (내부) |
+| **rustfs** | 파일/녹음 저장소 | 9000, 9001 (내부) |
 
 모든 서비스가 실행 중인지 확인하세요:
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-데이터는 Docker 볼륨(`postgres-data`, `minio-data` 등)에 유지되며 컨테이너 재시작 및 이미지 업데이트 후에도 보존됩니다.
+데이터는 Docker 볼륨(`postgres-data`, `rustfs-data` 등)에 유지되며 컨테이너 재시작 및 이미지 업데이트 후에도 보존됩니다.
 
 ## 백업
 
@@ -189,15 +189,15 @@ docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### MinIO 스토리지
+### RustFS 스토리지
 
-MinIO는 업로드된 파일, 녹음 및 첨부 파일을 저장합니다:
+RustFS는 업로드된 파일, 녹음 및 첨부 파일을 저장합니다:
 
 ```bash
-# MinIO 클라이언트(mc) 사용
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# RustFS 클라이언트(mc) 사용
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### 자동 백업
@@ -262,13 +262,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### MinIO 연결 오류
+### RustFS 연결 오류
 
-앱 시작 전에 MinIO 서비스가 정상인지 확인하세요:
+앱 시작 전에 RustFS 서비스가 정상인지 확인하세요:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## 서비스 아키텍처
@@ -278,7 +278,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 

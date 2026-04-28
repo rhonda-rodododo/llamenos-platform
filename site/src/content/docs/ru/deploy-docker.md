@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO credentials (change from defaults!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# RustFS credentials (change from defaults!)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Важно**: Установите надёжные уникальные пароли для `PG_PASSWORD`, `MINIO_ACCESS_KEY` и `MINIO_SECRET_KEY`.
+> **Важно**: Установите надёжные уникальные пароли для `PG_PASSWORD`, `STORAGE_ACCESS_KEY` и `STORAGE_SECRET_KEY`.
 
 ## 4. Настройка домена
 
@@ -94,7 +94,7 @@ docker compose up -d
 | **app** | Приложение Llamenos | 3000 (внутренний) |
 | **postgres** | База данных PostgreSQL | 5432 (внутренний) |
 | **caddy** | Обратный прокси + TLS | 80, 443 |
-| **minio** | Хранилище файлов/записей | 9000, 9001 (внутренний) |
+| **rustfs** | Хранилище файлов/записей | 9000, 9001 (внутренний) |
 
 Проверьте, что всё запущено:
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Ваши данные хранятся в томах Docker (`postgres-data`, `minio-data` и др.) и сохраняются при перезапуске контейнеров и обновлении образов.
+Ваши данные хранятся в томах Docker (`postgres-data`, `rustfs-data` и др.) и сохраняются при перезапуске контейнеров и обновлении образов.
 
 ## Резервное копирование
 
@@ -189,15 +189,15 @@ docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Хранилище MinIO
+### Хранилище RustFS
 
-MinIO хранит загруженные файлы, записи и вложения:
+RustFS хранит загруженные файлы, записи и вложения:
 
 ```bash
-# Using the MinIO client (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Using the RustFS client (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Автоматическое резервное копирование
@@ -262,13 +262,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Ошибки подключения MinIO
+### Ошибки подключения RustFS
 
-Убедитесь, что сервис MinIO работает исправно перед запуском приложения:
+Убедитесь, что сервис RustFS работает исправно перед запуском приложения:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Архитектура сервисов
@@ -278,7 +278,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 
@@ -340,12 +340,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Учётные данные MinIO (измените значения по умолчанию!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# Учётные данные RustFS (измените значения по умолчанию!)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Важно**: Установите надёжные уникальные пароли для `PG_PASSWORD`, `MINIO_ACCESS_KEY` и `MINIO_SECRET_KEY`.
+> **Важно**: Установите надёжные уникальные пароли для `PG_PASSWORD`, `STORAGE_ACCESS_KEY` и `STORAGE_SECRET_KEY`.
 
 ## 4. Настройка домена
 
@@ -379,7 +379,7 @@ docker compose up -d
 | **app** | Приложение Llamenos | 3000 (внутренний) |
 | **postgres** | База данных PostgreSQL | 5432 (внутренний) |
 | **caddy** | Обратный прокси + TLS | 80, 443 |
-| **minio** | Хранилище файлов/записей | 9000, 9001 (внутренний) |
+| **rustfs** | Хранилище файлов/записей | 9000, 9001 (внутренний) |
 
 Проверьте, что всё работает:
 
@@ -456,7 +456,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Данные сохраняются в томах Docker (`postgres-data`, `minio-data` и др.) и сохраняются при перезапуске контейнеров и обновлении образов.
+Данные сохраняются в томах Docker (`postgres-data`, `rustfs-data` и др.) и сохраняются при перезапуске контейнеров и обновлении образов.
 
 ## Резервное копирование
 
@@ -474,15 +474,15 @@ docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Хранилище MinIO
+### Хранилище RustFS
 
-MinIO хранит загруженные файлы, записи и вложения:
+RustFS хранит загруженные файлы, записи и вложения:
 
 ```bash
-# Используя клиент MinIO (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Используя клиент RustFS (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Автоматическое резервное копирование
@@ -547,13 +547,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Ошибки подключения MinIO
+### Ошибки подключения RustFS
 
-Убедитесь, что сервис MinIO работает до запуска приложения:
+Убедитесь, что сервис RustFS работает до запуска приложения:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Архитектура сервисов
@@ -563,7 +563,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 

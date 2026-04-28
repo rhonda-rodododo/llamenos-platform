@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Kalifikasyon MinIO (chanje valè pa defo yo!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# Kalifikasyon RustFS (chanje valè pa defo yo!)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Enpòtan**: Mete modpas fò ak inik pou `PG_PASSWORD`, `MINIO_ACCESS_KEY`, ak `MINIO_SECRET_KEY`.
+> **Enpòtan**: Mete modpas fò ak inik pou `PG_PASSWORD`, `STORAGE_ACCESS_KEY`, ak `STORAGE_SECRET_KEY`.
 
 ## 4. Konfigire domèn ou a
 
@@ -94,7 +94,7 @@ Sa kòmanse kat sèvis prensipal:
 | **app** | Aplikasyon Llamenos | 3000 (entèn) |
 | **postgres** | Baz done PostgreSQL | 5432 (entèn) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
-| **minio** | Estokaj fichye/anrejistreman | 9000, 9001 (entèn) |
+| **rustfs** | Estokaj fichye/anrejistreman | 9000, 9001 (entèn) |
 
 Verifye tout bagay ap mache:
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Done ou yo sere nan volim Docker (`postgres-data`, `minio-data`, elatriye) epi yo siviv redemaraj kontenè ak miz a jou imaj.
+Done ou yo sere nan volim Docker (`postgres-data`, `rustfs-data`, elatriye) epi yo siviv redemaraj kontenè ak miz a jou imaj.
 
 ## Sovgad
 
@@ -189,15 +189,15 @@ Pou restore:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Estokaj MinIO
+### Estokaj RustFS
 
-MinIO estoke fichye ki telechaje, anrejistreman, ak atachman:
+RustFS estoke fichye ki telechaje, anrejistreman, ak atachman:
 
 ```bash
-# Itilize kliyan MinIO a (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Itilize kliyan RustFS a (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Sovgad otomatize
@@ -262,13 +262,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Erè koneksyon MinIO
+### Erè koneksyon RustFS
 
-Asire sèvis MinIO a an bon sante anvan aplikasyon an kòmanse:
+Asire sèvis RustFS a an bon sante anvan aplikasyon an kòmanse:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Achitekti sèvis yo
@@ -278,7 +278,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 

@@ -21,7 +21,7 @@ Les deux cibles de déploiement exécutent **exactement le même code applicatif
 |-----------|------------|--------------|
 | **Runtime backend** | Cloudflare Workers | Node.js (via Hono) |
 | **Stockage des données** | Durable Objects (KV) | PostgreSQL |
-| **Stockage blob** | R2 | MinIO (compatible S3) |
+| **Stockage blob** | R2 | RustFS (compatible S3) |
 | **Transcription** | Whisper côté client (WASM) | Whisper côté client (WASM) |
 | **Fichiers statiques** | Workers Assets | Caddy / Hono serveStatic |
 | **Événements temps réel** | Relais Nostr (Nosflare) | Relais Nostr (strfry) |
@@ -64,7 +64,7 @@ L'auto-hébergement vous donne plus de contrôle mais aussi plus de responsabili
 - **Sécurité réseau** : Utilisez un pare-feu pour restreindre l'accès. Seuls les ports 80/443 doivent être publiquement accessibles.
 - **Secrets** : Ne mettez jamais de secrets dans les fichiers Docker Compose ou le contrôle de version. Utilisez des fichiers `.env` (exclus des images) ou les secrets Docker/Kubernetes.
 - **Mises à jour** : Tirez régulièrement de nouvelles images. Surveillez le [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) pour les correctifs de sécurité.
-- **Sauvegardes** : Sauvegardez régulièrement la base de données PostgreSQL et le stockage MinIO. Consultez la section sauvegardes de chaque guide de déploiement.
+- **Sauvegardes** : Sauvegardez régulièrement la base de données PostgreSQL et le stockage RustFS. Consultez la section sauvegardes de chaque guide de déploiement.
 
 ## Étapes suivantes
 

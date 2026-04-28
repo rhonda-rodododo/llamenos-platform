@@ -3,7 +3,7 @@ title: "Развёртывание: Kubernetes (Helm)"
 description: Развёртывание Llamenos в Kubernetes с помощью официального Helm-чарта.
 ---
 
-Это руководство охватывает развёртывание Llamenos в кластере Kubernetes с помощью официального Helm-чарта. Чарт управляет приложением и опциональными сервисами MinIO/Whisper как отдельными развёртываниями. База данных PostgreSQL предоставляется вами.
+Это руководство охватывает развёртывание Llamenos в кластере Kubernetes с помощью официального Helm-чарта. Чарт управляет приложением и опциональными сервисами RustFS/Whisper как отдельными развёртываниями. База данных PostgreSQL предоставляется вами.
 
 ## Предварительные требования
 
@@ -33,8 +33,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
   --set secrets.postgresPassword=YOUR_PG_PASSWORD \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -66,7 +66,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -169,18 +169,18 @@ kubectl get ingress llamenos
 
 > **Совет**: Для производственной среды используйте `secrets.existingSecret` для ссылки на Secret, управляемый External Secrets Operator, Sealed Secrets или Vault.
 
-### MinIO
+### RustFS
 
 | Параметр | Описание | По умолчанию |
 |-----------|-------------|---------|
-| `minio.enabled` | Развернуть MinIO | `true` |
-| `minio.image.repository` | Образ MinIO | `minio/minio` |
-| `minio.image.tag` | Тег MinIO | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | Том данных MinIO | `50Gi` |
-| `minio.persistence.storageClass` | Класс хранилища | `""` |
-| `minio.credentials.accessKey` | Корневой пользователь MinIO | `""` (обязательно) |
-| `minio.credentials.secretKey` | Корневой пароль MinIO | `""` (обязательно) |
-| `minio.resources` | Запросы и лимиты CPU/памяти | `{}` |
+| `rustfs.enabled` | Развернуть RustFS | `true` |
+| `rustfs.image.repository` | Образ RustFS | `rustfs/rustfs` |
+| `rustfs.image.tag` | Тег RustFS | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | Том данных RustFS | `50Gi` |
+| `rustfs.persistence.storageClass` | Класс хранилища | `""` |
+| `rustfs.credentials.accessKey` | Корневой пользователь RustFS | `""` (обязательно) |
+| `rustfs.credentials.secretKey` | Корневой пароль RustFS | `""` (обязательно) |
+| `rustfs.resources` | Запросы и лимиты CPU/памяти | `{}` |
 
 ### Транскрипция Whisper
 
@@ -228,26 +228,26 @@ secrets:
 kubectl create secret generic llamenos-secrets \
   --from-literal=admin-pubkey=your_key \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=rustfs-access-key=your_key \
+  --from-literal=rustfs-secret-key=your_key
 
 # Or with External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
 
-## Использование внешнего MinIO или S3
+## Использование внешнего RustFS или S3
 
-Если у вас уже есть MinIO или S3-совместимый сервис, отключите встроенный MinIO и передайте эндпоинт:
+Если у вас уже есть RustFS или S3-совместимый сервис, отключите встроенный RustFS и передайте эндпоинт:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://your-rustfs.example.com"
+    STORAGE_ACCESS_KEY: "your-key"
+    STORAGE_SECRET_KEY: "your-secret"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## Транскрипция на GPU
@@ -340,7 +340,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Распространённые причины: отсутствующие секреты, некорректный ADMIN_PUBKEY, PostgreSQL недоступен, MinIO не готов.
+Распространённые причины: отсутствующие секреты, некорректный ADMIN_PUBKEY, PostgreSQL недоступен, RustFS не готов.
 
 ### Ошибки подключения к базе данных
 
@@ -365,7 +365,7 @@ kubectl describe ingress llamenos
 - [Обзор самостоятельного хостинга](/docs/self-hosting) — сравнение вариантов развёртывания
 - [Развёртывание с Docker Compose](/docs/deploy-docker) — более простой вариант
 
-Это руководство описывает развёртывание Llamenos в кластере Kubernetes с помощью официального Helm-чарта. Чарт управляет приложением и опциональными сервисами MinIO/Whisper как отдельными развёртываниями. Базу данных PostgreSQL предоставляете вы.
+Это руководство описывает развёртывание Llamenos в кластере Kubernetes с помощью официального Helm-чарта. Чарт управляет приложением и опциональными сервисами RustFS/Whisper как отдельными развёртываниями. Базу данных PostgreSQL предоставляете вы.
 
 ## Предварительные требования
 
@@ -395,8 +395,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
   --set secrets.postgresPassword=YOUR_PG_PASSWORD \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -428,7 +428,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -531,18 +531,18 @@ kubectl get ingress llamenos
 
 > **Совет**: Для продакшена используйте `secrets.existingSecret` для ссылки на Secret, управляемый External Secrets Operator, Sealed Secrets или Vault.
 
-### MinIO
+### RustFS
 
 | Параметр | Описание | По умолчанию |
 |----------|---------|--------------|
-| `minio.enabled` | Развернуть MinIO | `true` |
-| `minio.image.repository` | Образ MinIO | `minio/minio` |
-| `minio.image.tag` | Тег MinIO | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | Том данных MinIO | `50Gi` |
-| `minio.persistence.storageClass` | Класс хранения | `""` |
-| `minio.credentials.accessKey` | Корневой пользователь MinIO | `""` (обязательно) |
-| `minio.credentials.secretKey` | Корневой пароль MinIO | `""` (обязательно) |
-| `minio.resources` | Запросы и лимиты CPU/памяти | `{}` |
+| `rustfs.enabled` | Развернуть RustFS | `true` |
+| `rustfs.image.repository` | Образ RustFS | `rustfs/rustfs` |
+| `rustfs.image.tag` | Тег RustFS | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | Том данных RustFS | `50Gi` |
+| `rustfs.persistence.storageClass` | Класс хранения | `""` |
+| `rustfs.credentials.accessKey` | Корневой пользователь RustFS | `""` (обязательно) |
+| `rustfs.credentials.secretKey` | Корневой пароль RustFS | `""` (обязательно) |
+| `rustfs.resources` | Запросы и лимиты CPU/памяти | `{}` |
 
 ### Транскрипция Whisper
 
@@ -590,26 +590,26 @@ secrets:
 kubectl create secret generic llamenos-secrets \
   --from-literal=admin-pubkey=your_key \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=rustfs-access-key=your_key \
+  --from-literal=rustfs-secret-key=your_key
 
 # Или с помощью External Secrets Operator, Sealed Secrets, Vault и др.
 ```
 
-## Использование внешнего MinIO или S3
+## Использование внешнего RustFS или S3
 
-Если у вас уже есть MinIO или S3-совместимый сервис, отключите встроенный MinIO и передайте endpoint:
+Если у вас уже есть RustFS или S3-совместимый сервис, отключите встроенный RustFS и передайте endpoint:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://your-rustfs.example.com"
+    STORAGE_ACCESS_KEY: "your-key"
+    STORAGE_SECRET_KEY: "your-secret"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## GPU-транскрипция
@@ -702,7 +702,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Частые причины: отсутствующие секреты, неверный ADMIN_PUBKEY, недоступный PostgreSQL, неготовый MinIO.
+Частые причины: отсутствующие секреты, неверный ADMIN_PUBKEY, недоступный PostgreSQL, неготовый RustFS.
 
 ### Ошибки подключения к базе данных
 

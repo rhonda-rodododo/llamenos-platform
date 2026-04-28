@@ -21,7 +21,7 @@ Cả hai mục tiêu triển khai chạy **cùng một mã ứng dụng**. Sự 
 |------------|------------|-------------|
 | **Backend runtime** | Cloudflare Workers | Node.js (qua Hono) |
 | **Lưu trữ dữ liệu** | Durable Objects (KV) | PostgreSQL |
-| **Blob storage** | R2 | MinIO (tương thích S3) |
+| **Blob storage** | R2 | RustFS (tương thích S3) |
 | **Chuyển đổi giọng nói** | Whisper phía máy khách (WASM) | Whisper phía máy khách (WASM) |
 | **File tĩnh** | Workers Assets | Caddy / Hono serveStatic |
 | **Sự kiện thời gian thực** | Nostr relay (Nosflare) | Nostr relay (strfry) |
@@ -64,7 +64,7 @@ Tự lưu trữ cho bạn nhiều quyền kiểm soát hơn nhưng cũng nhiều
 - **Bảo mật mạng**: Sử dụng tường lửa. Chỉ cổng 80/443 nên được công khai.
 - **Secrets**: Không bao giờ đặt secrets trong Docker Compose files hoặc version control. Sử dụng file `.env` hoặc Docker/Kubernetes secrets.
 - **Cập nhật**: Thường xuyên kéo image mới. Theo dõi [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md).
-- **Sao lưu**: Thường xuyên sao lưu PostgreSQL và MinIO. Xem phần sao lưu trong mỗi hướng dẫn triển khai.
+- **Sao lưu**: Thường xuyên sao lưu PostgreSQL và RustFS. Xem phần sao lưu trong mỗi hướng dẫn triển khai.
 
 ## Bước tiếp theo
 

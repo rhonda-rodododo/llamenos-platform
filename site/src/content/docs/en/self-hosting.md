@@ -21,7 +21,7 @@ Both deployment targets run the **exact same application code**. The difference 
 |-----------|------------|-------------|
 | **Backend runtime** | Cloudflare Workers | Node.js (via Hono) |
 | **Data storage** | Durable Objects (KV) | PostgreSQL |
-| **Blob storage** | R2 | MinIO (S3-compatible) |
+| **Blob storage** | R2 | RustFS (S3-compatible) |
 | **Transcription** | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
 | **Static files** | Workers Assets | Caddy / Hono serveStatic |
 | **Real-time events** | Nostr relay (Nosflare) | Nostr relay (strfry) |
@@ -64,7 +64,7 @@ Self-hosting gives you more control but also more responsibility:
 - **Network security**: Use a firewall to restrict access. Only ports 80/443 should be publicly accessible.
 - **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (excluded from images) or Docker/Kubernetes secrets.
 - **Updates**: Pull new images regularly. Watch the [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) for security fixes.
-- **Backups**: Back up the PostgreSQL database and MinIO storage regularly. See the backup section in each deployment guide.
+- **Backups**: Back up the PostgreSQL database and RustFS storage regularly. See the backup section in each deployment guide.
 
 ## Next steps
 

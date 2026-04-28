@@ -75,6 +75,6 @@ SignalWire WebRTC usa el mismo patron de claves API que Twilio:
 
 ## Solucion de problemas
 
-- **Errores de "Space not found"**: Verifica el nombre del Space (solo el subdominio, no la URL completa).
+- **Errores de "Space not found"**: Verifica el nombre del Space (solo el subdorustfs, no la URL completa).
 - **Fallos en webhooks**: Asegurate de que la URL de tu Worker sea accesible publicamente y use HTTPS.
 - **Problemas con el token API**: Los tokens de SignalWire pueden expirar. Crea un nuevo token si recibes errores de autenticacion.

@@ -21,7 +21,7 @@ Ambos objetivos de despliegue ejecutan **exactamente el mismo codigo de aplicaci
 |------------|------------|-------------|
 | **Runtime del backend** | Cloudflare Workers | Node.js (via Hono) |
 | **Almacenamiento de datos** | Durable Objects (KV) | PostgreSQL |
-| **Almacenamiento de archivos** | R2 | MinIO (compatible con S3) |
+| **Almacenamiento de archivos** | R2 | RustFS (compatible con S3) |
 | **Transcripcion** | Whisper del lado del cliente (WASM) | Whisper del lado del cliente (WASM) |
 | **Archivos estaticos** | Workers Assets | Caddy / Hono serveStatic |
 | **Eventos en tiempo real** | Relay Nostr (Nosflare) | Relay Nostr (strfry) |
@@ -34,7 +34,7 @@ Ambos objetivos de despliegue ejecutan **exactamente el mismo codigo de aplicaci
 
 - Un servidor Linux (2 nucleos CPU, 2 GB RAM minimo)
 - Docker y Docker Compose v2 (o un cluster Kubernetes para Helm)
-- Un nombre de dominio apuntando a tu servidor
+- Un nombre de dorustfs apuntando a tu servidor
 - Un par de claves admin (generado con `bun run bootstrap-admin`)
 - Al menos un canal de comunicacion (proveedor de voz, SMS, etc.)
 
@@ -64,7 +64,7 @@ El autoalojamiento te da mas control pero tambien mas responsabilidad:
 - **Seguridad de red**: Usa un firewall para restringir acceso. Solo los puertos 80/443 deben ser accesibles publicamente.
 - **Secretos**: Nunca pongas secretos en archivos Docker Compose o control de versiones. Usa archivos `.env` (excluidos de imagenes) o secretos de Docker/Kubernetes.
 - **Actualizaciones**: Descarga nuevas imagenes regularmente. Consulta el [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) para correcciones de seguridad.
-- **Respaldos**: Respalda la base de datos PostgreSQL y el almacenamiento MinIO regularmente. Consulta la seccion de respaldos en cada guia de despliegue.
+- **Respaldos**: Respalda la base de datos PostgreSQL y el almacenamiento RustFS regularmente. Consulta la seccion de respaldos en cada guia de despliegue.
 
 ## Siguientes pasos
 

@@ -21,7 +21,7 @@ Beide Bereitstellungsziele fuehren den **exakt gleichen Anwendungscode** aus. De
 |------------|------------|-----------------|
 | **Backend-Runtime** | Cloudflare Workers | Node.js (ueber Hono) |
 | **Datenspeicher** | Durable Objects (KV) | PostgreSQL |
-| **Blob-Speicher** | R2 | MinIO (S3-kompatibel) |
+| **Blob-Speicher** | R2 | RustFS (S3-kompatibel) |
 | **Transkription** | Client-seitiges Whisper (WASM) | Client-seitiges Whisper (WASM) |
 | **Statische Dateien** | Workers Assets | Caddy / Hono serveStatic |
 | **Echtzeit-Events** | Nostr-Relay (Nosflare) | Nostr-Relay (strfry) |
@@ -64,7 +64,7 @@ Selbst-Hosting gibt Ihnen mehr Kontrolle, aber auch mehr Verantwortung:
 - **Netzwerksicherheit**: Verwenden Sie eine Firewall, um den Zugriff einzuschraenken. Nur die Ports 80/443 sollten oeffentlich zugaenglich sein.
 - **Secrets**: Legen Sie Secrets niemals in Docker Compose-Dateien oder Versionskontrolle ab. Verwenden Sie `.env`-Dateien (von Images ausgeschlossen) oder Docker/Kubernetes-Secrets.
 - **Aktualisierungen**: Laden Sie regelmaessig neue Images herunter. Beobachten Sie das [Changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) fuer Sicherheitskorrekturen.
-- **Backups**: Sichern Sie die PostgreSQL-Datenbank und den MinIO-Speicher regelmaessig. Siehe den Backup-Abschnitt in jeder Bereitstellungsanleitung.
+- **Backups**: Sichern Sie die PostgreSQL-Datenbank und den RustFS-Speicher regelmaessig. Siehe den Backup-Abschnitt in jeder Bereitstellungsanleitung.
 
 ## Naechste Schritte
 
