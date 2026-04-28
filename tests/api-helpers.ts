@@ -950,7 +950,7 @@ export async function listCmsReportTypesViaApi(
   hubId?: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>[]> {
-  const path = hubId ? `/settings/cms/report-types?hubId=${hubId}` : '/settings/cms/report-types'
+  const path = hubId ? `/settings/report-types?hubId=${hubId}` : '/settings/report-types'
   const { data } = await apiGet<{ reportTypes: Record<string, unknown>[] }>(request, path, nsec)
   return data?.reportTypes ?? []
 }
@@ -960,7 +960,7 @@ export async function getCmsReportTypeViaApi(
   id: string,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/settings/cms/report-types/${id}`, nsec)
+  const { status, data } = await apiGet<Record<string, unknown>>(request, `/settings/report-types/${id}`, nsec)
   if (status !== 200) throw new Error(`Failed to get CMS report type: ${status}`)
   return data
 }
@@ -988,7 +988,7 @@ export async function createCmsReportTypeViaApi(
   ]
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    '/settings/cms/report-types',
+    '/settings/report-types',
     {
       name,
       label: options?.label ?? name.replace(/_/g, ' '),
@@ -1027,7 +1027,7 @@ export async function updateCmsReportTypeViaApi(
   updates: Record<string, unknown>,
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/settings/cms/report-types/${id}`, updates, nsec)
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/settings/report-types/${id}`, updates, nsec)
   if (status !== 200) throw new Error(`Failed to update CMS report type: ${status}`)
   return data
 }
@@ -1037,7 +1037,7 @@ export async function deleteCmsReportTypeViaApi(
   id: string,
   nsec = ADMIN_NSEC,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/settings/cms/report-types/${id}`, nsec)
+  const { status } = await apiDelete(request, `/settings/report-types/${id}`, nsec)
   if (status !== 200) throw new Error(`Failed to archive CMS report type: ${status}`)
 }
 

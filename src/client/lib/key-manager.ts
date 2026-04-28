@@ -17,11 +17,13 @@ import {
   clearStoredKey as platformClearStoredKey,
   pubkeyFromNsec,
   hasStoredKey as platformHasStoredKey,
+  getDevicePubkeys,
 } from './platform'
 
 // --- Private state (closure-scoped, never exported) ---
 let unlocked = false
 let publicKey: string | null = null
+let encryptionPubkey: string | null = null
 
 // --- Auto-lock ---
 let idleTimer: ReturnType<typeof setTimeout> | null = null
@@ -98,6 +100,9 @@ export async function unlock(pin: string): Promise<string | null> {
   if (!pubkey) return null
 
   publicKey = pubkey
+  // Fetch encryption pubkey from device state (v3 — separate Ed25519/X25519 keys)
+  const deviceState = await getDevicePubkeys()
+  encryptionPubkey = deviceState?.encryptionPubkeyHex ?? null
   unlocked = true
   resetIdleTimer()
   unlockCallbacks.forEach(cb => cb())
@@ -156,10 +161,17 @@ export function isUnlocked(): boolean {
 }
 
 /**
- * Get the public key (hex). Available when unlocked OR if we have it cached.
+ * Get the signing public key (hex). Available when unlocked OR if we have it cached.
  */
 export function getPublicKeyHex(): string | null {
   return publicKey
+}
+
+/**
+ * Get the X25519 encryption public key (hex). Available after unlock.
+ */
+export function getEncryptionPubkeyHex(): string | null {
+  return encryptionPubkey
 }
 
 /**

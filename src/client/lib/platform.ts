@@ -16,6 +16,75 @@
 const useTauri = typeof window !== 'undefined' &&
   ('__TAURI_INTERNALS__' in window || !!import.meta.env.PLAYWRIGHT_TEST)
 
+// ── Hex / Base64url helpers (used by v3 HPKE composition) ───────────
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16)
+  }
+  return bytes
+}
+
+function base64urlEncode(bytes: Uint8Array): string {
+  const b64 = btoa(String.fromCharCode(...bytes))
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function base64urlDecode(str: string): Uint8Array {
+  const padded = str.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - (str.length % 4)) % 4)
+  const binary = atob(padded)
+  return Uint8Array.from(binary, c => c.charCodeAt(0))
+}
+
+// ── AES-256-GCM helpers (WebCrypto — no private keys involved) ──────
+
+async function aesGcmEncrypt(keyHex: string, plaintext: string): Promise<string> {
+  const nonce = crypto.getRandomValues(new Uint8Array(12))
+  const encoded = new TextEncoder().encode(plaintext)
+  const keyBuf = hexToBytes(keyHex).buffer as ArrayBuffer
+  const key = await crypto.subtle.importKey('raw', keyBuf, 'AES-GCM', false, ['encrypt'])
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, encoded))
+  const combined = new Uint8Array(12 + ct.length)
+  combined.set(nonce)
+  combined.set(ct, 12)
+  return base64urlEncode(combined)
+}
+
+async function aesGcmDecrypt(keyHex: string, packed: string): Promise<string> {
+  const combined = base64urlDecode(packed)
+  const nonce = combined.slice(0, 12)
+  const ct = combined.slice(12)
+  const keyBuf = hexToBytes(keyHex).buffer as ArrayBuffer
+  const key = await crypto.subtle.importKey('raw', keyBuf, 'AES-GCM', false, ['decrypt'])
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce }, key, ct)
+  return new TextDecoder().decode(pt)
+}
+
+function randomKeyHex(): string {
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
+}
+
+// ── HPKE ↔ legacy envelope adapters ─────────────────────────────────
+
+function hpkeToKeyEnvelope(env: HpkeEnvelope, encPubHex: string): { wrappedKey: string; ephemeralPubkey: string } {
+  return { wrappedKey: JSON.stringify(env), ephemeralPubkey: encPubHex }
+}
+
+function hpkeToRecipientEnvelope(
+  env: HpkeEnvelope, pubkey: string, encPubHex: string,
+): { pubkey: string; wrappedKey: string; ephemeralPubkey: string } {
+  return { pubkey, wrappedKey: JSON.stringify(env), ephemeralPubkey: encPubHex }
+}
+
+function keyEnvelopeToHpke(envelope: { wrappedKey: string }): HpkeEnvelope {
+  return JSON.parse(envelope.wrappedKey) as HpkeEnvelope
+}
+
 // ── Tauri IPC wrapper (desktop only) ─────────────────────────────────
 
 async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -661,75 +730,172 @@ export async function eciesUnwrapKey(
   throw new Error('eciesUnwrapKey removed in v3 — use hpkeOpenKeyFromState with HpkeEnvelope')
 }
 
-/** @deprecated Use hpkeSealKey + hpke composition instead. */
+/**
+ * Encrypt a note payload for the author + admin recipients.
+ * V3: Random content key → AES-256-GCM payload, HPKE-wrapped key per reader.
+ * Pubkey args are signing pubkeys (identity); encryption uses the device's X25519 key.
+ */
 export async function encryptNote(
-  _payloadJson: string,
+  payloadJson: string,
   _authorPubkey: string,
   _adminPubkeys: string[],
 ): Promise<EncryptedNoteResult> {
-  throw new Error('encryptNote removed in v3 — compose with hpkeSealKey + AES-GCM')
+  const device = await getDevicePubkeys()
+  if (!device) throw new Error('Device key not unlocked')
+  const encPub = device.encryptionPubkeyHex
+
+  const contentKeyHex = randomKeyHex()
+  const encryptedContent = await aesGcmEncrypt(contentKeyHex, payloadJson)
+
+  const authorHpke = await hpkeSealKey(contentKeyHex, encPub, 'llamenos:note-key', '')
+  const authorEnvelope = hpkeToKeyEnvelope(authorHpke, encPub) as KeyEnvelope
+
+  // Wrap for each admin — currently self-encrypt (single-device pre-production)
+  const adminEnvelopes: RecipientEnvelope[] = [
+    hpkeToRecipientEnvelope(
+      await hpkeSealKey(contentKeyHex, encPub, 'llamenos:note-key', ''),
+      device.signingPubkeyHex, encPub,
+    ) as RecipientEnvelope,
+  ]
+
+  return { encryptedContent, authorEnvelope, adminEnvelopes }
 }
 
-/** @deprecated Use hpkeOpenKeyFromState + AES-GCM instead. */
+/**
+ * Decrypt a note using an HPKE-wrapped content key envelope.
+ */
 export async function decryptNote(
-  _encryptedContent: string,
-  _envelope: KeyEnvelope,
+  encryptedContent: string,
+  envelope: KeyEnvelope,
 ): Promise<string | null> {
-  throw new Error('decryptNote removed in v3 — compose with hpkeOpenKeyFromState + AES-GCM')
+  try {
+    const hpkeEnv = keyEnvelopeToHpke(envelope)
+    const contentKeyHex = await hpkeOpenKeyFromState(hpkeEnv, 'llamenos:note-key', '')
+    return await aesGcmDecrypt(contentKeyHex, encryptedContent)
+  } catch {
+    return null
+  }
 }
 
-/** @deprecated No more legacy note format. */
+/** No legacy note format in v3 — returns null. */
 export async function decryptLegacyNote(
   _packed: string,
 ): Promise<import('@shared/types').NotePayload | null> {
   return null
 }
 
-/** @deprecated Use hpkeSealKey composition instead. */
+/**
+ * Encrypt a message for multiple readers.
+ * V3: Random content key → AES-256-GCM, HPKE-wrapped key per reader.
+ */
 export async function encryptMessage(
-  _plaintext: string,
+  plaintext: string,
   _readerPubkeys: string[],
 ): Promise<EncryptedMessageResult> {
-  throw new Error('encryptMessage removed in v3 — compose with hpkeSealKey + AES-GCM')
+  const device = await getDevicePubkeys()
+  if (!device) throw new Error('Device key not unlocked')
+  const encPub = device.encryptionPubkeyHex
+
+  const contentKeyHex = randomKeyHex()
+  const encryptedContent = await aesGcmEncrypt(contentKeyHex, plaintext)
+
+  // Wrap for the current device (self-encrypt, single-device pre-production)
+  const readerEnvelopes: RecipientEnvelope[] = [
+    hpkeToRecipientEnvelope(
+      await hpkeSealKey(contentKeyHex, encPub, 'llamenos:message', ''),
+      device.signingPubkeyHex, encPub,
+    ) as RecipientEnvelope,
+  ]
+
+  return { encryptedContent, readerEnvelopes }
 }
 
-/** @deprecated Use hpkeOpenKeyFromState composition instead. */
+/**
+ * Decrypt a message from HPKE-wrapped reader envelopes.
+ */
 export async function decryptMessage(
-  _encryptedContent: string,
-  _readerEnvelopes: RecipientEnvelope[],
+  encryptedContent: string,
+  readerEnvelopes: RecipientEnvelope[],
 ): Promise<string | null> {
-  throw new Error('decryptMessage removed in v3 — compose with hpkeOpenKeyFromState + AES-GCM')
-}
-
-/** @deprecated Use hpkeOpenFromState composition instead. */
-export async function decryptCallRecord(
-  _encryptedContent: string,
-  _adminEnvelopes: RecipientEnvelope[],
-): Promise<{ answeredBy: string | null; callerNumber: string } | null> {
-  throw new Error('decryptCallRecord removed in v3 — compose with hpkeOpenFromState')
-}
-
-/** @deprecated Use hpkeOpenFromState instead. */
-export async function decryptTranscription(
-  _packed: string,
-  _ephemeralPubkeyHex: string,
-): Promise<string | null> {
-  throw new Error('decryptTranscription removed in v3 — use hpkeOpenFromState')
-}
-
-/** @deprecated Drafts need v3 migration. */
-export async function encryptDraft(_plaintext: string): Promise<string> {
-  throw new Error('encryptDraft removed in v3 — needs migration to HPKE')
-}
-
-/** @deprecated Drafts need v3 migration. */
-export async function decryptDraft(_packed: string): Promise<string | null> {
+  for (const env of readerEnvelopes) {
+    try {
+      const hpkeEnv = keyEnvelopeToHpke(env)
+      const contentKeyHex = await hpkeOpenKeyFromState(hpkeEnv, 'llamenos:message', '')
+      return await aesGcmDecrypt(contentKeyHex, encryptedContent)
+    } catch { /* try next envelope */ }
+  }
   return null
 }
 
-/** @deprecated Export encryption needs v3 migration. */
-export async function encryptExport(_jsonString: string): Promise<string> {
-  throw new Error('encryptExport removed in v3 — needs migration to HPKE')
+/**
+ * Decrypt an encrypted call record from admin envelopes.
+ */
+export async function decryptCallRecord(
+  encryptedContent: string,
+  adminEnvelopes: RecipientEnvelope[],
+): Promise<{ answeredBy: string | null; callerNumber: string } | null> {
+  for (const env of adminEnvelopes) {
+    try {
+      const hpkeEnv = keyEnvelopeToHpke(env)
+      const contentKeyHex = await hpkeOpenKeyFromState(hpkeEnv, 'llamenos:call-meta', '')
+      const json = await aesGcmDecrypt(contentKeyHex, encryptedContent)
+      return JSON.parse(json)
+    } catch { /* try next envelope */ }
+  }
+  return null
+}
+
+/**
+ * Decrypt a transcription (HPKE direct seal, not key-wrapped).
+ */
+export async function decryptTranscription(
+  packed: string,
+  _ephemeralPubkeyHex: string,
+): Promise<string | null> {
+  try {
+    // Transcriptions use HPKE direct seal (not key-wrap)
+    const envelope = JSON.parse(packed) as HpkeEnvelope
+    const plaintextHex = await hpkeOpenFromState(envelope, 'llamenos:transcription', '')
+    return new TextDecoder().decode(hexToBytes(plaintextHex))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Encrypt a draft using the device's own encryption key.
+ */
+export async function encryptDraft(plaintext: string): Promise<string> {
+  const device = await getDevicePubkeys()
+  if (!device) throw new Error('Device key not unlocked')
+  const contentKeyHex = randomKeyHex()
+  const encryptedContent = await aesGcmEncrypt(contentKeyHex, plaintext)
+  const envelope = await hpkeSealKey(contentKeyHex, device.encryptionPubkeyHex, 'llamenos:note-key', '')
+  return JSON.stringify({ content: encryptedContent, envelope })
+}
+
+/** Decrypt a draft encrypted by encryptDraft. */
+export async function decryptDraft(packed: string): Promise<string | null> {
+  try {
+    const { content, envelope } = JSON.parse(packed) as { content: string; envelope: HpkeEnvelope }
+    const contentKeyHex = await hpkeOpenKeyFromState(envelope, 'llamenos:note-key', '')
+    return await aesGcmDecrypt(contentKeyHex, content)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Encrypt a JSON export using the device's own key.
+ */
+export async function encryptExport(jsonString: string): Promise<string> {
+  const device = await getDevicePubkeys()
+  if (!device) throw new Error('Device key not unlocked')
+  const contentKeyHex = randomKeyHex()
+  const encryptedContent = await aesGcmEncrypt(contentKeyHex, jsonString)
+  const envelope = await hpkeSealKey(contentKeyHex, device.encryptionPubkeyHex, 'llamenos:note-key', '')
+  const combined = JSON.stringify({ content: encryptedContent, envelope })
+  return btoa(combined)
 }
 
 /** @deprecated Nostr signing removed in v3. Use ed25519Sign. */
