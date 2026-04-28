@@ -11,9 +11,11 @@ FROM oven/bun:1@sha256:0733e50325078969732ebe3b15ce4c4be5082f18c4ac1a0f0ca4839c2
 # oven/bun:1 pinned 2026-03-21 — update via Dependabot or on new minor release
 WORKDIR /app
 COPY package.json bun.lockb ./
-# Strip workspace references — Docker only builds the server, not the full monorepo
+# Strip workspace references — Docker only builds the server, not the full monorepo.
+# This invalidates the lockfile (workspace deps removed), so we delete bun.lockb
+# and let bun resolve fresh. The pinned versions in package.json ensure reproducibility.
 RUN bun -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf-8'));delete p.workspaces;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))"
-RUN bun install --production --ignore-scripts
+RUN rm -f bun.lockb && bun install --production --ignore-scripts
 
 # Stage 2: Production
 FROM oven/bun:1-slim@sha256:478281fdd196871c7e51ba6a820b7803a8ae97042ec86cdbc2e1c6b6626442d9
