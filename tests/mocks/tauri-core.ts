@@ -37,19 +37,21 @@ function base64urlDecode(str: string): Uint8Array {
 
 // ── Label registry (matches Rust labels.rs) ─────────────────────────
 
+// Labels must match packages/protocol/crypto-labels.json exactly.
+// Index order matches LABEL_REGISTRY in packages/crypto/src/labels.rs.
 const LABEL_MAP: Record<string, number> = {
-  'llamenos:note-key:v1': 0,
-  'llamenos:file-key:v1': 1,
-  'llamenos:file-metadata:v1': 2,
-  'llamenos:hub-key-wrap:v1': 3,
-  'llamenos:transcription:v1': 4,
-  'llamenos:message:v1': 5,
-  'llamenos:call-meta:v1': 6,
-  'llamenos:shift-schedule:v1': 7,
-  'llamenos:puk-sign:v1': 41,
-  'llamenos:puk-dh:v1': 42,
-  'llamenos:puk-secretbox:v1': 43,
-  'llamenos:puk-wrap-to-device:v1': 44,
+  'llamenos:note-key': 0,
+  'llamenos:file-key': 1,
+  'llamenos:file-metadata': 2,
+  'llamenos:hub-key-wrap': 3,
+  'llamenos:transcription': 4,
+  'llamenos:message': 5,
+  'llamenos:call-meta': 6,
+  'llamenos:shift-schedule': 7,
+  'llamenos:puk:sign:v1': 41,
+  'llamenos:puk:dh:v1': 42,
+  'llamenos:puk:secretbox:v1': 43,
+  'llamenos:puk:wrap:device:v1': 44,
   'llamenos:device-auth:v1': 46,
   'llamenos:sframe-call-secret:v1': 50,
   'llamenos:sframe-base-key:v1': 51,
@@ -394,9 +396,9 @@ const commands: Record<string, CommandHandler> = {
     // Generate random seed
     const seed = randomBytes(32)
 
-    // Derive PUK subkeys
-    const signSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk-sign:v1\x00\x00\x00\x01'))
-    const dhSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk-dh:v1\x00\x00\x00\x01'))
+    // Derive PUK subkeys (labels match crypto-labels.json)
+    const signSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk:sign:v1\x00\x00\x00\x01'))
+    const dhSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk:dh:v1\x00\x00\x00\x01'))
 
     const pukState = {
       generation: 1,
@@ -408,7 +410,7 @@ const commands: Record<string, CommandHandler> = {
     const envelope = hpkeSealMock(
       seed,
       ds.encryptionPubkeyHex,
-      'llamenos:puk-wrap-to-device:v1',
+      'llamenos:puk:wrap:device:v1',
       new Uint8Array(0),
     )
 
@@ -432,8 +434,8 @@ const commands: Record<string, CommandHandler> = {
     const genBuf = new Uint8Array(4)
     new DataView(genBuf.buffer).setUint32(0, newGen, false) // big-endian
 
-    const signLabel = new Uint8Array([...utf8ToBytes('llamenos:puk-sign:v1'), ...genBuf])
-    const dhLabel = new Uint8Array([...utf8ToBytes('llamenos:puk-dh:v1'), ...genBuf])
+    const signLabel = new Uint8Array([...utf8ToBytes('llamenos:puk:sign:v1'), ...genBuf])
+    const dhLabel = new Uint8Array([...utf8ToBytes('llamenos:puk:dh:v1'), ...genBuf])
 
     const signSubkey = hmac(sha256, newSeed, signLabel)
     const dhSubkey = hmac(sha256, newSeed, dhLabel)
@@ -450,13 +452,13 @@ const commands: Record<string, CommandHandler> = {
       envelope: hpkeSealMock(
         newSeed,
         encPubkeyHex,
-        'llamenos:puk-wrap-to-device:v1',
+        'llamenos:puk:wrap:device:v1',
         new Uint8Array(0),
       ),
     }))
 
     // CLKR: encrypt old seed under new generation's secretbox key
-    const sbLabel = new Uint8Array([...utf8ToBytes('llamenos:puk-secretbox:v1'), ...genBuf])
+    const sbLabel = new Uint8Array([...utf8ToBytes('llamenos:puk:secretbox:v1'), ...genBuf])
     const secretboxKey = hmac(sha256, newSeed, sbLabel)
     const clkrNonce = randomBytes(12)
     const clkrCipher = gcm(secretboxKey, clkrNonce)

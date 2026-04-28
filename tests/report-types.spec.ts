@@ -92,7 +92,7 @@ test.describe('Report Types', () => {
     await page.getByTestId('report-body-input').fill('Report with a selected type')
 
     // Submit
-    await page.getByTestId('report-submit-btn').click()
+    await page.getByTestId('report-form-submit-btn').click()
 
     // Verify report created
     await expect(page.getByText('Report submitted')).toBeVisible({ timeout: 10000 })

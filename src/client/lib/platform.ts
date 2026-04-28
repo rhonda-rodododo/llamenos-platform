@@ -643,14 +643,67 @@ export async function verifySchnorr(
   return ed25519Verify(message, signature, pubkey)
 }
 
+// ── Helpers: base64url ↔ hex conversion for HPKE enc field ──────────
+
+function base64urlToHex(b64url: string): string {
+  const padded = b64url.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - (b64url.length % 4)) % 4)
+  const binary = atob(padded)
+  return Array.from(binary, c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+}
+
+function hexToBase64url(hex: string): string {
+  const bytes = hex.match(/.{2}/g)!.map(b => String.fromCharCode(parseInt(b, 16))).join('')
+  return btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+// ── AES-256-GCM content encryption (WebCrypto) ─────────────────────
+
+async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
+  const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt'])
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(plaintext)))
+  const packed = new Uint8Array(iv.length + ct.length)
+  packed.set(iv)
+  packed.set(ct, iv.length)
+  return Array.from(packed, b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function aesGcmDecrypt(ciphertextHex: string, keyHex: string): Promise<string> {
+  const data = new Uint8Array(ciphertextHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const iv = data.slice(0, 12)
+  const ct = data.slice(12)
+  const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt'])
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ct)
+  return new TextDecoder().decode(plaintext)
+}
+
+/**
+ * Resolve the encryption pubkey for a recipient.
+ *
+ * If the pubkey matches the current device's signing pubkey, returns the
+ * device's X25519 encryption pubkey (they differ in v3). Otherwise returns
+ * the pubkey as-is (assumes it's already an encryption pubkey from the server).
+ */
+async function resolveEncryptionPubkey(signingOrEncPubkey: string): Promise<string> {
+  const deviceState = await getDevicePubkeys()
+  if (deviceState && signingOrEncPubkey === deviceState.signingPubkeyHex) {
+    return deviceState.encryptionPubkeyHex
+  }
+  return signingOrEncPubkey
+}
+
 /** @deprecated Use hpkeSealKey instead. */
 export async function eciesWrapKey(
   keyHex: string,
   recipientPubkey: string,
   label: string,
 ): Promise<KeyEnvelope> {
-  const envelope = await hpkeSealKey(keyHex, recipientPubkey, label, '')
-  return { wrappedKey: envelope.ct, ephemeralPubkey: envelope.enc }
+  const encPubkey = await resolveEncryptionPubkey(recipientPubkey)
+  const envelope = await hpkeSealKey(keyHex, encPubkey, label, '')
+  // Convert base64url enc to hex for eciesPubkeySchema compatibility
+  return { wrappedKey: envelope.ct, ephemeralPubkey: base64urlToHex(envelope.enc) }
 }
 
 /** @deprecated Use hpkeOpenKeyFromState instead. */
@@ -661,21 +714,67 @@ export async function eciesUnwrapKey(
   throw new Error('eciesUnwrapKey removed in v3 — use hpkeOpenKeyFromState with HpkeEnvelope')
 }
 
-/** @deprecated Use hpkeSealKey + hpke composition instead. */
+/**
+ * Encrypt a note payload with per-note forward secrecy.
+ * Generates a random AES-256-GCM key, encrypts content, then HPKE-wraps
+ * the key for the author and each admin.
+ */
 export async function encryptNote(
-  _payloadJson: string,
-  _authorPubkey: string,
-  _adminPubkeys: string[],
+  payloadJson: string,
+  authorPubkey: string,
+  adminPubkeys: string[],
 ): Promise<EncryptedNoteResult> {
-  throw new Error('encryptNote removed in v3 — compose with hpkeSealKey + AES-GCM')
+  // Generate random 32-byte content key
+  const keyBytes = crypto.getRandomValues(new Uint8Array(32))
+  const keyHex = Array.from(keyBytes, b => b.toString(16).padStart(2, '0')).join('')
+
+  // AES-256-GCM encrypt content
+  const encryptedContent = await aesGcmEncrypt(payloadJson, keyHex)
+
+  // HPKE-wrap key for author
+  const authorEncPub = await resolveEncryptionPubkey(authorPubkey)
+  const authorHpke = await hpkeSealKey(keyHex, authorEncPub, 'llamenos:note-key', '')
+  const authorEnvelope: KeyEnvelope = {
+    wrappedKey: authorHpke.ct,
+    ephemeralPubkey: base64urlToHex(authorHpke.enc),
+  }
+
+  // HPKE-wrap key for each admin
+  const adminEnvelopes: RecipientEnvelope[] = await Promise.all(
+    adminPubkeys.map(async (pubkey) => {
+      const encPub = await resolveEncryptionPubkey(pubkey)
+      const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:note-key', '')
+      return {
+        pubkey,
+        wrappedKey: hpke.ct,
+        ephemeralPubkey: base64urlToHex(hpke.enc),
+      }
+    }),
+  )
+
+  return { encryptedContent, authorEnvelope, adminEnvelopes }
 }
 
-/** @deprecated Use hpkeOpenKeyFromState + AES-GCM instead. */
+/**
+ * Decrypt a note by HPKE-opening the key envelope and AES-GCM decrypting content.
+ */
 export async function decryptNote(
-  _encryptedContent: string,
-  _envelope: KeyEnvelope,
+  encryptedContent: string,
+  envelope: KeyEnvelope,
 ): Promise<string | null> {
-  throw new Error('decryptNote removed in v3 — compose with hpkeOpenKeyFromState + AES-GCM')
+  try {
+    // Reconstruct HpkeEnvelope from the stored key envelope
+    const hpkeEnvelope: HpkeEnvelope = {
+      v: 3,
+      labelId: 0, // LABEL_NOTE_KEY index
+      enc: hexToBase64url(envelope.ephemeralPubkey),
+      ct: envelope.wrappedKey,
+    }
+    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:note-key', '')
+    return await aesGcmDecrypt(encryptedContent, keyHex)
+  } catch {
+    return null
+  }
 }
 
 /** @deprecated No more legacy note format. */
@@ -685,28 +784,93 @@ export async function decryptLegacyNote(
   return null
 }
 
-/** @deprecated Use hpkeSealKey composition instead. */
+/**
+ * Encrypt a message for multiple readers.
+ * Random AES-256-GCM key, HPKE-wrapped per reader.
+ */
 export async function encryptMessage(
-  _plaintext: string,
-  _readerPubkeys: string[],
+  plaintext: string,
+  readerPubkeys: string[],
 ): Promise<EncryptedMessageResult> {
-  throw new Error('encryptMessage removed in v3 — compose with hpkeSealKey + AES-GCM')
+  const keyBytes = crypto.getRandomValues(new Uint8Array(32))
+  const keyHex = Array.from(keyBytes, b => b.toString(16).padStart(2, '0')).join('')
+
+  const encryptedContent = await aesGcmEncrypt(plaintext, keyHex)
+
+  const readerEnvelopes: RecipientEnvelope[] = await Promise.all(
+    readerPubkeys.map(async (pubkey) => {
+      const encPub = await resolveEncryptionPubkey(pubkey)
+      const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:message', '')
+      return {
+        pubkey,
+        wrappedKey: hpke.ct,
+        ephemeralPubkey: base64urlToHex(hpke.enc),
+      }
+    }),
+  )
+
+  return { encryptedContent, readerEnvelopes }
 }
 
-/** @deprecated Use hpkeOpenKeyFromState composition instead. */
+/**
+ * Decrypt a message by finding our envelope and HPKE-opening the key.
+ */
 export async function decryptMessage(
-  _encryptedContent: string,
-  _readerEnvelopes: RecipientEnvelope[],
+  encryptedContent: string,
+  readerEnvelopes: RecipientEnvelope[],
 ): Promise<string | null> {
-  throw new Error('decryptMessage removed in v3 — compose with hpkeOpenKeyFromState + AES-GCM')
+  const deviceState = await getDevicePubkeys()
+  if (!deviceState) return null
+
+  // Find envelope for our pubkey (try signing pubkey match first)
+  const myEnvelope = readerEnvelopes.find(e =>
+    e.pubkey === deviceState.signingPubkeyHex || e.pubkey === deviceState.encryptionPubkeyHex,
+  )
+  if (!myEnvelope) return null
+
+  try {
+    const hpkeEnvelope: HpkeEnvelope = {
+      v: 3,
+      labelId: 5, // LABEL_MESSAGE index
+      enc: hexToBase64url(myEnvelope.ephemeralPubkey),
+      ct: myEnvelope.wrappedKey,
+    }
+    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:message', '')
+    return await aesGcmDecrypt(encryptedContent, keyHex)
+  } catch {
+    return null
+  }
 }
 
-/** @deprecated Use hpkeOpenFromState composition instead. */
+/**
+ * Decrypt a call record by finding our admin envelope and decrypting.
+ * Uses LABEL_CALL_META for key unwrapping (distinct from message label).
+ */
 export async function decryptCallRecord(
-  _encryptedContent: string,
-  _adminEnvelopes: RecipientEnvelope[],
+  encryptedContent: string,
+  adminEnvelopes: RecipientEnvelope[],
 ): Promise<{ answeredBy: string | null; callerNumber: string } | null> {
-  throw new Error('decryptCallRecord removed in v3 — compose with hpkeOpenFromState')
+  const deviceState = await getDevicePubkeys()
+  if (!deviceState) return null
+
+  const myEnvelope = adminEnvelopes.find(e =>
+    e.pubkey === deviceState.signingPubkeyHex || e.pubkey === deviceState.encryptionPubkeyHex,
+  )
+  if (!myEnvelope) return null
+
+  try {
+    const hpkeEnvelope: HpkeEnvelope = {
+      v: 3,
+      labelId: 6, // LABEL_CALL_META index
+      enc: hexToBase64url(myEnvelope.ephemeralPubkey),
+      ct: myEnvelope.wrappedKey,
+    }
+    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:call-meta', '')
+    const plaintext = await aesGcmDecrypt(encryptedContent, keyHex)
+    return JSON.parse(plaintext)
+  } catch {
+    return null
+  }
 }
 
 /** @deprecated Use hpkeOpenFromState instead. */
