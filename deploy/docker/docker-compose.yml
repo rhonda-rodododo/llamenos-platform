@@ -204,8 +204,8 @@ services:
   sip-bridge:
     profiles: ["asterisk"]
     build:
-      context: ../..
-      dockerfile: sip-bridge/Dockerfile
+      context: ../../sip-bridge
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       - PBX_TYPE=${PBX_TYPE:-asterisk}
@@ -364,8 +364,8 @@ services:
   signal-notifier:
     profiles: ["signal"]
     build:
-      context: ../..
-      dockerfile: signal-notifier/Dockerfile
+      context: ../../signal-notifier
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       - PORT=3100

@@ -1,7 +1,7 @@
 FROM oven/bun:1-slim
 WORKDIR /app
-COPY package.json ./
-RUN bun install --frozen-lockfile
+COPY package.json bun.lock* ./
+RUN bun install --production
 COPY tsconfig.json ./
 COPY src/ ./src/
 RUN mkdir -p /app/data
