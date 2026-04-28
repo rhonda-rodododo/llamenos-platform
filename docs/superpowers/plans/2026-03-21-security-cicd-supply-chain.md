@@ -21,7 +21,7 @@
 | `.github/workflows/tauri-release.yml` | ~~CRIT-CI1 (shell injection fix)~~ ✅ already fixed, HIGH-CI5 (per-job permissions) |
 | `.github/workflows/mobile-release.yml` | HIGH-CI1 (cargo-ndk --locked), HIGH-CI5 (per-job permissions) |
 | `.github/workflows/load-test.yml` | HIGH-CI4 (bun install --frozen-lockfile) |
-| `.github/workflows/ci.yml` | HIGH-CI6 (MinIO digest + macOS checksum), ~~MED-CI3 (bun audit level)~~ ✅ already fixed |
+| `.github/workflows/ci.yml` | HIGH-CI6 (RustFS digest + macOS checksum), ~~MED-CI3 (bun audit level)~~ ✅ already fixed |
 | `deploy/docker/Dockerfile` | CRIT-CI2 (digest-pin both FROM stages) |
 | `.github/dependabot.yml` | CRIT-CI2 (add Docker ecosystem) |
 | `deploy/docker/docker-compose.yml` | HIGH-CI2 (strfry digest), HIGH-CI3 (whisper digest), MED-CI1 (GlitchTip :? syntax) |
@@ -568,81 +568,81 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ---
 
-## Task 6: HIGH-CI6 — MinIO digest in Linux CI and checksum in macOS CI
+## Task 6: HIGH-CI6 — RustFS digest in Linux CI and checksum in macOS CI
 
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-**Background**: Two separate CI paths set up MinIO:
-1. **Linux job** (~line 304): Uses `docker run minio/minio:RELEASE.2025-01-20T14-49-07Z` without a digest pin.
-2. **macOS job** (~line 569): Downloads a MinIO binary via `curl` with no SHA-256 verification before `chmod +x`.
+**Background**: Two separate CI paths set up RustFS:
+1. **Linux job** (~line 304): Uses `docker run rustfs/rustfs:RELEASE.2025-01-20T14-49-07Z` without a digest pin.
+2. **macOS job** (~line 569): Downloads a RustFS binary via `curl` with no SHA-256 verification before `chmod +x`.
 
-- [ ] **Step 1: Fix the Linux CI MinIO Docker path**
+- [ ] **Step 1: Fix the Linux CI RustFS Docker path**
 
 ```bash
-grep -n 'minio/minio\|MINIO' .github/workflows/ci.yml | head -20
+grep -n 'rustfs/rustfs\|MINIO' .github/workflows/ci.yml | head -20
 ```
 
-Locate the `docker run minio/minio:RELEASE.2025-01-20T14-49-07Z` command (Linux job). Check `deploy/docker/docker-compose.yml` for the already-pinned digest:
+Locate the `docker run rustfs/rustfs:RELEASE.2025-01-20T14-49-07Z` command (Linux job). Check `deploy/docker/docker-compose.yml` for the already-pinned digest:
 
 ```bash
-grep 'minio.*sha256' deploy/docker/docker-compose.yml
+grep 'rustfs.*sha256' deploy/docker/docker-compose.yml
 ```
 
 Use that same digest in `ci.yml`. The docker run command should become:
 
 ```yaml
 run: |
-  docker run -d --name minio \
+  docker run -d --name rustfs \
     -p 9000:9000 \
     -e MINIO_ROOT_USER=testaccess \
     -e MINIO_ROOT_PASSWORD=testsecret123456 \
-    minio/minio:RELEASE.2025-01-20T14-49-07Z@sha256:ed9be66eb5f2636c18289c34c3b725ddf57815f2777c77b5938543b78a44f144 server /data
+    rustfs/rustfs:RELEASE.2025-01-20T14-49-07Z@sha256:ed9be66eb5f2636c18289c34c3b725ddf57815f2777c77b5938543b78a44f144 server /data
 ```
 
 (Verify this digest matches what's in docker-compose.yml.)
 
-- [ ] **Step 2: Get the SHA-256 of the macOS MinIO binary**
+- [ ] **Step 2: Get the SHA-256 of the macOS RustFS binary**
 
 **Run this locally on an arm64 Mac** (or note that the CI runner is `darwin-arm64`):
 
 ```bash
 MINIO_VERSION="RELEASE.2025-01-20T14-49-07Z"
-curl -sSfL "https://dl.min.io/server/minio/release/darwin-arm64/archive/minio.${MINIO_VERSION}" -o /tmp/minio-arm64
-shasum -a 256 /tmp/minio-arm64
-# Record the output: <hash>  /tmp/minio-arm64
+curl -sSfL "https://dl.min.io/server/rustfs/release/darwin-arm64/archive/rustfs.${MINIO_VERSION}" -o /tmp/rustfs-arm64
+shasum -a 256 /tmp/rustfs-arm64
+# Record the output: <hash>  /tmp/rustfs-arm64
 ```
 
 Copy the 64-character hex hash. This gets hardcoded into the workflow.
 
-- [ ] **Step 3: Fix the macOS CI MinIO curl path**
+- [ ] **Step 3: Fix the macOS CI RustFS curl path**
 
-Find the macOS job's MinIO setup in `ci.yml` (~line 569):
+Find the macOS job's RustFS setup in `ci.yml` (~line 569):
 
 ```bash
-grep -n 'curl.*minio\|chmod.*minio' .github/workflows/ci.yml
+grep -n 'curl.*rustfs\|chmod.*rustfs' .github/workflows/ci.yml
 ```
 
 Replace the unsafe download pattern:
 
 ```yaml
 # Before (approx lines 569-573):
-- name: Install MinIO
+- name: Install RustFS
   run: |
-    curl -sSfL https://dl.min.io/server/minio/release/darwin-arm64/minio -o /tmp/minio
-    chmod +x /tmp/minio
+    curl -sSfL https://dl.min.io/server/rustfs/release/darwin-arm64/rustfs -o /tmp/rustfs
+    chmod +x /tmp/rustfs
 
 # After:
-- name: Install MinIO
+- name: Install RustFS
   env:
     MINIO_VERSION: "RELEASE.2025-01-20T14-49-07Z"
     MINIO_SHA256: "<hash-recorded-in-step-2>"
   run: |
     curl -sSfL \
-      "https://dl.min.io/server/minio/release/darwin-arm64/archive/minio.${MINIO_VERSION}" \
-      -o /tmp/minio
-    echo "${MINIO_SHA256}  /tmp/minio" | shasum -a 256 -c -
-    chmod +x /tmp/minio
+      "https://dl.min.io/server/rustfs/release/darwin-arm64/archive/rustfs.${MINIO_VERSION}" \
+      -o /tmp/rustfs
+    echo "${MINIO_SHA256}  /tmp/rustfs" | shasum -a 256 -c -
+    chmod +x /tmp/rustfs
 ```
 
 - [ ] **Step 4: Validate YAML**
@@ -655,7 +655,7 @@ python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))" && ec
 
 ```bash
 git add .github/workflows/ci.yml
-git commit -m "fix(ci): pin MinIO to digest in Linux CI and verify checksum in macOS CI
+git commit -m "fix(ci): pin RustFS to digest in Linux CI and verify checksum in macOS CI
 
 Linux CI docker run now uses the same SHA-256 digest as docker-compose.yml.
 macOS CI curl download now verifies SHA-256 before chmod +x, matching

@@ -32,8 +32,8 @@ async function checkPostgres(): Promise<CheckResult> {
 }
 
 async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> {
-  // Backward-compat: accept legacy MINIO_ENDPOINT (deprecated)
-  const endpoint = (env.STORAGE_ENDPOINT as string | undefined) || (env.MINIO_ENDPOINT as string | undefined)
+  // Backward-compat: accept legacy STORAGE_ENDPOINT (deprecated)
+  const endpoint = (env.STORAGE_ENDPOINT as string | undefined) || (env.STORAGE_ENDPOINT as string | undefined)
   if (!endpoint) return { status: 'failing', detail: 'STORAGE_ENDPOINT not configured' }
   const t0 = Date.now()
   try {

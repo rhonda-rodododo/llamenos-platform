@@ -289,12 +289,12 @@ All platform E2E tests run against the same Docker Compose cluster, with per-pla
 
 #### `deploy/docker/docker-compose.e2e.yml`
 
-Override that spins up multiple `app` instances on different ports, sharing the same postgres/minio/strfry:
+Override that spins up multiple `app` instances on different ports, sharing the same postgres/rustfs/strfry:
 
 ```yaml
 services:
   # Shared infrastructure (from base docker-compose.yml):
-  #   postgres:5432, minio:9000, strfry:7777
+  #   postgres:5432, rustfs:9000, strfry:7777
 
   # Per-platform hub instances (isolated state via separate admin keypairs)
   app-desktop:
@@ -333,7 +333,7 @@ Each platform test script sets its hub URL:
 Benefits:
 - **No test interference** — each platform has its own admin, volunteers, and state
 - **Single `docker compose up`** — one command starts the entire test cluster
-- **Shared infrastructure** — postgres, minio, strfry run once (saves memory/CPU)
+- **Shared infrastructure** — postgres, rustfs, strfry run once (saves memory/CPU)
 - **Parallel execution** — all platform E2E suites can run simultaneously
 
 The orchestrator starts the cluster before running tests:

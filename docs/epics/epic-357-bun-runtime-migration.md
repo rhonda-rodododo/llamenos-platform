@@ -400,7 +400,7 @@ cd "$PROJECT_DIR"
 cmd_start() {
   # Start Docker Compose backing services (same as before)
   if ! docker compose -f "$COMPOSE_FILE" ps --status running 2>/dev/null | grep -q postgres; then
-    log "Starting backing services (PostgreSQL, MinIO, strfry)..."
+    log "Starting backing services (PostgreSQL, RustFS, strfry)..."
     docker compose -f "$COMPOSE_FILE" up -d --wait
   fi
 
@@ -627,7 +627,7 @@ const isSelfHosted = typeof process !== 'undefined' && process.env?.PLATFORM ===
 **Mitigation**: Bun's built-in server handles connection draining on SIGTERM automatically. Our shutdown handler only needs to clean up application resources (DB pool, alarm poller, Nostr WebSocket). Alternatively, use `Bun.serve()` explicitly (returns a `Server` object with `.stop()` method) instead of `export default`.
 
 ### Risk: LOW — npm package compatibility
-**Mitigation**: All remaining deps (Hono, nostr-tools, @noble/*, @simplewebauthn/*, @aws-sdk/client-s3) are pure JS/TS with no native modules. Verified: no `require()` calls in worker code, no `.node` native addons, no Node.js-specific APIs beyond what Bun supports. `@aws-sdk/client-s3` (MinIO client) is HTTP-based and works on Bun.
+**Mitigation**: All remaining deps (Hono, nostr-tools, @noble/*, @simplewebauthn/*, @aws-sdk/client-s3) are pure JS/TS with no native modules. Verified: no `require()` calls in worker code, no `.node` native addons, no Node.js-specific APIs beyond what Bun supports. `@aws-sdk/client-s3` (RustFS client) is HTTP-based and works on Bun.
 
 ### Risk: LOW — `process.on('SIGINT/SIGTERM')` for graceful shutdown
 **Mitigation**: Confirmed supported in Bun documentation. Works identically to Node.js.

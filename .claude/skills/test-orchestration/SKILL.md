@@ -112,7 +112,7 @@ No browser needed -- tests hit the API directly via Playwright's APIRequestConte
 **Always use dev compose (backing services) + `bun run dev:server` (app with file watching):**
 
 ```bash
-# 1. Start backing services (PostgreSQL, MinIO, strfry)
+# 1. Start backing services (PostgreSQL, RustFS, strfry)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # 2. Start app locally (auto-reloads on code changes via --watch)
@@ -333,7 +333,7 @@ docker compose -f deploy/docker/docker-compose.dev.yml down    # keep data
 docker compose -f deploy/docker/docker-compose.dev.yml down -v  # wipe data
 ```
 
-The dev compose exposes PostgreSQL (5432), MinIO (9000/9001), and strfry (7777) directly.
+The dev compose exposes PostgreSQL (5432), RustFS (9000/9001), and strfry (7777) directly.
 `bun run dev:server` sets `ENVIRONMENT=development` automatically, enabling `/api/test-reset`.
 
 ### For CI Only
@@ -348,7 +348,7 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build ap
 ### Environment Variables
 
 Dev compose uses hardcoded defaults (user: `llamenos`, password: `dev`).
-Production compose requires `.env` with `PG_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `HMAC_SECRET`.
+Production compose requires `.env` with `PG_PASSWORD`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `HMAC_SECRET`.
 
 ## CI vs Local Differences
 

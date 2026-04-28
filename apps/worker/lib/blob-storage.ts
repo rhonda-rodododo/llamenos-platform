@@ -18,10 +18,10 @@ export function createBlobStorage(opts?: {
   region?: string
 }): BlobStorage {
   // Backward-compat: read legacy MINIO_* env vars (deprecated)
-  const legacyEndpoint = process.env.MINIO_ENDPOINT
-  const legacyAccessKey = process.env.MINIO_ACCESS_KEY
-  const legacySecretKey = process.env.MINIO_SECRET_KEY
-  const legacyBucket = process.env.MINIO_BUCKET
+  const legacyEndpoint = process.env.STORAGE_ENDPOINT
+  const legacyAccessKey = process.env.STORAGE_ACCESS_KEY
+  const legacySecretKey = process.env.STORAGE_SECRET_KEY
+  const legacyBucket = process.env.STORAGE_BUCKET
   if (legacyEndpoint || legacyAccessKey || legacySecretKey) {
     console.warn('[blob-storage] DEPRECATED: MINIO_* env vars are deprecated. Use STORAGE_* instead.')
   }

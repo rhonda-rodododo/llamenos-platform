@@ -6,7 +6,7 @@
 
 **Architecture:** Field values for `location` and `file` types are JSON-encoded strings stored in the encrypted field envelope — the server never inspects them. New protocol schemas define the wire types; codegen propagates them to Swift/Kotlin. The desktop field editor is extracted into a standalone component that drives both report type and (in the future) entity type configuration.
 
-**Tech Stack:** TypeScript/React/shadcn/ui (desktop), SwiftUI/@Observable (iOS), Kotlin/Compose/Hilt (Android), Zod (protocol schemas), Bun/Hono (worker), MinIO/BlobStorage (file storage), `bun run codegen` (Swift+Kotlin type generation)
+**Tech Stack:** TypeScript/React/shadcn/ui (desktop), SwiftUI/@Observable (iOS), Kotlin/Compose/Hilt (Android), Zod (protocol schemas), Bun/Hono (worker), RustFS/BlobStorage (file storage), `bun run codegen` (Swift+Kotlin type generation)
 
 ---
 
