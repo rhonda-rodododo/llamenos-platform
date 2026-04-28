@@ -678,7 +678,7 @@ jobs:
           createuser -s llamenos 2>/dev/null || true
           createdb -O llamenos llamenos 2>/dev/null || true
 
-      - name: Start S3-compatible storage (MinIO binary for CI)
+      - name: Start S3-compatible storage for tests
         env:
           S3_COMPAT_VERSION: "RELEASE.2025-01-20T14-49-07Z"
           # SHA-256 of darwin-arm64 binary for S3_COMPAT_VERSION above.
