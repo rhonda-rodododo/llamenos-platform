@@ -229,6 +229,12 @@ final class SecurityHardeningTests: XCTestCase {
         // In XCTest (not on a device with entitlements), Keychain operations may fail
         // with -34018, but the service should still construct.
         let keychainService = KeychainService()
+        // Clear any wake key entries left by prior tests or runs so
+        // WakeKeyService.init → loadExistingKeys() starts clean.
+        keychainService.delete(key: "wake-private-key")
+        keychainService.delete(key: "wake-public-key")
+        keychainService.delete(key: "device-registered")
+
         let cryptoService = CryptoService()
         let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
 
@@ -257,6 +263,11 @@ final class SecurityHardeningTests: XCTestCase {
         // registerDevice() should throw WakeKeyError.noPrivateKey if called
         // before ensureKeypairExists().
         let keychainService = KeychainService()
+        // Clear any wake key entries left by prior tests or runs
+        keychainService.delete(key: "wake-private-key")
+        keychainService.delete(key: "wake-public-key")
+        keychainService.delete(key: "device-registered")
+
         let cryptoService = CryptoService()
         let apiService = APIService(cryptoService: cryptoService, hubContext: HubContext())
 

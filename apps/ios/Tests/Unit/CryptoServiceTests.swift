@@ -7,6 +7,14 @@ import XCTest
 /// no longer exists.
 final class CryptoServiceTests: XCTestCase {
 
+    override func setUp() {
+        super.setUp()
+        // The Rust FFI crypto state is global (per-process). Lock it before each
+        // test so that tests starting from a "locked" state are not polluted by
+        // a previous test that called generateDeviceKeys().
+        CryptoService().lock()
+    }
+
     // MARK: - Device Key Generation
 
     func testGenerateDeviceKeysProducesPublicKeys() throws {
