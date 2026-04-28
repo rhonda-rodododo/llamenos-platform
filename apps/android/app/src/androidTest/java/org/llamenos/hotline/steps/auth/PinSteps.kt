@@ -35,7 +35,9 @@ class PinSteps : BaseSteps() {
         val ciphertext: String,
         val salt: String,
         val nonce: String,
-        val pubkeyHex: String,
+        val signingPubkeyHex: String,
+        val encryptionPubkeyHex: String,
+        val deviceId: String,
         val iterations: UInt = 600_000u,
     )
 
@@ -78,21 +80,24 @@ class PinSteps : BaseSteps() {
     @Given("I have a stored identity with PIN {string}")
     fun iHaveAStoredIdentityWithPin(pin: String) {
         try {
-            cryptoService.generateKeypair()
             runBlocking {
-                val encrypted = cryptoService.encryptForStorage(pin)
+                val deviceId = java.util.UUID.randomUUID().toString()
+                val encrypted = cryptoService.generateDeviceKeys(deviceId, pin)
                 val stored = Json.encodeToString(
                     StoredKeyData(
                         ciphertext = encrypted.ciphertext,
                         salt = encrypted.salt,
                         nonce = encrypted.nonce,
-                        pubkeyHex = encrypted.pubkeyHex,
+                        signingPubkeyHex = encrypted.state.signingPubkeyHex,
+                        encryptionPubkeyHex = encrypted.state.encryptionPubkeyHex,
+                        deviceId = encrypted.state.deviceId,
                         iterations = encrypted.iterations,
                     )
                 )
                 keystoreService.store(KeystoreService.KEY_ENCRYPTED_KEYS, stored)
-                keystoreService.store(KeystoreService.KEY_PUBKEY, cryptoService.pubkey!!)
-                keystoreService.store(KeystoreService.KEY_NPUB, cryptoService.npub!!)
+                keystoreService.store(KeystoreService.KEY_SIGNING_PUBKEY, cryptoService.signingPubkeyHex!!)
+                keystoreService.store(KeystoreService.KEY_ENCRYPTION_PUBKEY, cryptoService.encryptionPubkeyHex!!)
+                keystoreService.store(KeystoreService.KEY_DEVICE_ID, encrypted.state.deviceId)
             }
             cryptoService.lock()
         } catch (_: Throwable) {
