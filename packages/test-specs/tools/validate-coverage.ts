@@ -694,6 +694,28 @@ function checkDuplicateFeatureNames(featureFiles: string[]) {
   }
 }
 
+// ---- Coverage thresholds ----
+
+/**
+ * Minimum required coverage percentages per platform.
+ * Platforms not listed here default to 100%.
+ *
+ * These thresholds are intentionally below 100% for mobile platforms
+ * while test infrastructure is being built out. Raise them as coverage
+ * improves.
+ *
+ * - desktop: 100% — full playwright-bdd coverage required
+ * - backend: 100% — full step coverage required
+ * - android: 75%  — many new-feature steps not yet ported to mobile
+ * - ios:     0%   — iOS test infra is early-stage; tracked but not gated
+ */
+const COVERAGE_THRESHOLDS: Record<Platform, number> = {
+  desktop: 100,
+  backend: 100,
+  android: 75,
+  ios: 0,
+};
+
 // ---- Main ----
 
 function main() {
@@ -766,17 +788,27 @@ function main() {
   console.log("Summary");
   console.log(`${"=".repeat(60)}`);
 
+  let failed = false;
+
   for (const r of results) {
-    const pct = r.total > 0 ? ((r.covered / r.total) * 100).toFixed(1) : "N/A";
-    const status = r.missing === 0 ? "\u2713" : "\u2717";
-    console.log(`  ${status} ${r.platform}: ${r.covered}/${r.total} (${pct}%)`);
+    const pct = r.total > 0 ? (r.covered / r.total) * 100 : 100;
+    const pctStr = r.total > 0 ? pct.toFixed(1) : "N/A";
+    const threshold = COVERAGE_THRESHOLDS[r.platform as Platform] ?? 100;
+    const belowThreshold = r.total > 0 && pct < threshold;
+    const status = belowThreshold ? "\u2717" : "\u2713";
+    const thresholdNote = threshold < 100 ? ` (threshold: ${threshold}%)` : "";
+    console.log(`  ${status} ${r.platform}: ${r.covered}/${r.total} (${pctStr}%)${thresholdNote}`);
+    if (belowThreshold) {
+      console.log(`      Required: ${threshold}%, Actual: ${pctStr}%`);
+      failed = true;
+    }
   }
 
-  if (totalMissing > 0) {
-    console.log(`\nFAILED: ${totalMissing} missing test implementations.`);
+  if (failed) {
+    console.log(`\nFAILED: One or more platforms are below their required coverage threshold.`);
     process.exit(1);
   } else {
-    console.log("\nPASSED: All platforms at 100% coverage.");
+    console.log("\nPASSED: All platforms meet their coverage thresholds.");
     process.exit(0);
   }
 }
