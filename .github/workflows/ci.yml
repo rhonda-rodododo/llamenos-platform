@@ -728,10 +728,9 @@ jobs:
           ENVIRONMENT: development
           DEV_RESET_SECRET: test-reset-secret
           HMAC_SECRET: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
-          MINIO_ENDPOINT: http://localhost:9000
-          MINIO_ACCESS_KEY: testaccess
-          MINIO_SECRET_KEY: testsecret123456
-          MINIO_BUCKET: llamenos-files
+          STORAGE_ENDPOINT: http://localhost:9000
+          STORAGE_ACCESS_KEY: testaccess
+          STORAGE_SECRET_KEY: testsecret123456
           SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
 
       - name: Show backend logs

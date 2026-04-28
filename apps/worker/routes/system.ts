@@ -69,10 +69,11 @@ async function fetchServices(env: Record<string, unknown>): Promise<ServiceStatu
   const services: ServiceStatus[] = []
 
   // Check blob storage
+  const hasStorage = !!(env.R2_BUCKET || env.STORAGE_MANAGER)
   services.push({
     name: 'Blob Storage',
-    status: env.R2_BUCKET ? 'ok' : 'down',
-    details: env.R2_BUCKET ? undefined : 'Not configured',
+    status: hasStorage ? 'ok' : 'down',
+    details: hasStorage ? undefined : 'Not configured',
   })
 
   // Check Nostr relay
@@ -190,7 +191,7 @@ systemRoutes.get('/health',
     calls,
     storage: {
       dbSize: 'N/A',
-      blobStorage: env.R2_BUCKET ? 'Connected' : 'Not configured',
+      blobStorage: (env.R2_BUCKET || env.STORAGE_MANAGER) ? 'Connected' : 'Not configured',
     },
     backup: {
       lastBackup: null,

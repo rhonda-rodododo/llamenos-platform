@@ -20,7 +20,7 @@ export type { WebAuthnSettings } from '@protocol/schemas/settings'
 // Platform service interfaces (structural typing)
 // ---------------------------------------------------------------------------
 
-/** Blob storage interface (MinIO/S3). */
+/** Blob storage interface (S3-compatible). */
 export interface BlobStorage {
   put(key: string, body: ReadableStream | ArrayBuffer | Uint8Array | string): Promise<void>
   get(key: string): Promise<{ body: ReadableStream; size: number; arrayBuffer(): Promise<ArrayBuffer> } | null>
@@ -36,8 +36,14 @@ export interface Env {
   // Transcription (CF: Ai binding, Node: Whisper HTTP client)
   AI: TranscriptionService
 
-  // Blob storage (CF: R2Bucket, Node: MinIO S3 client)
+  // Blob storage (CF: R2Bucket, Node: S3-compatible storage)
   R2_BUCKET: BlobStorage
+
+  // Hub-scoped storage manager (RustFS/MinIO with per-hub IAM)
+  STORAGE_MANAGER?: import('../lib/storage-manager').StorageManager
+
+  // Storage admin client for IAM operations
+  STORAGE_ADMIN?: import('../lib/storage-admin').StorageAdminClient
 
   // Nostr relay service binding (CF: Fetcher to Nosflare, Node: null)
   NOSFLARE?: { fetch(request: Request): Promise<Response> }

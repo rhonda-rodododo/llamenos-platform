@@ -1,6 +1,6 @@
 # Llamenos Dev Services
 #
-# Starts only the backing services (PostgreSQL, MinIO, strfry) without the app.
+# Starts only the backing services (PostgreSQL, RustFS, strfry) without the app.
 # The app runs locally via `bun run dev:server`.
 #
 # Usage:
@@ -38,19 +38,19 @@ services:
       timeout: 3s
       retries: 5
 
-  minio:
-    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+  rustfs:
+    image: rustfs/rustfs:latest
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
+      RUSTFS_ACCESS_KEY: devaccess
+      RUSTFS_SECRET_KEY: devsecret
+    command: server /data
     volumes:
-      - miniodata:/data
+      - rustfsdata:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -177,7 +177,7 @@ services:
 
 volumes:
   pgdata:
-  miniodata:
+  rustfsdata:
   strfrydata:
   signal-data:
   signal-notifier-data:

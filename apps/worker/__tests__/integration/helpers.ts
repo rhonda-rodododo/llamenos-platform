@@ -103,6 +103,8 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
   const defaultEnv: Env = {
     AI: { run: async () => ({}) } as unknown as Env['AI'],
     R2_BUCKET: { put: async () => ({}), get: async () => null, delete: async () => {} } as unknown as Env['R2_BUCKET'],
+    STORAGE_MANAGER: undefined,
+    STORAGE_ADMIN: undefined,
     TWILIO_ACCOUNT_SID: 'AC-test',
     TWILIO_AUTH_TOKEN: 'test-auth-token',
     TWILIO_PHONE_NUMBER: '+15551234567',

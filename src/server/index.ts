@@ -9,6 +9,8 @@ import 'reflect-metadata' // Required by @peculiar/x509 → tsyringe (transitive
 import { Hono } from 'hono'
 import { createDatabase, closeDb } from '../../apps/worker/db'
 import { createServices, type Services } from '../../apps/worker/services'
+import { createStorageManager, resolveStorageCredentials } from '../../apps/worker/lib/storage-manager'
+import { createStorageAdmin } from '../../apps/worker/lib/storage-admin'
 import { createBlobStorage } from '../../apps/worker/lib/blob-storage'
 import { createTranscriptionService } from '../../apps/worker/lib/transcription-client'
 import { createNostrPublisher, NodeNostrPublisher } from '../../apps/worker/lib/nostr-publisher'
@@ -69,6 +71,18 @@ const services: Services = createServices(db, {
 })
 console.log('[llamenos] Services initialized')
 
+// --- Initialize storage ---
+let storageAdmin = null
+let storageManager = null
+try {
+  const creds = resolveStorageCredentials()
+  storageAdmin = createStorageAdmin(creds)
+  storageManager = createStorageManager({ admin: storageAdmin })
+  console.log('[llamenos] Storage manager initialized')
+} catch (err) {
+  console.warn('[llamenos] Storage not configured:', err instanceof Error ? err.message : String(err))
+}
+
 const env: Record<string, unknown> = {
   ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
   ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
@@ -81,7 +95,9 @@ const env: Record<string, unknown> = {
   DEMO_MODE: process.env.DEMO_MODE || undefined,
   AI: createTranscriptionService(),
   R2_BUCKET: createBlobStorage(),
-  MINIO_ENDPOINT: process.env.MINIO_ENDPOINT || undefined,
+  STORAGE_MANAGER: storageManager,
+  STORAGE_ADMIN: storageAdmin,
+  STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT || process.env.MINIO_ENDPOINT || undefined,
   SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
   NOSTR_RELAY_URL: nostrRelayUrl || undefined,
   NOSTR_RELAY_PUBLIC_URL: process.env.NOSTR_RELAY_PUBLIC_URL || undefined,
