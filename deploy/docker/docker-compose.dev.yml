@@ -42,15 +42,14 @@ services:
     image: rustfs/rustfs:latest
     ports:
       - "9000:9000"
-      - "9001:9001"
     environment:
-      RUSTFS_ACCESS_KEY: devaccess
-      RUSTFS_SECRET_KEY: devsecret
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
     command: server /data
     volumes:
       - rustfsdata:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 5

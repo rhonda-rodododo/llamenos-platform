@@ -53,7 +53,7 @@ services:
       - STORAGE_ENDPOINT=http://rustfs:9000
       - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
       - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
-      - STORAGE_SSE_ENABLED=${STORAGE_SSE_ENABLED:-true}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-llamenos-files}
       - WHISPER_URL=${WHISPER_URL:-http://whisper:8080/v1/audio/transcriptions}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
@@ -141,11 +141,11 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 10s
 
   # ── Core: Nostr Relay (strfry) ────────────────────────────
   strfry:
