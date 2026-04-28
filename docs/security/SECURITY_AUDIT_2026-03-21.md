@@ -276,13 +276,13 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 ---
 
-### HIGH-CI6 (HIGH): MinIO binary downloaded and executed without checksum verification in iOS CI
+### HIGH-CI6 (HIGH): RustFS binary downloaded and executed without checksum verification in iOS CI
 
-**Component**: CI/CD — iOS build / MinIO
+**Component**: CI/CD — iOS build / RustFS
 **File(s)**: `.github/workflows/ci.yml:571-573`
-**Description**: The workflow downloads the MinIO binary via `curl` and immediately marks it executable and runs it. No SHA-256 checksum verification is performed. The git-cliff download in the same workflow correctly verifies its checksum immediately after download.
+**Description**: The workflow downloads the RustFS binary via `curl` and immediately marks it executable and runs it. No SHA-256 checksum verification is performed. The git-cliff download in the same workflow correctly verifies its checksum immediately after download.
 **Impact**: A MITM between the CI runner and `dl.min.io` (or a DNS-level redirect) can serve a malicious binary that executes on the macOS runner with iOS build secrets in scope, including code signing certificates and provisioning profile passphrases.
-**Fix**: After the `curl` download, verify the binary's SHA-256 against a hardcoded or securely fetched expected checksum before executing it. Alternatively, use the Docker MinIO image for a reproducible, digest-pinned alternative.
+**Fix**: After the `curl` download, verify the binary's SHA-256 against a hardcoded or securely fetched expected checksum before executing it. Alternatively, use the Docker RustFS image for a reproducible, digest-pinned alternative.
 
 ---
 
@@ -698,7 +698,7 @@ Steps:
 2. Pin all production Docker images to digest (CRIT-CI2, HIGH-CI2, HIGH-CI3).
 3. Add `--locked` and `--frozen-lockfile` to all `cargo install` and `bun install` calls (HIGH-CI1, HIGH-CI4).
 4. Scope workflow permissions to per-job least privilege (HIGH-CI5).
-5. Add MinIO checksum verification (HIGH-CI6).
+5. Add RustFS checksum verification (HIGH-CI6).
 6. Audit and rotate any secrets found in git history (HIGH-CI7).
 7. Enforce required environment variables with `:?` syntax (MED-CI1).
 8. Pin Ansible example vars (MED-CI2).

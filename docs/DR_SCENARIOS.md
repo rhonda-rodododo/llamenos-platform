@@ -12,7 +12,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 **Cause**: VPS provider hardware failure, accidental deletion, or catastrophic OS corruption that makes the server unbootable and unrecoverable.
 
-**Data at risk**: All data on the server — database, MinIO blobs, relay state, Docker volumes, configuration. Off-site backups are the only copy.
+**Data at risk**: All data on the server — database, RustFS blobs, relay state, Docker volumes, configuration. Off-site backups are the only copy.
 
 **Target RTO**: < 4 hours
 
@@ -46,10 +46,10 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
      | docker compose exec -T postgres psql -U llamenos -d llamenos
    ```
 
-5. **Restore MinIO blobs** (if backed up separately).
+5. **Restore RustFS blobs** (if backed up separately).
    ```bash
-   rclone copy remote:llamenos-minio-backup/ /opt/llamenos/minio-restore/
-   docker compose exec minio mc mirror /minio-restore/ local/llamenos-files/
+   rclone copy remote:llamenos-rustfs-backup/ /opt/llamenos/rustfs-restore/
+   docker compose exec rustfs mc mirror /rustfs-restore/ local/llamenos-files/
    ```
 
 6. **Update DNS** to point to the new server IP.
@@ -79,7 +79,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 **Cause**: PostgreSQL data corruption from disk errors, interrupted writes during power loss, or a buggy migration.
 
-**Data at risk**: Database contents — volunteer records, encrypted notes, audit logs, settings, shift schedules. MinIO blobs and configuration are unaffected.
+**Data at risk**: Database contents — volunteer records, encrypted notes, audit logs, settings, shift schedules. RustFS blobs and configuration are unaffected.
 
 **Target RTO**: < 1 hour
 
@@ -131,7 +131,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 ### Notes
 - Data created between the last backup and the corruption event is lost.
 - Daily backups limit the window to 24 hours. Consider enabling WAL archiving for continuous PITR.
-- MinIO blobs (encrypted file uploads) are not in PostgreSQL and are unaffected.
+- RustFS blobs (encrypted file uploads) are not in PostgreSQL and are unaffected.
 
 ---
 
@@ -139,7 +139,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 **Cause**: Attacker gains access to the server and encrypts all files, demanding payment for the decryption key.
 
-**Data at risk**: Everything on the compromised server. Assume all server-side secrets (database password, HMAC secret, MinIO credentials, Twilio API keys, server Nostr secret) are compromised.
+**Data at risk**: Everything on the compromised server. Assume all server-side secrets (database password, HMAC secret, RustFS credentials, Twilio API keys, server Nostr secret) are compromised.
 
 **Target RTO**: < 4 hours
 

@@ -322,11 +322,11 @@ echo "PG_PASSWORD: $PG_PASSWORD"
 HMAC_SECRET=$(openssl rand -hex 32)
 echo "HMAC_SECRET: $HMAC_SECRET"
 
-# Generate MinIO credentials
-MINIO_ACCESS_KEY=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)
-MINIO_SECRET_KEY=$(openssl rand -base64 24)
-echo "MINIO_ACCESS_KEY: $MINIO_ACCESS_KEY"
-echo "MINIO_SECRET_KEY: $MINIO_SECRET_KEY"
+# Generate RustFS credentials
+STORAGE_ACCESS_KEY=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)
+STORAGE_SECRET_KEY=$(openssl rand -base64 24)
+echo "STORAGE_ACCESS_KEY: $STORAGE_ACCESS_KEY"
+echo "STORAGE_SECRET_KEY: $STORAGE_SECRET_KEY"
 
 # Generate server Nostr secret (for relay event signing)
 SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
@@ -351,8 +351,8 @@ DOMAIN=hotline.yourorg.org
 ACME_EMAIL=admin@yourorg.org
 PG_PASSWORD=<generated above>
 HMAC_SECRET=<generated above>
-MINIO_ACCESS_KEY=<generated above>
-MINIO_SECRET_KEY=<generated above>
+STORAGE_ACCESS_KEY=<generated above>
+STORAGE_SECRET_KEY=<generated above>
 SERVER_NOSTR_SECRET=<generated above>
 
 # Application
@@ -412,7 +412,7 @@ docker compose up -d
 # Check all services are running
 docker compose ps
 
-# Expected output: app, postgres, caddy, minio all "running" with healthy status
+# Expected output: app, postgres, caddy, rustfs all "running" with healthy status
 # Wait for health checks (up to 30 seconds)
 docker compose logs -f app --since 1m
 ```
