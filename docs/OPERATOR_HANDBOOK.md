@@ -352,7 +352,7 @@ Rotate credentials on a quarterly schedule. Each rotation procedure is detailed 
 |--------|--------------------|
 | Database password (`PG_PASSWORD`) | Change in PostgreSQL, update `.env`, restart app |
 | Twilio credentials | Rotate API key in Twilio Console, update admin UI or `.env` |
-| MinIO credentials | Use `mc` to create new service account, update `.env` |
+| RustFS credentials | Use `mc` to create new service account, update `.env` |
 | HMAC secret | Generate new hex, update `.env`, restart app. **Warning**: invalidates all ban list hashes |
 | Asterisk secrets | Update `.env`, update ARI config, restart asterisk + bridge + app |
 
@@ -413,8 +413,8 @@ App container keeps restarting or exits immediately
     |   => Database not ready. Check: docker compose ps postgres
     |   => If not running: docker compose up -d postgres, wait 30s
     |
-    +-- "ECONNREFUSED" (minio)
-    |   => MinIO not ready. Check: docker compose ps minio
+    +-- "ECONNREFUSED" (rustfs)
+    |   => RustFS not ready. Check: docker compose ps rustfs
     |
     +-- "out of memory"
         => Insufficient RAM. Upgrade VPS or reduce PG_POOL_SIZE in .env.
@@ -632,7 +632,7 @@ The VPS itself has been compromised.
 
 1. **Provision a new server** (do not clean the compromised one).
 2. **Restore from backup** on the new server.
-3. **Rotate ALL secrets** (DB password, HMAC, MinIO, telephony, SSH keys).
+3. **Rotate ALL secrets** (DB password, HMAC, RustFS, telephony, SSH keys).
 4. **Update DNS** to new server.
 5. **Notify volunteers** to re-authenticate.
 6. **Preserve the compromised server** for forensics if legally required.
@@ -678,7 +678,7 @@ Calls fail but messaging and notes continue working.
 When nothing else is salvageable:
 
 1. Provision a new VPS and follow [QUICKSTART.md](QUICKSTART.md) sections 1-4.
-2. Restore database and MinIO from off-site backups.
+2. Restore database and RustFS from off-site backups.
 3. Generate new admin keypair: `bun run bootstrap-admin`
 4. Rotate ALL secrets.
 5. Update DNS.
@@ -702,7 +702,7 @@ When nothing else is salvageable:
               +------------+------------+
               |            |            |
         +-----+----+ +----+-----+ +---+----+
-        |   App    | |  strfry  | |  MinIO  |
+        |   App    | |  strfry  | |  RustFS  |
         | (Node.js)| |  (Nostr  | | (Blob   |
         | Port 3000| |  Relay)  | | Storage)|
         +-----+----+ | Port 7777| +---------+
@@ -727,7 +727,7 @@ When nothing else is salvageable:
 | **PostgreSQL** | Primary data store (identities, notes, settings, audit log) | Yes -- `/var/lib/postgresql/data/` |
 | **Caddy** | Reverse proxy, TLS termination, static files | TLS certificates |
 | **strfry** | Nostr relay for real-time events (calls, presence, typing) | LMDB (ephemeral events not persisted) |
-| **MinIO** | S3-compatible blob storage (encrypted reports, IVR audio) | Yes -- uploaded files |
+| **RustFS** | S3-compatible blob storage (encrypted reports, IVR audio) | Yes -- uploaded files |
 
 ### 8.3 Data Flow
 
@@ -838,7 +838,7 @@ cat /var/run/reboot-required 2>/dev/null || echo "No reboot required"
 
 # Secret generation
 openssl rand -hex 32        # For HMAC_SECRET, SERVER_NOSTR_SECRET
-openssl rand -base64 24     # For passwords (PG_PASSWORD, MinIO, etc.)
+openssl rand -base64 24     # For passwords (PG_PASSWORD, RustFS, etc.)
 ```
 
 ### 9.4 Backup Commands
@@ -884,7 +884,7 @@ docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
 | **Forward secrecy** | Each note uses a unique random key. Compromising one key does not reveal other notes. |
 | **Hub key** | A random symmetric key shared among all members for encrypting Nostr relay events. Rotated when members depart. |
 | **HMAC secret** | Server-side secret used for hashing phone numbers and IPs in ban lists and audit logs. |
-| **MinIO** | S3-compatible blob storage for encrypted file uploads (reports, IVR audio). |
+| **RustFS** | S3-compatible blob storage for encrypted file uploads (reports, IVR audio). |
 | **NIP-42** | Nostr Implementation Possibility 42: client authentication for relay access control. |
 | **Nostr** | An open protocol for decentralized event relay. Llamenos uses it for real-time communication. |
 | **nsec** | A Nostr secret key (BIP-340 Schnorr). The admin nsec is the master credential. |
