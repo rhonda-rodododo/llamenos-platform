@@ -78,7 +78,6 @@
     "android:emulators:start": "bash scripts/android-parallel-e2e.sh --emulators-only",
     "android:emulators:stop": "bash scripts/android-parallel-e2e.sh --stop",
     "android:sdk:setup": "bash scripts/setup-android-sdk.sh",
-    "test:integration:node": "bunx vitest run --config vitest.integration.node.config.ts",
     "dev:server": "bash scripts/dev-bun.sh",
     "dev:server:stop": "bash scripts/dev-bun.sh stop",
     "dev:server:logs": "bash scripts/dev-bun.sh logs",
