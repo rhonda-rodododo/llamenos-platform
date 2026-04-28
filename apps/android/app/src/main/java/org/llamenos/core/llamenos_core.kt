@@ -3321,13 +3321,3 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     }
 
 
-    /**
-     * Check if the mobile crypto state is unlocked (device secrets loaded in Rust memory).
-     *
-     * Placeholder stub — returns false until native libs are linked.
-     */
-    fun `mobileIsUnlocked`(): kotlin.Boolean {
-        return false
-    }
-
-
