@@ -21,7 +21,7 @@ use crate::auth;
 use crate::device_keys::{self, DeviceKeyState, DeviceSecrets, EncryptedDeviceKeys};
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{self, HpkeEnvelope};
-use crate::puk::{self, DevicePukEnvelope, PukState, RotatePukResult};
+use crate::puk::{self, PukState, RotatePukResult};
 use crate::sigchain::{self, SigchainLink, SigchainVerifiedState};
 use zeroize::Zeroize;
 

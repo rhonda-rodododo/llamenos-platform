@@ -487,7 +487,7 @@ struct CaseDetailView: View {
             // Sort toggle header
             if !viewModel.interactions.isEmpty {
                 HStack {
-                    Text(NSLocalizedString("cases_timeline", comment: "Timeline"))
+                    Text(NSLocalizedString("timeline_title", comment: "Timeline"))
                         .font(.brand(.caption))
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)

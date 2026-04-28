@@ -27,7 +27,7 @@ struct SchemaBrowserView: View {
                 } description: {
                     Text(errorMessage)
                 } actions: {
-                    Button(NSLocalizedString("actionRetry", comment: "Retry")) {
+                    Button(NSLocalizedString("action_retry", comment: "Retry")) {
                         Task { await loadEntityTypes() }
                     }
                 }

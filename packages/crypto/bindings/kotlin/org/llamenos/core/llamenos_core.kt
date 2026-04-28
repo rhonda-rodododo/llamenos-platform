@@ -58,7 +58,7 @@ open class RustBuffer : Structure() {
     companion object {
         internal fun alloc(size: ULong = 0UL) = uniffiRustCall() { status ->
             // Note: need to convert the size to a `Long` value to make this work with JVM.
-            UniffiLib.INSTANCE.ffi_llamenos_core_rustbuffer_alloc(size.toLong(), status)
+            UniffiLib.ffi_llamenos_core_rustbuffer_alloc(size.toLong(), status)
         }.also {
             if(it.data == null) {
                throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
@@ -74,49 +74,15 @@ open class RustBuffer : Structure() {
         }
 
         internal fun free(buf: RustBuffer.ByValue) = uniffiRustCall() { status ->
-            UniffiLib.INSTANCE.ffi_llamenos_core_rustbuffer_free(buf, status)
+            UniffiLib.ffi_llamenos_core_rustbuffer_free(buf, status)
         }
     }
 
     @Suppress("TooGenericExceptionThrown")
     fun asByteBuffer() =
-        this.data?.getByteBuffer(0, this.len.toLong())?.also {
+        this.data?.getByteBuffer(0, this.len)?.also {
             it.order(ByteOrder.BIG_ENDIAN)
         }
-}
-
-/**
- * The equivalent of the `*mut RustBuffer` type.
- * Required for callbacks taking in an out pointer.
- *
- * Size is the sum of all values in the struct.
- *
- * @suppress
- */
-class RustBufferByReference : ByReference(16) {
-    /**
-     * Set the pointed-to `RustBuffer` to the given value.
-     */
-    fun setValue(value: RustBuffer.ByValue) {
-        // NOTE: The offsets are as they are in the C-like struct.
-        val pointer = getPointer()
-        pointer.setLong(0, value.capacity)
-        pointer.setLong(8, value.len)
-        pointer.setPointer(16, value.data)
-    }
-
-    /**
-     * Get a `RustBuffer.ByValue` from this reference.
-     */
-    fun getValue(): RustBuffer.ByValue {
-        val pointer = getPointer()
-        val value = RustBuffer.ByValue()
-        value.writeField("capacity", pointer.getLong(0))
-        value.writeField("len", pointer.getLong(8))
-        value.writeField("data", pointer.getLong(16))
-
-        return value
-    }
 }
 
 // This is a helper for safely passing byte references into the rust code.
@@ -315,8 +281,9 @@ internal inline fun<T> uniffiTraitInterfaceCall(
     try {
         writeReturn(makeCall())
     } catch(e: kotlin.Exception) {
+        val err = try { e.stackTraceToString() } catch(_: Throwable) { "" }
         callStatus.code = UNIFFI_CALL_UNEXPECTED_ERROR
-        callStatus.error_buf = FfiConverterString.lower(e.toString())
+        callStatus.error_buf = FfiConverterString.lower(err)
     }
 }
 
@@ -333,26 +300,39 @@ internal inline fun<T, reified E: Throwable> uniffiTraitInterfaceCallWithError(
             callStatus.code = UNIFFI_CALL_ERROR
             callStatus.error_buf = lowerError(e)
         } else {
+            val err = try { e.stackTraceToString() } catch(_: Throwable) { "" }
             callStatus.code = UNIFFI_CALL_UNEXPECTED_ERROR
-            callStatus.error_buf = FfiConverterString.lower(e.toString())
+            callStatus.error_buf = FfiConverterString.lower(err)
         }
     }
 }
+// Initial value and increment amount for handles. 
+// These ensure that Kotlin-generated handles always have the lowest bit set
+private const val UNIFFI_HANDLEMAP_INITIAL = 1.toLong()
+private const val UNIFFI_HANDLEMAP_DELTA = 2.toLong()
+
 // Map handles to objects
 //
 // This is used pass an opaque 64-bit handle representing a foreign object to the Rust code.
 internal class UniffiHandleMap<T: Any> {
     private val map = ConcurrentHashMap<Long, T>()
-    private val counter = java.util.concurrent.atomic.AtomicLong(0)
+    // Start 
+    private val counter = java.util.concurrent.atomic.AtomicLong(UNIFFI_HANDLEMAP_INITIAL)
 
     val size: Int
         get() = map.size
 
     // Insert a new object into the handle map and get a handle for it
     fun insert(obj: T): Long {
-        val handle = counter.getAndAdd(1)
+        val handle = counter.getAndAdd(UNIFFI_HANDLEMAP_DELTA)
         map.put(handle, obj)
         return handle
+    }
+
+    // Clone a handle, creating a new one
+    fun clone(handle: Long): Long {
+        val obj = map.get(handle) ?: throw InternalException("UniffiHandleMap.clone: Invalid handle")
+        return insert(obj)
     }
 
     // Get an object from the handle map
@@ -377,673 +357,755 @@ private fun findLibraryName(componentName: String): String {
     return "llamenos_core"
 }
 
-private inline fun <reified Lib : Library> loadIndirect(
-    componentName: String
-): Lib {
-    return Native.load<Lib>(findLibraryName(componentName), Lib::class.java)
-}
-
 // Define FFI callback types
 internal interface UniffiRustFutureContinuationCallback : com.sun.jna.Callback {
     fun callback(`data`: Long,`pollResult`: Byte,)
 }
-internal interface UniffiForeignFutureFree : com.sun.jna.Callback {
+internal interface UniffiForeignFutureDroppedCallback : com.sun.jna.Callback {
     fun callback(`handle`: Long,)
 }
 internal interface UniffiCallbackInterfaceFree : com.sun.jna.Callback {
     fun callback(`handle`: Long,)
 }
+internal interface UniffiCallbackInterfaceClone : com.sun.jna.Callback {
+    fun callback(`handle`: Long,)
+    : Long
+}
 @Structure.FieldOrder("handle", "free")
-internal open class UniffiForeignFuture(
+internal open class UniffiForeignFutureDroppedCallbackStruct(
     @JvmField internal var `handle`: Long = 0.toLong(),
-    @JvmField internal var `free`: UniffiForeignFutureFree? = null,
+    @JvmField internal var `free`: UniffiForeignFutureDroppedCallback? = null,
 ) : Structure() {
     class UniffiByValue(
         `handle`: Long = 0.toLong(),
-        `free`: UniffiForeignFutureFree? = null,
-    ): UniffiForeignFuture(`handle`,`free`,), Structure.ByValue
+        `free`: UniffiForeignFutureDroppedCallback? = null,
+    ): UniffiForeignFutureDroppedCallbackStruct(`handle`,`free`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFuture) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureDroppedCallbackStruct) {
         `handle` = other.`handle`
         `free` = other.`free`
     }
 
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU8(
+internal open class UniffiForeignFutureResultU8(
     @JvmField internal var `returnValue`: Byte = 0.toByte(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Byte = 0.toByte(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU8(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU8(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU8) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU8 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU8.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU8.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI8(
+internal open class UniffiForeignFutureResultI8(
     @JvmField internal var `returnValue`: Byte = 0.toByte(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Byte = 0.toByte(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI8(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI8(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI8) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI8) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI8 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI8.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI8.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU16(
+internal open class UniffiForeignFutureResultU16(
     @JvmField internal var `returnValue`: Short = 0.toShort(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Short = 0.toShort(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU16(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU16(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU16) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU16 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU16.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU16.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI16(
+internal open class UniffiForeignFutureResultI16(
     @JvmField internal var `returnValue`: Short = 0.toShort(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Short = 0.toShort(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI16(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI16(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI16) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI16) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI16 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI16.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI16.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU32(
+internal open class UniffiForeignFutureResultU32(
     @JvmField internal var `returnValue`: Int = 0,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Int = 0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU32(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU32.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU32.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI32(
+internal open class UniffiForeignFutureResultI32(
     @JvmField internal var `returnValue`: Int = 0,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Int = 0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI32(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI32.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI32.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructU64(
+internal open class UniffiForeignFutureResultU64(
     @JvmField internal var `returnValue`: Long = 0.toLong(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Long = 0.toLong(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructU64(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultU64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructU64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultU64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteU64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructU64.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultU64.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructI64(
+internal open class UniffiForeignFutureResultI64(
     @JvmField internal var `returnValue`: Long = 0.toLong(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Long = 0.toLong(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructI64(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultI64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructI64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultI64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteI64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructI64.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultI64.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructF32(
+internal open class UniffiForeignFutureResultF32(
     @JvmField internal var `returnValue`: Float = 0.0f,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Float = 0.0f,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructF32(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultF32(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructF32) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultF32) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteF32 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructF32.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultF32.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructF64(
+internal open class UniffiForeignFutureResultF64(
     @JvmField internal var `returnValue`: Double = 0.0,
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: Double = 0.0,
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructF64(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultF64(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructF64) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultF64) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteF64 : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructF64.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultF64.UniffiByValue,)
 }
 @Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructPointer(
-    @JvmField internal var `returnValue`: Pointer = Pointer.NULL,
-    @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-) : Structure() {
-    class UniffiByValue(
-        `returnValue`: Pointer = Pointer.NULL,
-        `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructPointer(`returnValue`,`callStatus`,), Structure.ByValue
-
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructPointer) {
-        `returnValue` = other.`returnValue`
-        `callStatus` = other.`callStatus`
-    }
-
-}
-internal interface UniffiForeignFutureCompletePointer : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructPointer.UniffiByValue,)
-}
-@Structure.FieldOrder("returnValue", "callStatus")
-internal open class UniffiForeignFutureStructRustBuffer(
+internal open class UniffiForeignFutureResultRustBuffer(
     @JvmField internal var `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `returnValue`: RustBuffer.ByValue = RustBuffer.ByValue(),
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructRustBuffer(`returnValue`,`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultRustBuffer(`returnValue`,`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructRustBuffer) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultRustBuffer) {
         `returnValue` = other.`returnValue`
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteRustBuffer : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructRustBuffer.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultRustBuffer.UniffiByValue,)
 }
 @Structure.FieldOrder("callStatus")
-internal open class UniffiForeignFutureStructVoid(
+internal open class UniffiForeignFutureResultVoid(
     @JvmField internal var `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
 ) : Structure() {
     class UniffiByValue(
         `callStatus`: UniffiRustCallStatus.ByValue = UniffiRustCallStatus.ByValue(),
-    ): UniffiForeignFutureStructVoid(`callStatus`,), Structure.ByValue
+    ): UniffiForeignFutureResultVoid(`callStatus`,), Structure.ByValue
 
-   internal fun uniffiSetValue(other: UniffiForeignFutureStructVoid) {
+   internal fun uniffiSetValue(other: UniffiForeignFutureResultVoid) {
         `callStatus` = other.`callStatus`
     }
 
 }
 internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
-    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureStructVoid.UniffiByValue,)
+    fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultVoid.UniffiByValue,)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
-internal interface UniffiLib : Library {
-    companion object {
-        internal val INSTANCE: UniffiLib by lazy {
-            loadIndirect<UniffiLib>(componentName = "llamenos_core")
-            .also { lib: UniffiLib ->
-                uniffiCheckContractApiVersion(lib)
-                uniffiCheckApiChecksums(lib)
-                }
-        }
+// For large crates we prevent `MethodTooLargeException` (see #2340)
+// N.B. the name of the extension is very misleading, since it is
+// rather `InterfaceTooLargeException`, caused by too many methods
+// in the interface for large crates.
+//
+// By splitting the otherwise huge interface into two parts
+// * UniffiLib (this)
+// * IntegrityCheckingUniffiLib
+// And all checksum methods are put into `IntegrityCheckingUniffiLib`
+// we allow for ~2x as many methods in the UniffiLib interface.
+//
+// Note: above all written when we used JNA's `loadIndirect` etc.
+// We now use JNA's "direct mapping" - unclear if same considerations apply exactly.
+internal object IntegrityCheckingUniffiLib {
+    init {
+        Native.register(IntegrityCheckingUniffiLib::class.java, findLibraryName(componentName = "llamenos_core"))
+        uniffiCheckContractApiVersion(this)
+        uniffiCheckApiChecksums(this)
+    }
+    external fun uniffi_llamenos_core_checksum_func_decrypt_draft(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_decrypt_note(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_decrypt_with_pin(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_encrypt_draft(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_encrypt_with_pin(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_is_valid_pin(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_compute_sas_code(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_compute_shared_x_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_decrypt_message_for_reader(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_decrypt_server_event_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_decrypt_with_shared_key_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_ecies_decrypt_content_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_ecies_encrypt_content_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_ecies_unwrap_key_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_ecies_wrap_key_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_encrypt_message_for_readers(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_encrypt_note_for_recipients(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_random_bytes_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_create_auth_token(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_ed25519_verify(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_generate_and_load(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_get_device_state(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_open(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_open_key(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_seal(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_seal_key(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_is_unlocked(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_is_valid_pin(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_lock(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_create(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_derive_state(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_rotate(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_unwrap_seed(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sigchain_create_link(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sigchain_verify(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sigchain_verify_link(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sign(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_symmetric_decrypt(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_symmetric_encrypt(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_unlock(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_generate_keypair_mobile(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_get_public_key(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_is_valid_nsec(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_keypair_from_nsec_mobile(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_keypair_from_secret_key_hex_mobile(
+    ): Short
+    external fun ffi_llamenos_core_uniffi_contract_version(
+    ): Int
+
+        
+}
+
+internal object UniffiLib {
+    
+
+    init {
+        Native.register(UniffiLib::class.java, findLibraryName(componentName = "llamenos_core"))
         
     }
+    external fun uniffi_llamenos_core_fn_func_decrypt_draft(`packedHex`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_decrypt_note(`encryptedContent`: RustBuffer.ByValue,`envelope`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_decrypt_with_pin(`data`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_encrypt_draft(`plaintext`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_encrypt_with_pin(`nsec`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_is_valid_pin(`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_compute_sas_code(`sharedXHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_compute_shared_x_hex(`ourSecretHex`: RustBuffer.ByValue,`theirPubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_decrypt_call_record_for_reader(`encryptedContent`: RustBuffer.ByValue,`adminEnvelopes`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`readerPubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_decrypt_message_for_reader(`encryptedContent`: RustBuffer.ByValue,`readerEnvelopes`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`readerPubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_decrypt_server_event_hex(`encryptedHex`: RustBuffer.ByValue,`keyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_decrypt_with_shared_key_hex(`ciphertextHex`: RustBuffer.ByValue,`sharedXHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_ecies_decrypt_content_hex(`packedHex`: RustBuffer.ByValue,`ephemeralPubkeyHex`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_ecies_encrypt_content_hex(`plaintext`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_ecies_unwrap_key_hex(`envelope`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_ecies_wrap_key_hex(`keyHex`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_encrypt_message_for_readers(`plaintext`: RustBuffer.ByValue,`readerPubkeys`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_encrypt_note_for_recipients(`payloadJson`: RustBuffer.ByValue,`authorPubkey`: RustBuffer.ByValue,`adminPubkeys`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_random_bytes_hex(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_create_auth_token(`timestamp`: Long,`method`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_ed25519_verify(`messageHex`: RustBuffer.ByValue,`signatureHex`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_generate_and_load(`deviceId`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_get_device_state(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_open(`envelope`: RustBuffer.ByValue,`expectedLabel`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_open_key(`envelope`: RustBuffer.ByValue,`expectedLabel`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_seal(`plaintextHex`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_seal_key(`keyHex`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_is_unlocked(uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_is_valid_pin(`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_lock(uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+external fun uniffi_llamenos_core_fn_func_mobile_puk_create(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_puk_derive_state(`seedHex`: RustBuffer.ByValue,`generation`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_puk_rotate(`oldSeedHex`: RustBuffer.ByValue,`oldGen`: Int,`remainingDevicesJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_puk_unwrap_seed(`envelope`: RustBuffer.ByValue,`expectedLabel`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_random_bytes_hex(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_sigchain_create_link(`id`: RustBuffer.ByValue,`seq`: Long,`prevHash`: RustBuffer.ByValue,`timestamp`: RustBuffer.ByValue,`payloadJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_sigchain_verify(`linksJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_sigchain_verify_link(`linkJson`: RustBuffer.ByValue,`expectedSignerPubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_sign(`messageHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_symmetric_decrypt(`ciphertextHex`: RustBuffer.ByValue,`keyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_symmetric_encrypt(`plaintextHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_unlock(`data`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_generate_keypair_mobile(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_get_public_key(`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_is_valid_nsec(`nsec`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_keypair_from_nsec_mobile(`nsec`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_keypair_from_secret_key_hex_mobile(`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_llamenos_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_llamenos_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_llamenos_core_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+external fun ffi_llamenos_core_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_llamenos_core_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_u8(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_u8(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun ffi_llamenos_core_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_i8(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_i8(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun ffi_llamenos_core_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_u16(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_u16(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Short
+external fun ffi_llamenos_core_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_i16(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_i16(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Short
+external fun ffi_llamenos_core_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_u32(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_u32(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+external fun ffi_llamenos_core_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_i32(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_i32(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Int
+external fun ffi_llamenos_core_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_u64(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_u64(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun ffi_llamenos_core_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_i64(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_i64(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Long
+external fun ffi_llamenos_core_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_f32(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_f32(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Float
+external fun ffi_llamenos_core_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_f64(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_f64(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Double
+external fun ffi_llamenos_core_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_rust_buffer(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_rust_buffer(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun ffi_llamenos_core_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_cancel_void(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_free_void(`handle`: Long,
+): Unit
+external fun ffi_llamenos_core_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+): Unit
 
-    fun uniffi_llamenos_core_fn_func_create_auth_token(`secretKeyHex`: RustBuffer.ByValue,`timestamp`: Long,`method`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_decrypt_call_record_for_reader(`encryptedContent`: RustBuffer.ByValue,`adminEnvelopes`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`readerPubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_decrypt_draft(`packedHex`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_decrypt_message_for_reader(`encryptedContent`: RustBuffer.ByValue,`readerEnvelopes`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`readerPubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_decrypt_note(`encryptedContent`: RustBuffer.ByValue,`envelope`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_decrypt_with_pin(`data`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_derive_kek_hex(`pin`: RustBuffer.ByValue,`saltHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_ecies_unwrap_key_hex(`envelope`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_ecies_wrap_key_hex(`keyHex`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_encrypt_draft(`plaintext`: RustBuffer.ByValue,`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_encrypt_message_for_readers(`plaintext`: RustBuffer.ByValue,`readerPubkeys`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_encrypt_note_for_recipients(`payloadJson`: RustBuffer.ByValue,`authorPubkey`: RustBuffer.ByValue,`adminPubkeys`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_encrypt_with_pin(`nsec`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_generate_keypair(uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_get_public_key(`secretKeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_is_valid_nsec(`nsec`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun uniffi_llamenos_core_fn_func_is_valid_pin(`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun uniffi_llamenos_core_fn_func_keypair_from_nsec(`nsec`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_random_bytes_hex(uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun uniffi_llamenos_core_fn_func_verify_auth_token(`token`: RustBuffer.ByValue,`method`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun uniffi_llamenos_core_fn_func_verify_schnorr(`messageHex`: RustBuffer.ByValue,`signatureHex`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_llamenos_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_llamenos_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_llamenos_core_rustbuffer_free(`buf`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun ffi_llamenos_core_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_llamenos_core_rust_future_poll_u8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_u8(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_u8(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_u8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_llamenos_core_rust_future_poll_i8(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_i8(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_i8(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_i8(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    fun ffi_llamenos_core_rust_future_poll_u16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_u16(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_u16(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_u16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Short
-    fun ffi_llamenos_core_rust_future_poll_i16(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_i16(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_i16(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_i16(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Short
-    fun ffi_llamenos_core_rust_future_poll_u32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_u32(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_u32(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_u32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Int
-    fun ffi_llamenos_core_rust_future_poll_i32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_i32(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_i32(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_i32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Int
-    fun ffi_llamenos_core_rust_future_poll_u64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_u64(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_u64(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_u64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    fun ffi_llamenos_core_rust_future_poll_i64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_i64(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_i64(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_i64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Long
-    fun ffi_llamenos_core_rust_future_poll_f32(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_f32(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_f32(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_f32(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Float
-    fun ffi_llamenos_core_rust_future_poll_f64(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_f64(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_f64(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_f64(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Double
-    fun ffi_llamenos_core_rust_future_poll_pointer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_pointer(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_pointer(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_pointer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Pointer
-    fun ffi_llamenos_core_rust_future_poll_rust_buffer(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_rust_buffer(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_rust_buffer(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_rust_buffer(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    fun ffi_llamenos_core_rust_future_poll_void(`handle`: Long,`callback`: UniffiRustFutureContinuationCallback,`callbackData`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_cancel_void(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_free_void(`handle`: Long,
-    ): Unit
-    fun ffi_llamenos_core_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    fun uniffi_llamenos_core_checksum_func_create_auth_token(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_decrypt_draft(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_decrypt_message_for_reader(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_decrypt_note(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_decrypt_with_pin(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_derive_kek_hex(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_ecies_unwrap_key_hex(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_ecies_wrap_key_hex(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_encrypt_draft(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_encrypt_message_for_readers(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_encrypt_note_for_recipients(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_encrypt_with_pin(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_generate_keypair(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_get_public_key(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_is_valid_nsec(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_is_valid_pin(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_keypair_from_nsec(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_random_bytes_hex(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_verify_auth_token(
-    ): Short
-    fun uniffi_llamenos_core_checksum_func_verify_schnorr(
-    ): Short
-    fun ffi_llamenos_core_uniffi_contract_version(
-    ): Int
     
 }
 
-private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
+private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
     // Get the bindings contract version from our ComponentInterface
-    val bindings_contract_version = 26
+    val bindings_contract_version = 30
     // Get the scaffolding contract version by calling the into the dylib
     val scaffolding_contract_version = lib.ffi_llamenos_core_uniffi_contract_version()
     if (bindings_contract_version != scaffolding_contract_version) {
         throw RuntimeException("UniFFI contract version mismatch: try cleaning and rebuilding your project")
     }
 }
-
 @Suppress("UNUSED_PARAMETER")
-private fun uniffiCheckApiChecksums(lib: UniffiLib) {
-    if (lib.uniffi_llamenos_core_checksum_func_create_auth_token() != 62800.toShort()) {
+private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if (lib.uniffi_llamenos_core_checksum_func_decrypt_draft() != 63927.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader() != 10926.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_decrypt_note() != 57206.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_decrypt_draft() != 55174.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_decrypt_with_pin() != 5608.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_decrypt_message_for_reader() != 24819.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_encrypt_draft() != 38129.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_decrypt_note() != 17791.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_encrypt_with_pin() != 1946.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_decrypt_with_pin() != 5372.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_is_valid_pin() != 15961.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_derive_kek_hex() != 32027.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_compute_sas_code() != 38478.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_ecies_unwrap_key_hex() != 45205.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_compute_shared_x_hex() != 41736.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_ecies_wrap_key_hex() != 31485.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader() != 35207.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_encrypt_draft() != 50495.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_decrypt_message_for_reader() != 61088.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_encrypt_message_for_readers() != 63610.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_decrypt_server_event_hex() != 48073.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_encrypt_note_for_recipients() != 14883.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_decrypt_with_shared_key_hex() != 43855.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_encrypt_with_pin() != 63866.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_ecies_decrypt_content_hex() != 6987.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_generate_keypair() != 4768.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_ecies_encrypt_content_hex() != 22114.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_get_public_key() != 41631.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_ecies_unwrap_key_hex() != 61678.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_is_valid_nsec() != 41860.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_ecies_wrap_key_hex() != 31825.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_is_valid_pin() != 65518.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_encrypt_message_for_readers() != 19073.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_keypair_from_nsec() != 313.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_encrypt_note_for_recipients() != 20467.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_random_bytes_hex() != 19039.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_random_bytes_hex() != 29596.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_verify_auth_token() != 39412.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_create_auth_token() != 23090.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_llamenos_core_checksum_func_verify_schnorr() != 51139.toShort()) {
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_ed25519_verify() != 35261.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_generate_and_load() != 51176.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_get_device_state() != 13863.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_open() != 47930.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_open_key() != 8328.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_seal() != 41122.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_seal_key() != 45617.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_is_unlocked() != 56931.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_is_valid_pin() != 14552.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_lock() != 24331.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_create() != 309.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_derive_state() != 1813.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_rotate() != 2119.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_unwrap_seed() != 14373.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex() != 24092.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sigchain_create_link() != 21640.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sigchain_verify() != 45022.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sigchain_verify_link() != 64332.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sign() != 19728.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_symmetric_decrypt() != 47821.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_symmetric_encrypt() != 12406.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_unlock() != 24233.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_generate_keypair_mobile() != 18868.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_get_public_key() != 1574.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_is_valid_nsec() != 48244.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_keypair_from_nsec_mobile() != 36751.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_keypair_from_secret_key_hex_mobile() != 7531.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+}
+
+/**
+ * @suppress
+ */
+public fun uniffiEnsureInitialized() {
+    IntegrityCheckingUniffiLib
+    // UniffiLib() initialized as objects are used, but we still need to explicitly
+    // reference it so initialization across crates works as expected.
+    UniffiLib
 }
 
 // Async support
@@ -1063,8 +1125,33 @@ interface Disposable {
     fun destroy()
     companion object {
         fun destroy(vararg args: Any?) {
-            args.filterIsInstance<Disposable>()
-                .forEach(Disposable::destroy)
+            for (arg in args) {
+                when (arg) {
+                    is Disposable -> arg.destroy()
+                    is ArrayList<*> -> {
+                        for (idx in arg.indices) {
+                            val element = arg[idx]
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Map<*, *> -> {
+                        for (element in arg.values) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                    is Iterable<*> -> {
+                        for (element in arg) {
+                            if (element is Disposable) {
+                                element.destroy()
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1085,11 +1172,45 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
     }
 
 /** 
+ * Placeholder object used to signal that we're constructing an interface with a FFI handle.
+ *
+ * This is the first argument for interface constructors that input a raw handle. It exists is that
+ * so we can avoid signature conflicts when an interface has a regular constructor than inputs a
+ * Long.
+ *
+ * @suppress
+ * */
+object UniffiWithHandle
+
+/** 
  * Used to instantiate an interface without an actual pointer, for fakes in tests, mostly.
  *
  * @suppress
  * */
-object NoPointer
+object NoHandle
+
+/**
+ * @suppress
+ */
+public object FfiConverterUByte: FfiConverter<UByte, Byte> {
+    override fun lift(value: Byte): UByte {
+        return value.toUByte()
+    }
+
+    override fun read(buf: ByteBuffer): UByte {
+        return lift(buf.get())
+    }
+
+    override fun lower(value: UByte): Byte {
+        return value.toByte()
+    }
+
+    override fun allocationSize(value: UByte) = 1UL
+
+    override fun write(value: UByte, buf: ByteBuffer) {
+        buf.put(value.toByte())
+    }
+}
 
 /**
  * @suppress
@@ -1220,13 +1341,20 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 
 
 /**
- * A signed authentication token.
+ * A signed Ed25519 authentication token.
  */
 data class AuthToken (
-    val `pubkey`: kotlin.String, 
-    val `timestamp`: kotlin.ULong, 
+    val `pubkey`: kotlin.String
+    , 
+    val `timestamp`: kotlin.ULong
+    , 
     val `token`: kotlin.String
-) {
+    
+){
+    
+
+    
+
     
     companion object
 }
@@ -1259,30 +1387,206 @@ public object FfiConverterTypeAuthToken: FfiConverterRustBuffer<AuthToken> {
 
 
 /**
+ * Device key state exposed to callers (no secret material).
+ */
+data class DeviceKeyState (
+    /**
+     * Unique device identifier (UUID)
+     */
+    val `deviceId`: kotlin.String
+    , 
+    /**
+     * Ed25519 verifying (public) key, hex-encoded (32 bytes / 64 hex chars)
+     */
+    val `signingPubkeyHex`: kotlin.String
+    , 
+    /**
+     * X25519 public key, hex-encoded (32 bytes / 64 hex chars)
+     */
+    val `encryptionPubkeyHex`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDeviceKeyState: FfiConverterRustBuffer<DeviceKeyState> {
+    override fun read(buf: ByteBuffer): DeviceKeyState {
+        return DeviceKeyState(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DeviceKeyState) = (
+            FfiConverterString.allocationSize(value.`deviceId`) +
+            FfiConverterString.allocationSize(value.`signingPubkeyHex`) +
+            FfiConverterString.allocationSize(value.`encryptionPubkeyHex`)
+    )
+
+    override fun write(value: DeviceKeyState, buf: ByteBuffer) {
+            FfiConverterString.write(value.`deviceId`, buf)
+            FfiConverterString.write(value.`signingPubkeyHex`, buf)
+            FfiConverterString.write(value.`encryptionPubkeyHex`, buf)
+    }
+}
+
+
+
+/**
+ * HPKE envelope targeted at a specific device.
+ */
+data class DevicePukEnvelope (
+    val `deviceId`: kotlin.String
+    , 
+    val `envelope`: HpkeEnvelope
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDevicePukEnvelope: FfiConverterRustBuffer<DevicePukEnvelope> {
+    override fun read(buf: ByteBuffer): DevicePukEnvelope {
+        return DevicePukEnvelope(
+            FfiConverterString.read(buf),
+            FfiConverterTypeHpkeEnvelope.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DevicePukEnvelope) = (
+            FfiConverterString.allocationSize(value.`deviceId`) +
+            FfiConverterTypeHpkeEnvelope.allocationSize(value.`envelope`)
+    )
+
+    override fun write(value: DevicePukEnvelope, buf: ByteBuffer) {
+            FfiConverterString.write(value.`deviceId`, buf)
+            FfiConverterTypeHpkeEnvelope.write(value.`envelope`, buf)
+    }
+}
+
+
+
+/**
+ * Encrypted device key blob for PIN-protected storage.
+ */
+data class EncryptedDeviceKeys (
+    /**
+     * PBKDF2 salt, hex-encoded (32 bytes)
+     */
+    val `salt`: kotlin.String
+    , 
+    /**
+     * PBKDF2 iteration count
+     */
+    val `iterations`: kotlin.UInt
+    , 
+    /**
+     * AES-256-GCM nonce, hex-encoded (12 bytes)
+     */
+    val `nonce`: kotlin.String
+    , 
+    /**
+     * AES-256-GCM ciphertext of (signing_seed || encryption_seed), hex-encoded
+     */
+    val `ciphertext`: kotlin.String
+    , 
+    /**
+     * Device state (public info for identification)
+     */
+    val `state`: DeviceKeyState
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeEncryptedDeviceKeys: FfiConverterRustBuffer<EncryptedDeviceKeys> {
+    override fun read(buf: ByteBuffer): EncryptedDeviceKeys {
+        return EncryptedDeviceKeys(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeDeviceKeyState.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: EncryptedDeviceKeys) = (
+            FfiConverterString.allocationSize(value.`salt`) +
+            FfiConverterUInt.allocationSize(value.`iterations`) +
+            FfiConverterString.allocationSize(value.`nonce`) +
+            FfiConverterString.allocationSize(value.`ciphertext`) +
+            FfiConverterTypeDeviceKeyState.allocationSize(value.`state`)
+    )
+
+    override fun write(value: EncryptedDeviceKeys, buf: ByteBuffer) {
+            FfiConverterString.write(value.`salt`, buf)
+            FfiConverterUInt.write(value.`iterations`, buf)
+            FfiConverterString.write(value.`nonce`, buf)
+            FfiConverterString.write(value.`ciphertext`, buf)
+            FfiConverterTypeDeviceKeyState.write(value.`state`, buf)
+    }
+}
+
+
+
+/**
  * Encrypted key data stored on disk (Stronghold on desktop, Keychain on mobile).
  */
 data class EncryptedKeyData (
     /**
-     * hex, 16 bytes
+     * hex, 16 or 32 bytes (new encryptions use 32)
      */
-    val `salt`: kotlin.String, 
+    val `salt`: kotlin.String
+    , 
     /**
      * PBKDF2 iteration count (600,000)
      */
-    val `iterations`: kotlin.UInt, 
+    val `iterations`: kotlin.UInt
+    , 
     /**
      * hex, 24 bytes (XChaCha20 nonce)
      */
-    val `nonce`: kotlin.String, 
+    val `nonce`: kotlin.String
+    , 
     /**
      * hex, encrypted nsec bech32 string
      */
-    val `ciphertext`: kotlin.String, 
+    val `ciphertext`: kotlin.String
+    , 
     /**
      * Truncated SHA-256 hash of pubkey (not plaintext) for identification
      */
     val `pubkey`: kotlin.String
-) {
+    
+){
+    
+
+    
+
     
     companion object
 }
@@ -1327,12 +1631,18 @@ data class EncryptedMessage (
     /**
      * hex: nonce(24) + ciphertext
      */
-    val `encryptedContent`: kotlin.String, 
+    val `encryptedContent`: kotlin.String
+    , 
     /**
      * Message key wrapped for each reader (volunteer + admins)
      */
     val `readerEnvelopes`: List<RecipientKeyEnvelope>
-) {
+    
+){
+    
+
+    
+
     
     companion object
 }
@@ -1368,16 +1678,23 @@ data class EncryptedNote (
     /**
      * hex: nonce(24) + ciphertext
      */
-    val `encryptedContent`: kotlin.String, 
+    val `encryptedContent`: kotlin.String
+    , 
     /**
      * Note key wrapped for the author
      */
-    val `authorEnvelope`: KeyEnvelope, 
+    val `authorEnvelope`: KeyEnvelope
+    , 
     /**
      * Note key wrapped for each admin
      */
     val `adminEnvelopes`: List<RecipientKeyEnvelope>
-) {
+    
+){
+    
+
+    
+
     
     companion object
 }
@@ -1410,18 +1727,87 @@ public object FfiConverterTypeEncryptedNote: FfiConverterRustBuffer<EncryptedNot
 
 
 /**
+ * HPKE v3 envelope — the wire format for all encrypted fields.
+ */
+data class HpkeEnvelope (
+    /**
+     * Envelope version — must be 3
+     */
+    val `v`: kotlin.UByte
+    , 
+    /**
+     * Numeric label ID mapping to a CryptoLabel constant
+     */
+    val `labelId`: kotlin.UByte
+    , 
+    /**
+     * Base64url-encoded HPKE encapsulated key (32 bytes for X25519)
+     */
+    val `enc`: kotlin.String
+    , 
+    /**
+     * Base64url-encoded AEAD ciphertext
+     */
+    val `ct`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeHpkeEnvelope: FfiConverterRustBuffer<HpkeEnvelope> {
+    override fun read(buf: ByteBuffer): HpkeEnvelope {
+        return HpkeEnvelope(
+            FfiConverterUByte.read(buf),
+            FfiConverterUByte.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: HpkeEnvelope) = (
+            FfiConverterUByte.allocationSize(value.`v`) +
+            FfiConverterUByte.allocationSize(value.`labelId`) +
+            FfiConverterString.allocationSize(value.`enc`) +
+            FfiConverterString.allocationSize(value.`ct`)
+    )
+
+    override fun write(value: HpkeEnvelope, buf: ByteBuffer) {
+            FfiConverterUByte.write(value.`v`, buf)
+            FfiConverterUByte.write(value.`labelId`, buf)
+            FfiConverterString.write(value.`enc`, buf)
+            FfiConverterString.write(value.`ct`, buf)
+    }
+}
+
+
+
+/**
  * A symmetric key wrapped via ECIES for a single recipient.
  */
 data class KeyEnvelope (
     /**
      * hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
      */
-    val `wrappedKey`: kotlin.String, 
+    val `wrappedKey`: kotlin.String
+    , 
     /**
      * hex: compressed 33-byte ephemeral pubkey
      */
     val `ephemeralPubkey`: kotlin.String
-) {
+    
+){
+    
+
+    
+
     
     companion object
 }
@@ -1451,26 +1837,29 @@ public object FfiConverterTypeKeyEnvelope: FfiConverterRustBuffer<KeyEnvelope> {
 
 
 /**
- * A secp256k1 keypair with Nostr bech32 encodings.
+ * Result of an MLS commit operation.
  */
-data class KeyPair (
+data class MlsCommitResult (
     /**
-     * hex-encoded 32-byte secret key
+     * Serialized commit message, hex-encoded
      */
-    val `secretKeyHex`: kotlin.String, 
+    val `commitHex`: kotlin.String
+    , 
     /**
-     * hex-encoded 32-byte x-only public key
+     * Optional welcome message for new members, hex-encoded
      */
-    val `publicKey`: kotlin.String, 
+    val `welcomeHex`: kotlin.String?
+    , 
     /**
-     * bech32-encoded secret key (nsec1...)
+     * New epoch after commit
      */
-    val `nsec`: kotlin.String, 
-    /**
-     * bech32-encoded public key (npub1...)
-     */
-    val `npub`: kotlin.String
-) {
+    val `newEpoch`: kotlin.ULong
+    
+){
+    
+
+    
+
     
     companion object
 }
@@ -1478,28 +1867,224 @@ data class KeyPair (
 /**
  * @suppress
  */
-public object FfiConverterTypeKeyPair: FfiConverterRustBuffer<KeyPair> {
-    override fun read(buf: ByteBuffer): KeyPair {
-        return KeyPair(
+public object FfiConverterTypeMlsCommitResult: FfiConverterRustBuffer<MlsCommitResult> {
+    override fun read(buf: ByteBuffer): MlsCommitResult {
+        return MlsCommitResult(
             FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MlsCommitResult) = (
+            FfiConverterString.allocationSize(value.`commitHex`) +
+            FfiConverterOptionalString.allocationSize(value.`welcomeHex`) +
+            FfiConverterULong.allocationSize(value.`newEpoch`)
+    )
+
+    override fun write(value: MlsCommitResult, buf: ByteBuffer) {
+            FfiConverterString.write(value.`commitHex`, buf)
+            FfiConverterOptionalString.write(value.`welcomeHex`, buf)
+            FfiConverterULong.write(value.`newEpoch`, buf)
+    }
+}
+
+
+
+/**
+ * MLS group state (public info).
+ */
+data class MlsGroupState (
+    /**
+     * Group ID bytes, hex-encoded
+     */
+    val `groupIdHex`: kotlin.String
+    , 
+    /**
+     * Current epoch
+     */
+    val `epoch`: kotlin.ULong
+    , 
+    /**
+     * Number of members in the group
+     */
+    val `memberCount`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMlsGroupState: FfiConverterRustBuffer<MlsGroupState> {
+    override fun read(buf: ByteBuffer): MlsGroupState {
+        return MlsGroupState(
             FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MlsGroupState) = (
+            FfiConverterString.allocationSize(value.`groupIdHex`) +
+            FfiConverterULong.allocationSize(value.`epoch`) +
+            FfiConverterUInt.allocationSize(value.`memberCount`)
+    )
+
+    override fun write(value: MlsGroupState, buf: ByteBuffer) {
+            FfiConverterString.write(value.`groupIdHex`, buf)
+            FfiConverterULong.write(value.`epoch`, buf)
+            FfiConverterUInt.write(value.`memberCount`, buf)
+    }
+}
+
+
+
+/**
+ * Key package bundle for pre-publishing.
+ */
+data class MlsKeyPackageBundle (
+    /**
+     * Serialized key package bytes, hex-encoded
+     */
+    val `keyPackageHex`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMlsKeyPackageBundle: FfiConverterRustBuffer<MlsKeyPackageBundle> {
+    override fun read(buf: ByteBuffer): MlsKeyPackageBundle {
+        return MlsKeyPackageBundle(
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MlsKeyPackageBundle) = (
+            FfiConverterString.allocationSize(value.`keyPackageHex`)
+    )
+
+    override fun write(value: MlsKeyPackageBundle, buf: ByteBuffer) {
+            FfiConverterString.write(value.`keyPackageHex`, buf)
+    }
+}
+
+
+
+/**
+ * Mobile-safe keypair type — excludes secret key material.
+ *
+ * Returned by UniFFI-exported keygen functions. The secret key never crosses
+ * the FFI boundary; callers use the stateful loadKey/loadKeyFromNsec pattern.
+ */
+data class PublicKeyPair (
+    /**
+     * hex-encoded 32-byte x-only public key
+     */
+    val `publicKey`: kotlin.String
+    , 
+    /**
+     * bech32-encoded public key (npub1...)
+     */
+    val `npub`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePublicKeyPair: FfiConverterRustBuffer<PublicKeyPair> {
+    override fun read(buf: ByteBuffer): PublicKeyPair {
+        return PublicKeyPair(
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
         )
     }
 
-    override fun allocationSize(value: KeyPair) = (
-            FfiConverterString.allocationSize(value.`secretKeyHex`) +
+    override fun allocationSize(value: PublicKeyPair) = (
             FfiConverterString.allocationSize(value.`publicKey`) +
-            FfiConverterString.allocationSize(value.`nsec`) +
             FfiConverterString.allocationSize(value.`npub`)
     )
 
-    override fun write(value: KeyPair, buf: ByteBuffer) {
-            FfiConverterString.write(value.`secretKeyHex`, buf)
+    override fun write(value: PublicKeyPair, buf: ByteBuffer) {
             FfiConverterString.write(value.`publicKey`, buf)
-            FfiConverterString.write(value.`nsec`, buf)
             FfiConverterString.write(value.`npub`, buf)
+    }
+}
+
+
+
+/**
+ * PUK state (public info) — no secret material.
+ */
+data class PukState (
+    /**
+     * Monotonically incrementing generation (starts at 1)
+     */
+    val `generation`: kotlin.UInt
+    , 
+    /**
+     * Ed25519 verifying key derived from PUK sign subkey, hex-encoded
+     */
+    val `signPubkeyHex`: kotlin.String
+    , 
+    /**
+     * X25519 public key derived from PUK DH subkey, hex-encoded
+     */
+    val `dhPubkeyHex`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePukState: FfiConverterRustBuffer<PukState> {
+    override fun read(buf: ByteBuffer): PukState {
+        return PukState(
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PukState) = (
+            FfiConverterUInt.allocationSize(value.`generation`) +
+            FfiConverterString.allocationSize(value.`signPubkeyHex`) +
+            FfiConverterString.allocationSize(value.`dhPubkeyHex`)
+    )
+
+    override fun write(value: PukState, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`generation`, buf)
+            FfiConverterString.write(value.`signPubkeyHex`, buf)
+            FfiConverterString.write(value.`dhPubkeyHex`, buf)
     }
 }
 
@@ -1512,16 +2097,23 @@ data class RecipientKeyEnvelope (
     /**
      * recipient's x-only pubkey (hex, 32 bytes / 64 hex chars)
      */
-    val `pubkey`: kotlin.String, 
+    val `pubkey`: kotlin.String
+    , 
     /**
      * hex: nonce(24) + ciphertext(48)
      */
-    val `wrappedKey`: kotlin.String, 
+    val `wrappedKey`: kotlin.String
+    , 
     /**
      * hex: compressed 33-byte ephemeral pubkey
      */
     val `ephemeralPubkey`: kotlin.String
-) {
+    
+){
+    
+
+    
+
     
     companion object
 }
@@ -1548,6 +2140,227 @@ public object FfiConverterTypeRecipientKeyEnvelope: FfiConverterRustBuffer<Recip
             FfiConverterString.write(value.`pubkey`, buf)
             FfiConverterString.write(value.`wrappedKey`, buf)
             FfiConverterString.write(value.`ephemeralPubkey`, buf)
+    }
+}
+
+
+
+/**
+ * Result of PUK rotation: new state + envelopes for each device + CLKR chain link.
+ */
+data class RotatePukResult (
+    /**
+     * New PUK state after rotation
+     */
+    val `state`: PukState
+    , 
+    /**
+     * HPKE envelopes sealing the new seed to each device's X25519 pubkey
+     */
+    val `deviceEnvelopes`: List<DevicePukEnvelope>
+    , 
+    /**
+     * AES-GCM encrypted old seed under new secretbox key (CLKR chain link), hex-encoded
+     */
+    val `clkrChainLinkHex`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRotatePukResult: FfiConverterRustBuffer<RotatePukResult> {
+    override fun read(buf: ByteBuffer): RotatePukResult {
+        return RotatePukResult(
+            FfiConverterTypePukState.read(buf),
+            FfiConverterSequenceTypeDevicePukEnvelope.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RotatePukResult) = (
+            FfiConverterTypePukState.allocationSize(value.`state`) +
+            FfiConverterSequenceTypeDevicePukEnvelope.allocationSize(value.`deviceEnvelopes`) +
+            FfiConverterString.allocationSize(value.`clkrChainLinkHex`)
+    )
+
+    override fun write(value: RotatePukResult, buf: ByteBuffer) {
+            FfiConverterTypePukState.write(value.`state`, buf)
+            FfiConverterSequenceTypeDevicePukEnvelope.write(value.`deviceEnvelopes`, buf)
+            FfiConverterString.write(value.`clkrChainLinkHex`, buf)
+    }
+}
+
+
+
+/**
+ * A single entry in the sigchain.
+ */
+data class SigchainLink (
+    /**
+     * Unique ID (UUID)
+     */
+    val `id`: kotlin.String
+    , 
+    /**
+     * Monotonic sequence number (starts at 1)
+     */
+    val `seq`: kotlin.ULong
+    , 
+    /**
+     * SHA-256 of previous link (None for first entry)
+     */
+    val `prevHash`: kotlin.String?
+    , 
+    /**
+     * SHA-256 of canonical form of this entry
+     */
+    val `entryHash`: kotlin.String
+    , 
+    /**
+     * Device ID of the signer
+     */
+    val `signerDeviceId`: kotlin.String
+    , 
+    /**
+     * Ed25519 pubkey of the signing device, hex-encoded
+     */
+    val `signerPubkey`: kotlin.String
+    , 
+    /**
+     * Ed25519 signature over entry_hash, hex-encoded
+     */
+    val `signature`: kotlin.String
+    , 
+    /**
+     * ISO-8601 timestamp
+     */
+    val `timestamp`: kotlin.String
+    , 
+    /**
+     * JSON-encoded payload (type-tagged)
+     */
+    val `payloadJson`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSigchainLink: FfiConverterRustBuffer<SigchainLink> {
+    override fun read(buf: ByteBuffer): SigchainLink {
+        return SigchainLink(
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SigchainLink) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterULong.allocationSize(value.`seq`) +
+            FfiConverterOptionalString.allocationSize(value.`prevHash`) +
+            FfiConverterString.allocationSize(value.`entryHash`) +
+            FfiConverterString.allocationSize(value.`signerDeviceId`) +
+            FfiConverterString.allocationSize(value.`signerPubkey`) +
+            FfiConverterString.allocationSize(value.`signature`) +
+            FfiConverterString.allocationSize(value.`timestamp`) +
+            FfiConverterString.allocationSize(value.`payloadJson`)
+    )
+
+    override fun write(value: SigchainLink, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterULong.write(value.`seq`, buf)
+            FfiConverterOptionalString.write(value.`prevHash`, buf)
+            FfiConverterString.write(value.`entryHash`, buf)
+            FfiConverterString.write(value.`signerDeviceId`, buf)
+            FfiConverterString.write(value.`signerPubkey`, buf)
+            FfiConverterString.write(value.`signature`, buf)
+            FfiConverterString.write(value.`timestamp`, buf)
+            FfiConverterString.write(value.`payloadJson`, buf)
+    }
+}
+
+
+
+/**
+ * Result of verifying a complete sigchain.
+ */
+data class SigchainVerifiedState (
+    /**
+     * Number of verified links
+     */
+    val `verifiedCount`: kotlin.ULong
+    , 
+    /**
+     * Head sequence number
+     */
+    val `headSeq`: kotlin.ULong
+    , 
+    /**
+     * Head entry hash
+     */
+    val `headHash`: kotlin.String
+    , 
+    /**
+     * All device pubkeys currently in the verified set
+     */
+    val `activeDevicePubkeys`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSigchainVerifiedState: FfiConverterRustBuffer<SigchainVerifiedState> {
+    override fun read(buf: ByteBuffer): SigchainVerifiedState {
+        return SigchainVerifiedState(
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SigchainVerifiedState) = (
+            FfiConverterULong.allocationSize(value.`verifiedCount`) +
+            FfiConverterULong.allocationSize(value.`headSeq`) +
+            FfiConverterString.allocationSize(value.`headHash`) +
+            FfiConverterSequenceString.allocationSize(value.`activeDevicePubkeys`)
+    )
+
+    override fun write(value: SigchainVerifiedState, buf: ByteBuffer) {
+            FfiConverterULong.write(value.`verifiedCount`, buf)
+            FfiConverterULong.write(value.`headSeq`, buf)
+            FfiConverterString.write(value.`headHash`, buf)
+            FfiConverterSequenceString.write(value.`activeDevicePubkeys`, buf)
     }
 }
 
@@ -1589,6 +2402,10 @@ sealed class CryptoException(message: String): kotlin.Exception(message) {
         
         class InvalidPin(message: String) : CryptoException(message)
         
+        class InvalidInput(message: String) : CryptoException(message)
+        
+        class InvalidFormat(message: String) : CryptoException(message)
+        
 
     companion object ErrorHandler : UniffiRustCallStatusErrorHandler<CryptoException> {
         override fun lift(error_buf: RustBuffer.ByValue): CryptoException = FfiConverterTypeCryptoError.lift(error_buf)
@@ -1618,6 +2435,8 @@ public object FfiConverterTypeCryptoError : FfiConverterRustBuffer<CryptoExcepti
             14 -> CryptoException.JsonException(FfiConverterString.read(buf))
             15 -> CryptoException.WrongPin(FfiConverterString.read(buf))
             16 -> CryptoException.InvalidPin(FfiConverterString.read(buf))
+            17 -> CryptoException.InvalidInput(FfiConverterString.read(buf))
+            18 -> CryptoException.InvalidFormat(FfiConverterString.read(buf))
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
         
@@ -1693,9 +2512,49 @@ public object FfiConverterTypeCryptoError : FfiConverterRustBuffer<CryptoExcepti
                 buf.putInt(16)
                 Unit
             }
+            is CryptoException.InvalidInput -> {
+                buf.putInt(17)
+                Unit
+            }
+            is CryptoException.InvalidFormat -> {
+                buf.putInt(18)
+                Unit
+            }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?> {
+    override fun read(buf: ByteBuffer): kotlin.String? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterString.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.String?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterString.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.String?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterString.write(value, buf)
+        }
+    }
 }
 
 
@@ -1732,6 +2591,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeDevicePukEnvelope: FfiConverterRustBuffer<List<DevicePukEnvelope>> {
+    override fun read(buf: ByteBuffer): List<DevicePukEnvelope> {
+        val len = buf.getInt()
+        return List<DevicePukEnvelope>(len) {
+            FfiConverterTypeDevicePukEnvelope.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<DevicePukEnvelope>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeDevicePukEnvelope.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<DevicePukEnvelope>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeDevicePukEnvelope.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuffer<List<RecipientKeyEnvelope>> {
     override fun read(buf: ByteBuffer): List<RecipientKeyEnvelope> {
         val len = buf.getInt()
@@ -1754,55 +2641,14 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     }
 }
         /**
-         * Create a Schnorr auth token for API authentication.
-         *
-         * The message is bound to the specific request method + path to prevent
-         * cross-endpoint replay attacks.
-         */
-    @Throws(CryptoException::class) fun `createAuthToken`(`secretKeyHex`: kotlin.String, `timestamp`: kotlin.ULong, `method`: kotlin.String, `path`: kotlin.String): AuthToken {
-            return FfiConverterTypeAuthToken.lift(
-    uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_create_auth_token(
-        FfiConverterString.lower(`secretKeyHex`),FfiConverterULong.lower(`timestamp`),FfiConverterString.lower(`method`),FfiConverterString.lower(`path`),_status)
-}
-    )
-    }
-    
-
-        /**
-         * Decrypt a call record's encrypted metadata using the admin's envelope.
-         */
-    @Throws(CryptoException::class) fun `decryptCallRecordForReader`(`encryptedContent`: kotlin.String, `adminEnvelopes`: List<RecipientKeyEnvelope>, `secretKeyHex`: kotlin.String, `readerPubkey`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_decrypt_call_record_for_reader(
-        FfiConverterString.lower(`encryptedContent`),FfiConverterSequenceTypeRecipientKeyEnvelope.lower(`adminEnvelopes`),FfiConverterString.lower(`secretKeyHex`),FfiConverterString.lower(`readerPubkey`),_status)
-}
-    )
-    }
-    
-
-        /**
          * Decrypt a draft.
          */
     @Throws(CryptoException::class) fun `decryptDraft`(`packedHex`: kotlin.String, `secretKeyHex`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_decrypt_draft(
-        FfiConverterString.lower(`packedHex`),FfiConverterString.lower(`secretKeyHex`),_status)
-}
-    )
-    }
+    UniffiLib.uniffi_llamenos_core_fn_func_decrypt_draft(
     
-
-        /**
-         * Decrypt a message using the reader's envelope from the list.
-         */
-    @Throws(CryptoException::class) fun `decryptMessageForReader`(`encryptedContent`: kotlin.String, `readerEnvelopes`: List<RecipientKeyEnvelope>, `secretKeyHex`: kotlin.String, `readerPubkey`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_decrypt_message_for_reader(
-        FfiConverterString.lower(`encryptedContent`),FfiConverterSequenceTypeRecipientKeyEnvelope.lower(`readerEnvelopes`),FfiConverterString.lower(`secretKeyHex`),FfiConverterString.lower(`readerPubkey`),_status)
+        FfiConverterString.lower(`packedHex`),FfiConverterString.lower(`secretKeyHex`),_status)
 }
     )
     }
@@ -1814,7 +2660,8 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     @Throws(CryptoException::class) fun `decryptNote`(`encryptedContent`: kotlin.String, `envelope`: KeyEnvelope, `secretKeyHex`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_decrypt_note(
+    UniffiLib.uniffi_llamenos_core_fn_func_decrypt_note(
+    
         FfiConverterString.lower(`encryptedContent`),FfiConverterTypeKeyEnvelope.lower(`envelope`),FfiConverterString.lower(`secretKeyHex`),_status)
 }
     )
@@ -1827,7 +2674,8 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     @Throws(CryptoException::class) fun `decryptWithPin`(`data`: EncryptedKeyData, `pin`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_decrypt_with_pin(
+    UniffiLib.uniffi_llamenos_core_fn_func_decrypt_with_pin(
+    
         FfiConverterTypeEncryptedKeyData.lower(`data`),FfiConverterString.lower(`pin`),_status)
 }
     )
@@ -1835,15 +2683,185 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     
 
         /**
-         * Derive a 32-byte KEK from a PIN using PBKDF2-SHA256, returned as hex.
-         *
-         * `salt_hex` is a hex-encoded salt (typically 16 bytes / 32 hex chars).
+         * Encrypt a draft (local auto-save) with HKDF-derived key.
          */
-    @Throws(CryptoException::class) fun `deriveKekHex`(`pin`: kotlin.String, `saltHex`: kotlin.String): kotlin.String {
+    @Throws(CryptoException::class) fun `encryptDraft`(`plaintext`: kotlin.String, `secretKeyHex`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_derive_kek_hex(
-        FfiConverterString.lower(`pin`),FfiConverterString.lower(`saltHex`),_status)
+    UniffiLib.uniffi_llamenos_core_fn_func_encrypt_draft(
+    
+        FfiConverterString.lower(`plaintext`),FfiConverterString.lower(`secretKeyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Encrypt an nsec bech32 string with a PIN.
+         */
+    @Throws(CryptoException::class) fun `encryptWithPin`(`nsec`: kotlin.String, `pin`: kotlin.String, `pubkeyHex`: kotlin.String): EncryptedKeyData {
+            return FfiConverterTypeEncryptedKeyData.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_encrypt_with_pin(
+    
+        FfiConverterString.lower(`nsec`),FfiConverterString.lower(`pin`),FfiConverterString.lower(`pubkeyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Validate PIN format: 6-8 digits.
+         */ fun `isValidPin`(`pin`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_is_valid_pin(
+    
+        FfiConverterString.lower(`pin`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Derive a 6-digit SAS (Short Authentication String) code from an ECDH shared secret.
+         *
+         * `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
+         *
+         * Returns a "XXX XXX" formatted 6-digit code. Both devices compute this
+         * independently — matching codes prove no MITM is present.
+         *
+         * Uses the `hkdf` crate for proper HKDF (M25 — replaces manual HMAC HKDF).
+         */
+    @Throws(CryptoException::class) fun `computeSasCode`(`sharedXHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_compute_sas_code(
+    
+        FfiConverterString.lower(`sharedXHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Compute the ECDH shared x-coordinate for device provisioning.
+         *
+         * `our_secret_hex`: 64-char hex secret key
+         * `their_pubkey_hex`: 64-char hex x-only pubkey (or 66-char compressed)
+         *
+         * Returns the 32-byte shared x-coordinate as hex, which can be used
+         * for `decrypt_with_shared_key_hex` and `compute_sas_code`.
+         */
+    @Throws(CryptoException::class) fun `computeSharedXHex`(`ourSecretHex`: kotlin.String, `theirPubkeyHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_compute_shared_x_hex(
+    
+        FfiConverterString.lower(`ourSecretHex`),FfiConverterString.lower(`theirPubkeyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt a call record's encrypted metadata using the admin's envelope.
+         */
+    @Throws(CryptoException::class) fun `decryptCallRecordForReader`(`encryptedContent`: kotlin.String, `adminEnvelopes`: List<RecipientKeyEnvelope>, `secretKeyHex`: kotlin.String, `readerPubkey`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_decrypt_call_record_for_reader(
+    
+        FfiConverterString.lower(`encryptedContent`),FfiConverterSequenceTypeRecipientKeyEnvelope.lower(`adminEnvelopes`),FfiConverterString.lower(`secretKeyHex`),FfiConverterString.lower(`readerPubkey`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt a message using the reader's envelope from the list.
+         */
+    @Throws(CryptoException::class) fun `decryptMessageForReader`(`encryptedContent`: kotlin.String, `readerEnvelopes`: List<RecipientKeyEnvelope>, `secretKeyHex`: kotlin.String, `readerPubkey`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_decrypt_message_for_reader(
+    
+        FfiConverterString.lower(`encryptedContent`),FfiConverterSequenceTypeRecipientKeyEnvelope.lower(`readerEnvelopes`),FfiConverterString.lower(`secretKeyHex`),FfiConverterString.lower(`readerPubkey`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt a server-encrypted event payload (XChaCha20-Poly1305).
+         *
+         * Input: hex(nonce_24 + ciphertext), 32-byte key as hex.
+         * Output: decrypted UTF-8 string (JSON).
+         *
+         * Used by mobile platforms to decrypt Nostr relay events encrypted
+         * with the server event key (from GET /api/auth/me serverEventKeyHex).
+         */
+    @Throws(CryptoException::class) fun `decryptServerEventHex`(`encryptedHex`: kotlin.String, `keyHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_decrypt_server_event_hex(
+    
+        FfiConverterString.lower(`encryptedHex`),FfiConverterString.lower(`keyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt data that was encrypted with a provisioning shared key.
+         *
+         * `ciphertext_hex`: hex(nonce_24 + ciphertext) — XChaCha20-Poly1305
+         * `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
+         *
+         * Derives the symmetric key via HKDF (matches provisioning.rs — CRIT-C3 fix).
+         */
+    @Throws(CryptoException::class) fun `decryptWithSharedKeyHex`(`ciphertextHex`: kotlin.String, `sharedXHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_decrypt_with_shared_key_hex(
+    
+        FfiConverterString.lower(`ciphertextHex`),FfiConverterString.lower(`sharedXHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt an ECIES-encrypted payload (arbitrary length content).
+         *
+         * Supports both v2 (HKDF, version byte prefix) and v1 (legacy SHA-256) formats.
+         * `packed_hex`: hex(version_byte? + nonce_24 + ciphertext)
+         * `ephemeral_pubkey_hex`: compressed SEC1 (33 bytes / 66 hex chars)
+         * `secret_key_hex`: recipient's secret key
+         * `label`: domain separation label (e.g., LABEL_PUSH_WAKE)
+         */
+    @Throws(CryptoException::class) fun `eciesDecryptContentHex`(`packedHex`: kotlin.String, `ephemeralPubkeyHex`: kotlin.String, `secretKeyHex`: kotlin.String, `label`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_ecies_decrypt_content_hex(
+    
+        FfiConverterString.lower(`packedHex`),FfiConverterString.lower(`ephemeralPubkeyHex`),FfiConverterString.lower(`secretKeyHex`),FfiConverterString.lower(`label`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Encrypt arbitrary content via ECIES for a recipient.
+         *
+         * Returns `(packed_hex, ephemeral_pubkey_hex)`.
+         */
+    @Throws(CryptoException::class) fun `eciesEncryptContentHex`(`plaintext`: kotlin.String, `recipientPubkeyHex`: kotlin.String, `label`: kotlin.String): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_ecies_encrypt_content_hex(
+    
+        FfiConverterString.lower(`plaintext`),FfiConverterString.lower(`recipientPubkeyHex`),FfiConverterString.lower(`label`),_status)
 }
     )
     }
@@ -1855,7 +2873,8 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     @Throws(CryptoException::class) fun `eciesUnwrapKeyHex`(`envelope`: KeyEnvelope, `secretKeyHex`: kotlin.String, `label`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_ecies_unwrap_key_hex(
+    UniffiLib.uniffi_llamenos_core_fn_func_ecies_unwrap_key_hex(
+    
         FfiConverterTypeKeyEnvelope.lower(`envelope`),FfiConverterString.lower(`secretKeyHex`),FfiConverterString.lower(`label`),_status)
 }
     )
@@ -1870,21 +2889,9 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     @Throws(CryptoException::class) fun `eciesWrapKeyHex`(`keyHex`: kotlin.String, `recipientPubkeyHex`: kotlin.String, `label`: kotlin.String): KeyEnvelope {
             return FfiConverterTypeKeyEnvelope.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_ecies_wrap_key_hex(
-        FfiConverterString.lower(`keyHex`),FfiConverterString.lower(`recipientPubkeyHex`),FfiConverterString.lower(`label`),_status)
-}
-    )
-    }
+    UniffiLib.uniffi_llamenos_core_fn_func_ecies_wrap_key_hex(
     
-
-        /**
-         * Encrypt a draft (local auto-save) with HKDF-derived key.
-         */
-    @Throws(CryptoException::class) fun `encryptDraft`(`plaintext`: kotlin.String, `secretKeyHex`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_encrypt_draft(
-        FfiConverterString.lower(`plaintext`),FfiConverterString.lower(`secretKeyHex`),_status)
+        FfiConverterString.lower(`keyHex`),FfiConverterString.lower(`recipientPubkeyHex`),FfiConverterString.lower(`label`),_status)
 }
     )
     }
@@ -1896,7 +2903,8 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     @Throws(CryptoException::class) fun `encryptMessageForReaders`(`plaintext`: kotlin.String, `readerPubkeys`: List<kotlin.String>): EncryptedMessage {
             return FfiConverterTypeEncryptedMessage.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_encrypt_message_for_readers(
+    UniffiLib.uniffi_llamenos_core_fn_func_encrypt_message_for_readers(
+    
         FfiConverterString.lower(`plaintext`),FfiConverterSequenceString.lower(`readerPubkeys`),_status)
 }
     )
@@ -1909,7 +2917,8 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     @Throws(CryptoException::class) fun `encryptNoteForRecipients`(`payloadJson`: kotlin.String, `authorPubkey`: kotlin.String, `adminPubkeys`: List<kotlin.String>): EncryptedNote {
             return FfiConverterTypeEncryptedNote.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_encrypt_note_for_recipients(
+    UniffiLib.uniffi_llamenos_core_fn_func_encrypt_note_for_recipients(
+    
         FfiConverterString.lower(`payloadJson`),FfiConverterString.lower(`authorPubkey`),FfiConverterSequenceString.lower(`adminPubkeys`),_status)
 }
     )
@@ -1917,24 +2926,346 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     
 
         /**
-         * Encrypt an nsec bech32 string with a PIN.
-         */
-    @Throws(CryptoException::class) fun `encryptWithPin`(`nsec`: kotlin.String, `pin`: kotlin.String, `pubkeyHex`: kotlin.String): EncryptedKeyData {
-            return FfiConverterTypeEncryptedKeyData.lift(
-    uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_encrypt_with_pin(
-        FfiConverterString.lower(`nsec`),FfiConverterString.lower(`pin`),FfiConverterString.lower(`pubkeyHex`),_status)
+         * Generate 32 random bytes, returned as a hex string.
+         */ fun `randomBytesHex`(): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_random_bytes_hex(
+    
+        _status)
 }
     )
     }
     
 
         /**
-         * Generate a new random secp256k1 keypair.
-         */ fun `generateKeypair`(): KeyPair {
-            return FfiConverterTypeKeyPair.lift(
+         * Create an Ed25519 auth token using the device signing key in mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileCreateAuthToken`(`timestamp`: kotlin.ULong, `method`: kotlin.String, `path`: kotlin.String): AuthToken {
+            return FfiConverterTypeAuthToken.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_create_auth_token(
+    
+        FfiConverterULong.lower(`timestamp`),FfiConverterString.lower(`method`),FfiConverterString.lower(`path`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Verify an Ed25519 signature (stateless — no secrets needed).
+         */
+    @Throws(CryptoException::class) fun `mobileEd25519Verify`(`messageHex`: kotlin.String, `signatureHex`: kotlin.String, `pubkeyHex`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_ed25519_verify(
+    
+        FfiConverterString.lower(`messageHex`),FfiConverterString.lower(`signatureHex`),FfiConverterString.lower(`pubkeyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Generate a new device keypair, encrypt with PIN, load into mobile state.
+         * Returns the EncryptedDeviceKeys blob for persistent storage.
+         */
+    @Throws(CryptoException::class) fun `mobileGenerateAndLoad`(`deviceId`: kotlin.String, `pin`: kotlin.String): EncryptedDeviceKeys {
+            return FfiConverterTypeEncryptedDeviceKeys.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_generate_and_load(
+    
+        FfiConverterString.lower(`deviceId`),FfiConverterString.lower(`pin`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Get the device public keys from mobile state (no secrets exposed).
+         */
+    @Throws(CryptoException::class) fun `mobileGetDeviceState`(): DeviceKeyState {
+            return FfiConverterTypeDeviceKeyState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_get_device_state(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE open: decrypt an envelope using the device's X25519 key from mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeOpen`(`envelope`: HpkeEnvelope, `expectedLabel`: kotlin.String, `aadHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_open(
+    
+        FfiConverterTypeHpkeEnvelope.lower(`envelope`),FfiConverterString.lower(`expectedLabel`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE open a 32-byte key from an envelope using mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeOpenKey`(`envelope`: HpkeEnvelope, `expectedLabel`: kotlin.String, `aadHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_open_key(
+    
+        FfiConverterTypeHpkeEnvelope.lower(`envelope`),FfiConverterString.lower(`expectedLabel`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE seal: encrypt plaintext for a recipient's X25519 pubkey (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeSeal`(`plaintextHex`: kotlin.String, `recipientPubkeyHex`: kotlin.String, `label`: kotlin.String, `aadHex`: kotlin.String): HpkeEnvelope {
+            return FfiConverterTypeHpkeEnvelope.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_seal(
+    
+        FfiConverterString.lower(`plaintextHex`),FfiConverterString.lower(`recipientPubkeyHex`),FfiConverterString.lower(`label`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE seal a 32-byte key for a recipient (stateless convenience wrapper).
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeSealKey`(`keyHex`: kotlin.String, `recipientPubkeyHex`: kotlin.String, `label`: kotlin.String, `aadHex`: kotlin.String): HpkeEnvelope {
+            return FfiConverterTypeHpkeEnvelope.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_seal_key(
+    
+        FfiConverterString.lower(`keyHex`),FfiConverterString.lower(`recipientPubkeyHex`),FfiConverterString.lower(`label`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Check if the mobile crypto state is unlocked.
+         */ fun `mobileIsUnlocked`(): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
     uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_generate_keypair(
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_is_unlocked(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * Validate PIN format: 6-8 digits.
+         */ fun `mobileIsValidPin`(`pin`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_is_valid_pin(
+    
+        FfiConverterString.lower(`pin`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Lock the mobile crypto state — zeroize device secrets.
+         */ fun `mobileLock`()
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_lock(
+    
+        _status)
+}
+    
+    
+
+        /**
+         * Create the initial PUK (generation 1), wrapped to the device's X25519 pubkey.
+         * Returns JSON: { pukState, seedHex, envelope }
+         */
+    @Throws(CryptoException::class) fun `mobilePukCreate`(): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_create(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * Derive PUK subkeys for a given seed + generation (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobilePukDeriveState`(`seedHex`: kotlin.String, `generation`: kotlin.UInt): PukState {
+            return FfiConverterTypePukState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_derive_state(
+    
+        FfiConverterString.lower(`seedHex`),FfiConverterUInt.lower(`generation`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Rotate the PUK to a new generation (stateless — takes seed directly).
+         */
+    @Throws(CryptoException::class) fun `mobilePukRotate`(`oldSeedHex`: kotlin.String, `oldGen`: kotlin.UInt, `remainingDevicesJson`: kotlin.String): RotatePukResult {
+            return FfiConverterTypeRotatePukResult.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_rotate(
+    
+        FfiConverterString.lower(`oldSeedHex`),FfiConverterUInt.lower(`oldGen`),FfiConverterString.lower(`remainingDevicesJson`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Unwrap a PUK seed from an HPKE envelope using the device's X25519 key.
+         */
+    @Throws(CryptoException::class) fun `mobilePukUnwrapSeed`(`envelope`: HpkeEnvelope, `expectedLabel`: kotlin.String, `aadHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_unwrap_seed(
+    
+        FfiConverterTypeHpkeEnvelope.lower(`envelope`),FfiConverterString.lower(`expectedLabel`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Generate 32 random bytes as hex (for nonces, IDs, etc.).
+         */ fun `mobileRandomBytesHex`(): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_random_bytes_hex(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * Create a new sigchain link using the device's Ed25519 key from mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileSigchainCreateLink`(`id`: kotlin.String, `seq`: kotlin.ULong, `prevHash`: kotlin.String?, `timestamp`: kotlin.String, `payloadJson`: kotlin.String): SigchainLink {
+            return FfiConverterTypeSigchainLink.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sigchain_create_link(
+    
+        FfiConverterString.lower(`id`),FfiConverterULong.lower(`seq`),FfiConverterOptionalString.lower(`prevHash`),FfiConverterString.lower(`timestamp`),FfiConverterString.lower(`payloadJson`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Verify a complete sigchain (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobileSigchainVerify`(`linksJson`: kotlin.String): SigchainVerifiedState {
+            return FfiConverterTypeSigchainVerifiedState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sigchain_verify(
+    
+        FfiConverterString.lower(`linksJson`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Verify a single sigchain link (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobileSigchainVerifyLink`(`linkJson`: kotlin.String, `expectedSignerPubkey`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sigchain_verify_link(
+    
+        FfiConverterString.lower(`linkJson`),FfiConverterString.lower(`expectedSignerPubkey`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Sign a message (hex-encoded) using the device's Ed25519 key.
+         */
+    @Throws(CryptoException::class) fun `mobileSign`(`messageHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sign(
+    
+        FfiConverterString.lower(`messageHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt AES-256-GCM ciphertext. Input: hex(nonce_12 || ciphertext || tag_16), key_hex.
+         */
+    @Throws(CryptoException::class) fun `mobileSymmetricDecrypt`(`ciphertextHex`: kotlin.String, `keyHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_symmetric_decrypt(
+    
+        FfiConverterString.lower(`ciphertextHex`),FfiConverterString.lower(`keyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Encrypt plaintext with a random AES-256-GCM key.
+         * Returns (ciphertext_hex, key_hex) where ciphertext = hex(nonce_12 || ciphertext || tag_16).
+         */
+    @Throws(CryptoException::class) fun `mobileSymmetricEncrypt`(`plaintextHex`: kotlin.String): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_symmetric_encrypt(
+    
+        FfiConverterString.lower(`plaintextHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Unlock device keys from PIN-encrypted storage, load into mobile state.
+         * Returns the DeviceKeyState (public keys only — secrets stay in Rust).
+         */
+    @Throws(CryptoException::class) fun `mobileUnlock`(`data`: EncryptedDeviceKeys, `pin`: kotlin.String): DeviceKeyState {
+            return FfiConverterTypeDeviceKeyState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_unlock(
+    
+        FfiConverterTypeEncryptedDeviceKeys.lower(`data`),FfiConverterString.lower(`pin`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Mobile FFI exports — return PublicKeyPair only (no secret material crosses the FFI boundary).
+         */ fun `generateKeypairMobile`(): PublicKeyPair {
+            return FfiConverterTypePublicKeyPair.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_generate_keypair_mobile(
+    
         _status)
 }
     )
@@ -1947,7 +3278,8 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     @Throws(CryptoException::class) fun `getPublicKey`(`secretKeyHex`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_get_public_key(
+    UniffiLib.uniffi_llamenos_core_fn_func_get_public_key(
+    
         FfiConverterString.lower(`secretKeyHex`),_status)
 }
     )
@@ -1959,73 +3291,31 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
          */ fun `isValidNsec`(`nsec`: kotlin.String): kotlin.Boolean {
             return FfiConverterBoolean.lift(
     uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_is_valid_nsec(
+    UniffiLib.uniffi_llamenos_core_fn_func_is_valid_nsec(
+    
         FfiConverterString.lower(`nsec`),_status)
 }
     )
     }
     
 
-        /**
-         * Validate PIN format: 6-8 digits.
-         */ fun `isValidPin`(`pin`: kotlin.String): kotlin.Boolean {
-            return FfiConverterBoolean.lift(
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_is_valid_pin(
-        FfiConverterString.lower(`pin`),_status)
-}
-    )
-    }
-    
-
-        /**
-         * Derive a keypair from an nsec bech32 string.
-         */
-    @Throws(CryptoException::class) fun `keypairFromNsec`(`nsec`: kotlin.String): KeyPair {
-            return FfiConverterTypeKeyPair.lift(
+    @Throws(CryptoException::class) fun `keypairFromNsecMobile`(`nsec`: kotlin.String): PublicKeyPair {
+            return FfiConverterTypePublicKeyPair.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_keypair_from_nsec(
+    UniffiLib.uniffi_llamenos_core_fn_func_keypair_from_nsec_mobile(
+    
         FfiConverterString.lower(`nsec`),_status)
 }
     )
     }
     
 
-        /**
-         * Generate 32 random bytes, returned as a hex string.
-         */ fun `randomBytesHex`(): kotlin.String {
-            return FfiConverterString.lift(
-    uniffiRustCall() { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_random_bytes_hex(
-        _status)
-}
-    )
-    }
-    
-
-        /**
-         * Verify a Schnorr auth token.
-         *
-         * Returns true if the signature is valid for the given method + path.
-         */
-    @Throws(CryptoException::class) fun `verifyAuthToken`(`token`: AuthToken, `method`: kotlin.String, `path`: kotlin.String): kotlin.Boolean {
-            return FfiConverterBoolean.lift(
+    @Throws(CryptoException::class) fun `keypairFromSecretKeyHexMobile`(`secretKeyHex`: kotlin.String): PublicKeyPair {
+            return FfiConverterTypePublicKeyPair.lift(
     uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_verify_auth_token(
-        FfiConverterTypeAuthToken.lower(`token`),FfiConverterString.lower(`method`),FfiConverterString.lower(`path`),_status)
-}
-    )
-    }
+    UniffiLib.uniffi_llamenos_core_fn_func_keypair_from_secret_key_hex_mobile(
     
-
-        /**
-         * Verify a raw Schnorr signature over a message hash.
-         */
-    @Throws(CryptoException::class) fun `verifySchnorr`(`messageHex`: kotlin.String, `signatureHex`: kotlin.String, `pubkeyHex`: kotlin.String): kotlin.Boolean {
-            return FfiConverterBoolean.lift(
-    uniffiRustCallWithError(CryptoException) { _status ->
-    UniffiLib.INSTANCE.uniffi_llamenos_core_fn_func_verify_schnorr(
-        FfiConverterString.lower(`messageHex`),FfiConverterString.lower(`signatureHex`),FfiConverterString.lower(`pubkeyHex`),_status)
+        FfiConverterString.lower(`secretKeyHex`),_status)
 }
     )
     }

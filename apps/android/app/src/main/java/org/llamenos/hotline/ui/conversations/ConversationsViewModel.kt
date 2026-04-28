@@ -276,7 +276,7 @@ class ConversationsViewModel @Inject constructor(
 
                 val envelopes = encrypted.envelopes.map { env ->
                     CreateMessageEnvelope(
-                        pubkey = env.recipientPubkey,
+                        pubkey = env.pubkey,
                         wrappedKey = env.wrappedKey,
                         ephemeralPubkey = env.ephemeralPubkey,
                     )

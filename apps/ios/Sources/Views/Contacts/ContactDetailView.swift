@@ -73,7 +73,7 @@ struct ContactDetailView: View {
                     HStack {
                         Image(systemName: "clock.fill")
                             .foregroundStyle(Color.brandPrimary)
-                        Text(NSLocalizedString("contactDirectory_view_timeline", comment: "View Full Timeline"))
+                        Text(NSLocalizedString("contact_directory_view_timeline", comment: "View Full Timeline"))
                             .font(.brand(.body))
                             .fontWeight(.medium)
                         Spacer()
@@ -128,7 +128,7 @@ struct ContactDetailView: View {
                     HStack(spacing: 12) {
                         if let firstDate = DateFormatting.parseISO(contact.firstSeen) {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(NSLocalizedString("contactDirectory_first_seen", comment: "First seen"))
+                                Text(NSLocalizedString("contact_directory_first_seen", comment: "First seen"))
                                     .font(.brand(.caption2))
                                     .foregroundStyle(.tertiary)
                                 Text(firstDate.formatted(date: .abbreviated, time: .omitted))
@@ -139,7 +139,7 @@ struct ContactDetailView: View {
 
                         if let lastDate = DateFormatting.parseISO(contact.lastSeen) {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(NSLocalizedString("contactDirectory_last_seen", comment: "Last seen"))
+                                Text(NSLocalizedString("contact_directory_last_seen", comment: "Last seen"))
                                     .font(.brand(.caption2))
                                     .foregroundStyle(.tertiary)
                                 Text(lastDate.formatted(date: .abbreviated, time: .omitted))
@@ -160,7 +160,7 @@ struct ContactDetailView: View {
     @ViewBuilder
     private func identifiersSection(identifiers: [ContactIdentifier]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("contactDirectory_identifiers", comment: "Identifiers"))
+            Text(NSLocalizedString("contact_directory_identifiers", comment: "Identifiers"))
                 .font(.brand(.headline))
                 .foregroundStyle(Color.brandForeground)
 
@@ -194,7 +194,7 @@ struct ContactDetailView: View {
     @ViewBuilder
     private func interactionSummary(contact: ContactDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("contactDirectory_interactions", comment: "Interactions"))
+            Text(NSLocalizedString("contact_directory_interactions", comment: "Interactions"))
                 .font(.brand(.headline))
                 .foregroundStyle(Color.brandForeground)
 
@@ -202,25 +202,25 @@ struct ContactDetailView: View {
                 interactionStatCard(
                     icon: "phone.fill",
                     count: contact.callCount,
-                    label: NSLocalizedString("contactDirectory_calls", comment: "Calls"),
+                    label: NSLocalizedString("contact_directory_calls", comment: "Calls"),
                     color: Color.brandPrimary
                 )
                 interactionStatCard(
                     icon: "message.fill",
                     count: contact.conversationCount,
-                    label: NSLocalizedString("contactDirectory_messages", comment: "Messages"),
+                    label: NSLocalizedString("contact_directory_messages", comment: "Messages"),
                     color: .statusActive
                 )
                 interactionStatCard(
                     icon: "doc.text.fill",
                     count: contact.noteCount,
-                    label: NSLocalizedString("contactDirectory_notes", comment: "Notes"),
+                    label: NSLocalizedString("contact_directory_notes", comment: "Notes"),
                     color: Color.brandDarkTeal
                 )
                 interactionStatCard(
                     icon: "exclamationmark.triangle.fill",
                     count: contact.reportCount,
-                    label: NSLocalizedString("contactDirectory_reports", comment: "Reports"),
+                    label: NSLocalizedString("contact_directory_reports", comment: "Reports"),
                     color: Color.brandAccent
                 )
             }
@@ -254,7 +254,7 @@ struct ContactDetailView: View {
     @ViewBuilder
     private func linkedCasesSection(cases: [ContactLinkedCase]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("contactDirectory_linked_cases", comment: "Linked Cases"))
+            Text(NSLocalizedString("contact_directory_linked_cases", comment: "Linked Cases"))
                 .font(.brand(.headline))
                 .foregroundStyle(Color.brandForeground)
 
@@ -309,7 +309,7 @@ struct ContactDetailView: View {
     @ViewBuilder
     private func relationshipsSection(relationships: [AppContactRelationship]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(NSLocalizedString("contactDirectory_relationships", comment: "Relationships"))
+            Text(NSLocalizedString("contact_directory_relationships", comment: "Relationships"))
                 .font(.brand(.headline))
                 .foregroundStyle(Color.brandForeground)
 
@@ -358,7 +358,7 @@ struct ContactDetailView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
-            Text(NSLocalizedString("contactDirectory_loading", comment: "Loading contact..."))
+            Text(NSLocalizedString("contact_directory_loading", comment: "Loading contact..."))
                 .font(.brand(.subheadline))
                 .foregroundStyle(.secondary)
         }
@@ -372,7 +372,7 @@ struct ContactDetailView: View {
     private func errorState(_ error: String, vm: ContactDetailViewModel) -> some View {
         ContentUnavailableView {
             Label(
-                NSLocalizedString("contactDirectory_error", comment: "Unable to Load"),
+                NSLocalizedString("contact_directory_error", comment: "Unable to Load"),
                 systemImage: "exclamationmark.triangle"
             )
         } description: {

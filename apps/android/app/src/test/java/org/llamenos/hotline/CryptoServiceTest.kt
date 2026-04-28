@@ -3,12 +3,12 @@ package org.llamenos.hotline
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.llamenos.hotline.crypto.CryptoService
+import org.llamenos.hotline.crypto.HpkeEnvelope
 
 /**
  * Unit tests for [CryptoService].
@@ -40,35 +40,31 @@ class CryptoServiceTest {
     fun `initially not unlocked`() {
         assertFalse(cryptoService.isUnlocked)
         assertNull(cryptoService.pubkey)
-        assertNull(cryptoService.npub)
+        assertNull(cryptoService.signingPubkeyHex)
+        assertNull(cryptoService.encryptionPubkeyHex)
     }
 
     // ---- C6: Hard-fail without native library ----
 
     @Test(expected = IllegalStateException::class)
-    fun `generateKeypair throws without native lib`() {
-        cryptoService.generateKeypair()
+    fun `generateDeviceKeys throws without native lib`(): Unit = runBlocking {
+        cryptoService.generateDeviceKeys("device-id", "1234")
     }
 
     @Test(expected = IllegalStateException::class)
-    fun `importNsec throws without native lib`() {
-        cryptoService.importNsec("nsec1" + "a".repeat(58))
-    }
-
-    @Test(expected = IllegalStateException::class)
-    fun `encryptForStorage throws without native lib`(): Unit = runBlocking {
-        cryptoService.encryptForStorage("1234")
-    }
-
-    @Test(expected = IllegalStateException::class)
-    fun `decryptFromStorage throws without native lib`(): Unit = runBlocking {
-        val data = org.llamenos.hotline.crypto.EncryptedKeyData(
-            ciphertext = "test",
+    fun `unlockWithPin throws without native lib`(): Unit = runBlocking {
+        val data = org.llamenos.hotline.crypto.EncryptedDeviceKeys(
             salt = "test",
+            iterations = 600_000u,
             nonce = "test",
-            pubkeyHex = "test",
+            ciphertext = "test",
+            state = org.llamenos.hotline.crypto.DeviceKeyState(
+                deviceId = "test",
+                signingPubkeyHex = "a".repeat(64),
+                encryptionPubkeyHex = "b".repeat(64),
+            ),
         )
-        cryptoService.decryptFromStorage(data, "1234")
+        cryptoService.unlockWithPin(data, "1234")
     }
 
     @Test(expected = IllegalStateException::class)
@@ -88,11 +84,7 @@ class CryptoServiceTest {
 
     @Test(expected = IllegalStateException::class)
     fun `decryptNote throws without native lib`(): Unit = runBlocking {
-        val envelope = org.llamenos.protocol.RecipientEnvelope(
-            pubkey = "test",
-            wrappedKey = "test",
-            ephemeralPubkey = "test",
-        )
+        val envelope = HpkeEnvelope(v = 3, labelId = 0, enc = "test", ct = "test")
         cryptoService.decryptNote("test", envelope)
     }
 
@@ -103,7 +95,8 @@ class CryptoServiceTest {
 
     @Test(expected = IllegalStateException::class)
     fun `decryptMessage throws without native lib`(): Unit = runBlocking {
-        cryptoService.decryptMessage("test", "wrappedKey", "ephemeralPubkey")
+        val envelope = HpkeEnvelope(v = 3, labelId = 0, enc = "test", ct = "test")
+        cryptoService.decryptMessage("test", envelope)
     }
 
     @Test(expected = IllegalStateException::class)
@@ -139,15 +132,5 @@ class CryptoServiceTest {
         cryptoService.lock()
         cryptoService.lock()
         assertFalse(cryptoService.isUnlocked)
-    }
-
-    @Test
-    fun `importNsec rejects invalid prefix before native check`() {
-        try {
-            cryptoService.importNsec("invalid_key_format")
-            assertTrue("Should have thrown", false)
-        } catch (e: org.llamenos.hotline.crypto.CryptoException) {
-            assertTrue(e.message!!.contains("nsec1"))
-        }
     }
 }

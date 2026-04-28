@@ -48,10 +48,9 @@ class AuthInterceptorTest {
         // Even if we set test key state, nativeLibLoaded is false in JVM tests,
         // so createAuthTokenSync will throw IllegalStateException
         cryptoService.setTestKeyState(
-            secretHex = "a".repeat(64),
-            secretBech32 = "nsec1" + "a".repeat(58),
-            publicKey = "b".repeat(64),
-            nostrPub = "npub1" + "b".repeat(58),
+            signing = "a".repeat(64),
+            encryption = "b".repeat(64),
+            device = "test-device-id",
         )
 
         val chain = FakeChain()

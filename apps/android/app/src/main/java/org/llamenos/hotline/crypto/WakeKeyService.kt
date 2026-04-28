@@ -71,10 +71,11 @@ class WakeKeyService @Inject constructor(
         if (existing != null) return existing
 
         if (nativeLibLoaded) {
-            val kp = org.llamenos.core.generateKeypair()
-            keystoreService.store(KEY_WAKE_SECRET, kp.secretKeyHex)
-            keystoreService.store(KEY_WAKE_PUBKEY, kp.publicKey)
-            return kp.publicKey
+            val secretKeyHex = org.llamenos.core.mobileRandomBytesHex()
+            val publicKeyHex = org.llamenos.core.getPublicKey(secretKeyHex)
+            keystoreService.store(KEY_WAKE_SECRET, secretKeyHex)
+            keystoreService.store(KEY_WAKE_PUBKEY, publicKeyHex)
+            return publicKeyHex
         }
 
         // Placeholder: generate random keypair bytes

@@ -69,11 +69,11 @@ struct ContactsView: View {
             } label: {
                 if vm.selectedContactType == nil {
                     Label(
-                        NSLocalizedString("contactDirectory_filter_all", comment: "All Types"),
+                        NSLocalizedString("contact_directory_filter_all", comment: "All Types"),
                         systemImage: "checkmark"
                     )
                 } else {
-                    Text(NSLocalizedString("contactDirectory_filter_all", comment: "All Types"))
+                    Text(NSLocalizedString("contact_directory_filter_all", comment: "All Types"))
                 }
             }
 

@@ -6,17 +6,6 @@ import org.junit.Test
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.crypto.PinLockoutState
 
-/**
- * Unit tests for [KeystoreService].
- *
- * Note: EncryptedSharedPreferences requires the Android Keystore which is only
- * available on real devices/emulators. These unit tests verify the service's
- * logical behavior by testing companion object constants, the service interface
- * contract, and PIN lockout state machine logic.
- *
- * For full integration tests of EncryptedSharedPreferences and lockout persistence,
- * see the instrumented tests in androidTest/.
- */
 class KeystoreServiceTest {
 
     @Test
@@ -24,8 +13,8 @@ class KeystoreServiceTest {
         assertEquals("encrypted-keys", KeystoreService.KEY_ENCRYPTED_KEYS)
         assertEquals("hub-url", KeystoreService.KEY_HUB_URL)
         assertEquals("device-id", KeystoreService.KEY_DEVICE_ID)
-        assertEquals("pubkey", KeystoreService.KEY_PUBKEY)
-        assertEquals("npub", KeystoreService.KEY_NPUB)
+        assertEquals("signing-pubkey", KeystoreService.KEY_SIGNING_PUBKEY)
+        assertEquals("encryption-pubkey", KeystoreService.KEY_ENCRYPTION_PUBKEY)
         assertEquals("biometric-enabled", KeystoreService.KEY_BIOMETRIC_ENABLED)
     }
 
@@ -46,8 +35,8 @@ class KeystoreServiceTest {
             KeystoreService.KEY_ENCRYPTED_KEYS,
             KeystoreService.KEY_HUB_URL,
             KeystoreService.KEY_DEVICE_ID,
-            KeystoreService.KEY_PUBKEY,
-            KeystoreService.KEY_NPUB,
+            KeystoreService.KEY_SIGNING_PUBKEY,
+            KeystoreService.KEY_ENCRYPTION_PUBKEY,
             KeystoreService.KEY_BIOMETRIC_ENABLED,
             KeystoreService.KEY_FAILED_ATTEMPTS,
             KeystoreService.KEY_LOCKOUT_UNTIL,
@@ -66,8 +55,8 @@ class KeystoreServiceTest {
             KeystoreService.KEY_ENCRYPTED_KEYS,
             KeystoreService.KEY_HUB_URL,
             KeystoreService.KEY_DEVICE_ID,
-            KeystoreService.KEY_PUBKEY,
-            KeystoreService.KEY_NPUB,
+            KeystoreService.KEY_SIGNING_PUBKEY,
+            KeystoreService.KEY_ENCRYPTION_PUBKEY,
             KeystoreService.KEY_BIOMETRIC_ENABLED,
             KeystoreService.KEY_FAILED_ATTEMPTS,
             KeystoreService.KEY_LOCKOUT_UNTIL,
@@ -79,8 +68,6 @@ class KeystoreServiceTest {
             )
         }
     }
-
-    // ---- PIN Lockout State Machine ----
 
     @Test
     fun `PinLockoutState Unlocked contains attempts remaining`() {
@@ -103,12 +90,6 @@ class KeystoreServiceTest {
 
     @Test
     fun `lockout escalation schedule is correct`() {
-        // Verify the expected lockout durations per attempt count
-        // Attempts 1-4: no lockout (0ms)
-        // Attempts 5-6: 30s lockout
-        // Attempts 7-8: 2min lockout
-        // Attempt 9: 10min lockout
-        // Attempt 10+: wipe
         val expectedLockoutMs = mapOf(
             1 to 0L,
             2 to 0L,
@@ -127,7 +108,7 @@ class KeystoreServiceTest {
                 in 5..6 -> 30_000L
                 in 7..8 -> 120_000L
                 9 -> 600_000L
-                else -> -1L // wipe
+                else -> -1L
             }
             assertEquals(
                 "Attempt $attempts should have ${expectedMs}ms lockout",
@@ -136,7 +117,6 @@ class KeystoreServiceTest {
             )
         }
 
-        // Attempt 10+ should trigger wipe (represented as -1)
         val wipeAttempts = listOf(10, 11, 20, 100)
         for (attempts in wipeAttempts) {
             val lockoutMs = when (attempts) {
@@ -144,7 +124,7 @@ class KeystoreServiceTest {
                 in 5..6 -> 30_000L
                 in 7..8 -> 120_000L
                 9 -> 600_000L
-                else -> -1L // wipe
+                else -> -1L
             }
             assertEquals(
                 "Attempt $attempts should trigger wipe (-1)",

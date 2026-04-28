@@ -1410,9 +1410,16 @@
 "hubs_access_denied" = "Access denied";
 "hubs_create_hub" = "Create Hub";
 "hubs_create_hub_description" = "Create a new hub to organize your hotline operations.";
+"hubs_delete_hub" = "Delete Hub";
+"hubs_delete_hub_confirm_label" = "Type the hub name to confirm deletion";
+"hubs_delete_hub_confirm_placeholder" = "Hub name";
+"hubs_delete_hub_description" = "Permanently delete this hub and all of its data. This cannot be undone.";
+"hubs_delete_hub_name_mismatch" = "Hub name does not match";
+"hubs_delete_hub_warning" = "This will permanently delete all calls, notes, cases, contacts, shifts, and user accounts associated with this hub.";
 "hubs_edit_hub" = "Edit Hub";
 "hubs_edit_hub_description" = "Update the hub name, description, or phone number.";
 "hubs_hub_created" = "Hub created successfully";
+"hubs_hub_deleted" = "Hub deleted permanently";
 "hubs_hub_description" = "Description";
 "hubs_hub_description_placeholder" = "Brief description of this hub's purpose...";
 "hubs_hub_name" = "Hub Name";
