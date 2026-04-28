@@ -219,8 +219,7 @@ class WebSocketService @Inject constructor(
      */
     private fun decryptEvent(encryptedContent: String): AttributedHubEvent<LlamenosEvent>? {
         // Try each cached hub key — first successful decryption identifies the hub.
-        for ((hubId, keyBytes) in cryptoService.allHubKeys()) {
-            val keyHex = keyBytes.joinToString("") { "%02x".format(it) }
+        for ((hubId, keyHex) in cryptoService.allHubKeys()) {
             val plaintext = cryptoService.decryptServerEvent(encryptedContent, keyHex) ?: continue
             val event = parseTypedEvent(plaintext) ?: continue
             return AttributedHubEvent(hubId = hubId, event = event)

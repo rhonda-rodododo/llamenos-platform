@@ -163,7 +163,7 @@ impl WasmCryptoState {
     ) -> Result<JsValue, JsError> {
         let sk_hex = sk_hex_from(&self.secret_key)?;
         let now = js_sys::Date::now() as u64;
-        let token = auth::create_auth_token(&sk_hex, now, method, path).map_err(to_js_err)?;
+        let token = auth::create_auth_token_from_signing_key(&sk_hex, now, method, path).map_err(to_js_err)?;
         serde_wasm_bindgen::to_value(&token).map_err(to_js_err)
     }
 
@@ -553,7 +553,7 @@ pub fn verify_schnorr(
     sig_hex: &str,
     pubkey_hex: &str,
 ) -> Result<bool, JsError> {
-    auth::verify_schnorr(msg_hash_hex, sig_hex, pubkey_hex).map_err(to_js_err)
+    crate::auth_legacy::verify_schnorr(msg_hash_hex, sig_hex, pubkey_hex).map_err(to_js_err)
 }
 
 /// Wrap a 32-byte symmetric key for a recipient using ECIES.
@@ -585,7 +585,7 @@ pub fn create_auth_token_stateless(
     path: &str,
 ) -> Result<JsValue, JsError> {
     let now = js_sys::Date::now() as u64;
-    let token = auth::create_auth_token(sk_hex, now, method, path).map_err(to_js_err)?;
+    let token = auth::create_auth_token_from_signing_key(sk_hex, now, method, path).map_err(to_js_err)?;
     serde_wasm_bindgen::to_value(&token).map_err(to_js_err)
 }
 
