@@ -673,6 +673,52 @@ internal object IntegrityCheckingUniffiLib {
     ): Short
     external fun uniffi_llamenos_core_checksum_func_random_bytes_hex(
     ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_create_auth_token(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_ed25519_verify(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_generate_and_load(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_get_device_state(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_open(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_open_key(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_seal(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_hpke_seal_key(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_is_unlocked(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_is_valid_pin(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_lock(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_create(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_derive_state(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_rotate(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_puk_unwrap_seed(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sigchain_create_link(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sigchain_verify(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sigchain_verify_link(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_sign(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_symmetric_decrypt(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_symmetric_encrypt(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_unlock(
+    ): Short
     external fun uniffi_llamenos_core_checksum_func_generate_keypair_mobile(
     ): Short
     external fun uniffi_llamenos_core_checksum_func_get_public_key(
@@ -733,6 +779,52 @@ external fun uniffi_llamenos_core_fn_func_encrypt_message_for_readers(`plaintext
 external fun uniffi_llamenos_core_fn_func_encrypt_note_for_recipients(`payloadJson`: RustBuffer.ByValue,`authorPubkey`: RustBuffer.ByValue,`adminPubkeys`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_random_bytes_hex(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_create_auth_token(`timestamp`: Long,`method`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_ed25519_verify(`messageHex`: RustBuffer.ByValue,`signatureHex`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_generate_and_load(`deviceId`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_get_device_state(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_open(`envelope`: RustBuffer.ByValue,`expectedLabel`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_open_key(`envelope`: RustBuffer.ByValue,`expectedLabel`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_seal(`plaintextHex`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_hpke_seal_key(`keyHex`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_is_unlocked(uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_is_valid_pin(`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_lock(uniffi_out_err: UniffiRustCallStatus, 
+): Unit
+external fun uniffi_llamenos_core_fn_func_mobile_puk_create(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_puk_derive_state(`seedHex`: RustBuffer.ByValue,`generation`: Int,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_puk_rotate(`oldSeedHex`: RustBuffer.ByValue,`oldGen`: Int,`remainingDevicesJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_puk_unwrap_seed(`envelope`: RustBuffer.ByValue,`expectedLabel`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_random_bytes_hex(uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_sigchain_create_link(`id`: RustBuffer.ByValue,`seq`: Long,`prevHash`: RustBuffer.ByValue,`timestamp`: RustBuffer.ByValue,`payloadJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_sigchain_verify(`linksJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_sigchain_verify_link(`linkJson`: RustBuffer.ByValue,`expectedSignerPubkey`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_sign(`messageHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_symmetric_decrypt(`ciphertextHex`: RustBuffer.ByValue,`keyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_symmetric_encrypt(`plaintextHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_unlock(`data`: RustBuffer.ByValue,`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_generate_keypair_mobile(uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -918,6 +1010,75 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_llamenos_core_checksum_func_random_bytes_hex() != 29596.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_create_auth_token() != 23090.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_ed25519_verify() != 35261.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_generate_and_load() != 51176.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_get_device_state() != 13863.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_open() != 47930.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_open_key() != 8328.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_seal() != 41122.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_hpke_seal_key() != 45617.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_is_unlocked() != 56931.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_is_valid_pin() != 14552.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_lock() != 24331.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_create() != 309.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_derive_state() != 1813.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_rotate() != 2119.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_puk_unwrap_seed() != 14373.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex() != 24092.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sigchain_create_link() != 21640.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sigchain_verify() != 45022.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sigchain_verify_link() != 64332.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_sign() != 19728.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_symmetric_decrypt() != 47821.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_symmetric_encrypt() != 12406.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_unlock() != 24233.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_llamenos_core_checksum_func_generate_keypair_mobile() != 18868.toShort()) {
@@ -2772,6 +2933,327 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     UniffiLib.uniffi_llamenos_core_fn_func_random_bytes_hex(
     
         _status)
+}
+    )
+    }
+    
+
+        /**
+         * Create an Ed25519 auth token using the device signing key in mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileCreateAuthToken`(`timestamp`: kotlin.ULong, `method`: kotlin.String, `path`: kotlin.String): AuthToken {
+            return FfiConverterTypeAuthToken.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_create_auth_token(
+    
+        FfiConverterULong.lower(`timestamp`),FfiConverterString.lower(`method`),FfiConverterString.lower(`path`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Verify an Ed25519 signature (stateless — no secrets needed).
+         */
+    @Throws(CryptoException::class) fun `mobileEd25519Verify`(`messageHex`: kotlin.String, `signatureHex`: kotlin.String, `pubkeyHex`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_ed25519_verify(
+    
+        FfiConverterString.lower(`messageHex`),FfiConverterString.lower(`signatureHex`),FfiConverterString.lower(`pubkeyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Generate a new device keypair, encrypt with PIN, load into mobile state.
+         * Returns the EncryptedDeviceKeys blob for persistent storage.
+         */
+    @Throws(CryptoException::class) fun `mobileGenerateAndLoad`(`deviceId`: kotlin.String, `pin`: kotlin.String): EncryptedDeviceKeys {
+            return FfiConverterTypeEncryptedDeviceKeys.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_generate_and_load(
+    
+        FfiConverterString.lower(`deviceId`),FfiConverterString.lower(`pin`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Get the device public keys from mobile state (no secrets exposed).
+         */
+    @Throws(CryptoException::class) fun `mobileGetDeviceState`(): DeviceKeyState {
+            return FfiConverterTypeDeviceKeyState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_get_device_state(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE open: decrypt an envelope using the device's X25519 key from mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeOpen`(`envelope`: HpkeEnvelope, `expectedLabel`: kotlin.String, `aadHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_open(
+    
+        FfiConverterTypeHpkeEnvelope.lower(`envelope`),FfiConverterString.lower(`expectedLabel`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE open a 32-byte key from an envelope using mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeOpenKey`(`envelope`: HpkeEnvelope, `expectedLabel`: kotlin.String, `aadHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_open_key(
+    
+        FfiConverterTypeHpkeEnvelope.lower(`envelope`),FfiConverterString.lower(`expectedLabel`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE seal: encrypt plaintext for a recipient's X25519 pubkey (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeSeal`(`plaintextHex`: kotlin.String, `recipientPubkeyHex`: kotlin.String, `label`: kotlin.String, `aadHex`: kotlin.String): HpkeEnvelope {
+            return FfiConverterTypeHpkeEnvelope.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_seal(
+    
+        FfiConverterString.lower(`plaintextHex`),FfiConverterString.lower(`recipientPubkeyHex`),FfiConverterString.lower(`label`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * HPKE seal a 32-byte key for a recipient (stateless convenience wrapper).
+         */
+    @Throws(CryptoException::class) fun `mobileHpkeSealKey`(`keyHex`: kotlin.String, `recipientPubkeyHex`: kotlin.String, `label`: kotlin.String, `aadHex`: kotlin.String): HpkeEnvelope {
+            return FfiConverterTypeHpkeEnvelope.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_hpke_seal_key(
+    
+        FfiConverterString.lower(`keyHex`),FfiConverterString.lower(`recipientPubkeyHex`),FfiConverterString.lower(`label`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Check if the mobile crypto state is unlocked.
+         */ fun `mobileIsUnlocked`(): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_is_unlocked(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * Validate PIN format: 6-8 digits.
+         */ fun `mobileIsValidPin`(`pin`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_is_valid_pin(
+    
+        FfiConverterString.lower(`pin`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Lock the mobile crypto state — zeroize device secrets.
+         */ fun `mobileLock`()
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_lock(
+    
+        _status)
+}
+    
+    
+
+        /**
+         * Create the initial PUK (generation 1), wrapped to the device's X25519 pubkey.
+         * Returns JSON: { pukState, seedHex, envelope }
+         */
+    @Throws(CryptoException::class) fun `mobilePukCreate`(): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_create(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * Derive PUK subkeys for a given seed + generation (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobilePukDeriveState`(`seedHex`: kotlin.String, `generation`: kotlin.UInt): PukState {
+            return FfiConverterTypePukState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_derive_state(
+    
+        FfiConverterString.lower(`seedHex`),FfiConverterUInt.lower(`generation`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Rotate the PUK to a new generation (stateless — takes seed directly).
+         */
+    @Throws(CryptoException::class) fun `mobilePukRotate`(`oldSeedHex`: kotlin.String, `oldGen`: kotlin.UInt, `remainingDevicesJson`: kotlin.String): RotatePukResult {
+            return FfiConverterTypeRotatePukResult.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_rotate(
+    
+        FfiConverterString.lower(`oldSeedHex`),FfiConverterUInt.lower(`oldGen`),FfiConverterString.lower(`remainingDevicesJson`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Unwrap a PUK seed from an HPKE envelope using the device's X25519 key.
+         */
+    @Throws(CryptoException::class) fun `mobilePukUnwrapSeed`(`envelope`: HpkeEnvelope, `expectedLabel`: kotlin.String, `aadHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_puk_unwrap_seed(
+    
+        FfiConverterTypeHpkeEnvelope.lower(`envelope`),FfiConverterString.lower(`expectedLabel`),FfiConverterString.lower(`aadHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Generate 32 random bytes as hex (for nonces, IDs, etc.).
+         */ fun `mobileRandomBytesHex`(): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_random_bytes_hex(
+    
+        _status)
+}
+    )
+    }
+    
+
+        /**
+         * Create a new sigchain link using the device's Ed25519 key from mobile state.
+         */
+    @Throws(CryptoException::class) fun `mobileSigchainCreateLink`(`id`: kotlin.String, `seq`: kotlin.ULong, `prevHash`: kotlin.String?, `timestamp`: kotlin.String, `payloadJson`: kotlin.String): SigchainLink {
+            return FfiConverterTypeSigchainLink.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sigchain_create_link(
+    
+        FfiConverterString.lower(`id`),FfiConverterULong.lower(`seq`),FfiConverterOptionalString.lower(`prevHash`),FfiConverterString.lower(`timestamp`),FfiConverterString.lower(`payloadJson`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Verify a complete sigchain (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobileSigchainVerify`(`linksJson`: kotlin.String): SigchainVerifiedState {
+            return FfiConverterTypeSigchainVerifiedState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sigchain_verify(
+    
+        FfiConverterString.lower(`linksJson`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Verify a single sigchain link (stateless).
+         */
+    @Throws(CryptoException::class) fun `mobileSigchainVerifyLink`(`linkJson`: kotlin.String, `expectedSignerPubkey`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sigchain_verify_link(
+    
+        FfiConverterString.lower(`linkJson`),FfiConverterString.lower(`expectedSignerPubkey`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Sign a message (hex-encoded) using the device's Ed25519 key.
+         */
+    @Throws(CryptoException::class) fun `mobileSign`(`messageHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_sign(
+    
+        FfiConverterString.lower(`messageHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt AES-256-GCM ciphertext. Input: hex(nonce_12 || ciphertext || tag_16), key_hex.
+         */
+    @Throws(CryptoException::class) fun `mobileSymmetricDecrypt`(`ciphertextHex`: kotlin.String, `keyHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_symmetric_decrypt(
+    
+        FfiConverterString.lower(`ciphertextHex`),FfiConverterString.lower(`keyHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Encrypt plaintext with a random AES-256-GCM key.
+         * Returns (ciphertext_hex, key_hex) where ciphertext = hex(nonce_12 || ciphertext || tag_16).
+         */
+    @Throws(CryptoException::class) fun `mobileSymmetricEncrypt`(`plaintextHex`: kotlin.String): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_symmetric_encrypt(
+    
+        FfiConverterString.lower(`plaintextHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Unlock device keys from PIN-encrypted storage, load into mobile state.
+         * Returns the DeviceKeyState (public keys only — secrets stay in Rust).
+         */
+    @Throws(CryptoException::class) fun `mobileUnlock`(`data`: EncryptedDeviceKeys, `pin`: kotlin.String): DeviceKeyState {
+            return FfiConverterTypeDeviceKeyState.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_unlock(
+    
+        FfiConverterTypeEncryptedDeviceKeys.lower(`data`),FfiConverterString.lower(`pin`),_status)
 }
     )
     }
