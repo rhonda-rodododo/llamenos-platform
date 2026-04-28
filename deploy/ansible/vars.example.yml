@@ -41,7 +41,7 @@ deploy_group: deploy
 llamenos_app_enabled: true
 llamenos_postgres_enabled: true
 llamenos_caddy_enabled: true
-llamenos_minio_enabled: true
+llamenos_rustfs_enabled: true
 llamenos_strfry_enabled: true
 llamenos_transcription_enabled: false
 llamenos_asterisk_enabled: false
@@ -54,7 +54,7 @@ llamenos_signal_enabled: false
 llamenos_app_image: ghcr.io/llamenos/llamenos:0.1.0  # Update on each release
 llamenos_postgres_image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
 llamenos_caddy_image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
-llamenos_minio_image: minio/minio:RELEASE.2025-01-20T14-49-07Z@sha256:ed9be66eb5f2636c18289c34c3b725ddf57815f2777c77b5938543b78a44f144
+llamenos_rustfs_image: rustfs/rustfs:latest
 llamenos_strfry_image: dockurr/strfry:1.0.1@sha256:4bcfddc8aab07e17d35198c0618d6a9c8e5d3e27b211741ebce9f7058cdd1e21
 llamenos_whisper_image: fedirz/faster-whisper-server:0.4.1  # digest pin pending: tag not yet on Docker Hub
 llamenos_asterisk_image: andrius/asterisk@sha256:e30df5ec1b512827bf3cffc49b8000b07376a05c950736d028348eba80035015  # 20.x
@@ -88,14 +88,14 @@ pg_pool_size: 10
 # Port to expose when PostgreSQL is on a separate host (multi-host only)
 llamenos_postgres_port: 5432
 
-# ─── MinIO (Blob Storage) ───────────────────────────────────────
+# ─── RustFS (Blob Storage) ──────────────────────────────────────
 # Access credentials (generate with: openssl rand -base64 24)
-minio_access_key: ""
-minio_secret_key: ""
-minio_bucket: llamenos-files
+storage_access_key: ""
+storage_secret_key: ""
+storage_bucket: llamenos-files
 
-# Port to expose when MinIO is on a separate host (multi-host only)
-llamenos_minio_port: 9000
+# Port to expose when RustFS is on a separate host (multi-host only)
+llamenos_rustfs_port: 9000
 
 # ─── Telephony (Twilio) ─────────────────────────────────────────
 # Leave empty if configuring via the admin UI or using Asterisk
@@ -171,10 +171,10 @@ backup_strfry_retain_daily: 7
 backup_strfry_retain_weekly: 4
 backup_strfry_retain_monthly: 3
 
-# MinIO (object store mirror)
-backup_minio_retain_daily: 7
-backup_minio_retain_weekly: 4
-backup_minio_retain_monthly: 3
+# RustFS (object store mirror)
+backup_rustfs_retain_daily: 7
+backup_rustfs_retain_weekly: 4
+backup_rustfs_retain_monthly: 3
 
 # Config (docker-compose.yml, .env, Caddyfile, etc.)
 backup_config_retain_daily: 14

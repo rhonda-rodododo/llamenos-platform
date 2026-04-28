@@ -15,10 +15,10 @@ DATABASE_URL={{ llamenos_database_url }}
 PG_POOL_SIZE={{ pg_pool_size }}
 
 # ─── Object Storage ─────────────────────────────────────────
-MINIO_ENDPOINT={{ llamenos_minio_endpoint }}
-MINIO_ACCESS_KEY={{ minio_access_key }}
-MINIO_SECRET_KEY={{ minio_secret_key }}
-MINIO_BUCKET={{ minio_bucket }}
+STORAGE_ENDPOINT={{ llamenos_rustfs_endpoint }}
+STORAGE_ACCESS_KEY={{ storage_access_key }}
+STORAGE_SECRET_KEY={{ storage_secret_key }}
+STORAGE_BUCKET={{ storage_bucket }}
 
 # ─── Telephony ───────────────────────────────────────────────
 TWILIO_ACCOUNT_SID={{ twilio_account_sid }}

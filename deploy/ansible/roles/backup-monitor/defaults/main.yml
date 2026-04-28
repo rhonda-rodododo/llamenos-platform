@@ -21,9 +21,9 @@ backup_monitor_dirs:
   - name: strfry
     path: "{{ backup_base_dir }}/strfry/daily"
     pattern: "llamenos-strfry-*.jsonl*"
-  - name: minio
-    path: "{{ backup_base_dir }}/minio/daily"
-    pattern: "llamenos-minio-*.tar*"
+  - name: rustfs
+    path: "{{ backup_base_dir }}/rustfs/daily"
+    pattern: "llamenos-rustfs-*.tar*"
   - name: config
     path: "{{ backup_base_dir }}/config/daily"
     pattern: "llamenos-config-*.tar*"

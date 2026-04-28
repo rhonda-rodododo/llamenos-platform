@@ -6,7 +6,7 @@
 # 2. Restore config (docker-compose.yml, .env, Caddyfile)
 # 3. Restore PostgreSQL
 # 4. Restore strfry (Nostr events)
-# 5. Restore MinIO (file attachments)
+# 5. Restore RustFS (file attachments)
 # 6. Verify data integrity
 # 7. Start services
 #
@@ -72,7 +72,7 @@
         patterns: "{{ 'llamenos-postgres-' + restore_timestamp + '*' if restore_timestamp else 'llamenos-postgres-*' }}"
         file_type: file
       register: pg_backup_files
-      tags: [postgres, strfry, minio, config]
+      tags: [postgres, strfry, rustfs, config]
 
     - name: Select PostgreSQL backup file
       ansible.builtin.set_fact:
@@ -94,19 +94,19 @@
       when: strfry_backup_files.matched > 0
       tags: [strfry]
 
-    - name: Find MinIO backup
+    - name: Find RustFS backup
       ansible.builtin.find:
-        paths: "{{ restore_source_dir }}/minio/daily"
-        patterns: "{{ 'llamenos-minio-' + restore_timestamp + '*' if restore_timestamp else 'llamenos-minio-*' }}"
+        paths: "{{ restore_source_dir }}/rustfs/daily"
+        patterns: "{{ 'llamenos-rustfs-' + restore_timestamp + '*' if restore_timestamp else 'llamenos-rustfs-*' }}"
         file_type: file
-      register: minio_backup_files
-      tags: [minio]
+      register: rustfs_backup_files
+      tags: [rustfs]
 
-    - name: Select MinIO backup file
+    - name: Select RustFS backup file
       ansible.builtin.set_fact:
-        minio_backup_file: "{{ (minio_backup_files.files | sort(attribute='mtime') | last).path }}"
-      when: minio_backup_files.matched > 0
-      tags: [minio]
+        rustfs_backup_file: "{{ (rustfs_backup_files.files | sort(attribute='mtime') | last).path }}"
+      when: rustfs_backup_files.matched > 0
+      tags: [rustfs]
 
     - name: Find config backup
       ansible.builtin.find:
@@ -128,7 +128,7 @@
           Selected backup files:
             PostgreSQL: {{ pg_backup_file | default('NOT FOUND') }}
             strfry:     {{ strfry_backup_file | default('NOT FOUND') }}
-            MinIO:      {{ minio_backup_file | default('NOT FOUND') }}
+            RustFS:     {{ rustfs_backup_file | default('NOT FOUND') }}
             Config:     {{ config_backup_file | default('NOT FOUND') }}
       tags: always
 
@@ -138,14 +138,14 @@
       ansible.builtin.command:
         cmd: docker compose -f {{ app_dir }}/docker-compose.yml down
       when: not restore_dry_run
-      tags: [postgres, strfry, minio, config]
+      tags: [postgres, strfry, rustfs, config]
       ignore_errors: true
 
     - name: "[DRY RUN] Would stop Docker Compose stack"
       ansible.builtin.debug:
         msg: "docker compose down (skipped — dry run)"
       when: restore_dry_run
-      tags: [postgres, strfry, minio, config]
+      tags: [postgres, strfry, rustfs, config]
 
     # ── Create temp directory ──────────────────────────────────────
 
@@ -199,8 +199,8 @@
     - name: Start PostgreSQL container only
       ansible.builtin.command:
         cmd: docker compose -f {{ app_dir }}/docker-compose.yml up -d postgres
-      when: not restore_dry_run and (pg_backup_file is defined or strfry_backup_file is defined or minio_backup_file is defined)
-      tags: [postgres, strfry, minio]
+      when: not restore_dry_run and (pg_backup_file is defined or strfry_backup_file is defined or rustfs_backup_file is defined)
+      tags: [postgres, strfry, rustfs]
 
     - name: Wait for PostgreSQL to be ready
       ansible.builtin.command:
@@ -329,65 +329,63 @@
       when: restore_dry_run and strfry_backup_file is defined
       tags: [strfry]
 
-    # ── Restore MinIO ──────────────────────────────────────────────
+    # ── Restore RustFS ─────────────────────────────────────────────
 
-    - name: Start MinIO container
+    - name: Start RustFS container
       ansible.builtin.command:
-        cmd: docker compose -f {{ app_dir }}/docker-compose.yml up -d minio
-      when: not restore_dry_run and minio_backup_file is defined
-      tags: [minio]
+        cmd: docker compose -f {{ app_dir }}/docker-compose.yml up -d rustfs
+      when: not restore_dry_run and rustfs_backup_file is defined
+      tags: [rustfs]
 
-    - name: Wait for MinIO to be healthy
+    - name: Wait for RustFS to be healthy
       ansible.builtin.command:
-        cmd: docker compose -f {{ app_dir }}/docker-compose.yml exec -T minio mc ready local
-      register: minio_ready
+        cmd: docker compose -f {{ app_dir }}/docker-compose.yml exec -T rustfs curl -sf http://localhost:9000/health
+      register: rustfs_ready
       retries: 10
       delay: 2
-      until: minio_ready.rc == 0
-      when: not restore_dry_run and minio_backup_file is defined
-      tags: [minio]
+      until: rustfs_ready.rc == 0
+      when: not restore_dry_run and rustfs_backup_file is defined
+      tags: [rustfs]
       ignore_errors: true
 
-    - name: Decrypt and extract MinIO backup
+    - name: Decrypt and extract RustFS backup
       ansible.builtin.shell: |
-        mkdir -p {{ restore_tmpdir.path }}/minio-restore
+        mkdir -p {{ restore_tmpdir.path }}/rustfs-restore
         {% if backup_age_public_key | default('') | length > 0 %}
-        age -d -i {{ restore_age_key_path }} {{ minio_backup_file }} | tar -xzf - -C {{ restore_tmpdir.path }}/minio-restore
+        age -d -i {{ restore_age_key_path }} {{ rustfs_backup_file }} | tar -xzf - -C {{ restore_tmpdir.path }}/rustfs-restore
         {% else %}
-        tar -xzf {{ minio_backup_file }} -C {{ restore_tmpdir.path }}/minio-restore
+        tar -xzf {{ rustfs_backup_file }} -C {{ restore_tmpdir.path }}/rustfs-restore
         {% endif %}
       when:
-        - minio_backup_file is defined
+        - rustfs_backup_file is defined
         - not restore_dry_run
-      tags: [minio]
+      tags: [rustfs]
 
-    - name: Copy restored files into MinIO container
+    - name: Copy restored files into RustFS container
       ansible.builtin.shell: |
-        CONTAINER_NAME="$(docker compose -f {{ app_dir }}/docker-compose.yml ps -q minio)"
-        docker cp {{ restore_tmpdir.path }}/minio-restore/. "${CONTAINER_NAME}:/tmp/minio-restore/"
-        docker compose -f {{ app_dir }}/docker-compose.yml exec -T minio \
-          sh -c "mc alias set local http://localhost:9000 \${MINIO_ROOT_USER} \${MINIO_ROOT_PASSWORD} --api S3v4 2>/dev/null; \
-                 mc mb --ignore-existing local/{{ backup_minio_bucket | default('llamenos-files') }}; \
-                 mc mirror /tmp/minio-restore/ local/{{ backup_minio_bucket | default('llamenos-files') }}/ --overwrite; \
-                 rm -rf /tmp/minio-restore"
-      register: minio_restore_result
+        CONTAINER_NAME="$(docker compose -f {{ app_dir }}/docker-compose.yml ps -q rustfs)"
+        docker cp {{ restore_tmpdir.path }}/rustfs-restore/. "${CONTAINER_NAME}:/tmp/rustfs-restore/"
+        docker compose -f {{ app_dir }}/docker-compose.yml exec -T rustfs \
+          sh -c "aws s3 sync /tmp/rustfs-restore/ s3://{{ backup_rustfs_bucket | default('llamenos-files') }}/ --endpoint-url http://localhost:9000; \
+                 rm -rf /tmp/rustfs-restore"
+      register: rustfs_restore_result
       when:
-        - minio_backup_file is defined
+        - rustfs_backup_file is defined
         - not restore_dry_run
-      tags: [minio]
+      tags: [rustfs]
       ignore_errors: true
 
-    - name: Display MinIO restore result
+    - name: Display RustFS restore result
       ansible.builtin.debug:
-        msg: "MinIO restore: {{ minio_restore_result.stdout_lines | default(['no output']) }}"
-      when: minio_restore_result is defined
-      tags: [minio]
+        msg: "RustFS restore: {{ rustfs_restore_result.stdout_lines | default(['no output']) }}"
+      when: rustfs_restore_result is defined
+      tags: [rustfs]
 
-    - name: "[DRY RUN] Would restore MinIO from {{ minio_backup_file | default('N/A') }}"
+    - name: "[DRY RUN] Would restore RustFS from {{ rustfs_backup_file | default('N/A') }}"
       ansible.builtin.debug:
-        msg: "MinIO restore skipped (dry run)"
-      when: restore_dry_run and minio_backup_file is defined
-      tags: [minio]
+        msg: "RustFS restore skipped (dry run)"
+      when: restore_dry_run and rustfs_backup_file is defined
+      tags: [rustfs]
 
     # ── Start full stack ───────────────────────────────────────────
 
@@ -395,7 +393,7 @@
       ansible.builtin.command:
         cmd: docker compose -f {{ app_dir }}/docker-compose.yml up -d
       when: not restore_dry_run
-      tags: [postgres, strfry, minio, config]
+      tags: [postgres, strfry, rustfs, config]
 
     - name: Wait for application health check
       ansible.builtin.uri:
@@ -408,7 +406,7 @@
       delay: 5
       until: health_check.status == 200
       when: not restore_dry_run
-      tags: [postgres, strfry, minio, config]
+      tags: [postgres, strfry, rustfs, config]
       ignore_errors: true
 
     - name: Display restore summary
@@ -416,10 +414,10 @@
         msg: |
           Restore {{ 'DRY RUN ' if restore_dry_run else '' }}complete.
 
-          PostgreSQL: {{ 'RESTORED' if pg_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
-          strfry:     {{ 'RESTORED' if strfry_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
-          MinIO:      {{ 'RESTORED' if minio_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
-          Config:     {{ 'RESTORED' if config_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
+           PostgreSQL: {{ 'RESTORED' if pg_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
+           strfry:     {{ 'RESTORED' if strfry_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
+           RustFS:     {{ 'RESTORED' if rustfs_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
+           Config:     {{ 'RESTORED' if config_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
 
           Health check: {{ health_check.json | default('N/A') }}
 

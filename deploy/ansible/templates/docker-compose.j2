@@ -31,10 +31,10 @@ services:
       - HOTLINE_NAME=${HOTLINE_NAME}
       - ENVIRONMENT=${ENVIRONMENT}
       - HMAC_SECRET=${HMAC_SECRET}
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET=${MINIO_BUCKET}
+      - STORAGE_ENDPOINT=http://rustfs:9000
+      - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY}
+      - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY}
+      - STORAGE_BUCKET=${STORAGE_BUCKET}
       - WHISPER_URL=${WHISPER_URL}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
@@ -50,7 +50,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
       strfry:
         condition: service_healthy
@@ -114,19 +114,19 @@ services:
         limits:
           memory: 128M
 
-  minio:
-    image: {{ minio_image }}
-    command: server /data --console-address ":9001"
+  rustfs:
+    image: {{ rustfs_image }}
+    command: server /data
     restart: unless-stopped
     volumes:
-      - minio-data:/data
+      - rustfs-data:/data
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+      - RUSTFS_ACCESS_KEY=${STORAGE_ACCESS_KEY}
+      - RUSTFS_SECRET_KEY=${STORAGE_SECRET_KEY}
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -317,7 +317,7 @@ volumes:
   postgres-data:
   caddy-data:
   caddy-config:
-  minio-data:
+  rustfs-data:
   nostr-data:
 {% if 'asterisk' in compose_profiles %}
   asterisk-config:

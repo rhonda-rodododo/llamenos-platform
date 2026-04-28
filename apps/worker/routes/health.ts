@@ -31,12 +31,13 @@ async function checkPostgres(): Promise<CheckResult> {
   }
 }
 
-async function checkMinio(env: Record<string, unknown>): Promise<CheckResult> {
-  const endpoint = env.MINIO_ENDPOINT as string | undefined
-  if (!endpoint) return { status: 'failing', detail: 'MINIO_ENDPOINT not configured' }
+async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> {
+  // Backward-compat: accept legacy MINIO_ENDPOINT (deprecated)
+  const endpoint = (env.STORAGE_ENDPOINT as string | undefined) || (env.MINIO_ENDPOINT as string | undefined)
+  if (!endpoint) return { status: 'failing', detail: 'STORAGE_ENDPOINT not configured' }
   const t0 = Date.now()
   try {
-    const url = `${endpoint.replace(/\/$/, '')}/minio/health/live`
+    const url = `${endpoint.replace(/\/$/, '')}/health`
     const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
     return { status: 'ok', latencyMs: Date.now() - t0 }
@@ -77,14 +78,14 @@ async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult
 }
 
 async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
-  const [postgres, minio, relay, sipBridge] = await Promise.all([
+  const [postgres, storage, relay, sipBridge] = await Promise.all([
     checkPostgres(),
-    checkMinio(env),
+    checkStorage(env),
     checkNostrRelay(env),
     checkSipBridge(env),
   ])
 
-  const checks: Record<string, CheckResult> = { postgres, minio, relay }
+  const checks: Record<string, CheckResult> = { postgres, storage, relay }
   if (sipBridge !== null) checks.sipBridge = sipBridge
 
   const status = Object.values(checks).every(v => v.status === 'ok') ? 'ok' : 'degraded'
