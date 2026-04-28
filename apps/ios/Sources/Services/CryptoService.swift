@@ -91,9 +91,9 @@ private func ffiMobileRandomBytesHex() -> String {
     mobileRandomBytesHex()
 }
 
-// Legacy keypair generation still needed for device linking ephemeral ECDH
-private func ffiGenerateKeypair() -> KeyPair {
-    generateKeypair()
+// Mobile FFI for device-linking ephemeral ECDH (returns secret + public).
+private func ffiGenerateEphemeralKeypair() -> EphemeralKeyPair {
+    generateEphemeralKeypairMobile()
 }
 
 // MARK: - CryptoService
@@ -342,7 +342,7 @@ final class CryptoService: @unchecked Sendable {
     /// Generate an ephemeral secp256k1 keypair for the ECDH key exchange
     /// during device linking.
     func generateEphemeralKeypair() -> (secretHex: String, publicHex: String) {
-        let kp = ffiGenerateKeypair()
+        let kp = ffiGenerateEphemeralKeypair()
         return (kp.secretKeyHex, kp.publicKey)
     }
 
@@ -371,6 +371,22 @@ final class CryptoService: @unchecked Sendable {
     /// Decrypt a server-encrypted event payload (XChaCha20-Poly1305).
     static func decryptServerEvent(encryptedHex: String, keyHex: String) -> String? {
         return try? ffiDecryptServerEventHex(encryptedHex: encryptedHex, keyHex: keyHex)
+    }
+
+    // MARK: - Stateless Auth Token (test bootstrap)
+
+    /// Create an Ed25519 auth token from a raw signing-key secret hex.
+    /// Stateless — does NOT use any loaded device state. Used by integration
+    /// tests that need to sign requests on behalf of an out-of-band identity
+    /// (e.g. XCTEST_ADMIN_SECRET-driven admin bootstrap).
+    static func createAuthTokenStatic(secretHex: String, method: String, path: String) throws -> AuthToken {
+        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        return try mobileCreateAuthTokenFromSigningKey(
+            signingKeyHex: secretHex,
+            timestamp: timestamp,
+            method: method,
+            path: path
+        )
     }
 
     // MARK: - Hub Key Cache

@@ -209,10 +209,15 @@ final class EventsViewModel {
             guard let envelope = envelopes.first(where: { $0.pubkey == ourPubkey }) else { continue }
 
             do {
+                let hpkeEnvelope = HpkeEnvelope(
+                    v: 3,
+                    labelId: 0,
+                    enc: envelope.ephemeralPubkey,
+                    ct: envelope.wrappedKey
+                )
                 let plaintext = try cryptoService.decryptMessage(
                     encryptedContent: encrypted,
-                    wrappedKey: envelope.wrappedKey,
-                    ephemeralPubkey: envelope.ephemeralPubkey
+                    envelope: hpkeEnvelope
                 )
                 if let data = plaintext.data(using: .utf8),
                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {

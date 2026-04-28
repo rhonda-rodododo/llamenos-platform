@@ -272,10 +272,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             if let injected = payloadDecryptorForTesting {
                 decryptedJSON = try injected(encryptedHex)
             } else {
-                decryptedJSON = try appState.wakeKeyService.decryptWakePayload(encryptedHex: encryptedHex)
+                decryptedJSON = try decryptWakePayloadAuto(appState.wakeKeyService, payload: encryptedHex)
             }
             #else
-            let decryptedJSON = try appState.wakeKeyService.decryptWakePayload(encryptedHex: encryptedHex)
+            let decryptedJSON = try decryptWakePayloadAuto(appState.wakeKeyService, payload: encryptedHex)
             #endif
 
             // Parse the decrypted payload and post a local notification
@@ -326,6 +326,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             completionHandler(.failed)
         }
     }
+}
+
+/// Decrypt a wake payload routing on the wire format: JSON envelope → HPKE,
+/// otherwise hex → legacy ECIES.
+private func decryptWakePayloadAuto(_ service: WakeKeyService, payload: String) throws -> String {
+    let trimmed = payload.trimmingCharacters(in: .whitespaces)
+    if trimmed.hasPrefix("{") {
+        return try service.decryptWakePayload(envelopeJSON: trimmed)
+    }
+    return try service.decryptWakePayloadLegacy(encryptedHex: trimmed)
 }
 
 // MARK: - UNUserNotificationCenterDelegate (Notification Tap Routing)

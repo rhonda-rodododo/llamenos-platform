@@ -160,16 +160,14 @@ final class ReportsViewModel {
 
             let result = try cryptoService.encryptNote(payload: body, recipientPubkeys: recipientPubkeys)
 
-            let authorEnvelope: ProtocolKeyEnvelope?
-            if let ourPubkey = cryptoService.encryptionPubkeyHex,
-               let ours = result.envelopes.first(where: { $0.pubkey == ourPubkey }) {
-                authorEnvelope = ProtocolKeyEnvelope(
-                    wrappedKey: ours.envelope.ct,
-                    ephemeralPubkey: ours.envelope.enc
-                )
-            } else {
-                authorEnvelope = nil
+            guard let ourPubkey = cryptoService.encryptionPubkeyHex,
+                  let ours = result.envelopes.first(where: { $0.pubkey == ourPubkey }) else {
+                throw CryptoServiceError.noKeyLoaded
             }
+            let authorEnvelope = ProtocolKeyEnvelope(
+                ephemeralPubkey: ours.envelope.enc,
+                wrappedKey: ours.envelope.ct
+            )
 
             let request = CreateReportRequest(
                 title: title,
@@ -177,12 +175,12 @@ final class ReportsViewModel {
                 encryptedContent: result.ciphertextHex,
                 authorEnvelope: authorEnvelope,
                 adminEnvelopes: result.envelopes
-                    .filter { $0.pubkey != cryptoService.encryptionPubkeyHex }
+                    .filter { $0.pubkey != ourPubkey }
                     .map { env in
                         RecipientEnvelope(
+                            ephemeralPubkey: env.envelope.enc,
                             pubkey: env.pubkey,
-                            wrappedKey: env.envelope.ct,
-                            ephemeralPubkey: env.envelope.enc
+                            wrappedKey: env.envelope.ct
                         )
                     }
             )

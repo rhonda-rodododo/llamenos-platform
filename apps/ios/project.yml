@@ -36,6 +36,17 @@ targets:
       properties:
         UIDesignRequiresCompatibility: true
         UILaunchScreen: {}
+        UIBackgroundModes:
+          - remote-notification
+          - voip
+          - audio
+        CFBundleURLTypes:
+          - CFBundleURLName: org.llamenos.hotline
+            CFBundleURLSchemes:
+              - llamenos
+        NSMicrophoneUsageDescription: Llamenos uses the microphone for voice-to-text input when filling out report fields.
+        NSSpeechRecognitionUsageDescription: Llamenos uses speech recognition to transcribe voice input into report fields.
+        NSLocationWhenInUseUsageDescription: Llamenos uses your location to autofill location fields in reports, with your permission.
     entitlements:
       path: Sources/App/Llamenos.entitlements
       properties:

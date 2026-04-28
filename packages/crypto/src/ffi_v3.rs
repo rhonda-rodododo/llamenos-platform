@@ -144,6 +144,21 @@ pub fn mobile_create_auth_token(
     with_secrets(|secrets, _| auth::create_auth_token(secrets, timestamp, &method, &path))
 }
 
+/// Create an Ed25519 auth token from a raw signing-key secret hex.
+///
+/// Stateless: does NOT touch the loaded mobile device state. Used by integration
+/// tests that need to sign requests on behalf of a server-side identity (e.g.
+/// admin bootstrap) where the signing secret is provided out-of-band.
+#[uniffi::export]
+pub fn mobile_create_auth_token_from_signing_key(
+    signing_key_hex: String,
+    timestamp: u64,
+    method: String,
+    path: String,
+) -> Result<auth::AuthToken, CryptoError> {
+    auth::create_auth_token_from_signing_key(&signing_key_hex, timestamp, &method, &path)
+}
+
 // ── Ed25519 signing (stateful) ─────────────────────────────────────
 
 /// Sign a message (hex-encoded) using the device's Ed25519 key.
