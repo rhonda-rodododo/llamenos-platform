@@ -121,7 +121,7 @@ export default system
 The `fetch*` helper functions query:
 - `fetchServerHealth`: calls the existing `/api/health` endpoint internally and adds uptime/version
 - `fetchCallMetrics`: queries `RecordsDO` (CF) or PostgreSQL `kv_store` for today's call records, aggregates counts
-- `fetchStorageInfo`: on Node.js, runs `pg_database_size()` and checks MinIO bucket size; on CF, returns `null` (CF manages storage)
+- `fetchStorageInfo`: on Node.js, runs `pg_database_size()` and checks RustFS bucket size; on CF, returns `null` (CF manages storage)
 - `fetchBackupInfo`: on Node.js, reads the backup log and state file from disk; on CF, returns `null`
 - `fetchVolunteerInfo`: queries `IdentityDO` for active volunteers and `ShiftManagerDO` for current shift status
 
@@ -459,7 +459,7 @@ Propagate to all 13 locales, then run `bun run i18n:codegen` and `bun run i18n:v
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
 | System health endpoint is slow (aggregates from multiple sources) | Medium | Low | Use `Promise.allSettled` — partial failures don't block the response; each source has a 5-second timeout |
-| Storage size queries expensive on large databases | Low | Low | `pg_database_size()` is fast (reads pg_stat); MinIO bucket size uses HEAD bucket API |
+| Storage size queries expensive on large databases | Low | Low | `pg_database_size()` is fast (reads pg_stat); RustFS bucket size uses HEAD bucket API |
 | CF Workers have limited system metrics available | Medium | Low | CF-specific fields return `null`; dashboard shows "N/A" gracefully. CF has its own analytics dashboard |
 | Auto-refresh creates unnecessary load | Low | Low | 30-second interval is modest; endpoint is lightweight; only fires when admin is viewing the page |
 | Mobile views lag behind desktop feature set | Low | Medium | Mobile views are read-only dashboards — simpler to implement; API is the same |

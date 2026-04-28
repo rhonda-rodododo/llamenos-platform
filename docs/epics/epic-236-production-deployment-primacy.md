@@ -1,4 +1,6 @@
 # Epic 236: Node.js Production Deployment Primacy & Infrastructure Hardening
+> **Note**: MinIO has been replaced by RustFS as of PR #40. All references to MinIO in this document should be read as RustFS.
+
 
 ## Goal
 
@@ -13,11 +15,11 @@ The architecture audit (2026-03-03) found the Node.js platform is fully implemen
 - Docs still frame CF Workers as primary
 - No `bun run dev:node` for local development against the production runtime
 - Health check is a bare `200 OK` — doesn't verify database/relay/storage connectivity
-- Helm chart has structural issues (MinIO as Deployment instead of StatefulSet, no HPA/PDB)
+- Helm chart has structural issues (RustFS as Deployment instead of StatefulSet, no HPA/PDB)
 - No Prometheus metrics endpoint for Kubernetes monitoring
 - No structured logging
 - Docker build has minor security gaps (sourcemaps in production, fragile workspace stripping)
-- Ansible backup doesn't cover MinIO blob storage
+- Ansible backup doesn't cover RustFS blob storage
 - OpenTofu allows SSH from 0.0.0.0/0
 
 For a crisis response hotline used by activist organizations, self-hosted is the expected deployment. These improvements are critical for production readiness.
@@ -31,7 +33,7 @@ For a crisis response hotline used by activist organizations, self-hosted is the
 List Node.js first, CF second:
 
 ```markdown
-- **Backend (Production)**: Node.js 20+ with Hono, PostgreSQL 17, MinIO (S3), strfry (Nostr relay)
+- **Backend (Production)**: Node.js 20+ with Hono, PostgreSQL 17, RustFS (S3), strfry (Nostr relay)
 - **Backend (Demo/Eval)**: Cloudflare Workers + Durable Objects (zero-infra evaluation)
 ```
 
@@ -41,7 +43,7 @@ Add Node.js dev commands to CLAUDE.md and package.json:
 
 ```markdown
 # Backend (production runtime)
-bun run dev:node                         # Local Node.js dev server (PostgreSQL + MinIO via Docker)
+bun run dev:node                         # Local Node.js dev server (PostgreSQL + RustFS via Docker)
 bun run build:node                       # Build Node.js server
 bun run start:node                       # Run built server
 
@@ -54,7 +56,7 @@ bun run dev:worker                       # Wrangler dev server (CF Workers + DOs
 Add deployment models section:
 ```markdown
 ## Deployment Models
-- **Self-hosted (recommended)**: Node.js + PostgreSQL + MinIO on EU-jurisdiction VPS
+- **Self-hosted (recommended)**: Node.js + PostgreSQL + RustFS on EU-jurisdiction VPS
 - **Cloud evaluation**: Cloudflare Workers (demo deployments, zero-infrastructure evaluation)
 ```
 
@@ -85,7 +87,7 @@ api.get('/health', async (c) => {
     checks.database = 'ok'
   } catch { checks.database = 'failing' }
 
-  // MinIO/R2 connectivity
+  // RustFS/R2 connectivity
   try {
     await c.env.R2_BUCKET.head('health-check')
     checks.storage = 'ok'
@@ -204,8 +206,8 @@ if [ ! -f .env ]; then
   # Auto-generate all secrets
   sed -i "s|^PG_PASSWORD=.*|PG_PASSWORD=$(openssl rand -base64 24)|" .env
   sed -i "s|^HMAC_SECRET=.*|HMAC_SECRET=$(openssl rand -hex 32)|" .env
-  sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=$(openssl rand -base64 16)|" .env
-  sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=$(openssl rand -base64 24)|" .env
+  sed -i "s|^STORAGE_ACCESS_KEY=.*|STORAGE_ACCESS_KEY=$(openssl rand -base64 16)|" .env
+  sed -i "s|^STORAGE_SECRET_KEY=.*|STORAGE_SECRET_KEY=$(openssl rand -base64 24)|" .env
   sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=$(openssl rand -hex 32)|" .env
 
   echo "Generated .env with random secrets"
@@ -230,22 +232,22 @@ echo "Then open https://your-domain and log in."
 
 ### Phase 4: Helm Chart Fixes
 
-#### 4.1 Convert MinIO from Deployment to StatefulSet
+#### 4.1 Convert RustFS from Deployment to StatefulSet
 
-**Critical**: MinIO as a Deployment risks data loss on pod eviction.
+**Critical**: RustFS as a Deployment risks data loss on pod eviction.
 
 ```yaml
-# templates/statefulset-minio.yaml (replaces deployment-minio.yaml)
+# templates/statefulset-rustfs.yaml (replaces deployment-rustfs.yaml)
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "llamenos.fullname" . }}-minio
+  name: {{ include "llamenos.fullname" . }}-rustfs
 spec:
-  serviceName: {{ include "llamenos.fullname" . }}-minio
+  serviceName: {{ include "llamenos.fullname" . }}-rustfs
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/component: minio
+      app.kubernetes.io/component: rustfs
   template:
     # ... same pod spec as current deployment
   volumeClaimTemplates:
@@ -255,7 +257,7 @@ spec:
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            storage: {{ .Values.minio.persistence.size | default "10Gi" }}
+            storage: {{ .Values.rustfs.persistence.size | default "10Gi" }}
 ```
 
 #### 4.2 Add HorizontalPodAutoscaler
@@ -384,18 +386,18 @@ appVersion: "0.20.0"
 
 ### Phase 5: Ansible Improvements
 
-#### 5.1 Add MinIO Blob Storage to Backup
+#### 5.1 Add RustFS Blob Storage to Backup
 
-Current backup only covers PostgreSQL. Add MinIO backup:
+Current backup only covers PostgreSQL. Add RustFS backup:
 
 ```yaml
 # roles/backup/templates/backup.sh.j2 addition
-echo "[$(date)] Backing up MinIO data..."
-docker compose exec -T minio mc mirror /data /tmp/minio-backup
-tar czf "${backup_dir}/minio-${timestamp}.tar.gz" -C /tmp minio-backup
-age -r {{ backup_age_public_key }} -o "${backup_dir}/minio-${timestamp}.tar.gz.age" \
-  "${backup_dir}/minio-${timestamp}.tar.gz"
-rm -f "${backup_dir}/minio-${timestamp}.tar.gz"
+echo "[$(date)] Backing up RustFS data..."
+docker compose exec -T rustfs mc mirror /data /tmp/rustfs-backup
+tar czf "${backup_dir}/rustfs-${timestamp}.tar.gz" -C /tmp rustfs-backup
+age -r {{ backup_age_public_key }} -o "${backup_dir}/rustfs-${timestamp}.tar.gz.age" \
+  "${backup_dir}/rustfs-${timestamp}.tar.gz"
+rm -f "${backup_dir}/rustfs-${timestamp}.tar.gz"
 ```
 
 #### 5.2 Add Backup Restore Test
@@ -565,7 +567,7 @@ Add to `package.json`:
 
 #### 8.2 Dev-Only Docker Compose
 
-Create `deploy/docker/docker-compose.dev.yml` with just PostgreSQL + MinIO + strfry (no app container):
+Create `deploy/docker/docker-compose.dev.yml` with just PostgreSQL + RustFS + strfry (no app container):
 
 ```yaml
 services:
@@ -585,16 +587,16 @@ services:
       timeout: 3s
       retries: 5
 
-  minio:
-    image: minio/minio
+  rustfs:
+    image: rustfs/rustfs
     ports:
       - "9000:9000"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: rustfsadmin
+      MINIO_ROOT_PASSWORD: rustfsadmin
     command: server /data
     volumes:
-      - miniodata:/data
+      - rustfsdata:/data
 
   strfry:
     image: dockurr/strfry:latest
@@ -605,7 +607,7 @@ services:
 
 volumes:
   pgdata:
-  miniodata:
+  rustfsdata:
   strfrydata:
 ```
 
@@ -619,7 +621,7 @@ set -euo pipefail
 
 # Start backing services if not running
 if ! docker compose -f deploy/docker/docker-compose.dev.yml ps --status running | grep -q postgres; then
-  echo "Starting PostgreSQL, MinIO, strfry..."
+  echo "Starting PostgreSQL, RustFS, strfry..."
   docker compose -f deploy/docker/docker-compose.dev.yml up -d
   echo "Waiting for PostgreSQL..."
   until docker compose -f deploy/docker/docker-compose.dev.yml exec -T postgres pg_isready -U llamenos; do sleep 1; done
@@ -631,9 +633,9 @@ export PG_PORT=5432
 export PG_USER=llamenos
 export PG_PASSWORD=dev
 export PG_DATABASE=llamenos
-export MINIO_ENDPOINT=http://localhost:9000
-export MINIO_ACCESS_KEY=minioadmin
-export MINIO_SECRET_KEY=minioadmin
+export STORAGE_ENDPOINT=http://localhost:9000
+export STORAGE_ACCESS_KEY=rustfsadmin
+export STORAGE_SECRET_KEY=rustfsadmin
 export HMAC_SECRET=$(echo -n "dev-hmac-secret-not-for-production" | sha256sum | cut -d' ' -f1)
 export SERVER_NOSTR_SECRET=$(echo -n "dev-nostr-secret-not-for-production" | sha256sum | cut -d' ' -f1)
 export ADMIN_PUBKEY=${ADMIN_PUBKEY:-"0000000000000000000000000000000000000000000000000000000000000000"}
@@ -695,10 +697,10 @@ Create `deploy/PRODUCTION_CHECKLIST.md`:
 2. `bun run dev:node` starts a working local dev server against PostgreSQL
 3. `/api/health/ready` verifies database, storage, and relay connectivity
 4. Helm chart passes `helm lint` and `helm template` validation
-5. MinIO runs as StatefulSet in Kubernetes
+5. RustFS runs as StatefulSet in Kubernetes
 6. HPA scales app replicas based on CPU/memory
 7. PDB prevents all pods from being evicted simultaneously
-8. Backup script covers both PostgreSQL and MinIO
+8. Backup script covers both PostgreSQL and RustFS
 9. `deploy/docker/first-run.sh` provisions a working instance from scratch
 10. `/metrics` endpoint returns Prometheus-compatible metrics
 11. Structured JSON logs visible in `docker compose logs`
@@ -715,4 +717,4 @@ Create `deploy/PRODUCTION_CHECKLIST.md`:
 - **Medium**: Health check dependency verification adds latency to probe responses (mitigate with separate /health/live and /health/ready)
 - **Low**: Prometheus metrics add memory overhead (~5-10 MB for prom-client)
 - **Low**: Structured logging changes may break existing log parsing scripts
-- **Low**: MinIO StatefulSet migration requires manual PVC data migration for existing deployments
+- **Low**: RustFS StatefulSet migration requires manual PVC data migration for existing deployments

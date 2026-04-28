@@ -85,7 +85,7 @@
 
 ### Track 1: Ansible Fleet Deployment (E276-E280) — COMPLETE
 - **E276**: Multi-host Ansible inventory with per-service toggles, service discovery templates, matrix-docker-ansible-deploy pattern
-- **E277**: Per-service backup roles (postgres, strfry, minio, config), cross-host aggregation, backup monitoring, restore playbook
+- **E277**: Per-service backup roles (postgres, strfry, rustfs, config), cross-host aggregation, backup monitoring, restore playbook
 - **E278**: Full observability stack (Prometheus, Grafana, Loki, Promtail, Alertmanager, Node Exporter) + lightweight healthcheck-only mode
 - **E279**: Container watchdog with restart budgets, PostgreSQL VACUUM maintenance, NTP drift detection, cert/disk monitoring
 - **E280**: Blue-green rolling updates with block/rescue auto-rollback, version tracking, dependency-ordered multi-host updates
@@ -474,7 +474,7 @@
 - **desktop-e2e.yml**: SHA-pinned actions
 - **mobile-release.yml**: SHA-pinned actions
 - **tauri-release.yml**: SHA-pinned actions, fixed missing Rust target on Linux
-- **docker-compose.yml**: Digest-pinned base images (postgres, minio, redis)
+- **docker-compose.yml**: Digest-pinned base images (postgres, rustfs, redis)
 - **ansible/vars.example.yml**: Fixed hardcoded SSH port, added SSH key path variable
 - **dev-node.sh**: Auto-generate random HMAC_SECRET for dev if not set
 
@@ -632,10 +632,10 @@
 
 ### Epic 235: Node.js Platform E2E Test Parity
 - **79 integration tests** in `tests/integration/node/`: postgres-storage (29), alarm-poller (10), websocket-shim (17), blob-storage (9), migration (14)
-- **17 pass** without external deps (WebSocket shim), 62 skip gracefully when PostgreSQL/MinIO unavailable
+- **17 pass** without external deps (WebSocket shim), 62 skip gracefully when PostgreSQL/RustFS unavailable
 - **playwright.docker.config.ts** targeting Docker Compose Node.js server directly (no Vite)
 - **vitest.integration.node.config.ts** with 30s timeouts and path aliases
-- **CI jobs**: `e2e-node` (Playwright against Docker), `integration-node` (PostgreSQL + MinIO service containers)
+- **CI jobs**: `e2e-node` (Playwright against Docker), `integration-node` (PostgreSQL + RustFS service containers)
 - **npm script**: `test:integration:node`
 - Commit: `99c96f2`
 
@@ -647,11 +647,11 @@
 - **Caddyfile**: JSON access logging to stdout
 - **esbuild**: conditional sourcemaps (`process.env.NODE_ENV !== 'production'`)
 - **first-run.sh**: one-command setup (secret generation, env validation, stack startup, health wait)
-- **docker-compose.dev.yml**: backing services only (PostgreSQL, MinIO, strfry) with localhost ports
+- **docker-compose.dev.yml**: backing services only (PostgreSQL, RustFS, strfry) with localhost ports
 
 **Phase 4-6 (Helm, Ansible, OpenTofu):**
-- **Helm chart 0.2.0**: MinIO Deployment → StatefulSet (data loss protection), HPA (CPU 70%, memory 80%), PDB (app + strfry), ServiceMonitor for Prometheus, split liveness/readiness probes
-- **Ansible**: MinIO backup via `mc mirror` in backup role, `playbooks/test-restore.yml` for restore verification
+- **Helm chart 0.2.0**: RustFS Deployment → StatefulSet (data loss protection), HPA (CPU 70%, memory 80%), PDB (app + strfry), ServiceMonitor for Prometheus, split liveness/readiness probes
+- **Ansible**: RustFS backup via `mc mirror` in backup role, `playbooks/test-restore.yml` for restore verification
 - **OpenTofu**: `admin_ssh_cidrs` variable replacing hardcoded `0.0.0.0/0` in Hetzner firewall
 
 **Phase 7-9 (Observability, Dev Server, Checklist):**
@@ -1626,7 +1626,7 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] `src/platform/cloudflare.ts` — CF re-export (thin wrapper)
 - [x] `src/platform/node/durable-object.ts` — SQLite-backed DO shim (better-sqlite3, WAL mode, setTimeout alarms)
 - [x] `src/platform/node/websocket-pair.ts` — WebSocketPair polyfill (EventEmitter-based connected shim sockets)
-- [x] `src/platform/node/blob-storage.ts` — S3/MinIO client (@aws-sdk/client-s3)
+- [x] `src/platform/node/blob-storage.ts` — S3/RustFS client (@aws-sdk/client-s3)
 - [x] `src/platform/node/transcription.ts` — HTTP client for faster-whisper container
 - [x] `src/platform/node/env.ts` — Node.js env shim (Docker secrets + env vars, DO singletons)
 - [x] `src/platform/node/server.ts` — @hono/node-server entry point with static files + WS upgrade
@@ -1646,15 +1646,15 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 
 ### Docker Infrastructure
 - [x] `deploy/docker/Dockerfile` — Multi-stage build (frontend + backend + production)
-- [x] `deploy/docker/docker-compose.yml` — app, caddy, minio (core) + whisper, asterisk, signal (profiles)
+- [x] `deploy/docker/docker-compose.yml` — app, caddy, rustfs (core) + whisper, asterisk, signal (profiles)
 - [x] `deploy/docker/Caddyfile` — Reverse proxy with security headers
 - [x] `deploy/docker/.env.example` — All configuration variables documented
 - [x] `.dockerignore` — Build exclusions
 
 ### Helm Chart (`deploy/helm/llamenos/`)
 - [x] `Chart.yaml` — apiVersion v2, appVersion 0.9.1
-- [x] `values.yaml` — Configurable app, MinIO, Whisper, Asterisk, Signal, ingress, secrets
-- [x] `templates/` — deployment-app, service-app, ingress, secret, pvc-app, deployment-minio, deployment-whisper, serviceaccount, NOTES.txt, _helpers.tpl
+- [x] `values.yaml` — Configurable app, RustFS, Whisper, Asterisk, Signal, ingress, secrets
+- [x] `templates/` — deployment-app, service-app, ingress, secret, pvc-app, deployment-rustfs, deployment-whisper, serviceaccount, NOTES.txt, _helpers.tpl
 
 ### CI/CD
 - [x] `.github/workflows/docker.yml` — Build + push to GHCR on tag push (app + asterisk-bridge images)
@@ -2383,11 +2383,11 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 ## Production Readiness Epics 276-300 (5 Tracks)
 
 ### Track 1: Infrastructure & Self-Hosting (E276-E280)
-- [x] Ansible deployment playbook with Docker Compose, PostgreSQL, MinIO, nginx, Certbot
+- [x] Ansible deployment playbook with Docker Compose, PostgreSQL, RustFS, nginx, Certbot
 - [x] Kubernetes/Helm chart with StatefulSet, PV claims, Ingress, HPA
 - [x] Node.js platform adapter with PostgreSQL shim for all 7 DOs
 - [x] Monitoring stack: Prometheus, Grafana, Loki, 3 dashboards, 12 alert rules
-- [x] Auto-backup with S3/MinIO, point-in-time recovery, integrity verification
+- [x] Auto-backup with S3/RustFS, point-in-time recovery, integrity verification
 
 ### Track 2: Data Safety (E281-E285)
 - [x] Storage sharding: per-entry keys with prefix scans (DO storage)

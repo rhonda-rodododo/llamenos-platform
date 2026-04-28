@@ -24,7 +24,7 @@ Running `wrangler pages deploy dist` from wrong directory deploys Vite app to Pa
 | app | llamenos/app | Node.js server | web + internal |
 | postgres | postgres:16 | Primary database (Drizzle ORM, Bun SQL) | internal |
 | caddy | caddy:2 | Reverse proxy, auto-TLS | web |
-| minio | minio/minio | Blob storage (R2 equivalent) | internal |
+| rustfs | rustfs/rustfs | Blob storage (R2 equivalent) | internal |
 | strfry | strfry | Nostr relay (real-time events) | internal |
 | whisper | (profile) | Transcription service | internal |
 | asterisk | (profile) | PBX for self-hosted telephony | internal |
@@ -35,7 +35,7 @@ Required env vars: PG_PASSWORD, SERVER_NOSTR_SECRET (64 hex), HMAC_SECRET, ADMIN
 ## Helm (deploy/helm/)
 - Multi-replica RollingUpdate
 - External PostgreSQL required
-- MinIO for blob storage
+- RustFS for blob storage
 - Optional Whisper sidecar
 
 ## Ansible (deploy/ansible/)
