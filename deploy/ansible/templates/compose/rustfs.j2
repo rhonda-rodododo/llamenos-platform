@@ -27,7 +27,7 @@ services:
       - internal
 {% endif %}
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 5

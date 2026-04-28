@@ -1,13 +1,13 @@
 ---
-# MinIO object storage role — deploys the S3-compatible blob store
+# RustFS object storage role — deploys the S3-compatible blob store
 #
 # Skips if:
-#   - llamenos_minio_enabled is false
+#   - llamenos_rustfs_enabled is false
 #   - This host is not in the llamenos_storage group (when the group has members)
 
-- name: Skip if minio not enabled
+- name: Skip if rustfs not enabled
   ansible.builtin.meta: end_play
-  when: not (llamenos_minio_enabled | default(true))
+  when: not (llamenos_rustfs_enabled | default(true))
 
 - name: Skip if not assigned to this host
   ansible.builtin.meta: end_play
@@ -15,41 +15,41 @@
     groups.get('llamenos_storage', []) | length > 0 and
     inventory_hostname not in groups.get('llamenos_storage', [])
 
-- name: Create minio service directory
+- name: Create rustfs service directory
   ansible.builtin.file:
-    path: "{{ app_dir }}/services/minio"
+    path: "{{ app_dir }}/services/rustfs"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0750"
 
-- name: Template minio compose file
+- name: Template rustfs compose file
   ansible.builtin.template:
-    src: compose/minio.j2
-    dest: "{{ app_dir }}/services/minio/docker-compose.yml"
+    src: compose/rustfs.j2
+    dest: "{{ app_dir }}/services/rustfs/docker-compose.yml"
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0640"
-  notify: Restart minio service
+  notify: Restart rustfs service
 
-- name: Template minio environment
+- name: Template rustfs environment
   ansible.builtin.template:
-    src: env/minio.j2
-    dest: "{{ app_dir }}/services/minio/.env.minio"
+    src: env/rustfs.j2
+    dest: "{{ app_dir }}/services/rustfs/.env.rustfs"
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0600"
-  notify: Restart minio service
+  notify: Restart rustfs service
 
-- name: Pull minio image
+- name: Pull rustfs image
   community.docker.docker_compose_v2:
-    project_src: "{{ app_dir }}/services/minio"
+    project_src: "{{ app_dir }}/services/rustfs"
     pull: always
     state: present
     recreate: never
 
-- name: Start minio service
+- name: Start rustfs service
   community.docker.docker_compose_v2:
-    project_src: "{{ app_dir }}/services/minio"
+    project_src: "{{ app_dir }}/services/rustfs"
     state: present
-  register: minio_compose
+  register: rustfs_compose

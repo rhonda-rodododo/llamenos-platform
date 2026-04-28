@@ -224,34 +224,34 @@
             openssl rand -base64 24
         success_msg: "pg_password: [set, {{ pg_password | length }} chars]"
 
-    - name: Assert minio_access_key is set
+    - name: Assert storage_access_key is set
       ansible.builtin.assert:
         that:
-          - minio_access_key is defined
-          - minio_access_key | length > 0
+          - storage_access_key is defined
+          - storage_access_key | length > 0
         fail_msg: |
-          REQUIRED: 'minio_access_key' must be set.
+          REQUIRED: 'storage_access_key' must be set.
           
-          Current value: {{ minio_access_key | default('NOT SET') }}
+          Current value: {{ storage_access_key | default('NOT SET') }}
           
           To generate:
             openssl rand -base64 24
-        success_msg: "minio_access_key: [set]"
+        success_msg: "storage_access_key: [set]"
 
-    - name: Assert minio_secret_key meets minimum length
+    - name: Assert storage_secret_key meets minimum length
       ansible.builtin.assert:
         that:
-          - minio_secret_key is defined
-          - minio_secret_key | length >= 16
+          - storage_secret_key is defined
+          - storage_secret_key | length >= 16
         fail_msg: |
-          REQUIRED: 'minio_secret_key' must be at least 16 characters long.
+          REQUIRED: 'storage_secret_key' must be at least 16 characters long.
           
-          Current value: {{ minio_secret_key | default('NOT SET') }}
-          Length: {{ minio_secret_key | default('') | length }} chars (expected: >= 16)
+          Current value: {{ storage_secret_key | default('NOT SET') }}
+          Length: {{ storage_secret_key | default('') | length }} chars (expected: >= 16)
           
           To generate:
             openssl rand -base64 24
-        success_msg: "minio_secret_key: [set, {{ minio_secret_key | length }} chars]"
+        success_msg: "storage_secret_key: [set, {{ storage_secret_key | length }} chars]"
 
     - name: Assert bridge_secret is set when Asterisk is enabled
       ansible.builtin.assert:
@@ -313,8 +313,8 @@
           Admin Pubkey: {{ admin_pubkey[:16] }}...
           Server Nostr Secret: {{ server_nostr_secret[:8] }}...
           PostgreSQL Password: [set, {{ pg_password | length }} chars]
-          MinIO Access Key: [set]
-          MinIO Secret Key: [set, {{ minio_secret_key | length }} chars]
+           Storage Access Key: [set]
+           Storage Secret Key: [set, {{ storage_secret_key | length }} chars]
           HMAC Secret: [set, {{ hmac_secret | length }} chars]
           Backup Encryption: {{ 'ENABLED' if backup_age_public_key | default('') | length > 0 else 'DISABLED (set backup_age_public_key to enable)' }}
           ===========================================

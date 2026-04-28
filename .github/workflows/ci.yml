@@ -667,7 +667,7 @@ jobs:
 
       # ── Native backend for API-connected UI tests ──
       # Docker is unavailable on macOS GHA runners (no nested virtualization).
-      # Run PostgreSQL and MinIO natively instead.
+      # Run PostgreSQL and S3-compatible storage natively instead.
       - name: Start PostgreSQL
         run: |
           brew install postgresql@17
@@ -678,7 +678,7 @@ jobs:
           createuser -s llamenos 2>/dev/null || true
           createdb -O llamenos llamenos 2>/dev/null || true
 
-      - name: Start MinIO
+      - name: Start S3-compatible storage (MinIO binary for CI)
         env:
           MINIO_VERSION: "RELEASE.2025-01-20T14-49-07Z"
           # SHA-256 of darwin-arm64 minio binary for MINIO_VERSION above.
@@ -693,7 +693,7 @@ jobs:
           MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup /tmp/minio server /tmp/minio-data &>/tmp/minio.log &
           for i in $(seq 1 15); do
             if curl -sf http://localhost:9000/minio/health/live; then
-              echo "MinIO is ready"
+              echo "S3-compatible storage is ready"
               break
             fi
             sleep 1
@@ -731,6 +731,7 @@ jobs:
           STORAGE_ENDPOINT: http://localhost:9000
           STORAGE_ACCESS_KEY: testaccess
           STORAGE_SECRET_KEY: testsecret123456
+          STORAGE_BUCKET: llamenos-files
           SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
 
       - name: Show backend logs

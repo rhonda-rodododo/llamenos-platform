@@ -33,13 +33,13 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # Allow MinIO
-    {{- if .Values.minio.enabled }}
+    # Allow RustFS
+    {{- if .Values.rustfs.enabled }}
     - to:
         - podSelector:
             matchLabels:
               {{- include "llamenos.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: minio
+              app.kubernetes.io/component: rustfs
       ports:
         - protocol: TCP
           port: 9000
@@ -85,19 +85,19 @@ spec:
         - protocol: TCP
           port: 443
 ---
-# Restrict MinIO: only accept traffic from app pod
-{{- if .Values.minio.enabled }}
+# Restrict RustFS: only accept traffic from app pod
+{{- if .Values.rustfs.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "llamenos.fullname" . }}-minio
+  name: {{ include "llamenos.fullname" . }}-rustfs
   labels:
     {{- include "llamenos.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
       {{- include "llamenos.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: minio
+      app.kubernetes.io/component: rustfs
   policyTypes:
     - Ingress
   ingress:

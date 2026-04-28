@@ -1,7 +1,2 @@
 ---
-- name: Restart rustfs backup timer
-  ansible.builtin.systemd:
-    name: rustfs-backup.timer
-    state: restarted
-    daemon_reload: true
-  when: ansible_facts.systemd is defined
+# No handlers needed — RustFS backup is script-based, no services to restart.

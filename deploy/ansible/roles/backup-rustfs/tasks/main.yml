@@ -1,7 +1,11 @@
 ---
 # RustFS backup role
 #
-# Mirrors all objects from the RustFS buckets using rclone:
+<<<<<<<< HEAD:deploy/ansible/roles/backup-minio/tasks/main.yml
+# Mirrors all objects from the RustFS bucket using mc mirror:
+========
+# Mirrors all objects from the RustFS bucket using s3 mirror/rclone:
+>>>>>>>> 0fe7c5a3 (feat: complete MinIO→RustFS migration — update Ansible, Helm, strip all references):deploy/ansible/roles/backup-rustfs/tasks/main.yml
 # - Archives as compressed tarball
 # - Optional age encryption
 # - Retention policy (daily/weekly/monthly)

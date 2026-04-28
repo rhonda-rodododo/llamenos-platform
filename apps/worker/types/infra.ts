@@ -20,7 +20,7 @@ export type { WebAuthnSettings } from '@protocol/schemas/settings'
 // Platform service interfaces (structural typing)
 // ---------------------------------------------------------------------------
 
-/** Blob storage interface (S3-compatible). */
+/** Blob storage interface (RustFS/S3-compatible). */
 export interface BlobStorage {
   put(key: string, body: ReadableStream | ArrayBuffer | Uint8Array | string): Promise<void>
   get(key: string): Promise<{ body: ReadableStream; size: number; arrayBuffer(): Promise<ArrayBuffer> } | null>
