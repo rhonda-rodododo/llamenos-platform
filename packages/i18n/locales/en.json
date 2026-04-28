@@ -186,7 +186,8 @@
     "noUsers": "No Volunteers",
     "searchUsers": "Search volunteers…",
     "tabUsers": "Volunteers",
-    "users": "Volunteers"
+    "users": "Volunteers",
+    "schemaBrowser": "Schema Browser"
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -606,7 +607,8 @@
     "typeLegalResource": "Legal Resource",
     "typeOrganization": "Organization",
     "typeServiceProvider": "Service Provider",
-    "viewTimeline": "View Timeline"
+    "viewTimeline": "View Timeline",
+    "loading": "Loading contact..."
   },
   "cases": {
     "accessAdmin": "Admin only",
@@ -767,7 +769,26 @@
     "emptyHint": "Cases will appear here as your team creates them.",
     "commentEncrypted": "Comments are encrypted end-to-end",
     "addComment": "Add Comment",
-    "commentSubmit": "Submit"
+    "commentSubmit": "Submit",
+    "enableHintAdmin": "Enable case management in hub settings",
+    "createComingSoon": "Coming soon",
+    "availableTypes": "Available Types",
+    "assignedSuffix": "Assigned",
+    "decrypting": "Decrypting...",
+    "fieldEncrypted": "Encrypted",
+    "newestFirst": "Newest first",
+    "oldestFirst": "Oldest first",
+    "noInteractionsHint": "No interactions yet",
+    "added": "Added",
+    "encryptedContent": "Encrypted content",
+    "interactionComment": "Comment",
+    "interactionStatus": "Status change",
+    "interactionNote": "Note",
+    "interactionCall": "Call",
+    "interactionMessage": "Message",
+    "interactionUpload": "Upload",
+    "interactionAssessment": "Assessment",
+    "interactionReferral": "Referral"
   },
   "reportLinks": {
     "linkReport": "Link Report",
@@ -900,7 +921,11 @@
     "title": "Call History",
     "to": "To",
     "transcription": "Transcription",
-    "unanswered": "Unanswered"
+    "unanswered": "Unanswered",
+    "errorTitle": "Unable to Load",
+    "emptyTitle": "No Call History",
+    "emptyFiltered": "No matching calls",
+    "emptyMessage": "No calls have been recorded yet"
   },
   "callSettings": {
     "description": "Configure call queue behavior and voicemail settings.",
@@ -982,7 +1007,11 @@
     "status": "Status",
     "submit": "Submit",
     "success": "Success",
-    "yes": "Yes"
+    "yes": "Yes",
+    "ok": "OK",
+    "create": "Create",
+    "all": "All",
+    "previous": "Previous"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1208,7 +1237,9 @@
     "viewAllNotes": "View All Notes",
     "viewCalls": "View Calls",
     "noUsersOnline": "No volunteers online",
-    "userStatus": "Volunteer Status"
+    "userStatus": "Volunteer Status",
+    "callHistory": "Call History",
+    "triage": "Triage"
   },
   "decryptingKeys": "Decrypting keys...",
   "delete": "Delete",
@@ -1304,7 +1335,8 @@
     "pinTooShort": "PIN must be at least 6 digits",
     "wakeDecryptFailed": "Wake decrypt failed: %@",
     "wakeKeyGeneration": "Failed to generate wake key",
-    "wakeRegisterFailed": "Device registration failed: %@"
+    "wakeRegisterFailed": "Device registration failed: %@",
+    "title": "Error"
   },
   "events": {
     "cmsDisabled": "Case management is not enabled.",
@@ -1342,7 +1374,32 @@
     "tabReports": "Reports",
     "tabTimeline": "Timeline",
     "title": "Events",
-    "updatedAt": "Updated {{time}}"
+    "updatedAt": "Updated {{time}}",
+    "encodeError": "Failed to encode event details",
+    "createSubEvent": "Create Sub-Event",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "cases": "Cases",
+    "reports": "Reports",
+    "subEvents": "Sub-Events",
+    "description": "Description",
+    "metadata": "Metadata",
+    "eventId": "Event ID",
+    "created": "Created",
+    "updated": "Updated",
+    "locationPrecision": "Location Precision",
+    "tabSubEvents": "Sub-Events",
+    "cmsDisabledTitle": "Events Not Available",
+    "emptyTitle": "No Events",
+    "listHeader": "Events",
+    "eventType": "Event Type",
+    "titlePlaceholder": "Event title",
+    "descriptionPlaceholder": "Description (optional)",
+    "detailsSection": "Details",
+    "hasEndDate": "Set End Date",
+    "datesSection": "Dates",
+    "locationPlaceholder": "Location description",
+    "locationSection": "Location"
   },
   "eventType": {
     "call": "Call",
@@ -1583,7 +1640,19 @@
     "deleteHubDescription": "Permanently delete this hub and all of its data. This cannot be undone.",
     "deleteHubNameMismatch": "Hub name does not match",
     "deleteHubWarning": "This will permanently delete all calls, notes, cases, contacts, shifts, and user accounts associated with this hub.",
-    "hubDeleted": "Hub deleted permanently"
+    "hubDeleted": "Hub deleted permanently",
+    "createdSuccess": "Hub created successfully",
+    "emptyTitle": "No Hubs",
+    "emptyMessage": "You haven't joined any hubs yet",
+    "yourHubs": "Your Hubs",
+    "active": "Active",
+    "namePlaceholder": "Hub name",
+    "slugPlaceholder": "hub-slug",
+    "nameSection": "Hub Name",
+    "descriptionPlaceholder": "Hub description",
+    "descriptionSection": "Description",
+    "phonePlaceholder": "Phone number",
+    "phoneSection": "Phone Number"
   },
   "identityLabel": "Identity",
   "import": {
@@ -1642,7 +1711,8 @@
     "hubUrlPlaceholder": "https://hub.example.org",
     "importKey": "Import Existing Key",
     "or": "or",
-    "subtitle": "Secure crisis response hotline"
+    "subtitle": "Secure crisis response hotline",
+    "linkDevice": "Link a Device"
   },
   "logout": {
     "confirmAction": "Logout",
@@ -1882,7 +1952,8 @@
     "unlockAttempts": "%d of %d attempts used",
     "unlockSubtitle": "Enter your PIN to unlock",
     "unlockTitle": "Enter your PIN",
-    "unlockVerifying": "Verifying..."
+    "unlockVerifying": "Verifying...",
+    "createPin": "Create a PIN"
   },
   "pinChallenge": {
     "description": "Enter your PIN to continue with this action.",
@@ -2159,7 +2230,14 @@
     "statuses": "Statuses",
     "statusesCount": "%d statuses",
     "subRecords": "Sub-Records",
-    "template": "Template"
+    "template": "Template",
+    "fieldsLabel": "Fields",
+    "statusesLabel": "Statuses",
+    "name": "Name",
+    "label": "Label",
+    "description": "Description",
+    "category": "Category",
+    "overview": "Overview"
   },
   "searchConversations": "Search conversations...",
   "select": {
@@ -2289,7 +2367,11 @@
     "transcriptionSettings": "Transcription",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Browser calling is not available. Your admin needs to enable WebRTC in the telephony provider settings."
+    "webrtcNotConfigured": "Browser calling is not available. Your admin needs to enable WebRTC in the telephony provider settings.",
+    "copyPubkey": "Copy Public Key",
+    "signingPubkey": "Signing Public Key",
+    "encryptionPubkey": "Encryption Public Key",
+    "deviceId": "Device ID"
   },
   "setup": {
     "autoResponse": "Auto-Response Template",
@@ -2671,7 +2753,10 @@
     "statusUpdated": "Status updated",
     "title": "Triage",
     "titlePlaceholder": "Case title...",
-    "untitled": "Untitled Report"
+    "untitled": "Untitled Report",
+    "detailInfo": "Triage Detail",
+    "loading": "Loading...",
+    "errorTitle": "Unable to Load"
   },
   "unlock": {
     "biometricReason": "Unlock Llamenos",
@@ -2804,5 +2889,56 @@
     "title": "Volunteers",
     "unnamed": "Unnamed Volunteer",
     "userAdded": "Volunteer added successfully"
+  },
+  "location": {
+    "permissionDenied": "Location permission denied",
+    "noResult": "No location found"
+  },
+  "call": {
+    "statusAnswered": "Answered",
+    "statusMissed": "Missed",
+    "statusVoicemail": "Voicemail",
+    "filterAll": "All"
+  },
+  "notification": {
+    "incomingCall": "Incoming Call",
+    "callBody": "A caller needs assistance"
+  },
+  "signalNotifications": {
+    "title": "Signal Notifications",
+    "description": "Receive call and security alerts via Signal",
+    "contactRegistered": "Contact registered",
+    "contactRemoved": "Contact removed",
+    "notConfigured": "Signal not configured",
+    "yourContact": "Your contact",
+    "contactActive": "Active",
+    "contactTypeLabel": "Type",
+    "lastVerified": "Last verified",
+    "hashLabel": "Identifier hash",
+    "registerHelp": "Register your Signal contact to receive notifications",
+    "phoneNumber": "Phone number",
+    "username": "Username",
+    "phonePlaceholder": "+1 555 000 0000",
+    "usernamePlaceholder": "@username",
+    "register": "Register",
+    "alertPreferences": "Alert preferences",
+    "useSignalAlerts": "Use Signal alerts",
+    "useSignalAlertsHelp": "Receive security alerts via Signal",
+    "disappearingTimer": "Disappearing messages",
+    "disappearingTimerHelp": "Messages will disappear after this time",
+    "timerOff": "Off",
+    "timer1Day": "1 day",
+    "timer7Days": "7 days",
+    "timer30Days": "30 days",
+    "digestCadence": "Digest cadence",
+    "cadenceOff": "Off",
+    "cadenceDaily": "Daily",
+    "cadenceWeekly": "Weekly",
+    "alertEvents": "Activity alerts",
+    "alertNewDevice": "New device linked",
+    "alertPasskeyChange": "Passkey changed",
+    "alertPinChange": "PIN changed",
+    "noContactWarning": "No Signal contact registered",
+    "privacyNote": "Only a hash of your contact info is stored"
   }
 }
