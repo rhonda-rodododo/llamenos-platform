@@ -246,7 +246,7 @@ struct NoteDetailView: View {
                         "followUp": .bool(true),
                     ]
                 ),
-                authorPubkey: "abc123def456abc123def456abc123def456abc123def456abc123def456abcd",
+                authorPubkey: "preview_pubkey_0000000000000000000000000000000000000000000000000001",
                 callId: "call-12345-abcde",
                 conversationId: nil,
                 createdAt: Date().addingTimeInterval(-3600),
