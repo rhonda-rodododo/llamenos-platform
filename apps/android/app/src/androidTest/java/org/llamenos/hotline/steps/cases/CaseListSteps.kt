@@ -92,7 +92,7 @@ class CaseListSteps : BaseSteps() {
                         activity.applicationContext,
                         CaseListSteps.NpubEntryPoint::class.java
                     )
-                    npubText = entryPoint.cryptoService().npub
+                    npubText = entryPoint.cryptoService().encryptionPubkeyHex
                     Log.d("CaseListSteps", "Read npub via EntryPoint: ${npubText?.take(20)}...")
                 } catch (e: Throwable) {
                     Log.w("CaseListSteps", "EntryPoint access failed: ${e.message}")

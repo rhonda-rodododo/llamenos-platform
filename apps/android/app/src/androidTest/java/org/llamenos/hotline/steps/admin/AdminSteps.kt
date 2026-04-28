@@ -14,6 +14,7 @@ import io.cucumber.java.After
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import kotlinx.coroutines.runBlocking
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.steps.BaseSteps
@@ -131,7 +132,7 @@ class AdminSteps : BaseSteps() {
 
     @Given("the crypto service is locked")
     fun theCryptoServiceIsLocked() {
-        cryptoService.generateKeypair()
+        runBlocking { cryptoService.generateDeviceKeys(java.util.UUID.randomUUID().toString(), "123456") }
         cryptoService.lock()
     }
 
