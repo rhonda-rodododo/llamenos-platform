@@ -14,6 +14,7 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
 
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { x25519 } from '@noble/curves/ed25519.js'
+import { schnorr } from '@noble/curves/secp256k1.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { hmac } from '@noble/hashes/hmac.js'
@@ -77,6 +78,11 @@ interface MockDeviceKeyState {
 let mockSecrets: MockDeviceSecrets | null = null
 let mockDeviceState: MockDeviceKeyState | null = null
 let mockEncryptedKeys: unknown = null
+
+// Key type tracking for auth token generation
+type KeyType = 'ed25519' | 'secp256k1'
+let currentKeyType: KeyType = 'ed25519'
+let schnorrSecretBytes: Uint8Array | null = null // secp256k1 secret for Schnorr auth
 
 function deriveEd25519Pubkey(seed: Uint8Array): Uint8Array {
   return ed25519.getPublicKey(seed)
@@ -250,17 +256,19 @@ const commands: Record<string, CommandHandler> = {
 
     const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
 
-    const result = { ...encrypted, state }
+    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
     mockSecrets = { signingSeed, encryptionSeed }
     mockDeviceState = state
     mockEncryptedKeys = result
+    currentKeyType = 'ed25519'
+    schnorrSecretBytes = null
 
     return result
   },
 
   unlock_with_pin: async (a) => {
     const data = (mockEncryptedKeys ?? a.data) as {
-      salt: string; nonce: string; ciphertext: string; state: MockDeviceKeyState
+      salt: string; nonce: string; ciphertext: string; state: MockDeviceKeyState; _keyType?: string
     }
     if (!data) throw new Error('No key stored. Complete onboarding first.')
 
@@ -269,6 +277,16 @@ const commands: Record<string, CommandHandler> = {
 
     mockSecrets = { signingSeed, encryptionSeed }
     mockDeviceState = data.state
+
+    // Restore key type for auth token generation
+    if (data._keyType === 'secp256k1') {
+      currentKeyType = 'secp256k1'
+      schnorrSecretBytes = signingSeed
+    } else {
+      currentKeyType = 'ed25519'
+      schnorrSecretBytes = null
+    }
+
     return data.state
   },
 
@@ -286,23 +304,26 @@ const commands: Record<string, CommandHandler> = {
   // --- Auth tokens (Ed25519) ---
 
   create_auth_token_from_state: (a) => {
-    const secrets = requireSecrets()
     const timestamp = a.timestamp as number
     const method = a.method as string
     const path = a.path as string
 
-    // Auth message: SHA-256("llamenos:device-auth:v1:" + timestamp + ":" + method + ":" + path)
-    const msgStr = `llamenos:device-auth:v1:${timestamp}:${method}:${path}`
-    const msgHash = sha256(utf8ToBytes(msgStr))
-
-    const sig = ed25519.sign(msgHash, secrets.signingSeed)
-
-    const token = {
-      pubkey: bytesToHex(deriveEd25519Pubkey(secrets.signingSeed)),
-      timestamp,
-      token: bytesToHex(sig),
+    if (currentKeyType === 'secp256k1' && schnorrSecretBytes) {
+      // Schnorr auth (secp256k1) for legacy nsec import
+      const pubkey = bytesToHex(schnorr.getPublicKey(schnorrSecretBytes))
+      const msgStr = `llamenos:auth:${pubkey}:${timestamp}:${method}:${path}`
+      const msgHash = sha256(utf8ToBytes(msgStr))
+      const sig = schnorr.sign(msgHash, schnorrSecretBytes)
+      return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
     }
-    return JSON.stringify(token)
+
+    // Ed25519 auth (v3 device keys)
+    const secrets = requireSecrets()
+    const pubkey = bytesToHex(deriveEd25519Pubkey(secrets.signingSeed))
+    const msgStr = `llamenos:auth:${pubkey}:${timestamp}:${method}:${path}`
+    const msgHash = sha256(utf8ToBytes(msgStr))
+    const sig = ed25519.sign(msgHash, secrets.signingSeed)
+    return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
   },
 
   // --- Ed25519 signing/verification ---
@@ -581,6 +602,99 @@ const commands: Record<string, CommandHandler> = {
     const sendKey = hkdf(sha256, baseKey, new Uint8Array(0), indexBuf, 32)
 
     return bytesToHex(sendKey)
+  },
+
+  // --- Device import (known Ed25519 seed) ---
+
+  device_import_and_load: async (a) => {
+    const signingSecretHex = a.signingSecretHex as string
+    const pin = a.pin as string
+    const deviceId = a.deviceId as string
+
+    const signingSeed = hexToBytes(signingSecretHex)
+    // Derive encryption seed from signing seed via HKDF (matches Rust)
+    const encryptionSeed = hkdf(sha256, signingSeed, new Uint8Array(0),
+      utf8ToBytes('llamenos:device-encryption-seed:v1'), 32)
+
+    const signingPubkey = deriveEd25519Pubkey(signingSeed)
+    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
+
+    const state: MockDeviceKeyState = {
+      deviceId,
+      signingPubkeyHex: bytesToHex(signingPubkey),
+      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
+    }
+
+    const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
+    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
+
+    mockSecrets = { signingSeed, encryptionSeed }
+    mockDeviceState = state
+    mockEncryptedKeys = result
+    currentKeyType = 'ed25519'
+    schnorrSecretBytes = null
+
+    return result
+  },
+
+  // --- Legacy nsec import (secp256k1 secret for Schnorr auth) ---
+
+  legacy_import_nsec: async (a) => {
+    const nsecHex = a.nsecHex as string
+    const pin = a.pin as string
+    const deviceId = a.deviceId as string
+
+    const secretBytes = hexToBytes(nsecHex)
+    const xOnlyPubkey = schnorr.getPublicKey(secretBytes)
+
+    // For secp256k1 legacy keys, we store the secret as "signingSeed"
+    // and derive a dummy encryption seed (not used for HPKE in legacy mode)
+    const encryptionSeed = hkdf(sha256, secretBytes, new Uint8Array(0),
+      utf8ToBytes('llamenos:legacy-encryption-seed:v1'), 32)
+    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
+
+    const state: MockDeviceKeyState = {
+      deviceId,
+      signingPubkeyHex: bytesToHex(xOnlyPubkey),
+      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
+    }
+
+    const encrypted = await encryptWithPin(secretBytes, encryptionSeed, pin)
+    const result = { ...encrypted, state, _keyType: 'secp256k1' as string }
+
+    mockSecrets = { signingSeed: secretBytes, encryptionSeed }
+    mockDeviceState = state
+    mockEncryptedKeys = result
+    currentKeyType = 'secp256k1'
+    schnorrSecretBytes = secretBytes
+
+    return result
+  },
+
+  // --- Ephemeral Ed25519 keypair (for admin-created users) ---
+
+  generate_ephemeral_ed25519: () => {
+    const seed = randomBytes(32)
+    const pubkey = deriveEd25519Pubkey(seed)
+    return {
+      signingPubkeyHex: bytesToHex(pubkey),
+      seedHex: bytesToHex(seed),
+    }
+  },
+
+  // --- Backup generation ---
+
+  generate_backup_from_state: (_a) => {
+    const secrets = requireSecrets()
+    const state = requireDeviceState()
+    // Return a mock backup JSON — real Rust would encrypt with recovery key
+    return JSON.stringify({
+      v: 3,
+      deviceId: state.deviceId,
+      signingPubkeyHex: state.signingPubkeyHex,
+      encryptionPubkeyHex: state.encryptionPubkeyHex,
+      encryptedPayload: bytesToHex(secrets.signingSeed), // Mock: not actually encrypted
+    })
   },
 }
 

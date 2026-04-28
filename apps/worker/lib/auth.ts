@@ -1,5 +1,6 @@
 import type { AuthPayload, User } from '../types'
 import { schnorr } from '@noble/curves/secp256k1.js'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
@@ -40,7 +41,20 @@ export async function verifyAuthToken(auth: AuthPayload, method?: string, path?:
   try {
     const boundMessage = `${AUTH_PREFIX}${auth.pubkey}:${auth.timestamp}:${method}:${path}`
     const boundHash = sha256(utf8ToBytes(boundMessage))
-    return schnorr.verify(hexToBytes(auth.token), boundHash, hexToBytes(auth.pubkey))
+    const tokenBytes = hexToBytes(auth.token)
+    const pubkeyBytes = hexToBytes(auth.pubkey)
+
+    // Try secp256k1 Schnorr first (backward compatible with Nostr-style keys)
+    try {
+      if (schnorr.verify(tokenBytes, boundHash, pubkeyBytes)) return true
+    } catch { /* Not a valid Schnorr signature — try Ed25519 */ }
+
+    // Try Ed25519 (v3 device keys)
+    try {
+      if (ed25519.verify(tokenBytes, boundHash, pubkeyBytes)) return true
+    } catch { /* Not a valid Ed25519 signature either */ }
+
+    return false
   } catch {
     return false
   }
@@ -71,7 +85,7 @@ export async function authenticateRequest(
     }
   }
 
-  // Fall back to Schnorr signature auth
+  // Fall back to signature auth (Schnorr or Ed25519)
   const auth = parseAuthHeader(authHeader)
   if (!auth) return null
   const url = new URL(request.url)

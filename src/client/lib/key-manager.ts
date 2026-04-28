@@ -137,6 +137,18 @@ export async function importKey(nsec: string, pin: string): Promise<string> {
 }
 
 /**
+ * Mark the key manager as unlocked with a known pubkey.
+ * Used when CryptoState is already loaded (e.g. post-bootstrap, post-onboarding)
+ * and we need to sync the key-manager's tracked state without re-decrypting.
+ */
+export function markUnlocked(pubkeyHex: string): void {
+  publicKey = pubkeyHex
+  unlocked = true
+  resetIdleTimer()
+  unlockCallbacks.forEach(cb => cb())
+}
+
+/**
  * Check if the key manager is currently unlocked.
  */
 export function isUnlocked(): boolean {

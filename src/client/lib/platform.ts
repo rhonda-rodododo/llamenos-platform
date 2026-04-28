@@ -13,7 +13,8 @@
 
 // ── Backend detection ────────────────────────────────────────────────
 
-const useTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+const useTauri = typeof window !== 'undefined' &&
+  ('__TAURI_INTERNALS__' in window || !!import.meta.env.PLAYWRIGHT_TEST)
 
 // ── Tauri IPC wrapper (desktop only) ─────────────────────────────────
 
@@ -111,6 +112,37 @@ export async function deviceGenerateAndLoad(
     return tauriInvoke<EncryptedDeviceKeys>('device_generate_and_load', { pin, deviceId })
   }
   throw new Error('WASM device key generation not yet implemented')
+}
+
+/**
+ * Import a known Ed25519 signing seed as device keys.
+ * Encryption seed is derived via HKDF from the signing seed.
+ * Used in tests to import known key material.
+ */
+export async function deviceImportAndLoad(
+  signingSecretHex: string,
+  pin: string,
+  deviceId: string,
+): Promise<EncryptedDeviceKeys> {
+  if (useTauri) {
+    return tauriInvoke<EncryptedDeviceKeys>('device_import_and_load', { signingSecretHex, pin, deviceId })
+  }
+  throw new Error('WASM device import not yet implemented')
+}
+
+/**
+ * Import a legacy secp256k1 secret key (nsec hex) as device keys.
+ * Used for backward-compatible admin login in tests.
+ */
+export async function legacyImportNsec(
+  nsecHex: string,
+  pin: string,
+  deviceId: string,
+): Promise<EncryptedDeviceKeys> {
+  if (useTauri) {
+    return tauriInvoke<EncryptedDeviceKeys>('legacy_import_nsec', { nsecHex, pin, deviceId })
+  }
+  throw new Error('WASM legacy import not yet implemented')
 }
 
 /**
@@ -551,10 +583,12 @@ export interface FileKeyEnvelope {
 
 // --- Legacy function wrappers ---
 
-/** @deprecated Use deviceGenerateAndLoad instead. */
+/** @deprecated Use deviceGenerateAndLoad + persistAndUnlockDeviceKeys instead. */
 export async function generateKeypairAndLoad(pin: string): Promise<GenerateAndLoadResult> {
   const deviceId = crypto.randomUUID()
   const encrypted = await deviceGenerateAndLoad(pin, deviceId)
+  // Persist to store so the key survives page reloads
+  await persistAndUnlockDeviceKeys(encrypted, pin)
   // Map v3 result to v2 shape for callers
   return {
     publicKey: encrypted.state.signingPubkeyHex,
@@ -739,18 +773,33 @@ export async function rewrapFileKey(
   throw new Error('rewrapFileKey removed in v3 — compose hpkeOpenKeyFromState + hpkeSealKey')
 }
 
-/** @deprecated Backup generation needs v3 migration. */
+/**
+ * Generate an encrypted backup from the current CryptoState.
+ * In v3, wraps the device key material for offline recovery.
+ */
 export async function generateBackupFromState(
-  _pubkey: string,
-  _pin: string,
-  _recoveryKey: string,
+  pubkey: string,
+  pin: string,
+  recoveryKey: string,
 ): Promise<string> {
-  throw new Error('generateBackupFromState removed in v3 — needs device key backup migration')
+  if (useTauri) {
+    return tauriInvoke<string>('generate_backup_from_state', { pubkey, pin, recoveryKey })
+  }
+  throw new Error('WASM backup generation not yet implemented')
 }
 
-/** @deprecated No more ephemeral Nostr keypairs. */
+/**
+ * Generate an ephemeral Ed25519 keypair for admin-created users.
+ * Returns the hex-encoded signing seed as "nsec" for backward compat with callers.
+ * The public key is the Ed25519 signing pubkey hex.
+ */
 export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
-  throw new Error('generateEphemeralKeypair removed in v3 — no more Nostr nsec/npub')
+  if (useTauri) {
+    // Use the mock/Rust to generate a random Ed25519 seed and derive pubkey
+    const result = await tauriInvoke<{ signingPubkeyHex: string; seedHex: string }>('generate_ephemeral_ed25519')
+    return { publicKey: result.signingPubkeyHex, npub: '', nsec: result.seedHex }
+  }
+  throw new Error('WASM ephemeral keypair not yet implemented')
 }
 
 /** @deprecated Device provisioning needs v3 migration. */

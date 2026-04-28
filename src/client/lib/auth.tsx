@@ -259,6 +259,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginAfterKeyLoaded = useCallback(async (pubkeyHex: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }))
     try {
+      // Sync key-manager state so getAuthHeaders() can produce auth tokens
+      keyManager.markUnlocked(pubkeyHex)
       const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/login')
       const parsed = JSON.parse(tokenJson)
       await login(pubkeyHex, parsed.timestamp, parsed.token)

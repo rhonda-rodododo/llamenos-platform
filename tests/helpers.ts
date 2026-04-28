@@ -1,8 +1,17 @@
 import { type Page, type APIRequestContext, expect } from '@playwright/test'
+import { nip19 } from 'nostr-tools'
+import { bytesToHex } from '@noble/hashes/utils.js'
 import { TestIds, navTestIdMap } from './test-ids'
 
 export const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
 export const TEST_PIN = '123456'
+
+/** Decode a bech32 nsec to hex secret key (Node-side). */
+function nsecToHex(nsec: string): string {
+  const decoded = nip19.decode(nsec)
+  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
+  return bytesToHex(decoded.data as Uint8Array)
+}
 
 /**
  * Default timeout values for common operations.
@@ -121,19 +130,19 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
 }
 
 /**
- * Login as admin: uses the app's own platform layer to encrypt/store the key,
- * then enters PIN to unlock. Both encrypt and decrypt happen in the same browser
- * context, avoiding any Node.js-vs-browser crypto mismatch.
+ * Login as admin: imports the legacy secp256k1 nsec via the IPC mock,
+ * persists to store, then enters PIN to unlock. Uses Schnorr auth
+ * (backward-compatible with the bootstrap flow).
  */
 export async function loginAsAdmin(page: Page) {
+  const secretHex = nsecToHex(ADMIN_NSEC)
+
   await page.goto('/login')
   await page.evaluate(() => {
     sessionStorage.clear()
-    // Browser store uses 'llamenos:' prefix — clear the correct key
+    localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
     localStorage.removeItem('llamenos:llamenos-encrypted-key')
-    // Legacy/Tauri keys — clear for safety
     localStorage.removeItem('llamenos-encrypted-key')
-    localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
   })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
@@ -141,16 +150,13 @@ export async function loginAsAdmin(page: Page) {
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
   await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Use the app's own platform layer (which routes through the Tauri IPC mock)
-  // to encrypt and store the key. This ensures encrypt and decrypt use the same
-  // crypto implementation (browser-side @noble/ciphers).
-  await page.evaluate(async ({ nsec, pin }) => {
+  // Import the secp256k1 secret via legacy_import_nsec, persist encrypted keys
+  await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const publicKey = await platform.pubkeyFromNsec(nsec)
-    if (!publicKey) throw new Error('Failed to parse admin nsec')
-    await platform.encryptWithPin(nsec, pin, publicKey)
+    const encrypted = await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
+    await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
-  }, { nsec: ADMIN_NSEC, pin: TEST_PIN })
+  }, { secretHex, pin: TEST_PIN })
 
   // Reload to trigger PIN screen — the encrypted key persists in localStorage
   await page.reload()
@@ -159,10 +165,6 @@ export async function loginAsAdmin(page: Page) {
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
   // Wait for admin section in sidebar or hamburger button (mobile) — confirms getMe() completed.
-  // Without this, the brief window between isKeyUnlocked=true (onUnlock fires synchronously)
-  // and getMe() completing (async) can cause isAdmin=false on the first admin-only route.
-  // On mobile viewports, the sidebar is CSS-hidden (hamburger shows instead), so we check
-  // viewport width to determine which element to wait for.
   const viewport = page.viewportSize()
   const isMobile = viewport ? viewport.width < 768 : false
   if (isMobile) {
@@ -173,19 +175,17 @@ export async function loginAsAdmin(page: Page) {
 }
 
 /**
- * Login as user (volunteer): uses the app's own platform layer to encrypt/store the key,
- * then enters PIN to unlock. Both encrypt and decrypt happen in the same browser
- * context, avoiding any Node.js-vs-browser crypto mismatch.
+ * Login as user (volunteer): imports Ed25519 seed via IPC mock,
+ * persists to store, then enters PIN to unlock.
+ * The `seedHex` param is the Ed25519 signing seed hex (returned by createUserAndGetNsec).
  */
-export async function loginAsVolunteer(page: Page, nsec: string) {
+export async function loginAsVolunteer(page: Page, seedHex: string) {
   await page.goto('/login')
   await page.evaluate(() => {
     sessionStorage.clear()
-    // Browser store uses 'llamenos:' prefix — clear the correct key
+    localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
     localStorage.removeItem('llamenos:llamenos-encrypted-key')
-    // Legacy/Tauri keys — clear for safety
     localStorage.removeItem('llamenos-encrypted-key')
-    localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
   })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
@@ -193,14 +193,13 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   // Wait for __TEST_PLATFORM to be loaded
   await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Encrypt and store via the browser's platform layer (same context as decrypt)
-  await page.evaluate(async ({ nsec, pin }) => {
+  // Import the Ed25519 seed, persist encrypted keys
+  await page.evaluate(async ({ seedHex, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const publicKey = await platform.pubkeyFromNsec(nsec)
-    if (!publicKey) throw new Error('Failed to parse user nsec')
-    await platform.encryptWithPin(nsec, pin, publicKey)
+    const encrypted = await platform.deviceImportAndLoad(seedHex, pin, crypto.randomUUID())
+    await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
-  }, { nsec, pin: TEST_PIN })
+  }, { seedHex, pin: TEST_PIN })
 
   // Reload to trigger PIN screen
   await page.reload()
@@ -208,9 +207,7 @@ export async function loginAsVolunteer(page: Page, nsec: string) {
   await enterPin(page, TEST_PIN)
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
 
-  // New users land on /profile-setup, but the React useEffect redirect may fire
-  // slightly after the URL leaves /login (race condition with snapshot check).
-  // Use Promise.race to detect whichever appears first: profile-setup button or nav-sidebar.
+  // New users land on /profile-setup — detect and handle
   const profileSetupBtn = page.getByRole('button', { name: /complete setup/i })
   const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
   const landedOnProfileSetup = await Promise.race([
