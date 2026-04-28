@@ -9,11 +9,16 @@
 #   - Sets ENVIRONMENT=development (enables /api/test-reset endpoint)
 #   - Disables read_only to allow SQLite WAL files in tmpfs
 #   - Fixes strfry NOFILES config for CI (default 1M exceeds GitHub Actions ulimit of 65536)
-#   - Configures signal-notifier and asterisk-bridge in test mode
+#   - Configures signal-notifier and sip-bridge in test mode
 
 services:
   # Fix strfry for CI: mount config with nofiles=0 (don't attempt to set ulimit)
+  # Override ulimits from base compose (1M exceeds GitHub Actions limit of 65536)
   strfry:
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     volumes:
       - ./strfry-test.conf:/etc/strfry.conf:ro
 
@@ -56,9 +61,9 @@ services:
       - NOTIFIER_DB_PATH=/tmp/notifier-test.db
 
   # ── Asterisk sidecar: test mode ────────────────────────────────────
-  # asterisk-bridge points to the mock ARI endpoint; BRIDGE_SECRET and
+  # sip-bridge points to the mock ARI endpoint; BRIDGE_SECRET and
   # ARI_PASSWORD come from .env (set to ci-test-* values in CI).
-  asterisk-bridge:
+  sip-bridge:
     environment:
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_USERNAME=llamenos

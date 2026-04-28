@@ -252,8 +252,8 @@ jobs:
       - name: Build and start Docker Compose (core services)
         run: |
           docker compose --env-file .env \
-            -f docker-compose.yml \
-            -f docker-compose.test.yml \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
             up -d --build --wait app
         timeout-minutes: 10
 
@@ -261,8 +261,8 @@ jobs:
         run: |
           docker compose --env-file .env \
             --profile signal --profile asterisk \
-            -f docker-compose.yml \
-            -f docker-compose.test.yml \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
             up -d --build
         timeout-minutes: 5
 
@@ -285,13 +285,13 @@ jobs:
         run: |
           docker compose --env-file .env \
             --profile signal --profile asterisk \
-            -f docker-compose.yml \
-            -f docker-compose.test.yml \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
             ps || true
           docker compose --env-file .env \
             --profile signal --profile asterisk \
-            -f docker-compose.yml \
-            -f docker-compose.test.yml \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
             logs --tail=50 || true
 
       - name: Run E2E tests
@@ -326,8 +326,8 @@ jobs:
         run: |
           docker compose --env-file .env \
             --profile signal --profile asterisk \
-            -f docker-compose.yml \
-            -f docker-compose.test.yml \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
             down -v
 
 
