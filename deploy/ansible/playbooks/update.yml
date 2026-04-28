@@ -5,7 +5,7 @@
 # 1. Snapshot current image versions and config (for rollback)
 # 2. Run pre-update backup
 # 3. Pull new images
-# 4. Update infrastructure services first (postgres, minio, strfry, caddy)
+# 4. Update infrastructure services first (postgres, rustfs, strfry, caddy)
 # 5. Health-check infrastructure
 # 6. Blue-green update the app service (start new, verify, stop old)
 # 7. Health-check the full stack
@@ -33,7 +33,7 @@
     # Infrastructure services updated before app
     infra_services:
       - postgres
-      - minio
+      - rustfs
       - strfry
       - caddy
 

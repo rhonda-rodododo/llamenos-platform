@@ -1,33 +1,31 @@
-# MinIO Object Storage — managed by Ansible
+# RustFS Object Storage — managed by Ansible
 # Do not edit manually; changes will be overwritten on next deploy.
 # Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
 
-name: llamenos-minio
+name: llamenos-rustfs
 
 services:
-  minio:
-    image: {{ llamenos_minio_image }}
-    command: server /data --console-address ":9001"
+  rustfs:
+    image: {{ llamenos_rustfs_image }}
+    command: server /data
     restart: unless-stopped
     volumes:
-      - minio-data:/data
+      - rustfs-data:/data
     env_file:
-      - .env.minio
+      - .env.rustfs
 {% if llamenos_internal_tls_enabled %}
     ports:
-      - "{{ llamenos_minio_port | default('9000') }}:9000"
-      - "9001:9001"
+      - "{{ llamenos_rustfs_port | default('9000') }}:9000"
 {% elif groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_storage', [])) | length == 0 %}
     # App is on a different host — expose port for cross-host access
     ports:
-      - "{{ llamenos_minio_port | default('9000') }}:9000"
-      - "9001:9001"
+      - "{{ llamenos_rustfs_port | default('9000') }}:9000"
 {% else %}
     networks:
       - internal
 {% endif %}
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,7 +38,7 @@ services:
           memory: 256M
 
 volumes:
-  minio-data:
+  rustfs-data:
 
 {% if not llamenos_internal_tls_enabled and not (groups.get('llamenos_app', []) | length > 0 and groups['llamenos_app'] | intersect(groups.get('llamenos_storage', [])) | length == 0) %}
 networks:

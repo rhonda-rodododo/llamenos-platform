@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 #
-# Llamenos MinIO Backup Script — managed by Ansible
+# Llamenos RustFS Backup Script — managed by Ansible
 #
-# Uses `mc mirror` inside the MinIO container to export all objects from
-# the bucket, then tars and optionally encrypts the result.
+# Mirrors all objects from the RustFS bucket using rclone or aws s3 sync,
+# then tars and optionally encrypts the result.
 #
 # Usage:
-#   ./backup-minio.sh              # Run a daily backup
-#   ./backup-minio.sh --manual     # Run and tag as manual backup
-#   ./backup-minio.sh --manifest   # Output manifest entry to stdout
+#   ./backup-rustfs.sh              # Run a daily backup
+#   ./backup-rustfs.sh --manual     # Run and tag as manual backup
+#   ./backup-rustfs.sh --manifest   # Output manifest entry to stdout
 
 set -euo pipefail
 
-BACKUP_DIR="{{ backup_minio_dir }}"
+BACKUP_DIR="{{ backup_rustfs_dir }}"
 COMPOSE_FILE="{{ backup_compose_file }}"
 AGE_RECIPIENT="{{ backup_age_public_key }}"
 RCLONE_REMOTE="{{ backup_rclone_remote }}"
-MINIO_BUCKET="{{ backup_minio_bucket }}"
+RUSTFS_BUCKET="{{ backup_rustfs_bucket }}"
 TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
 DAY_OF_WEEK="$(date -u +%u)"
 DAY_OF_MONTH="$(date -u +%d)"
@@ -31,46 +31,49 @@ for arg in "$@"; do
 done
 
 log() {
-  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [minio] $*"
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [rustfs] $*"
 }
 
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "${TMPDIR}"' EXIT
 
-MIRROR_DIR="${TMPDIR}/minio-mirror"
-mkdir -p "${MIRROR_DIR}"
+SYNC_DIR="${TMPDIR}/rustfs-sync"
+mkdir -p "${SYNC_DIR}"
 
-log "Starting ${BACKUP_TYPE} MinIO backup..."
+log "Starting ${BACKUP_TYPE} RustFS backup..."
 
-# Step 1: Mirror bucket contents out of the container
-# mc is available inside the minio container; we use docker exec to run it
-docker compose -f "${COMPOSE_FILE}" exec -T minio \
-  mc alias set {{ backup_minio_alias }} http://localhost:9000 \
-    "${MINIO_ROOT_USER:-}" "${MINIO_ROOT_PASSWORD:-}" \
-    --api S3v4 2>/dev/null || true
+# Step 1: Sync bucket contents using rclone or aws CLI
+# Prefer rclone if available, fall back to aws s3 sync
+if command -v rclone &>/dev/null; then
+  rclone sync \
+    "s3:{{ backup_rustfs_bucket }}" \
+    "${SYNC_DIR}/" \
+    --s3-provider=Minio \
+    --s3-endpoint="http://localhost:9000" \
+    {% if backup_rustfs_remove_deleted %}--delete{% endif %} \
+    2>&1 || true
+elif command -v aws &>/dev/null; then
+  aws s3 sync \
+    "s3://{{ backup_rustfs_bucket }}/" \
+    "${SYNC_DIR}/" \
+    --endpoint-url="http://localhost:9000" \
+    {% if backup_rustfs_remove_deleted %}--delete{% endif %} \
+    2>&1 || true
+else
+  log "WARNING: Neither rclone nor aws CLI available. Attempting docker-based sync..."
+  CONTAINER_NAME="$(docker compose -f "${COMPOSE_FILE}" ps -q rustfs)"
+  docker compose -f "${COMPOSE_FILE}" exec -T rustfs \
+    sh -c "aws s3 sync s3://${RUSTFS_BUCKET}/ /tmp/rustfs-sync/ --endpoint-url http://localhost:9000 {% if backup_rustfs_remove_deleted %}--delete{% endif %} 2>&1" || true
+  docker cp "${CONTAINER_NAME}:/tmp/rustfs-sync/." "${SYNC_DIR}/" 2>/dev/null || true
+fi
 
-# Copy objects to a temp path inside the container, then docker cp out
-CONTAINER_TMP="/tmp/backup-mirror-${TIMESTAMP}"
-docker compose -f "${COMPOSE_FILE}" exec -T minio \
-  sh -c "mkdir -p ${CONTAINER_TMP} && mc mirror {{ backup_minio_alias }}/${MINIO_BUCKET} ${CONTAINER_TMP}/ {% if backup_minio_remove_deleted %}--remove{% endif %} {% if backup_minio_overwrite %}--overwrite{% endif %} 2>&1" || true
-
-# Get the container name dynamically
-CONTAINER_NAME="$(docker compose -f "${COMPOSE_FILE}" ps -q minio)"
-
-# Copy mirrored files out of container
-docker cp "${CONTAINER_NAME}:${CONTAINER_TMP}/." "${MIRROR_DIR}/" 2>/dev/null || true
-
-# Clean up inside container
-docker compose -f "${COMPOSE_FILE}" exec -T minio \
-  rm -rf "${CONTAINER_TMP}" 2>/dev/null || true
-
-OBJECT_COUNT="$(find "${MIRROR_DIR}" -type f | wc -l)"
-log "Mirrored ${OBJECT_COUNT} objects"
+OBJECT_COUNT="$(find "${SYNC_DIR}" -type f | wc -l)"
+log "Synced ${OBJECT_COUNT} objects"
 
 # Step 2: Tar and compress
-TAR_FILE="${TMPDIR}/llamenos-minio-${TIMESTAMP}.tar.gz"
-tar -czf "${TAR_FILE}" -C "${MIRROR_DIR}" .
-rm -rf "${MIRROR_DIR}"
+TAR_FILE="${TMPDIR}/llamenos-rustfs-${TIMESTAMP}.tar.gz"
+tar -czf "${TAR_FILE}" -C "${SYNC_DIR}" .
+rm -rf "${SYNC_DIR}"
 
 DUMP_SIZE="$(stat -c%s "${TAR_FILE}")"
 log "Compressed archive: ${DUMP_SIZE} bytes"
@@ -80,12 +83,12 @@ DUMP_SHA256="$(sha256sum "${TAR_FILE}" | cut -d' ' -f1)"
 
 # Step 4: Encrypt with age (if configured)
 if [ -n "${AGE_RECIPIENT}" ]; then
-  FILENAME="llamenos-minio-${TIMESTAMP}.tar.gz.age"
+  FILENAME="llamenos-rustfs-${TIMESTAMP}.tar.gz.age"
   log "Encrypting backup with age..."
   age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}" "${TAR_FILE}"
   rm -f "${TAR_FILE}"
 else
-  FILENAME="llamenos-minio-${TIMESTAMP}.tar.gz"
+  FILENAME="llamenos-rustfs-${TIMESTAMP}.tar.gz"
   mv "${TAR_FILE}" "${TMPDIR}/${FILENAME}"
   log "WARNING: No age public key configured. Backup is NOT encrypted."
 fi
@@ -138,16 +141,16 @@ enforce_retention() {
   fi
 }
 
-enforce_retention "${BACKUP_DIR}/daily" {{ backup_minio_retain_daily }} 'llamenos-minio-*'
-enforce_retention "${BACKUP_DIR}/weekly" {{ backup_minio_retain_weekly }} 'llamenos-minio-*'
-enforce_retention "${BACKUP_DIR}/monthly" {{ backup_minio_retain_monthly }} 'llamenos-minio-*'
+enforce_retention "${BACKUP_DIR}/daily" {{ backup_rustfs_retain_daily }} 'llamenos-rustfs-*'
+enforce_retention "${BACKUP_DIR}/weekly" {{ backup_rustfs_retain_weekly }} 'llamenos-rustfs-*'
+enforce_retention "${BACKUP_DIR}/monthly" {{ backup_rustfs_retain_monthly }} 'llamenos-rustfs-*'
 
 # Step 9: Manifest entry
-MANIFEST_ENTRY="minio|${TIMESTAMP}|${FILENAME}|${FINAL_SIZE}|${DUMP_SHA256}|${BACKUP_TYPE}|objects=${OBJECT_COUNT}"
+MANIFEST_ENTRY="rustfs|${TIMESTAMP}|${FILENAME}|${FINAL_SIZE}|${DUMP_SHA256}|${BACKUP_TYPE}|objects=${OBJECT_COUNT}"
 echo "${MANIFEST_ENTRY}" >> "${BACKUP_DIR}/../manifest.log"
 
 if [ "${MANIFEST_MODE}" = true ]; then
   echo "${MANIFEST_ENTRY}"
 fi
 
-log "MinIO backup complete: ${FILENAME} (${FINAL_SIZE} bytes, ${OBJECT_COUNT} objects)"
+log "RustFS backup complete: ${FILENAME} (${FINAL_SIZE} bytes, ${OBJECT_COUNT} objects)"

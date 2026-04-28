@@ -47,7 +47,7 @@
         - app
         - postgres
         - caddy
-        - minio
+        - rustfs
         - strfry
 
     - name: Create optional service directories (if enabled)

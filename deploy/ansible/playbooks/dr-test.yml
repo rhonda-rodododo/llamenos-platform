@@ -92,28 +92,28 @@
               volumes:
                 - dr-pgdata:/var/lib/postgresql/data
 
-            minio:
-              image: minio/minio:latest
-              command: server /data --console-address ":9001"
+            rustfs:
+              image: rustfs/rustfs:latest
+              command: server /data
               environment:
-                MINIO_ROOT_USER: dr-test-access
-                MINIO_ROOT_PASSWORD: dr-test-secret-key
+                RUSTFS_ACCESS_KEY: dr-test-access
+                RUSTFS_SECRET_KEY: dr-test-secret-key
               ports:
                 - "{{ dr_port | int + 2 }}:9000"
               healthcheck:
-                test: ["CMD", "mc", "ready", "local"]
+                test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
                 interval: 5s
                 timeout: 3s
                 retries: 10
               volumes:
-                - dr-minio:/data
+                - dr-rustfs:/data
 
             app:
               image: ghcr.io/llamenos/llamenos:latest
               depends_on:
                 postgres:
                   condition: service_healthy
-                minio:
+                rustfs:
                   condition: service_healthy
               environment:
                 NODE_ENV: production
@@ -122,10 +122,10 @@
                 PG_USER: llamenos
                 PG_PASSWORD: dr-test-password
                 PG_DATABASE: llamenos
-                MINIO_ENDPOINT: minio
-                MINIO_PORT: "9000"
-                MINIO_ACCESS_KEY: dr-test-access
-                MINIO_SECRET_KEY: dr-test-secret-key
+                STORAGE_ENDPOINT: rustfs
+                STORAGE_PORT: "9000"
+                STORAGE_ACCESS_KEY: dr-test-access
+                STORAGE_SECRET_KEY: dr-test-secret-key
                 HMAC_SECRET: "{{ 'dr-test-hmac-secret-for-validation-only' | hash('sha256') }}"
                 ADMIN_PUBKEY: "0000000000000000000000000000000000000000000000000000000000000000"
                 SERVER_NOSTR_SECRET: "{{ 'dr-test-nostr-secret-for-validation-only' | hash('sha256') }}"
@@ -141,7 +141,7 @@
 
           volumes:
             dr-pgdata:
-            dr-minio:
+            dr-rustfs:
       tags: provision
 
     - name: Record provision start time
