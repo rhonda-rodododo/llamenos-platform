@@ -2,7 +2,7 @@ FROM oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b62
 WORKDIR /app
 
 # Install dependencies
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
 # Copy source code

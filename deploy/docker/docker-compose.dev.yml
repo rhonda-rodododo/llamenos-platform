@@ -92,8 +92,8 @@ services:
   signal-notifier:
     profiles: ["signal"]
     build:
-      context: ../..
-      dockerfile: signal-notifier/Dockerfile
+      context: ../../signal-notifier
+      dockerfile: Dockerfile
     ports:
       - "3100:3100"
     environment:
@@ -152,8 +152,8 @@ services:
   sip-bridge:
     profiles: ["telephony"]
     build:
-      context: ../..
-      dockerfile: sip-bridge/Dockerfile
+      context: ../../sip-bridge
+      dockerfile: Dockerfile
     ports:
       - "3200:3000"
     environment:
