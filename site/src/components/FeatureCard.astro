@@ -16,7 +16,7 @@ const { title, description, icon } = Astro.props;
 
   <div class="relative">
     <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-accent/20 to-accent/5 text-xl ring-1 ring-accent/20 transition-all duration-300 group-hover:ring-accent/40 group-hover:shadow-lg group-hover:shadow-accent/10">
-      {icon}
+      <span set:html={icon} />
     </div>
     <h3 class="text-base font-semibold text-fg mb-2 transition-colors duration-300 group-hover:text-accent-bright">{title}</h3>
     <p class="text-sm text-fg-muted leading-relaxed">{description}</p>
