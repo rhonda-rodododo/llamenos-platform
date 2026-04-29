@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.roborazzi)
 }
 
 // ecryptfs (encrypted home dirs) has a 143-byte filename limit. D8 global synthetics
@@ -104,6 +105,8 @@ android {
             // 0/false/null instead of failing loudly. Long-term fix: wrap Log behind
             // an abstraction. For now, this is the standard Android approach.
             isReturnDefaultValues = true
+            // Required for Robolectric to access Android resources (strings, drawables, etc.)
+            isIncludeAndroidResources = true
         }
     }
 }
@@ -188,6 +191,9 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
     testImplementation(kotlin("test"))
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.robolectric)
 
     androidTestImplementation(libs.espresso)
     androidTestImplementation(platform(libs.compose.bom))
