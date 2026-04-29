@@ -11,11 +11,25 @@ description: "How Llámenos protects caller and volunteer identity against well-
 
 CounterSpy 2026 — Atlanta, Sunday May 3
 
-<!-- notes: Welcome. I'm Rhonda. Phones on airplane mode if that's relevant to your threat model — and if you're at CounterSpy, it probably is. This is a 90-minute talk. I have a lot to show you. Raise your hand if you have questions mid-slide — I'd rather make this interactive than have you leave with half the picture. Before I start: I am not selling you anything. This is AGPL-3.0 software. I'm here to explain threat models. -->
+<!-- notes: Phones on airplane mode if that's relevant to your threat model — and if you're at CounterSpy, it probably is. I'm Rhonda. This talk is about software I built because people I love were getting their phones seized at protests and their call records subpoenaed. Ninety minutes. I have a lot to show you. Questions during the talk — I'd rather it be a conversation than a monologue. Before I start: I am not selling you anything. This is AGPL-3.0 software. You can read every line. -->
 
 ---
 
-## Who Is This Talk For?
+## It Started Like This
+
+> *A detective in Atlanta called an organizer at 9:37am on a Tuesday. He knew her name. He knew she'd answered calls at 11pm, 1am, and 2am during the protest. He cited specific call durations.*
+>
+> *She'd been running her org's crisis line through Google Voice. The detective had served an administrative subpoena on Google three days earlier. Google had complied within 48 hours. She didn't know.*
+
+:::fragment
+*He didn't need a warrant. He needed a form and 48 hours.*
+:::
+
+<!-- notes: Pause here. Let this land. This is not a hypothetical. Administrative subpoenas to US-based cloud providers require no judicial review. The provider doesn't have to tell you they complied. You might find out months later in a transparency report, or you might find out when a detective calls you. This is the threat we're designing against. Not nation-state zero-days. Not sophisticated cryptographic attacks. Paperwork. -->
+
+---
+
+## Who This Talk Is For
 
 - **Legal observer networks** documenting state violence at protests
 - **Jail support** hotlines taking calls from detainees and families
@@ -28,97 +42,102 @@ CounterSpy 2026 — Atlanta, Sunday May 3
 *If you're running a phone-based support operation for people who face real threats — this talk is for you.*
 :::
 
-<!-- notes: Ask the room: raise your hand if you operate or support a crisis line. Keep it up if you're on Google Voice. Keep it up if you use Twilio directly. This frames the problem for those who aren't operators themselves. About 75 minutes of content plus 15 minutes of questions. -->
+<!-- notes: Raise your hand if you operate or support a crisis line. Keep it up if you're on Google Voice. Keep it up if you use Twilio directly. Keep it up if your volunteers write notes in Google Docs. Okay. I see you. You're the reason I'm here. -->
 
 ---
 
 ## What I'll Cover
 
-1. **Why existing tools fail** the activist threat model
+1. **Why existing tools fail** the activist threat model (and specifically how)
 2. **SIP trunking** — why call routing matters for privacy
 3. **E2EE notes and messages** — what "zero-knowledge server" actually means
-4. **Signal channel integration** — for orgs that need Signal-based reporting
-5. **What changed in v2** — the results of a crypto review
-6. **Self-hosting** — what it takes, what it costs, what it protects
-7. **What we still can't protect** — be honest about the boundary
+4. **What a subpoena actually gets** — walking through the matrix
+5. **Signal channel integration** — for orgs using Signal in the field
+6. **What changed in v2** — results of a crypto review
+7. **Self-hosting** — what it takes, what it costs, what it protects
+8. **What we still can't protect** — be honest about the boundary
 
-<!-- notes: Rough timing: Parts 1-2 take about 20 min, Part 3 about 20 min, Parts 4-5 about 20 min, Parts 6-7 about 10 min, then Q&A. Adjust based on audience questions throughout. -->
+<!-- notes: Rough timing: Parts 1-2 take about 20 min, Part 3 about 20 min, Parts 4-6 about 20 min, Parts 7-8 about 10 min, then Q&A. Adjust based on audience questions throughout. The most important section is Part 4 — the subpoena matrix. That's where the architecture becomes real. -->
 
 ---
 
 # Part 1: The Problem
 
-<!-- notes: Transition: Let's start with who's coming for your org and why your current tools are a gift to them. -->
+<!-- notes: Let's start with who's coming for your org and why your current tools are a gift to them. -->
 
 ---
 
-## The Realistic Adversaries
+## Your Adversaries, Named
 
 :::columns
 :::left
-### Well-Resourced
-- Law enforcement with **administrative subpoenas** (no judicial review, 48 hrs)
-- Fusion centers correlating data across agencies
-- Federal agencies with NSLs
+### State actors
+- **Local police** with administrative subpoenas (no judge, 24-72 hrs)
+- **Federal agencies** (FBI, ICE) with NSLs and grand jury subpoenas
+- **Fusion centers** correlating data across agencies
+- DHS behavioral analysis units pattern-matching on call timing
 :::right
-### Moderately Resourced
-- Right-wing groups with **OSINT toolkits**
-- Private investigators with **carrier access**
-- Doxxing crews targeting volunteers by name
+### Contracted/private
+- **Right-wing groups** with OSINT toolkits and PI contracts
+- **Private investigators** with carrier-level access and courthouse relationships
+- Doxxing crews targeting volunteers by name, employer, and neighborhood
 :::
 
 :::fragment
-**Note: We're not defending against nation-state 0-days or coerced admins. That's a different threat model.**
+*None of these adversaries need to break encryption. They go to your provider with a form.*
 :::
 
-<!-- notes: Administrative subpoenas are the key point here. They require no judge. A detective can serve one directly to Google, to Twilio, to any US-based cloud provider. Response time is typically 24-72 hours. The provider almost never tells you. This is the threat most activist hotlines face day-to-day — not sophisticated attacks, just paperwork. -->
+<!-- notes: Name the adversaries directly. "Law enforcement" is too abstract. We're talking about cops. We're talking about ICE. We're talking about the private investigators that right-wing groups hire after getting org member lists from leak sites. The threat model matters because it determines what you protect against. We're not defending against nation-state zero-days aimed at individual people. We're defending against a detective with 48 hours and a form. That's achievable. Let's talk about how. -->
 
 ---
 
 ## Real Scenarios
 
-> *A detective got a Google administrative subpoena. All incoming call records for the past 90 days: timestamps, caller IDs, duration. They called the organizer whose personal number showed up most often.*
+> *A detective got a Google administrative subpoena. All incoming call records for the past 90 days: timestamps, caller IDs, duration. They called the organizer whose personal number showed up most often as the answering line.*
 
 :::fragment
-> *A Twilio account was subpoenaed during a protest response. The dashboard showed every call: who called, who answered, how long they talked.*
+> *A Twilio account was subpoenaed during a protest response. The dashboard showed every call: who called, who answered, how long they talked. Volunteer phone numbers were in the CDRs.*
 :::
 
 :::fragment
-> *A volunteer's notes were in a shared Google Doc. The doc was in a G Suite account. The org didn't know Google had responded to a CIPA request.*
+> *A volunteer's notes were in a shared Google Doc. The doc was in a G Suite account. The org didn't know Google had responded to a CIPA request until the legal case surfaced it.*
 :::
 
-<!-- notes: These are anonymized composites from real incidents. Don't name orgs. The point is: these are not sophisticated attacks. They're paperwork. The attacker doesn't need to break encryption — they go to the provider with a form. Our job is to make that form useless. -->
+<!-- notes: These are composites from real incidents — don't name the orgs, obviously. The point: these are not sophisticated attacks. They're paperwork. The attacker doesn't need to break encryption or compromise your server. They just need to ask your cloud provider nicely — or not so nicely — and the provider complies. Our job is to make that form useless. -->
 
 ---
 
 ## Why Google Voice Fails
 
-- **Call records**: Google stores them. Administrative subpoena = Google hands them over.
+- **Call records**: Google stores them. Administrative subpoena = Google hands them over within 48 hours.
 - **Caller ID**: Google sees the real number. You have it, they have it.
-- **48-hour administrative subpoena**: No judicial review. No notice to you.
-- **Account access**: If the account is compromised, everything is exposed.
-- **Google Fi extension**: Organizer's personal number becomes visible when they answer.
+- **Account access**: If the G Suite account is compromised, everything is exposed.
+- **The volunteer's personal number**: When they answer a Google Voice forwarded call, their phone number shows up in the CDR.
+
+:::fragment
+*Your Google Voice call log is basically a gift-wrapped package for any detective with a subpoena and 48 hours.*
+:::
 
 :::fragment
 *Google Voice was designed for a business's customer support line. Not for a legal observer network.*
 :::
 
-<!-- notes: Google's "administrative subpoena" compliance is extremely fast. I've spoken to people who only found out because they asked for a transparency report months later. The latency between the subpoena and the call to the organizer was under 72 hours in at least one case I know of. -->
+<!-- notes: Google's administrative subpoena compliance is extremely fast. I've spoken to people who only found out they were subpoenaed because they asked for a transparency report months later. The latency between the subpoena and the detective's phone call to the organizer was under 72 hours in at least one case I know of personally. -->
 
 ---
 
 ## Why Twilio Direct API Fails
 
-- **CDRs in the dashboard**: Every call — caller ID, called number, duration, timestamp, recording URL — stored in Twilio's dashboard.
-- **Twilio is US-based**: Subject to US law and administrative subpoenas.
-- **TwiML Apps store config**: Who your volunteers are is in your Twilio account.
-- **Recording storage**: If you record calls for quality, those recordings are on Twilio S3.
+- **CDRs in the dashboard**: Every call — caller ID, called number, duration, timestamp — stored in Twilio's dashboard, forever, by default.
+- **Twilio is US-based**: Subject to US law. Administrative subpoenas. Grand jury subpoenas. NSLs.
+- **TwiML Apps store config**: Your volunteer phone numbers are in your Twilio account config.
+- **Recording storage**: If you record calls for "quality," those recordings are on Twilio S3. Under the same subpoena.
 
 :::fragment
-*Twilio is a great developer tool. It's a terrible privacy layer for activist hotlines.*
+*Twilio is a great developer tool. It is a terrible privacy layer for activist hotlines.*
 :::
 
-<!-- notes: I want to be fair to Twilio here. They publish transparency reports, they push back on some requests. But "they sometimes push back" is not a threat model. When law enforcement has a valid administrative subpoena, US-based providers comply. -->
+<!-- notes: I want to be fair to Twilio. They publish transparency reports. They push back on some requests. But "they sometimes push back" is not a threat model. When law enforcement has a valid administrative subpoena, US-based providers comply. Twilio does not have a legal obligation to protect your volunteers from cops. That obligation is yours, and the way you fulfill it is through architecture. -->
 
 ---
 
@@ -128,31 +147,29 @@ CounterSpy 2026 — Atlanta, Sunday May 3
 Google Voice account
     ├── Call history (caller ID, timestamps, duration)
     ├── Voicemail recordings (stored by Google)
-    └── Account holder identity
+    └── Account holder identity → who runs the hotline
 
 Twilio dashboard  
-    ├── CDRs: every call, every participant
-    ├── TwiML config: who your volunteers are
-    └── Recording files on S3
+    ├── CDRs: every call, every participant phone number
+    ├── TwiML config: volunteer phone numbers
+    └── Recording files on S3 → actual call audio
 
 Notes in Google Docs
     ├── Full plaintext content
-    └── Edit history showing when each volunteer wrote
+    └── Edit history showing when each volunteer wrote what
 ```
 
 :::fragment
 **Every hop is a separate subpoena target. And they all comply.**
 :::
 
-<!-- notes: This is why we talk about "attack surface reduction." You can't make the calls disappear, but you can make the call records useless and the notes unreadable. -->
+<!-- notes: This is why we talk about "attack surface reduction." You can't make the calls disappear. But you can make the call records useless, and the notes unreadable. That's the design goal. Not invisibility. Uselessness — turning what the adversary gets into something they can't act on. -->
 
 ---
 
 # Part 2: The Architecture
 
-## Why SIP Trunking Changes Everything
-
-<!-- notes: Transition: Now let's talk about what we actually built. The core insight is that the metadata — who called whom, when, for how long — is as dangerous as the content. -->
+<!-- notes: Now let's talk about what we actually built. The core insight is: metadata is as dangerous as content. Who called whom, when, for how long — that's enough to identify an organizer, map a network, and build a harassment campaign. -->
 
 ---
 
@@ -171,13 +188,13 @@ Notes in Google Docs
 ### SIP Trunk (Llámenos)
 
 - PSTN number → SIP trunk → **your server**
-- You control what gets logged (or: nothing)
+- You control what gets logged (including: nothing)
 - Telnyx/SignalWire offer CDR-free options
 - Self-hosted Asterisk/FreeSWITCH: no cloud provider at all
 - More setup, **you own the metadata**
 :::
 
-<!-- notes: The SIP trunk is the key architectural move. Instead of "Twilio routes calls for you," you're saying "a PSTN number terminates at MY server, then I route." The call detail record lives on your infrastructure, not Twilio's. If you go all the way to self-hosted Asterisk with no cloud SIP provider, there's no external party with records at all — just your database. -->
+<!-- notes: The SIP trunk is the key architectural move. Instead of "Twilio routes calls for you," you're saying "a PSTN number terminates at MY server, then I route." The call detail record lives on your infrastructure, not Twilio's. If you go all the way to self-hosted Asterisk with no cloud SIP provider, there's no external party with records at all — just your database, which you control. -->
 
 ---
 
@@ -204,7 +221,7 @@ First volunteer picks up → others hang up
   ↳ Volunteer logs encrypted notes
 ```
 
-<!-- notes: Walk through this slowly. The SIP bridge is the key piece. It's running on your server, behind a Cloudflare Tunnel for ingress. No public IP needed. The PSTN number is just a DID (Direct Inward Dial) from whatever SIP provider you chose. -->
+<!-- notes: Walk through this slowly. The SIP bridge is the key piece — it's running on your server, behind a Cloudflare Tunnel for ingress, no public IP needed. The PSTN number is just a DID (Direct Inward Dial) from whatever SIP provider you chose. The caller's phone rings YOUR server. Not Twilio's server. Not Google's server. Yours. -->
 
 ---
 
@@ -212,27 +229,27 @@ First volunteer picks up → others hang up
 
 :::columns
 :::left
-### Sequential Ring (traditional)
+### Sequential Ring (most hotlines)
 - Call → Volunteer 1 (ring 20s)
 - No answer → Volunteer 2 (ring 20s)
 - No answer → Volunteer 3 (ring 20s)
 
-**What the CDR shows:**
-Three separate call legs to three numbers. Timestamps show who was tried when. Who answered is obvious.
+**What the CDR reveals:**
+Three separate call legs to three numbers. Timestamps show who was tried when. The whole volunteer roster, with timing, in one CDR.
 :::right
 ### Parallel Ring (Llámenos)
 - Call → ALL on-shift volunteers simultaneously
 - First pickup → others instantly hang up
 
-**What the CDR shows (on your server):**
+**What your server logs:**
 One inbound call. Outbound legs all start at the same timestamp. First pickup wins.
 :::
 
 :::fragment
-*Sequential ring is a timeline of your volunteer roster. Parallel ring is a single event.*
+*Sequential ring is a directory of your volunteer roster, handed to any detective with a subpoena. Parallel ring is a single event.*
 :::
 
-<!-- notes: This is subtle but important for OSINT defense. If an adversary can see CDRs, sequential ring tells them: "here are the volunteer phone numbers, in order, at this time of day." Parallel ring tells them much less. Combined with CDR-free SIP trunks, the metadata posture is dramatically better. -->
+<!-- notes: This is subtle but important for OSINT defense. If an adversary can see CDRs, sequential ring tells them: here are the volunteer phone numbers, in order of who answers first, on which days. That's your volunteer mapping. Parallel ring gives them much less — and combined with CDR-free SIP trunks, the metadata posture is dramatically better. Also: parallel ring is better operations. In a real crisis line, if you ring volunteers sequentially, the first person gets all the calls. Parallel ring distributes load AND reduces timing correlation. Two wins. -->
 
 ---
 
@@ -240,9 +257,9 @@ One inbound call. Outbound legs all start at the same timestamp. First pickup wi
 
 ```
 TelephonyAdapter (abstract interface)
-├── TwilioAdapter          ← Easy. CDRs in dashboard. OK for low-risk orgs.
+├── TwilioAdapter          ← Easy. CDRs in dashboard. Okay for low-risk orgs.
 ├── SignalWireAdapter       ← CDR-configurable. Better than Twilio.
-├── TelnyxAdapter          ← CDR-free SIP trunk option. Good choice.
+├── TelnyxAdapter          ← CDR-free SIP trunk option. Recommended.
 ├── VonageAdapter
 ├── PlivoAdapter
 ├── BandwidthAdapter
@@ -251,10 +268,10 @@ TelephonyAdapter (abstract interface)
 ```
 
 :::fragment
-*Every adapter implements the same interface. Switching providers is a config change, not a rewrite.*
+*Every adapter implements the same interface. Switching providers is a config change, not a code rewrite.*
 :::
 
-<!-- notes: The adapter architecture means you can start with Twilio while you're building out your self-hosting capability, then migrate to Telnyx, then eventually to self-hosted Asterisk when you're ready. No code changes. The SIP bridge (sip-bridge/) is provider-agnostic — PBX_TYPE env var selects the backend. -->
+<!-- notes: The adapter architecture means you can start with Twilio while you're building your self-hosting capability, migrate to Telnyx when you're ready, then to self-hosted Asterisk when you want full control. No code changes — just update PBX_TYPE in your .env. The SIP bridge is provider-agnostic. This is important because your threat model might evolve. You don't want to rewrite your hotline infrastructure every time you move up the privacy ladder. -->
 
 ---
 
@@ -262,7 +279,7 @@ TelephonyAdapter (abstract interface)
 
 ```bash
 # What you run
-docker compose -f deploy/docker/docker-compose.yml up -d
+docker compose up -d
 
 # Services:
 # ├── PostgreSQL     — encrypted notes, call records, audit log
@@ -272,18 +289,18 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 # └── signal-notifier — zero-knowledge Signal sidecar (optional)
 ```
 
-- **Cloudflare Tunnels** for ingress — no public IP exposed
-- **EU hosting** option for GDPR compliance
+- **Cloudflare Tunnels** for ingress — no public IP exposed, ever
+- **EU hosting** compatible — Hetzner in Germany or Finland, GDPR by design
 - **No telemetry** to any external party
 - Reproducible builds with **SLSA provenance** and **cosign** verification
 
-<!-- notes: The Cloudflare Tunnel means your server doesn't need a public IP. It phones home to Cloudflare, which handles ingress. This is important for operational security — no IP address exposed to the internet. The reproducible build system lets you verify that the binary you're running matches the published source code. -->
+<!-- notes: The Cloudflare Tunnel means your server doesn't need a public IP. It phones home to Cloudflare, which handles ingress. No port scanning. No DDoS directly at your IP. IP address not exposed to clients. Yes, Cloudflare is still a third party — I'll talk about the trust model there in the limitations section. But it's substantially better than "here's my server's IP, please subpoena it." -->
 
 ---
 
 # Part 3: E2EE — Zero-Knowledge Notes & Messages
 
-<!-- notes: Transition: Now the most important part — what happens AFTER the call. The notes. The conversation history. The reason your server is valuable to an adversary. -->
+<!-- notes: Now the most important part — what happens after the call. The notes. The conversation history. The reason your server is valuable to an adversary. Let me show you what "zero-knowledge" actually means in practice. -->
 
 ---
 
@@ -308,10 +325,10 @@ The server should **not** be able to read call notes, even under subpoena.
 :::
 
 :::fragment
-*A successful subpoena gets you: "yes, a call happened at 11:47pm, duration 23 minutes, here's a ciphertext blob."*
+*A successful subpoena of your server gets them: "yes, a call happened at 11:47pm, duration 23 minutes, here's a ciphertext blob." Have fun with that, detective.*
 :::
 
-<!-- notes: This is the key promise. If your server is compromised, if you're served a subpoena, if an admin is coerced — they get encrypted blobs. To read a note, you need the volunteer's private key. The private key never leaves the device. -->
+<!-- notes: This is the core promise. If your server is compromised, if you're served a subpoena, if an admin is coerced — they get encrypted blobs. To read a note, you need the volunteer's private key. The private key never leaves the device. Ever. The server is a zero-knowledge relay. It's moving data it can't read. -->
 
 ---
 
@@ -339,7 +356,36 @@ For each note written:
   6. Discard note_key from memory
 ```
 
-<!-- notes: "Forward secrecy" means: if a key is compromised tomorrow, it doesn't decrypt yesterday's notes. Each note has its own random key. The volunteer's identity key is only used to wrap the per-note key — not to encrypt content directly. So even if the volunteer's identity key is later compromised, the attacker has to also get the wrapped note key for each note individually. -->
+<!-- notes: "Forward secrecy" means: if someone gets a volunteer's identity key tomorrow, it doesn't let them decrypt yesterday's notes. Each note has its own random 256-bit key. The identity key is only used to WRAP the per-note key — not to encrypt content directly. So even if the identity key is compromised, the attacker has to also get the wrapped note key for each individual note. It's envelopes inside envelopes. A whole detective novel's worth of extra homework. -->
+
+---
+
+## Client-Side Transcription — Audio Never Leaves the Browser
+
+This one is a big deal.
+
+:::columns
+:::left
+### How most transcription works
+- Call audio → sent to API (Cloudflare, Google, OpenAI)
+- Transcription service processes your call content
+- You get text back
+- **The transcription provider heard everything**
+- Subpoena the transcription provider
+:::right
+### How Llámenos does it
+- WASM Whisper model — runs in the volunteer's browser
+- AudioWorklet ring buffer → Web Worker isolation
+- Transcript generated locally
+- **Audio never leaves the device. At all.**
+- Works offline after first model download
+:::
+
+:::fragment
+*The transcription provider can't be subpoenaed for audio that never reached them.*
+:::
+
+<!-- notes: This is one of the things I'm most proud of. We moved transcription from a cloud API to in-browser WASM — Whisper via Hugging Face's ONNX runtime. The audio is captured by MediaRecorder, processed in a Web Worker, and the resulting transcript text is encrypted immediately with the note's E2EE key. No network request. No API key. No transcript provider. The call audio exists only in browser memory for the duration of the processing. For this audience: that's huge. That's the audio equivalent of zero-knowledge. -->
 
 ---
 
@@ -348,24 +394,22 @@ For each note written:
 :::columns
 :::left
 ### v1: secp256k1 ECIES
-
-- Non-standard curve for key agreement
-- Custom construction (SHA-256 + XChaCha20)
-- No formal security proof for this exact combination
+- Non-standard curve for key agreement (Nostr-specific)
+- Custom construction — no formal proof for this exact combination
 - Single nsec per user = single point of compromise
-- **Identified issues:** no domain separation, no forward secrecy, wrong curve
+- No domain separation = cross-protocol attack surface
+- **Identified in review:** non-standard, not formally verified
 :::right
 ### v2: HPKE (RFC 9180)
-
-- X25519 for key agreement (standard)
-- HKDF-SHA256 for key derivation (standard)
+- X25519 key agreement (standard, constant-time)
+- HKDF-SHA256 for KDF (standard)
 - AES-256-GCM for AEAD (standard)
-- Formally specified, actively maintained
+- Formally specified, IETF-maintained, actively audited
 - Per-device keys + sigchain authorization
 - **57 domain separation labels** (Albrecht defense)
 :::
 
-<!-- notes: The v1 → v2 migration came out of a review by a cryptographer who has worked on Signal's protocol. The core problem with v1 was: it worked, but it wasn't a standard construction. A jury of your peers can't quickly verify a custom ECIES scheme. HPKE is an IETF RFC. It's the same key agreement used in TLS 1.3's 0-RTT. The formal security analysis exists. -->
+<!-- notes: The v1 → v2 migration came out of a review by a cryptographer who has worked on Signal's protocol. The core problem with v1 was: it worked, but "it worked" is not the same as "it's formally verified." A custom ECIES scheme using Nostr's secp256k1 curve — you can't point a peer at an RFC and say "that's what we do." HPKE is an IETF RFC. It's the same key agreement used in TLS 1.3's 0-RTT mode. The formal security analysis exists. That matters when you're trying to explain your security model to a lawyer, a journalist, or another cryptographer. -->
 
 ---
 
@@ -387,10 +431,10 @@ Every cryptographic operation has a **unique context string**.
 ```
 
 :::fragment
-*Without domain separation: an attacker could feed a wrapped message key into the note-key decryption path, or cross-protocol attacks between ECDH uses. With 57 labels: each operation is cryptographically isolated.*
+*Without domain separation: an attacker could craft an input valid as both a message key and a note key, achieving a cross-protocol attack. With 57 distinct labels: each operation is cryptographically isolated.*
 :::
 
-<!-- notes: The "Albrecht defense" refers to Martin Albrecht's work on cross-protocol attacks in real-world crypto deployments. If you use the same key derivation function with the same inputs across two different operations, an attacker can try to mix the outputs. Domain separation labels prevent this by binding the output of every HKDF/ECDH/HPKE operation to its specific purpose. We generate these constants in one JSON file and compile them to TypeScript, Swift, and Kotlin via codegen. No raw string literals in the codebase. -->
+<!-- notes: The "Albrecht defense" — named after Martin Albrecht's work on cross-protocol attacks in real-world deployments. If you use the same KDF with the same inputs across two different operations, an attacker who can interact with one context might be able to influence the other. Domain separation labels prevent this by binding every HKDF/ECDH/HPKE output to its specific purpose. We generate these constants from a single JSON file and compile them to TypeScript, Swift, and Kotlin via codegen. No raw string literals anywhere in the codebase. -->
 
 ---
 
@@ -413,37 +457,13 @@ New model (v2):
     Signed by existing authorized device
 ```
 
-<!-- notes: The sigchain is borrowed conceptually from Signal's sealed sender. Each device authorization is a signed statement from an already-authorized device. You verify a new device by comparing a short authentication string (SAS) — four emoji, six words, whatever — between the two devices. This prevents a MITM from injecting a rogue device into your sigchain. -->
-
----
-
-## What the Server "Knows" vs. What It Knows
-
-:::columns
-:::left
-### Server CAN observe
-- A call happened at timestamp T
-- Call duration D seconds
-- Which hub the call came through
-- That a note was created (not contents)
-- Volunteer device pubkey (not name, not number)
-:::right
-### Server CANNOT observe
-- Note contents
-- Message contents
-- Caller phone number (HMAC-hashed)
-- Caller identity
-- Message transcript
-- Who the volunteer is as a person
-:::
-
-<!-- notes: The caller phone number is stored as an HMAC hash (llamenos:phone: prefix). The HMAC key is a server secret. This means the server can recognize "same caller called again" without storing the number in plaintext. If someone gets the database, they see a hash — they can't reverse it to the phone number without the HMAC key. If they get the HMAC key AND the database, they can compute hashes but not the original numbers. -->
+<!-- notes: The sigchain is conceptually borrowed from Signal's sealed sender. Each device authorization is a signed statement from an already-authorized device. You verify a new device by comparing a Short Authentication String — four emoji, six words, whatever — between the two devices. This prevents a MITM from injecting a rogue device into your account. And importantly: if one device is seized, the other devices aren't automatically compromised. Device compromise is local. -->
 
 ---
 
 ## Per-Message Envelope Encryption
 
-Same pattern as notes — for inbound SMS, WhatsApp, Signal messages:
+Same zero-knowledge pattern as notes — for inbound Signal, SMS, WhatsApp messages:
 
 ```
 Inbound message arrives at webhook
@@ -466,54 +486,132 @@ Server cannot read stored messages
 ```
 
 :::fragment
-*The server acts as a blind relay. It routes messages it cannot read.*
+*The server is a blind relay. It routes messages it cannot read.*
 :::
 
-<!-- notes: This is important for Signal integration especially. When someone sends a Signal message to your org's Signal number, the server receives it, encrypts it immediately, and throws away the plaintext. Even if the server is compromised moments after the message arrives, the plaintext is gone. The attacker gets ciphertext. -->
+<!-- notes: This is important for Signal integration especially. When someone sends a Signal message to your org's Signal number, the server receives it, encrypts it immediately, and throws away the plaintext. Even if the server is compromised moments after the message arrives, the plaintext is gone. The attacker gets ciphertext. This is different from how most messaging integrations work — most store the plaintext forever. We discard it immediately. -->
 
 ---
 
-## Cascading Key Rotation
+# Part 4: What Does a Subpoena Actually Get?
 
-:::columns
-:::left
-### The Problem
-Volunteer leaves the org. They still have their copy of old note keys. You want to ensure future notes are inaccessible to them.
-:::right
-### The Solution
-**Per-User Key (PUK)** with cascading lazy rotation:
-
-```
-PUK ──wraps──▶ items_key
-items_key ──wraps──▶ per-note key
-per-note key ──encrypts──▶ note content
-```
-
-On volunteer departure: rotate PUK. Lazy re-wrap of items_keys. Future notes: departed volunteer can't decrypt.
-:::
-
-<!-- notes: "Lazy rotation" means we don't immediately re-encrypt all historical notes. Historical notes stay encrypted with old keys — the departed volunteer has their old device key and could still read historical notes they had access to. That's accepted. What we guarantee: future notes after the rotation are inaccessible to the departed volunteer. MLS (behind a feature flag) will handle group key rotation when that's ready. -->
+<!-- notes: This is the slide I really want this audience to internalize. Let me walk through each subpoena scenario concretely. What does each adversary actually get, and what can't they get. -->
 
 ---
 
-# Part 4: Signal Channels
+## Hosting Provider Subpoena (Cloudflare, VPS)
 
-<!-- notes: Transition: A lot of orgs already use Signal for internal coordination. We built a way to route Signal messages into the same zero-knowledge system. -->
+**What they CAN hand over:**
+
+| Data | What it reveals |
+|------|----------------|
+| Call metadata | Timestamps, durations, volunteer assignment (pubkey only) |
+| Encrypted database blobs | Ciphertext — useless without volunteer/admin private keys |
+| Caller phone hashes | HMAC hashes — irreversible without your HMAC secret |
+| Audit logs | Event types + truncated IP hashes, no content |
+| Traffic metadata | Request times, sizes, IP addresses |
+
+**What they CANNOT hand over:**
+
+Note content, message content, transcription text, per-note encryption keys (ephemeral, never stored), volunteer private keys (device-side only), your HMAC secret.
+
+<!-- notes: This is the key scenario. Law enforcement goes to your hosting provider — Cloudflare, Hetzner, DigitalOcean, whoever. Gets a court order. The provider hands over everything they have. What does that get them? Encrypted blobs, timestamps, and hashed phone numbers. They can prove a call happened. They cannot read what was said in the notes. They cannot identify the caller. Metadata: yes. Content: no. That's a meaningful line. -->
+
+---
+
+## Telephony Provider Subpoena (Twilio, Telnyx, etc.)
+
+**What they CAN hand over:**
+
+| Data | If you use... |
+|------|--------------|
+| Call detail records (caller ID, times, duration) | All providers |
+| Call recordings | Only if recording is enabled — **Llámenos does NOT enable recording by default** |
+| SMS message content | Twilio, SignalWire SMS (passes through in plaintext) |
+| WhatsApp content | Via Meta Business API |
+
+**What they CANNOT hand over:**
+
+Call notes (never sent to telephony provider), volunteer identities beyond routing phone numbers (with CDR-free trunk), any E2EE content.
+
+:::fragment
+*With CDR-free SIP trunking: the telephony provider has routing records only — no call content, no volunteer phone numbers in their system.*
+:::
+
+<!-- notes: This is why the SIP trunk choice matters. With Twilio Programmable Voice: they have everything. With Telnyx CDR-free SIP trunk: they have much less — just the DID termination record. With self-hosted Asterisk pointing at a SIP DID: the provider sees only that a call terminated at your server, and your server is what you just talked about — encrypted blobs and metadata. -->
+
+---
+
+## Device Seizure
+
+**Without volunteer's PIN:**
+- Encrypted key blob in localStorage (requires PIN brute-force)
+- 600,000 PBKDF2 iterations + 6-8 digit PIN = estimated hours to days on GPU hardware
+- Session tokens may still be valid if device was recently used (8-hour TTL — admin can revoke)
+
+**With PIN (or successful brute-force):**
+- Access to that volunteer's notes only — not other volunteers' notes
+- Per-note forward secrecy: compromising identity key doesn't reveal notes without also getting per-note envelopes
+
+**Admin device seized:**
+- If admin nsec obtained: attacker can decrypt ALL notes (admin envelope on every note)
+- Admin key separation: identity key vs. decryption key are separate keypairs — compromising auth doesn't auto-expose notes
+
+<!-- notes: The device seizure scenario is worth walking through carefully. If a volunteer's phone is seized unlocked — bad day. Admin can revoke the session. The volunteer's notes are accessible but only their notes. If the phone is locked, the attacker needs to brute-force a 6-8 digit PIN against 600k PBKDF2 iterations. That's not impossible but it's not fast either. The admin device is the most sensitive — store it somewhere that isn't your pocket at a protest. -->
+
+---
+
+## The Honest Limitations: What We Do NOT Claim
+
+- **Traffic analysis resistance**: No padding, no dummy traffic. A watcher can see call timing patterns.
+- **SMS/WhatsApp transport E2EE**: These channels require provider-side plaintext in transit. We E2EE at rest; the provider sees it in transit.
+- **PIN brute-force resistance (offline)**: 6-8 digits is ~27 bits of entropy. A seized encrypted blob + a GPU = brute-forceable in days to weeks.
+- **Metadata confidentiality**: The server needs timestamps and routing data to function.
+- **Cloudflare as adversary**: If Cloudflare is willing and legally compelled to instrument the Workers runtime — they could. We recommend self-hosted deployment for high-threat orgs.
+
+:::fragment
+*We're solving for the realistic adversary: lazy cops with administrative subpoenas. Not nation-states with runtime instrumentation budgets.*
+:::
+
+<!-- notes: I want to say this clearly: we built this for the threat model that most US activist orgs actually face. An FBI agent with a national security letter and unlimited resources is a different problem than a county sheriff with a form and 48 hours. We're solving the second problem really well. The first problem — nation-state adversary targeting you specifically — you have bigger issues than your hotline software. Operational security, device hygiene, physical security. Llámenos is one layer, not the whole stack. -->
+
+---
+
+# Part 5: Signal Channels
+
+<!-- notes: A lot of orgs already use Signal for internal coordination. We built a way to route Signal messages into the same zero-knowledge system. Let me explain what we actually built and what the field use cases look like. -->
 
 ---
 
 ## Why We Added Signal as a Channel
 
-- Callers who can't install your app can reach you via Signal
-- Rapid responders in the field have Signal already
-- Legal observers want to file reports from their phone
-- Jail support families want to send updates via what they already have
+Signal is already where your people are:
+
+- **Legal observers in the field** can't install a custom app mid-protest. They have Signal.
+- **Jail support families** sending updates about arraignment times use what's on their phone.
+- **Rapid responders** on the ground need to file reports fast — Signal is the fastest secure channel.
+- **Callers who can't use the hotline number** can reach you via Signal with better privacy.
 
 :::fragment
-*The goal: one secure inbox. Voice calls, SMS, WhatsApp, Signal — all end up encrypted in the same place.*
+*The goal: one secure inbox. Voice calls, Signal, SMS, WhatsApp — all end up encrypted in the same place, behind the same zero-knowledge design.*
 :::
 
-<!-- notes: The impetus for Signal integration was feedback from legal observer networks. Their observers in the field have Signal, not a custom app. They need to send updates during a protest. "We have 12 people arrested, here are the names." That message needs to be encrypted at rest, not sitting in a Signal group that includes 40 people. -->
+<!-- notes: The impetus for Signal integration was feedback from legal observer networks. Their observers in the field have Signal, not a custom app, and they're not going to install one while they're watching police arrest people. They need to send: "12 people arrested, here are the names, badge number 4471 made the call." That message needs to be encrypted at rest, not sitting in a Signal group that includes 40 people with varying device security. -->
+
+---
+
+## Field Use Cases for Signal
+
+| Scenario | Signal channel enables |
+|---------|----------------------|
+| Observer at protest | Files rapid arrest report via Signal → encrypts in case management |
+| Jail support coordinator | Sends arraignment update blast to all registered contacts |
+| Organizer filing incident | Sends evidence description via Signal → linked to incident record |
+| Admin notifying volunteers | Sends schedule change to all Signal-registered volunteers |
+| Field medic coordinating | Reports injuries without naming anyone in cleartext |
+| Legal team | Receives encrypted case notes from Signal channel without being in the app |
+
+<!-- notes: These aren't hypothetical. These are the workflows that led to the Signal integration request. The pattern is: someone in a high-stakes field situation needs to file a record, they can't stop and open a custom app, but they have Signal. The channel integration means that Signal message becomes an E2EE record in the case management system. No copy-paste. No manual logging later. It just appears, encrypted. -->
 
 ---
 
@@ -539,7 +637,7 @@ Solution: HMAC-hashed contact resolution
     App never sees the phone number in plaintext
 ```
 
-<!-- notes: The Signal sidecar is a separate process that runs alongside the main app. It has access to Signal credentials (via signal-cli or similar). The main app communicates with it via a bearer token. The sidecar resolves HMAC hashes to Signal registrations — it knows the mapping, but the mapping is: hash → Signal registration, not hash → phone number. If the sidecar is compromised, the attacker sees hashes, not numbers. -->
+<!-- notes: The Signal sidecar is isolated from the main app. It communicates via a bearer token. If the sidecar is compromised, the attacker sees HMAC hashes, not phone numbers. The sidecar knows "hash ABC → Signal registration XYZ" but not "hash ABC → +14045551234". The mapping is hash to registration, not hash to number. This is what zero-knowledge contact resolution means: we can route notifications to people without knowing who they are. -->
 
 ---
 
@@ -553,37 +651,18 @@ Solution: HMAC-hashed contact resolution
 - App encrypts immediately using per-message envelope
 - Read receipts sent back via sidecar
 - Typing indicators supported
+- Identity key trust verification (safety number changes held pending review)
 :::right
-### Outbound
-- App sends notification request to sidecar
-- Sidecar resolves HMAC → Signal registration
-- Delivers via Signal protocol
-- Identity key trust verification before delivery
-- Retry queue with backoff
-- Failover to SMS if Signal delivery fails
+### Outbound: Blast / Broadcast
+- Jail support update: "17 people arraigned, bail 9am"
+- Rapid response alert: "Police moving on south side"
+- Schedule change: "Tonight's shift has coverage"
+- PostgreSQL-backed delivery queue
+- Per-channel rate limiting (Signal: 1 msg/sec per recipient)
+- Retry with exponential backoff
 :::
 
-<!-- notes: The identity key verification is important. Signal identifies users by their identity key. If someone's identity key changes (e.g., they reinstalled Signal), you get a safety number change warning. The sidecar checks for this and holds delivery pending manual review — same behavior as Signal desktop. -->
-
----
-
-## Blast / Broadcast
-
-Send a message to all registered Signal contacts at once:
-
-- **Jail support update**: "17 people arraigned, bail hearing at 9am tomorrow"
-- **Rapid response alert**: "Police moving on south side, rally to 5th and Main"
-- **Schedule change**: "Tonight's shift covered by backup volunteers"
-
-```
-Blast delivery:
-  ├── PostgreSQL-backed delivery queue
-  ├── Per-channel rate limiting (Signal: 1 msg/sec per recipient)
-  ├── Per-recipient delivery status tracking
-  └── Retry with exponential backoff
-```
-
-<!-- notes: Rate limiting is critical here. Signal aggressively rate-limits bulk senders. The blast service handles this with a delivery queue and per-recipient rate limiting. You don't want to get your org's Signal number banned because you sent a bulk message too fast. -->
+<!-- notes: Rate limiting is critical. Signal aggressively rate-limits bulk senders — if you blast 200 recipients without rate limiting, you'll get your org's Signal number banned. The delivery queue handles this. Also important: the identity key verification. If someone reinstalls Signal, they get a new identity key. The sidecar detects this as a safety number change and holds delivery pending manual review — same as Signal desktop does. This prevents you from accidentally sending to a number that's been taken over. -->
 
 ---
 
@@ -600,23 +679,22 @@ Blast delivery:
 :::right
 ### Signal doesn't have
 - **Parallel ring** for voice routing
-- **Case management** and note-taking
+- **Case management** and structured note-taking
 - **Role-based access** (volunteer vs. admin)
-- **Admin audit logs**
+- **Admin audit logs** (tamper-evident)
 - **Template-driven workflows**
 - **Multi-hub routing** (multiple orgs, one volunteer)
 - **On-call shift scheduling**
+- **Caller identity hashing** (you don't know who called Signal)
 :::
 
-<!-- notes: This comes up a lot. "Why not just use Signal?" Signal is great for 1:1 and small group communication. It's not a call routing system. It doesn't know who's on shift. It doesn't have parallel ring. It doesn't have case management. And importantly: Signal's server knows your phone number. Llámenos doesn't store your volunteers' phone numbers in plaintext. They're hashed. -->
+<!-- notes: This comes up in every demo. "Why not just use Signal?" Signal is great for 1:1 and small group communication. It's not a call routing system. It doesn't know who's on shift. It doesn't have parallel ring. It doesn't have case management. And Signal's server knows your phone number — it's in their database. Llámenos doesn't store volunteer phone numbers in plaintext. They're hashed. Different threat models. -->
 
 ---
 
-# Part 5: What Changed in v2
+# Part 6: What Changed in v2
 
-## The Crypto Review
-
-<!-- notes: Transition: I want to be transparent about our process. We had v1 working, we had someone review it, and we found real problems. Here's what we found and what we changed. -->
+<!-- notes: I want to be transparent about our process. We had v1 working, we had a cryptographer review it, and they found real problems. Here's what we found and what we changed. This is important: don't use software where the developers are afraid to talk about what they got wrong. -->
 
 ---
 
@@ -629,7 +707,7 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 :::
 
 :::fragment
-2. **Single nsec per user** — one private key per person, lives on multiple devices. Compromise one device → compromise all notes.
+2. **Single nsec per user** — one private key per person, on multiple devices. Device compromise = all notes compromised.
 :::
 
 :::fragment
@@ -641,10 +719,10 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 :::
 
 :::fragment
-5. **No SAS verification** on device linking — MITM could inject a rogue device
+5. **No SAS verification** on device linking — MITM could inject a rogue device into your sigchain
 :::
 
-<!-- notes: I want to be clear: v1 wasn't broken in the sense that it would have been trivially exploited. The issues were architectural weaknesses that would matter against a sophisticated cryptographic adversary. The review was valuable precisely because it forced us to think through each protocol detail. The changes we made are not cosmetic. -->
+<!-- notes: I want to be clear: v1 wasn't broken in the sense of "trivially exploited by a script kiddie." The issues were architectural weaknesses that would matter against a sophisticated cryptographic adversary. The review was valuable precisely because it forced us to think through each protocol detail. None of the changes were cosmetic. Each one closes a specific attack class. -->
 
 ---
 
@@ -663,7 +741,7 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 :::right
 ### v2
 - **HPKE (RFC 9180)** — X25519-HKDF-SHA256-AES256-GCM
-- XChaCha20-Poly1305 (content, still good)
+- XChaCha20-Poly1305 (content, still fine)
 - **Per-device Ed25519/X25519 keys**
 - **57 domain separation labels** (Albrecht defense)
 - **Random key per note** (forward secrecy)
@@ -671,7 +749,7 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 - **Append-only hash-chained sigchain**
 :::
 
-<!-- notes: HPKE (RFC 9180) is the IETF-standardized hybrid public key encryption scheme. The exact suite we use — X25519-HKDF-SHA256-AES256-GCM — is the same as what TLS 1.3 uses for 0-RTT. It has a formal security proof. It's audited. It's not a custom construction. -->
+<!-- notes: HPKE X25519-HKDF-SHA256-AES256-GCM is the same suite used in TLS 1.3's 0-RTT mode. It has a formal security proof. It's audited. It's not a custom construction. You can point a cryptographer at RFC 9180 and they can verify our implementation against a specification, not just against our own claims. -->
 
 ---
 
@@ -686,11 +764,11 @@ packages/crypto/  (Rust crate)
 ├── PBKDF2 / HKDF key derivation
 ├── XChaCha20-Poly1305 content encryption
 ├── SFrame key derivation (voice E2EE)
-└── MLS (behind feature flag, for group state)
+└── MLS (behind feature flag)
 
 Compiled to:
 ├── native     → Tauri desktop (via Cargo path dep)
-├── WASM       → browser test builds
+├── WASM       → browser builds
 └── UniFFI     → iOS XCFramework + Android JNI .so
 ```
 
@@ -698,7 +776,7 @@ Compiled to:
 *One implementation reviewed once. Platform-specific crypto libraries are where divergence hides.*
 :::
 
-<!-- notes: This is a principle from Signal's design too. You want one audited implementation, not three implementations that drift from each other. The UniFFI bindings let the Rust crate be called from Swift (iOS) and Kotlin (Android) directly. The WASM build lets browser-based tests use the same crypto. -->
+<!-- notes: This is a principle from Signal's design: one audited implementation, not three implementations that drift from each other. The UniFFI bindings let the Rust crate be called from Swift (iOS) and Kotlin (Android) directly. The WASM build lets browser tests use the same crypto. One code path. One audit. One thing to review if you want to verify our claims. That's the right architecture for security-critical software. -->
 
 ---
 
@@ -718,47 +796,19 @@ SFrame (RFC 9605):
 *Your SIP bridge passes encrypted frames. Even if the bridge is compromised, the audio is ciphertext.*
 :::
 
-<!-- notes: SFrame is an IETF RFC (9605) for media frame encryption. It was designed specifically for WebRTC media streams, but it applies to SIP media as well. The key derivation is integrated into packages/crypto — same Rust crate, same audit surface. This means a compromised SIP bridge sees only encrypted media frames, not call audio. -->
+<!-- notes: SFrame is an IETF RFC (9605) for media frame encryption. Designed for WebRTC streams. The key derivation is integrated into packages/crypto — same Rust crate, same audit surface. What this means: a compromised SIP bridge sees only encrypted media frames, not call audio. The wiretap is broken at the media layer. -->
 
 ---
 
-## Device Provisioning Protocol
+# Part 7: Self-Hosting & Deployment
 
-```
-Linking a new device (Signal-style ephemeral ECDH):
-
-  New device:
-    Generate ephemeral X25519 keypair
-    Post ephemeralPubkey to provisioning room
-
-  Existing authorized device:
-    Fetch ephemeralPubkey
-    Derive shared secret: ECDH(device_privkey, ephemeral_pubkey)
-    Derive SAS: HKDF-SHA256(shared_secret, "llamenos:sas")
-    Display SAS to user (6 words / 4 emoji)
-    Wrap identity key material for new device
-    Post to provisioning room
-
-  User compares SAS on both screens
-  If they match: new device is authorized in sigchain
-  If mismatch: abort — there's a MITM
-```
-
-<!-- notes: The SAS (Short Authentication String) verification is the key step. The two devices independently compute a hash of the ECDH shared secret. If a MITM is intercepting, they'll see different values. The user visually confirms "yes, these match" — same as Signal's safety number comparison or WhatsApp's QR code pairing. -->
-
----
-
-# Part 6: Self-Hosting & Deployment
-
-<!-- notes: Transition: Now let's talk about what it actually takes to run this. -->
+<!-- notes: What does it actually take to run this? This section is for the people in the room who are thinking about deploying it, or who are advising orgs that might. -->
 
 ---
 
 ## What You Run
 
 ```yaml
-# deploy/docker/docker-compose.yml
-
 services:
   db:           PostgreSQL 16 (encrypted notes, audit log)
   app:          Bun + Hono (the API server)
@@ -767,38 +817,15 @@ services:
   
 # Optional profiles:
   signal:       signal-notifier sidecar (port 3100)
-  telephony:    Kamailio + CoTURN (if you want full self-hosted SIP)
-  inference:    LLM firehose agent (message extraction)
+  telephony:    Kamailio + CoTURN (full self-hosted SIP)
   monitoring:   Prometheus + Grafana
 ```
 
 - **Cloudflare Tunnels** for ingress — no exposed public IP
-- **EU hosting** compatible — GDPR by design
-- **Kubernetes** option: Helm chart with health probes
+- **EU hosting**: Hetzner Germany/Finland for GDPR compliance
+- **Kubernetes** option: Helm chart with health probes and network policies
 
-<!-- notes: The Nostr relay (strfry) is not optional. It's the real-time event bus between the server and clients. Hub events, push notifications, call routing — all go through Nostr relay. It's self-hosted on your infrastructure. Your Nostr relay, not one of the public ones. -->
-
----
-
-## Reproducible Builds — Verify What You're Running
-
-```bash
-# Anyone can verify the binary matches the published source
-./scripts/verify-build.sh
-
-# What this checks:
-# - SOURCE_DATE_EPOCH is set (reproducible timestamps)
-# - Content-hashed filenames match published CHECKSUMS.txt
-# - SLSA provenance attestation verifiable via cosign
-# - SBOM (Software Bill of Materials) matches dependencies
-```
-
-- **SLSA Level 2 provenance**: Build provenance signed by CI
-- **cosign**: Verify the signature on the release
-- **SBOM**: Know exactly what libraries you're running
-- **knope** manages version bumps — no manual version file editing
-
-<!-- notes: Reproducible builds matter for activist orgs because it means you're not taking my word for what the binary does. You can build it yourself from source and get the same hash. This is auditable. The SLSA provenance tells you which GitHub Actions workflow built it and when. cosign is the signature verification. The CHECKSUMS.txt in every release has SHA-256 hashes for every artifact. -->
+<!-- notes: The strfry Nostr relay is not optional — it's the real-time event bus between server and clients. Your Nostr relay, running on your infrastructure, not one of the public ones. This is important: hub events, call routing, presence — all go through the relay. That relay is yours. Cost for a small org: 2 CPU, 4GB RAM VPS on Hetzner is about €8/month. SIP DID from Telnyx is $1-5/month. That's the infrastructure cost for a secure hotline. -->
 
 ---
 
@@ -818,20 +845,41 @@ Nothing in the app is hardcoded to any specific use case.
     }
   ],
   "roles": ["volunteer", "observer", "dispatcher"],
-  "customFields": [...],
-  "workflowSteps": [...]
+  "customFields": [...]
 }
 ```
 
 *Legal observer network, jail support, domestic violence line, immigration legal — same codebase, different template.*
 
-<!-- notes: This is intentional. We didn't want to build a "jail support app" that gets repurposed. We built a secure routing and case management infrastructure that you configure via templates. Your org's use case is a JSON file. If you change use cases, you change the template. If a different org wants to use Llámenos, they write their own template. -->
+<!-- notes: This is intentional. We didn't build a "jail support app" that gets repurposed. We built secure routing and case management infrastructure that you configure via templates. Your org's use case is a JSON file. If you change use cases — new template. If a different org wants to use Llámenos — different template. The platform doesn't care what kind of crisis hotline you run. You define the entities, the report types, the fields, the workflows. -->
 
 ---
 
-# Part 7: What We Still Can't Protect
+## Multi-Hub: One Install, Many Lines
 
-<!-- notes: Transition: I want to close with honesty. Llámenos is a significant improvement over Google Voice and Twilio direct. It is not a magic shield. Here's what we can't protect against. -->
+Your org might run more than one line:
+
+```
+Hub A: Jail support line (overnight after mass arrests)
+Hub B: Rapid response line (daytime, protest hours)  
+Hub C: Community safety line (ongoing)
+
+One volunteer can be in all three hubs.
+All hubs active simultaneously — incoming calls from any hub ring them.
+Active hub in the UI doesn't affect which calls they receive.
+```
+
+- Each hub has its own encrypted key space, volunteers, shifts, and case records
+- Hub key rotates on member departure — departed member can't read new hub events
+- Multi-org: different orgs can run separate hubs on the same install
+
+<!-- notes: Multi-hub came from feedback that orgs don't run one line — they run several. The jail support crew runs overnight. The rapid response crew runs during protests. The community safety line runs all the time. Before Llámenos, each of these was a separate system — or worse, a separate phone number with volunteers managing multiple Google Voice accounts. Multi-hub means one deployment, one set of volunteers, multiple operational contexts. Each hub is cryptographically isolated. -->
+
+---
+
+# Part 8: What We Still Can't Protect
+
+<!-- notes: I want to close with honesty. Llámenos is a significant improvement over Google Voice and Twilio direct. It is not magic. Here's what we can't protect against, and I want to say this clearly so you don't deploy it with false confidence. -->
 
 ---
 
@@ -840,39 +888,40 @@ Nothing in the app is hardcoded to any specific use case.
 :::columns
 :::left
 ### We protect against
-- Administrative subpoenas to cloud providers
+- Administrative subpoenas to cloud providers (notes unreadable)
 - CDR analysis (with CDR-free SIP trunk)
-- Note content exposure (E2EE)
+- Note content exposure (E2EE, forward secrecy)
 - Message content exposure (E2EE)
-- Caller identity via phone records (HMAC)
+- Caller identity via phone records (HMAC hashing)
 - Sequential ring volunteer identification
-- Note exposure via key compromise (forward secrecy)
+- Device seizure note exposure (PIN-protected keys)
 :::right
 ### We don't protect against
-- **Carrier metadata**: Your SIP provider still sees traffic patterns
-- **Timing correlation**: Sophisticated adversary can correlate
-- **Device compromise**: Owned device = decryptable notes
-- **Admin coercion**: Coerced admin can re-wrap note keys
-- **Nation-state 0-days**: On the server, the clients, or the crypto
-- **Operational security failures**: Bad password hygiene, phishing
+- **Traffic analysis**: Sophisticated adversary can see call timing patterns
+- **Device seizure with PIN**: Seized + unlocked = notes accessible
+- **Admin coercion**: A coerced admin can decrypt all notes
+- **Nation-state runtime instrumentation**: If Cloudflare is your adversary, use self-hosted
+- **Operational security failures**: Bad passwords, phishing, shoulder surfing
+- **SMS/WhatsApp in transit**: Provider sees plaintext during delivery
 :::
 
-<!-- notes: I want to be very clear about admin coercion. If an admin is physically coerced, they can decrypt notes. This is not a flaw in the cryptography — it's a fundamental property of multi-admin E2EE. The alternative is "only the volunteer can read notes, admins cannot" — which means admins can't do case management. We made the design choice that admins need to read notes, and we document the consequence: coerced admin = exposed notes. Know your threat model. -->
+<!-- notes: Admin coercion deserves a mention. If an admin is physically coerced — that's a bad day. They can decrypt notes. This is not a flaw in the cryptography — it's a fundamental property of any multi-admin system where admins need to read records. The design choice: admins need case management access, so they have an envelope on every note. If your threat model includes coerced admins, store the admin key on an air-gapped device that doesn't travel to protests. -->
 
 ---
 
-## Know Your Threat Model
+## Know Your Threat Model Before You Deploy
 
 > *Llámenos is designed for the realistic threat faced by a US-based activist organization: law enforcement administrative subpoenas, OSINT-level adversaries, and insider threats. It is not designed to withstand a dedicated nation-state adversary with physical access to your infrastructure.*
 
-**Before deploying:**
-- Who is your adversary?
-- What can they do without a warrant?
-- What can they do with a warrant?
-- Who are your admins and what's their risk profile?
+**Before deploying, answer:**
+- Who is your adversary? Be specific.
+- What can they do without a warrant in your jurisdiction?
+- What can they do WITH a warrant?
+- Who are your admins and what's their physical security posture?
 - What happens if your server is seized?
+- What happens if a volunteer is an informant?
 
-<!-- notes: The "seized server" question is important. If law enforcement seizes your server, they get encrypted blobs and call metadata (timestamps, duration, hashed phone numbers). They do NOT get note contents, message contents, or plaintext caller IDs — assuming you've configured CDR-free SIP. That's a meaningful protection. It means they have to come back with something harder to get than an administrative subpoena. -->
+<!-- notes: The "seized server" question matters. If law enforcement seizes your server, they get encrypted blobs and call metadata. They do NOT get note content or plaintext caller IDs — if you've configured CDR-free SIP. That's a meaningful protection. It means they have to come back with something harder to get than an administrative subpoena. And that means more time, more scrutiny, more opportunity for your legal team to fight it. Not invincibility. But friction. -->
 
 ---
 
@@ -881,17 +930,29 @@ Nothing in the app is hardcoded to any specific use case.
 - **Code**: `github.com/llamenos-hotline/llamenos` (AGPL-3.0)
 - **Self-hosting docs**: `llamenos-hotline.com/docs`
 - **This deck**: `llamenos-hotline.com/slides/counterspy-2026/`
-- **Signal**: Ask me after the talk — I'll share the group link
+- **Signal**: Ask me after the talk
 
 :::fragment
 *We especially need:*
-- *Organizations willing to run beta deployments*
-- *Cryptographers to review the HPKE implementation*
+- *Organizations willing to run beta deployments — real ops, real feedback*
+- *Cryptographers to audit the HPKE implementation*
 - *People who have survived subpoenas and can stress-test our threat model assumptions*
 - *EU-based orgs for GDPR validation*
 :::
 
-<!-- notes: The project is pre-production. No production users yet. We are looking for organizations willing to run beta deployments — ideally ones that have real security needs and existing operational security practices. If you've been subpoenaed, I want to talk to you specifically. Your real-world experience stress-tests our threat model assumptions in ways that theoretical analysis cannot. -->
+:::fragment
+*This is pre-production software. We built it to be auditable. We built it to be self-hosted. We built it because the existing options were a gift to cops.*
+:::
+
+<!-- notes: The project is pre-production. No production users yet. We need orgs with real security needs who are willing to give us real-world feedback. If you've been subpoenaed — I want to talk to you specifically. Your experience stress-tests our assumptions in ways that theoretical analysis cannot. Come find me after this. I'll be the one by the coffee trying to convince people that self-hosting a Nostr relay is worth it.
+
+Likely questions:
+1. "What does it cost?" — €8-15/month VPS on Hetzner. $1-5/month SIP DID. That's it.
+2. "What about GDPR?" — HMAC-hashed caller numbers, E2EE content, EU hosting available. Caller data question for your DPA.
+3. "Can we port our Google Voice number?" — Yes. Port to a SIP-capable provider, point at your trunk.
+4. "What's the status of MLS?" — Behind a feature flag. Functional, not battle-tested. Wait for the RFC to stabilize.
+5. "What if a volunteer leaves badly?" — Hub key rotation. Future notes inaccessible. Historical notes they took: they still have their device key. That's the forward secrecy trade-off. Same as any E2EE system.
+6. "Can we use this with existing Twilio numbers?" — Yes, via Twilio Elastic SIP Trunking — different from Programmable Voice API, better CDR posture. -->
 
 ---
 
@@ -902,17 +963,3 @@ Nothing in the app is hardcoded to any specific use case.
 *"More Secure Hubs for Your Spokes"*
 
 `llamenos-hotline.com/slides/counterspy-2026/`
-
-<!-- notes: Likely questions to prepare for:
-
-1. "What does it cost to self-host?" — Small VPS (2 CPU, 4GB RAM) is enough for most orgs. ~$10-20/month on Hetzner (EU). SIP trunk DID is $1-5/month depending on provider. PostgreSQL storage grows slowly.
-
-2. "What happens when a volunteer leaves and they might be a threat?" — Key rotation via PUK. Future notes inaccessible to departed volunteer. Historical notes they had access to: they still have those keys. This is accepted. Same limitation as any E2EE system.
-
-3. "How hard is it to migrate from Google Voice?" — Get a new phone number (or port your existing one to a SIP-capable provider), point it at your SIP trunk, deploy the Docker Compose stack. No automated migration tool yet.
-
-4. "GDPR — what about caller data?" — Caller phone numbers stored as HMAC hashes (one-way). Call timestamps stored. Content encrypted. For EU org with EU callers: you're not storing identifiable call content. Legal question: is a hashed phone number "personal data"? EU DPA may have views on this. Get legal advice for your jurisdiction.
-
-5. "Can we use this with our existing Twilio numbers?" — Yes. TwilioAdapter supports SIP trunking via Twilio Elastic SIP Trunking, which is different from Twilio Programmable Voice API. Elastic SIP gives you significantly better CDR control.
-
-6. "What's the status of the MLS implementation?" — Behind a feature flag. Functional but not battle-tested. We recommend waiting for the MLS RFC to stabilize further before enabling it in production. -->
