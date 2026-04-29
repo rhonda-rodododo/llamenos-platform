@@ -5,7 +5,7 @@ guidesHeading: गाइड
 guides:
   - title: शुरू करना
     description: पूर्वापेक्षाएँ, इंस्टॉलेशन, टेलीफ़ोनी सेटअप, और आपकी पहली तैनाती।
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: एडमिन गाइड
     description: वॉलंटियर, शिफ्ट, बैन सूची, कस्टम फ़ील्ड, और सेटिंग्स प्रबंधित करें।
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: टेलीफ़ोनी प्रदाता
     description: समर्थित टेलीफ़ोनी प्रदाताओं की तुलना करें और अपनी हॉटलाइन के लिए सबसे उपयुक्त चुनें।
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "सेटअप: Twilio"
     description: Twilio को अपने टेलीफ़ोनी प्रदाता के रूप में कॉन्फ़िगर करने की चरण-दर-चरण गाइड।
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "सेटअप: SignalWire"
     description: SignalWire को अपने टेलीफ़ोनी प्रदाता के रूप में कॉन्फ़िगर करने की चरण-दर-चरण गाइड।
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "सेटअप: Vonage"
     description: Vonage को अपने टेलीफ़ोनी प्रदाता के रूप में कॉन्फ़िगर करने की चरण-दर-चरण गाइड।
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "सेटअप: Plivo"
     description: Plivo को अपने टेलीफ़ोनी प्रदाता के रूप में कॉन्फ़िगर करने की चरण-दर-चरण गाइड।
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "सेटअप: Asterisk (सेल्फ़-होस्टेड)"
     description: अधिकतम गोपनीयता और नियंत्रण के लिए ARI ब्रिज के साथ Asterisk तैनात करें।
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: WebRTC ब्राउज़र कॉलिंग
     description: WebRTC का उपयोग करके वॉलंटियर्स के लिए ब्राउज़र में कॉल उत्तर देना सक्षम करें।
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: सुरक्षा मॉडल
     description: समझें कि क्या एन्क्रिप्ट किया गया है, क्या नहीं, और थ्रेट मॉडल क्या है।
     href: /security

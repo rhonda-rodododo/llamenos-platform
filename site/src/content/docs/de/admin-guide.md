@@ -7,7 +7,7 @@ Als Administrator verwalten Sie alles: Freiwillige, Schichten, Anrufeinstellunge
 
 ## Anmeldung
 
-Melden Sie sich mit dem `nsec` (Nostr-Geheimschluessel) an, der waehrend der [Einrichtung](/docs/getting-started) generiert wurde. Die Anmeldeseite akzeptiert das nsec-Format (`nsec1...`). Ihr Browser signiert eine Challenge mit dem Schluessel -- das Geheimnis verlaesst niemals das Geraet.
+Melden Sie sich mit dem `nsec` (Nostr-Geheimschluessel) an, der waehrend der [Einrichtung](/docs/deploy) generiert wurde. Die Anmeldeseite akzeptiert das nsec-Format (`nsec1...`). Ihr Browser signiert eine Challenge mit dem Schluessel -- das Geheimnis verlaesst niemals das Geraet.
 
 Optional koennen Sie einen WebAuthn-Passkey in den Einstellungen registrieren, um sich auf weiteren Geraeten ohne Passwort anzumelden.
 

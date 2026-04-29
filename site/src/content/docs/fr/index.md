@@ -5,7 +5,7 @@ guidesHeading: Guides
 guides:
   - title: Premiers pas
     description: Prerequis, installation, configuration telephonique et premier deploiement.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: Guide administrateur
     description: Gerez les benevoles, les equipes, les listes de blocage, les champs personnalises et les parametres.
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: Fournisseurs de telephonie
     description: Comparez les fournisseurs de telephonie pris en charge et choisissez celui qui convient le mieux a votre ligne.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "Configuration : Twilio"
     description: Guide etape par etape pour configurer Twilio comme fournisseur de telephonie.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "Configuration : SignalWire"
     description: Guide etape par etape pour configurer SignalWire comme fournisseur de telephonie.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "Configuration : Vonage"
     description: Guide etape par etape pour configurer Vonage comme fournisseur de telephonie.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "Configuration : Plivo"
     description: Guide etape par etape pour configurer Plivo comme fournisseur de telephonie.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "Configuration : Asterisk (auto-heberge)"
     description: Deployez Asterisk avec le bridge ARI pour un maximum de confidentialite et de controle.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: Appels WebRTC dans le navigateur
     description: Activez la prise d'appels dans le navigateur pour les benevoles via WebRTC.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: Modele de securite
     description: Comprenez ce qui est chiffre, ce qui ne l'est pas et le modele de menaces.
     href: /security

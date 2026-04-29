@@ -7,7 +7,7 @@ As an admin, you manage everything: volunteers, shifts, communication channels, 
 
 ## Logging in
 
-Log in with the `nsec` (Nostr secret key) generated during [setup](/docs/getting-started). The login page accepts the nsec format (`nsec1...`). Your browser signs a challenge with the key — the secret never leaves the device.
+Log in with the `nsec` (Nostr secret key) generated during [setup](/docs/deploy). The login page accepts the nsec format (`nsec1...`). Your browser signs a challenge with the key — the secret never leaves the device.
 
 Optionally, register a WebAuthn passkey in Settings for passwordless login on additional devices.
 
@@ -129,7 +129,7 @@ Configure SMS, WhatsApp, and Signal channels:
 - **WhatsApp** — enable/disable, enter Meta Cloud API credentials (access token, verify token, phone number ID). Supports template messages for initiating conversations within the 24-hour messaging window.
 - **Signal** — enable/disable, configure the signal-cli-rest-api bridge URL and phone number. Includes health monitoring with graceful degradation.
 
-Each channel has its own webhook endpoint — see [Getting Started](/docs/getting-started) for the URLs to configure.
+Each channel has its own webhook endpoint — see [Getting Started](/docs/deploy) for the URLs to configure.
 
 ### WebAuthn policy
 

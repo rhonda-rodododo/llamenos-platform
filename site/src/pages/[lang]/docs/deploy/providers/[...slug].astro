@@ -1,0 +1,29 @@
+---
+import DocsLayout from '../../../../../layouts/DocsLayout.astro';
+import { getCollection, getEntry, render } from 'astro:content';
+import { type Lang, nonDefaultLocales, defaultLang } from '../../../../../i18n/config';
+
+export async function getStaticPaths() {
+  const docs = await getCollection('docs');
+  const slugs = docs
+    .filter(d => {
+      const parts = d.id.split('/');
+      return parts[0] === defaultLang && parts[1] === 'deploy' && parts[2] === 'providers' && parts.length === 4 && parts[3] !== 'index';
+    })
+    .map(d => d.id.split('/').slice(3).join('/'));
+
+  return nonDefaultLocales.flatMap(lang =>
+    slugs.map(slug => ({ params: { lang, slug }, props: { slug } }))
+  );
+}
+
+const lang = Astro.params.lang as Lang;
+const { slug } = Astro.props;
+const entry = (await getEntry('docs', `${lang}/deploy/providers/${slug}`)) ?? (await getEntry('docs', `en/deploy/providers/${slug}`))!;
+const { Content } = await render(entry);
+---
+
+<DocsLayout title={entry.data.title} lang={lang}>
+  <h1>{entry.data.title}</h1>
+  <Content />
+</DocsLayout>

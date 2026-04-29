@@ -5,7 +5,7 @@ guidesHeading: Hướng dẫn
 guides:
   - title: Bắt đầu
     description: Yêu cầu tiên quyết, cài đặt, thiết lập dịch vụ điện thoại và triển khai lần đầu.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: Hướng dẫn quản trị viên
     description: Quản lý tình nguyện viên, ca trực, danh sách chặn, trường tùy chỉnh và cài đặt.
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: Nhà cung cấp dịch vụ điện thoại
     description: So sánh các nhà cung cấp dịch vụ điện thoại được hỗ trợ và chọn phương án phù hợp nhất cho đường dây nóng của bạn.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "Thiết lập: Twilio"
     description: Hướng dẫn từng bước để cấu hình Twilio làm nhà cung cấp dịch vụ điện thoại.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "Thiết lập: SignalWire"
     description: Hướng dẫn từng bước để cấu hình SignalWire làm nhà cung cấp dịch vụ điện thoại.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "Thiết lập: Vonage"
     description: Hướng dẫn từng bước để cấu hình Vonage làm nhà cung cấp dịch vụ điện thoại.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "Thiết lập: Plivo"
     description: Hướng dẫn từng bước để cấu hình Plivo làm nhà cung cấp dịch vụ điện thoại.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "Thiết lập: Asterisk (Tự lưu trữ)"
     description: Triển khai Asterisk với cầu nối ARI để đạt mức bảo mật và kiểm soát tối đa.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: Gọi qua trình duyệt WebRTC
     description: Bật tính năng WebRTC để tình nguyện viên có thể nhận cuộc gọi trực tiếp từ trình duyệt.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: Mô hình bảo mật
     description: Hiểu những gì được mã hóa, những gì không và mô hình đe dọa.
     href: /security

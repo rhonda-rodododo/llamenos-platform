@@ -26,11 +26,11 @@ const sections = [
     heading: t.docs.setupDeployment,
     items: [
       { href: lp('/docs'), label: t.docs.overview },
-      { href: lp('/docs/getting-started'), label: t.docs.gettingStarted },
-      { href: lp('/docs/architecture'), label: t.docs.architecture },
-      { href: lp('/docs/self-hosting'), label: t.docs.selfHosting },
-      { href: lp('/docs/deploy-docker'), label: t.docs.deployDocker },
-      { href: lp('/docs/deploy-kubernetes'), label: t.docs.deployKubernetes },
+      { href: lp('/docs/deploy'), label: t.docs.gettingStarted },
+      { href: lp('/docs/deploy/self-hosting'), label: t.docs.selfHosting },
+      { href: lp('/docs/deploy/docker'), label: t.docs.deployDocker },
+      { href: lp('/docs/deploy/kubernetes'), label: t.docs.deployKubernetes },
+      { href: lp('/docs/deploy/coopcloud'), label: 'Co-op Cloud' },
     ],
   },
   {
@@ -46,33 +46,29 @@ const sections = [
   {
     heading: t.docs.voiceProviders,
     items: [
-      { href: lp('/docs/telephony-providers'), label: t.docs.telephonyProviders },
-      { href: lp('/docs/setup-twilio'), label: t.docs.setupTwilio },
-      { href: lp('/docs/setup-signalwire'), label: t.docs.setupSignalwire },
-      { href: lp('/docs/setup-vonage'), label: t.docs.setupVonage },
-      { href: lp('/docs/setup-plivo'), label: t.docs.setupPlivo },
-      { href: lp('/docs/setup-asterisk'), label: t.docs.setupAsterisk },
-      { href: lp('/docs/webrtc-calling'), label: t.docs.webrtcCalling },
+      { href: lp('/docs/deploy/providers'), label: t.docs.telephonyProviders },
+      { href: lp('/docs/deploy/providers/twilio'), label: t.docs.setupTwilio },
+      { href: lp('/docs/deploy/providers/signalwire'), label: t.docs.setupSignalwire },
+      { href: lp('/docs/deploy/providers/vonage'), label: t.docs.setupVonage },
+      { href: lp('/docs/deploy/providers/plivo'), label: t.docs.setupPlivo },
+      { href: lp('/docs/deploy/providers/asterisk'), label: t.docs.setupAsterisk },
+      { href: lp('/docs/deploy/providers/webrtc'), label: t.docs.webrtcCalling },
     ],
   },
   {
     heading: t.docs.messagingChannels,
     items: [
-      { href: lp('/docs/setup-sms'), label: t.docs.setupSms },
-      { href: lp('/docs/setup-whatsapp'), label: t.docs.setupWhatsapp },
-      { href: lp('/docs/setup-signal'), label: t.docs.setupSignal },
+      { href: lp('/docs/deploy/providers/sms'), label: t.docs.setupSms },
+      { href: lp('/docs/deploy/providers/whatsapp'), label: t.docs.setupWhatsapp },
+      { href: lp('/docs/deploy/providers/signal'), label: t.docs.setupSignal },
     ],
   },
   {
     heading: t.docs.reference,
     items: [
-      { href: lp('/docs/api-reference'), label: t.docs.apiReference },
-    ],
-  },
-  {
-    heading: t.docs.helpSection,
-    items: [
-      { href: lp('/docs/troubleshooting'), label: t.docs.troubleshooting },
+      { href: lp('/docs/reference/api-reference'), label: t.docs.apiReference },
+      { href: lp('/docs/reference/architecture'), label: t.docs.architecture },
+      { href: lp('/docs/reference/troubleshooting'), label: t.docs.troubleshooting },
     ],
   },
 ];

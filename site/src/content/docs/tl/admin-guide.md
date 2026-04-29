@@ -7,7 +7,7 @@ Bilang admin, pinamamahalaan mo ang lahat: mga boluntaryo, shift, mga setting ng
 
 ## Pag-log in
 
-Mag-log in gamit ang `nsec` (Nostr secret key) na nabuo sa panahon ng [pag-setup](/docs/getting-started). Tinatanggap ng login page ang nsec format (`nsec1...`). Pumipirma ang iyong browser ng hamon gamit ang key -- hindi kailanman umaalis ang secret sa device.
+Mag-log in gamit ang `nsec` (Nostr secret key) na nabuo sa panahon ng [pag-setup](/docs/deploy). Tinatanggap ng login page ang nsec format (`nsec1...`). Pumipirma ang iyong browser ng hamon gamit ang key -- hindi kailanman umaalis ang secret sa device.
 
 Opsyonal, mag-register ng WebAuthn passkey sa Settings para sa passwordless login sa ibang mga device.
 

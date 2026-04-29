@@ -7,7 +7,7 @@ Antanke administratè, ou jere tout bagay: volontè, ekip travay, paramèt apèl
 
 ## Koneksyon
 
-Konekte ak `nsec` (kle sekrè Nostr) ki te jenere pandan [enstalasyon](/docs/getting-started) an. Paj koneksyon an aksepte fòma nsec (`nsec1...`). Navigatè ou a siyen yon defi ak kle a -- sekrè a pa janm kite aparèy la.
+Konekte ak `nsec` (kle sekrè Nostr) ki te jenere pandan [enstalasyon](/docs/deploy) an. Paj koneksyon an aksepte fòma nsec (`nsec1...`). Navigatè ou a siyen yon defi ak kle a -- sekrè a pa janm kite aparèy la.
 
 Opsyonèlman, anrejistre yon passkey WebAuthn nan Settings pou koneksyon san modpas sou lòt aparèy.
 

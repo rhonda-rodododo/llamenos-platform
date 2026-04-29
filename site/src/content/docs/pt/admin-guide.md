@@ -7,7 +7,7 @@ Como administrador, voce gerencia tudo: voluntarios, turnos, configuracoes de ch
 
 ## Login
 
-Faca login com o `nsec` (chave secreta Nostr) gerado durante a [configuracao](/docs/getting-started). A pagina de login aceita o formato nsec (`nsec1...`). Seu navegador assina um desafio com a chave -- o segredo nunca sai do dispositivo.
+Faca login com o `nsec` (chave secreta Nostr) gerado durante a [configuracao](/docs/deploy). A pagina de login aceita o formato nsec (`nsec1...`). Seu navegador assina um desafio com a chave -- o segredo nunca sai do dispositivo.
 
 Opcionalmente, registre uma chave de acesso WebAuthn nas Configuracoes para login sem senha em dispositivos adicionais.
 

@@ -5,7 +5,7 @@ guidesHeading: Руководства
 guides:
   - title: Начало работы
     description: Предварительные требования, установка, настройка телефонии и первое развёртывание.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: Руководство администратора
     description: Управление волонтёрами, сменами, списками блокировки, пользовательскими полями и настройками.
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: Провайдеры телефонии
     description: Сравнение поддерживаемых провайдеров телефонии и выбор наиболее подходящего для вашей горячей линии.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "Настройка: Twilio"
     description: Пошаговое руководство по настройке Twilio в качестве провайдера телефонии.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "Настройка: SignalWire"
     description: Пошаговое руководство по настройке SignalWire в качестве провайдера телефонии.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "Настройка: Vonage"
     description: Пошаговое руководство по настройке Vonage в качестве провайдера телефонии.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "Настройка: Plivo"
     description: Пошаговое руководство по настройке Plivo в качестве провайдера телефонии.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "Настройка: Asterisk (самостоятельный хостинг)"
     description: Развёртывание Asterisk с мостом ARI для максимальной конфиденциальности и контроля.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: Звонки через браузер (WebRTC)
     description: Включение возможности отвечать на звонки прямо в браузере для волонтёров с помощью WebRTC.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: Модель безопасности
     description: Понимание того, что зашифровано, что нет, и модели угроз.
     href: /security

@@ -2,6 +2,8 @@
 import DocsLayout from '../../../layouts/DocsLayout.astro';
 import { getEntry, render } from 'astro:content';
 import { type Lang, defaultLang, nonDefaultLocales } from '../../../i18n/config';
+import { getTranslation } from '../../../i18n/utils';
+import { common } from '../../../i18n/translations/common';
 
 export function getStaticPaths() {
   return nonDefaultLocales.map(lang => ({ params: { lang } }));
@@ -10,25 +12,85 @@ export function getStaticPaths() {
 const lang = Astro.params.lang as Lang;
 const entry = (await getEntry('docs', lang)) ?? (await getEntry('docs', 'en'))!;
 const { Content } = await render(entry);
+const t = getTranslation(common, lang);
 
 function lp(path: string) {
-  return lang === defaultLang ? path : `/${lang}${path}`;
+  return `/${lang}${path}`;
 }
+
+const sections = [
+  {
+    title: t.docs.setupDeployment,
+    items: [
+      { href: lp('/docs/deploy'), label: t.docs.gettingStarted },
+      { href: lp('/docs/deploy/docker'), label: t.docs.deployDocker },
+      { href: lp('/docs/deploy/kubernetes'), label: t.docs.deployKubernetes },
+      { href: lp('/docs/deploy/self-hosting'), label: t.docs.selfHosting },
+      { href: lp('/docs/deploy/coopcloud'), label: 'Co-op Cloud' },
+    ],
+  },
+  {
+    title: t.docs.userGuides,
+    items: [
+      { href: lp('/docs/guides'), label: t.docs.guides },
+      { href: lp('/docs/admin-guide'), label: t.docs.adminGuide },
+      { href: lp('/docs/volunteer-guide'), label: t.docs.volunteerGuide },
+      { href: lp('/docs/reporter-guide'), label: t.docs.reporterGuide },
+      { href: lp('/docs/mobile-guide'), label: t.docs.mobileGuide },
+    ],
+  },
+  {
+    title: t.docs.voiceProviders,
+    items: [
+      { href: lp('/docs/deploy/providers'), label: t.docs.telephonyProviders },
+      { href: lp('/docs/deploy/providers/twilio'), label: t.docs.setupTwilio },
+      { href: lp('/docs/deploy/providers/signalwire'), label: t.docs.setupSignalwire },
+      { href: lp('/docs/deploy/providers/vonage'), label: t.docs.setupVonage },
+      { href: lp('/docs/deploy/providers/plivo'), label: t.docs.setupPlivo },
+      { href: lp('/docs/deploy/providers/asterisk'), label: t.docs.setupAsterisk },
+      { href: lp('/docs/deploy/providers/sms'), label: t.docs.setupSms },
+      { href: lp('/docs/deploy/providers/whatsapp'), label: t.docs.setupWhatsapp },
+      { href: lp('/docs/deploy/providers/signal'), label: t.docs.setupSignal },
+      { href: lp('/docs/deploy/providers/webrtc'), label: t.docs.webrtcCalling },
+    ],
+  },
+  {
+    title: t.docs.reference,
+    items: [
+      { href: lp('/docs/reference/api-reference'), label: t.docs.apiReference },
+      { href: lp('/docs/reference/architecture'), label: t.docs.architecture },
+      { href: lp('/docs/reference/troubleshooting'), label: t.docs.troubleshooting },
+      { href: lp('/security'), label: 'Security' },
+    ],
+  },
+];
 ---
 
 <DocsLayout title={entry.data.title} lang={lang}>
   <h1>{entry.data.title}</h1>
-  <p>{entry.data.description}</p>
+  <p class="text-fg-muted text-lg mb-8">{entry.data.description}</p>
 
-  <h2>{entry.data.guidesHeading ?? 'Guides'}</h2>
-  <div class="not-prose grid grid-cols-1 gap-4 sm:grid-cols-2">
-    {entry.data.guides?.map(guide => (
-      <a href={lp(guide.href)} class="rounded-xl border border-border bg-bg-card p-5 transition-colors hover:border-border-bright group">
-        <h3 class="text-base font-semibold text-fg mb-1 group-hover:text-accent-bright transition-colors">{guide.title}</h3>
-        <p class="text-sm text-fg-muted">{guide.description}</p>
-      </a>
+  <div class="not-prose space-y-8">
+    {sections.map(section => (
+      <div>
+        <h2 class="text-lg font-semibold text-fg mb-3">{section.title}</h2>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {section.items.map(item => (
+            <a
+              href={item.href}
+              class="rounded-xl border border-border bg-bg-card p-4 transition-colors hover:border-border-bright group"
+            >
+              <h3 class="text-sm font-semibold text-fg group-hover:text-accent-bright transition-colors">
+                {item.label}
+              </h3>
+            </a>
+          ))}
+        </div>
+      </div>
     ))}
   </div>
 
-  <Content />
+  <div class="mt-12">
+    <Content />
+  </div>
 </DocsLayout>
