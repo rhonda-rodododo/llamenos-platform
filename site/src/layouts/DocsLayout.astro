@@ -1,6 +1,7 @@
 ---
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import SearchBar from '../components/SearchBar.astro';
 import '../styles/global.css';
 import { type Lang, defaultLang, languages } from '../i18n/config';
 import { getTranslation } from '../i18n/utils';
@@ -97,6 +98,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/docs';
       <!-- Sidebar -->
       <aside class="mb-8 lg:mb-0 lg:w-56 lg:shrink-0">
         <nav class="lg:sticky lg:top-24 space-y-6">
+          <SearchBar />
           {sections.map(section => (
             <div>
               <h2 class="text-xs font-semibold uppercase tracking-wider text-fg-dim mb-3">{section.heading}</h2>
