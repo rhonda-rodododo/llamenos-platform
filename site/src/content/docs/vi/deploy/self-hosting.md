@@ -1,73 +1,120 @@
 ---
-title: Tổng quan tự lưu trữ
-description: Triển khai Llamenos trên hạ tầng riêng với Docker Compose hoặc Kubernetes.
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Llamenos có thể chạy trên Cloudflare Workers **hoặc** trên hạ tầng riêng của bạn. Tự lưu trữ cho phép bạn kiểm soát hoàn toàn vị trí dữ liệu, cách ly mạng và lựa chọn hạ tầng — quan trọng cho các tổ chức không thể sử dụng nền tảng đám mây của bên thứ ba hoặc cần đáp ứng các yêu cầu tuân thủ nghiêm ngặt.
+Llamenos is designed to run on your own infrastructure. Self-hosting gives you full control over data residency, network isolation, and infrastructure choices — critical for organizations protecting against well-funded adversaries.
 
-## Tùy chọn triển khai
+## Deployment options
 
-| Tùy chọn | Phù hợp nhất cho | Độ phức tạp | Khả năng mở rộng |
-|----------|-----------------|-------------|-------------------|
-| [Cloudflare Workers](/docs/deploy) | Bắt đầu dễ nhất, edge toàn cầu | Thấp | Tự động |
-| [Docker Compose](/docs/deploy/docker) | Tự lưu trữ trên một máy chủ | Trung bình | Đơn nút |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | Điều phối đa dịch vụ | Cao hơn | Mở rộng ngang (đa bản sao) |
+| Option | Best for | Complexity | Scaling |
+|--------|----------|------------|---------|
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## Khác biệt kiến trúc
+## Docker Compose files
 
-Cả hai mục tiêu triển khai chạy **cùng một mã ứng dụng**. Sự khác biệt nằm ở lớp hạ tầng:
+Docker Compose uses a layered approach:
 
-| Thành phần | Cloudflare | Tự lưu trữ |
-|------------|------------|-------------|
-| **Backend runtime** | Cloudflare Workers | Node.js (qua Hono) |
-| **Lưu trữ dữ liệu** | Durable Objects (KV) | PostgreSQL |
-| **Blob storage** | R2 | MinIO (tương thích S3) |
-| **Chuyển đổi giọng nói** | Whisper phía máy khách (WASM) | Whisper phía máy khách (WASM) |
-| **File tĩnh** | Workers Assets | Caddy / Hono serveStatic |
-| **Sự kiện thời gian thực** | Nostr relay (Nosflare) | Nostr relay (strfry) |
-| **TLS termination** | Cloudflare edge | Caddy (HTTPS tự động) |
-| **Chi phí** | Theo sử dụng (có gói miễn phí) | Chi phí máy chủ của bạn |
+| File | Purpose |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-## Yêu cầu
+For **local development**, use the dev overlay. For **production**, stack the production overlay:
 
-### Yêu cầu tối thiểu
+```bash
+# Local (backing services only + bun run dev:server)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- Một máy chủ Linux (tối thiểu 2 lõi CPU, 2 GB RAM)
-- Docker và Docker Compose v2 (hoặc cụm Kubernetes cho Helm)
-- Một tên miền trỏ đến máy chủ
-- Một cặp khóa quản trị (tạo bằng `bun run bootstrap-admin`)
-- Ít nhất một kênh liên lạc (nhà cung cấp thoại, SMS, v.v.)
+# Production
+docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
+```
 
-### Thành phần tùy chọn
+Or use the setup script:
 
-- **Whisper transcription** — cần 4 GB+ RAM (CPU) hoặc GPU
-- **Asterisk** — cho SIP tự lưu trữ (xem [Thiết lập Asterisk](/docs/deploy/providers/asterisk))
-- **Signal bridge** — cho tin nhắn Signal (xem [Thiết lập Signal](/docs/deploy/providers/signal))
+```bash
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
+```
 
-## So sánh nhanh
+## Core services
 
-**Chọn Docker Compose nếu:**
-- Bạn chạy trên một máy chủ hoặc VPS
-- Bạn muốn thiết lập tự lưu trữ đơn giản nhất
-- Bạn quen với Docker cơ bản
+All deployment targets run these core services:
 
-**Chọn Kubernetes (Helm) nếu:**
-- Bạn đã có cụm K8s
-- Bạn cần mở rộng ngang (nhiều bản sao)
-- Bạn muốn tích hợp với công cụ K8s hiện có (cert-manager, external-secrets, v.v.)
+| Component | Purpose |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **strfry** | Nostr relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## Cân nhắc bảo mật
+## Optional services
 
-Tự lưu trữ cho bạn nhiều quyền kiểm soát hơn nhưng cũng nhiều trách nhiệm hơn:
+| Component | Profile | Purpose |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-- **Mã hóa dữ liệu lưu trữ**: Dữ liệu PostgreSQL không được mã hóa mặc định. Sử dụng mã hóa toàn đĩa (LUKS, dm-crypt) hoặc bật PostgreSQL TDE. Ghi chú cuộc gọi và bản chuyển đổi đã được mã hóa E2EE — máy chủ không bao giờ thấy bản rõ.
-- **Bảo mật mạng**: Sử dụng tường lửa. Chỉ cổng 80/443 nên được công khai.
-- **Secrets**: Không bao giờ đặt secrets trong Docker Compose files hoặc version control. Sử dụng file `.env` hoặc Docker/Kubernetes secrets.
-- **Cập nhật**: Thường xuyên kéo image mới. Theo dõi [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md).
-- **Sao lưu**: Thường xuyên sao lưu PostgreSQL và MinIO. Xem phần sao lưu trong mỗi hướng dẫn triển khai.
+## What you need
 
-## Bước tiếp theo
+### Minimum requirements
 
-- [Triển khai Docker Compose](/docs/deploy/docker) — chạy trong 10 phút
-- [Triển khai Kubernetes](/docs/deploy/kubernetes) — triển khai với Helm
-- [Bắt đầu](/docs/deploy) — triển khai Cloudflare Workers
+- A Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (or a Kubernetes cluster for Helm)
+- A domain name pointing to your server
+- `openssl` (for generating secrets)
+- At least one communication channel configured
+
+### Optional components
+
+- **Transcription** — client-side WASM Whisper; no additional server component needed
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
+
+## Cloudflare Tunnels (alternative ingress)
+
+Instead of exposing ports 80/443 directly, you can use [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. This hides your server IP and provides DDoS protection:
+
+```bash
+cloudflared tunnel create llamenos
+cloudflared tunnel route dns llamenos hotline.yourorg.com
+cloudflared tunnel run llamenos
+```
+
+Configure the tunnel to forward to `http://localhost:3000`.
+
+## Security considerations
+
+Self-hosting gives you more control but also more responsibility:
+
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, and messages are E2EE — the server never sees plaintext.
+- **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Watch the changelog for security fixes.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
+
+## Ansible playbooks
+
+The `deploy/ansible/` directory contains preflight and smoke-check playbooks:
+
+```bash
+# Pre-deployment system verification
+ansible-playbook deploy/ansible/preflight.yml -i your_inventory
+
+# Post-deployment smoke check
+ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
+```
+
+## Next steps
+
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers

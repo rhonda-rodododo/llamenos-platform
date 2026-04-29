@@ -1,73 +1,120 @@
 ---
-title: 자체 호스팅 개요
-description: Docker Compose 또는 Kubernetes를 사용하여 자체 인프라에 Llamenos를 배포합니다.
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Llamenos는 Cloudflare Workers **또는** 자체 인프라에서 실행할 수 있습니다. 자체 호스팅은 데이터 거주지, 네트워크 격리 및 인프라 선택에 대한 완전한 제어를 제공합니다 — 타사 클라우드 플랫폼을 사용할 수 없거나 엄격한 규정 준수 요건을 충족해야 하는 조직에 중요합니다.
+Llamenos is designed to run on your own infrastructure. Self-hosting gives you full control over data residency, network isolation, and infrastructure choices — critical for organizations protecting against well-funded adversaries.
 
-## 배포 옵션
+## Deployment options
 
-| 옵션 | 적합한 용도 | 복잡도 | 스케일링 |
-|------|-------------|--------|----------|
-| [Cloudflare Workers](/docs/deploy) | 가장 쉬운 시작, 글로벌 엣지 | 낮음 | 자동 |
-| [Docker Compose](/docs/deploy/docker) | 단일 서버 자체 호스팅 | 중간 | 단일 노드 |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | 멀티 서비스 오케스트레이션 | 높음 | 수평 확장 (다중 복제본) |
+| Option | Best for | Complexity | Scaling |
+|--------|----------|------------|---------|
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## 아키텍처 차이점
+## Docker Compose files
 
-두 배포 대상 모두 **동일한 애플리케이션 코드**를 실행합니다. 차이점은 인프라 계층에 있습니다:
+Docker Compose uses a layered approach:
 
-| 구성 요소 | Cloudflare | 자체 호스팅 |
-|-----------|------------|-------------|
-| **백엔드 런타임** | Cloudflare Workers | Node.js (via Hono) |
-| **데이터 스토리지** | Durable Objects (KV) | PostgreSQL |
-| **Blob 스토리지** | R2 | MinIO (S3-compatible) |
-| **음성 변환** | 클라이언트측 Whisper (WASM) | 클라이언트측 Whisper (WASM) |
-| **정적 파일** | Workers Assets | Caddy / Hono serveStatic |
-| **실시간 이벤트** | Nostr relay (Nosflare) | Nostr relay (strfry) |
-| **TLS 종단** | Cloudflare 엣지 | Caddy (자동 HTTPS) |
-| **비용** | 사용량 기반 (무료 티어 제공) | 서버 비용 |
+| File | Purpose |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-## 필요 사항
+For **local development**, use the dev overlay. For **production**, stack the production overlay:
 
-### 최소 요구 사항
+```bash
+# Local (backing services only + bun run dev:server)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- Linux 서버 (2 CPU 코어, 최소 2 GB RAM)
-- Docker 및 Docker Compose v2 (또는 Helm용 Kubernetes 클러스터)
-- 서버를 가리키는 도메인 이름
-- 관리자 키 쌍 (`bun run bootstrap-admin`으로 생성)
-- 최소 하나의 통신 채널 (음성 서비스 제공업체, SMS 등)
+# Production
+docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
+```
 
-### 선택적 구성 요소
+Or use the setup script:
 
-- **Whisper 음성 변환** — 4 GB 이상 RAM 필요 (CPU) 또는 더 빠른 처리를 위한 GPU
-- **Asterisk** — 자체 호스팅 SIP 전화 서비스 ([Asterisk 설정](/docs/deploy/providers/asterisk) 참조)
-- **Signal 브리지** — Signal 메시징 ([Signal 설정](/docs/deploy/providers/signal) 참조)
+```bash
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
+```
 
-## 빠른 비교
+## Core services
 
-**다음의 경우 Docker Compose를 선택하세요:**
-- 단일 서버 또는 VPS에서 운영하는 경우
-- 가장 간단한 자체 호스팅 설정을 원하는 경우
-- Docker 기본 사항에 익숙한 경우
+All deployment targets run these core services:
 
-**다음의 경우 Kubernetes (Helm)를 선택하세요:**
-- 이미 K8s 클러스터가 있는 경우
-- 수평 확장(다중 복제본)이 필요한 경우
-- 기존 K8s 도구(cert-manager, external-secrets 등)와 통합하려는 경우
+| Component | Purpose |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **strfry** | Nostr relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## 보안 고려 사항
+## Optional services
 
-자체 호스팅은 더 많은 제어권을 제공하지만 더 많은 책임도 수반합니다:
+| Component | Profile | Purpose |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-- **저장 시 데이터**: PostgreSQL 데이터는 기본적으로 암호화되지 않고 저장됩니다. 서버에서 전체 디스크 암호화(LUKS, dm-crypt)를 사용하거나, 사용 가능한 경우 PostgreSQL TDE를 활성화하세요. 통화 메모와 음성 변환 기록은 이미 E2EE로 보호됩니다 — 서버는 평문을 볼 수 없습니다.
-- **네트워크 보안**: 방화벽을 사용하여 접근을 제한하세요. 포트 80/443만 공개적으로 접근 가능해야 합니다.
-- **시크릿**: Docker Compose 파일이나 버전 관리에 시크릿을 넣지 마세요. `.env` 파일(이미지에서 제외) 또는 Docker/Kubernetes 시크릿을 사용하세요.
-- **업데이트**: 정기적으로 새 이미지를 가져오세요. 보안 수정 사항은 [변경 로그](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md)를 확인하세요.
-- **백업**: PostgreSQL 데이터베이스와 MinIO 스토리지를 정기적으로 백업하세요. 각 배포 가이드의 백업 섹션을 참조하세요.
+## What you need
 
-## 다음 단계
+### Minimum requirements
 
-- [Docker Compose 배포](/docs/deploy/docker) — 10분 만에 시작하기
-- [Kubernetes 배포](/docs/deploy/kubernetes) — Helm으로 배포
-- [시작하기](/docs/deploy) — Cloudflare Workers 배포
+- A Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (or a Kubernetes cluster for Helm)
+- A domain name pointing to your server
+- `openssl` (for generating secrets)
+- At least one communication channel configured
+
+### Optional components
+
+- **Transcription** — client-side WASM Whisper; no additional server component needed
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
+
+## Cloudflare Tunnels (alternative ingress)
+
+Instead of exposing ports 80/443 directly, you can use [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. This hides your server IP and provides DDoS protection:
+
+```bash
+cloudflared tunnel create llamenos
+cloudflared tunnel route dns llamenos hotline.yourorg.com
+cloudflared tunnel run llamenos
+```
+
+Configure the tunnel to forward to `http://localhost:3000`.
+
+## Security considerations
+
+Self-hosting gives you more control but also more responsibility:
+
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, and messages are E2EE — the server never sees plaintext.
+- **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Watch the changelog for security fixes.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
+
+## Ansible playbooks
+
+The `deploy/ansible/` directory contains preflight and smoke-check playbooks:
+
+```bash
+# Pre-deployment system verification
+ansible-playbook deploy/ansible/preflight.yml -i your_inventory
+
+# Post-deployment smoke check
+ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
+```
+
+## Next steps
+
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers

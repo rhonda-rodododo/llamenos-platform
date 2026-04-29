@@ -1,73 +1,120 @@
 ---
-title: Apèsi Otojere
-description: Depoze Llamenos sou pwòp enfrastriktirè ou a ak Docker Compose oswa Kubernetes.
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Llamenos ka kouri sou Cloudflare Workers **oswa** sou pwòp enfrastriktirè ou a. Otojere ba ou kontwòl konplè sou rezidans done, izolasyon rezo, ak chwa enfrastriktirè — enpòtan pou òganizasyon ki pa ka itilize platfòm nwaj tiyès oswa ki bezwen satisfè egzijans konformite estrik.
+Llamenos is designed to run on your own infrastructure. Self-hosting gives you full control over data residency, network isolation, and infrastructure choices — critical for organizations protecting against well-funded adversaries.
 
-## Opsyon depoze
+## Deployment options
 
-| Opsyon | Pi bon pou | Konpleksite | Eskalad |
+| Option | Best for | Complexity | Scaling |
 |--------|----------|------------|---------|
-| [Cloudflare Workers](/docs/deploy) | Kòmansman pi fasil, bò mondyal | Ba | Otomatik |
-| [Docker Compose](/docs/deploy/docker) | Otojere sèvè sèl | Mwayen | Nod sèl |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | Òkestrasyon miltisèvis | Pi wo | Orizontal (miltiplik replik) |
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## Diferans achitekti
+## Docker Compose files
 
-Tou de sib depoze yo kouri **menm kòd aplikasyon egzak la**. Diferans lan se nan kouch enfrastriktirè a:
+Docker Compose uses a layered approach:
 
-| Konpozant | Cloudflare | Otojere |
-|-----------|------------|-------------|
-| **Ekzekisyon backend** | Cloudflare Workers | Node.js (via Hono) |
-| **Depo done** | Durable Objects (KV) | PostgreSQL |
-| **Depo blob** | R2 | MinIO (konpatib S3) |
-| **Trankskripsyon** | Whisper bò kliyan (WASM) | Whisper bò kliyan (WASM) |
-| **Fichye estatik** | Workers Assets | Caddy / Hono serveStatic |
-| **Evènman an tan reyèl** | Relè Nostr (Nosflare) | Relè Nostr (strfry) |
-| **Tèminasyon TLS** | Bò Cloudflare | Caddy (HTTPS otomatik) |
-| **Kòut** | Baze sou itilizasyon (nivo gratis disponib) | Kòut sèvè ou yo |
+| File | Purpose |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-## Sa ou bezwen
+For **local development**, use the dev overlay. For **production**, stack the production overlay:
 
-### Egzijans minimòm
+```bash
+# Local (backing services only + bun run dev:server)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- Yon sèvè Linux (2 kè CPU, 2 Go RAM minimòm)
-- Docker ak Docker Compose v2 (oswa yon klastè Kubernetes pou Helm)
-- Yon non domèn ki pwen sou sèvè ou a
-- Yon pè kle admin (jenere ak `bun run bootstrap-admin`)
-- Omwen yon chanèl kominikasyon (founisè vwa, SMS, elatriye)
+# Production
+docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
+```
 
-### Konpozant opsyonèl
+Or use the setup script:
 
-- **Trankskripsyon Whisper** — bezwen 4 Go+ RAM (CPU) oswa yon GPU pou tretman pi vit
-- **Asterisk** — pou telefoni SIP otojere (gade [konfigirasyon Asterisk](/docs/deploy/providers/asterisk))
-- **Pon Signal** — pou mesaj Signal (gade [konfigirasyon Signal](/docs/deploy/providers/signal))
+```bash
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
+```
 
-## Konparezon rapid
+## Core services
 
-**Chwazi Docker Compose si:**
-- Ou ap kouri sou yon sèvè sèl oswa VPS
-- Ou vle konfigirasyon otojere pi senp posib
-- Ou alèz ak baz Docker
+All deployment targets run these core services:
 
-**Chwazi Kubernetes (Helm) si:**
-- Ou deja gen yon klastè K8s
-- Ou bezwen eskalad orizontal (miltiplik replik)
-- Ou vle entegre ak zouti K8s egzistan (cert-manager, external-secrets, elatriye)
+| Component | Purpose |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **strfry** | Nostr relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## Konsiderasyon sekirite
+## Optional services
 
-Otojere ba ou plis kontwòl men tou plis responsablite:
+| Component | Profile | Purpose |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-- **Done an repo**: Done PostgreSQL estoke san chifman pa default. Itilize chifman disque entegral (LUKS, dm-crypt) sou sèvè ou a, oswa aktive PostgreSQL TDE si disponib. Remake ke nòt apèl ak trankskripsyon deja E2EE — sèvè a pa janm wè tèks klè.
-- **Sekirite rezo**: Itilize yon firewall pou restriksyon aksè. Sèlman pò 80/443 ta dwe aksesib piblikman.
-- **Sekrè**: Pa janm mete sekrè nan fichye Docker Compose oswa kontwòl vèsyon. Itilize fichye `.env` (ekskli soti nan imaj) oswa sekrè Docker/Kubernetes.
-- **Mizajou**: Tire nouvo imaj regilyèman. Gade [jounal chanjman](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) pou kòrèksyon sekirite.
-- **Backup**: Fè backup baz done PostgreSQL ak depo MinIO regilyèman. Gade seksyon backup nan chak gid depoze.
+## What you need
 
-## Etap pwochen yo
+### Minimum requirements
 
-- [Depoze Docker Compose](/docs/deploy/docker) — kouri nan 10 minit
-- [Depoze Kubernetes](/docs/deploy/kubernetes) — depoze ak Helm
-- [Kòmanse](/docs/deploy) — depoze Cloudflare Workers
+- A Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (or a Kubernetes cluster for Helm)
+- A domain name pointing to your server
+- `openssl` (for generating secrets)
+- At least one communication channel configured
+
+### Optional components
+
+- **Transcription** — client-side WASM Whisper; no additional server component needed
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
+
+## Cloudflare Tunnels (alternative ingress)
+
+Instead of exposing ports 80/443 directly, you can use [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. This hides your server IP and provides DDoS protection:
+
+```bash
+cloudflared tunnel create llamenos
+cloudflared tunnel route dns llamenos hotline.yourorg.com
+cloudflared tunnel run llamenos
+```
+
+Configure the tunnel to forward to `http://localhost:3000`.
+
+## Security considerations
+
+Self-hosting gives you more control but also more responsibility:
+
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, and messages are E2EE — the server never sees plaintext.
+- **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Watch the changelog for security fixes.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
+
+## Ansible playbooks
+
+The `deploy/ansible/` directory contains preflight and smoke-check playbooks:
+
+```bash
+# Pre-deployment system verification
+ansible-playbook deploy/ansible/preflight.yml -i your_inventory
+
+# Post-deployment smoke check
+ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
+```
+
+## Next steps
+
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers

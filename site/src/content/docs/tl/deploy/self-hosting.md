@@ -1,73 +1,120 @@
 ---
-title: Pangkalahatang-tanaw ng Self-Hosting
-description: I-deploy ang Llamenos sa iyong sariling infrastructure gamit ang Docker Compose o Kubernetes.
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Maaaring patakbuhin ang Llamenos sa Cloudflare Workers **o** sa iyong sariling infrastructure. Ang self-hosting ay nagbibigay sa iyo ng buong kontrol sa kung saan nakaimbak ang data, network isolation, at mga pagpili sa infrastructure — mahalaga para sa mga organisasyong hindi makagamit ng third-party cloud platforms o kailangang sumunod sa mahigpit na mga kinakailangan sa compliance.
+Llamenos is designed to run on your own infrastructure. Self-hosting gives you full control over data residency, network isolation, and infrastructure choices — critical for organizations protecting against well-funded adversaries.
 
-## Mga opsyon sa deployment
+## Deployment options
 
-| Opsyon | Pinakamainam para sa | Complexity | Scaling |
-|--------|---------------------|------------|---------|
-| [Cloudflare Workers](/docs/deploy) | Pinakamadaling pagsisimula, global edge | Mababa | Awtomatiko |
-| [Docker Compose](/docs/deploy/docker) | Single-server self-hosting | Katamtaman | Single node |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | Multi-service orchestration | Mas mataas | Horizontal (multi-replica) |
+| Option | Best for | Complexity | Scaling |
+|--------|----------|------------|---------|
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## Mga pagkakaiba sa arkitektura
+## Docker Compose files
 
-Parehong deployment target ay nagpapatakbo ng **eksaktong parehong application code**. Ang pagkakaiba ay nasa infrastructure layer:
+Docker Compose uses a layered approach:
 
-| Bahagi | Cloudflare | Self-Hosted |
-|--------|------------|-------------|
-| **Backend runtime** | Cloudflare Workers | Node.js (sa pamamagitan ng Hono) |
-| **Data storage** | Durable Objects (KV) | PostgreSQL |
-| **Blob storage** | R2 | MinIO (S3-compatible) |
-| **Transcription** | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
-| **Static files** | Workers Assets | Caddy / Hono serveStatic |
-| **Real-time events** | Nostr relay (Nosflare) | Nostr relay (strfry) |
-| **TLS termination** | Cloudflare edge | Caddy (automatic HTTPS) |
-| **Gastos** | Batay sa paggamit (may libreng tier) | Gastos sa iyong server |
+| File | Purpose |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-## Ano ang kailangan mo
+For **local development**, use the dev overlay. For **production**, stack the production overlay:
 
-### Minimum na mga kinakailangan
+```bash
+# Local (backing services only + bun run dev:server)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- Isang Linux server (minimum 2 CPU cores, 2 GB RAM)
-- Docker at Docker Compose v2 (o Kubernetes cluster para sa Helm)
-- Isang domain name na nakaturo sa iyong server
-- Isang admin keypair (ginawa gamit ang `bun run bootstrap-admin`)
-- Hindi bababa sa isang communication channel (voice provider, SMS, atbp.)
+# Production
+docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
+```
 
-### Mga opsyonal na bahagi
+Or use the setup script:
 
-- **Whisper transcription** — nangangailangan ng 4 GB+ RAM (CPU) o GPU para sa mas mabilis na pagproseso
-- **Asterisk** — para sa self-hosted SIP telephony (tingnan ang [Asterisk setup](/docs/deploy/providers/asterisk))
-- **Signal bridge** — para sa Signal messaging (tingnan ang [Signal setup](/docs/deploy/providers/signal))
+```bash
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
+```
 
-## Mabilisang paghahambing
+## Core services
 
-**Pumili ng Docker Compose kung:**
-- Nagpapatakbo ka sa isang server o VPS
-- Gusto mo ang pinaka-simpleng self-hosted setup
-- Komportable ka sa mga Docker basics
+All deployment targets run these core services:
 
-**Pumili ng Kubernetes (Helm) kung:**
-- Mayroon ka nang K8s cluster
-- Kailangan mo ng horizontal scaling (maraming replica)
-- Gusto mong mag-integrate sa umiiral na K8s tooling (cert-manager, external-secrets, atbp.)
+| Component | Purpose |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **strfry** | Nostr relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## Mga konsiderasyon sa seguridad
+## Optional services
 
-Ang self-hosting ay nagbibigay ng mas maraming kontrol pero mas marami ring responsibilidad:
+| Component | Profile | Purpose |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-- **Data at rest**: Ang PostgreSQL data ay naka-store nang hindi naka-encrypt bilang default. Gumamit ng full-disk encryption (LUKS, dm-crypt) sa iyong server, o i-enable ang PostgreSQL TDE kung available. Tandaan na ang mga call note at transcription ay naka-E2EE na — hindi kailanman nakikita ng server ang plaintext.
-- **Network security**: Gumamit ng firewall para limitahan ang access. Tanging port 80/443 lang ang dapat na publicly accessible.
-- **Mga secret**: Huwag kailanman ilagay ang mga secret sa Docker Compose files o version control. Gumamit ng `.env` files (hindi kasama sa mga image) o Docker/Kubernetes secrets.
-- **Mga update**: Regular na mag-pull ng bagong mga image. Bantayan ang [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) para sa mga security fix.
-- **Mga backup**: Regular na i-backup ang PostgreSQL database at MinIO storage. Tingnan ang backup section sa bawat deployment guide.
+## What you need
 
-## Mga susunod na hakbang
+### Minimum requirements
 
-- [Docker Compose deployment](/docs/deploy/docker) — magsimula sa loob ng 10 minuto
-- [Kubernetes deployment](/docs/deploy/kubernetes) — i-deploy gamit ang Helm
-- [Pagsisimula](/docs/deploy) — Cloudflare Workers deployment
+- A Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (or a Kubernetes cluster for Helm)
+- A domain name pointing to your server
+- `openssl` (for generating secrets)
+- At least one communication channel configured
+
+### Optional components
+
+- **Transcription** — client-side WASM Whisper; no additional server component needed
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
+
+## Cloudflare Tunnels (alternative ingress)
+
+Instead of exposing ports 80/443 directly, you can use [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. This hides your server IP and provides DDoS protection:
+
+```bash
+cloudflared tunnel create llamenos
+cloudflared tunnel route dns llamenos hotline.yourorg.com
+cloudflared tunnel run llamenos
+```
+
+Configure the tunnel to forward to `http://localhost:3000`.
+
+## Security considerations
+
+Self-hosting gives you more control but also more responsibility:
+
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, and messages are E2EE — the server never sees plaintext.
+- **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Watch the changelog for security fixes.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
+
+## Ansible playbooks
+
+The `deploy/ansible/` directory contains preflight and smoke-check playbooks:
+
+```bash
+# Pre-deployment system verification
+ansible-playbook deploy/ansible/preflight.yml -i your_inventory
+
+# Post-deployment smoke check
+ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
+```
+
+## Next steps
+
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers
