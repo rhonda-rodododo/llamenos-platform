@@ -1,6 +1,8 @@
 import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 import mermaid from 'astro-mermaid';
+import sitemap from '@astrojs/sitemap';
+import pagefind from 'astro-pagefind';
 
 export default defineConfig({
   output: 'static',
@@ -9,6 +11,8 @@ export default defineConfig({
       // Dark theme for better readability on dark backgrounds
       theme: 'dark',
     }),
+    sitemap(),
+    pagefind(),
   ],
   vite: {
     plugins: [tailwindcss()],
