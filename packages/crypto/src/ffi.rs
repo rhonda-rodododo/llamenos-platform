@@ -489,6 +489,12 @@ mod tests {
 
         let mut nonce_bytes = [0u8; 24];
         getrandom::getrandom(&mut nonce_bytes).unwrap();
+        // Ensure first byte != 0x02 (ECIES_VERSION_V2) so the version
+        // check fires deterministically instead of falling through to
+        // decryption failure when the random nonce happens to start with 0x02.
+        if nonce_bytes[0] == 0x02 {
+            nonce_bytes[0] = 0x01;
+        }
         let nonce = XNonce::from_slice(&nonce_bytes);
         let cipher = XChaCha20Poly1305::new_from_slice(&sym_key).unwrap();
         let ct = cipher.encrypt(nonce, content.as_bytes()).unwrap();
