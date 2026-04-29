@@ -10,6 +10,18 @@ const { Content } = await render(entry);
   <h1>{entry.data.title}</h1>
   <p>{entry.data.description}</p>
 
+  <div class="not-prose mb-8 rounded-xl border border-accent/30 bg-accent/5 p-5">
+    <div class="flex items-start gap-4">
+      <div class="flex-1">
+        <h2 class="text-base font-semibold text-fg mb-1">Browse All Guides</h2>
+        <p class="text-sm text-fg-muted mb-3">Searchable and filterable guide library — find guides by audience role or task type.</p>
+        <a href="/docs/guides" class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-bright transition-colors">
+          Browse Guides →
+        </a>
+      </div>
+    </div>
+  </div>
+
   <h2>{entry.data.guidesHeading ?? 'Guides'}</h2>
   <div class="not-prose grid grid-cols-1 gap-4 sm:grid-cols-2">
     {entry.data.guides?.map(guide => (

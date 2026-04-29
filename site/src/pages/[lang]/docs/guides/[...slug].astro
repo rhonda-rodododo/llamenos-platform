@@ -1,0 +1,98 @@
+---
+import DocsLayout from '../../../../layouts/DocsLayout.astro';
+import { getCollection, render } from 'astro:content';
+import { type Lang, nonDefaultLocales } from '../../../../i18n/config';
+import { getTranslation } from '../../../../i18n/utils';
+import { common } from '../../../../i18n/translations/common';
+
+export async function getStaticPaths() {
+  const guides = await getCollection('guides');
+  return nonDefaultLocales.flatMap(lang =>
+    guides
+      .filter(g => g.id.startsWith(`${lang}/`))
+      .map(guide => ({
+        params: { lang, slug: guide.id.split('/').slice(1).join('/') },
+        props: { guide },
+      }))
+  );
+}
+
+const { guide } = Astro.props;
+const lang = Astro.params.lang as Lang;
+const { Content } = await render(guide);
+const t = getTranslation(common, lang);
+
+const audienceLabels: Record<string, string> = {
+  admin: t.docs.audienceAdmin,
+  user: t.docs.audienceUser,
+  caller: t.docs.audienceCaller,
+};
+
+const taskLabels: Record<string, string> = {
+  setup: t.docs.taskSetup,
+  'daily-use': t.docs.taskDailyUse,
+  configuration: t.docs.taskConfiguration,
+  troubleshooting: t.docs.taskTroubleshooting,
+  security: t.docs.taskSecurity,
+};
+
+const allGuides = await getCollection('guides');
+const related = allGuides
+  .filter(g => g.id !== guide.id && g.id.startsWith(`${lang}/`))
+  .map(g => {
+    let score = 0;
+    if (guide.data.feature && g.data.feature === guide.data.feature) score += 3;
+    score += g.data.audience.filter(a => guide.data.audience.includes(a)).length;
+    score += g.data.task.filter(tk => guide.data.task.includes(tk)).length;
+    return { guide: g, score };
+  })
+  .filter(r => r.score > 0)
+  .sort((a, b) => b.score - a.score)
+  .slice(0, 4)
+  .map(r => r.guide);
+---
+
+<DocsLayout title={guide.data.title} description={guide.data.description} lang={lang}>
+  <div class="not-prose mb-2 flex items-center gap-2 text-sm text-fg-dim">
+    <a href={`/${lang}/docs/guides`} class="hover:text-fg transition-colors">{t.docs.guides}</a>
+    <span>›</span>
+    <span class="text-fg-muted">{guide.data.title}</span>
+  </div>
+
+  <div class="not-prose mb-6 flex flex-wrap gap-1.5">
+    {guide.data.audience.map(a => (
+      <span class="inline-flex items-center rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent-bright">
+        {audienceLabels[a] ?? a}
+      </span>
+    ))}
+    {guide.data.task.map(tk => (
+      <span class="inline-flex items-center rounded-full bg-bg-soft px-2.5 py-1 text-xs font-medium text-fg-muted border border-border">
+        {taskLabels[tk] ?? tk}
+      </span>
+    ))}
+  </div>
+
+  <h1>{guide.data.title}</h1>
+  <p class="lead">{guide.data.description}</p>
+
+  <Content />
+
+  {related.length > 0 && (
+    <div class="not-prose mt-12 pt-8 border-t border-border">
+      <h2 class="text-lg font-semibold text-fg mb-4">Related Guides</h2>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {related.map(r => (
+          <a
+            href={`/${lang}/docs/guides/${r.id.split('/').slice(1).join('/')}`}
+            class="rounded-lg border border-border bg-bg-card p-4 transition-colors hover:border-border-bright group"
+          >
+            <h3 class="text-sm font-semibold text-fg group-hover:text-accent-bright transition-colors">
+              {r.data.title}
+            </h3>
+            <p class="text-xs text-fg-muted mt-1">{r.data.description}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  )}
+</DocsLayout>

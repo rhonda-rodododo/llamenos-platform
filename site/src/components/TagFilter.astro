@@ -1,0 +1,214 @@
+---
+import { type Lang, defaultLang } from '../i18n/config';
+import { getTranslation } from '../i18n/utils';
+import { common } from '../i18n/translations/common';
+
+interface Props {
+  lang?: Lang;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = getTranslation(common, lang);
+
+const audienceFilters = [
+  { value: 'admin', label: t.docs.audienceAdmin },
+  { value: 'user', label: t.docs.audienceUser },
+  { value: 'caller', label: t.docs.audienceCaller },
+];
+
+const taskFilters = [
+  { value: 'setup', label: t.docs.taskSetup },
+  { value: 'daily-use', label: t.docs.taskDailyUse },
+  { value: 'configuration', label: t.docs.taskConfiguration },
+  { value: 'troubleshooting', label: t.docs.taskTroubleshooting },
+  { value: 'security', label: t.docs.taskSecurity },
+];
+---
+
+<div class="tag-filter" data-tag-filter>
+  <div class="filter-group">
+    <span class="filter-label">Audience:</span>
+    <div class="filter-pills">
+      {audienceFilters.map(f => (
+        <button
+          class="filter-pill"
+          data-filter-type="audience"
+          data-filter-value={f.value}
+          aria-pressed="false"
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Task:</span>
+    <div class="filter-pills">
+      {taskFilters.map(f => (
+        <button
+          class="filter-pill"
+          data-filter-type="task"
+          data-filter-value={f.value}
+          aria-pressed="false"
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  </div>
+</div>
+
+<style>
+  .tag-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .filter-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-fg-dim);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .filter-pills {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: nowrap;
+  }
+
+  .filter-pill {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    border: 1px solid var(--color-border);
+    color: var(--color-fg-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .filter-pill:hover {
+    border-color: var(--color-border-bright);
+    color: var(--color-fg);
+  }
+
+  .filter-pill[aria-pressed="true"] {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+  }
+
+  .filter-pill[aria-pressed="true"]:hover {
+    background: var(--color-accent-bright);
+    border-color: var(--color-accent-bright);
+  }
+
+  @media (min-width: 640px) {
+    .tag-filter {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+  }
+</style>
+
+<script>
+  function initTagFilter() {
+    const container = document.querySelector('[data-tag-filter]');
+    if (!container) return;
+
+    const pills = container.querySelectorAll<HTMLButtonElement>('.filter-pill');
+    const cards = document.querySelectorAll<HTMLElement>('[data-guide-card]');
+
+    const activeFilters: { audience: Set<string>; task: Set<string> } = {
+      audience: new Set(),
+      task: new Set(),
+    };
+
+    function syncFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      activeFilters.audience = new Set(params.getAll('audience'));
+      activeFilters.task = new Set(params.getAll('task'));
+
+      pills.forEach(pill => {
+        const type = pill.dataset.filterType as 'audience' | 'task';
+        const value = pill.dataset.filterValue!;
+        const isActive = activeFilters[type].has(value);
+        pill.setAttribute('aria-pressed', String(isActive));
+      });
+
+      filterCards();
+    }
+
+    function syncToUrl() {
+      const params = new URLSearchParams();
+      activeFilters.audience.forEach(v => params.append('audience', v));
+      activeFilters.task.forEach(v => params.append('task', v));
+      const qs = params.toString();
+      const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+      history.replaceState(null, '', url);
+    }
+
+    function filterCards() {
+      const hasAudience = activeFilters.audience.size > 0;
+      const hasTask = activeFilters.task.size > 0;
+
+      cards.forEach(card => {
+        const cardAudiences = (card.dataset.audience || '').split(',').filter(Boolean);
+        const cardTasks = (card.dataset.task || '').split(',').filter(Boolean);
+
+        const matchesAudience = !hasAudience || cardAudiences.some(a => activeFilters.audience.has(a));
+        const matchesTask = !hasTask || cardTasks.some(t => activeFilters.task.has(t));
+
+        card.style.display = (matchesAudience && matchesTask) ? '' : 'none';
+      });
+    }
+
+    pills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        const type = pill.dataset.filterType as 'audience' | 'task';
+        const value = pill.dataset.filterValue!;
+
+        if (activeFilters[type].has(value)) {
+          activeFilters[type].delete(value);
+          pill.setAttribute('aria-pressed', 'false');
+        } else {
+          activeFilters[type].add(value);
+          pill.setAttribute('aria-pressed', 'true');
+        }
+
+        filterCards();
+        syncToUrl();
+      });
+    });
+
+    syncFromUrl();
+  }
+
+  initTagFilter();
+</script>

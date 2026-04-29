@@ -20,11 +20,11 @@ const guides = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/guides' }),
   schema: z.object({
     title: z.string(),
-    description: z.string().optional(),
-    audience: z.array(z.string()).optional(),
-    task: z.array(z.string()).optional(),
+    description: z.string(),
+    audience: z.array(z.enum(['admin', 'user', 'caller'])),
+    task: z.array(z.enum(['setup', 'daily-use', 'configuration', 'troubleshooting', 'security'])),
     feature: z.string().optional(),
-    order: z.number().optional(),
+    order: z.number().optional().default(999),
   }),
 });
 
