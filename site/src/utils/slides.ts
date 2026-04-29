@@ -15,14 +15,14 @@ const INLINE_NOTES_RE = /<!--\s*notes?:\s*([\s\S]*?)-->/gi;
 const BLOCK_NOTES_RE = /:::notes?\s*\n([\s\S]*?):::/gi;
 // Background image directive
 const BACKGROUND_RE = /^:::background\(([^)]+)\)\s*\n?/m;
-// Columns block
-const COLUMNS_RE = /:::columns\s*\n([\s\S]*?):::/g;
-// Left side within columns
+// Columns block — closing ::: must be on its own line (not :::left/:::right/:::fragment etc.)
+const COLUMNS_RE = /:::columns\s*\n([\s\S]*?)^:::$/gm;
+// Left side within columns — stops at :::right or end
 const LEFT_RE = /:::left\s*\n([\s\S]*?)(?=:::right|$)/;
-// Right side within columns
-const RIGHT_RE = /:::right\s*\n([\s\S]*?)(?=:::$|$)/;
-// Fragment (incremental reveal)
-const FRAGMENT_RE = /:::fragment\s*\n?([\s\S]*?):::/g;
+// Right side within columns — captures everything after :::right to end
+const RIGHT_RE = /:::right\s*\n([\s\S]*?)$/;
+// Fragment (incremental reveal) — closing ::: on its own line
+const FRAGMENT_RE = /:::fragment\s*\n?([\s\S]*?)^:::$/gm;
 
 export function markdownToHtml(markdown: string): string {
   return marked.parse(markdown, { async: false }) as string;
@@ -54,7 +54,7 @@ function extractBackground(raw: string): { text: string; background: string | nu
 }
 
 function processColumns(raw: string): string {
-  return raw.replace(new RegExp(COLUMNS_RE.source, 'g'), (_match: string, inner: string) => {
+  return raw.replace(new RegExp(COLUMNS_RE.source, 'gm'), (_match: string, inner: string) => {
     const leftMatch = LEFT_RE.exec(inner);
     const rightMatch = RIGHT_RE.exec(inner);
     const leftContent = leftMatch ? leftMatch[1].trim() : '';
@@ -69,7 +69,7 @@ function processColumns(raw: string): string {
 }
 
 function processFragments(raw: string): string {
-  return raw.replace(new RegExp(FRAGMENT_RE.source, 'g'), (_match: string, content: string) => {
+  return raw.replace(new RegExp(FRAGMENT_RE.source, 'gm'), (_match: string, content: string) => {
     return `<div class="fragment" data-fragment-hidden="true">${markdownToHtml(content.trim())}</div>`;
   });
 }
