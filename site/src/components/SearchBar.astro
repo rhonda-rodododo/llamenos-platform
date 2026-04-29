@@ -1,0 +1,99 @@
+---
+import Search from 'astro-pagefind/components/Search';
+
+interface Props {
+  placeholder?: string;
+}
+
+const { placeholder = 'Search documentation...' } = Astro.props;
+---
+
+<div class="search-bar">
+  <Search
+    id="docs-search"
+    className="pagefind-ui"
+    uiOptions={{
+      showImages: false,
+      showEmptyFilters: false,
+      excerptLength: 20,
+      resetStyles: true,
+    }}
+  />
+</div>
+
+<style>
+  .search-bar {
+    margin-bottom: 1.5rem;
+  }
+
+  /* Override pagefind-ui styles for dark theme */
+  .search-bar :global(.pagefind-ui) {
+    --pagefind-ui-scale: 0.85;
+    --pagefind-ui-primary: var(--color-accent-bright);
+    --pagefind-ui-text: var(--color-fg);
+    --pagefind-ui-background: var(--color-bg-soft);
+    --pagefind-ui-border: var(--color-border);
+    --pagefind-ui-tag: var(--color-bg-card);
+    --pagefind-ui-border-width: 1px;
+    --pagefind-ui-border-radius: 0.5rem;
+    --pagefind-ui-font: var(--font-sans);
+  }
+
+  .search-bar :global(.pagefind-ui__search-input) {
+    background: var(--color-bg-soft) !important;
+    color: var(--color-fg) !important;
+    border-color: var(--color-border) !important;
+    font-size: 0.875rem !important;
+    padding: 0.625rem 1rem 0.625rem 2.5rem !important;
+    border-radius: 0.5rem !important;
+    transition: border-color 0.2s ease !important;
+    height: auto !important;
+    line-height: 1.5 !important;
+  }
+
+  .search-bar :global(.pagefind-ui__search-input:focus) {
+    border-color: var(--color-accent-bright) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px oklch(0.60 0.14 195 / 0.2) !important;
+  }
+
+  .search-bar :global(.pagefind-ui__search-input::placeholder) {
+    color: var(--color-fg-dim) !important;
+  }
+
+  .search-bar :global(.pagefind-ui__search-clear) {
+    color: var(--color-fg-muted) !important;
+    background: none !important;
+  }
+
+  .search-bar :global(.pagefind-ui__results-area) {
+    margin-top: 0.5rem !important;
+  }
+
+  .search-bar :global(.pagefind-ui__result) {
+    border-color: var(--color-border) !important;
+    padding: 0.75rem 0 !important;
+  }
+
+  .search-bar :global(.pagefind-ui__result-link) {
+    color: var(--color-accent-bright) !important;
+    font-size: 0.875rem !important;
+  }
+
+  .search-bar :global(.pagefind-ui__result-excerpt) {
+    color: var(--color-fg-muted) !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .search-bar :global(.pagefind-ui__message) {
+    color: var(--color-fg-muted) !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .search-bar :global(.pagefind-ui__button) {
+    color: var(--color-accent-bright) !important;
+    background: var(--color-bg-card) !important;
+    border-color: var(--color-border) !important;
+    border-radius: 0.375rem !important;
+  }
+</style>
