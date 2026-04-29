@@ -1,68 +1,29 @@
 ---
 title: Documentation
 description: Learn how to deploy, configure, and use Llamenos.
-guidesHeading: Guides
+guidesHeading: Featured Links
 guides:
   - title: Getting Started
     description: Prerequisites, installation, setup wizard, and your first deployment.
-    href: /docs/getting-started
-  - title: Architecture
-    description: System architecture overview — repositories, data flow, encryption layers, and real-time communication.
-    href: /docs/architecture
+    href: /docs/deploy
   - title: Self-Hosting Overview
     description: Deploy on your own infrastructure with Docker Compose or Kubernetes.
-    href: /docs/self-hosting
+    href: /docs/deploy/self-hosting
   - title: "Deploy: Docker Compose"
     description: Single-server self-hosted deployment with automatic HTTPS.
-    href: /docs/deploy-docker
+    href: /docs/deploy/docker
   - title: "Deploy: Kubernetes (Helm)"
     description: Deploy to Kubernetes with the official Helm chart.
-    href: /docs/deploy-kubernetes
-  - title: Admin Guide
-    description: Manage volunteers, shifts, channels, ban lists, reports, and settings.
-    href: /docs/admin-guide
-  - title: Volunteer Guide
-    description: Log in, receive calls, respond to messages, write notes, and use transcription.
-    href: /docs/volunteer-guide
-  - title: Reporter Guide
-    description: Submit encrypted reports and track their status.
-    href: /docs/reporter-guide
-  - title: Mobile Guide
-    description: Install and set up the Llamenos mobile app on iOS and Android.
-    href: /docs/mobile-guide
+    href: /docs/deploy/kubernetes
+  - title: "Deploy: Co-op Cloud"
+    description: Deploy as a standardized recipe for cooperative hosting collectives.
+    href: /docs/deploy/coopcloud
+  - title: Browse All Guides
+    description: Searchable guide library — find guides by audience role or task type.
+    href: /docs/guides
   - title: Telephony Providers
     description: Compare supported telephony providers and choose the best fit for your hotline.
-    href: /docs/telephony-providers
-  - title: "Setup: SMS"
-    description: Enable inbound/outbound SMS messaging via your telephony provider.
-    href: /docs/setup-sms
-  - title: "Setup: WhatsApp"
-    description: Connect WhatsApp Business via the Meta Cloud API.
-    href: /docs/setup-whatsapp
-  - title: "Setup: Signal"
-    description: Set up the Signal channel via the signal-cli bridge.
-    href: /docs/setup-signal
-  - title: "Setup: Twilio"
-    description: Step-by-step guide to configure Twilio as your telephony provider.
-    href: /docs/setup-twilio
-  - title: "Setup: SignalWire"
-    description: Step-by-step guide to configure SignalWire as your telephony provider.
-    href: /docs/setup-signalwire
-  - title: "Setup: Vonage"
-    description: Step-by-step guide to configure Vonage as your telephony provider.
-    href: /docs/setup-vonage
-  - title: "Setup: Plivo"
-    description: Step-by-step guide to configure Plivo as your telephony provider.
-    href: /docs/setup-plivo
-  - title: "Setup: Asterisk (Self-Hosted)"
-    description: Deploy Asterisk with the ARI bridge for maximum privacy and control.
-    href: /docs/setup-asterisk
-  - title: WebRTC Browser Calling
-    description: Enable in-browser call answering for volunteers using WebRTC.
-    href: /docs/webrtc-calling
-  - title: Troubleshooting
-    description: Solutions for common issues with deployment, desktop, mobile, telephony, and crypto.
-    href: /docs/troubleshooting
+    href: /docs/deploy/providers
   - title: Security Model
     description: Understand what's encrypted, what isn't, and the threat model.
     href: /security
@@ -70,19 +31,21 @@ guides:
 
 ## Architecture overview
 
-Llamenos is a single-page application (SPA) that can run on **Cloudflare Workers** or on your own infrastructure via **Docker Compose / Kubernetes**. It supports voice calls, SMS, WhatsApp, and Signal — all routed to on-shift volunteers through a unified interface.
+Llamenos is a self-hosted single-page application (SPA) deployed via **Docker Compose** or **Kubernetes**. It supports voice calls, SMS, WhatsApp, and Signal — all routed to on-shift staff through a unified interface.
 
-| Component | Cloudflare | Self-Hosted |
-|---|---|---|
-| Frontend | Vite + React + TanStack Router | Same |
-| Backend | Cloudflare Workers + 6 Durable Objects | Node.js + PostgreSQL |
-| Blob Storage | R2 | MinIO (S3-compatible) |
-| Voice | Twilio, SignalWire, Vonage, Plivo, or Asterisk | Same |
-| Messaging | SMS, WhatsApp Business, Signal | Same |
-| Auth | Nostr keypairs (BIP-340 Schnorr) + WebAuthn | Same |
-| Encryption | ECIES (secp256k1 + XChaCha20-Poly1305) | Same |
-| Transcription | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
-| i18n | i18next (13 languages) | Same |
+| Component | Technology |
+|---|---|
+| Frontend | Vite + React + TanStack Router |
+| Backend | Bun + Hono + PostgreSQL |
+| Blob Storage | RustFS (S3-compatible) |
+| Identity Provider | Authentik (self-hosted OIDC) |
+| Voice | Twilio, SignalWire, Vonage, Plivo, or Asterisk |
+| Messaging | SMS, WhatsApp Business, Signal |
+| Auth | JWT + multi-factor KEK + WebAuthn passkeys |
+| Encryption | ECIES (secp256k1 + XChaCha20-Poly1305), 3 tiers |
+| Transcription | Client-side Whisper (WASM) — audio never leaves browser |
+| Real-time | Nostr relay (strfry) |
+| i18n | i18next (13 languages) |
 
 ## Roles
 

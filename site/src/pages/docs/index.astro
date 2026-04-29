@@ -4,33 +4,86 @@ import { getEntry, render } from 'astro:content';
 
 const entry = (await getEntry('docs', 'en'))!;
 const { Content } = await render(entry);
+
+const sections = [
+  {
+    title: 'Getting Started',
+    description: 'Deploy your own Llamenos hotline',
+    items: [
+      { href: '/docs/deploy', label: 'Getting Started', desc: 'Prerequisites and first deployment' },
+      { href: '/docs/deploy/docker', label: 'Docker Compose', desc: 'Single-server deployment with automatic HTTPS' },
+      { href: '/docs/deploy/kubernetes', label: 'Kubernetes (Helm)', desc: 'Deploy with the official Helm chart' },
+      { href: '/docs/deploy/self-hosting', label: 'Self-Hosting', desc: 'Overview of self-hosted deployment' },
+      { href: '/docs/deploy/coopcloud', label: 'Co-op Cloud', desc: 'Recipe for cooperative hosting collectives' },
+    ],
+  },
+  {
+    title: 'User Guides',
+    description: 'How-to guides by role and task',
+    items: [
+      { href: '/docs/guides', label: 'Browse All Guides', desc: '15 searchable guides with audience/task filtering' },
+      { href: '/docs/admin-guide', label: 'Admin Guide', desc: 'Manage volunteers, shifts, channels, and settings' },
+      { href: '/docs/volunteer-guide', label: 'Volunteer Guide', desc: 'Receive calls, write notes, use transcription' },
+      { href: '/docs/reporter-guide', label: 'Reporter Guide', desc: 'Submit encrypted reports and track status' },
+      { href: '/docs/mobile-guide', label: 'Mobile Guide', desc: 'Install the iOS and Android apps' },
+    ],
+  },
+  {
+    title: 'Provider Setup',
+    description: 'Connect your voice and messaging providers',
+    items: [
+      { href: '/docs/deploy/providers', label: 'Provider Comparison', desc: 'Compare all supported telephony providers' },
+      { href: '/docs/deploy/providers/twilio', label: 'Twilio', desc: 'Configure Twilio voice and SMS' },
+      { href: '/docs/deploy/providers/signalwire', label: 'SignalWire', desc: 'Configure SignalWire' },
+      { href: '/docs/deploy/providers/vonage', label: 'Vonage', desc: 'Configure Vonage' },
+      { href: '/docs/deploy/providers/plivo', label: 'Plivo', desc: 'Configure Plivo' },
+      { href: '/docs/deploy/providers/asterisk', label: 'Asterisk', desc: 'Self-hosted with ARI bridge' },
+      { href: '/docs/deploy/providers/sms', label: 'SMS', desc: 'Enable inbound/outbound SMS' },
+      { href: '/docs/deploy/providers/whatsapp', label: 'WhatsApp', desc: 'Connect WhatsApp Business' },
+      { href: '/docs/deploy/providers/signal', label: 'Signal', desc: 'Set up the Signal channel' },
+      { href: '/docs/deploy/providers/webrtc', label: 'WebRTC', desc: 'In-browser call answering' },
+    ],
+  },
+  {
+    title: 'Reference',
+    description: 'Technical documentation and troubleshooting',
+    items: [
+      { href: '/docs/reference/api-reference', label: 'API Reference', desc: 'REST API endpoints and authentication' },
+      { href: '/docs/reference/architecture', label: 'Architecture', desc: 'System architecture and data flow' },
+      { href: '/docs/reference/troubleshooting', label: 'Troubleshooting', desc: 'Solutions for common issues' },
+      { href: '/security', label: 'Security Model', desc: 'Threat model and encryption details' },
+    ],
+  },
+];
 ---
 
 <DocsLayout title={entry.data.title}>
   <h1>{entry.data.title}</h1>
-  <p>{entry.data.description}</p>
+  <p class="text-fg-muted text-lg mb-8">{entry.data.description}</p>
 
-  <div class="not-prose mb-8 rounded-xl border border-accent/30 bg-accent/5 p-5">
-    <div class="flex items-start gap-4">
-      <div class="flex-1">
-        <h2 class="text-base font-semibold text-fg mb-1">Browse All Guides</h2>
-        <p class="text-sm text-fg-muted mb-3">Searchable and filterable guide library — find guides by audience role or task type.</p>
-        <a href="/docs/guides" class="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-bright transition-colors">
-          Browse Guides →
-        </a>
+  <div class="not-prose space-y-8">
+    {sections.map(section => (
+      <div>
+        <h2 class="text-lg font-semibold text-fg mb-1">{section.title}</h2>
+        <p class="text-sm text-fg-muted mb-4">{section.description}</p>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {section.items.map(item => (
+            <a
+              href={item.href}
+              class="rounded-xl border border-border bg-bg-card p-4 transition-colors hover:border-border-bright group"
+            >
+              <h3 class="text-sm font-semibold text-fg group-hover:text-accent-bright transition-colors">
+                {item.label}
+              </h3>
+              <p class="text-xs text-fg-muted mt-1">{item.desc}</p>
+            </a>
+          ))}
+        </div>
       </div>
-    </div>
-  </div>
-
-  <h2>{entry.data.guidesHeading ?? 'Guides'}</h2>
-  <div class="not-prose grid grid-cols-1 gap-4 sm:grid-cols-2">
-    {entry.data.guides?.map(guide => (
-      <a href={guide.href} class="rounded-xl border border-border bg-bg-card p-5 transition-colors hover:border-border-bright group">
-        <h3 class="text-base font-semibold text-fg mb-1 group-hover:text-accent-bright transition-colors">{guide.title}</h3>
-        <p class="text-sm text-fg-muted">{guide.description}</p>
-      </a>
     ))}
   </div>
 
-  <Content />
+  <div class="mt-12">
+    <Content />
+  </div>
 </DocsLayout>

@@ -5,7 +5,7 @@ guidesHeading: 가이드
 guides:
   - title: 시작하기
     description: 사전 요구 사항, 설치, 전화 서비스 설정 및 첫 번째 배포.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: 관리자 가이드
     description: 자원봉사자, 근무 일정, 차단 목록, 사용자 정의 필드 및 설정을 관리합니다.
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: 전화 서비스 제공업체
     description: 지원되는 전화 서비스 제공업체를 비교하고 핫라인에 가장 적합한 업체를 선택하세요.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "설정: Twilio"
     description: Twilio를 전화 서비스 제공업체로 구성하는 단계별 가이드.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "설정: SignalWire"
     description: SignalWire를 전화 서비스 제공업체로 구성하는 단계별 가이드.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "설정: Vonage"
     description: Vonage를 전화 서비스 제공업체로 구성하는 단계별 가이드.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "설정: Plivo"
     description: Plivo를 전화 서비스 제공업체로 구성하는 단계별 가이드.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "설정: Asterisk (자체 호스팅)"
     description: 최대의 개인정보 보호와 제어를 위해 ARI 브리지와 함께 Asterisk를 배포합니다.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: WebRTC 브라우저 통화
     description: WebRTC를 사용하여 자원봉사자가 브라우저에서 전화를 받을 수 있도록 설정합니다.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: 보안 모델
     description: 무엇이 암호화되고 무엇이 되지 않는지, 그리고 위협 모델을 이해합니다.
     href: /security

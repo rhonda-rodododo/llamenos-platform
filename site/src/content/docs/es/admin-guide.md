@@ -7,7 +7,7 @@ Como administrador, gestionas todo: voluntarios, turnos, canales de comunicacion
 
 ## Iniciar sesion
 
-Inicia sesion con el `nsec` (clave secreta Nostr) generado durante la [configuracion inicial](/es/docs/getting-started). La pagina de inicio de sesion acepta el formato nsec (`nsec1...`). Tu navegador firma un desafio con la clave, y el secreto nunca sale del dispositivo.
+Inicia sesion con el `nsec` (clave secreta Nostr) generado durante la [configuracion inicial](/es/docs/deploy). La pagina de inicio de sesion acepta el formato nsec (`nsec1...`). Tu navegador firma un desafio con la clave, y el secreto nunca sale del dispositivo.
 
 Opcionalmente, registra una passkey de WebAuthn en Configuracion para iniciar sesion sin contrasena en otros dispositivos.
 
@@ -129,7 +129,7 @@ Configura los canales de SMS, WhatsApp y Signal:
 - **WhatsApp** — habilitar/deshabilitar, ingresar credenciales de la API Cloud de Meta (token de acceso, token de verificacion, ID de numero de telefono). Soporta mensajes de plantilla para iniciar conversaciones dentro de la ventana de 24 horas.
 - **Signal** — habilitar/deshabilitar, configurar la URL del bridge signal-cli-rest-api y numero de telefono. Incluye monitoreo de salud con degradacion elegante.
 
-Cada canal tiene su propio endpoint de webhook — consulta [Primeros Pasos](/es/docs/getting-started) para las URLs a configurar.
+Cada canal tiene su propio endpoint de webhook — consulta [Primeros Pasos](/es/docs/deploy) para las URLs a configurar.
 
 ### Politica de WebAuthn
 

@@ -5,7 +5,7 @@ guidesHeading: Mga Gabay
 guides:
   - title: Pagsisimula
     description: Mga kinakailangan, pag-install, pag-setup ng telephony, at iyong unang deployment.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: Gabay para sa Admin
     description: Pamahalaan ang mga boluntaryo, shift, ban list, custom field, at mga setting.
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: Mga Telephony Provider
     description: Ihambing ang mga sinusuportahang telephony provider at piliin ang pinakamainam para sa iyong hotline.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "Setup: Twilio"
     description: Hakbang-hakbang na gabay para i-configure ang Twilio bilang iyong telephony provider.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "Setup: SignalWire"
     description: Hakbang-hakbang na gabay para i-configure ang SignalWire bilang iyong telephony provider.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "Setup: Vonage"
     description: Hakbang-hakbang na gabay para i-configure ang Vonage bilang iyong telephony provider.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "Setup: Plivo"
     description: Hakbang-hakbang na gabay para i-configure ang Plivo bilang iyong telephony provider.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "Setup: Asterisk (Self-Hosted)"
     description: I-deploy ang Asterisk gamit ang ARI bridge para sa pinakamataas na privacy at kontrol.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: WebRTC Browser Calling
     description: I-enable ang pagsagot ng tawag sa browser para sa mga boluntaryo gamit ang WebRTC.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: Modelo ng Seguridad
     description: Unawain kung ano ang naka-encrypt, kung ano ang hindi, at ang threat model.
     href: /security

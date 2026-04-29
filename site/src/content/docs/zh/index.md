@@ -5,7 +5,7 @@ guidesHeading: 指南
 guides:
   - title: 快速入门
     description: 前置条件、安装、电话服务配置和首次部署。
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: 管理员指南
     description: 管理志愿者、排班、封禁列表、自定义字段和设置。
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: 电话服务提供商
     description: 比较支持的电话服务提供商，为您的热线选择最合适的方案。
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "配置：Twilio"
     description: 逐步指导您配置 Twilio 作为电话服务提供商。
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "配置：SignalWire"
     description: 逐步指导您配置 SignalWire 作为电话服务提供商。
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "配置：Vonage"
     description: 逐步指导您配置 Vonage 作为电话服务提供商。
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "配置：Plivo"
     description: 逐步指导您配置 Plivo 作为电话服务提供商。
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "配置：Asterisk（自托管）"
     description: 部署 Asterisk 和 ARI 桥接服务，获得最大的隐私保护和控制权。
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: WebRTC 浏览器通话
     description: 启用 WebRTC，让志愿者通过浏览器接听来电。
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: 安全模型
     description: 了解哪些内容被加密、哪些没有，以及威胁模型。
     href: /security

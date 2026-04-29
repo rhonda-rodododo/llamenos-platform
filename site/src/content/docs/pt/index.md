@@ -5,16 +5,16 @@ guidesHeading: Guias
 guides:
   - title: Primeiros passos
     description: Pre-requisitos, instalacao, assistente de configuracao e primeira implantacao.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: Auto-hospedagem
     description: Implante na sua propria infraestrutura com Docker Compose ou Kubernetes.
-    href: /docs/self-hosting
+    href: /docs/deploy/self-hosting
   - title: "Implantar: Docker Compose"
     description: Implantacao auto-hospedada em servidor unico com HTTPS automatico.
-    href: /docs/deploy-docker
+    href: /docs/deploy/docker
   - title: "Implantar: Kubernetes (Helm)"
     description: Implante no Kubernetes com o chart oficial do Helm.
-    href: /docs/deploy-kubernetes
+    href: /docs/deploy/kubernetes
   - title: Guia do administrador
     description: Gerencie voluntarios, turnos, canais, conversas, reportes, bloqueios e configuracoes.
     href: /docs/admin-guide
@@ -29,40 +29,40 @@ guides:
     href: /docs/mobile-guide
   - title: Provedores de telefonia
     description: Compare os provedores de telefonia suportados e escolha o melhor para sua linha.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "Configuracao: SMS"
     description: Ative mensagens SMS de entrada e saida atraves do seu provedor de telefonia.
-    href: /docs/setup-sms
+    href: /docs/deploy/providers/sms
   - title: "Configuracao: WhatsApp"
     description: Conecte o WhatsApp Business via a API Cloud da Meta.
-    href: /docs/setup-whatsapp
+    href: /docs/deploy/providers/whatsapp
   - title: "Configuracao: Signal"
     description: Configure o canal Signal atraves do bridge signal-cli.
-    href: /docs/setup-signal
+    href: /docs/deploy/providers/signal
   - title: "Configuracao: Twilio"
     description: Guia passo a passo para configurar o Twilio como provedor de telefonia.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "Configuracao: SignalWire"
     description: Guia passo a passo para configurar o SignalWire como provedor de telefonia.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "Configuracao: Vonage"
     description: Guia passo a passo para configurar o Vonage como provedor de telefonia.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "Configuracao: Plivo"
     description: Guia passo a passo para configurar o Plivo como provedor de telefonia.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "Configuracao: Asterisk (auto-hospedado)"
     description: Implante o Asterisk com o bridge ARI para maxima privacidade e controle.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: Chamadas WebRTC no navegador
     description: Ative o atendimento de chamadas no navegador para voluntarios usando WebRTC.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: Arquitetura
     description: Visao geral da arquitetura do sistema, fluxo de dados, criptografia e comunicacao em tempo real.
-    href: /docs/architecture
+    href: /docs/reference/architecture
   - title: Solucao de problemas
     description: Solucoes para problemas comuns com implantacao, apps, telefonia e criptografia.
-    href: /docs/troubleshooting
+    href: /docs/reference/troubleshooting
   - title: Modelo de seguranca
     description: Entenda o que esta criptografado, o que nao esta e o modelo de ameacas.
     href: /security

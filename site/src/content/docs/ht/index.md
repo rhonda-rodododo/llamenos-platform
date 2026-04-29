@@ -5,7 +5,7 @@ guidesHeading: Gid yo
 guides:
   - title: Kijan Pou Kòmanse
     description: Kondisyon prealab, enstalasyon, konfigirasyon telefoni, ak premye deplwaman ou.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: Gid pou Administratè
     description: Jere volontè, ekip travay, lis entèdi, chan pèsonalize, ak paramèt yo.
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: Founisè Telefoni yo
     description: Konpare founisè telefoni ki sipòte yo epi chwazi sa ki pi bon pou liy dirèk ou a.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "Setup: Twilio"
     description: Gid etap pa etap pou konfigire Twilio kòm founisè telefoni ou.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "Setup: SignalWire"
     description: Gid etap pa etap pou konfigire SignalWire kòm founisè telefoni ou.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "Setup: Vonage"
     description: Gid etap pa etap pou konfigire Vonage kòm founisè telefoni ou.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "Setup: Plivo"
     description: Gid etap pa etap pou konfigire Plivo kòm founisè telefoni ou.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "Setup: Asterisk (Ebèje Pa Ou Menm)"
     description: Deplwaye Asterisk ak pon ARI a pou pi gwo nivo konfidansyalite ak kontwòl.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: Apèl nan Navigatè ak WebRTC
     description: Aktive repons apèl nan navigatè pou volontè yo ak WebRTC.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: Modèl Sekirite
     description: Konprann sa ki chifre, sa ki pa chifre, ak modèl menas la.
     href: /security

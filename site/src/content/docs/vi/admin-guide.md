@@ -7,7 +7,7 @@ Với vai trò quản trị viên, bạn quản lý mọi thứ: tình nguyện 
 
 ## Đăng nhập
 
-Đăng nhập bằng `nsec` (khóa bí mật Nostr) được tạo trong quá trình [thiết lập](/docs/getting-started). Trang đăng nhập chấp nhận định dạng nsec (`nsec1...`). Trình duyệt của bạn ký xác thực bằng khóa — khóa bí mật không bao giờ rời khỏi thiết bị.
+Đăng nhập bằng `nsec` (khóa bí mật Nostr) được tạo trong quá trình [thiết lập](/docs/deploy). Trang đăng nhập chấp nhận định dạng nsec (`nsec1...`). Trình duyệt của bạn ký xác thực bằng khóa — khóa bí mật không bao giờ rời khỏi thiết bị.
 
 Tùy chọn, đăng ký passkey WebAuthn trong Cài đặt để đăng nhập không cần mật khẩu trên các thiết bị khác.
 

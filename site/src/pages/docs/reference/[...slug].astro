@@ -1,0 +1,26 @@
+---
+import DocsLayout from '../../../layouts/DocsLayout.astro';
+import { getCollection, render } from 'astro:content';
+import { defaultLang } from '../../../i18n/config';
+
+export async function getStaticPaths() {
+  const docs = await getCollection('docs');
+  return docs
+    .filter(d => {
+      const parts = d.id.split('/');
+      return parts[0] === defaultLang && parts[1] === 'reference' && parts.length === 3;
+    })
+    .map(d => ({
+      params: { slug: d.id.split('/').slice(2).join('/') },
+      props: { entry: d },
+    }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+---
+
+<DocsLayout title={entry.data.title}>
+  <h1>{entry.data.title}</h1>
+  <Content />
+</DocsLayout>

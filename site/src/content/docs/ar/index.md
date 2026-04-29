@@ -5,7 +5,7 @@ guidesHeading: الأدلة
 guides:
   - title: البدء
     description: المتطلبات الأساسية، التثبيت، إعداد الاتصالات الهاتفية، وأول عملية نشر.
-    href: /docs/getting-started
+    href: /docs/deploy
   - title: دليل المسؤول
     description: إدارة المتطوعين، المناوبات، قوائم الحظر، الحقول المخصصة، والإعدادات.
     href: /docs/admin-guide
@@ -14,25 +14,25 @@ guides:
     href: /docs/volunteer-guide
   - title: مزودو خدمات الاتصالات
     description: مقارنة مزودي خدمات الاتصالات المدعومين واختيار الأنسب لخط الطوارئ الخاص بك.
-    href: /docs/telephony-providers
+    href: /docs/deploy/providers
   - title: "الإعداد: Twilio"
     description: دليل خطوة بخطوة لتكوين Twilio كمزود خدمة الاتصالات.
-    href: /docs/setup-twilio
+    href: /docs/deploy/providers/twilio
   - title: "الإعداد: SignalWire"
     description: دليل خطوة بخطوة لتكوين SignalWire كمزود خدمة الاتصالات.
-    href: /docs/setup-signalwire
+    href: /docs/deploy/providers/signalwire
   - title: "الإعداد: Vonage"
     description: دليل خطوة بخطوة لتكوين Vonage كمزود خدمة الاتصالات.
-    href: /docs/setup-vonage
+    href: /docs/deploy/providers/vonage
   - title: "الإعداد: Plivo"
     description: دليل خطوة بخطوة لتكوين Plivo كمزود خدمة الاتصالات.
-    href: /docs/setup-plivo
+    href: /docs/deploy/providers/plivo
   - title: "الإعداد: Asterisk (مستضاف ذاتياً)"
     description: نشر Asterisk مع جسر ARI للحصول على أقصى درجات الخصوصية والتحكم.
-    href: /docs/setup-asterisk
+    href: /docs/deploy/providers/asterisk
   - title: الاتصال عبر المتصفح باستخدام WebRTC
     description: تمكين المتطوعين من الرد على المكالمات مباشرة من المتصفح باستخدام WebRTC.
-    href: /docs/webrtc-calling
+    href: /docs/deploy/providers/webrtc
   - title: نموذج الأمان
     description: فهم ما هو مشفر وما ليس كذلك، ونموذج التهديدات.
     href: /security

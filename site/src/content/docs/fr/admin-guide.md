@@ -7,7 +7,7 @@ En tant qu'administrateur, vous gerez tout : benevoles, equipes, parametres d'ap
 
 ## Connexion
 
-Connectez-vous avec le `nsec` (cle secrete Nostr) genere lors de la [configuration](/docs/getting-started). La page de connexion accepte le format nsec (`nsec1...`). Votre navigateur signe un defi avec la cle -- le secret ne quitte jamais l'appareil.
+Connectez-vous avec le `nsec` (cle secrete Nostr) genere lors de la [configuration](/docs/deploy). La page de connexion accepte le format nsec (`nsec1...`). Votre navigateur signe un defi avec la cle -- le secret ne quitte jamais l'appareil.
 
 Vous pouvez egalement enregistrer une cle d'acces WebAuthn dans les Parametres pour une connexion sans mot de passe sur d'autres appareils.
 
