@@ -2,10 +2,13 @@ import { test, expect } from '@playwright/test'
 import { ADMIN_NSEC, TEST_PIN, Timeouts, TestIds } from './helpers'
 
 test.describe('Smoke tests', () => {
-  test('app loads with correct title', async ({ page }) => {
+  test('app loads with correct title', async ({ page, request }) => {
+    // Title is config-driven (HOTLINE_NAME env var). Fetch the real value first.
+    const configRes = await request.get('/api/config')
+    expect(configRes.ok()).toBeTruthy()
+    const { hotlineName } = await configRes.json() as { hotlineName: string }
     await page.goto('/')
-    // index.html has <title>Hotline</title>; config may change it at runtime
-    await expect(page).toHaveTitle(/Hotline/i)
+    await expect(page).toHaveTitle(hotlineName)
   })
 
   test('unauthenticated user is redirected to login', async ({ page }) => {
