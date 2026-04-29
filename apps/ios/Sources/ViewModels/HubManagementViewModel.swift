@@ -66,20 +66,32 @@ final class HubManagementViewModel {
     // MARK: - Eager Hub Key Loading
 
     /// Pre-fetch and cache hub keys for all hubs in the background.
-    /// Runs fetches in parallel; individual failures are logged and skipped.
+    /// Fetches run in parallel; loadHubKey is called serially from the task group
+    /// body (not inside child tasks) to avoid concurrent writes to the key cache.
+    /// Individual failures are logged and skipped.
     func eagerLoadHubKeys(for hubs: [Hub]) async {
-        await withTaskGroup(of: Void.self) { group in
+        await withTaskGroup(of: (String, HubKeyEnvelopeResponse)?.self) { group in
             for hub in hubs {
                 guard !cryptoService.hasHubKey(hubId: hub.id) else { continue }
+                let hubId = hub.id
                 group.addTask {
                     do {
-                        let envelope = try await self.apiService.getHubKey(hub.id)
-                        try self.cryptoService.loadHubKey(hubId: hub.id, envelope: envelope)
+                        let envelope = try await self.apiService.getHubKey(hubId)
+                        return (hubId, envelope)
                     } catch {
                         // Individual key fetch errors do not propagate — log and continue
                         // so that the hub list remains usable even if some keys fail.
-                        print("[HubManagementViewModel] Failed to eager-load key for hub \(hub.id): \(error)")
+                        print("[HubManagementViewModel] Failed to eager-load key for hub \(hubId): \(error)")
+                        return nil
                     }
+                }
+            }
+            for await result in group {
+                guard let (hubId, envelope) = result else { continue }
+                do {
+                    try self.cryptoService.loadHubKey(hubId: hubId, envelope: envelope)
+                } catch {
+                    print("[HubManagementViewModel] Failed to cache hub key for hub \(hubId): \(error)")
                 }
             }
         }
