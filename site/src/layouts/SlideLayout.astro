@@ -1,6 +1,8 @@
 ---
 import type { ParsedSlide } from '../utils/slides';
-import '../styles/global.css';
+// Note: global.css intentionally NOT imported — slides are self-contained
+// to avoid Tailwind resets and marketing site styles interfering with
+// the 1920x1080 presentation canvas scaling.
 
 interface Props {
   title: string;
