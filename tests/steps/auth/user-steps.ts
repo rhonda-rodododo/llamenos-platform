@@ -225,7 +225,10 @@ Given('I have created and then deleted a volunteer', async ({ page }) => {
 When('the volunteer logs in and navigates to {string}', async ({ page }, path: string) => {
   const nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_nsec)) as string
   await loginAsVolunteer(page, nsec)
-  await navigateAfterLogin(page, path)
+  // This step is only used in access-denied scenarios — the volunteer is navigating
+  // somewhere they shouldn't be able to reach. Passing true asserts "Access Denied"
+  // is shown rather than accepting either outcome.
+  await navigateAfterLogin(page, path, true)
 })
 
 // "the reviewer logs in" is defined in roles-extended-steps.ts

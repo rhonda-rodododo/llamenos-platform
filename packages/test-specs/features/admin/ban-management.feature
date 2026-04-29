@@ -86,7 +86,7 @@ Feature: Ban Management
     Scenario: Volunteer cannot access ban list
       Given a volunteer exists
       When the volunteer logs in and navigates to "/bans"
-      Then they should see "Access denied"
+      Then they should see "Access Denied"
 
   # ── Backend: Ban check on incoming call ───────────────────────────
 

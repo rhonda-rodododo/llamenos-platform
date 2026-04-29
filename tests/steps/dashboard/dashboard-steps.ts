@@ -48,7 +48,15 @@ Then('the identity card should display my npub', async ({ page }) => {
 })
 
 Then('the npub should start with {string}', async ({ page }, prefix: string) => {
-  // npub is content-based — getByText is acceptable for content assertions
+  // Check __test_keypair first (crypto-interop tests store the keypair in window)
+  const keypair = await page.evaluate(
+    () => (window as Record<string, unknown>).__test_keypair as { npub?: string } | undefined,
+  )
+  if (keypair?.npub) {
+    expect(keypair.npub).toMatch(new RegExp(`^${prefix}`))
+    return
+  }
+  // Fallback: look for npub text in the DOM (dashboard/account pages)
   const npubEl = page.getByText(/npub1/).first()
   await expect(npubEl).toBeVisible({ timeout: Timeouts.ELEMENT })
   const text = await npubEl.textContent()
