@@ -5,14 +5,17 @@ import Testing
 // MARK: - Mocks with call counting
 
 /// API service mock that records which hub IDs had getHubKey called.
-/// @MainActor ensures safe mutation from concurrent tasks within @MainActor test contexts.
-@MainActor
-final class TrackingHubAPIService: @preconcurrency HubAPIServiceProtocol {
-    var fetchedHubIds: [String] = []
+/// Uses NSLock for thread safety — `eagerLoadHubKeys` calls these methods from
+/// concurrent `withTaskGroup` child tasks via protocol existential, bypassing
+/// any actor isolation.
+final class TrackingHubAPIService: HubAPIServiceProtocol, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _fetchedHubIds: [String] = []
+    var fetchedHubIds: [String] { lock.withLock { _fetchedHubIds } }
     var hubKeyError: Error?
 
     func getHubKey(_ hubId: String) async throws -> HubKeyEnvelopeResponse {
-        fetchedHubIds.append(hubId)
+        lock.withLock { _fetchedHubIds.append(hubId) }
         if let error = hubKeyError { throw error }
         return HubKeyEnvelopeResponse(
             envelope: HubKeyEnvelopeResponseEnvelope(
@@ -23,7 +26,7 @@ final class TrackingHubAPIService: @preconcurrency HubAPIServiceProtocol {
         )
     }
 
-    nonisolated func hp(_ path: String) -> String { path }
+    func hp(_ path: String) -> String { path }
 
     func request<T: Decodable>(method: String, path: String, body: (any Encodable)?) async throws -> T {
         // Stub HubsListResponse for loadHubs() calls
@@ -35,24 +38,22 @@ final class TrackingHubAPIService: @preconcurrency HubAPIServiceProtocol {
 }
 
 /// Crypto service mock that records which hub IDs had loadHubKey called.
-/// @MainActor ensures safe mutation from concurrent tasks within @MainActor test contexts.
-@MainActor
-final class TrackingHubCryptoService: @preconcurrency HubCryptoServiceProtocol {
+/// Uses NSLock for thread safety — same reasoning as TrackingHubAPIService.
+final class TrackingHubCryptoService: HubCryptoServiceProtocol, @unchecked Sendable {
+    private let lock = NSLock()
     /// Hub IDs pre-populated as "already cached".
     var cachedHubIds: Set<String> = []
-    var loadedHubIds: [String] = []
+    private var _loadedHubIds: [String] = []
+    var loadedHubIds: [String] { lock.withLock { _loadedHubIds } }
     var loadHubKeyError: Error?
 
     func hasHubKey(hubId: String) -> Bool {
-        cachedHubIds.contains(hubId)
+        lock.withLock { cachedHubIds.contains(hubId) }
     }
 
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws {
         if let error = loadHubKeyError { throw error }
-        loadedHubIds.append(hubId)
-        // Do NOT insert into cachedHubIds here — the eager load guard check
-        // happens before tasks run, so this won't affect the test outcome.
-        // Only update cachedHubIds when explicitly testing cache-hit behavior.
+        lock.withLock { _loadedHubIds.append(hubId) }
     }
 }
 
