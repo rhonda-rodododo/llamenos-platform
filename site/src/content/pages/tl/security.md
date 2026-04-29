@@ -1,116 +1,127 @@
 ---
 title: Seguridad at Privacy
-subtitle: Ano ang protektado, ano ang nakikita, at ano ang maaaring makuha sa ilalim ng subpoena — nakaayos ayon sa mga feature na ginagamit mo.
+subtitle: Ano ang protektado, ano ang nakikita, at ano ang maaaring makuha sa pamamagitan ng subpoena — inorganisa ayon sa mga feature na ginagamit mo.
 ---
 
-## Kung makatanggap ng subpoena ang iyong hosting provider
+## Kung masubpoena ang iyong hosting provider
 
-| MAAARI nilang ibigay | HINDI nila maibibigay |
-|---------------------|----------------------|
-| Metadata ng tawag/mensahe (oras, tagal) | Nilalaman ng nota, mga transcript, nilalaman ng ulat |
-| Mga naka-encrypt na database blob | Mga decryption key (naka-store sa iyong mga device) |
-| Kung aling mga volunteer ang aktibo kailan | Mga per-note encryption key (ephemeral) |
-| Nilalaman ng SMS/WhatsApp message | Ang iyong HMAC secret para sa pag-reverse ng phone hashes |
+| Maaari nilang ibigay | HINDI nila maibibigay |
+|----------------------|------------------------|
+| Metadata ng tawag/mensahe (oras, tagal) | Nilalaman ng notes, transcripts, report bodies |
+| Encrypted na database blobs | Pangalan ng mga volunteer (end-to-end encrypted) |
+| Aling mga volunteer account ang aktibo noong | Mga contact directory record (end-to-end encrypted) |
+| | Nilalaman ng mensahe (naka-encrypt pagdating, naka-imbak bilang ciphertext) |
+| | Mga decryption key (protektado ng iyong PIN, identity provider account, at opsyonal na hardware security key) |
+| | Mga per-note encryption key (ephemeral — sinisira pagkatapos i-wrap) |
+| | Ang iyong HMAC secret para sa pag-reverse ng phone hashes |
 
-**Nag-iimbak ang server ng data na hindi nito mababasa.** Ang metadata (kailan, gaano katagal, sino) ay nakikita. Ang nilalaman (ano ang sinabi, ano ang sinulat) ay hindi.
+**Nag-iimbak ang server ng data na hindi nito mababasa.** Ang metadata (kailan, gaano katagal, aling mga account) ay nakikita. Ang content (ano ang sinabi, ano ang isinulat, sino ang iyong mga contact) ay hindi.
 
 ---
 
 ## Ayon sa feature
 
-Ang iyong privacy exposure ay nakadepende sa kung aling mga channel ang ie-enable mo:
+Ang iyong privacy exposure ay depende sa kung aling mga channel ang ine-enable mo:
 
 ### Mga voice call
 
-| Kung gumagamit ka ng... | Maa-access ng third parties | Maa-access ng server | E2EE content |
-|------------------------|---------------------------|---------------------|--------------|
-| Twilio/SignalWire/Vonage/Plivo | Call audio (live), call records | Call metadata | Mga nota, transcript |
-| Self-hosted Asterisk | Wala (kontrolado mo) | Call metadata | Mga nota, transcript |
-| Browser-to-browser (WebRTC) | Wala | Call metadata | Mga nota, transcript |
+| Kung gumagamit ka ng... | Maa-access ng third party | Maa-access ng server | End-to-end encrypted na content |
+|-------------------------|---------------------------|----------------------|--------------------------------|
+| Twilio/SignalWire/Vonage/Plivo | Call audio (live), call records | Call metadata | Notes, transcripts |
+| Self-hosted Asterisk | Wala (ikaw ang may kontrol) | Call metadata | Notes, transcripts |
+| Browser-to-browser (WebRTC) | Wala | Call metadata | Notes, transcripts |
 
-**Subpoena sa telephony provider**: Mayroon silang call detail records (oras, phone numbers, tagal). WALA silang call notes o transcripts. Naka-disable ang recording bilang default.
+**Subpoena sa telephony provider**: Meron silang call detail records (oras, phone number, tagal). WALA silang call notes o transcripts. Naka-disable ang recording bilang default.
 
-**Transcription window**: Sa panahon ng ~30 segundo ng transcription, pinoproseso ng Cloudflare Workers AI ang audio. Pagkatapos ng transcription, naka-encrypt na text lamang ang naka-store.
+**Transcription**: Nangyayari ang transcription nang buo sa iyong browser gamit ang on-device AI. **Hindi umaalis ang audio sa iyong device.** Ang encrypted transcript lang ang ini-store.
 
 ### Text messaging
 
-| Channel | Provider access | Server storage | Mga tala |
-|---------|----------------|----------------|----------|
-| SMS | Binabasa ng iyong telephony provider ang lahat ng mensahe | Plaintext | Likas na limitasyon ng SMS |
-| WhatsApp | Binabasa ng Meta ang lahat ng mensahe | Plaintext | Kinakailangan ng WhatsApp Business API |
-| Signal | E2EE ang Signal network, pero dine-decrypt ng signal-cli bridge | Plaintext | Mas maganda kaysa SMS, hindi zero-knowledge |
+| Channel | Access ng provider | Storage sa server | Notes |
+|---------|--------------------|-------------------|-------|
+| SMS | Nababasa ng telephony provider mo ang lahat ng mensahe | **Encrypted** | Ang provider ay nag-iimbak ng orihinal na mensahe |
+| WhatsApp | Nababasa ng Meta ang lahat ng mensahe | **Encrypted** | Ang provider ay nag-iimbak ng orihinal na mensahe |
+| Signal | End-to-end encrypted ang Signal network, pero dine-decrypt ng bridge pagdating | **Encrypted** | Mas maganda kaysa SMS, hindi zero-knowledge |
 
-**Subpoena sa messaging provider**: Mayroon ang SMS provider ng buong message content. Mayroon ang Meta ng WhatsApp content. Ang mga Signal message ay E2EE hanggang sa bridge, pero ang bridge (tumatakbo sa iyong server) ay may plaintext.
+**Nae-encrypt ang mga mensahe pagdating sa iyong server.** Ciphertext lang ang ini-store ng server. Maaaring nasa provider pa rin ang orihinal na mensahe — limitasyon iyon ng mga platform na iyon, hindi natin mababago.
 
-**Pagpapabuti sa hinaharap**: Ini-explore namin ang E2EE message storage kung saan ciphertext lamang ang ini-store ng server. Tingnan ang [mga plano](#mga-plano).
+**Subpoena sa messaging provider**: Meron ang SMS provider ng buong message content. Meron ang Meta ng WhatsApp content. Ang Signal messages ay end-to-end encrypted sa bridge, pero ang bridge (tumatakbo sa iyong server) ay nagde-decrypt bago mag-re-encrypt para sa storage. Sa lahat ng kaso, **ciphertext lang ang nasa iyong server** — hindi mababasa ng hosting provider ang message content.
 
-### Mga nota, transcript, at ulat
+### Notes, transcripts, at reports
 
-Lahat ng nilalaman na sinulat ng volunteer ay end-to-end encrypted:
+Lahat ng content na sinulat ng volunteer ay end-to-end encrypted:
 
-- Bawat nota ay gumagamit ng natatanging random key (forward secrecy)
-- Hiwalay na bini-wrap ang mga key para sa volunteer at admin
-- Ciphertext lamang ang ini-store ng server
+- Bawat note ay gumagamit ng **unique random key** (forward secrecy — ang pag-kompromiso ng isang note ay hindi nangangahulugang nakompromiso na rin ang iba)
+- Ang mga key ay hiwalay na naka-wrap para sa volunteer at bawat admin
+- Ciphertext lang ang ini-store ng server
 - Nangyayari ang decryption sa browser
+- **Ang custom fields, report content, at file attachments ay lahat individually encrypted**
 
-**Pag-seize ng device**: Nang walang iyong PIN, naka-encrypt na blob ang makukuha ng mga attacker. Ang 6-digit PIN na may 600K PBKDF2 iterations ay tumatagal ng maraming oras para sa brute-force sa GPU hardware.
+**Pag-seize ng device**: Kung walang iyong PIN **at** access sa iyong identity provider account, ang makukuha ng attacker ay encrypted blob na computationally infeasible i-decrypt. Kung gumagamit ka rin ng hardware security key, **tatlong independent na factor** ang nagpoprotekta sa iyong data.
 
 ---
 
 ## Privacy ng phone number ng volunteer
 
-Kapag tumatanggap ang mga volunteer ng mga tawag sa kanilang personal na telepono, nai-expose ang kanilang mga numero sa iyong telephony provider.
+Kapag tumatanggap ng tawag sa kanilang personal na phone ang mga volunteer, ang numero nila ay nakalantad sa iyong telephony provider.
 
-| Senaryo | Phone number na nakikita ng |
-|---------|---------------------------|
-| PSTN call sa telepono ng volunteer | Telephony provider, phone carrier |
-| Browser-to-browser (WebRTC) | Wala (nananatili ang audio sa browser) |
-| Self-hosted Asterisk + SIP phone | Iyong Asterisk server lamang |
+| Senaryo | Phone number nakikita ng |
+|---------|--------------------------|
+| PSTN call sa phone ng volunteer | Telephony provider, phone carrier |
+| Browser-to-browser (WebRTC) | Walang makakakita (nananatili ang audio sa browser) |
+| Self-hosted Asterisk + SIP phone | Ang iyong Asterisk server lang |
 
 **Para protektahan ang phone number ng volunteer**: Gumamit ng browser-based calling (WebRTC) o magbigay ng SIP phones na konektado sa self-hosted Asterisk.
 
-**Pagpapabuti sa hinaharap**: Native desktop at mobile apps para sa pagtanggap ng mga tawag nang hindi ine-expose ang personal na phone numbers.
+---
+
+## Kamakailan lang na-ship
+
+Ang mga pagpapabuti na ito ay live na ngayon:
+
+| Feature | Privacy benefit |
+|---------|-----------------|
+| Encrypted message storage | Ang SMS, WhatsApp, at Signal messages ay naka-store bilang ciphertext sa iyong server |
+| On-device transcription | Hindi umaalis ang audio sa iyong browser — pinoproseso nang buo sa iyong device |
+| Multi-factor key protection | Ang iyong encryption keys ay protektado ng iyong PIN, identity provider, at opsyonal na hardware security key |
+| Hardware security keys | Ang physical key ay nagdadagdag ng third factor na hindi mako-kompromiso nang remote |
+| Reproducible builds | I-verify na ang deployed code ay tumutugma sa public source |
+| Encrypted contact directory | Ang contact records, relationships, at notes ay end-to-end encrypted |
+
+## Naplano pa
+
+| Feature | Privacy benefit |
+|---------|-----------------|
+| Native call-receiving apps | Walang personal phone number ang malelantad |
 
 ---
 
-## Mga plano
+## Summary table
 
-Nagtatrabaho kami sa mga pagpapabuti para mabawasan ang mga trust requirements:
-
-| Feature | Status | Privacy benefit |
-|---------|--------|-----------------|
-| E2EE message storage | Planado | SMS/WhatsApp/Signal na naka-store bilang ciphertext |
-| Client-side transcription | Planado | Hindi kailanman umalis ang audio sa browser |
-| Native call-receiving apps | Planado | Walang nai-expose na personal na phone numbers |
-| Reproducible builds | Planado | I-verify na ang deployed code ay tumutugma sa source |
-| Self-hosted Signal bridge | Available | Patakbuhin ang signal-cli sa iyong sariling infrastructure |
-
----
-
-## Buod na talahanayan
-
-| Uri ng data | Naka-encrypt | Nakikita ng server | Makukuha sa ilalim ng subpoena |
-|------------|-------------|-------------------|-----------------------------|
-| Mga call note | Oo (E2EE) | Hindi | Ciphertext lamang |
-| Mga transcript | Oo (E2EE) | Hindi | Ciphertext lamang |
-| Mga ulat | Oo (E2EE) | Hindi | Ciphertext lamang |
-| Mga file attachment | Oo (E2EE) | Hindi | Ciphertext lamang |
+| Uri ng data | Encrypted | Nakikita ng server | Makukuha sa subpoena |
+|-------------|-----------|--------------------|-----------------------|
+| Call notes | Oo (end-to-end) | Hindi | Ciphertext lang |
+| Transcripts | Oo (end-to-end) | Hindi | Ciphertext lang |
+| Reports | Oo (end-to-end) | Hindi | Ciphertext lang |
+| File attachments | Oo (end-to-end) | Hindi | Ciphertext lang |
+| Contact records | Oo (end-to-end) | Hindi | Ciphertext lang |
+| Volunteer identities | Oo (end-to-end) | Hindi | Ciphertext lang |
+| Team/role metadata | Oo (encrypted) | Hindi | Ciphertext lang |
+| Custom field definitions | Oo (encrypted) | Hindi | Ciphertext lang |
+| SMS/WhatsApp/Signal content | Oo (sa iyong server) | Hindi | Ciphertext mula sa iyong server; maaaring nasa provider ang orihinal |
 | Call metadata | Hindi | Oo | Oo |
-| Mga volunteer identity | Naka-encrypt at rest | Admin lamang | Oo (na may pagsisikap) |
-| Mga caller phone hash | HMAC hashed | Hash lamang | Hash (hindi mare-reverse nang wala ang iyong secret) |
-| SMS content | Hindi | Oo | Oo |
-| WhatsApp content | Hindi | Oo | Oo (pati mula sa Meta) |
-| Signal content | Hindi | Oo | Oo (mula sa iyong server) |
+| Caller phone hashes | HMAC hashed | Hash lang | Hash (hindi mare-reverse nang wala ang iyong secret) |
 
 ---
 
 ## Para sa mga security auditor
 
-Teknikal na dokumentasyon:
+Technical documentation:
 
 - [Protocol Specification](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/protocol/llamenos-protocol.md)
 - [Threat Model](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/THREAT_MODEL.md)
 - [Data Classification](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/DATA_CLASSIFICATION.md)
 - [Security Audits](https://github.com/rhonda-rodododo/llamenos/tree/main/docs/security)
+- [API Documentation](/api/docs)
 
-Ang Llamenos ay open source: [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)
+Open source ang Llamenos: [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)

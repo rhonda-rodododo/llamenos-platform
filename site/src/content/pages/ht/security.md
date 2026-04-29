@@ -8,11 +8,14 @@ subtitle: Sa ki pwoteje, sa ki vizib, ak sa ki ka jwenn anba sibpena — òganiz
 | Yo KAPAB bay | Yo PA KAPAB bay |
 |------------------|---------------------|
 | Metadata apèl/mesaj (lè, dire) | Kontni nòt, transkripsyon, kò rapò |
-| Blòb baz done chifre | Kle dechifraj (estoke sou aparèy ou yo) |
-| Ki vòlontè ki te aktif ak lè | Kle chifraj pa nòt (efemè) |
-| Kontni mesaj SMS/WhatsApp | Sekrè HMAC ou pou ranvèse hash telefòn |
+| Blòb baz done chifre | Non vòlontè (chifre de-bout-an-bout) |
+| Ki vòlontè ki te aktif ak lè | Dosye repètwa kontak (chifre de-bout-an-bout) |
+| | Kontni mesaj (chifre lè li rive, estoke kòm tèks chifre) |
+| | Kle dechifraj (pwoteje pa PIN ou, kont founisè idantite ou, ak opsyonèlman kle sekirite materyèl ou) |
+| | Kle chifraj pa nòt (efemè — detwi apre vlope) |
+| | Sekrè HMAC ou pou ranvèse hash telefòn |
 
-**Sèvè a estoke done li pa ka li.** Metadata (ki lè, pandan konbyen tan, ki moun) vizib. Kontni (sa ki te di, sa ki te ekri) pa vizib.
+**Sèvè a estoke done li pa ka li.** Metadata (ki lè, pandan konbyen tan, ki kont) vizib. Kontni (sa ki te di, sa ki te ekri, ki moun ki kontak ou) pa vizib.
 
 ---
 
@@ -30,30 +33,31 @@ Ekspozisyon vi prive ou depann sou ki chanèl ou aktive :
 
 **Sibpena founisè telefoni** : Yo gen dosye detay apèl (lè, nimewo telefòn, dire). Yo PA gen nòt apèl oswa transkripsyon. Anrejistreman dezaktive pa defo.
 
-**Fenèt transkripsyon** : Pandan ~30 segonn transkripsyon an, odyo trete pa Cloudflare Workers AI. Apre transkripsyon, sèlman tèks chifre estoke.
+**Transkripsyon** : Transkripsyon fèt nèt nan navigatè ou avèk AI sou aparèy. **Odyo pa janm kite aparèy ou.** Sèlman transkripsyon chifre estoke.
 
 ### Mesaj Tèks
 
 | Chanèl | Aksè founisè | Estokaj sèvè | Nòt |
 |---------|-----------------|----------------|-------|
-| SMS | Founisè telefoni ou li tout mesaj | Tèks klè | Limitasyon inik nan SMS |
-| WhatsApp | Meta li tout mesaj | Tèks klè | Egzijans API WhatsApp Business |
-| Signal | Rezo Signal E2EE, men pon signal-cli dechifre | Tèks klè | Pi bon pase SMS, pa zewo-konesans |
+| SMS | Founisè telefoni ou li tout mesaj | **Chifre** | Founisè kenbe mesaj orijinal yo |
+| WhatsApp | Meta li tout mesaj | **Chifre** | Founisè kenbe mesaj orijinal yo |
+| Signal | Rezo Signal E2EE, men pon dechifre lè li rive | **Chifre** | Pi bon pase SMS, pa zewo-konesans |
 
-**Sibpena founisè mesaj** : Founisè SMS gen kontni mesaj konplè. Meta gen kontni WhatsApp. Mesaj Signal E2EE nan pon, men pon (ki kouri sou sèvè ou) gen tèks klè.
+**Mesaj yo chifre nan moman yo rive sou sèvè ou.** Sèvè a estoke sèlman tèks chifre. Founisè telefoni oswa mesaj ou ka toujou gen mesaj orijinal la — se yon limitasyon nan platfòm sa yo, pa yon bagay nou ka chanje.
 
-**Amelyorasyon alavni** : Nou ap eksplore estokaj mesaj E2EE kote sèvè a estoke sèlman tèks chifre. Gade [fèy wout](#whats-planned).
+**Sibpena founisè mesaj** : Founisè SMS gen kontni mesaj konplè. Meta gen kontni WhatsApp. Mesaj Signal E2EE nan pon, men pon (ki kouri sou sèvè ou) dechifre anvan re-chifre pou estokaj. Nan tout ka, **sèvè ou gen sèlman tèks chifre** — founisè ostaj pa ka li kontni mesaj.
 
 ### Nòt, Transkripsyon, ak Rapò
 
-Tout kontni ekri pa vòlontè chifre de-de-wout :
+Tout kontni ekri pa vòlontè chifre de-bout-an-bout :
 
-- Chak nòt itilize yon kle aléatwa inik (konfidansyalite pèsistan)
-- Kle yo vlope separe pou vòlontè ak admin
+- Chak nòt itilize yon **kle aléatwa inik** (konfidansyalite pèsistan — konpwomèt yon nòt pa konpwomèt lòt yo)
+- Kle yo vlope separe pou vòlontè ak chak admin
 - Sèvè a estoke sèlman tèks chifre
 - Dechifraj fèt nan navigatè a
+- **Chan pèsonalize, kontni rapò, ak atachman fichye tout chifre individyèlman**
 
-**Sezi aparèy** : San PIN ou, atakan jwenn yon blòb chifre. Yon PIN 6 chif ak 600K iterasyon PBKDF2 pran plizyè zè pou fòse-brital sou materyèl GPU.
+**Sezi aparèy** : San PIN ou **ak** aksè nan kont founisè idantite ou, atakan jwenn yon blòb chifre ki enposib pou dechifre. Si ou itilize tou yon kle sekirite materyèl, **twa faktè endepandan** pwoteje done ou.
 
 ---
 
@@ -69,21 +73,26 @@ Lè vòlontè resevwa apèl sou telefòn pèsonèl yo, nimewo yo ekspoze nan fou
 
 **Pou pwoteje nimewo telefòn vòlontè** : Itilize apèl baze sou navigatè (WebRTC) oswa bay telefòn SIP konekte ak Asterisk otojere.
 
-**Amelyorasyon alavni** : Aplikasyon biwo ak mobil natif pou resevwa apèl san ekspoze nimewo telefòn pèsonèl.
-
 ---
 
-## Sa Ki Planifye
+## Resaman Livre
 
-Nou ap travay sou amelyorasyon pou redwi egzijans konfyans :
+Amelyorasyon sa yo disponib jodi a :
 
-| Fonksyon | Estati | Benefis vi prive |
-|---------|--------|-----------------|
-| Estokaj mesaj E2EE | Planifye | SMS/WhatsApp/Signal estoke kòm tèks chifre |
-| Transkripsyon kote kliyan | Planifye | Odyo pa janm kite navigatè |
-| Aplikasyon natif pou resevwa apèl | Planifye | Pa gen nimewo telefòn pèsonèl ekspoze |
-| Build repwodiksib | Planifye | Verifye kòd deplwaye matche sous |
-| Pon Signal otojere | Disponib | Kouri signal-cli sou pwòp enfrastriktirè ou |
+| Fonksyon | Benefis vi prive |
+|---------|-----------------|
+| Estokaj mesaj chifre | Mesaj SMS, WhatsApp ak Signal estoke kòm tèks chifre sou sèvè ou |
+| Transkripsyon sou aparèy | Odyo pa janm kite navigatè ou — trete nèt sou aparèy ou |
+| Pwoteksyon kle milti-faktè | Kle chifraj ou pwoteje pa PIN ou, founisè idantite ou, ak opsyonèlman kle sekirite materyèl |
+| Kle sekirite materyèl | Kle fizik ajoute yon twazyèm faktè ki pa ka konpwomèt adistans |
+| Build repwodiksib | Verifye kòd deplwaye matche sous piblik |
+| Repètwa kontak chifre | Dosye kontak, relasyon, ak nòt chifre de-bout-an-bout |
+
+## Toujou Planifye
+
+| Fonksyon | Benefis vi prive |
+|---------|-----------------|
+| Aplikasyon natif pou resevwa apèl | Pa gen nimewo telefòn pèsonèl ekspoze |
 
 ---
 
@@ -95,12 +104,13 @@ Nou ap travay sou amelyorasyon pou redwi egzijans konfyans :
 | Transkripsyon | Wi (E2EE) | Non | Sèlman tèks chifre |
 | Rapò | Wi (E2EE) | Non | Sèlman tèks chifre |
 | Atachman fichye | Wi (E2EE) | Non | Sèlman tèks chifre |
+| Dosye kontak | Wi (E2EE) | Non | Sèlman tèks chifre |
+| Idantite vòlontè | Wi (E2EE) | Non | Sèlman tèks chifre |
+| Metadata ekip/wòl | Wi (chifre) | Non | Sèlman tèks chifre |
+| Definisyon chan pèsonalize | Wi (chifre) | Non | Sèlman tèks chifre |
+| Kontni SMS/WhatsApp/Signal | Wi (sou sèvè ou) | Non | Tèks chifre sou sèvè ou; founisè ka gen orijinal |
 | Metadata apèl | Non | Wi | Wi |
-| Idantite vòlontè | Chifre nan repo | Admin sèlman | Wi (ak efò) |
 | Hash telefòn moun k ap rele | HMAC hache | Hash sèlman | Hash (pa ranvèsab san sekrè ou) |
-| Kontni SMS | Non | Wi | Wi |
-| Kontni WhatsApp | Non | Wi | Wi (tou soti nan Meta) |
-| Kontni Signal | Non | Wi | Wi (soti nan sèvè ou) |
 
 ---
 
@@ -112,5 +122,6 @@ Dokimantasyon teknik :
 - [Modèl Menas](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/THREAT_MODEL.md)
 - [Klasifikasyon Done](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/DATA_CLASSIFICATION.md)
 - [Odit Sekirite](https://github.com/rhonda-rodododo/llamenos/tree/main/docs/security)
+- [Dokimantasyon API](/api/docs)
 
 Llamenos sous louvri : [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)

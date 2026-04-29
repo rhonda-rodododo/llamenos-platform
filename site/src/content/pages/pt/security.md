@@ -8,11 +8,14 @@ subtitle: O que esta protegido, o que e visivel e o que pode ser obtido sob inti
 | Podem fornecer | NAO podem fornecer |
 |----------------|---------------------|
 | Metadados de chamadas/mensagens (horarios, duracoes) | Conteudo de notas, transcricoes, corpos de reportes |
-| Blobs de banco de dados criptografados | Chaves de decifracao (armazenadas nos seus dispositivos) |
-| Quais voluntarios estavam ativos e quando | Chaves de criptografia por nota (efemeras) |
-| Conteudo de mensagens SMS/WhatsApp | Seu segredo HMAC para reverter hashes de telefone |
+| Blobs de banco de dados criptografados | Nomes de voluntarios (criptografia de ponta a ponta) |
+| Quais voluntarios estavam ativos e quando | Registros do diretorio de contatos (criptografia de ponta a ponta) |
+| | Conteudo de mensagens (criptografado na chegada, armazenado como texto cifrado) |
+| | Chaves de decifracao (protegidas pelo seu PIN, sua conta de provedor de identidade e opcionalmente sua chave de seguranca de hardware) |
+| | Chaves de criptografia por nota (efemeras — destruidas apos envolvimento) |
+| | Seu segredo HMAC para reverter hashes de telefone |
 
-**O servidor armazena dados que nao pode ler.** Metadados (quando, quanto tempo, quem) sao visiveis. Conteudo (o que foi dito, o que foi escrito) nao e.
+**O servidor armazena dados que nao pode ler.** Metadados (quando, quanto tempo, quais contas) sao visiveis. Conteudo (o que foi dito, o que foi escrito, quem sao seus contatos) nao e.
 
 ---
 
@@ -30,30 +33,31 @@ Sua exposicao de privacidade depende de quais canais voce ativa:
 
 **Intimacao ao provedor de telefonia**: Eles tem registros detalhados de chamadas (horarios, numeros de telefone, duracoes). Eles NAO tem notas de chamadas ou transcricoes. A gravacao esta desativada por padrao.
 
-**Janela de transcricao**: Durante os ~30 segundos de transcricao, o audio e processado pelo Cloudflare Workers AI. Apos a transcricao, apenas texto criptografado e armazenado.
+**Transcricao**: A transcricao acontece inteiramente no seu navegador usando IA no dispositivo. **O audio nunca sai do seu dispositivo.** Apenas a transcricao criptografada e armazenada.
 
 ### Mensagens de texto
 
 | Canal | Acesso do provedor | Armazenamento no servidor | Notas |
 |-------|-------------------|--------------------------|-------|
-| SMS | Seu provedor de telefonia le todas as mensagens | Texto simples | Limitacao inerente do SMS |
-| WhatsApp | A Meta le todas as mensagens | Texto simples | Requisito da API WhatsApp Business |
-| Signal | A rede Signal e E2EE, mas o bridge signal-cli decifra | Texto simples | Melhor que SMS, nao e conhecimento zero |
+| SMS | Seu provedor de telefonia le todas as mensagens | **Criptografado** | Provedor retem as mensagens originais |
+| WhatsApp | A Meta le todas as mensagens | **Criptografado** | Provedor retem as mensagens originais |
+| Signal | A rede Signal e E2EE, mas o bridge decifra na chegada | **Criptografado** | Melhor que SMS, nao e conhecimento zero |
 
-**Intimacao ao provedor de mensagens**: O provedor de SMS tem o conteudo completo das mensagens. A Meta tem o conteudo do WhatsApp. Mensagens Signal sao E2EE ate o bridge, mas o bridge (rodando no seu servidor) tem texto simples.
+**As mensagens sao criptografadas no momento em que chegam ao seu servidor.** O servidor armazena apenas texto cifrado. Seu provedor de telefonia ou mensagens pode ainda ter a mensagem original — isso e uma limitacao dessas plataformas, nao algo que possamos mudar.
 
-**Melhoria futura**: Estamos explorando armazenamento E2EE de mensagens onde o servidor armazena apenas texto cifrado. Veja [o que esta planejado](#o-que-esta-planejado).
+**Intimacao ao provedor de mensagens**: O provedor de SMS tem o conteudo completo das mensagens. A Meta tem o conteudo do WhatsApp. Mensagens Signal sao E2EE ate o bridge, mas o bridge (rodando no seu servidor) decifra antes de re-criptografar para armazenamento. Em todos os casos, **seu servidor tem apenas texto cifrado** — o provedor de hospedagem nao pode ler o conteudo das mensagens.
 
 ### Notas, transcricoes e reportes
 
 Todo conteudo escrito por voluntarios e criptografado de ponta a ponta:
 
-- Cada nota usa uma chave aleatoria unica (sigilo futuro)
-- As chaves sao envolvidas separadamente para o voluntario e o administrador
+- Cada nota usa uma **chave aleatoria unica** (sigilo futuro — comprometer uma nota nao compromete outras)
+- As chaves sao envolvidas separadamente para o voluntario e cada administrador
 - O servidor armazena apenas texto cifrado
 - A decifracao acontece no navegador
+- **Campos personalizados, conteudo de reportes e anexos de arquivo sao todos criptografados individualmente**
 
-**Apreensao de dispositivo**: Sem seu PIN, os atacantes obtem um blob criptografado. Um PIN de 6 digitos com 600K iteracoes PBKDF2 leva horas para quebrar por forca bruta em hardware GPU.
+**Apreensao de dispositivo**: Sem seu PIN **e** acesso a sua conta de provedor de identidade, os atacantes obtem um blob criptografado que e computacionalmente impossivel de decifrar. Se voce tambem usa uma chave de seguranca de hardware, **tres fatores independentes** protegem seus dados.
 
 ---
 
@@ -69,21 +73,26 @@ Quando voluntarios recebem chamadas em seus telefones pessoais, seus numeros fic
 
 **Para proteger numeros de telefone de voluntarios**: Use chamadas pelo navegador (WebRTC) ou forneca telefones SIP conectados a Asterisk auto-hospedado.
 
-**Melhoria futura**: Aplicativos nativos de desktop e movel para receber chamadas sem expor numeros de telefone pessoais.
-
 ---
 
-## O que esta planejado
+## Lancado recentemente
 
-Estamos trabalhando em melhorias para reduzir requisitos de confianca:
+Estas melhorias estao disponiveis hoje:
 
-| Funcionalidade | Status | Beneficio de privacidade |
-|----------------|--------|--------------------------|
-| Armazenamento E2EE de mensagens | Planejado | SMS/WhatsApp/Signal armazenados como texto cifrado |
-| Transcricao no lado do cliente | Planejado | Audio nunca sai do navegador |
-| Aplicativos nativos para receber chamadas | Planejado | Numeros de telefone pessoais nao expostos |
-| Builds reproduziveis | Planejado | Verificar que o codigo implantado corresponde ao fonte |
-| Bridge Signal auto-hospedado | Disponivel | Executar signal-cli na sua propria infraestrutura |
+| Funcionalidade | Beneficio de privacidade |
+|----------------|--------------------------|
+| Armazenamento criptografado de mensagens | Mensagens SMS, WhatsApp e Signal armazenadas como texto cifrado no seu servidor |
+| Transcricao no dispositivo | Audio nunca sai do seu navegador — processado inteiramente no seu dispositivo |
+| Protecao de chaves multifator | Suas chaves de criptografia sao protegidas pelo seu PIN, provedor de identidade e opcionalmente chave de seguranca de hardware |
+| Chaves de seguranca de hardware | Chaves fisicas adicionam um terceiro fator que nao pode ser comprometido remotamente |
+| Builds reproduziveis | Verificar que o codigo implantado corresponde ao fonte publico |
+| Diretorio de contatos criptografado | Registros de contatos, relacionamentos e notas sao criptografados de ponta a ponta |
+
+## Ainda planejado
+
+| Funcionalidade | Beneficio de privacidade |
+|----------------|--------------------------|
+| Aplicativos nativos para receber chamadas | Numeros de telefone pessoais nao expostos |
 
 ---
 
@@ -95,12 +104,13 @@ Estamos trabalhando em melhorias para reduzir requisitos de confianca:
 | Transcricoes | Sim (E2EE) | Nao | Apenas texto cifrado |
 | Reportes | Sim (E2EE) | Nao | Apenas texto cifrado |
 | Anexos de arquivo | Sim (E2EE) | Nao | Apenas texto cifrado |
+| Registros de contatos | Sim (E2EE) | Nao | Apenas texto cifrado |
+| Identidades de voluntarios | Sim (E2EE) | Nao | Apenas texto cifrado |
+| Metadados de equipe/funcoes | Sim (criptografado) | Nao | Apenas texto cifrado |
+| Definicoes de campos personalizados | Sim (criptografado) | Nao | Apenas texto cifrado |
+| Conteudo SMS/WhatsApp/Signal | Sim (no seu servidor) | Nao | Texto cifrado do seu servidor; provedor pode ter original |
 | Metadados de chamadas | Nao | Sim | Sim |
-| Identidades de voluntarios | Criptografado em repouso | Apenas admin | Sim (com esforco) |
 | Hashes de telefone de chamadores | HMAC hasheado | Apenas hash | Hash (nao reversivel sem seu segredo) |
-| Conteudo SMS | Nao | Sim | Sim |
-| Conteudo WhatsApp | Nao | Sim | Sim (tambem da Meta) |
-| Conteudo Signal | Nao | Sim | Sim (do seu servidor) |
 
 ---
 
@@ -112,5 +122,6 @@ Documentacao tecnica:
 - [Modelo de Ameacas](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/THREAT_MODEL.md)
 - [Classificacao de Dados](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/DATA_CLASSIFICATION.md)
 - [Auditorias de Seguranca](https://github.com/rhonda-rodododo/llamenos/tree/main/docs/security)
+- [Documentacao API](/api/docs)
 
 Llamenos e codigo aberto: [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)
