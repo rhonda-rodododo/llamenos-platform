@@ -1,0 +1,71 @@
+---
+import DocsLayout from '../../../../layouts/DocsLayout.astro';
+import TagFilter from '../../../../components/TagFilter.astro';
+import { getCollection } from 'astro:content';
+import { type Lang, nonDefaultLocales } from '../../../../i18n/config';
+import { getTranslation } from '../../../../i18n/utils';
+import { common } from '../../../../i18n/translations/common';
+
+export function getStaticPaths() {
+  return nonDefaultLocales.map(lang => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+const t = getTranslation(common, lang);
+
+const allGuides = await getCollection('guides');
+const guides = allGuides.filter(g => g.id.startsWith(`${lang}/`));
+const sorted = guides.sort((a, b) => (a.data.order ?? 999) - (b.data.order ?? 999));
+
+const audienceLabels: Record<string, string> = {
+  admin: t.docs.audienceAdmin,
+  user: t.docs.audienceUser,
+  caller: t.docs.audienceCaller,
+};
+
+const taskLabels: Record<string, string> = {
+  setup: t.docs.taskSetup,
+  'daily-use': t.docs.taskDailyUse,
+  configuration: t.docs.taskConfiguration,
+  troubleshooting: t.docs.taskTroubleshooting,
+  security: t.docs.taskSecurity,
+};
+---
+
+<DocsLayout title={t.docs.guides} lang={lang}>
+  <h1>{t.docs.guides}</h1>
+  <p class="text-fg-muted mb-6">{t.docs.browseAllGuides}</p>
+
+  <div class="not-prose">
+    <TagFilter lang={lang} />
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {sorted.map(guide => (
+        <a
+          href={`/${lang}/docs/guides/${guide.id.split('/').slice(1).join('/')}`}
+          class="rounded-xl border border-border bg-bg-card p-5 transition-colors hover:border-border-bright group"
+          data-guide-card
+          data-audience={guide.data.audience.join(',')}
+          data-task={guide.data.task.join(',')}
+        >
+          <h3 class="text-base font-semibold text-fg mb-1 group-hover:text-accent-bright transition-colors">
+            {guide.data.title}
+          </h3>
+          <p class="text-sm text-fg-muted mb-3">{guide.data.description}</p>
+          <div class="flex flex-wrap gap-1.5">
+            {guide.data.audience.map(a => (
+              <span class="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent-bright">
+                {audienceLabels[a] ?? a}
+              </span>
+            ))}
+            {guide.data.task.map(tk => (
+              <span class="inline-flex items-center rounded-full bg-bg-soft px-2 py-0.5 text-xs font-medium text-fg-muted border border-border">
+                {taskLabels[tk] ?? tk}
+              </span>
+            ))}
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</DocsLayout>

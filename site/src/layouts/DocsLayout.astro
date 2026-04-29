@@ -36,6 +36,7 @@ const sections = [
   {
     heading: t.docs.userGuides,
     items: [
+      { href: lp('/docs/guides'), label: t.docs.guides },
       { href: lp('/docs/admin-guide'), label: t.docs.adminGuide },
       { href: lp('/docs/volunteer-guide'), label: t.docs.volunteerGuide },
       { href: lp('/docs/reporter-guide'), label: t.docs.reporterGuide },
@@ -109,7 +110,10 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/docs';
                       href={item.href}
                       class:list={[
                         'block px-3 py-2 rounded-lg text-sm transition-colors',
-                        currentPath === item.href.replace(/\/$/, '')
+                        (() => {
+                          const href = item.href.replace(/\/$/, '');
+                          return currentPath === href || currentPath.startsWith(href + '/');
+                        })()
                           ? 'text-accent-bright bg-accent/10 font-medium border-l-2 border-accent'
                           : 'text-fg-muted hover:text-fg hover:bg-bg-soft/50'
                       ]}
