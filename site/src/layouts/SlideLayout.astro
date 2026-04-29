@@ -30,7 +30,7 @@ const formattedDate = date
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <title>{title} | Llámenos Slides</title>
 
-  <style>
+  <style is:global>
     /* ─── Reset & Base ──────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -140,49 +140,49 @@ const formattedDate = date
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.5em;
+      gap: 16px;
     }
 
-    /* ─── Typography ───────────────────────────────────────────── */
+    /* ─── Typography (px units — fixed 1920×1080 canvas) ─────── */
     .slide-inner h1 {
-      font-size: 4.5rem;
+      font-size: 72px;
       font-weight: 700;
       line-height: 1.1;
       letter-spacing: -0.03em;
       color: var(--slide-fg);
-      margin-bottom: 0.3em;
+      margin-bottom: 22px;
     }
     .slide-inner h2 {
-      font-size: 3.2rem;
+      font-size: 52px;
       font-weight: 700;
       line-height: 1.15;
       letter-spacing: -0.025em;
       color: var(--slide-fg);
-      margin-bottom: 0.5em;
-      padding-bottom: 0.3em;
-      border-bottom: 2px solid var(--slide-accent);
+      margin-bottom: 26px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--slide-accent);
     }
     .slide-inner h3 {
-      font-size: 2.2rem;
+      font-size: 36px;
       font-weight: 600;
       color: var(--slide-accent-bright);
-      margin-bottom: 0.4em;
+      margin-bottom: 14px;
     }
     .slide-inner p {
-      font-size: 1.8rem;
+      font-size: 30px;
       line-height: 1.6;
       color: var(--slide-fg-muted);
-      margin-bottom: 0.6em;
+      margin-bottom: 18px;
     }
     .slide-inner ul, .slide-inner ol {
-      font-size: 1.75rem;
+      font-size: 28px;
       line-height: 1.55;
       color: var(--slide-fg-muted);
-      padding-left: 1.6em;
-      margin-bottom: 0.75em;
+      padding-left: 48px;
+      margin-bottom: 22px;
     }
     .slide-inner li {
-      margin-bottom: 0.4em;
+      margin-bottom: 12px;
     }
     .slide-inner li::marker {
       color: var(--slide-accent);
@@ -199,7 +199,7 @@ const formattedDate = date
 
     /* Title slide: subtitle after h1 */
     .slide-layout-title .slide-inner h2 {
-      font-size: 2.4rem;
+      font-size: 38px;
       font-weight: 400;
       color: var(--slide-fg-muted);
       border: none;
@@ -207,29 +207,29 @@ const formattedDate = date
       margin: 0;
     }
     .slide-layout-title .slide-inner p {
-      font-size: 1.6rem;
+      font-size: 26px;
       color: oklch(0.55 0.08 195);
-      margin-top: 1em;
+      margin-top: 24px;
     }
 
     /* ─── Code blocks ──────────────────────────────────────────── */
     .slide-inner pre {
       background: var(--slide-bg-card);
       border: 1px solid var(--slide-border);
-      border-radius: 0.5rem;
-      padding: 1.2rem 1.5rem;
+      border-radius: 8px;
+      padding: 20px 24px;
       overflow-x: auto;
-      font-size: 1.4rem;
+      font-size: 22px;
       line-height: 1.6;
-      margin: 0.5em 0;
+      margin: 12px 0;
     }
     .slide-inner code {
       font-family: var(--font-mono);
       font-size: 0.9em;
       background: var(--slide-bg-card);
       border: 1px solid var(--slide-border);
-      border-radius: 0.25rem;
-      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      padding: 2px 8px;
       color: var(--slide-amber);
     }
     .slide-inner pre code {
@@ -243,13 +243,13 @@ const formattedDate = date
     /* ─── Blockquote / Quote slides ─────────────────────────────── */
     .slide-inner blockquote {
       border-left: 4px solid var(--slide-accent);
-      padding: 0.75em 1.5em;
-      margin: 0.5em 0;
+      padding: 18px 36px;
+      margin: 12px 0;
       background: var(--slide-bg-soft);
-      border-radius: 0 0.5rem 0.5rem 0;
+      border-radius: 0 8px 8px 0;
     }
     .slide-inner blockquote p {
-      font-size: 2.4rem;
+      font-size: 28px;
       font-style: italic;
       color: var(--slide-fg);
     }
@@ -259,34 +259,57 @@ const formattedDate = date
     }
     .slide-layout-quote .slide-inner blockquote {
       border-left: 6px solid var(--slide-accent-bright);
-      padding: 1.5em 2em;
+      padding: 36px 48px;
+    }
+
+    /* ─── Tables ────────────────────────────────────────────────── */
+    .slide-inner table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 24px;
+      margin: 16px 0;
+    }
+    .slide-inner th {
+      text-align: left;
+      font-weight: 600;
+      color: var(--slide-fg);
+      padding: 12px 16px;
+      border-bottom: 2px solid var(--slide-accent);
+    }
+    .slide-inner td {
+      padding: 10px 16px;
+      color: var(--slide-fg-muted);
+      border-bottom: 1px solid var(--slide-border);
+    }
+    .slide-inner tr:last-child td {
+      border-bottom: none;
     }
 
     /* ─── Two-column layout ─────────────────────────────────────── */
     .slide-columns {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 4rem;
+      gap: 60px;
       width: 100%;
     }
     .slide-col h2 {
-      font-size: 2.4rem !important;
+      font-size: 38px !important;
       border-bottom: 2px solid var(--slide-accent) !important;
-      padding-bottom: 0.3em !important;
-      margin-bottom: 0.6em !important;
+      padding-bottom: 10px !important;
+      margin-bottom: 18px !important;
     }
     .slide-col h3 {
-      font-size: 1.8rem !important;
+      font-size: 28px !important;
       color: var(--slide-accent-bright) !important;
     }
     .slide-col p, .slide-col li {
-      font-size: 1.5rem !important;
+      font-size: 24px !important;
     }
 
     /* ─── Fragments (incremental reveal) ─────────────────────────── */
     .fragment[data-fragment-hidden="true"] {
       opacity: 0;
-      transform: translateY(0.5rem);
+      transform: translateY(8px);
       transition: opacity 0.25s ease, transform 0.25s ease;
     }
     .fragment.visible {
