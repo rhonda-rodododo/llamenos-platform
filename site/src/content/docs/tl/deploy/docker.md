@@ -15,8 +15,8 @@ Ang gabay na ito ay gagabay sa iyo sa pag-deploy ng Llamenos gamit ang Docker Co
 ## 1. I-clone ang repository
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Gumawa ng admin keypair

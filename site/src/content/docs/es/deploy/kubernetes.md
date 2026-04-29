@@ -17,8 +17,8 @@ Esta guia cubre el despliegue de Llamenos en un cluster de Kubernetes usando el 
 ## 1. Generar el par de claves admin
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

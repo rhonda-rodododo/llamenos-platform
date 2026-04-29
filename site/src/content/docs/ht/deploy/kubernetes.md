@@ -18,8 +18,8 @@ Gid sa a kouvri depoze Llamenos nan yon klastè Kubernetes lè l sèvi ak chèt 
 ## 1. Jenere pè kle admin lan
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

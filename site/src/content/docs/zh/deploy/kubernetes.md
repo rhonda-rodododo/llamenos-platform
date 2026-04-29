@@ -18,8 +18,8 @@ description: 使用官方 Helm Chart 将 Llamenos 部署到 Kubernetes。
 ## 1. 生成管理员密钥对
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

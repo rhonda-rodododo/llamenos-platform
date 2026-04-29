@@ -18,8 +18,8 @@ description: 공식 Helm 차트를 사용하여 Kubernetes에 Llamenos를 배포
 ## 1. 관리자 키 쌍 생성
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

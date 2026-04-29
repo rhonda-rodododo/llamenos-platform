@@ -18,8 +18,8 @@ description: Развёртывание Llamenos в Kubernetes с помощью
 ## 1. Генерация пары ключей администратора
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```
@@ -380,8 +380,8 @@ kubectl describe ingress llamenos
 ## 1. Генерация ключевой пары администратора
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

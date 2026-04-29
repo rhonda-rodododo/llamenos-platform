@@ -15,8 +15,8 @@ description: نشر Llamenos على خادمك الخاص باستخدام Docke
 ## 1. استنساخ المستودع
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. إنشاء زوج مفاتيح المسؤول

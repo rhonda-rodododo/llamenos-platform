@@ -18,8 +18,8 @@ Hướng dẫn này bao gồm việc triển khai Llamenos lên cụm Kubernetes
 ## 1. Tạo cặp khóa quản trị
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

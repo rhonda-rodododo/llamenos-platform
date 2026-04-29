@@ -18,8 +18,8 @@ Saklaw ng gabay na ito ang pag-deploy ng Llamenos sa isang Kubernetes cluster ga
 ## 1. Gumawa ng admin keypair
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

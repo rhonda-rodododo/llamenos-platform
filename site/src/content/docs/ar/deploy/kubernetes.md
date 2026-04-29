@@ -18,8 +18,8 @@ description: نشر Llamenos على Kubernetes باستخدام مخطط Helm ا
 ## 1. إنشاء زوج مفاتيح المسؤول
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

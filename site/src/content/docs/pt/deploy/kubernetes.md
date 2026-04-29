@@ -18,8 +18,8 @@ Este guia abrange a implantacao do Llamenos em um cluster Kubernetes usando o ch
 ## 1. Gerar o par de chaves do administrador
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

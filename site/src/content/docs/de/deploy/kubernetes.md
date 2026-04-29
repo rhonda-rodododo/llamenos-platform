@@ -18,8 +18,8 @@ Diese Anleitung behandelt die Bereitstellung von Llamenos in einem Kubernetes-Cl
 ## 1. Admin-Schluesselpaar generieren
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

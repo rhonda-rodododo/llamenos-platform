@@ -18,8 +18,8 @@ Ce guide couvre le déploiement de Llamenos sur un cluster Kubernetes en utilisa
 ## 1. Générer la paire de clés administrateur
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 bun install
 bun run bootstrap-admin
 ```

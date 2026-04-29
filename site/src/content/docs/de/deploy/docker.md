@@ -15,8 +15,8 @@ Diese Anleitung fuehrt Sie durch die Bereitstellung von Llamenos mit Docker Comp
 ## 1. Repository klonen
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Admin-Schluesselpaar generieren
