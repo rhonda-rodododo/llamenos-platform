@@ -293,7 +293,7 @@ The current file is 309 lines. Target is approximately 185 lines (~40% reduction
 ### Task 8: Update memory MEMORY.md
 
 **Files:**
-- Modify: `/home/rikki/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`
+- Modify: `~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`
 
 - [ ] Find and remove the entire `## Feature Development Workflow (CRITICAL — follow exactly)` section (lines 86–121 in current file), which includes the three Phase subsections and the `### Epic File Quality Requirements` block.
 
@@ -325,12 +325,12 @@ The current file is 309 lines. Target is approximately 185 lines (~40% reduction
 
 **Files:** None modified
 
-- [ ] Run `grep -c "Durable Object\|DORouter\|idFromName\|durable-objects" /home/rikki/projects/llamenos/CLAUDE.md` — expect 0 or 1 (the spec allows a single historical note like "DOs removed in Epic 357–358"). Fail only if count ≥ 2.
-- [ ] Run `grep -r "phased workflow\|Phase 1\|Phase 2\|Phase 3" /home/rikki/projects/llamenos/.claude/skills/bdd-feature-development/SKILL.md` — expect zero matches.
-- [ ] Run `grep "backbone of this project" /home/rikki/projects/llamenos/.claude/skills/epic-authoring/SKILL.md` — expect zero matches.
-- [ ] Run `grep "dev:node" /home/rikki/projects/llamenos/.claude/skills/test-orchestration/SKILL.md` — expect zero matches.
-- [ ] Run `grep "DO storage" /home/rikki/projects/llamenos/.claude/skills/release-deployment/SKILL.md` — expect zero matches.
-- [ ] Run `grep "TypeScript Post-Processor" /home/rikki/projects/llamenos/.claude/skills/protocol-schema-change/SKILL.md` — expect zero matches.
-- [ ] Run `grep "Feature Development Workflow (CRITICAL" /home/rikki/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md` — expect zero matches.
-- [ ] Confirm `wc -l /home/rikki/projects/llamenos/CLAUDE.md` reports ≤200 lines.
+- [ ] Run `grep -c "Durable Object\|DORouter\|idFromName\|durable-objects" ~/projects/llamenos/CLAUDE.md` — expect 0 or 1 (the spec allows a single historical note like "DOs removed in Epic 357–358"). Fail only if count ≥ 2.
+- [ ] Run `grep -r "phased workflow\|Phase 1\|Phase 2\|Phase 3" ~/projects/llamenos/.claude/skills/bdd-feature-development/SKILL.md` — expect zero matches.
+- [ ] Run `grep "backbone of this project" ~/projects/llamenos/.claude/skills/epic-authoring/SKILL.md` — expect zero matches.
+- [ ] Run `grep "dev:node" ~/projects/llamenos/.claude/skills/test-orchestration/SKILL.md` — expect zero matches.
+- [ ] Run `grep "DO storage" ~/projects/llamenos/.claude/skills/release-deployment/SKILL.md` — expect zero matches.
+- [ ] Run `grep "TypeScript Post-Processor" ~/projects/llamenos/.claude/skills/protocol-schema-change/SKILL.md` — expect zero matches.
+- [ ] Run `grep "Feature Development Workflow (CRITICAL" ~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md` — expect zero matches.
+- [ ] Confirm `wc -l ~/projects/llamenos/CLAUDE.md` reports ≤200 lines.
 - [ ] Commit: `git commit -m "chore: workflow reform verification complete"` (only if any last-minute fixes were made; skip if nothing changed)

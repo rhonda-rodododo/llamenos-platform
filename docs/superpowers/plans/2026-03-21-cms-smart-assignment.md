@@ -52,7 +52,7 @@ This follows the same pattern as `piiFields` and `closedStatuses` already in tha
 
 Run:
 ```bash
-cd /home/rikki/projects/llamenos && grep -r "drizzle-kit\|push\|migrate" package.json | head -10
+cd ~/projects/llamenos && grep -r "drizzle-kit\|push\|migrate" package.json | head -10
 ```
 
 Check whether this project uses `drizzle-kit push` (schema-push development flow) or SQL migration files. The project has no `apps/worker/db/migrations/` directory, which means it likely uses `drizzle-kit push` or a custom schema-push script. Confirm with:
@@ -96,7 +96,7 @@ Use `.optional().default([])` on the definition schema (never bare `.default([])
 - [ ] **1.5 — Run codegen and typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run codegen && bun run typecheck
+cd ~/projects/llamenos && bun run codegen && bun run typecheck
 ```
 
 Expected: 0 errors. If TypeScript errors appear because `EntityTypeDefinition` inferred type is missing the field somewhere, fix those now.
@@ -143,7 +143,7 @@ requiredSpecializations: (data.requiredSpecializations as string[]) ?? [],
 - [ ] **2.3 — Typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: 0 errors.
@@ -251,7 +251,7 @@ describe('scoreVolunteer', () => {
 - [ ] **3.2 — Run the test to confirm it fails**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun test apps/worker/lib/assignment-scorer.test.ts
+cd ~/projects/llamenos && bun test apps/worker/lib/assignment-scorer.test.ts
 ```
 
 Expected: `Cannot find module './assignment-scorer'` (or similar). File does not exist yet.
@@ -333,7 +333,7 @@ export function scoreVolunteer(
 - [ ] **3.4 — Run the test to confirm it passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun test apps/worker/lib/assignment-scorer.test.ts
+cd ~/projects/llamenos && bun test apps/worker/lib/assignment-scorer.test.ts
 ```
 
 Expected: all 8 tests PASS.
@@ -341,7 +341,7 @@ Expected: all 8 tests PASS.
 - [ ] **3.5 — Typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: 0 errors.
@@ -423,7 +423,7 @@ suggestions.sort((a, b) => b.score - a.score)
 - [ ] **4.2 — Typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: 0 errors. The `User` type from `types/infra.ts` is what `allUsers` returns, and `scoreVolunteer` accepts that type.
@@ -550,7 +550,7 @@ Check whether `record` is `const` or `let` at the point of creation — change i
 - [ ] **5.3 — Typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: 0 errors. If the `services` type is wrong for `pickBestAssignee`, look at how `c.get('services')` is typed in the other route handlers in this file and match it.
@@ -714,7 +714,7 @@ If `User` doesn't include these fields yet, they come from `apps/worker/types/in
 - [ ] **6.4 — Typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: 0 errors.
@@ -817,7 +817,7 @@ In `packages/test-specs/features/core/cms-assignment.feature`, ADD the following
 - [ ] **7.2 — Run BDD tests to confirm new scenarios fail (missing steps)**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "FAIL|undefined|missing|Error" | head -30
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "FAIL|undefined|missing|Error" | head -30
 ```
 
 Expected: errors about undefined step definitions.
@@ -1066,7 +1066,7 @@ If there's a glob pattern like `tests/steps/backend/**/*.ts`, the file is auto-d
 - [ ] **7.5 — Run BDD tests to confirm new scenarios pass**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd
+cd ~/projects/llamenos && bun run test:backend:bdd
 ```
 
 Expected: all new `@backend` scenarios PASS, no regressions in existing scenarios.
@@ -1087,7 +1087,7 @@ git commit -m "test(cms): BDD scenarios for specialization scoring and auto-assi
 - [ ] **8.1 — Run full typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: 0 errors, clean build.
@@ -1095,7 +1095,7 @@ Expected: 0 errors, clean build.
 - [ ] **8.2 — Run unit tests**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun test apps/worker/lib/assignment-scorer.test.ts
+cd ~/projects/llamenos && bun test apps/worker/lib/assignment-scorer.test.ts
 ```
 
 Expected: all PASS.
@@ -1103,7 +1103,7 @@ Expected: all PASS.
 - [ ] **8.3 — Run backend BDD**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd
+cd ~/projects/llamenos && bun run test:backend:bdd
 ```
 
 Expected: all scenarios PASS including the new ones. No regressions.
@@ -1111,7 +1111,7 @@ Expected: all scenarios PASS including the new ones. No regressions.
 - [ ] **8.4 — Run Android unit tests**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest
 ```
 
 Expected: all PASS (Android is not directly affected, but this confirms no shared type breakage propagated).
@@ -1119,7 +1119,7 @@ Expected: all PASS (Android is not directly affected, but this confirms no share
 - [ ] **8.5 — Run codegen check**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run codegen:check
+cd ~/projects/llamenos && bun run codegen:check
 ```
 
 Expected: no drift. If drift is detected, run `bun run codegen` and commit the updated generated files.

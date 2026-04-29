@@ -109,7 +109,7 @@ export type FileFieldValue = z.infer<typeof fileFieldValueSchema>
 - [ ] **Step 1.3: Run codegen and typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 bun run codegen
 bun run typecheck
 ```
@@ -500,7 +500,7 @@ In the `FieldInput` function, add a `case 'location':` before the `default:` cas
 - [ ] **Step 3.3: Run typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 bun run typecheck && bun run build
 ```
 
@@ -1877,7 +1877,7 @@ suspend fun uploadCmsFile(
 - [ ] **Step 9.2: Compile Android debug**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew compileDebugKotlin 2>&1 | tail -30
+cd ~/projects/llamenos/apps/android && ./gradlew compileDebugKotlin 2>&1 | tail -30
 ```
 
 Expected: BUILD SUCCESSFUL.
@@ -2087,7 +2087,7 @@ The `DynamicField` composable will need `locationService` and `apiService` passe
 - [ ] **Step 10.3: Compile and test Android**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android
+cd ~/projects/llamenos/apps/android
 ./gradlew testDebugUnitTest && ./gradlew lintDebug && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -30
 ```
 
@@ -2282,7 +2282,7 @@ JoinFieldType.File -> FileUploadField(
 - [ ] **Step 11.3: Compile and test Android**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android
+cd ~/projects/llamenos/apps/android
 ./gradlew testDebugUnitTest && ./gradlew lintDebug && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -30
 ```
 
@@ -2304,7 +2304,7 @@ git commit -m "feat(android): implement FileUploadField composable with file pic
 - [ ] **Step 12.1: Full desktop verification**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 bun run typecheck && bun run build
 bun run test
 ```
@@ -2314,7 +2314,7 @@ Expected: 0 type errors, build succeeds, all Playwright tests pass.
 - [ ] **Step 12.2: Full Android verification**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android
+cd ~/projects/llamenos/apps/android
 ./gradlew testDebugUnitTest && ./gradlew lintDebug && ./gradlew compileDebugAndroidTestKotlin
 ```
 

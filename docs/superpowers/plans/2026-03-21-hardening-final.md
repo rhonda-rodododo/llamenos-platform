@@ -35,11 +35,11 @@
 
 ### Gap 1 — iOS: Fix Hub Context Switch on Background Push
 
-**Context:** `AppDelegate.application(_:didReceiveRemoteNotification:fetchCompletionHandler:)` in `/home/rikki/projects/llamenos/apps/ios/Sources/App/LlamenosApp.swift` lines 276–279 calls `appState.hubContext.setActiveHub(hubId)` unconditionally on every silent push. This switches the UI's browsing context silently in the background. The correct path for context switching is the tap handler (`userNotificationCenter(_:didReceive:)` at line 319), which is already correct and must remain unchanged. The background handler should call `linphoneService.handleVoipPush(callId:hubId:)` for `incoming_call` type notifications and never call `setActiveHub`.
+**Context:** `AppDelegate.application(_:didReceiveRemoteNotification:fetchCompletionHandler:)` in `~/projects/llamenos/apps/ios/Sources/App/LlamenosApp.swift` lines 276–279 calls `appState.hubContext.setActiveHub(hubId)` unconditionally on every silent push. This switches the UI's browsing context silently in the background. The correct path for context switching is the tap handler (`userNotificationCenter(_:didReceive:)` at line 319), which is already correct and must remain unchanged. The background handler should call `linphoneService.handleVoipPush(callId:hubId:)` for `incoming_call` type notifications and never call `setActiveHub`.
 
 #### Task 1.1 — Write iOS push routing test (test first)
 
-- [ ] Create `/home/rikki/projects/llamenos/apps/ios/Tests/Unit/PushRoutingTests.swift` with the following tests:
+- [ ] Create `~/projects/llamenos/apps/ios/Tests/Unit/PushRoutingTests.swift` with the following tests:
   - `backgroundPushForHubBDoesNotSwitchActiveHubFromHubA` — set up `HubContext` with Hub A active; simulate a background push for Hub B with `type == "incoming_call"`; assert `hubContext.activeHubId` is still Hub A afterward.
   - `backgroundPushIncomingCallRoutesToLinphoneService` — simulate a background push `{"type":"incoming_call","callId":"call-001","hubId":"hub-B",...}`; assert `linphoneService.pendingCallHubIdForTesting("call-001") == "hub-B"`.
   - `tapHandlerDoesSetActiveHub` — simulate user tapping a delivered notification with `hubId == "hub-B"`; assert `hubContext.activeHubId == "hub-B"` (verifies correct path is preserved).
@@ -152,7 +152,7 @@
 
 #### Task 1.2 — Fix iOS AppDelegate background push handler
 
-- [ ] Edit `/home/rikki/projects/llamenos/apps/ios/Sources/App/LlamenosApp.swift`:
+- [ ] Edit `~/projects/llamenos/apps/ios/Sources/App/LlamenosApp.swift`:
   - In `application(_:didReceiveRemoteNotification:fetchCompletionHandler:)` (line ~276), **remove** the block that calls `appState.hubContext.setActiveHub(hubId)`:
     ```swift
     // REMOVE this block entirely:
@@ -189,11 +189,11 @@
 
 ### Gap 1 — Android: Fix Hub Context Switch on Background Push
 
-**Context:** `PushService.onMessageReceived` in `/home/rikki/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/service/PushService.kt` lines 122–125 calls `activeHubState.setActiveHub(wakeHubId)` in the wake-payload coroutine block unconditionally. This runs for all notification types (shift reminders, announcements) and silently switches the UI. The `handleIncomingCall` function's existing `setActiveHub` call (line 231) is intentional (app-unlocked path, context switch is acceptable) and must remain. The fix removes only the wake-payload coroutine's unconditional switch.
+**Context:** `PushService.onMessageReceived` in `~/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/service/PushService.kt` lines 122–125 calls `activeHubState.setActiveHub(wakeHubId)` in the wake-payload coroutine block unconditionally. This runs for all notification types (shift reminders, announcements) and silently switches the UI. The `handleIncomingCall` function's existing `setActiveHub` call (line 231) is intentional (app-unlocked path, context switch is acceptable) and must remain. The fix removes only the wake-payload coroutine's unconditional switch.
 
 #### Task 1.3 — Write Android PushService unit test (test first)
 
-- [ ] Create `/home/rikki/projects/llamenos/apps/android/app/src/test/java/org/llamenos/hotline/service/PushServiceTest.kt`:
+- [ ] Create `~/projects/llamenos/apps/android/app/src/test/java/org/llamenos/hotline/service/PushServiceTest.kt`:
 
   ```kotlin
   package org.llamenos.hotline.service
@@ -269,11 +269,11 @@
 
   > **Note:** This test depends on a new `PushNotificationRouter` class (a pure routing helper extracted from `PushService`). This is the pattern to keep the Firebase service testable. The class is created in Task 1.4.
 
-- [ ] Run to confirm red: `cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.service.PushServiceTest" 2>&1 | tail -20`
+- [ ] Run to confirm red: `cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.service.PushServiceTest" 2>&1 | tail -20`
 
 #### Task 1.4 — Extract routing helper and fix Android PushService
 
-- [ ] Create `/home/rikki/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/service/PushNotificationRouter.kt`:
+- [ ] Create `~/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/service/PushNotificationRouter.kt`:
 
   ```kotlin
   package org.llamenos.hotline.service
@@ -338,7 +338,7 @@
   }
   ```
 
-- [ ] Edit `/home/rikki/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/service/PushService.kt`:
+- [ ] Edit `~/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/service/PushService.kt`:
   - Inject `PushNotificationRouter` (construct it with `activeHubState` and `linphoneService` in `onMessageReceived`).
   - In the wake-payload coroutine block (lines ~117–132), **remove** the `setActiveHub` call and replace it with `router.routeWakePayload(...)`:
 
@@ -392,9 +392,9 @@
 
 - [ ] Check that `WakePayload` in `WakeKeyService.kt` has a `callId` field. If not, add `val callId: String? = null` to the data class.
 
-- [ ] Run tests (green): `cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.service.PushServiceTest" 2>&1 | tail -20`
-- [ ] Run full Android unit suite: `cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -30`
-- [ ] Compile E2E test APK: `cd /home/rikki/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20`
+- [ ] Run tests (green): `cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.service.PushServiceTest" 2>&1 | tail -20`
+- [ ] Run full Android unit suite: `cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -30`
+- [ ] Compile E2E test APK: `cd ~/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20`
 
 - [ ] Commit: `git commit -m "fix(android): remove setActiveHub from wake-payload coroutine (Gap 1 multi-hub routing)"`
 
@@ -406,7 +406,7 @@
 
 #### Task 2.1 — Add codegen:check to CI
 
-- [ ] Edit `/home/rikki/projects/llamenos/.github/workflows/ci.yml`. After the step at line 85 (`run: bun run codegen`), add:
+- [ ] Edit `~/projects/llamenos/.github/workflows/ci.yml`. After the step at line 85 (`run: bun run codegen`), add:
 
   ```yaml
       - name: Verify codegen output is up to date
@@ -425,8 +425,8 @@
         run: bun run i18n:validate:all
   ```
 
-- [ ] Verify the codegen:check script exists in `package.json`: `grep -n "codegen:check" /home/rikki/projects/llamenos/package.json`
-- [ ] Verify locally: `cd /home/rikki/projects/llamenos && bun run codegen && bun run codegen:check` — must exit 0.
+- [ ] Verify the codegen:check script exists in `package.json`: `grep -n "codegen:check" ~/projects/llamenos/package.json`
+- [ ] Verify locally: `cd ~/projects/llamenos && bun run codegen && bun run codegen:check` — must exit 0.
 
 - [ ] Commit: `git commit -m "ci: add codegen:check gate after codegen step (Gap 2)"`
 
@@ -440,7 +440,7 @@
 
 - [ ] Check `packages/protocol/tools/codegen.ts` for any reference to `'typescript'` or `generated/typescript`:
   ```bash
-  grep -n "typescript\|TYPESCRIPT" /home/rikki/projects/llamenos/packages/protocol/tools/codegen.ts
+  grep -n "typescript\|TYPESCRIPT" ~/projects/llamenos/packages/protocol/tools/codegen.ts
   ```
 - [ ] If any TypeScript output target exists, remove it from `codegen.ts` before deleting the directory.
 
@@ -448,21 +448,21 @@
 
 - [ ] Delete the stale files:
   ```bash
-  rm -rf /home/rikki/projects/llamenos/packages/protocol/generated/typescript/
+  rm -rf ~/projects/llamenos/packages/protocol/generated/typescript/
   ```
-- [ ] Verify deletion: `ls /home/rikki/projects/llamenos/packages/protocol/generated/` — should only show `swift/` and `kotlin/` subdirectories.
-- [ ] Verify `codegen` does not recreate it: `cd /home/rikki/projects/llamenos && bun run codegen && ls packages/protocol/generated/` — `typescript/` must not reappear.
-- [ ] Verify `codegen:check` passes: `cd /home/rikki/projects/llamenos && bun run codegen:check`
+- [ ] Verify deletion: `ls ~/projects/llamenos/packages/protocol/generated/` — should only show `swift/` and `kotlin/` subdirectories.
+- [ ] Verify `codegen` does not recreate it: `cd ~/projects/llamenos && bun run codegen && ls packages/protocol/generated/` — `typescript/` must not reappear.
+- [ ] Verify `codegen:check` passes: `cd ~/projects/llamenos && bun run codegen:check`
 - [ ] Check that the stale files are not imported anywhere:
   ```bash
-  grep -r "generated/typescript\|from.*protocol.*generated.*typescript" /home/rikki/projects/llamenos/src /home/rikki/projects/llamenos/apps/worker 2>/dev/null
+  grep -r "generated/typescript\|from.*protocol.*generated.*typescript" ~/projects/llamenos/src ~/projects/llamenos/apps/worker 2>/dev/null
   ```
 
 #### Task 3.3 — Verify .gitignore coverage
 
 - [ ] Check that `packages/protocol/generated/` is already gitignored:
   ```bash
-  grep -n "generated" /home/rikki/projects/llamenos/packages/protocol/.gitignore 2>/dev/null || grep -n "packages/protocol/generated" /home/rikki/projects/llamenos/.gitignore
+  grep -n "generated" ~/projects/llamenos/packages/protocol/.gitignore 2>/dev/null || grep -n "packages/protocol/generated" ~/projects/llamenos/.gitignore
   ```
 - [ ] Confirm `git status` does not show the deleted files as tracked (they should be gitignored, meaning deletion has no git diff). If they were tracked, `git rm -r packages/protocol/generated/typescript/` is needed instead.
 
@@ -478,7 +478,7 @@
 
 The existing BDD backend tests (`bun run test:backend:bdd`) serve as the integration test: if `validateConfig()` incorrectly rejects the test environment config, BDD tests will fail to start. Add one focused unit test for the validation logic itself in a new file.
 
-- [ ] Create `/home/rikki/projects/llamenos/apps/worker/lib/config.test.ts`:
+- [ ] Create `~/projects/llamenos/apps/worker/lib/config.test.ts`:
 
   ```typescript
   import { describe, it, expect } from 'bun:test'
@@ -549,11 +549,11 @@ The existing BDD backend tests (`bun run test:backend:bdd`) serve as the integra
   })
   ```
 
-- [ ] Run to confirm red (file does not exist yet): `cd /home/rikki/projects/llamenos && bun test apps/worker/lib/config.test.ts 2>&1 | tail -20`
+- [ ] Run to confirm red (file does not exist yet): `cd ~/projects/llamenos && bun test apps/worker/lib/config.test.ts 2>&1 | tail -20`
 
 #### Task 4.2 — Create apps/worker/lib/config.ts
 
-- [ ] Create `/home/rikki/projects/llamenos/apps/worker/lib/config.ts`:
+- [ ] Create `~/projects/llamenos/apps/worker/lib/config.ts`:
 
   ```typescript
   /**
@@ -646,11 +646,11 @@ The existing BDD backend tests (`bun run test:backend:bdd`) serve as the integra
   }
   ```
 
-- [ ] Run tests (green): `cd /home/rikki/projects/llamenos && bun test apps/worker/lib/config.test.ts 2>&1 | tail -20`
+- [ ] Run tests (green): `cd ~/projects/llamenos && bun test apps/worker/lib/config.test.ts 2>&1 | tail -20`
 
 #### Task 4.3 — Call validateConfig from server entry point
 
-- [ ] Edit `/home/rikki/projects/llamenos/src/server/index.ts`. Add the following at the top of the file, immediately after the imports and before the `console.log('[llamenos] Starting...')` line:
+- [ ] Edit `~/projects/llamenos/src/server/index.ts`. Add the following at the top of the file, immediately after the imports and before the `console.log('[llamenos] Starting...')` line:
 
   ```typescript
   import { validateConfig } from '../../apps/worker/lib/config'
@@ -673,8 +673,8 @@ The existing BDD backend tests (`bun run test:backend:bdd`) serve as the integra
 
   > **Note on Bun vs CF Workers guard:** The spec says wrap in `if (typeof Bun !== 'undefined')` — but `src/server/index.ts` is already Bun-only (it is not imported by `apps/worker/index.ts` which is the CF Workers entry). No guard is needed here. `apps/worker/app.ts` does not call `validateConfig` and never should.
 
-- [ ] Verify typecheck passes: `cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | tail -20`
-- [ ] Verify BDD backend tests still pass: `cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30`
+- [ ] Verify typecheck passes: `cd ~/projects/llamenos && bun run typecheck 2>&1 | tail -20`
+- [ ] Verify BDD backend tests still pass: `cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30`
 
 - [ ] Commit: `git commit -m "feat(worker): startup env var validation in config.ts (Gap 4)"`
 
@@ -686,17 +686,17 @@ The existing BDD backend tests (`bun run test:backend:bdd`) serve as the integra
 
 #### Task 5.1 — Add axiom to CLAUDE.md
 
-- [ ] Edit `/home/rikki/projects/llamenos/CLAUDE.md`. Find the "Key Technical Patterns" section (the large bulleted list with `TelephonyAdapter`, `MessagingAdapter`, etc.). Add the following as the **first** bullet in that section:
+- [ ] Edit `~/projects/llamenos/CLAUDE.md`. Find the "Key Technical Patterns" section (the large bulleted list with `TelephonyAdapter`, `MessagingAdapter`, etc.). Add the following as the **first** bullet in that section:
 
   ```markdown
   - **Multi-hub routing axiom**: Any authenticated user — regardless of role — can be a member of multiple hubs simultaneously. The app must receive calls, push notifications, and relay events from ALL member hubs regardless of which hub is currently active in the UI. The active hub controls browsing context only. **Never gate incoming call or notification handling on active hub state.** Background push handlers must never call `setActiveHub` — only explicit user tap actions or the app-unlocked call answer path may switch the active hub.
   ```
 
-- [ ] Verify the text is searchable as "multi-hub routing axiom": `grep -n "multi-hub routing axiom" /home/rikki/projects/llamenos/CLAUDE.md`
+- [ ] Verify the text is searchable as "multi-hub routing axiom": `grep -n "multi-hub routing axiom" ~/projects/llamenos/CLAUDE.md`
 
 #### Task 5.2 — Add hub routing section to PROTOCOL.md
 
-- [ ] Edit `/home/rikki/projects/llamenos/docs/protocol/PROTOCOL.md`. Find Section 5 (`## 5. Push Notification Protocol`). After the existing `### 5.4 VoIP Push (iOS)` section (around line 1960) and before `---`, add a new subsection:
+- [ ] Edit `~/projects/llamenos/docs/protocol/PROTOCOL.md`. Find Section 5 (`## 5. Push Notification Protocol`). After the existing `### 5.4 VoIP Push (iOS)` section (around line 1960) and before `---`, add a new subsection:
 
   ```markdown
   ### 5.5 Hub Routing for Push Notifications
@@ -714,7 +714,7 @@ The existing BDD backend tests (`bun run test:backend:bdd`) serve as the integra
   This constraint preserves the multi-hub axiom: a user browsing Hub A must not have their context silently switched to Hub B by a background notification.
   ```
 
-- [ ] Verify: `grep -n "5.5 Hub Routing" /home/rikki/projects/llamenos/docs/protocol/PROTOCOL.md`
+- [ ] Verify: `grep -n "5.5 Hub Routing" ~/projects/llamenos/docs/protocol/PROTOCOL.md`
 
 - [ ] Commit: `git commit -m "docs: add multi-hub routing axiom to CLAUDE.md and PROTOCOL.md (Gap 5)"`
 
@@ -729,29 +729,29 @@ Run these after all tasks are complete.
 - [ ] `ssh mac "cd ~/projects/llamenos && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' 2>&1 | grep -E 'passed|failed'"` — full suite green, no regressions
 
 ### Gap 1 Android
-- [ ] `cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.service.PushServiceTest" 2>&1 | tail -10` — 4 new tests green
-- [ ] `cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -10` — full suite green, no regressions
-- [ ] `cd /home/rikki/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -10` — compiles without errors
+- [ ] `cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.service.PushServiceTest" 2>&1 | tail -10` — 4 new tests green
+- [ ] `cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -10` — full suite green, no regressions
+- [ ] `cd ~/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -10` — compiles without errors
 
 ### Gap 2 CI
-- [ ] `grep -A1 "Run codegen" /home/rikki/projects/llamenos/.github/workflows/ci.yml` — shows `bun run codegen:check` immediately after
-- [ ] `cd /home/rikki/projects/llamenos && bun run codegen && bun run codegen:check` — exits 0
+- [ ] `grep -A1 "Run codegen" ~/projects/llamenos/.github/workflows/ci.yml` — shows `bun run codegen:check` immediately after
+- [ ] `cd ~/projects/llamenos && bun run codegen && bun run codegen:check` — exits 0
 
 ### Gap 3 Protocol
-- [ ] `ls /home/rikki/projects/llamenos/packages/protocol/generated/` — no `typescript/` subdirectory
-- [ ] `cd /home/rikki/projects/llamenos && bun run codegen && ls packages/protocol/generated/` — `typescript/` does not reappear
-- [ ] `cd /home/rikki/projects/llamenos && bun run codegen:check` — exits 0
+- [ ] `ls ~/projects/llamenos/packages/protocol/generated/` — no `typescript/` subdirectory
+- [ ] `cd ~/projects/llamenos && bun run codegen && ls packages/protocol/generated/` — `typescript/` does not reappear
+- [ ] `cd ~/projects/llamenos && bun run codegen:check` — exits 0
 
 ### Gap 4 Worker
-- [ ] `cd /home/rikki/projects/llamenos && bun test apps/worker/lib/config.test.ts` — all unit tests green
-- [ ] `cd /home/rikki/projects/llamenos && bun run typecheck && bun run build` — no type errors
-- [ ] `cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -10` — BDD tests pass (startup validation accepts test env)
+- [ ] `cd ~/projects/llamenos && bun test apps/worker/lib/config.test.ts` — all unit tests green
+- [ ] `cd ~/projects/llamenos && bun run typecheck && bun run build` — no type errors
+- [ ] `cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -10` — BDD tests pass (startup validation accepts test env)
 
 ### Gap 5 Docs
-- [ ] `grep -n "multi-hub routing axiom" /home/rikki/projects/llamenos/CLAUDE.md` — match found
-- [ ] `grep -n "5.5 Hub Routing" /home/rikki/projects/llamenos/docs/protocol/PROTOCOL.md` — match found
+- [ ] `grep -n "multi-hub routing axiom" ~/projects/llamenos/CLAUDE.md` — match found
+- [ ] `grep -n "5.5 Hub Routing" ~/projects/llamenos/docs/protocol/PROTOCOL.md` — match found
 
 ### Full regression check
-- [ ] `cd /home/rikki/projects/llamenos && bun run typecheck && bun run build` — passes
-- [ ] `cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -10` — backend BDD green
-- [ ] `cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest lintDebug 2>&1 | tail -10` — Android clean
+- [ ] `cd ~/projects/llamenos && bun run typecheck && bun run build` — passes
+- [ ] `cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -10` — backend BDD green
+- [ ] `cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest lintDebug 2>&1 | tail -10` — Android clean

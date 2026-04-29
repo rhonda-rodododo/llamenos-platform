@@ -79,7 +79,7 @@ export interface WakePayload {
 - [ ] **Step 1.2: Verify typecheck passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: zero errors.
@@ -139,7 +139,7 @@ for (const assignedPubkey of body.pubkeys) {
 - [ ] **Step 2.3: Verify typecheck passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: zero errors.
@@ -178,7 +178,7 @@ Add to `packages/test-specs/features/core/push-hub-dispatch.feature`:
 - [ ] **Step 3.2: Run the BDD suite to confirm the new scenario is RED**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -A 5 "assignment push"
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -A 5 "assignment push"
 ```
 
 Expected: the new scenario fails (step "a case record exists" undefined or assertion fails).
@@ -252,7 +252,7 @@ Then('the push payload should carry a recordId', ({ world }) => {
 - [ ] **Step 3.4: Run the new scenario to confirm it is GREEN**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "assignment push|PASS|FAIL" | head -10
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "assignment push|PASS|FAIL" | head -10
 ```
 
 Expected: the new scenarios pass.
@@ -296,7 +296,7 @@ fun `assignment push type is handled without crash`() {
 - [ ] **Step 4.2: Run Android unit tests (expect pass already — this is a documentation test)**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -20
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -20
 ```
 
 - [ ] **Step 4.3: Add `"assignment"` handling in `dispatchByType`**
@@ -370,7 +370,7 @@ In `apps/android/app/src/main/res/values/strings.xml`, add:
 Check codegen:
 
 ```bash
-grep -r "case_assigned" /home/rikki/projects/llamenos/packages/i18n/locales/en.json 2>/dev/null || echo "not in i18n"
+grep -r "case_assigned" ~/projects/llamenos/packages/i18n/locales/en.json 2>/dev/null || echo "not in i18n"
 ```
 
 If not in i18n, add to `packages/i18n/locales/en.json` under the `"android"` or appropriate section and run `bun run i18n:codegen`. If the project hand-maintains `strings.xml`, add directly.
@@ -378,7 +378,7 @@ If not in i18n, add to `packages/i18n/locales/en.json` under the `"android"` or 
 - [ ] **Step 4.5: Run Android unit tests and compilation**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && \
+cd ~/projects/llamenos/apps/android && \
   ./gradlew testDebugUnitTest && \
   ./gradlew compileDebugAndroidTestKotlin
 ```
@@ -406,7 +406,7 @@ On iOS, the wake payload decryption happens in `WakeKeyService.decryptWakePayloa
 
 ```bash
 grep -rn "shift_reminder\|incoming_call\|push.*type\|wakePayload.*type" \
-  /home/rikki/projects/llamenos/apps/ios/Sources/ \
+  ~/projects/llamenos/apps/ios/Sources/ \
   --include="*.swift" | head -20
 ```
 
@@ -453,7 +453,7 @@ extension Notification.Name {
 - [ ] **Step 5.3: Build on Mac (iOS simulator)**
 
 ```bash
-ssh mac "cd /home/rikki/projects/llamenos && xcodebuild build \
+ssh mac "cd ~/projects/llamenos && xcodebuild build \
   -scheme Llamenos-Package \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
   2>&1 | tail -30"
@@ -481,7 +481,7 @@ The backend route `POST /records/:id/notify-contacts` is already fully implement
 
 ```bash
 grep -n "NotifyContactsBody\|NotifyContactsResponse\|notifyContactsBodySchema" \
-  /home/rikki/projects/llamenos/packages/protocol/schemas/notifications.ts | head -10
+  ~/projects/llamenos/packages/protocol/schemas/notifications.ts | head -10
 ```
 
 Confirm `NotifyContactsBody` and `NotifyContactsResponse` exist in `@protocol/schemas/notifications`.
@@ -511,7 +511,7 @@ export async function notifyContacts(
 - [ ] **Step 6.3: Verify typecheck passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: zero errors.
@@ -547,7 +547,7 @@ Find the `"cases"` object in `packages/i18n/locales/en.json` (around line 611) a
 - [ ] **Step 7.2: Run i18n validation**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run i18n:validate:desktop
+cd ~/projects/llamenos && bun run i18n:validate:desktop
 ```
 
 Expected: passes (new keys exist in en.json, other locales will show missing — that is acceptable for new keys).
@@ -732,7 +732,7 @@ export function NotifyContactsDialog({
 - [ ] **Step 8.2: Verify typecheck passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: zero errors.
@@ -740,7 +740,7 @@ Expected: zero errors.
 - [ ] **Step 8.3: Verify build passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run build
+cd ~/projects/llamenos && bun run build
 ```
 
 Expected: build succeeds.
@@ -853,7 +853,7 @@ In the `CasesPage` return JSX, just before the closing `</>` or after the existi
 - [ ] **Step 9.4: Verify typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: zero errors, build succeeds.
@@ -929,7 +929,7 @@ import {
 - [ ] **Step 10.3: Run codegen and verify it succeeds**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run codegen
+cd ~/projects/llamenos && bun run codegen
 ```
 
 Expected: codegen completes without error.
@@ -937,7 +937,7 @@ Expected: codegen completes without error.
 - [ ] **Step 10.4: Verify typecheck passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 - [ ] **Step 10.5: Commit**
@@ -1137,7 +1137,7 @@ Then('the report conversionStatus should be {string}', async ({ request, world }
 - [ ] **Step 11.4: Run BDD tests to confirm new scenarios are RED**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "convert-to-case|conversion endpoint|PASS|FAIL" | head -20
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "convert-to-case|conversion endpoint|PASS|FAIL" | head -20
 ```
 
 Expected: the new scenarios fail with 404 (endpoint not yet implemented).
@@ -1362,7 +1362,7 @@ import { convertReportToCaseBodySchema, convertReportToCaseResponseSchema, type 
 - [ ] **Step 12.5: Verify typecheck passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 Expected: zero errors. Fix any type mismatches before proceeding.
@@ -1370,7 +1370,7 @@ Expected: zero errors. Fix any type mismatches before proceeding.
 - [ ] **Step 12.6: Run the BDD tests — new scenarios should turn GREEN**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "conversion endpoint|convert-to-case|PASS|FAIL" | head -20
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "conversion endpoint|convert-to-case|PASS|FAIL" | head -20
 ```
 
 Expected: all three new scenarios pass.
@@ -1415,7 +1415,7 @@ export async function convertReportToCase(
 - [ ] **Step 13.2: Verify typecheck passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck
+cd ~/projects/llamenos && bun run typecheck
 ```
 
 - [ ] **Step 13.3: Commit**
@@ -1451,7 +1451,7 @@ Add to the `"reports"` section (search for `"reports"` object):
 - [ ] **Step 14.2: Verify i18n validation passes**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run i18n:validate:desktop
+cd ~/projects/llamenos && bun run i18n:validate:desktop
 ```
 
 - [ ] **Step 14.3: Commit**
@@ -1664,7 +1664,7 @@ export function ConvertToCaseDialog({
 - [ ] **Step 15.2: Verify typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: zero errors, build succeeds.
@@ -1761,7 +1761,7 @@ const handleSubmit = useCallback(async () => {
 - [ ] **Step 16.3: Verify typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: zero errors, build succeeds.
@@ -1769,7 +1769,7 @@ Expected: zero errors, build succeeds.
 - [ ] **Step 16.4: Run BDD triage regression scenario**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "triage|conversion|PASS|FAIL" | head -20
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "triage|conversion|PASS|FAIL" | head -20
 ```
 
 Expected: all triage scenarios pass (including the regression scenario added in Task 11).
@@ -1788,7 +1788,7 @@ git commit -m "feat(desktop): migrate TriageCaseCreationPanel to atomic convertR
 - [ ] **Step 17.1: Run full typecheck + build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: zero errors, build succeeds.
@@ -1796,7 +1796,7 @@ Expected: zero errors, build succeeds.
 - [ ] **Step 17.2: Run full BDD suite**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30
 ```
 
 Expected: all scenarios pass (or only pre-existing failures, none introduced by this work).
@@ -1804,7 +1804,7 @@ Expected: all scenarios pass (or only pre-existing failures, none introduced by 
 - [ ] **Step 17.3: Run Android unit tests + E2E test compilation**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && \
+cd ~/projects/llamenos/apps/android && \
   ./gradlew testDebugUnitTest && \
   ./gradlew compileDebugAndroidTestKotlin
 ```
@@ -1814,7 +1814,7 @@ Expected: all tests pass, compilation succeeds.
 - [ ] **Step 17.4: Run Rust crypto tests (no changes expected)**
 
 ```bash
-cd /home/rikki/projects/llamenos && \
+cd ~/projects/llamenos && \
   cargo test --manifest-path packages/crypto/Cargo.toml --features mobile
 ```
 

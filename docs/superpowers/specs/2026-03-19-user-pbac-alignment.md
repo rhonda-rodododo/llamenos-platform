@@ -538,7 +538,7 @@ Update `CLAUDE.md`:
 - "Volunteer identity protection" → "User identity protection"
 - Any place "volunteer" is used as an entity type rather than a role name
 
-Update `/home/rikki/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`:
+Update `~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`:
 - "E2E Testing Conventions": `createVolunteerAndGetNsec()` → `createUserAndGetNsec()`
 - Update any memory entries using "volunteer" as entity type
 

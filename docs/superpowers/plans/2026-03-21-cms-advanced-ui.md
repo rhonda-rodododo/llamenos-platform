@@ -83,7 +83,7 @@ The "Verify Integrity" button and `data-testid="evidence-verify-btn"` / `data-te
 Search for all usages of `<EvidenceDetailDialog` in the codebase.
 
 ```bash
-grep -r "EvidenceDetailDialog" /home/rikki/projects/llamenos/src --include="*.tsx" -l
+grep -r "EvidenceDetailDialog" ~/projects/llamenos/src --include="*.tsx" -l
 ```
 
 In each call site (likely `evidence-tab.tsx`), pass:
@@ -95,7 +95,7 @@ Import `useAuth` in the call site if not already present.
 - [ ] **Step 1.3: Run typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: exits 0 with no errors.
@@ -103,7 +103,7 @@ Expected: exits 0 with no errors.
 - [ ] **Step 1.4: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add src/client/components/cases/evidence-detail-dialog.tsx src/client/components/cases/evidence-tab.tsx
 git commit -m "$(cat <<'EOF'
 feat(cases): tabbed evidence detail dialog with admin-gated custody chain
@@ -142,8 +142,8 @@ In `report-types-section.tsx`, fields are typed as `CustomFieldDefinition[]` fro
 Check whether `EntityFieldDefinition` and `CustomFieldDefinition` share enough structure to be handled by a generic component. Run:
 
 ```bash
-grep -n "EntityFieldDefinition\|CustomFieldDefinition\|ReportFieldDefinition" /home/rikki/projects/llamenos/packages/shared/types.ts | head -40
-grep -n "EntityFieldDefinition\|CustomFieldDefinition\|ReportFieldDefinition" /home/rikki/projects/llamenos/packages/protocol/schemas/*.ts | head -40
+grep -n "EntityFieldDefinition\|CustomFieldDefinition\|ReportFieldDefinition" ~/projects/llamenos/packages/shared/types.ts | head -40
+grep -n "EntityFieldDefinition\|CustomFieldDefinition\|ReportFieldDefinition" ~/projects/llamenos/packages/protocol/schemas/*.ts | head -40
 ```
 
 The report-types section currently uses `CustomFieldDefinition` with fields: `id`, `name`, `label`, `type`, `required`, `options`, `validation`, `visibleToUsers`, `editableByUsers`, `context`, `order`, `createdAt`. The entity type section uses `EntityFieldDefinition` with a compatible subset. The spec asks for a `FieldsEditor<T extends EntityFieldDefinition>` generic. Use the shared base type as the type constraint.
@@ -213,7 +213,7 @@ The `renderExtraConfig` callback is rendered inside the field edit form, below t
 - [ ] **Step 2b.2: Run typecheck to verify the new component**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep "fields-editor"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep "fields-editor"
 ```
 
 Fix any type errors before proceeding.
@@ -240,7 +240,7 @@ import { FieldsEditor } from './fields-editor'
 - [ ] **Step 2c.2: Run typecheck after refactor**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep -E "case-management|fields-editor"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep -E "case-management|fields-editor"
 ```
 
 ### Step 2d: Wire FieldsEditor into report-types-section.tsx
@@ -277,7 +277,7 @@ import { FieldsEditor } from './fields-editor'
 The `supportAudioInput` field is part of `ReportFieldDefinition` (extends `EntityFieldDefinition` or `CustomFieldDefinition` with that extra property). Use a type assertion if needed, but verify the type actually exists first:
 
 ```bash
-grep -n "supportAudioInput" /home/rikki/projects/llamenos/packages/shared/types.ts /home/rikki/projects/llamenos/packages/protocol/schemas/*.ts
+grep -n "supportAudioInput" ~/projects/llamenos/packages/shared/types.ts ~/projects/llamenos/packages/protocol/schemas/*.ts
 ```
 
 If `supportAudioInput` is on the protocol schema type but not `CustomFieldDefinition`, cast appropriately and document why.
@@ -285,7 +285,7 @@ If `supportAudioInput` is on the protocol schema type but not `CustomFieldDefini
 - [ ] **Step 2d.2: Run typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: exits 0.
@@ -293,7 +293,7 @@ Expected: exits 0.
 - [ ] **Step 2d.3: Run BDD tests to confirm no schema regressions**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30
 ```
 
 Expected: same pass count as before this task (no new failures).
@@ -301,7 +301,7 @@ Expected: same pass count as before this task (no new failures).
 - [ ] **Step 2d.4: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add \
   src/client/components/admin-settings/fields-editor.tsx \
   src/client/components/admin-settings/case-management-section.tsx \
@@ -339,7 +339,7 @@ The `super-admin` role already has `permissions: ['*']` so it automatically gets
 - [ ] **Step 3.2: Verify typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep "permissions"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep "permissions"
 ```
 
 Expected: no new errors.
@@ -347,7 +347,7 @@ Expected: no new errors.
 - [ ] **Step 3.3: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add packages/shared/permissions.ts
 git commit -m "$(cat <<'EOF'
 feat(permissions): add cases:read-cross-hub permission to catalog
@@ -390,7 +390,7 @@ Note: use `.optional().default(false)` per the project convention (bare `.defaul
 - [ ] **Step 4a.2: Run codegen to propagate to Swift/Kotlin**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run codegen
+cd ~/projects/llamenos && bun run codegen
 ```
 
 Expected: exits 0, updated generated Swift/Kotlin types.
@@ -398,7 +398,7 @@ Expected: exits 0, updated generated Swift/Kotlin types.
 - [ ] **Step 4a.3: Run typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | tail -20
+cd ~/projects/llamenos && bun run typecheck 2>&1 | tail -20
 ```
 
 ### Step 4b: Add ListAcrossHubsInput + listAcrossHubs service method
@@ -484,9 +484,9 @@ async listAcrossHubs(input: ListAcrossHubsInput): Promise<{
 
 ```bash
 grep -n "summaryEnvelopes\|recipientPubkey\|EnvelopeEntry\|RecipientEnvelope" \
-  /home/rikki/projects/llamenos/packages/protocol/schemas/records.ts \
-  /home/rikki/projects/llamenos/packages/protocol/schemas/common.ts \
-  /home/rikki/projects/llamenos/apps/worker/db/schema/*.ts \
+  ~/projects/llamenos/packages/protocol/schemas/records.ts \
+  ~/projects/llamenos/packages/protocol/schemas/common.ts \
+  ~/projects/llamenos/apps/worker/db/schema/*.ts \
   2>/dev/null | head -30
 ```
 
@@ -495,7 +495,7 @@ Adjust the JSONB contains expression to match the actual envelope shape. If the 
 - [ ] **Step 4b.3: Run typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep -E "cases\.ts|listAcrossHubs"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep -E "cases\.ts|listAcrossHubs"
 ```
 
 Fix any type errors. The most likely issue is that `rowToRecord` may be private or named differently.
@@ -503,7 +503,7 @@ Fix any type errors. The most likely issue is that `rowToRecord` may be private 
 - [ ] **Step 4b.4: Commit schema + service**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add packages/protocol/schemas/records.ts apps/worker/services/cases.ts
 git commit -m "$(cat <<'EOF'
 feat(cases): add allHubs query param schema and listAcrossHubs service method
@@ -558,7 +558,7 @@ async getNetworkSuperAdminPubkeys(): Promise<string[]> {
 `users.roles` is a JSONB array of role IDs. Verify the column name by grepping the schema:
 
 ```bash
-grep -n '"roles"\|roles:' /home/rikki/projects/llamenos/apps/worker/db/schema/*.ts | head -10
+grep -n '"roles"\|roles:' ~/projects/llamenos/apps/worker/db/schema/*.ts | head -10
 ```
 
 Adjust the column reference if needed.
@@ -566,7 +566,7 @@ Adjust the column reference if needed.
 - [ ] **Step 5a.2: Verify typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep "identity"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep "identity"
 ```
 
 ### Step 5b: Accept superAdminPubkeys in determineEnvelopeRecipients
@@ -610,19 +610,19 @@ const recipients = determineEnvelopeRecipients(entityType, assignedPubkeys, hubM
 `services.identity` is available via `c.get('services').identity`. Verify the exact services access pattern by reading the existing handler:
 
 ```bash
-grep -n "services.identity\|c.get('services')" /home/rikki/projects/llamenos/apps/worker/routes/records.ts | head -10
+grep -n "services.identity\|c.get('services')" ~/projects/llamenos/apps/worker/routes/records.ts | head -10
 ```
 
 - [ ] **Step 5b.3: Typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep -E "envelope-recipients|records\.ts"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep -E "envelope-recipients|records\.ts"
 ```
 
 - [ ] **Step 5b.4: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add \
   apps/worker/services/identity.ts \
   apps/worker/lib/envelope-recipients.ts \
@@ -674,13 +674,13 @@ This must come before the existing `listInput` construction so the two paths are
 - [ ] **Step 6.2: Typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep "records\.ts"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep "records\.ts"
 ```
 
 - [ ] **Step 6.3: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add apps/worker/routes/records.ts
 git commit -m "$(cat <<'EOF'
 feat(records): cross-hub list endpoint for super-admins
@@ -828,7 +828,7 @@ Then('the response should be 403 Forbidden', ({ world }) => {
 - [ ] **Step 7.4: Run BDD tests — expect new scenarios to fail (RED)**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "cross-hub|FAILED|PASSED" | tail -20
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | grep -E "cross-hub|FAILED|PASSED" | tail -20
 ```
 
 Expected: the two new cross-hub scenarios fail; existing scenarios pass.
@@ -838,7 +838,7 @@ Expected: the two new cross-hub scenarios fail; existing scenarios pass.
 After Tasks 4–6 are implemented, re-run:
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -30
 ```
 
 Expected: all scenarios pass. Fix any implementation gaps revealed by failures.
@@ -846,7 +846,7 @@ Expected: all scenarios pass. Fix any implementation gaps revealed by failures.
 - [ ] **Step 7.6: Commit BDD tests**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add \
   packages/test-specs/features/core/cms-cross-hub.feature \
   tests/steps/backend/cross-hub.steps.ts \
@@ -906,13 +906,13 @@ Note: `hp()` is correct here — the backend route is mounted under `/hubs/:hubI
 - [ ] **Step 8.2: Typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep "api\.ts"
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep "api\.ts"
 ```
 
 - [ ] **Step 8.3: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add src/client/lib/api.ts
 git commit -m "$(cat <<'EOF'
 feat(api): add allHubs param to listRecords client function
@@ -1005,7 +1005,7 @@ In the record list row rendering, when `allHubs` is active, show a hub badge:
 Check that `CaseRecord` from `@/lib/api` has a `hubId` field. If not, look at what `listAcrossHubs` returns — the service method maps DB rows to `CaseRecord`. The DB `case_records` table has `hubId`. Verify:
 
 ```bash
-grep -n "hubId\|hub_id" /home/rikki/projects/llamenos/packages/protocol/schemas/records.ts | head -10
+grep -n "hubId\|hub_id" ~/projects/llamenos/packages/protocol/schemas/records.ts | head -10
 ```
 
 If `hubId` is not on the `CaseRecord` type, add it to `recordSchema` in `packages/protocol/schemas/records.ts` as `z.string().optional()`.
@@ -1049,7 +1049,7 @@ This is a minimal, correct implementation that avoids a full router refactor. Do
 - [ ] **Step 9.6: Typecheck and build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: exits 0. Fix any type errors (most likely `hubId` not on `CaseRecord` — see step 9.4).
@@ -1057,7 +1057,7 @@ Expected: exits 0. Fix any type errors (most likely `hubId` not on `CaseRecord` 
 - [ ] **Step 9.7: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add src/client/routes/cases.tsx packages/protocol/schemas/records.ts
 git commit -m "$(cat <<'EOF'
 feat(cases): All Hubs toggle for super-admins with cross-hub navigation
@@ -1079,7 +1079,7 @@ EOF
 - [ ] **Step 10.1: Full typecheck + build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck && bun run build
+cd ~/projects/llamenos && bun run typecheck && bun run build
 ```
 
 Expected: exits 0.
@@ -1087,7 +1087,7 @@ Expected: exits 0.
 - [ ] **Step 10.2: Full BDD test suite**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -40
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -40
 ```
 
 Expected: all scenarios pass. Any new failures must be investigated and fixed — do not commit with failures.
@@ -1095,7 +1095,7 @@ Expected: all scenarios pass. Any new failures must be investigated and fixed �
 - [ ] **Step 10.3: Android compile check**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && \
+cd ~/projects/llamenos/apps/android && \
   ./gradlew testDebugUnitTest && \
   ./gradlew lintDebug && \
   ./gradlew compileDebugAndroidTestKotlin
@@ -1110,7 +1110,7 @@ Grep to confirm the required `data-testid` attributes are in place:
 ```bash
 grep -rn \
   "evidence-custody-tab\|evidence-custody-chain\|evidence-custody-entry\|evidence-verify-btn\|evidence-verify-result\|cases-all-hubs-toggle\|cases-hub-badge\|report-field-[0-9]\|report-field-label\|report-field-type\|report-field-remove" \
-  /home/rikki/projects/llamenos/src/client \
+  ~/projects/llamenos/src/client \
   --include="*.tsx"
 ```
 
@@ -1119,7 +1119,7 @@ All must appear.
 - [ ] **Step 10.5: Final commit (if any cleanup needed)**
 
 ```bash
-cd /home/rikki/projects/llamenos
+cd ~/projects/llamenos
 git add -p  # stage only intentional remaining changes
 git commit -m "$(cat <<'EOF'
 chore(cms-advanced-ui): final cleanup and verification

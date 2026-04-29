@@ -693,7 +693,7 @@ Looking at `packages/protocol/schemas/contacts-v2.ts`: `contactSchema` matches `
 
 **Context:** The spec (Open Question 5) explicitly says to proceed with deleting TypeScript codegen because TypeScript uses `z.infer<>` directly. The generated `packages/protocol/generated/typescript/types.ts` is consumed by zero TypeScript files (verified: no imports found). The `crypto-labels.ts` generated file is re-exported from `packages/shared/crypto-labels.ts` — check if this is also generated and currently consumed.
 
-- [ ] Run `grep -r "from.*generated/typescript" /home/rikki/projects/llamenos/src /home/rikki/projects/llamenos/apps/worker /home/rikki/projects/llamenos/packages/shared` to confirm zero consumers.
+- [ ] Run `grep -r "from.*generated/typescript" ~/projects/llamenos/src ~/projects/llamenos/apps/worker ~/projects/llamenos/packages/shared` to confirm zero consumers.
 - [ ] Check if `packages/shared/crypto-labels.ts` re-exports from the generated TypeScript file or from `packages/protocol/crypto-labels.json` directly. If it imports from the generated file, this must be changed to import from `packages/protocol/crypto-labels.json` or inline the constants.
 - [ ] In `packages/protocol/tools/codegen.ts`, remove the TypeScript generation from `main()`:
   - Remove `tsLines` from the `Promise.all` call

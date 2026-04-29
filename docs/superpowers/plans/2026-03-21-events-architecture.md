@@ -231,7 +231,7 @@ test.describe('Events Architecture', () => {
 - [ ] **Step 1.2: Run the test to confirm it fails**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test -- tests/events-architecture.spec.ts
+cd ~/projects/llamenos && bun run test -- tests/events-architecture.spec.ts
 ```
 
 Expected: FAIL — the first test will fail because the page calls `/api/records?entityTypeId=...` instead of `/api/events`.
@@ -368,7 +368,7 @@ export async function unlinkReportFromEvent(eventId: string, reportId: string) {
 - [ ] **Step 2.4: Run typecheck to verify no type errors**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | head -40
+cd ~/projects/llamenos && bun run typecheck 2>&1 | head -40
 ```
 
 Expected: No new errors. The `Event` type from `@protocol/schemas/events` conflicts with the browser DOM `Event` global — aliased as `CmsEvent` above to avoid this.
@@ -376,7 +376,7 @@ Expected: No new errors. The `Event` type from `@protocol/schemas/events` confli
 - [ ] **Step 2.5: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add src/client/lib/api.ts && git commit -m "feat(desktop): add event API functions to api.ts — listEvents, createEvent, link/unlink"
+cd ~/projects/llamenos && git add src/client/lib/api.ts && git commit -m "feat(desktop): add event API functions to api.ts — listEvents, createEvent, link/unlink"
 ```
 
 ---
@@ -563,7 +563,7 @@ export function CreateEventDialog({ open, onOpenChange, onCreated, entityType }:
 - [ ] **Step 3.2: Run typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep -E "error|create-event-dialog" | head -20
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep -E "error|create-event-dialog" | head -20
 ```
 
 Expected: No errors in the new file. Fix any type issues (the `readerEnvelopes` field from `encryptMessage` must match `recipientEnvelopeSchema` shape — check `EncryptedMessageResult` in `platform.ts` for the exact field names).
@@ -571,7 +571,7 @@ Expected: No errors in the new file. Fix any type issues (the `readerEnvelopes` 
 - [ ] **Step 3.3: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add src/client/components/cases/create-event-dialog.tsx && git commit -m "feat(desktop): add CreateEventDialog with date/location fields and E2EE"
+cd ~/projects/llamenos && git add src/client/components/cases/create-event-dialog.tsx && git commit -m "feat(desktop): add CreateEventDialog with date/location fields and E2EE"
 ```
 
 ---
@@ -1411,7 +1411,7 @@ function LinkReportDialog({
 - [ ] **Step 4.2: Run typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep "events" | head -30
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep "events" | head -30
 ```
 
 Fix any type errors. Common issues:
@@ -1422,7 +1422,7 @@ Fix any type errors. Common issues:
 - [ ] **Step 4.3: Run tests — expect partial pass**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test -- tests/events-architecture.spec.ts --timeout 30000 2>&1 | tail -30
+cd ~/projects/llamenos && bun run test -- tests/events-architecture.spec.ts --timeout 30000 2>&1 | tail -30
 ```
 
 Expected: Test 1 (API endpoint check) should now PASS. Tests 2 and 3 may still fail if the dialog is not visible in test builds — acceptable at this stage; they'll be addressed after the full implementation.
@@ -1430,7 +1430,7 @@ Expected: Test 1 (API endpoint check) should now PASS. Tests 2 and 3 may still f
 - [ ] **Step 4.4: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add src/client/routes/events.tsx && git commit -m "feat(desktop): rewrite events page to use /api/events — remove records API usage"
+cd ~/projects/llamenos && git add src/client/routes/events.tsx && git commit -m "feat(desktop): rewrite events page to use /api/events — remove records API usage"
 ```
 
 ---
@@ -1579,7 +1579,7 @@ class EventsViewModelTest {
 - [ ] **Step 5.2: Run the test to confirm it fails**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.EventsViewModelTest" 2>&1 | tail -20
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.EventsViewModelTest" 2>&1 | tail -20
 ```
 
 Expected: FAIL — `AppEvent` doesn't exist yet. Compilation error: `Unresolved reference: AppEvent` and `Unresolved reference: EventsUiState` (EventsUiState still uses `Record` type).
@@ -1587,7 +1587,7 @@ Expected: FAIL — `AppEvent` doesn't exist yet. Compilation error: `Unresolved 
 - [ ] **Step 5.3: Commit the test file**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add apps/android/app/src/test/java/org/llamenos/hotline/EventsViewModelTest.kt && git commit -m "test(android): add EventsViewModelTest asserting AppEvent model fields"
+cd ~/projects/llamenos && git add apps/android/app/src/test/java/org/llamenos/hotline/EventsViewModelTest.kt && git commit -m "test(android): add EventsViewModelTest asserting AppEvent model fields"
 ```
 
 ---
@@ -1747,7 +1747,7 @@ data class UpdateEventRequest(
 Note: `RecipientEnvelope` is already defined in the existing model layer. Verify with:
 
 ```bash
-grep -rn "data class RecipientEnvelope\|class RecipientEnvelope" /home/rikki/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/model/ --include="*.kt"
+grep -rn "data class RecipientEnvelope\|class RecipientEnvelope" ~/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/model/ --include="*.kt"
 ```
 
 If `RecipientEnvelope` is in a different package (e.g., `org.llamenos.protocol`), update the import accordingly.
@@ -1755,7 +1755,7 @@ If `RecipientEnvelope` is in a different package (e.g., `org.llamenos.protocol`)
 - [ ] **Step 6.2: Run the unit test again**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.EventsViewModelTest" 2>&1 | tail -20
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.EventsViewModelTest" 2>&1 | tail -20
 ```
 
 Expected: Still FAIL — `EventsUiState` still imports `Record`. That's fine; it will be fixed in Task 7.
@@ -1763,7 +1763,7 @@ Expected: Still FAIL — `EventsUiState` still imports `Record`. That's fine; it
 - [ ] **Step 6.3: Commit the model**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add apps/android/app/src/main/java/org/llamenos/hotline/model/AppEvent.kt && git commit -m "feat(android): add AppEvent model and response types for events API"
+cd ~/projects/llamenos && git add apps/android/app/src/main/java/org/llamenos/hotline/model/AppEvent.kt && git commit -m "feat(android): add AppEvent model and response types for events API"
 ```
 
 ---
@@ -2170,7 +2170,7 @@ class EventsViewModel @Inject constructor(
 **Important:** After writing, check what `RecipientEnvelope` import is correct in the project. Run:
 
 ```bash
-grep -rn "class RecipientEnvelope\|data class RecipientEnvelope" /home/rikki/projects/llamenos/apps/android/app/src/main/java/ --include="*.kt" | head -5
+grep -rn "class RecipientEnvelope\|data class RecipientEnvelope" ~/projects/llamenos/apps/android/app/src/main/java/ --include="*.kt" | head -5
 ```
 
 Adjust the import (`org.llamenos.protocol.RecipientEnvelope` or `org.llamenos.hotline.model.RecipientEnvelope`) accordingly.
@@ -2178,13 +2178,13 @@ Adjust the import (`org.llamenos.protocol.RecipientEnvelope` or `org.llamenos.ho
 Also check `EncryptedMessage.envelopes` return type — the field on each envelope is `recipientPubkey` vs `pubkey`:
 
 ```bash
-grep -n "recipientPubkey\|val pubkey" /home/rikki/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt | head -10
+grep -n "recipientPubkey\|val pubkey" ~/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt | head -10
 ```
 
 - [ ] **Step 7.2: Run the unit test**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.EventsViewModelTest" 2>&1 | tail -20
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest --tests "org.llamenos.hotline.EventsViewModelTest" 2>&1 | tail -20
 ```
 
 Expected: PASS. If compilation fails, fix import issues for `RecipientEnvelope` or `AppEvent`.
@@ -2192,7 +2192,7 @@ Expected: PASS. If compilation fails, fix import issues for `RecipientEnvelope` 
 - [ ] **Step 7.3: Run full Android unit tests to check for regressions**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -30
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -30
 ```
 
 Expected: All tests pass.
@@ -2200,7 +2200,7 @@ Expected: All tests pass.
 - [ ] **Step 7.4: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add apps/android/app/src/main/java/org/llamenos/hotline/ui/events/EventsViewModel.kt && git commit -m "feat(android): rewrite EventsViewModel to use /api/events with real E2EE encryption"
+cd ~/projects/llamenos && git add apps/android/app/src/main/java/org/llamenos/hotline/ui/events/EventsViewModel.kt && git commit -m "feat(android): rewrite EventsViewModel to use /api/events with real E2EE encryption"
 ```
 
 ---
@@ -2399,7 +2399,7 @@ Button(
 - [ ] **Step 8.4: Check i18n strings exist**
 
 ```bash
-grep "events_field_start_date\|events_field_end_date\|events_field_location" /home/rikki/projects/llamenos/apps/android/app/src/main/res/values/strings.xml
+grep "events_field_start_date\|events_field_end_date\|events_field_location" ~/projects/llamenos/apps/android/app/src/main/res/values/strings.xml
 ```
 
 If missing, add them to `strings.xml`:
@@ -2419,7 +2419,7 @@ Then run `bun run i18n:codegen` to regenerate.
 - [ ] **Step 8.5: Compile Android tests**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -20
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -20
 ```
 
 Expected: PASS.
@@ -2427,7 +2427,7 @@ Expected: PASS.
 - [ ] **Step 8.6: Compile Android E2E test Kotlin**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
+cd ~/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
 ```
 
 Expected: Successful compilation.
@@ -2435,7 +2435,7 @@ Expected: Successful compilation.
 - [ ] **Step 8.7: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add \
+cd ~/projects/llamenos && git add \
   apps/android/app/src/main/java/org/llamenos/hotline/ui/events/EventListScreen.kt \
   apps/android/app/src/main/java/org/llamenos/hotline/ui/events/EventDetailScreen.kt \
   apps/android/app/src/main/java/org/llamenos/hotline/ui/events/CreateEventScreen.kt \
@@ -2459,7 +2459,7 @@ The iOS `CreateEventRequest` is missing `eventTypeHash` and `statusHash` fields.
 The struct at line 101 already has the right fields but may not be passing them in. Check the current definition:
 
 ```bash
-grep -A 15 "struct CreateEventRequest" /home/rikki/projects/llamenos/apps/ios/Sources/Models/Event.swift
+grep -A 15 "struct CreateEventRequest" ~/projects/llamenos/apps/ios/Sources/Models/Event.swift
 ```
 
 If `eventTypeHash` and `statusHash` are already in `CreateEventRequest` — they are. The struct is correct. The issue is in `EventsViewModel.swift` which passes `blindIndexes: [:]` and omits the two hash fields.
@@ -2510,7 +2510,7 @@ struct CreateEventRequest: Codable, Sendable {
 This step requires `ssh mac`. If mac is available:
 
 ```bash
-ssh mac "cd /home/rikki/projects/llamenos && xcodebuild build -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' -quiet 2>&1 | tail -20"
+ssh mac "cd ~/projects/llamenos && xcodebuild build -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' -quiet 2>&1 | tail -20"
 ```
 
 If mac is not available, skip and note this for CI verification.
@@ -2518,7 +2518,7 @@ If mac is not available, skip and note this for CI verification.
 - [ ] **Step 9.3: Commit**
 
 ```bash
-cd /home/rikki/projects/llamenos && git add \
+cd ~/projects/llamenos && git add \
   apps/ios/Sources/Models/Event.swift \
   apps/ios/Sources/ViewModels/EventsViewModel.swift \
   && git commit -m "fix(ios): populate eventTypeHash and statusHash in CreateEventRequest"
@@ -2531,7 +2531,7 @@ cd /home/rikki/projects/llamenos && git add \
 - [ ] **Step 10.1: Run desktop typecheck**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run typecheck 2>&1 | grep -E "^src/client/(lib/api|routes/events|components/cases/create-event)" | head -20
+cd ~/projects/llamenos && bun run typecheck 2>&1 | grep -E "^src/client/(lib/api|routes/events|components/cases/create-event)" | head -20
 ```
 
 Expected: No errors in the changed files.
@@ -2539,7 +2539,7 @@ Expected: No errors in the changed files.
 - [ ] **Step 10.2: Run desktop build**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run build 2>&1 | tail -10
+cd ~/projects/llamenos && bun run build 2>&1 | tail -10
 ```
 
 Expected: Build succeeds.
@@ -2547,7 +2547,7 @@ Expected: Build succeeds.
 - [ ] **Step 10.3: Run Playwright events architecture tests**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test -- tests/events-architecture.spec.ts --timeout 30000 2>&1 | tail -30
+cd ~/projects/llamenos && bun run test -- tests/events-architecture.spec.ts --timeout 30000 2>&1 | tail -30
 ```
 
 Expected: All 4 tests PASS.
@@ -2555,7 +2555,7 @@ Expected: All 4 tests PASS.
 - [ ] **Step 10.4: Run full Playwright suite (check for regressions)**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test 2>&1 | tail -20
+cd ~/projects/llamenos && bun run test 2>&1 | tail -20
 ```
 
 Expected: Same pass count as before this feature (no regressions).
@@ -2563,7 +2563,7 @@ Expected: Same pass count as before this feature (no regressions).
 - [ ] **Step 10.5: Run Android unit tests**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -20
+cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -20
 ```
 
 Expected: All tests pass including `EventsViewModelTest`.
@@ -2571,7 +2571,7 @@ Expected: All tests pass including `EventsViewModelTest`.
 - [ ] **Step 10.6: Compile Android E2E tests**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -10
+cd ~/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -10
 ```
 
 Expected: Compilation succeeds.
@@ -2579,7 +2579,7 @@ Expected: Compilation succeeds.
 - [ ] **Step 10.7: Run Android lint**
 
 ```bash
-cd /home/rikki/projects/llamenos/apps/android && ./gradlew lintDebug 2>&1 | grep -E "error:|Error" | head -10
+cd ~/projects/llamenos/apps/android && ./gradlew lintDebug 2>&1 | grep -E "error:|Error" | head -10
 ```
 
 Expected: No new lint errors.
@@ -2587,7 +2587,7 @@ Expected: No new lint errors.
 - [ ] **Step 10.8: Run BDD backend tests**
 
 ```bash
-cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -20
+cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -20
 ```
 
 Expected: Existing events BDD scenarios remain green. No scenario should be using records API for event creation.
@@ -2595,7 +2595,7 @@ Expected: Existing events BDD scenarios remain green. No scenario should be usin
 - [ ] **Step 10.9: Final commit if any cleanup needed**
 
 ```bash
-cd /home/rikki/projects/llamenos && git status
+cd ~/projects/llamenos && git status
 ```
 
 Commit any remaining unstaged changes.

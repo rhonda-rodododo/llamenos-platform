@@ -127,7 +127,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 3: Commit documentation**
 
   ```bash
-  cd /home/rikki/projects/llamenos
+  cd ~/projects/llamenos
   git add CLAUDE.md docs/protocol/PROTOCOL.md
   git commit -m "docs: add multi-hub axiom architecture guarantees and cross-hub routing semantics"
   ```
@@ -300,7 +300,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 
   On the Mac (via ssh mac):
   ```bash
-  ssh mac "cd /home/rikki/projects/llamenos && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' 2>&1 | tail -20"
+  ssh mac "cd ~/projects/llamenos && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' 2>&1 | tail -20"
   ```
   Expected: All existing tests pass + new LinphoneService tests pass.
 
@@ -325,7 +325,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 1: Check for Android hub-switching bug in LinphoneService.kt**
 
   ```bash
-  grep -n "setActiveHub\|activeHubState" /home/rikki/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/telephony/LinphoneService.kt
+  grep -n "setActiveHub\|activeHubState" ~/projects/llamenos/apps/android/app/src/main/java/org/llamenos/hotline/telephony/LinphoneService.kt
   ```
 
   If `setActiveHub` is called in the call listener: remove that call and instead expose `incomingCallHubId: StateFlow<String?>` so the call UI can display hub identity without switching context.
@@ -442,14 +442,14 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 5: Run Android unit tests**
 
   ```bash
-  cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -30
+  cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest 2>&1 | tail -30
   ```
   Expected: all unit tests pass.
 
 - [ ] **Step 6: Compile Android test APK**
 
   ```bash
-  cd /home/rikki/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
+  cd ~/projects/llamenos/apps/android && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
   ```
   Expected: BUILD SUCCESSFUL
 
@@ -479,7 +479,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 
   Run codegen to regenerate TypeScript/Swift/Kotlin constants:
   ```bash
-  cd /home/rikki/projects/llamenos && bun run codegen
+  cd ~/projects/llamenos && bun run codegen
   ```
   Expected: codegen completes without errors.
 
@@ -560,7 +560,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 5: Generate and run DB migration**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run db:generate
+  cd ~/projects/llamenos && bun run db:generate
   ```
   Expected: new migration file created in `apps/worker/db/migrations/`.
 
@@ -572,7 +572,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 6: Run typecheck**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck
+  cd ~/projects/llamenos && bun run typecheck
   ```
   Expected: no errors.
 
@@ -647,7 +647,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 2: Run the feature to confirm it fails**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub Ban Propagation" 2>&1 | tail -20
+  cd ~/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub Ban Propagation" 2>&1 | tail -20
   ```
   Expected: scenarios fail with "step not found" or similar — red.
 
@@ -763,7 +763,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 4: Run typecheck**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck
+  cd ~/projects/llamenos && bun run typecheck
   ```
   Expected: no errors.
 
@@ -1068,14 +1068,14 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 7: Run ban propagation BDD tests**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub Ban Propagation" 2>&1 | tail -30
+  cd ~/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub Ban Propagation" 2>&1 | tail -30
   ```
   Expected: all 6 scenarios pass — green.
 
 - [ ] **Step 8: Run typecheck and full backend BDD suite**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
+  cd ~/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
   ```
   Expected: no type errors; existing tests still pass.
 
@@ -1202,7 +1202,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 4: Generate and run DB migration**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run db:generate && bun run db:migrate
+  cd ~/projects/llamenos && bun run db:generate && bun run db:migrate
   ```
   Expected: migration applies without errors.
 
@@ -1388,14 +1388,14 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 10: Run user flags BDD tests**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub User Suspension" 2>&1 | tail -30
+  cd ~/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub User Suspension" 2>&1 | tail -30
   ```
   Expected: all 5 scenarios pass — green.
 
 - [ ] **Step 11: Run typecheck + full backend BDD**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
+  cd ~/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
   ```
 
 - [ ] **Step 12: Commit F3**
@@ -1451,7 +1451,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 2: Read the actual audit service signature**
 
   ```bash
-  grep -n "async list\|listAuditLog\|export" /home/rikki/projects/llamenos/apps/worker/services/audit.ts | head -20
+  grep -n "async list\|listAuditLog\|export" ~/projects/llamenos/apps/worker/services/audit.ts | head -20
   ```
 
   Then add `listAllHubs()` method matching the existing `list()` signature but without the hubId constraint.
@@ -1563,7 +1563,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 7: Run cross-hub audit BDD tests**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub Audit Log" 2>&1 | tail -30
+  cd ~/projects/llamenos && bun run test:backend:bdd -- --grep "Cross-Hub Audit Log" 2>&1 | tail -30
   ```
   Expected: all 3 scenarios pass — green.
 
@@ -1587,7 +1587,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 
 > **Before implementing:** Verify `system:manage-hubs` permission in `packages/shared/permissions.ts`:
 > ```bash
-> grep "system:manage-hubs\|system:" /home/rikki/projects/llamenos/packages/shared/permissions.ts
+> grep "system:manage-hubs\|system:" ~/projects/llamenos/packages/shared/permissions.ts
 > ```
 > If it does not exist, add it.
 
@@ -1687,7 +1687,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 5: Generate and run DB migration**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run db:generate && bun run db:migrate
+  cd ~/projects/llamenos && bun run db:generate && bun run db:migrate
   ```
 
 - [ ] **Step 6: Update ringing.ts with fallback logic**
@@ -1849,14 +1849,14 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 9: Run mutual aid BDD tests**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run test:backend:bdd -- --grep "Mutual Aid Fallback" 2>&1 | tail -30
+  cd ~/projects/llamenos && bun run test:backend:bdd -- --grep "Mutual Aid Fallback" 2>&1 | tail -30
   ```
   Expected: all 4 scenarios pass — green.
 
 - [ ] **Step 10: Run typecheck + full BDD**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
+  cd ~/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
   ```
 
 - [ ] **Step 11: Commit F5**
@@ -2094,7 +2094,7 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 8: Generate migration**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run db:generate && bun run db:migrate
+  cd ~/projects/llamenos && bun run db:generate && bun run db:migrate
   ```
 
 - [ ] **Step 9: Add step definitions for network broadcast**
@@ -2104,14 +2104,14 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 10: Run broadcast BDD tests**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run test:backend:bdd -- --grep "Network-Level Emergency Broadcast" 2>&1 | tail -30
+  cd ~/projects/llamenos && bun run test:backend:bdd -- --grep "Network-Level Emergency Broadcast" 2>&1 | tail -30
   ```
   Expected: all 5 scenarios pass — green.
 
 - [ ] **Step 11: Run typecheck + full BDD**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
+  cd ~/projects/llamenos && bun run typecheck && bun run test:backend:bdd 2>&1 | tail -10
   ```
 
 - [ ] **Step 12: Commit F6 backend**
@@ -2370,19 +2370,19 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 4: Run Android unit tests + compile test APK**
 
   ```bash
-  cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
+  cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
   ```
 
 - [ ] **Step 5: Run iOS tests**
 
   ```bash
-  ssh mac "cd /home/rikki/projects/llamenos && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' 2>&1 | tail -20"
+  ssh mac "cd ~/projects/llamenos && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' 2>&1 | tail -20"
   ```
 
 - [ ] **Step 6: Run desktop typecheck + build**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck && bun run build 2>&1 | tail -10
+  cd ~/projects/llamenos && bun run typecheck && bun run build 2>&1 | tail -10
   ```
 
 - [ ] **Step 7: Commit F6 client**
@@ -2399,33 +2399,33 @@ This spec covers 7 features spanning backend, iOS, Android, and Desktop. Feature
 - [ ] **Step 1: Run full backend BDD suite**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -20
+  cd ~/projects/llamenos && bun run test:backend:bdd 2>&1 | tail -20
   ```
   Expected: all existing + new scenarios pass. Any failures must be fixed before proceeding.
 
 - [ ] **Step 2: Run desktop typecheck + Playwright**
 
   ```bash
-  cd /home/rikki/projects/llamenos && bun run typecheck && bun run test 2>&1 | tail -20
+  cd ~/projects/llamenos && bun run typecheck && bun run test 2>&1 | tail -20
   ```
   Expected: type check clean, Playwright tests green.
 
 - [ ] **Step 3: Run Android unit tests + lint + test APK compilation**
 
   ```bash
-  cd /home/rikki/projects/llamenos/apps/android && ./gradlew testDebugUnitTest && ./gradlew lintDebug && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
+  cd ~/projects/llamenos/apps/android && ./gradlew testDebugUnitTest && ./gradlew lintDebug && ./gradlew compileDebugAndroidTestKotlin 2>&1 | tail -20
   ```
 
 - [ ] **Step 4: Run iOS unit tests (on mac)**
 
   ```bash
-  ssh mac "cd /home/rikki/projects/llamenos && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' 2>&1 | tail -20"
+  ssh mac "cd ~/projects/llamenos && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17' 2>&1 | tail -20"
   ```
 
 - [ ] **Step 5: Run Rust crypto tests**
 
   ```bash
-  cd /home/rikki/projects/llamenos && cargo test --manifest-path packages/crypto/Cargo.toml --features mobile 2>&1 | tail -10
+  cd ~/projects/llamenos && cargo test --manifest-path packages/crypto/Cargo.toml --features mobile 2>&1 | tail -10
   ```
 
 - [ ] **Step 6: Verify verification gates from spec**

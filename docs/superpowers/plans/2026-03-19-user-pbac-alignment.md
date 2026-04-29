@@ -646,8 +646,8 @@ Run: `grep -rn "c\.get('volunteer')" apps/worker/routes/ --include="*.ts"` to fi
 ### Task 14: CLAUDE.md and docs
 
 **Files:**
-- Modify: `/home/rikki/projects/llamenos/CLAUDE.md`
-- Modify: `/home/rikki/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`
+- Modify: `~/projects/llamenos/CLAUDE.md`
+- Modify: `~/.claude/projects/-home-rikki-projects-llamenos/memory/MEMORY.md`
 
 #### `CLAUDE.md`
 

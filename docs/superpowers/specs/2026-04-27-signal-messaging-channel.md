@@ -16,6 +16,7 @@ The v2 codebase has a working Signal adapter at `apps/worker/messaging/signal/` 
 - **Messaging router** at `/api/messaging/signal/webhook?hub={hubId}` with hub-scoped routing, E2EE envelope encryption on inbound, blast keyword interception, auto-assignment, and push dispatch
 
 What is **not** implemented:
+
 1. Registration/verification flow (no admin routes to register a number)
 2. Receipt handling (`receiptMessage` in webhook payload is ignored)
 3. Reaction handling (`reaction` in `dataMessage` is ignored)
@@ -32,6 +33,7 @@ What is **not** implemented:
 A single `signal-cli-rest-api` instance manages multiple registered Signal numbers. Each hub configures its own Signal number. The adapter routes sends/receives to the correct account based on hub config.
 
 signal-cli-rest-api supports multiple accounts natively:
+
 - Register via `POST /v1/register/{number}`
 - Verify via `POST /v1/register/{number}/verify/{code}`
 - Send from specific number via `number` field in send request
@@ -42,13 +44,13 @@ signal-cli-rest-api supports multiple accounts natively:
 ```typescript
 // Extends existing SignalConfig
 interface SignalConfig {
-  bridgeUrl: string              // shared across all hubs
-  bridgeApiKey: string           // shared API key for the bridge
-  webhookSecret: string          // shared webhook auth token
-  registeredNumber: string       // THIS hub's Signal number
-  trustMode: 'auto' | 'tofu' | 'manual'  // identity verification strategy
-  autoResponse?: string
-  afterHoursResponse?: string
+  bridgeUrl: string; // shared across all hubs
+  bridgeApiKey: string; // shared API key for the bridge
+  webhookSecret: string; // shared webhook auth token
+  registeredNumber: string; // THIS hub's Signal number
+  trustMode: "auto" | "tofu" | "manual"; // identity verification strategy
+  autoResponse?: string;
+  afterHoursResponse?: string;
 }
 ```
 
@@ -69,6 +71,7 @@ Hub admins configure their own number. The bridge URL and API key may come from 
 ### Alternative: Link as Secondary Device
 
 For numbers already registered on a primary device:
+
 1. Admin selects "Link Device" in settings
 2. Backend calls `GET /v1/qrcodelink?device_name=Llamenos` on the bridge
 3. Bridge returns a `tsdevice:` URI (rendered as QR code in admin UI)
@@ -99,6 +102,7 @@ signal-cli-rest-api delivers receipts as webhook payloads with `envelope.receipt
 ### Implementation
 
 Add `parseStatusWebhook` to `SignalAdapter`:
+
 - Detect `receiptMessage` presence in webhook payload
 - Map `type: "DELIVERY"` to `MessageDeliveryStatus.delivered`
 - Map `type: "READ"` to `MessageDeliveryStatus.read`
@@ -135,6 +139,7 @@ Inbound reactions arrive in `envelope.dataMessage.reaction`:
 ### Outbound
 
 signal-cli-rest-api supports sending reactions:
+
 ```
 POST /v2/send
 { "number": "+sender", "recipients": ["+target"], "reaction": { "emoji": "...", "target_author": "+...", "target_timestamp": 123 } }
@@ -168,11 +173,11 @@ Signal has safety number verification. When a contact's identity key changes, si
 
 ### Trust Modes
 
-| Mode | Behavior | Use Case |
-|------|----------|----------|
-| `auto` | Always trust new identity keys | Convenience; appropriate for hotline use where callers may reinstall Signal |
-| `tofu` | Trust on first use, alert on change | Balanced — flags potential MITM but allows first contact |
-| `manual` | Block messages until admin verifies safety number | Maximum security; impractical for most hotline scenarios |
+| Mode     | Behavior                                          | Use Case                                                                    |
+| -------- | ------------------------------------------------- | --------------------------------------------------------------------------- |
+| `auto`   | Always trust new identity keys                    | Convenience; appropriate for hotline use where callers may reinstall Signal |
+| `tofu`   | Trust on first use, alert on change               | Balanced — flags potential MITM but allows first contact                    |
+| `manual` | Block messages until admin verifies safety number | Maximum security; impractical for most hotline scenarios                    |
 
 ### Implementation
 
@@ -210,6 +215,7 @@ Messages that exhaust retries are marked `dead_letter` with the last error. Admi
 ### Outbound Rate Limits
 
 Signal has undocumented rate limits. Conservative defaults:
+
 - **Per-number**: 60 messages/minute, 1000 messages/hour
 - **Burst**: Allow up to 10 messages in 1 second, then throttle
 - Implementation: Token bucket per registered number, checked before each send
@@ -218,6 +224,7 @@ Signal has undocumented rate limits. Conservative defaults:
 ### Configuration
 
 Rate limits stored in `SignalConfig`:
+
 ```typescript
 rateLimits?: {
   messagesPerMinute: number   // default: 60
@@ -274,11 +281,13 @@ Located in Settings > Messaging > Signal:
 ### Signal Bridge Threat Model
 
 The signal-cli-rest-api instance has access to:
+
 - Signal session keys (can decrypt all messages in transit)
 - Registered phone numbers and their identity keys
 - Message content in plaintext (before our E2EE envelope wrap)
 
 **Mitigations**:
+
 - Bridge runs on internal network only (Docker `internal` network, no port exposure)
 - Bridge API key required for all requests (Bearer token auth)
 - Webhook secret validates inbound webhooks (prevents external injection)
@@ -302,15 +311,15 @@ The signal-cli-rest-api instance has access to:
 
 ## Decisions to Review
 
-| # | Decision | Chosen Option | Alternatives Considered |
-|---|----------|---------------|------------------------|
-| 1 | Bridge architecture | Shared bridge, per-hub account | Per-hub bridge instance (more isolation but heavier ops); Dedicated bridge per number (overkill for Signal's model) |
-| 2 | Trust mode default | TOFU (trust on first use) | Auto-trust (simpler but no MITM detection); Manual (too restrictive for hotline) |
-| 3 | Retry strategy | PostgreSQL job queue with exponential backoff | In-memory retry (lost on restart); Redis-backed (adds dependency); setTimeout chains (fragile) |
-| 4 | Rate limit implementation | Token bucket per number (in-memory with PostgreSQL persistence) | Sliding window (more memory); External rate limiter service (overkill) |
-| 5 | Failover trigger | Persistent errors (>5 consecutive failures or 429 extended) | Manual-only switchover (slower response); Immediate on first failure (too aggressive) |
-| 6 | Typing indicators | Ephemeral Nostr events (not persisted) | WebSocket direct (already have Nostr relay for real-time); Database polling (too slow) |
-| 7 | Reaction storage | Annotation on target message (externalId lookup) | Separate reactions table (over-engineered); Embedded in message metadata (harder to query) |
-| 8 | Registration flow | Both SMS/voice verify AND device linking | SMS-only (some numbers can't receive SMS); Device-link only (requires existing primary device) |
-| 9 | Dead letter visibility | Admin-only dashboard with manual retry | Auto-notify assigned volunteer (leaks delivery infra); Discard silently (loses messages) |
-| 10 | Number rotation | Phase 2 (optional) — conversations pinned to number | Immediate round-robin (breaks safety number continuity); No rotation (single point of failure) |
+| #   | Decision                  | Chosen Option                                                   | Alternatives Considered                                                                                             |
+| --- | ------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1   | Bridge architecture       | Shared bridge, per-hub account                                  | Per-hub bridge instance (more isolation but heavier ops); Dedicated bridge per number (overkill for Signal's model) |
+| 2   | Trust mode default        | TOFU (trust on first use)                                       | Auto-trust (simpler but no MITM detection); Manual (too restrictive for hotline)                                    |
+| 3   | Retry strategy            | PostgreSQL job queue with exponential backoff                   | In-memory retry (lost on restart); Redis-backed (adds dependency); setTimeout chains (fragile)                      |
+| 4   | Rate limit implementation | Token bucket per number (in-memory with PostgreSQL persistence) | Sliding window (more memory); External rate limiter service (overkill)                                              |
+| 5   | Failover trigger          | Persistent errors (>5 consecutive failures or 429 extended)     | Manual-only switchover (slower response); Immediate on first failure (too aggressive)                               |
+| 6   | Typing indicators         | Ephemeral Nostr events (not persisted)                          | WebSocket direct (already have Nostr relay for real-time); Database polling (too slow)                              |
+| 7   | Reaction storage          | Annotation on target message (externalId lookup)                | Separate reactions table (over-engineered); Embedded in message metadata (harder to query)                          |
+| 8   | Registration flow         | Both SMS/voice verify AND device linking                        | SMS-only (some numbers can't receive SMS); Device-link only (requires existing primary device)                      |
+| 9   | Dead letter visibility    | Admin-only dashboard with manual retry                          | Auto-notify assigned volunteer (leaks delivery infra); Discard silently (loses messages)                            |
+| 10  | Number rotation           | Phase 2 (optional) — conversations pinned to number             | Immediate round-robin (breaks safety number continuity); No rotation (single point of failure)                      |

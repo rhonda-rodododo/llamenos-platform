@@ -18,7 +18,7 @@ Implement a PostgreSQL-backed job queue for reliable blast message delivery. Whe
 ### Component Diagram
 
 ```
-[BlastsService.send()] 
+[BlastsService.send()]
     → expandBlast() → INSERT blast_deliveries (one per subscriber×channel)
     → update blast status → 'sending'
 
@@ -64,6 +64,7 @@ CREATE INDEX blast_deliveries_blast_id_idx ON blast_deliveries (blast_id);
 ### Schema Additions to `subscribers` Table
 
 Add `encryptedIdentifier` column (already exists in v1):
+
 ```sql
 ALTER TABLE subscribers ADD COLUMN encrypted_identifier TEXT;
 ```
@@ -73,11 +74,13 @@ The `encryptedIdentifier` stores the ECIES-wrapped PII (phone number / identifie
 ### Schema Addition to `blasts` Table
 
 Add `localizedContent` column:
+
 ```sql
 ALTER TABLE blasts ADD COLUMN localized_content JSONB NOT NULL DEFAULT '{}'::jsonb;
 ```
 
 Structure: `Record<string, BlastContent>` keyed by language code. The `content` field remains as the default/fallback. Example:
+
 ```json
 {
   "es": { "text": "Hola mundo" },
@@ -89,13 +92,13 @@ Structure: `Record<string, BlastContent>` keyed by language code. The `content` 
 
 Token bucket rate limiter, one bucket per channel type per hub:
 
-| Channel | Default Rate | Burst |
-|---------|-------------|-------|
-| SMS (Twilio) | 1 msg/sec | 5 |
-| SMS (SignalWire) | 5 msg/sec | 10 |
-| WhatsApp | 10 msg/sec | 20 |
-| Signal | 5 msg/sec | 10 |
-| RCS | 3 msg/sec | 6 |
+| Channel          | Default Rate | Burst |
+| ---------------- | ------------ | ----- |
+| SMS (Twilio)     | 1 msg/sec    | 5     |
+| SMS (SignalWire) | 5 msg/sec    | 10    |
+| WhatsApp         | 10 msg/sec   | 20    |
+| Signal           | 5 msg/sec    | 10    |
+| RCS              | 3 msg/sec    | 6     |
 
 Implementation: In-memory token bucket (no Redis needed for single-server). Refills at the configured rate. If a bucket is empty, the delivery stays in `pending` and the poller moves on. Deliveries that couldn't send due to rate limiting are NOT counted as attempts — they remain pending with an unchanged `nextAttemptAt`. The poller naturally re-picks them on the next cycle (5s).
 
@@ -128,6 +131,7 @@ For large subscriber lists, expansion happens in batches of 500 to avoid transac
 ### Mid-Flight Opt-Out Check
 
 Before sending each delivery:
+
 1. Re-query the subscriber's current status
 2. If `status !== 'active'` or `doubleOptInConfirmed === false`: mark delivery as `opted_out`, skip send
 3. This catches opt-outs that happen between expansion and delivery (important for slow-draining large blasts)
@@ -142,10 +146,12 @@ Before sending each delivery:
 ### Hub Key Rotation Interaction
 
 The blast content is stored in plaintext in the `content`/`localizedContent` fields (not E2EE at rest in the current schema). This is acceptable because:
+
 1. The server already processes plaintext content during messaging (it must pass body text to Twilio/Signal/etc.)
 2. The security model protects subscriber PII (encrypted identifiers), not blast content from the server
 
 If future requirements demand E2EE blast content:
+
 - Content would be encrypted with hub key at creation time
 - On hub key rotation, active/scheduled blasts would need re-encryption or cancellation
 - For now, this is deferred — the server must read content to send it anyway
@@ -153,11 +159,13 @@ If future requirements demand E2EE blast content:
 ### Real-Time Stats via Nostr Events
 
 Define a new ephemeral Nostr event kind:
+
 ```typescript
-export const KIND_BLAST_PROGRESS = 20010  // ephemeral, not persisted
+export const KIND_BLAST_PROGRESS = 20010; // ephemeral, not persisted
 ```
 
 Event payload (encrypted with hub key for relay privacy):
+
 ```json
 {
   "blastId": "uuid",
@@ -177,8 +185,9 @@ Published every N deliveries (configurable, default every 10) and on blast compl
 ### Blast Completion Detection
 
 After each delivery batch, check:
+
 ```sql
-SELECT COUNT(*) FROM blast_deliveries 
+SELECT COUNT(*) FROM blast_deliveries
 WHERE blast_id = ? AND status IN ('pending', 'sending')
 ```
 
@@ -187,6 +196,7 @@ If zero remaining: update blast status to `sent`, publish final stats event.
 ### Cancellation
 
 `BlastsService.cancel(id)`:
+
 1. Set blast `status` to `cancelled`, `cancelledAt` to now
 2. UPDATE all `blast_deliveries` WHERE `blast_id = id AND status IN ('pending', 'sending')` SET `status = 'cancelled'`
 3. In-flight deliveries (already picked up by poller) check blast status before sending
@@ -194,6 +204,7 @@ If zero remaining: update blast status to `sent`, publish final stats event.
 ### Delivery Status Webhooks
 
 When a messaging provider sends a delivery receipt (via `parseStatusWebhook()`):
+
 1. Match the `external_id` on `blast_deliveries`
 2. If matched: update status to `delivered`, set `deliveredAt`
 3. Update blast stats (increment `delivered`, decrement `sent` if tracking separately)
@@ -201,6 +212,7 @@ When a messaging provider sends a delivery receipt (via `parseStatusWebhook()`):
 ### API Endpoints (already partially exist)
 
 New/modified:
+
 - `POST /api/blasts/:id/send` — trigger expansion + delivery (exists, needs wiring)
 - `GET /api/blasts/:id/deliveries` — paginated delivery list with status breakdown
 - `GET /api/blasts/:id/stats` — real-time delivery stats
@@ -208,17 +220,17 @@ New/modified:
 
 ## Files to Modify/Create
 
-| File | Action |
-|------|--------|
-| `apps/worker/db/schema/blasts.ts` | Add `blastDeliveries` table, add columns to `subscribers` and `blasts` |
-| `apps/worker/services/blasts.ts` | Implement `expandBlast()`, `processDeliveryBatch()`, delivery CRUD |
-| `apps/worker/services/blast-delivery-poller.ts` | New: background poller (modeled on outbox-poller) |
-| `apps/worker/services/blast-rate-limiter.ts` | New: token bucket rate limiter |
-| `apps/worker/services/scheduler.ts` | Wire up the blast poller start/stop |
-| `packages/shared/types.ts` | Extend `BlastContent` with localized content, add delivery types |
-| `packages/shared/nostr-events.ts` | Add `KIND_BLAST_PROGRESS` |
-| `apps/worker/services/index.ts` | Export new services |
-| `apps/worker/routes/blasts.ts` | Add delivery listing and stats endpoints |
+| File                                            | Action                                                                 |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `apps/worker/db/schema/blasts.ts`               | Add `blastDeliveries` table, add columns to `subscribers` and `blasts` |
+| `apps/worker/services/blasts.ts`                | Implement `expandBlast()`, `processDeliveryBatch()`, delivery CRUD     |
+| `apps/worker/services/blast-delivery-poller.ts` | New: background poller (modeled on outbox-poller)                      |
+| `apps/worker/services/blast-rate-limiter.ts`    | New: token bucket rate limiter                                         |
+| `apps/worker/services/scheduler.ts`             | Wire up the blast poller start/stop                                    |
+| `packages/shared/types.ts`                      | Extend `BlastContent` with localized content, add delivery types       |
+| `packages/shared/nostr-events.ts`               | Add `KIND_BLAST_PROGRESS`                                              |
+| `apps/worker/services/index.ts`                 | Export new services                                                    |
+| `apps/worker/routes/blasts.ts`                  | Add delivery listing and stats endpoints                               |
 
 ## Decisions to Review
 
@@ -226,6 +238,7 @@ New/modified:
 
 **Chosen**: PostgreSQL `blast_deliveries` table as the job queue  
 **Alternatives considered**:
+
 - **Redis/BullMQ**: More features (priority, delayed jobs, dashboard) but adds infrastructure dependency and doesn't persist in the same transaction as subscriber expansion
 - **In-memory queue**: Simpler but lost on restart, no crash recovery
 - **External queue service (SQS, CloudEvents)**: Over-engineered for self-hosted single-server deployment
@@ -236,6 +249,7 @@ New/modified:
 
 **Chosen**: In-memory token bucket per channel type  
 **Alternatives considered**:
+
 - **Database-based sliding window**: Survives restarts but adds queries per delivery
 - **Redis token bucket**: Standard for distributed systems but adds Redis dependency
 - **Fixed delay between sends**: Simple but doesn't allow burst capability
@@ -246,6 +260,7 @@ New/modified:
 
 **Chosen**: `encryptedIdentifier` field decrypted at send time using hub key held by server  
 **Alternatives considered**:
+
 - **Plaintext identifier stored permanently**: Simpler but violates privacy principles
 - **Client-side decryption + server relay**: Would require client to be online during blast send — unacceptable for scheduled/automated sends
 - **One-time decryption at expansion into delivery row**: Stores plaintext in delivery rows temporarily
@@ -256,6 +271,7 @@ New/modified:
 
 **Chosen**: `localizedContent: Record<string, BlastContent>` JSONB field on the blast  
 **Alternatives considered**:
+
 - **Separate `blast_content_translations` table**: Normalized but adds joins for every delivery
 - **Array of `{ lang, content }` objects**: Less ergonomic for lookup
 - **Template engine with interpolation**: Over-engineered for static translated text
@@ -266,6 +282,7 @@ New/modified:
 
 **Chosen**: Plaintext content in database (server must read it to send)  
 **Alternatives considered**:
+
 - **E2EE content encrypted with hub key**: Adds complexity around key rotation and scheduled sends
 - **Client-side send orchestration**: Client decrypts and relays each message — unscalable, requires client online
 
@@ -275,6 +292,7 @@ New/modified:
 
 **Chosen**: Dual-interval — 5s for active delivery processing, 60s for scheduled blast checks  
 **Alternatives considered**:
+
 - **Single interval (e.g., 10s)**: Simpler but either too slow for active deliveries or too frequent for scheduled checks
 - **Event-driven (LISTEN/NOTIFY)**: More responsive but adds pg_notify complexity
 - **Exponential backoff when idle**: Saves cycles but adds complexity
@@ -285,6 +303,7 @@ New/modified:
 
 **Chosen**: Store `external_id` on delivery, correlate via status webhooks  
 **Alternatives considered**:
+
 - **Fire-and-forget (mark sent immediately)**: Simpler but no delivery confirmation
 - **Polling provider status API**: Adds API calls and rate limit concerns
 - **Treat adapter `sendMessage()` success as final**: Miss transient provider failures
@@ -295,6 +314,7 @@ New/modified:
 
 **Chosen**: Eager batch expansion — all matching subscribers get delivery rows immediately on send  
 **Alternatives considered**:
+
 - **Lazy/streaming**: Query subscribers as needed during delivery — risks subscriber list changing mid-blast
 - **Cursor-based pagination during expansion**: Handles very large lists but complicates resumability
 

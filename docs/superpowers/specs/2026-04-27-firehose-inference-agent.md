@@ -91,6 +91,7 @@ Window 2: [t=120, t=180min) -> key_2
 ```
 
 Each window key is:
+
 1. Generated via `crypto.getRandomValues(new Uint8Array(32))`
 2. Used to encrypt all messages arriving within that window (XChaCha20-Poly1305 with domain label `LABEL_FIREHOSE_BUFFER_ENCRYPT`)
 3. Stored in memory only (never persisted to disk/DB in plaintext)
@@ -103,19 +104,19 @@ This ensures forward secrecy: compromising the current window key does not revea
 
 The existing v1 schema (from `firehose_message_buffer`) carries forward with additions:
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | text PK | Message ID |
-| `connection_id` | text FK | Which firehose connection |
-| `signal_timestamp` | timestamp | Original message timestamp |
-| `encrypted_content` | text | Envelope-encrypted message body |
-| `encrypted_sender_info` | text | Envelope-encrypted sender metadata |
-| `window_id` | text | Which key window this belongs to |
-| `cluster_id` | text | Set after extraction clustering |
-| `extracted_report_id` | text | Set after successful extraction |
-| `schema_version` | text | CMS field schema version at ingest time |
-| `received_at` | timestamp | Server receipt time |
-| `expires_at` | timestamp | TTL expiry |
+| Column                  | Type      | Purpose                                 |
+| ----------------------- | --------- | --------------------------------------- |
+| `id`                    | text PK   | Message ID                              |
+| `connection_id`         | text FK   | Which firehose connection               |
+| `signal_timestamp`      | timestamp | Original message timestamp              |
+| `encrypted_content`     | text      | Envelope-encrypted message body         |
+| `encrypted_sender_info` | text      | Envelope-encrypted sender metadata      |
+| `window_id`             | text      | Which key window this belongs to        |
+| `cluster_id`            | text      | Set after extraction clustering         |
+| `extracted_report_id`   | text      | Set after successful extraction         |
+| `schema_version`        | text      | CMS field schema version at ingest time |
+| `received_at`           | timestamp | Server receipt time                     |
+| `expires_at`            | timestamp | TTL expiry                              |
 
 ### TTL and Cleanup
 
@@ -145,29 +146,29 @@ Each connection can configure:
 ```typescript
 interface InferenceConfig {
   /** Primary endpoint URL (default: http://localhost:11434/v1) */
-  endpoint: string
+  endpoint: string;
   /** Primary model name (default: qwen3:8b) */
-  model: string
+  model: string;
   /** API key for endpoint (default: 'not-needed' for local) */
-  apiKey?: string
+  apiKey?: string;
   /** Inference mode: 'local' (default) or 'external' */
-  mode: 'local' | 'external'
+  mode: "local" | "external";
   /** Required when mode='external' */
-  externalInferenceConsent?: boolean
+  externalInferenceConsent?: boolean;
 
   /** Progressive extraction config */
   progressive?: {
     /** Enable cheap-then-expensive cascade */
-    enabled: boolean
+    enabled: boolean;
     /** Confidence threshold below which expensive model is used */
-    confidenceThreshold: number  // default: 0.6
+    confidenceThreshold: number; // default: 0.6
     /** Expensive model endpoint (can be same or different server) */
-    expensiveEndpoint?: string
+    expensiveEndpoint?: string;
     /** Expensive model name */
-    expensiveModel: string
+    expensiveModel: string;
     /** Expensive model API key */
-    expensiveApiKey?: string
-  }
+    expensiveApiKey?: string;
+  };
 }
 ```
 
@@ -234,22 +235,22 @@ Prompts are **not hardcoded to any use case** (legal observer, jail support, etc
 
 All firehose events use generic Nostr tags (`["t", "llamenos:event"]`) so the relay cannot distinguish event types. Event content is encrypted with the hub's event key (via `encryptHubEvent`).
 
-| Event | Kind | Content Type | Purpose |
-|-------|------|-------------|---------|
-| Report extracted | `KIND_FIREHOSE_REPORT` | `firehose:report` | New extraction available for review |
-| Report notification | `KIND_FIREHOSE_REPORT` | `firehose:report:notify` | Push notification to admins |
-| Circuit breaker tripped | `KIND_FIREHOSE_ALERT` | `firehose:alert:circuit-breaker` | Inference endpoint failure alert |
-| Connection status change | `KIND_FIREHOSE_STATUS` | `firehose:status` | Agent started/stopped/paused |
-| Health check result | `KIND_FIREHOSE_HEALTH` | `firehose:health` | Periodic endpoint health status |
+| Event                    | Kind                   | Content Type                     | Purpose                             |
+| ------------------------ | ---------------------- | -------------------------------- | ----------------------------------- |
+| Report extracted         | `KIND_FIREHOSE_REPORT` | `firehose:report`                | New extraction available for review |
+| Report notification      | `KIND_FIREHOSE_REPORT` | `firehose:report:notify`         | Push notification to admins         |
+| Circuit breaker tripped  | `KIND_FIREHOSE_ALERT`  | `firehose:alert:circuit-breaker` | Inference endpoint failure alert    |
+| Connection status change | `KIND_FIREHOSE_STATUS` | `firehose:status`                | Agent started/stopped/paused        |
+| Health check result      | `KIND_FIREHOSE_HEALTH` | `firehose:health`                | Periodic endpoint health status     |
 
 ### Event Tags
 
 ```typescript
 tags: [
-  ['d', hubId],           // hub scope
-  ['t', 'llamenos:event'], // generic tag (relay cannot distinguish)
-  ['c', connectionId],    // connection reference
-]
+  ["d", hubId], // hub scope
+  ["t", "llamenos:event"], // generic tag (relay cannot distinguish)
+  ["c", connectionId], // connection reference
+];
 ```
 
 ---
@@ -302,14 +303,15 @@ Inference requests are rate-limited per connection using a token bucket:
 
 ```typescript
 interface TokenBucket {
-  tokens: number       // current tokens
-  maxTokens: number    // bucket capacity (default: 10)
-  refillRate: number   // tokens per second (default: 0.5)
-  lastRefill: number   // timestamp of last refill
+  tokens: number; // current tokens
+  maxTokens: number; // bucket capacity (default: 10)
+  refillRate: number; // tokens per second (default: 0.5)
+  lastRefill: number; // timestamp of last refill
 }
 ```
 
 When the bucket is empty:
+
 1. Messages continue to accumulate in the buffer (they are encrypted and stored regardless)
 2. The extraction loop skips inference and logs a backpressure warning
 3. The next extraction cycle checks the bucket again
@@ -323,10 +325,10 @@ When backpressure is active, newer message clusters are prioritized over older o
 
 Carried forward from v1 with enhancements:
 
-| State | Behavior |
-|-------|----------|
-| **Closed** | Normal operation. Failure counter resets on success. |
-| **Open** | After N consecutive failures (default 3), agent is paused. Buffer continues accumulating. Nostr alert published. |
+| State         | Behavior                                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Closed**    | Normal operation. Failure counter resets on success.                                                                           |
+| **Open**      | After N consecutive failures (default 3), agent is paused. Buffer continues accumulating. Nostr alert published.               |
 | **Half-open** | After a configurable cooldown (default 5 minutes), the next extraction cycle is attempted. Success -> closed. Failure -> open. |
 
 The v1 implementation goes straight from closed to open (auto-pause). The v2 enhancement adds a half-open state with automatic recovery, reducing admin intervention for transient failures.
@@ -347,6 +349,7 @@ When progressive extraction is enabled:
 3. **Fallback**: If the expensive model also fails or returns low confidence, use the cheap model's result if it exceeds `CONFIDENCE_THRESHOLD` (0.3), otherwise discard
 
 This allows operators to:
+
 - Use a fast 8B local model for most extractions (sub-second latency)
 - Fall back to a larger model (70B local or external API) only when needed
 - Control cost/latency tradeoffs per connection
@@ -369,6 +372,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** Tiered -- self-hosted (Ollama/vLLM) by default, external API opt-in with data minimization.
 **Alternatives considered:**
+
 - Self-hosted only: Simpler security model, but excludes operators without GPU hardware
 - External only: Lower operational burden, but violates zero-knowledge principle for the default case
 - Client-side inference (WASM): Like the Whisper transcription pattern -- impractical for LLM-scale models on volunteer devices
@@ -377,6 +381,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** Ephemeral per-window symmetric keys, ECIES-wrapped for agent pubkey, destroyed after window closes.
 **Alternatives considered:**
+
 - Encrypt with agent pubkey directly (per-message ECIES): Expensive for high-throughput channels, and the agent needs to decrypt in bulk anyway
 - Encrypt with hub key: Would allow any hub member to decrypt buffers, violating least-privilege
 - No buffer encryption (rely on DB access controls): Unacceptable -- compromised DB would expose all buffered plaintext
@@ -385,6 +390,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** `openai` npm package with configurable `baseURL` for both local and remote.
 **Alternatives considered:**
+
 - Direct HTTP calls: More control but more code to maintain; OpenAI SDK handles retries, streaming, response parsing
 - Provider-specific SDKs: Ollama has its own SDK, but the OpenAI-compatible endpoint is standard across all providers now
 - LangChain/LlamaIndex: Too heavy, too many abstractions, version churn; direct SDK is simpler and more predictable
@@ -393,6 +399,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** Heuristic time-window clustering (5 min) as first pass, optional LLM-refined clustering as second pass.
 **Alternatives considered:**
+
 - LLM-only clustering: Expensive for every extraction cycle; heuristic handles the common case well
 - Embedding-based clustering: Requires a separate embedding model; adds complexity without clear benefit for the message volumes we handle
 - No clustering (extract from full buffer): Loses incident boundaries; a single extraction from 100+ messages produces low-quality results
@@ -401,6 +408,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** Configurable two-tier cascade with confidence threshold trigger.
 **Alternatives considered:**
+
 - Always use expensive model: Cost-prohibitive for high-volume channels
 - Always use cheap model: Acceptable quality for most cases, but misses complex incidents
 - Ensemble (run both, merge results): Complex merge logic, unclear benefit over cascade
@@ -409,6 +417,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** Three-state circuit breaker (closed/open/half-open) with automatic recovery attempt.
 **Alternatives considered:**
+
 - v1 pattern (closed/open only, manual resume): Requires admin intervention for transient failures
 - Exponential backoff without circuit breaker: Does not alert admins of persistent issues
 - No circuit breaker (fail and retry indefinitely): Could overwhelm a struggling inference endpoint
@@ -417,6 +426,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** Record schema version at ingest, re-extract buffered messages when schema changes, leave historical reports untouched.
 **Alternatives considered:**
+
 - Re-extract everything (including historical): Dangerous -- could produce different results from the same messages, breaking audit trail
 - Ignore schema changes for buffered messages: Would produce reports with stale field definitions
 - Version the extraction prompt separately from the schema: Over-engineered; schema version is sufficient
@@ -425,6 +435,7 @@ The following Zod schemas need to be added to `packages/protocol/schemas/`:
 
 **Chosen:** Pseudonymize senders (`User-A`, `User-B`), strip IDs, strip organizational context, audit-log every external call.
 **Alternatives considered:**
+
 - Send full context to external API: Violates zero-knowledge principle
 - Differential privacy / noise injection: Impractical for text extraction -- noise degrades extraction quality
 - Encrypt messages for external API (homomorphic): Not feasible with current LLM architectures
