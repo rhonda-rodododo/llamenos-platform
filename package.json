@@ -105,6 +105,7 @@
     "@scure/base": "^2.2.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.0",
+    "reflect-metadata": "^0.2.2",
     "@tanstack/react-router": "^1.168.25",
     "@tanstack/router-plugin": "^1.167.28",
     "@tauri-apps/api": "^2.10.1",
