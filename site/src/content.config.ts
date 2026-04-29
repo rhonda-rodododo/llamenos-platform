@@ -25,4 +25,16 @@ const pages = defineCollection({
   }),
 });
 
-export const collections = { docs, pages };
+const slides = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/slides' }),
+  schema: z.object({
+    title: z.string(),
+    author: z.string().optional(),
+    date: z.coerce.date().optional(),
+    event: z.string().optional(),
+    description: z.string().optional(),
+    theme: z.string().optional().default('dark'),
+  }),
+});
+
+export const collections = { docs, pages, slides };

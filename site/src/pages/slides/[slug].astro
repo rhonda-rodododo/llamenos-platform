@@ -1,0 +1,26 @@
+---
+import { getCollection } from 'astro:content';
+import SlideLayout from '../../layouts/SlideLayout.astro';
+import { parseSlideDeck } from '../../utils/slides';
+
+export async function getStaticPaths() {
+  const decks = await getCollection('slides');
+  return decks.map(deck => ({
+    params: { slug: deck.id },
+    props: { deck },
+  }));
+}
+
+const { deck } = Astro.props;
+const slides = parseSlideDeck(deck.body ?? '');
+---
+
+<SlideLayout
+  title={deck.data.title}
+  author={deck.data.author}
+  event={deck.data.event}
+  date={deck.data.date}
+  description={deck.data.description}
+  slides={slides}
+  slug={deck.id}
+/>

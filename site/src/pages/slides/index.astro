@@ -1,0 +1,74 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const decks = (await getCollection('slides')).sort((a, b) => {
+  const dateA = a.data.date ? new Date(a.data.date).getTime() : 0;
+  const dateB = b.data.date ? new Date(b.data.date).getTime() : 0;
+  return dateB - dateA;
+});
+---
+
+<BaseLayout title="Slide Decks">
+  <div class="max-w-5xl mx-auto px-6 py-16">
+    <div class="mb-12">
+      <h1 class="text-4xl font-bold tracking-tight mb-3" style="color: var(--color-fg)">
+        Slide Decks
+      </h1>
+      <p class="text-lg" style="color: var(--color-fg-muted)">
+        Presentations on secure infrastructure, activist technology, and crisis response.
+      </p>
+    </div>
+
+    {decks.length === 0 ? (
+      <p style="color: var(--color-fg-dim)">No slide decks yet.</p>
+    ) : (
+      <ul class="grid gap-4">
+        {decks.map(deck => {
+          const formattedDate = deck.data.date
+            ? deck.data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+            : null;
+          return (
+            <li>
+              <a
+                href={`/slides/${deck.id}/`}
+                class="group block p-6 rounded-xl border transition-all duration-200"
+                style="background: var(--color-bg-card); border-color: var(--color-border);"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex-1 min-w-0">
+                    <h2 class="text-xl font-semibold mb-1 group-hover:text-[var(--color-accent-bright)] transition-colors truncate"
+                      style="color: var(--color-fg)">
+                      {deck.data.title}
+                    </h2>
+                    {deck.data.description && (
+                      <p class="text-sm mb-3" style="color: var(--color-fg-muted)">
+                        {deck.data.description}
+                      </p>
+                    )}
+                    <div class="flex flex-wrap gap-3 text-xs" style="color: var(--color-fg-dim)">
+                      {deck.data.author && <span>by {deck.data.author}</span>}
+                      {deck.data.event && (
+                        <span class="px-2 py-0.5 rounded" style="background: var(--color-bg-soft); color: var(--color-accent-bright)">
+                          {deck.data.event}
+                        </span>
+                      )}
+                      {formattedDate && <span>{formattedDate}</span>}
+                    </div>
+                  </div>
+                  <svg
+                    class="w-5 h-5 flex-shrink-0 mt-1 group-hover:translate-x-1 transition-transform"
+                    style="color: var(--color-fg-dim)"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </div>
+</BaseLayout>
