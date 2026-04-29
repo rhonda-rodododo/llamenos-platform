@@ -15,8 +15,8 @@ description: Развёртывание Llamenos на вашем сервере 
 ## 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Генерация пары ключей администратора
@@ -300,8 +300,8 @@ flowchart TD
 ## 1. Клонирование репозитория
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Генерация ключевой пары администратора

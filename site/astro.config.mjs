@@ -11,7 +11,26 @@ export default defineConfig({
       // Dark theme for better readability on dark backgrounds
       theme: 'dark',
     }),
-    sitemap(),
+    sitemap({
+      i18n: {
+        defaultLocale: 'en',
+        locales: {
+          en: 'en',
+          es: 'es',
+          zh: 'zh-Hans',
+          tl: 'tl',
+          vi: 'vi',
+          ar: 'ar',
+          fr: 'fr',
+          ht: 'ht',
+          ko: 'ko',
+          ru: 'ru',
+          hi: 'hi',
+          pt: 'pt',
+          de: 'de',
+        },
+      },
+    }),
     pagefind(),
   ],
   vite: {

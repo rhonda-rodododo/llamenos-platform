@@ -48,6 +48,10 @@ export const home: Record<string, {
     subtitle: string;
     sections: FeatureSection[];
   };
+  screenshots: {
+    heading: string;
+    subtitle: string;
+  };
   security: {
     heading: string;
     description: string;
@@ -237,6 +241,10 @@ export const home: Record<string, {
         },
       ],
     },
+    screenshots: {
+      heading: 'See it in action',
+      subtitle: 'A modern, responsive interface designed for crisis response. Works on desktop and mobile.',
+    },
     security: {
       heading: 'Honest about security',
       description: "We publish exactly what is encrypted, what isn't, and what the server can see. No hand-waving. HPKE (RFC 9180) replaces ECIES. Per-note forward secrecy means compromising a key can't reveal past notes. 57 domain separation labels prevent cross-protocol attacks. Audio never leaves your browser. Read the full security model.",
@@ -265,6 +273,10 @@ export const home: Record<string, {
       subtitle: 'Una profundidad extraordinaria de capacidades — cada decisión tomada pensando en activistas, organizadores y sus adversarios.',
       // TODO: translate sections
       sections: [],
+    },
+    screenshots: {
+      heading: 'Véalo en acción',
+      subtitle: 'Una interfaz moderna y responsiva diseñada para respuesta a crisis. Funciona en escritorio y móvil.',
     },
     security: {
       heading: 'Honestos sobre la seguridad',
@@ -295,6 +307,10 @@ export const home: Record<string, {
       // TODO: translate sections
       sections: [],
     },
+    screenshots: {
+      heading: '实际效果展示',
+      subtitle: '为危机响应设计的现代响应式界面。支持桌面和移动设备。',
+    },
     security: {
       heading: '坦诚的安全声明',
       description: '我们准确公布哪些内容已加密、哪些未加密以及服务器能看到什么。绝不含糊。HPKE（RFC 9180）取代了 ECIES。逐条前向保密意味着泄露密钥无法揭示过去的笔记。阅读完整的安全模型。',
@@ -323,6 +339,10 @@ export const home: Record<string, {
       subtitle: 'Napakalalim na kakayahan — bawat desisyon ay ginawa na may isip sa mga aktibista, organizer, at kanilang mga kalaban.',
       // TODO: translate sections
       sections: [],
+    },
+    screenshots: {
+      heading: 'Tingnan ito sa aksyon',
+      subtitle: 'Isang modernong, responsive na interface na dinisenyo para sa crisis response. Gumagana sa desktop at mobile.',
     },
     security: {
       heading: 'Tapat tungkol sa seguridad',
@@ -353,6 +373,10 @@ export const home: Record<string, {
       // TODO: translate sections
       sections: [],
     },
+    screenshots: {
+      heading: 'Xem thực tế',
+      subtitle: 'Giao diện hiện đại, responsive được thiết kế cho ứng phó khủng hoảng. Hoạt động trên máy tính và điện thoại.',
+    },
     security: {
       heading: 'Trung thực về bảo mật',
       description: 'Chúng tôi công bố chính xác những gì được mã hóa, những gì không và những gì máy chủ có thể thấy. Không mập mờ. HPKE (RFC 9180) thay thế ECIES. Bảo mật chuyển tiếp theo ghi chú nghĩa là lộ khóa không thể tiết lộ ghi chú trước đó. Đọc mô hình bảo mật đầy đủ.',
@@ -381,6 +405,10 @@ export const home: Record<string, {
       subtitle: 'عمق استثنائي من القدرات — كل قرار اتُخذ مع وضع الناشطين والمنظمين وخصومهم في الاعتبار.',
       // TODO: translate sections
       sections: [],
+    },
+    screenshots: {
+      heading: 'شاهده أثناء العمل',
+      subtitle: 'واجهة حديثة ومتجاوبة مصممة للاستجابة للأزمات. تعمل على الحاسوب والجوال.',
     },
     security: {
       heading: 'صادقون بشأن الأمان',
@@ -411,6 +439,10 @@ export const home: Record<string, {
       // TODO: translate sections
       sections: [],
     },
+    screenshots: {
+      heading: 'Voyez-le en action',
+      subtitle: 'Une interface moderne et responsive conçue pour la réponse aux crises. Fonctionne sur ordinateur et mobile.',
+    },
     security: {
       heading: 'Honnêtes sur la sécurité',
       description: "Nous publions exactement ce qui est chiffré, ce qui ne l'est pas et ce que le serveur peut voir. Sans ambiguïté. HPKE (RFC 9180) remplace ECIES. Le secret de transfert par note signifie que compromettre une clé ne révèle pas les notes passées. Lisez le modèle de sécurité complet.",
@@ -439,6 +471,10 @@ export const home: Record<string, {
       subtitle: 'Yon pwofondè ekstraòdinè de kapasite — chak desizyon pran pou aktivis, òganizatè, ak advèsè yo.',
       // TODO: translate sections
       sections: [],
+    },
+    screenshots: {
+      heading: 'Gade li an aksyon',
+      subtitle: 'Yon entèfas modèn epi responsiv ki fèt pou repons a kriz. Li mache sou òdinatè ak telefòn.',
     },
     security: {
       heading: 'Onèt sou sekirite',
@@ -469,6 +505,10 @@ export const home: Record<string, {
       // TODO: translate sections
       sections: [],
     },
+    screenshots: {
+      heading: '실제 동작 확인',
+      subtitle: '위기 대응을 위해 설계된 현대적이고 반응형인 인터페이스. 데스크톱과 모바일에서 작동합니다.',
+    },
     security: {
       heading: '보안에 대해 솔직하게',
       description: '무엇이 암호화되고, 무엇이 되지 않으며, 서버가 무엇을 볼 수 있는지 정확히 공개합니다. 모호함 없이. HPKE(RFC 9180)가 ECIES를 대체했습니다. 메모별 전방 비밀성은 키가 유출되어도 이전 메모를 볼 수 없음을 의미합니다. 전체 보안 모델을 읽어보세요.',
@@ -497,6 +537,10 @@ export const home: Record<string, {
       subtitle: 'Исключительная глубина возможностей — каждое решение принималось с учётом активистов, организаторов и их противников.',
       // TODO: translate sections
       sections: [],
+    },
+    screenshots: {
+      heading: 'Посмотрите в действии',
+      subtitle: 'Современный адаптивный интерфейс для реагирования на кризисы. Работает на компьютере и мобильных устройствах.',
     },
     security: {
       heading: 'Честно о безопасности',
@@ -527,6 +571,10 @@ export const home: Record<string, {
       // TODO: translate sections
       sections: [],
     },
+    screenshots: {
+      heading: 'इसे क्रिया में देखें',
+      subtitle: 'संकट प्रतिक्रिया के लिए डिज़ाइन किया गया आधुनिक, रिस्पॉन्सिव इंटरफ़ेस। डेस्कटॉप और मोबाइल पर काम करता है।',
+    },
     security: {
       heading: 'सुरक्षा के बारे में ईमानदार',
       description: 'हम सटीक रूप से प्रकाशित करते हैं कि क्या एन्क्रिप्टेड है, क्या नहीं है, और सर्वर क्या देख सकता है। बिना अस्पष्टता के। HPKE (RFC 9180) ने ECIES की जगह ली है। प्रति-नोट फॉरवर्ड सीक्रेसी का अर्थ है कि कुंजी से समझौता पिछले नोट्स को प्रकट नहीं करता। पूरा सुरक्षा मॉडल पढ़ें।',
@@ -556,6 +604,10 @@ export const home: Record<string, {
       // TODO: translate sections
       sections: [],
     },
+    screenshots: {
+      heading: 'Veja em ação',
+      subtitle: 'Uma interface moderna e responsiva projetada para resposta a crises. Funciona no desktop e no celular.',
+    },
     security: {
       heading: 'Honestos sobre segurança',
       description: 'Publicamos exatamente o que está criptografado, o que não está e o que o servidor pode ver. Sem ambiguidade. HPKE (RFC 9180) substituiu o ECIES. O sigilo direto por nota significa que comprometer uma chave não revela notas anteriores. Leia o modelo de segurança completo.',
@@ -584,6 +636,10 @@ export const home: Record<string, {
       subtitle: 'Eine außergewöhnliche Tiefe der Fähigkeiten — jede Entscheidung mit Blick auf Aktivisten, Organisatoren und ihre Gegner getroffen.',
       // TODO: translate sections
       sections: [],
+    },
+    screenshots: {
+      heading: 'In Aktion sehen',
+      subtitle: 'Eine moderne, responsive Oberfläche für Krisenreaktion. Funktioniert auf Desktop und Mobilgeräten.',
     },
     security: {
       heading: 'Ehrlich über Sicherheit',

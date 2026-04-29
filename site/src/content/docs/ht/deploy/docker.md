@@ -15,8 +15,8 @@ Gid sa a akonpanye ou nan deplwaman Llamenos ak Docker Compose sou yon sèl sèv
 ## 1. Klone depo a
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Jenere pè kle administratè a

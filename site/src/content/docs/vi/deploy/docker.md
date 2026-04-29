@@ -15,8 +15,8 @@ Hướng dẫn này sẽ giúp bạn triển khai Llamenos với Docker Compose 
 ## 1. Clone kho mã nguồn
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Tạo cặp khóa quản trị

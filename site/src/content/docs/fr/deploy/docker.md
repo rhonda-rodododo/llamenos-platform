@@ -15,8 +15,8 @@ Ce guide vous accompagne dans le déploiement de Llamenos avec Docker Compose su
 ## 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Générer la paire de clés administrateur

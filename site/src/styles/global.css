@@ -21,6 +21,7 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
@@ -57,6 +58,13 @@ a {
 .prose {
   max-width: 72ch;
   line-height: 1.75;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
 }
 
 .prose h1 {
@@ -164,7 +172,10 @@ a {
 }
 
 .prose table {
-  width: 100%;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
   border-collapse: collapse;
   margin-bottom: 1.5rem;
 }
@@ -240,6 +251,14 @@ a {
 
 .prose details > p:last-child {
   padding-bottom: 1rem;
+}
+
+.not-prose a {
+  color: var(--color-accent-bright);
+}
+
+.not-prose a:hover {
+  color: var(--color-accent);
 }
 
 /* Feature list styling — bold-dash pattern: **Title** — Description */

@@ -15,8 +15,8 @@ description: एक सर्वर पर Docker Compose के साथ Llame
 ## 1. रिपॉजिटरी क्लोन करें
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. Admin keypair जनरेट करें

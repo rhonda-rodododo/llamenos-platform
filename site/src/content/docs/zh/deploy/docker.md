@@ -15,8 +15,8 @@ description: 使用 Docker Compose 在您自己的服务器上部署 Llamenos。
 ## 1. 克隆仓库
 
 ```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
+git clone https://github.com/your-org/llamenos-platform.git
+cd llamenos-platform
 ```
 
 ## 2. 生成管理员密钥对

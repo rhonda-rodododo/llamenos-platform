@@ -95,7 +95,7 @@ const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/docs';
       <!-- Sidebar -->
       <aside class="mb-8 lg:mb-0 lg:w-56 lg:shrink-0">
         <nav class="lg:sticky lg:top-24 space-y-6">
-          <SearchBar />
+          <SearchBar placeholder={t.searchPlaceholder} />
           {sections.map(section => (
             <div>
               <h2 class="text-xs font-semibold uppercase tracking-wider text-fg-dim mb-3">{section.heading}</h2>

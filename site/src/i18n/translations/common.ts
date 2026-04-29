@@ -53,6 +53,7 @@ export const common: Record<string, {
     taskTroubleshooting: string;
     taskSecurity: string;
   };
+  searchPlaceholder: string;
   languageSwitcher: string;
 }> = {
   en: {
@@ -110,6 +111,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Troubleshooting',
       taskSecurity: 'Security',
     },
+    searchPlaceholder: 'Search documentation...',
     languageSwitcher: 'Language',
   },
   es: {
@@ -167,6 +169,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Solución de problemas',
       taskSecurity: 'Seguridad',
     },
+    searchPlaceholder: 'Buscar documentación...',
     languageSwitcher: 'Idioma',
   },
   zh: {
@@ -224,6 +227,7 @@ export const common: Record<string, {
       taskTroubleshooting: '故障排除',
       taskSecurity: '安全',
     },
+    searchPlaceholder: '搜索文档...',
     languageSwitcher: '语言',
   },
   tl: {
@@ -281,6 +285,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Pag-troubleshoot',
       taskSecurity: 'Seguridad',
     },
+    searchPlaceholder: 'Maghanap sa dokumentasyon...',
     languageSwitcher: 'Wika',
   },
   vi: {
@@ -338,6 +343,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Khắc phục sự cố',
       taskSecurity: 'Bảo mật',
     },
+    searchPlaceholder: 'Tìm kiếm tài liệu...',
     languageSwitcher: 'Ngôn ngữ',
   },
   ar: {
@@ -395,6 +401,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'استكشاف الأخطاء',
       taskSecurity: 'الأمان',
     },
+    searchPlaceholder: 'البحث في التوثيق...',
     languageSwitcher: 'اللغة',
   },
   fr: {
@@ -452,6 +459,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Dépannage',
       taskSecurity: 'Sécurité',
     },
+    searchPlaceholder: 'Rechercher dans la documentation...',
     languageSwitcher: 'Langue',
   },
   ht: {
@@ -509,6 +517,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Rezoud pwoblèm',
       taskSecurity: 'Sekirite',
     },
+    searchPlaceholder: 'Chèche nan dokimantasyon...',
     languageSwitcher: 'Lang',
   },
   ko: {
@@ -566,6 +575,7 @@ export const common: Record<string, {
       taskTroubleshooting: '문제 해결',
       taskSecurity: '보안',
     },
+    searchPlaceholder: '문서 검색...',
     languageSwitcher: '언어',
   },
   ru: {
@@ -623,6 +633,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Устранение неполадок',
       taskSecurity: 'Безопасность',
     },
+    searchPlaceholder: 'Поиск по документации...',
     languageSwitcher: 'Язык',
   },
   hi: {
@@ -680,6 +691,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'समस्या निवारण',
       taskSecurity: 'सुरक्षा',
     },
+    searchPlaceholder: 'दस्तावेज़ खोजें...',
     languageSwitcher: 'भाषा',
   },
   pt: {
@@ -737,6 +749,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Solução de problemas',
       taskSecurity: 'Segurança',
     },
+    searchPlaceholder: 'Pesquisar documentação...',
     languageSwitcher: 'Idioma',
   },
   de: {
@@ -794,6 +807,7 @@ export const common: Record<string, {
       taskTroubleshooting: 'Fehlerbehebung',
       taskSecurity: 'Sicherheit',
     },
+    searchPlaceholder: 'Dokumentation durchsuchen...',
     languageSwitcher: 'Sprache',
   },
 };

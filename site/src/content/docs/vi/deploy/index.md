@@ -15,8 +15,8 @@ Triển khai đường dây nóng Llamenos của riêng bạn trong vòng một 
 ## 1. Sao chép và cài đặt
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos.git
-cd llamenos
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
+cd llamenos-platform
 bun install
 ```
 
