@@ -447,7 +447,11 @@ jobs:
           IDX=0
           while IFS= read -r file; do
             if [ $((IDX % 2)) -eq "$SHARD_ID" ]; then
-              REL="${file#packages/test-specs/features/}"
+              # Prepend "features/" to match the Android asset path:
+              # Gradle copies packages/test-specs/features/platform/mobile/**
+              # to src/androidTest/assets/features/platform/mobile/**
+              # so asset paths start with "features/platform/mobile/"
+              REL="features/${file#packages/test-specs/features/}"
               if [ -n "$SHARD_FEATURES" ]; then
                 SHARD_FEATURES="${SHARD_FEATURES},${REL}"
               else
@@ -585,9 +589,8 @@ jobs:
         env:
           MINIO_VERSION: "RELEASE.2025-01-20T14-49-07Z"
           # SHA-256 of darwin-arm64 minio binary for MINIO_VERSION above.
-          # Verified on arm64 Mac: shasum -a 256 /tmp/minio-arm64
-          # TODO: verify on arm64 before deploying — Linux cannot cross-verify arm64 binaries
-          MINIO_SHA256: "8b790ea8e3819a8c7d0e2fd2ff90e879a5e0e6df6f9def07e9459d45fe29c5ac"
+          # Sourced from: https://dl.min.io/server/minio/release/darwin-arm64/archive/minio.RELEASE.2025-01-20T14-49-07Z.sha256sum
+          MINIO_SHA256: "f8469f3eaa868bf21cc09b5a6087cf4997bf63d73979ecd5d3fb8b8358ac3f55"
         run: |
           curl -sSfL \
             "https://dl.min.io/server/minio/release/darwin-arm64/archive/minio.${MINIO_VERSION}" \

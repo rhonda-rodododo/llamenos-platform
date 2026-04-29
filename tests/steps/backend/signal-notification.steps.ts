@@ -222,14 +222,6 @@ When('the first delivery attempt fails', async ({ request, world }) => {
   notifState.retryCount = (data as { retryCount?: number })?.retryCount ?? 0
 })
 
-When('the notification should be retried', async ({ request, world }) => {
-  const notifState = getNotifState(world)
-  if (!notifState.registrationSuccess || !notifState.notificationId) return
-
-  // Trigger retry
-  await notifierPost(request, `/notify/${notifState.notificationId}/retry`, {})
-})
-
 When('the contact is unregistered', async ({ request, world }) => {
   const notifState = getNotifState(world)
   if (!notifState.contactId || !notifState.registrationSuccess) return

@@ -11,6 +11,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
+import { setLastResponse } from './shared-state'
 import {
   simulateIncomingCall,
   simulateAnswerCall,
@@ -28,7 +29,6 @@ interface SipBridgeState {
   callerNumber: string
   recordingRef?: string
   dtmfDigits?: string
-  sipHealthStatus?: number
 }
 
 const STATE_KEY = 'sip-bridge'
@@ -64,33 +64,8 @@ Given('no volunteers are on shift', async ({ world }) => {
   }
 })
 
-Given(
-  'an inbound SIP call arrives from {string}',
-  async ({ request, world }, callerNumber: string) => {
-    const state = getScenarioState(world)
-    const result = await simulateIncomingCall(request, {
-      callerNumber,
-      hubId: state.hubId,
-    })
-    setState(world, STATE_KEY, {
-      callerNumber,
-      callId: result.callId,
-      callStatus: result.status,
-    } satisfies SipBridgeState)
-    state.callId = result.callId
-    state.callStatus = result.status
-  },
-)
-
-Given('a volunteer answers the call', async ({ request, world }) => {
-  const state = getScenarioState(world)
-  expect(state.callId).toBeDefined()
-  expect(state.volunteers.length).toBeGreaterThan(0)
-  const result = await simulateAnswerCall(request, state.callId!, state.volunteers[0].pubkey)
-  const sipState = getSipState(world)
-  sipState.callStatus = result.status
-  state.callStatus = result.status
-})
+// NOTE: 'an inbound SIP call arrives from {string}' and 'a volunteer answers the call'
+// are handled by the When steps below (Given/When with same text = duplicate in playwright-bdd)
 
 // ── When ─────────────────────────────────────────────────────────────
 
@@ -178,12 +153,11 @@ When('the SIP bridge health endpoint is requested', async ({ request, world }) =
     const res = await request.get('http://localhost:3000/api/health/ready')
     healthStatus = res.status()
   }
-  const sipState = getSipState(world) ?? ({ callerNumber: '' } as SipBridgeState)
   if (!getSipState(world)) {
-    setState(world, STATE_KEY, { ...sipState, sipHealthStatus: healthStatus } satisfies SipBridgeState)
-  } else {
-    sipState.sipHealthStatus = healthStatus
+    setState(world, STATE_KEY, { callerNumber: '' } satisfies SipBridgeState)
   }
+  // Store in shared state so assertions.steps.ts `the response status should be {int}` works
+  setLastResponse(world, { status: healthStatus, data: {} })
 })
 
 When('the call rings with no answer', async ({ request, world }) => {
@@ -232,16 +206,7 @@ Then('a call ring Nostr event should be published', async ({ world }) => {
   expect(state.callId).toBeDefined()
 })
 
-Then('the call status should be {string}', async ({ request, world }, expectedStatus: string) => {
-  const state = getScenarioState(world)
-  expect(state.callId).toBeDefined()
-  const { status, data } = await apiGet<{ status: string }>(
-    request,
-    `/calls/${state.callId}`,
-  )
-  expect(status).toBe(200)
-  expect(data.status).toBe(expectedStatus)
-})
+// NOTE: 'the call status should be {string}' is defined in call-actions.steps.ts
 
 Then(
   'the call should be assigned to the answering volunteer',
@@ -286,7 +251,5 @@ Then('the call metadata should include recording info', async ({ request, world 
   expect(hasRecording || true).toBe(true) // Non-blocking: sidecar may not have recording configured in CI
 })
 
-Then('the response status should be {int}', async ({ world }, expectedStatus: number) => {
-  const sipState = getSipState(world)
-  expect(sipState.sipHealthStatus).toBe(expectedStatus)
-})
+// NOTE: 'the response status should be {int}' is defined in assertions.steps.ts
+// The 'When the SIP bridge health endpoint is requested' step stores status via setLastResponse
