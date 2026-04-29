@@ -357,7 +357,7 @@ function ReportCard({ report, isSelected, onSelect, reportTypes }: {
       </div>
       <div className="mt-1.5 flex items-center gap-2">
         {reportTypeName && (
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge data-testid="report-type-badge" variant="secondary" className="text-[10px]">
             {reportTypeName}
           </Badge>
         )}
