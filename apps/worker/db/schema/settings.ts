@@ -29,6 +29,7 @@ export const systemSettings = pgTable('system_settings', {
   ).default(false),
   ivrLanguages: text('ivr_languages')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   messagingConfig: jsonb('messaging_config').notNull().default({}),
   telephonyProvider: jsonb('telephony_provider'),
@@ -44,9 +45,11 @@ export const systemSettings = pgTable('system_settings', {
   appliedTemplates: jsonb('applied_templates').notNull().default([]),
   fallbackGroup: text('fallback_group')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   reportCategories: text('report_categories')
     .array()
+    .notNull()
     .default(
       sql`'{"Incident Report","Field Observation","Evidence","Other"}'::text[]`,
     ),
@@ -140,13 +143,13 @@ export const customFieldDefinitions = pgTable('custom_field_definitions', {
   label: text('label').notNull(),
   fieldType: text('field_type').notNull(),
   required: boolean('required').default(false),
-  options: text('options').array(),
+  options: text('options').array().notNull().default(sql`'{}'::text[]`),
   validation: jsonb('validation'),
   visibleToUsers: boolean('visible_to_users').default(true),
   editableByUsers: boolean('editable_by_users').default(true),
   context: text('context').notNull().default('all'),
   maxFileSize: integer('max_file_size'),
-  allowedMimeTypes: text('allowed_mime_types').array(),
+  allowedMimeTypes: text('allowed_mime_types').array().notNull().default(sql`'{}'::text[]`),
   maxFiles: integer('max_files').default(1),
   sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -175,6 +178,7 @@ export const entityTypeDefinitions = pgTable('entity_type_definitions', {
   defaultStatus: text('default_status').notNull().default(''),
   closedStatuses: text('closed_statuses')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   severities: jsonb('severities'),
   defaultSeverity: text('default_severity'),
@@ -187,14 +191,15 @@ export const entityTypeDefinitions = pgTable('entity_type_definitions', {
     .default('assigned'),
   piiFields: text('pii_fields')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   allowSubRecords: boolean('allow_sub_records').default(false),
   allowFileAttachments: boolean('allow_file_attachments').default(true),
   allowInteractionLinks: boolean('allow_interaction_links').default(true),
   showInNavigation: boolean('show_in_navigation').default(true),
   showInDashboard: boolean('show_in_dashboard').default(true),
-  accessRoles: text('access_roles').array(),
-  editRoles: text('edit_roles').array(),
+  accessRoles: text('access_roles').array().notNull().default(sql`'{}'::text[]`),
+  editRoles: text('edit_roles').array().notNull().default(sql`'{}'::text[]`),
   isArchived: boolean('is_archived').default(false),
   isSystem: boolean('is_system').default(false),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -255,6 +260,7 @@ export const reportTypeDefinitions = pgTable('report_type_definitions', {
   defaultStatus: text('default_status').notNull().default(''),
   closedStatuses: text('closed_statuses')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   allowCaseConversion: boolean('allow_case_conversion').default(false),
   mobileOptimized: boolean('mobile_optimized').default(false),

@@ -27,7 +27,7 @@ export const subscribers = pgTable(
     identifierHash: text('identifier_hash').notNull(),
     encryptedIdentifier: text('encrypted_identifier'),
     channels: jsonb('channels').notNull().default(sql`'[]'::jsonb`),
-    tags: text('tags').array().default(sql`'{}'::text[]`),
+    tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
     language: text('language').notNull().default('en'),
     status: text('status').notNull().default('active'),
     doubleOptInConfirmed: boolean('double_opt_in_confirmed').default(false),
@@ -58,10 +58,12 @@ export const blasts = pgTable('blasts', {
   status: text('status').notNull().default('draft'),
   targetChannels: text('target_channels')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
-  targetTags: text('target_tags').array().default(sql`'{}'::text[]`),
+  targetTags: text('target_tags').array().notNull().default(sql`'{}'::text[]`),
   targetLanguages: text('target_languages')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
   sentAt: timestamp('sent_at', { withTimezone: true }),

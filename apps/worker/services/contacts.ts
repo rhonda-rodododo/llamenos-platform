@@ -66,7 +66,7 @@ export class ContactsService {
         hubId: input.hubId,
         identifierHashes: input.identifierHashes,
         nameHash: input.nameHash ?? null,
-        trigramTokens: input.trigramTokens ?? null,
+        trigramTokens: input.trigramTokens ?? [],
         encryptedSummary: input.encryptedSummary,
         summaryEnvelopes: input.summaryEnvelopes,
         encryptedPii: input.encryptedPII ?? null,

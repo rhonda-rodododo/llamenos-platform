@@ -69,7 +69,7 @@ export const messages = pgTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
     hasAttachments: boolean('has_attachments').default(false),
-    attachmentIds: text('attachment_ids').array(),
+    attachmentIds: text('attachment_ids').array().notNull().default(sql`'{}'::text[]`),
     status: text('status').default('sent'),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     readAt: timestamp('read_at', { withTimezone: true }),

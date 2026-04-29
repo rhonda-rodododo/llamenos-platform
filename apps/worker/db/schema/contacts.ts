@@ -30,7 +30,10 @@ export const contacts = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     nameHash: text('name_hash'),
-    trigramTokens: text('trigram_tokens').array(),
+    trigramTokens: text('trigram_tokens')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     encryptedSummary: text('encrypted_summary').notNull(),
     summaryEnvelopes: jsonb('summary_envelopes').notNull().default([]),
     encryptedPii: text('encrypted_pii'),
@@ -38,6 +41,7 @@ export const contacts = pgTable(
     contactTypeHash: text('contact_type_hash'),
     tagHashes: text('tag_hashes')
       .array()
+      .notNull()
       .default(sql`'{}'::text[]`),
     statusHash: text('status_hash'),
     blindIndexes: jsonb('blind_indexes').notNull().default({}),

@@ -47,9 +47,11 @@ export const caseRecords = pgTable(
     reportCount: integer('report_count').notNull().default(0),
     eventIds: text('event_ids')
       .array()
+      .notNull()
       .default(sql`'{}'::text[]`),
     reportIds: text('report_ids')
       .array()
+      .notNull()
       .default(sql`'{}'::text[]`),
     parentRecordId: text('parent_record_id'),
     createdBy: text('created_by').notNull(),

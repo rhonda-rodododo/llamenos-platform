@@ -32,16 +32,21 @@ export const users = pgTable('users', {
   callPreference: text('call_preference'),
   spokenLanguages: text('spoken_languages')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   uiLanguage: text('ui_language'),
   transcriptionEnabled: boolean('transcription_enabled').default(true),
   profileCompleted: boolean('profile_completed').default(false),
   active: boolean('active').notNull().default(true),
   encryptedSecretKey: text('encrypted_secret_key').default(''),
-  supportedMessagingChannels: text('supported_messaging_channels').array(),
+  supportedMessagingChannels: text('supported_messaging_channels')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
   messagingEnabled: boolean('messaging_enabled'),
   specializations: text('specializations')
     .array()
+    .notNull()
     .default(sql`'{}'::text[]`),
   maxCaseAssignments: integer('max_case_assignments'),
   teamId: text('team_id'),
@@ -112,7 +117,10 @@ export const webauthnCredentials = pgTable(
       .references(() => users.pubkey, { onDelete: 'cascade' }),
     publicKey: text('public_key').notNull(),
     counter: integer('counter').notNull().default(0),
-    transports: text('transports').array(),
+    transports: text('transports')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     backedUp: boolean('backed_up').default(false),
     label: text('label').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true })
