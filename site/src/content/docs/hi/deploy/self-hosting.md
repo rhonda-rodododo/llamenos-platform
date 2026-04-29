@@ -1,73 +1,120 @@
 ---
-title: Self-Hosting अवलोकन
-description: Docker Compose या Kubernetes के साथ अपने बुनियादी ढांचे पर Llamenos deploy करें।
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Llamenos Cloudflare Workers **या** आपके खुद के बुनियादी ढांचे पर चल सकता है। Self-hosting आपको data residency, network isolation, और infrastructure choices पर पूर्ण नियंत्रण देता है — उन संगठनों के लिए महत्वपूर्ण जो third-party cloud platforms उपयोग नहीं कर सकते या सख्त अनुपालन आवश्यकताओं को पूरा करने की जरूरत है।
+Llamenos is designed to run on your own infrastructure. Self-hosting gives you full control over data residency, network isolation, and infrastructure choices — critical for organizations protecting against well-funded adversaries.
 
 ## Deployment options
 
-| विकल्प | सबसे अच्छा | जटिलता | Scaling |
+| Option | Best for | Complexity | Scaling |
 |--------|----------|------------|---------|
-| [Cloudflare Workers](/docs/deploy) | सबसे आसान शुरुआत, global edge | कम | स्वचालित |
-| [Docker Compose](/docs/deploy/docker) | Single-server self-hosting | मध्यम | Single node |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | Multi-service orchestration | अधिक | Horizontal (multi-replica) |
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## Architecture अंतर
+## Docker Compose files
 
-दोनों deployment targets **बिल्कुल समान एप्लिकेशन कोड** चलाते हैं। अंतर infrastructure layer में है:
+Docker Compose uses a layered approach:
 
-| Component | Cloudflare | Self-Hosted |
-|-----------|------------|-------------|
-| **Backend runtime** | Cloudflare Workers | Node.js (Hono के माध्यम से) |
-| **Data storage** | Durable Objects (KV) | PostgreSQL |
-| **Blob storage** | R2 | MinIO (S3-compatible) |
-| **Transcription** | Client-side Whisper (WASM) | Client-side Whisper (WASM) |
-| **Static files** | Workers Assets | Caddy / Hono serveStatic |
-| **Real-time events** | Nostr relay (Nosflare) | Nostr relay (strfry) |
-| **TLS termination** | Cloudflare edge | Caddy (automatic HTTPS) |
-| **लागत** | Usage-based (free tier उपलब्ध) | आपके server की लागत |
+| File | Purpose |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-## आपको क्या चाहिए
+For **local development**, use the dev overlay. For **production**, stack the production overlay:
 
-### न्यूनतम आवश्यकताएं
+```bash
+# Local (backing services only + bun run dev:server)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- एक Linux सर्वर (2 CPU cores, 2 GB RAM न्यूनतम)
-- Docker और Docker Compose v2 (या Helm के लिए Kubernetes cluster)
-- आपके सर्वर की ओर इशारा करते domain name
-- एक admin keypair (`bun run bootstrap-admin` से generated)
-- कम से कम एक communication channel (voice provider, SMS, आदि)
+# Production
+docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
+```
 
-### वैकल्पिक components
+Or use the setup script:
 
-- **Whisper transcription** — 4 GB+ RAM (CPU) या तेज़ processing के लिए GPU की आवश्यकता
-- **Asterisk** — self-hosted SIP telephony के लिए (देखें [Asterisk setup](/docs/deploy/providers/asterisk))
-- **Signal bridge** — Signal messaging के लिए (देखें [Signal setup](/docs/deploy/providers/signal))
+```bash
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
+```
 
-## त्वरित तुलना
+## Core services
 
-**Docker Compose चुनें यदि:**
-- आप single server या VPS पर चल रहे हैं
-- आप सबसे सरल self-hosted setup चाहते हैं
-- आप Docker basics से परिचित हैं
+All deployment targets run these core services:
 
-**Kubernetes (Helm) चुनें यदि:**
-- आपके पास पहले से K8s cluster है
-- आपको horizontal scaling (multiple replicas) की जरूरत है
-- आप existing K8s tooling (cert-manager, external-secrets, आदि) के साथ integrate करना चाहते हैं
+| Component | Purpose |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **strfry** | Nostr relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## सुरक्षा विचार
+## Optional services
 
-Self-hosting आपको अधिक नियंत्रण देता है लेकिन अधिक जिम्मेदारी भी:
+| Component | Profile | Purpose |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-- **Data at rest**: PostgreSQL data डिफ़ॉल्ट रूप से unencrypted रहता है। अपने सर्वर पर full-disk encryption (LUKS, dm-crypt) उपयोग करें, या उपलब्ध हो तो PostgreSQL TDE सक्षम करें। ध्यान दें कि call notes और transcriptions पहले से ही E2EE हैं — सर्वर कभी plaintext नहीं देखता।
-- **Network security**: Access restrict करने के लिए firewall उपयोग करें। केवल ports 80/443 publicly accessible होने चाहिए।
-- **Secrets**: Docker Compose files या version control में कभी secrets न डालें। `.env` files (images से excluded) या Docker/Kubernetes secrets उपयोग करें।
-- **Updates**: नियमित रूप से नई images pull करें। Security fixes के लिए [changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) देखें।
-- **Backups**: नियमित रूप से PostgreSQL database और MinIO storage का backup लें। प्रत्येक deployment guide में backup section देखें।
+## What you need
 
-## अगले चरण
+### Minimum requirements
 
-- [Docker Compose deployment](/docs/deploy/docker) — 10 मिनट में चलना शुरू करें
-- [Kubernetes deployment](/docs/deploy/kubernetes) — Helm के साथ deploy करें
-- [Getting Started](/docs/deploy) — Cloudflare Workers deployment
+- A Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (or a Kubernetes cluster for Helm)
+- A domain name pointing to your server
+- `openssl` (for generating secrets)
+- At least one communication channel configured
+
+### Optional components
+
+- **Transcription** — client-side WASM Whisper; no additional server component needed
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
+
+## Cloudflare Tunnels (alternative ingress)
+
+Instead of exposing ports 80/443 directly, you can use [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. This hides your server IP and provides DDoS protection:
+
+```bash
+cloudflared tunnel create llamenos
+cloudflared tunnel route dns llamenos hotline.yourorg.com
+cloudflared tunnel run llamenos
+```
+
+Configure the tunnel to forward to `http://localhost:3000`.
+
+## Security considerations
+
+Self-hosting gives you more control but also more responsibility:
+
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, and messages are E2EE — the server never sees plaintext.
+- **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Watch the changelog for security fixes.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
+
+## Ansible playbooks
+
+The `deploy/ansible/` directory contains preflight and smoke-check playbooks:
+
+```bash
+# Pre-deployment system verification
+ansible-playbook deploy/ansible/preflight.yml -i your_inventory
+
+# Post-deployment smoke check
+ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
+```
+
+## Next steps
+
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers
