@@ -55,7 +55,11 @@ if ! reporter_run_step "health-check" curl -sf "${HUB_URL}/api/health" >/dev/nul
 fi
 reporter_record_suite "health-check" 1 0 0
 
-# Step 3: Run backend BDD tests via Playwright
+# Step 3: Generate BDD test files from features + step definitions
+# playwright-bdd v8 requires explicit bddgen before test execution
+bunx bddgen 2>&1
+
+# Step 4: Run backend BDD tests via Playwright
 # --workers=1: backend tests share server state (test-reset clears all DOs)
 # so all spec files must run serially to avoid cross-test interference
 if reporter_run_step "backend-bdd" bunx playwright test --project=backend-bdd --workers=1; then

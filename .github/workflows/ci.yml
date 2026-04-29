@@ -294,6 +294,9 @@ jobs:
             -f deploy/docker/docker-compose.test.yml \
             logs --tail=50 || true
 
+      - name: Generate BDD test files
+        run: bunx bddgen
+
       - name: Run E2E tests
         run: bunx playwright test
 

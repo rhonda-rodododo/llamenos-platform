@@ -16,13 +16,13 @@ Feature: SIP Bridge Integration
     Given 3 volunteers are on shift
     When an inbound SIP call arrives from "+15553330001"
     Then a call ring Nostr event should be published
-    And the call status should be "ringing"
+    And the SIP call status should be "ringing"
 
   Scenario: Call answered terminates other ringing channels
     Given 2 volunteers are on shift
     And an inbound SIP call arrives from "+15553330002"
     When a volunteer answers the call
-    Then the call status should be "in-progress"
+    Then the SIP call status should be "in-progress"
     And the call should be assigned to the answering volunteer
 
   Scenario: DTMF gather collects digits
@@ -39,7 +39,7 @@ Feature: SIP Bridge Integration
 
   Scenario: SIP bridge health check returns healthy
     When the SIP bridge health endpoint is requested
-    Then the response status should be 200
+    Then the SIP health response status should be 200
 
   # ── Call Lifecycle ────────────────────────────────────────────────
 
@@ -47,11 +47,11 @@ Feature: SIP Bridge Integration
     Given no volunteers are on shift
     When an inbound SIP call arrives from "+15553330004"
     And the call rings with no answer
-    Then the call status should be "unanswered"
+    Then the SIP call status should be "unanswered"
 
   Scenario: Call ended by caller updates call status
     Given 1 volunteers are on shift
     And an inbound SIP call arrives from "+15553330005"
     And a volunteer answers the call
     When the caller disconnects
-    Then the call status should be "completed"
+    Then the SIP call status should be "completed"

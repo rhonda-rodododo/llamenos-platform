@@ -64,34 +64,6 @@ Given('no volunteers are on shift', async ({ world }) => {
   }
 })
 
-Given(
-  'an inbound SIP call arrives from {string}',
-  async ({ request, world }, callerNumber: string) => {
-    const state = getScenarioState(world)
-    const result = await simulateIncomingCall(request, {
-      callerNumber,
-      hubId: state.hubId,
-    })
-    setState(world, STATE_KEY, {
-      callerNumber,
-      callId: result.callId,
-      callStatus: result.status,
-    } satisfies SipBridgeState)
-    state.callId = result.callId
-    state.callStatus = result.status
-  },
-)
-
-Given('a volunteer answers the call', async ({ request, world }) => {
-  const state = getScenarioState(world)
-  expect(state.callId).toBeDefined()
-  expect(state.volunteers.length).toBeGreaterThan(0)
-  const result = await simulateAnswerCall(request, state.callId!, state.volunteers[0].pubkey)
-  const sipState = getSipState(world)
-  sipState.callStatus = result.status
-  state.callStatus = result.status
-})
-
 // ── When ─────────────────────────────────────────────────────────────
 
 When(
@@ -232,7 +204,7 @@ Then('a call ring Nostr event should be published', async ({ world }) => {
   expect(state.callId).toBeDefined()
 })
 
-Then('the call status should be {string}', async ({ request, world }, expectedStatus: string) => {
+Then('the SIP call status should be {string}', async ({ request, world }, expectedStatus: string) => {
   const state = getScenarioState(world)
   expect(state.callId).toBeDefined()
   const { status, data } = await apiGet<{ status: string }>(
@@ -286,7 +258,7 @@ Then('the call metadata should include recording info', async ({ request, world 
   expect(hasRecording || true).toBe(true) // Non-blocking: sidecar may not have recording configured in CI
 })
 
-Then('the response status should be {int}', async ({ world }, expectedStatus: number) => {
+Then('the SIP health response status should be {int}', async ({ world }, expectedStatus: number) => {
   const sipState = getSipState(world)
   expect(sipState.sipHealthStatus).toBe(expectedStatus)
 })
