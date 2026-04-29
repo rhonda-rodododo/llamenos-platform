@@ -15,29 +15,20 @@ Diese Anleitung behandelt die Bereitstellung von Llamenos in einem Kubernetes-Cl
 - cert-manager (optional, fuer automatische TLS-Zertifikate)
 - [Bun](https://bun.sh/) lokal installiert (zur Generierung des Admin-Schluesselpaars)
 
-## 1. Admin-Schluesselpaar generieren
-
-```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
-bun install
-bun run bootstrap-admin
-```
-
-Bewahren Sie den **nsec** sicher auf. Kopieren Sie den **hexadezimalen oeffentlichen Schluessel** fuer die Helm-Werte.
 
 ## 2. Chart installieren
 
 ```bash
 helm install llamenos deploy/helm/llamenos/ \
-  --set secrets.adminPubkey=IHR_HEX_OEFFENTLICHER_SCHLUESSEL \
-  --set secrets.postgresPassword=IHR_PG_PASSWORT \
-  --set postgres.host=IHR_PG_HOST \
-  --set minio.credentials.accessKey=ihr-zugangsschluessel \
-  --set minio.credentials.secretKey=ihr-geheimschluessel \
-  --set ingress.hosts[0].host=hotline.ihredomain.com \
+  --set secrets.postgresPassword=YOUR_PG_PASSWORD \
+  --set secrets.hmacSecret=YOUR_HMAC_HEX \
+  --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
+  --set postgres.host=YOUR_PG_HOST \
+  --set minio.credentials.accessKey=your-access-key \
+  --set minio.credentials.secretKey=your-secret-key \
+  --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
-  --set ingress.tls[0].hosts[0]=hotline.ihredomain.com
+  --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
 ```
 
 Oder erstellen Sie eine `values-production.yaml`-Datei fuer reproduzierbare Bereitstellungen:
@@ -46,22 +37,32 @@ Oder erstellen Sie eine `values-production.yaml`-Datei fuer reproduzierbare Bere
 # values-production.yaml
 app:
   image:
-    repository: ghcr.io/your-org/llamenos
-    tag: "0.14.0"
+    repository: ghcr.io/rhonda-rodododo/llamenos
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
   replicas: 2
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "1Gi"
   env:
-    HOTLINE_NAME: "Ihre Hotline"
+    HOTLINE_NAME: "Your Hotline"
+    NODE_ENV: "production"
 
 postgres:
-  host: meine-rds-instanz.region.rds.amazonaws.com
+  host: my-rds-instance.region.rds.amazonaws.com
   port: 5432
   database: llamenos
   user: llamenos
   poolSize: 10
 
 secrets:
-  adminPubkey: "ihr_hex_oeffentlicher_schluessel"
-  postgresPassword: "ihr-starkes-passwort"
+  postgresPassword: "your-strong-password"
+  hmacSecret: "64-hex-chars-hmac-signing-key"
+  serverNostrSecret: "64-hex-chars-nostr-identity-key"
   # twilioAccountSid: ""
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
@@ -72,20 +73,19 @@ minio:
     size: 50Gi
     storageClass: "gp3"
   credentials:
-    accessKey: "ihr-zugangsschluessel"
-    secretKey: "ihr-geheimschluessel-aendern"
+    accessKey: "your-access-key"
+    secretKey: "your-secret-key-change-me"
 
-whisper:
+strfry:
   enabled: true
-  model: "Systran/faster-whisper-base"
-  device: "cpu"
-  resources:
-    requests:
-      memory: "2Gi"
-      cpu: "1"
-    limits:
-      memory: "4Gi"
-      cpu: "2"
+
+signalNotifier:
+  enabled: false
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    interval: 30s
 
 ingress:
   enabled: true
@@ -93,14 +93,14 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
-    - host: hotline.ihredomain.com
+    - host: hotline.yourdomain.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: llamenos-tls
       hosts:
-        - hotline.ihredomain.com
+        - hotline.yourdomain.com
 ```
 
 Dann installieren:
@@ -117,7 +117,7 @@ kubectl get pods -l app.kubernetes.io/instance=llamenos
 
 # App-Gesundheit pruefen
 kubectl port-forward svc/llamenos 3000:3000
-curl http://localhost:3000/api/health
+curl http://localhost:3000/health/ready
 # → {"status":"ok"}
 ```
 
@@ -139,7 +139,7 @@ Oeffnen Sie `https://hotline.ihredomain.com` in Ihrem Browser. Melden Sie sich m
 
 | Parameter | Beschreibung | Standard |
 |-----------|-------------|----------|
-| `app.image.repository` | Container-Image | `ghcr.io/your-org/llamenos` |
+| `app.image.repository` | Container-Image | `ghcr.io/rhonda-rodododo/llamenos` |
 | `app.image.tag` | Image-Tag | Chart appVersion |
 | `app.port` | Anwendungsport | `3000` |
 | `app.replicas` | Pod-Replikate | `2` |
@@ -160,7 +160,8 @@ Oeffnen Sie `https://hotline.ihredomain.com` in Ihrem Browser. Melden Sie sich m
 
 | Parameter | Beschreibung | Standard |
 |-----------|-------------|----------|
-| `secrets.adminPubkey` | Admin-Nostr-Hex-oeffentlicher-Schluessel | `""` |
+| `secrets.hmacSecret` | HMAC signing key — 64 hex chars (required) | `""` |
+| `secrets.serverNostrSecret` | Server Nostr identity key — 64 hex chars (required) | `""` |
 | `secrets.postgresPassword` | PostgreSQL-Passwort (erforderlich) | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |
@@ -276,7 +277,6 @@ kubectl scale deployment llamenos --replicas=3
 
 Oder setzen Sie `app.replicas` in Ihrer Wertedatei. PostgreSQL Advisory Locks stellen die Datenkonsistenz ueber Replikate hinweg sicher.
 
-Fuer automatische globale Skalierung ohne Infrastrukturverwaltung sollten Sie die [Cloudflare Workers-Bereitstellung](/docs/deploy) in Betracht ziehen.
 
 ## Ueberwachung
 
@@ -288,19 +288,19 @@ Das Chart konfiguriert Liveness-, Readiness- und Startup-Probes gegen `/api/heal
 # In das Deployment-Template integriert
 livenessProbe:
   httpGet:
-    path: /api/health
+    path: /health/live
     port: http
   initialDelaySeconds: 15
   periodSeconds: 15
 readinessProbe:
   httpGet:
-    path: /api/health
+    path: /health/live
     port: http
   initialDelaySeconds: 10
   periodSeconds: 10
 startupProbe:
   httpGet:
-    path: /api/health
+    path: /health/live
     port: http
   failureThreshold: 30
   periodSeconds: 5
@@ -358,6 +358,114 @@ Ueberpruefen Sie, ob der Ingress-Controller laeuft und die Ingress-Ressource ein
 kubectl get ingress llamenos
 kubectl describe ingress llamenos
 ```
+
+
+## cert-manager integration
+
+If you have [cert-manager](https://cert-manager.io/) installed, configure the cluster issuer for automatic TLS:
+
+```yaml
+# cluster-issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+Reference it in your ingress annotations:
+
+```yaml
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+```
+
+## External Secrets Operator
+
+For production, use [External Secrets Operator](https://external-secrets.io/) to sync secrets from AWS SSM, Vault, GCP Secret Manager, etc.
+
+```yaml
+# llamenos-externalsecret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: llamenos-secrets
+  namespace: llamenos
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: my-secret-store
+    kind: ClusterSecretStore
+  target:
+    name: llamenos-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: postgres-password
+      remoteRef:
+        key: llamenos/postgres-password
+    - secretKey: hmac-secret
+      remoteRef:
+        key: llamenos/hmac-secret
+    - secretKey: server-nostr-secret
+      remoteRef:
+        key: llamenos/server-nostr-secret
+    - secretKey: minio-access-key
+      remoteRef:
+        key: llamenos/minio-access-key
+    - secretKey: minio-secret-key
+      remoteRef:
+        key: llamenos/minio-secret-key
+```
+
+Then reference in Helm values:
+
+```yaml
+secrets:
+  existingSecret: llamenos-secrets
+```
+
+## Prometheus ServiceMonitor
+
+Enable the `ServiceMonitor` for Prometheus Operator:
+
+```yaml
+monitoring:
+  enabled: true
+  serviceMonitor:
+    namespace: monitoring
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: kube-prometheus-stack
+```
+
+## Production hardening checklist
+
+Before going live:
+
+- [ ] **Secrets via ESO or Sealed Secrets** — never commit secrets to values files
+- [ ] **Resource requests and limits** set on all deployments
+- [ ] **PodDisruptionBudget** configured (`minAvailable: 1`) for zero-downtime drains
+- [ ] **NetworkPolicy** restricting ingress to app pod from ingress controller only
+- [ ] **Read-only root filesystem** (`securityContext.readOnlyRootFilesystem: true`)
+- [ ] **Non-root user** (`securityContext.runAsNonRoot: true`)
+- [ ] **PostgreSQL TLS** enabled (`postgres.sslMode: require`)
+- [ ] **cert-manager ClusterIssuer** configured for automatic Let's Encrypt renewal
+- [ ] **Prometheus ServiceMonitor** enabled and scraping
+- [ ] **Liveness/readiness probes** verified after deploy
+- [ ] **Image pull policy** set to `IfNotPresent`
+- [ ] **Ingress rate limiting** annotations configured
+
 
 ## Naechste Schritte
 

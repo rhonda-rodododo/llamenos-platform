@@ -1,73 +1,120 @@
 ---
-title: Uebersicht Selbst-Hosting
-description: Stellen Sie Llamenos auf Ihrer eigenen Infrastruktur mit Docker Compose oder Kubernetes bereit.
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Llamenos kann auf Cloudflare Workers **oder** auf Ihrer eigenen Infrastruktur laufen. Selbst-Hosting gibt Ihnen die volle Kontrolle ueber Datenresidenz, Netzwerkisolation und Infrastrukturentscheidungen -- wichtig fuer Organisationen, die keine Cloud-Plattformen von Drittanbietern nutzen koennen oder strenge Compliance-Anforderungen erfuellen muessen.
+Llamenos is designed to run on your own infrastructure. Self-hosting gives you full control over data residency, network isolation, and infrastructure choices — critical for organizations protecting against well-funded adversaries.
 
-## Bereitstellungsoptionen
+## Deployment options
 
-| Option | Am besten fuer | Komplexitaet | Skalierung |
-|--------|----------------|--------------|------------|
-| [Cloudflare Workers](/docs/deploy) | Einfachster Start, globale Edge | Niedrig | Automatisch |
-| [Docker Compose](/docs/deploy/docker) | Einzelserver-Selbst-Hosting | Mittel | Einzelner Knoten |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | Multi-Service-Orchestrierung | Hoeher | Horizontal (Multi-Replikat) |
+| Option | Best for | Complexity | Scaling |
+|--------|----------|------------|---------|
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## Architekturunterschiede
+## Docker Compose files
 
-Beide Bereitstellungsziele fuehren den **exakt gleichen Anwendungscode** aus. Der Unterschied liegt in der Infrastrukturschicht:
+Docker Compose uses a layered approach:
 
-| Komponente | Cloudflare | Selbst gehostet |
-|------------|------------|-----------------|
-| **Backend-Runtime** | Cloudflare Workers | Node.js (ueber Hono) |
-| **Datenspeicher** | Durable Objects (KV) | PostgreSQL |
-| **Blob-Speicher** | R2 | MinIO (S3-kompatibel) |
-| **Transkription** | Client-seitiges Whisper (WASM) | Client-seitiges Whisper (WASM) |
-| **Statische Dateien** | Workers Assets | Caddy / Hono serveStatic |
-| **Echtzeit-Events** | Nostr-Relay (Nosflare) | Nostr-Relay (strfry) |
-| **TLS-Terminierung** | Cloudflare Edge | Caddy (automatisches HTTPS) |
-| **Kosten** | Nutzungsbasiert (kostenloses Kontingent verfuegbar) | Ihre Serverkosten |
+| File | Purpose |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-## Was Sie benoetigen
+For **local development**, use the dev overlay. For **production**, stack the production overlay:
 
-### Mindestanforderungen
+```bash
+# Local (backing services only + bun run dev:server)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- Ein Linux-Server (2 CPU-Kerne, mindestens 2 GB RAM)
-- Docker und Docker Compose v2 (oder ein Kubernetes-Cluster fuer Helm)
-- Ein Domainname, der auf Ihren Server verweist
-- Ein Admin-Schluesselpaar (generiert mit `bun run bootstrap-admin`)
-- Mindestens ein Kommunikationskanal (Sprachanbieter, SMS, etc.)
+# Production
+docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
+```
 
-### Optionale Komponenten
+Or use the setup script:
 
-- **Whisper-Transkription** -- erfordert 4 GB+ RAM (CPU) oder eine GPU fuer schnellere Verarbeitung
-- **Asterisk** -- fuer selbst gehostete SIP-Telefonie (siehe [Asterisk-Einrichtung](/docs/deploy/providers/asterisk))
-- **Signal-Bridge** -- fuer Signal-Nachrichten (siehe [Signal-Einrichtung](/docs/deploy/providers/signal))
+```bash
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
+```
 
-## Schnellvergleich
+## Core services
 
-**Waehlen Sie Docker Compose, wenn:**
-- Sie auf einem einzelnen Server oder VPS laufen
-- Sie das einfachstmoegliche selbst gehostete Setup wuenschen
-- Sie mit Docker-Grundlagen vertraut sind
+All deployment targets run these core services:
 
-**Waehlen Sie Kubernetes (Helm), wenn:**
-- Sie bereits einen K8s-Cluster haben
-- Sie horizontale Skalierung benoetigen (mehrere Replikate)
-- Sie mit vorhandenem K8s-Tooling integrieren moechten (cert-manager, external-secrets, etc.)
+| Component | Purpose |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **strfry** | Nostr relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## Sicherheitsueberlegungen
+## Optional services
 
-Selbst-Hosting gibt Ihnen mehr Kontrolle, aber auch mehr Verantwortung:
+| Component | Profile | Purpose |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-- **Daten im Ruhezustand**: PostgreSQL-Daten werden standardmaessig unverschluesselt gespeichert. Verwenden Sie Festplattenverschluesselung (LUKS, dm-crypt) auf Ihrem Server, oder aktivieren Sie PostgreSQL TDE, falls verfuegbar. Beachten Sie, dass Anrufnotizen und Transkriptionen bereits E2EE sind -- der Server sieht niemals Klartext.
-- **Netzwerksicherheit**: Verwenden Sie eine Firewall, um den Zugriff einzuschraenken. Nur die Ports 80/443 sollten oeffentlich zugaenglich sein.
-- **Secrets**: Legen Sie Secrets niemals in Docker Compose-Dateien oder Versionskontrolle ab. Verwenden Sie `.env`-Dateien (von Images ausgeschlossen) oder Docker/Kubernetes-Secrets.
-- **Aktualisierungen**: Laden Sie regelmaessig neue Images herunter. Beobachten Sie das [Changelog](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) fuer Sicherheitskorrekturen.
-- **Backups**: Sichern Sie die PostgreSQL-Datenbank und den MinIO-Speicher regelmaessig. Siehe den Backup-Abschnitt in jeder Bereitstellungsanleitung.
+## What you need
 
-## Naechste Schritte
+### Minimum requirements
 
-- [Docker Compose-Bereitstellung](/docs/deploy/docker) -- in 10 Minuten einsatzbereit
-- [Kubernetes-Bereitstellung](/docs/deploy/kubernetes) -- mit Helm bereitstellen
-- [Erste Schritte](/docs/deploy) -- Cloudflare Workers-Bereitstellung
+- A Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (or a Kubernetes cluster for Helm)
+- A domain name pointing to your server
+- `openssl` (for generating secrets)
+- At least one communication channel configured
+
+### Optional components
+
+- **Transcription** — client-side WASM Whisper; no additional server component needed
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
+
+## Cloudflare Tunnels (alternative ingress)
+
+Instead of exposing ports 80/443 directly, you can use [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. This hides your server IP and provides DDoS protection:
+
+```bash
+cloudflared tunnel create llamenos
+cloudflared tunnel route dns llamenos hotline.yourorg.com
+cloudflared tunnel run llamenos
+```
+
+Configure the tunnel to forward to `http://localhost:3000`.
+
+## Security considerations
+
+Self-hosting gives you more control but also more responsibility:
+
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, and messages are E2EE — the server never sees plaintext.
+- **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Watch the changelog for security fixes.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
+
+## Ansible playbooks
+
+The `deploy/ansible/` directory contains preflight and smoke-check playbooks:
+
+```bash
+# Pre-deployment system verification
+ansible-playbook deploy/ansible/preflight.yml -i your_inventory
+
+# Post-deployment smoke check
+ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
+```
+
+## Next steps
+
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers

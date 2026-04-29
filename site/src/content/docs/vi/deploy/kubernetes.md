@@ -15,23 +15,14 @@ Hướng dẫn này bao gồm việc triển khai Llamenos lên cụm Kubernetes
 - cert-manager (tùy chọn, cho chứng chỉ TLS tự động)
 - [Bun](https://bun.sh/) cài đặt trên máy cục bộ (để tạo cặp khóa quản trị)
 
-## 1. Tạo cặp khóa quản trị
-
-```bash
-git clone https://github.com/your-org/llamenos.git
-cd llamenos
-bun install
-bun run bootstrap-admin
-```
-
-Lưu **nsec** an toàn. Sao chép **khóa công khai hex** cho Helm values.
 
 ## 2. Cài đặt chart
 
 ```bash
 helm install llamenos deploy/helm/llamenos/ \
-  --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
   --set secrets.postgresPassword=YOUR_PG_PASSWORD \
+  --set secrets.hmacSecret=YOUR_HMAC_HEX \
+  --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
   --set minio.credentials.accessKey=your-access-key \
   --set minio.credentials.secretKey=your-secret-key \
@@ -46,11 +37,20 @@ Hoặc tạo file `values-production.yaml` để triển khai tái lập:
 # values-production.yaml
 app:
   image:
-    repository: ghcr.io/your-org/llamenos
-    tag: "0.14.0"
+    repository: ghcr.io/rhonda-rodododo/llamenos
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
   replicas: 2
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "1Gi"
   env:
     HOTLINE_NAME: "Your Hotline"
+    NODE_ENV: "production"
 
 postgres:
   host: my-rds-instance.region.rds.amazonaws.com
@@ -60,8 +60,12 @@ postgres:
   poolSize: 10
 
 secrets:
-  adminPubkey: "your_hex_public_key"
   postgresPassword: "your-strong-password"
+  hmacSecret: "64-hex-chars-hmac-signing-key"
+  serverNostrSecret: "64-hex-chars-nostr-identity-key"
+  # twilioAccountSid: ""
+  # twilioAuthToken: ""
+  # twilioPhoneNumber: ""
 
 minio:
   enabled: true
@@ -72,17 +76,16 @@ minio:
     accessKey: "your-access-key"
     secretKey: "your-secret-key-change-me"
 
-whisper:
+strfry:
   enabled: true
-  model: "Systran/faster-whisper-base"
-  device: "cpu"
-  resources:
-    requests:
-      memory: "2Gi"
-      cpu: "1"
-    limits:
-      memory: "4Gi"
-      cpu: "2"
+
+signalNotifier:
+  enabled: false
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    interval: 30s
 
 ingress:
   enabled: true
@@ -111,7 +114,7 @@ helm install llamenos deploy/helm/llamenos/ -f values-production.yaml
 ```bash
 kubectl get pods -l app.kubernetes.io/instance=llamenos
 kubectl port-forward svc/llamenos 3000:3000
-curl http://localhost:3000/api/health
+curl http://localhost:3000/health/ready
 # → {"status":"ok"}
 ```
 
@@ -133,7 +136,7 @@ Mở `https://hotline.yourdomain.com` trong trình duyệt. Đăng nhập bằng
 
 | Tham số | Mô tả | Mặc định |
 |---------|-------|----------|
-| `app.image.repository` | Container image | `ghcr.io/your-org/llamenos` |
+| `app.image.repository` | Container image | `ghcr.io/rhonda-rodododo/llamenos` |
 | `app.image.tag` | Image tag | Chart appVersion |
 | `app.port` | Cổng ứng dụng | `3000` |
 | `app.replicas` | Số bản sao Pod | `2` |
@@ -154,7 +157,8 @@ Mở `https://hotline.yourdomain.com` trong trình duyệt. Đăng nhập bằng
 
 | Tham số | Mô tả | Mặc định |
 |---------|-------|----------|
-| `secrets.adminPubkey` | Khóa công khai hex Nostr quản trị | `""` |
+| `secrets.hmacSecret` | HMAC signing key — 64 hex chars (required) | `""` |
+| `secrets.serverNostrSecret` | Server Nostr identity key — 64 hex chars (required) | `""` |
 | `secrets.postgresPassword` | Mật khẩu PostgreSQL (bắt buộc) | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |
@@ -191,7 +195,8 @@ secrets:
 
 ```bash
 kubectl create secret generic llamenos-secrets \
-  --from-literal=admin-pubkey=your_key \
+  --from-literal=hmac-secret=your_hmac_hex \
+  --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
   --from-literal=minio-access-key=your_key \
   --from-literal=minio-secret-key=your_key
@@ -259,6 +264,114 @@ kubectl run pg-test --rm -it --image=postgres:17-alpine -- psql postgresql://lla
 kubectl get ingress llamenos
 kubectl describe ingress llamenos
 ```
+
+
+## cert-manager integration
+
+If you have [cert-manager](https://cert-manager.io/) installed, configure the cluster issuer for automatic TLS:
+
+```yaml
+# cluster-issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+Reference it in your ingress annotations:
+
+```yaml
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+```
+
+## External Secrets Operator
+
+For production, use [External Secrets Operator](https://external-secrets.io/) to sync secrets from AWS SSM, Vault, GCP Secret Manager, etc.
+
+```yaml
+# llamenos-externalsecret.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: llamenos-secrets
+  namespace: llamenos
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: my-secret-store
+    kind: ClusterSecretStore
+  target:
+    name: llamenos-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: postgres-password
+      remoteRef:
+        key: llamenos/postgres-password
+    - secretKey: hmac-secret
+      remoteRef:
+        key: llamenos/hmac-secret
+    - secretKey: server-nostr-secret
+      remoteRef:
+        key: llamenos/server-nostr-secret
+    - secretKey: minio-access-key
+      remoteRef:
+        key: llamenos/minio-access-key
+    - secretKey: minio-secret-key
+      remoteRef:
+        key: llamenos/minio-secret-key
+```
+
+Then reference in Helm values:
+
+```yaml
+secrets:
+  existingSecret: llamenos-secrets
+```
+
+## Prometheus ServiceMonitor
+
+Enable the `ServiceMonitor` for Prometheus Operator:
+
+```yaml
+monitoring:
+  enabled: true
+  serviceMonitor:
+    namespace: monitoring
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: kube-prometheus-stack
+```
+
+## Production hardening checklist
+
+Before going live:
+
+- [ ] **Secrets via ESO or Sealed Secrets** — never commit secrets to values files
+- [ ] **Resource requests and limits** set on all deployments
+- [ ] **PodDisruptionBudget** configured (`minAvailable: 1`) for zero-downtime drains
+- [ ] **NetworkPolicy** restricting ingress to app pod from ingress controller only
+- [ ] **Read-only root filesystem** (`securityContext.readOnlyRootFilesystem: true`)
+- [ ] **Non-root user** (`securityContext.runAsNonRoot: true`)
+- [ ] **PostgreSQL TLS** enabled (`postgres.sslMode: require`)
+- [ ] **cert-manager ClusterIssuer** configured for automatic Let's Encrypt renewal
+- [ ] **Prometheus ServiceMonitor** enabled and scraping
+- [ ] **Liveness/readiness probes** verified after deploy
+- [ ] **Image pull policy** set to `IfNotPresent`
+- [ ] **Ingress rate limiting** annotations configured
+
 
 ## Bước tiếp theo
 

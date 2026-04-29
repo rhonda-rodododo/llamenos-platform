@@ -1,142 +1,120 @@
 ---
-title: Обзор самостоятельного хостинга
-description: Развёртывание Llamenos на собственной инфраструктуре с Docker Compose или Kubernetes.
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Llamenos может работать на Cloudflare Workers **или** на вашей собственной инфраструктуре. Самостоятельный хостинг даёт вам полный контроль над хранением данных, сетевой изоляцией и выбором инфраструктуры — это важно для организаций, которые не могут использовать сторонние облачные платформы или должны выполнять строгие требования соответствия.
+Llamenos is designed to run on your own infrastructure. Self-hosting gives you full control over data residency, network isolation, and infrastructure choices — critical for organizations protecting against well-funded adversaries.
 
-## Варианты развёртывания
+## Deployment options
 
-| Вариант | Лучше всего для | Сложность | Масштабирование |
+| Option | Best for | Complexity | Scaling |
 |--------|----------|------------|---------|
-| [Cloudflare Workers](/docs/deploy) | Простейший старт, глобальный edge | Низкая | Автоматическое |
-| [Docker Compose](/docs/deploy/docker) | Самостоятельный хостинг на одном сервере | Средняя | Один узел |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | Многосервисная оркестрация | Высокая | Горизонтальное (несколько реплик) |
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## Различия в архитектуре
+## Docker Compose files
 
-Оба варианта развёртывания запускают **точно одинаковый код приложения**. Различие — в уровне инфраструктуры:
+Docker Compose uses a layered approach:
 
-| Компонент | Cloudflare | Самостоятельный хостинг |
-|-----------|------------|-------------|
-| **Среда выполнения бэкенда** | Cloudflare Workers | Node.js (через Hono) |
-| **Хранилище данных** | Durable Objects (KV) | PostgreSQL |
-| **Хранилище блобов** | R2 | MinIO (совместимый с S3) |
-| **Транскрипция** | Клиентский Whisper (WASM) | Клиентский Whisper (WASM) |
-| **Статические файлы** | Workers Assets | Caddy / Hono serveStatic |
-| **События реального времени** | Nostr relay (Nosflare) | Nostr relay (strfry) |
-| **Завершение TLS** | Cloudflare edge | Caddy (автоматический HTTPS) |
-| **Стоимость** | По использованию (есть бесплатный уровень) | Стоимость вашего сервера |
+| File | Purpose |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-## Что вам нужно
+For **local development**, use the dev overlay. For **production**, stack the production overlay:
 
-### Минимальные требования
+```bash
+# Local (backing services only + bun run dev:server)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- Сервер Linux (минимум 2 ядра CPU, 2 ГБ ОЗУ)
-- Docker и Docker Compose v2 (или кластер Kubernetes для Helm)
-- Доменное имя, указывающее на ваш сервер
-- Пара ключей администратора (генерируется с помощью `bun run bootstrap-admin`)
-- Хотя бы один канал связи (провайдер голосовой связи, SMS и т. д.)
+# Production
+docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
+```
 
-### Опциональные компоненты
+Or use the setup script:
 
-- **Транскрипция Whisper** — требует 4 ГБ+ ОЗУ (CPU) или GPU для более быстрой обработки
-- **Asterisk** — для самостоятельно размещённой SIP-телефонии (см. [Настройка Asterisk](/docs/deploy/providers/asterisk))
-- **Signal bridge** — для обмена сообщениями через Signal (см. [Настройка Signal](/docs/deploy/providers/signal))
+```bash
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
+```
 
-## Быстрое сравнение
+## Core services
 
-**Выберите Docker Compose, если:**
-- Вы работаете на одном сервере или VPS
-- Вам нужна максимально простая самостоятельная настройка
-- Вы знакомы с основами Docker
+All deployment targets run these core services:
 
-**Выберите Kubernetes (Helm), если:**
-- У вас уже есть кластер K8s
-- Вам нужно горизонтальное масштабирование (несколько реплик)
-- Вы хотите интегрировать существующие инструменты K8s (cert-manager, external-secrets и т. д.)
+| Component | Purpose |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **strfry** | Nostr relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## Соображения безопасности
+## Optional services
 
-Самостоятельный хостинг даёт больше контроля, но и больше ответственности:
+| Component | Profile | Purpose |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-- **Данные в покое**: Данные PostgreSQL по умолчанию хранятся в незашифрованном виде. Используйте полнодисковое шифрование (LUKS, dm-crypt) на вашем сервере или включите PostgreSQL TDE, если доступно. Обратите внимание, что заметки звонков и транскрипты уже зашифрованы E2EE — сервер никогда не видит открытый текст.
-- **Сетевая безопасность**: Используйте брандмауэр для ограничения доступа. Только порты 80/443 должны быть публично доступны.
-- **Секреты**: Никогда не помещайте секреты в файлы Docker Compose или систему контроля версий. Используйте файлы `.env` (исключённые из образов) или секреты Docker/Kubernetes.
-- **Обновления**: Регулярно загружайте новые образы. Следите за [журналом изменений](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) для получения исправлений безопасности.
-- **Резервное копирование**: Регулярно создавайте резервные копии базы данных PostgreSQL и хранилища MinIO. См. раздел резервного копирования в каждом руководстве по развёртыванию.
+## What you need
 
-## Следующие шаги
+### Minimum requirements
 
-- [Развёртывание с Docker Compose](/docs/deploy/docker) — запуск за 10 минут
-- [Развёртывание в Kubernetes](/docs/deploy/kubernetes) — развёртывание с Helm
-- [Начало работы](/docs/deploy) — развёртывание на Cloudflare Workers
+- A Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (or a Kubernetes cluster for Helm)
+- A domain name pointing to your server
+- `openssl` (for generating secrets)
+- At least one communication channel configured
 
-Llamenos может работать на Cloudflare Workers **или** на вашей собственной инфраструктуре. Самостоятельный хостинг даёт полный контроль над размещением данных, сетевой изоляцией и выбором инфраструктуры — это важно для организаций, которые не могут использовать сторонние облачные платформы или должны соответствовать строгим требованиям комплаенса.
+### Optional components
 
-## Варианты развёртывания
+- **Transcription** — client-side WASM Whisper; no additional server component needed
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
 
-| Вариант | Подходит для | Сложность | Масштабирование |
-|---------|-------------|-----------|-----------------|
-| [Cloudflare Workers](/docs/deploy) | Простейший старт, глобальный edge | Низкая | Автоматическое |
-| [Docker Compose](/docs/deploy/docker) | Самостоятельный хостинг на одном сервере | Средняя | Один узел |
-| [Kubernetes (Helm)](/docs/deploy/kubernetes) | Оркестрация нескольких сервисов | Высокая | Горизонтальное (несколько реплик) |
+## Cloudflare Tunnels (alternative ingress)
 
-## Архитектурные различия
+Instead of exposing ports 80/443 directly, you can use [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. This hides your server IP and provides DDoS protection:
 
-Оба варианта развёртывания запускают **один и тот же код приложения**. Разница заключается в инфраструктурном уровне:
+```bash
+cloudflared tunnel create llamenos
+cloudflared tunnel route dns llamenos hotline.yourorg.com
+cloudflared tunnel run llamenos
+```
 
-| Компонент | Cloudflare | Самостоятельный хостинг |
-|-----------|------------|------------------------|
-| **Среда выполнения бэкенда** | Cloudflare Workers | Node.js (via Hono) |
-| **Хранилище данных** | Durable Objects (KV) | PostgreSQL |
-| **Хранилище блобов** | R2 | MinIO (S3-compatible) |
-| **Транскрипция** | Клиентская Whisper (WASM) | Клиентская Whisper (WASM) |
-| **Статические файлы** | Workers Assets | Caddy / Hono serveStatic |
-| **Событийная система** | Nostr relay (Nosflare) | Nostr relay (strfry) |
-| **TLS-терминация** | Cloudflare edge | Caddy (автоматический HTTPS) |
-| **Стоимость** | По использованию (бесплатный уровень) | Ваши серверные расходы |
+Configure the tunnel to forward to `http://localhost:3000`.
 
-## Что вам нужно
+## Security considerations
 
-### Минимальные требования
+Self-hosting gives you more control but also more responsibility:
 
-- Linux-сервер (2 ядра CPU, минимум 2 ГБ RAM)
-- Docker и Docker Compose v2 (или кластер Kubernetes для Helm)
-- Доменное имя, указывающее на ваш сервер
-- Ключевая пара администратора (генерируется с помощью `bun run bootstrap-admin`)
-- Минимум один канал связи (провайдер голосовой связи, SMS и т. д.)
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Use full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, and messages are E2EE — the server never sees plaintext.
+- **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Watch the changelog for security fixes.
+- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
 
-### Опциональные компоненты
+## Ansible playbooks
 
-- **Транскрипция Whisper** — требует 4+ ГБ RAM (CPU) или GPU для более быстрой обработки
-- **Asterisk** — для самостоятельного хостинга SIP-телефонии (см. [Настройка Asterisk](/docs/deploy/providers/asterisk))
-- **Signal-мост** — для обмена сообщениями через Signal (см. [Настройка Signal](/docs/deploy/providers/signal))
+The `deploy/ansible/` directory contains preflight and smoke-check playbooks:
 
-## Быстрое сравнение
+```bash
+# Pre-deployment system verification
+ansible-playbook deploy/ansible/preflight.yml -i your_inventory
 
-**Выбирайте Docker Compose, если:**
-- Вы работаете на одном сервере или VPS
-- Вам нужна простейшая самостоятельная установка
-- Вы знакомы с основами Docker
+# Post-deployment smoke check
+ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
+```
 
-**Выбирайте Kubernetes (Helm), если:**
-- У вас уже есть K8s-кластер
-- Вам нужно горизонтальное масштабирование (несколько реплик)
-- Вы хотите интеграцию с существующим инструментарием K8s (cert-manager, external-secrets и др.)
+## Next steps
 
-## Рекомендации по безопасности
-
-Самостоятельный хостинг даёт больше контроля, но и больше ответственности:
-
-- **Данные в покое**: Данные PostgreSQL по умолчанию хранятся без шифрования. Используйте полнодисковое шифрование (LUKS, dm-crypt) на сервере или включите PostgreSQL TDE, если доступно. Обратите внимание, что заметки и транскрипции уже защищены E2EE — сервер никогда не видит открытый текст.
-- **Сетевая безопасность**: Используйте файрвол для ограничения доступа. Только порты 80/443 должны быть публично доступны.
-- **Секреты**: Никогда не помещайте секреты в файлы Docker Compose или систему контроля версий. Используйте файлы `.env` (исключённые из образов) или секреты Docker/Kubernetes.
-- **Обновления**: Регулярно обновляйте образы. Следите за [журналом изменений](https://github.com/your-org/llamenos/blob/main/CHANGELOG.md) для исправлений безопасности.
-- **Резервное копирование**: Регулярно создавайте резервные копии базы данных PostgreSQL и хранилища MinIO. См. раздел резервного копирования в каждом руководстве по развёртыванию.
-
-## Следующие шаги
-
-- [Развёртывание с Docker Compose](/docs/deploy/docker) — запуск за 10 минут
-- [Развёртывание в Kubernetes](/docs/deploy/kubernetes) — развёртывание с Helm
-- [Начало работы](/docs/deploy) — развёртывание на Cloudflare Workers
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers
