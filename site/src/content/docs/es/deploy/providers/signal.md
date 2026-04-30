@@ -14,12 +14,7 @@ Llamenos soporta mensajeria Signal a traves de un bridge [signal-cli-rest-api](h
 
 ## Arquitectura
 
-```mermaid
-flowchart LR
-    User["Usuario Signal"] --> Servers["Servidores Signal"]
-    Servers --> Bridge["Bridge signal-cli<br/>(autoalojado)"]
-    Bridge --> Worker["Worker Llamenos<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 El bridge signal-cli se ejecuta en tu infraestructura y reenvia mensajes a tu Worker via webhooks HTTP. Esto significa que controlas toda la ruta del mensaje desde Signal hasta tu aplicacion.
 

@@ -273,14 +273,7 @@ docker compose logs minio
 
 ## Arquitetura dos servicos
 
-```mermaid
-flowchart TD
-    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, proxy reverso)"]
-    Caddy -->|":3000"| App["App<br/>(Node.js)"]
-    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
-    App -.->|"opcional"| Whisper["Whisper<br/>:8080"]
-```
+![Docker Architecture](/diagrams/docker-architecture.svg)
 
 ## Proximos passos
 

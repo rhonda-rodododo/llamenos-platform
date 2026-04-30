@@ -14,12 +14,7 @@ Llamenos hỗ trợ tin nhắn Signal qua cầu nối [signal-cli-rest-api](http
 
 ## Kiến trúc
 
-```mermaid
-flowchart LR
-    User["Signal User"] --> Servers["Signal Servers"]
-    Servers --> Bridge["signal-cli bridge<br/>(self-hosted)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 Cầu nối signal-cli chạy trên hạ tầng của bạn và chuyển tiếp tin nhắn đến Worker qua HTTP webhook. Điều này có nghĩa bạn kiểm soát toàn bộ đường đi của tin nhắn từ Signal đến ứng dụng.
 

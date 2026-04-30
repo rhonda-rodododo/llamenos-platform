@@ -234,16 +234,7 @@ curl -I http://hotline.yourorg.com
 
 ## Service architecture
 
-```mermaid
-flowchart TD
-    Internet -->|":80/:443"| Caddy["Caddy (TLS, reverse proxy)"]
-    Caddy -->|":3000"| App["App (Bun)"]
-    Caddy -->|"/nostr"| Strfry["strfry (Nostr relay)"]
-    App --> PostgreSQL[("PostgreSQL")]
-    App --> MinIO[("MinIO (S3)")]
-    App -.->|"--profile signal"| SignalNotifier["signal-notifier :3100"]
-    App -.->|"--profile telephony"| SipBridge["sip-bridge"]
-```
+![Docker Architecture](/diagrams/docker-architecture.svg)
 
 ## Next steps
 

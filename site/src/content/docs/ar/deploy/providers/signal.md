@@ -14,12 +14,7 @@ description: إعداد قناة رسائل Signal عبر جسر signal-cli لل
 
 ## البنية
 
-```mermaid
-flowchart LR
-    User["Signal User"] --> Servers["Signal Servers"]
-    Servers --> Bridge["signal-cli bridge<br/>(self-hosted)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 يعمل جسر signal-cli على بنيتك التحتية ويوجه الرسائل إلى Worker الخاص بك عبر webhooks HTTP. هذا يعني أنك تتحكم في مسار الرسالة بالكامل من Signal إلى تطبيقك.
 

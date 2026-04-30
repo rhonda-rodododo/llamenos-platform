@@ -207,13 +207,7 @@ curl -I http://linea.tudominio.com
 
 ## Arquitectura del servicio
 
-```mermaid
-flowchart TD
-    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, proxy inverso)"]
-    Caddy -->|":3000"| App["App<br/>(Node.js)"]
-    App --> MinIO[("MinIO<br/>:9000")]
-    App -.->|"opcional"| Whisper["Whisper<br/>:8080"]
-```
+![Docker Architecture](/diagrams/docker-architecture.svg)
 
 ## Siguientes pasos
 

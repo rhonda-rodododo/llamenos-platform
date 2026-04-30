@@ -14,12 +14,7 @@ Llamenos unterstuetzt Signal-Nachrichten ueber eine selbst gehostete [signal-cli
 
 ## Architektur
 
-```mermaid
-flowchart LR
-    User["Signal-Benutzer"] --> Servers["Signal-Server"]
-    Servers --> Bridge["signal-cli-Bridge<br/>(selbst gehostet)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 Die signal-cli-Bridge laeuft auf Ihrer Infrastruktur und leitet Nachrichten ueber HTTP-Webhooks an Ihren Worker weiter. Das bedeutet, Sie kontrollieren den gesamten Nachrichtenweg von Signal bis zu Ihrer Anwendung.
 

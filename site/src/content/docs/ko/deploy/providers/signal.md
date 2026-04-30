@@ -14,12 +14,7 @@ Llamenos는 자체 호스팅 [signal-cli-rest-api](https://github.com/bbernhard/
 
 ## 아키텍처
 
-```mermaid
-flowchart LR
-    User["Signal 사용자"] --> Servers["Signal 서버"]
-    Servers --> Bridge["signal-cli 브리지<br/>(자체 호스팅)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 signal-cli 브리지는 사용자 인프라에서 실행되며 HTTP 웹훅을 통해 Worker로 메시지를 전달합니다. 이는 Signal에서 애플리케이션까지의 전체 메시지 경로를 사용자가 제어한다는 것을 의미합니다.
 

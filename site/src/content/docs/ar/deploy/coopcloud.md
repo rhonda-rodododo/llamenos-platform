@@ -309,18 +309,7 @@ abra app logs -f hotline.example.com
 
 ## Service architecture
 
-```mermaid
-flowchart TD
-    Internet -->|":443"| Traefik["Traefik<br/>(TLS termination)"]
-    Traefik -->|":80"| Nginx["Nginx<br/>(reverse proxy)"]
-    Nginx -->|":3000"| App["App<br/>(Bun)"]
-    Nginx -->|"/nostr"| Relay["strfry<br/>(Nostr relay)"]
-    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
-    App -.->|"optional"| SignalNotifier["signal-notifier<br/>:3100"]
-    App -.->|"optional"| SipBridge["sip-bridge"]
-    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
-```
+![Co-op Cloud Architecture](/diagrams/coopcloud-architecture.svg)
 
 ## Troubleshooting
 

@@ -14,12 +14,7 @@ Llamenos поддерживает обмен сообщениями через S
 
 ## Архитектура
 
-```mermaid
-flowchart LR
-    User["Signal User"] --> Servers["Signal Servers"]
-    Servers --> Bridge["signal-cli bridge<br/>(self-hosted)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 Мост signal-cli работает на вашей инфраструктуре и перенаправляет сообщения в ваш Worker через HTTP-вебхуки. Это означает, что вы контролируете весь путь сообщения от Signal до вашего приложения.
 
