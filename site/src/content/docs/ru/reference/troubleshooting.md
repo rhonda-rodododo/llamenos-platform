@@ -120,7 +120,7 @@ bun run deploy:site     # Deploy marketing site only
 Настольное приложение использует Tauri updater для проверки новых версий. Если обновления не обнаруживаются:
 
 - Проверьте подключение к интернету
-- Убедитесь, что эндпоинт обновления доступен: `https://github.com/rhonda-rodododo/llamenos/releases/latest/download/latest.json`
+- Убедитесь, что эндпоинт обновления доступен: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
 - На Linux автообновление AppImage требует наличия прав на запись для файла в его каталоге
 - На macOS приложение должно находиться в `/Applications` (не запускаться непосредственно с DMG)
 
@@ -262,6 +262,6 @@ Llamenos применяет режим одного экземпляра. Есл
 
 Если ваша проблема не описана здесь:
 
-- Проверьте [GitHub Issues](https://github.com/rhonda-rodododo/llamenos/issues) для получения информации об известных ошибках и обходных путях
+- Проверьте [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) для получения информации об известных ошибках и обходных путях
 - Поищите существующие обращения перед созданием нового
 - При сообщении об ошибке укажите: режим развёртывания (Cloudflare/Docker/Kubernetes), платформу (Desktop/Mobile) и любые сообщения об ошибках из консоли браузера или терминала

@@ -3,6 +3,7 @@ import { type Lang, defaultLang } from '../i18n/config';
 import { getTranslation, getLocalizedPath } from '../i18n/utils';
 import { common } from '../i18n/translations/common';
 import LanguageSwitcher from './LanguageSwitcher.astro';
+import { siteConfig } from '../config';
 
 interface Props {
   lang?: Lang;
@@ -61,7 +62,7 @@ const navItems = [
         <LanguageSwitcher lang={lang} />
       </div>
       <a
-        href="https://github.com/rhonda-rodododo/llamenos"
+        href={siteConfig.github.url}
         class="ml-2 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-all hover:bg-accent-bright hover:shadow-lg hover:shadow-accent/20"
         target="_blank"
         rel="noopener noreferrer"
@@ -104,7 +105,7 @@ const navItems = [
         <LanguageSwitcher lang={lang} />
       </div>
       <a
-        href="https://github.com/rhonda-rodododo/llamenos"
+        href={siteConfig.github.url}
         class="mobile-nav-link mt-1 mx-4 inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-sm font-medium text-white transition-all hover:bg-accent-bright"
         target="_blank"
         rel="noopener noreferrer"

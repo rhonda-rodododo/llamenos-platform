@@ -118,10 +118,10 @@ Ang mga pagpapabuti na ito ay live na ngayon:
 
 Technical documentation:
 
-- [Protocol Specification](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/protocol/llamenos-protocol.md)
-- [Threat Model](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/THREAT_MODEL.md)
-- [Data Classification](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Security Audits](https://github.com/rhonda-rodododo/llamenos/tree/main/docs/security)
+- [Protocol Specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Threat Model](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
+- [Data Classification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Security Audits](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [API Documentation](/api/docs)
 
-Open source ang Llamenos: [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)
+Open source ang Llamenos: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)

@@ -3,6 +3,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
 import { type Lang, defaultLang, languages } from '../i18n/config';
+import { siteConfig } from '../config';
 
 interface Props {
   title: string;
@@ -10,7 +11,7 @@ interface Props {
   lang?: Lang;
 }
 
-const { title, description = 'Secure open-source crisis response hotline software with end-to-end encryption.', lang = defaultLang } = Astro.props;
+const { title, description = siteConfig.description, lang = defaultLang } = Astro.props;
 const dir = languages[lang].dir;
 ---
 

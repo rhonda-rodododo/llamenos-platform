@@ -2,11 +2,11 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getTranslation } from '../i18n/utils';
 import { download } from '../i18n/translations/download';
+import { siteConfig } from '../config';
 
 const t = getTranslation(download, 'en');
 
-const REPO = 'rhonda-rodododo/llamenos';
-const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+const RELEASES_URL = siteConfig.github.releasesUrl;
 const LATEST_JSON = `${RELEASES_URL}/download/latest.json`;
 ---
 

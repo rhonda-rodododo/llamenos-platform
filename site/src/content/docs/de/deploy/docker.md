@@ -15,7 +15,7 @@ Diese Anleitung fuehrt Sie durch die Bereitstellung von Llamenos mit Docker Comp
 ## 1. Repository klonen
 
 ```bash
-git clone https://github.com/your-org/llamenos-platform.git
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
 cd llamenos-platform
 ```
 

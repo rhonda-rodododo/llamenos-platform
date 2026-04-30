@@ -15,7 +15,7 @@ Esta guia te lleva paso a paso a traves del despliegue de Llamenos con Docker Co
 ## 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/your-org/llamenos-platform.git
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
 cd llamenos-platform
 ```
 

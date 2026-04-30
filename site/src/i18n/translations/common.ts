@@ -62,7 +62,7 @@ export const common: Record<string, {
       projectHeading: 'Project',
       docsHeading: 'Documentation',
       tagline: 'Open-source secure crisis response hotline software. Built with end-to-end encryption by default.',
-      copyright: 'Llámenos contributors. Open source under MIT license.',
+      copyright: 'Llámenos contributors. Open source under AGPL-3.0 license.',
 
       gettingStarted: 'Getting Started',
       adminGuide: 'Admin Guide',
@@ -120,7 +120,7 @@ export const common: Record<string, {
       projectHeading: 'Proyecto',
       docsHeading: 'Documentación',
       tagline: 'Software de línea de crisis segura y de código abierto. Cifrado de extremo a extremo por defecto.',
-      copyright: 'Colaboradores de Llámenos. Código abierto bajo licencia MIT.',
+      copyright: 'Colaboradores de Llámenos. Código abierto bajo licencia AGPL-3.0.',
 
       gettingStarted: 'Primeros pasos',
       adminGuide: 'Guía del administrador',
@@ -178,7 +178,7 @@ export const common: Record<string, {
       projectHeading: '项目',
       docsHeading: '文档',
       tagline: '开源安全危机响应热线软件。默认端到端加密。',
-      copyright: 'Llámenos 贡献者。MIT 许可证开源。',
+      copyright: 'Llámenos 贡献者。AGPL-3.0 许可证开源。',
 
       gettingStarted: '快速入门',
       adminGuide: '管理员指南',
@@ -236,7 +236,7 @@ export const common: Record<string, {
       projectHeading: 'Proyekto',
       docsHeading: 'Dokumentasyon',
       tagline: 'Open-source na secure na crisis response hotline software. May end-to-end encryption bilang default.',
-      copyright: 'Mga kontribyutor ng Llámenos. Open source sa ilalim ng MIT license.',
+      copyright: 'Mga kontribyutor ng Llámenos. Open source sa ilalim ng AGPL-3.0 license.',
 
       gettingStarted: 'Pagsisimula',
       adminGuide: 'Gabay ng Admin',
@@ -294,7 +294,7 @@ export const common: Record<string, {
       projectHeading: 'Dự án',
       docsHeading: 'Tài liệu',
       tagline: 'Phần mềm đường dây nóng ứng phó khủng hoảng mã nguồn mở và bảo mật. Mã hóa đầu cuối theo mặc định.',
-      copyright: 'Những người đóng góp Llámenos. Mã nguồn mở theo giấy phép MIT.',
+      copyright: 'Những người đóng góp Llámenos. Mã nguồn mở theo giấy phép AGPL-3.0.',
 
       gettingStarted: 'Bắt đầu',
       adminGuide: 'Hướng dẫn quản trị',
@@ -352,7 +352,7 @@ export const common: Record<string, {
       projectHeading: 'المشروع',
       docsHeading: 'التوثيق',
       tagline: 'برنامج خط ساخن مفتوح المصدر وآمن للاستجابة للأزمات. تشفير من طرف إلى طرف افتراضيًا.',
-      copyright: 'مساهمو Llámenos. مصدر مفتوح بموجب رخصة MIT.',
+      copyright: 'مساهمو Llámenos. مصدر مفتوح بموجب رخصة AGPL-3.0.',
 
       gettingStarted: 'البدء',
       adminGuide: 'دليل المسؤول',
@@ -410,7 +410,7 @@ export const common: Record<string, {
       projectHeading: 'Projet',
       docsHeading: 'Documentation',
       tagline: "Logiciel de ligne d'urgence sécurisé et open source. Chiffrement de bout en bout par défaut.",
-      copyright: 'Contributeurs de Llámenos. Open source sous licence MIT.',
+      copyright: 'Contributeurs de Llámenos. Open source sous licence AGPL-3.0.',
 
       gettingStarted: 'Premiers pas',
       adminGuide: "Guide de l'administrateur",
@@ -468,7 +468,7 @@ export const common: Record<string, {
       projectHeading: 'Pwojè',
       docsHeading: 'Dokimantasyon',
       tagline: 'Lojisyèl liy kriz ki an sekirite epi open source. Chifre bout-an-bout pa defo.',
-      copyright: 'Kontribitè Llámenos. Open source anba lisans MIT.',
+      copyright: 'Kontribitè Llámenos. Open source anba lisans AGPL-3.0.',
 
       gettingStarted: 'Kòmanse',
       adminGuide: 'Gid Administratè',
@@ -526,7 +526,7 @@ export const common: Record<string, {
       projectHeading: '프로젝트',
       docsHeading: '문서',
       tagline: '오픈 소스 보안 위기 대응 핫라인 소프트웨어. 기본적으로 종단간 암호화.',
-      copyright: 'Llámenos 기여자. MIT 라이선스 오픈 소스.',
+      copyright: 'Llámenos 기여자. AGPL-3.0 라이선스 오픈 소스.',
 
       gettingStarted: '시작하기',
       adminGuide: '관리자 가이드',
@@ -584,7 +584,7 @@ export const common: Record<string, {
       projectHeading: 'Проект',
       docsHeading: 'Документация',
       tagline: 'Открытое безопасное программное обеспечение для кризисной горячей линии. Сквозное шифрование по умолчанию.',
-      copyright: 'Участники Llámenos. Открытый исходный код по лицензии MIT.',
+      copyright: 'Участники Llámenos. Открытый исходный код по лицензии AGPL-3.0.',
 
       gettingStarted: 'Начало работы',
       adminGuide: 'Руководство администратора',
@@ -642,7 +642,7 @@ export const common: Record<string, {
       projectHeading: 'परियोजना',
       docsHeading: 'दस्तावेज़',
       tagline: 'ओपन-सोर्स सुरक्षित संकट प्रतिक्रिया हॉटलाइन सॉफ़्टवेयर। डिफ़ॉल्ट रूप से एंड-टू-एंड एन्क्रिप्शन।',
-      copyright: 'Llámenos योगदानकर्ता। MIT लाइसेंस के तहत ओपन सोर्स।',
+      copyright: 'Llámenos योगदानकर्ता। AGPL-3.0 लाइसेंस के तहत ओपन सोर्स।',
 
       gettingStarted: 'शुरू करें',
       adminGuide: 'प्रशासक गाइड',
@@ -700,7 +700,7 @@ export const common: Record<string, {
       projectHeading: 'Projeto',
       docsHeading: 'Documentação',
       tagline: 'Software de linha de crise seguro e de código aberto. Criptografia de ponta a ponta por padrão.',
-      copyright: 'Contribuidores do Llámenos. Código aberto sob licença MIT.',
+      copyright: 'Contribuidores do Llámenos. Código aberto sob licença AGPL-3.0.',
 
       gettingStarted: 'Primeiros passos',
       adminGuide: 'Guia do administrador',
@@ -758,7 +758,7 @@ export const common: Record<string, {
       projectHeading: 'Projekt',
       docsHeading: 'Dokumentation',
       tagline: 'Open-Source-Software für sichere Krisenhotlines. Standardmäßig Ende-zu-Ende-verschlüsselt.',
-      copyright: 'Llámenos-Mitwirkende. Open Source unter MIT-Lizenz.',
+      copyright: 'Llámenos-Mitwirkende. Open Source unter AGPL-3.0-Lizenz.',
 
       gettingStarted: 'Erste Schritte',
       adminGuide: 'Administratorhandbuch',
