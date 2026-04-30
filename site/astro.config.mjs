@@ -1,16 +1,11 @@
 import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
-import mermaid from 'astro-mermaid';
 import sitemap from '@astrojs/sitemap';
 import pagefind from 'astro-pagefind';
 
 export default defineConfig({
   output: 'static',
   integrations: [
-    mermaid({
-      // Dark theme for better readability on dark backgrounds
-      theme: 'dark',
-    }),
     sitemap({
       i18n: {
         defaultLocale: 'en',
