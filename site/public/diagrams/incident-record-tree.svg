@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 330" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 12px; font-weight: 500; text-anchor: start; }
+    .root-label { font-size: 13px; font-weight: 700; text-anchor: start; fill: #ffffff; }
+    .detail { font-size: 10px; fill: #8ec8c8; text-anchor: start; }
+    .branch { stroke: #51AFAE; stroke-width: 2; fill: none; }
+    .sub-branch { stroke: #3a8888; stroke-width: 1.5; fill: none; }
+  </style>
+  <defs>
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="subGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a7575" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#1a5555" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Root: Incident -->
+  <rect x="15" y="10" width="310" height="35" class="node" fill="#51AFAE" fill-opacity="0.3" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="30" y="32" class="root-label">📍 Incident: MLK Ave Protest, 2026-05-01</text>
+
+  <!-- Main trunk -->
+  <line x1="45" y1="45" x2="45" y2="305" class="branch"/>
+
+  <!-- Person: Alice -->
+  <line x1="45" y1="68" x2="75" y2="68" class="branch"/>
+  <rect x="80" y="52" width="260" height="32" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="72" class="label">👤 Person: Alice, arrested at 10pm</text>
+
+  <!-- Alice sub-branch -->
+  <line x1="115" y1="84" x2="115" y2="155" class="sub-branch"/>
+
+  <line x1="115" y1="105" x2="140" y2="105" class="sub-branch"/>
+  <rect x="145" y="90" width="330" height="30" class="node" fill="url(#subGrad)" stroke="#3a8888" stroke-width="1.5"/>
+  <text x="160" y="109" class="label">📄 Arrest Report: Charges: disorderly conduct</text>
+
+  <!-- Note under arrest report -->
+  <line x1="175" y1="120" x2="175" y2="153" class="sub-branch"/>
+  <line x1="175" y1="145" x2="200" y2="145" class="sub-branch"/>
+  <rect x="205" y="130" width="290" height="30" class="node" fill="url(#subGrad)" stroke="#3a8888" stroke-width="1.2"/>
+  <text x="220" y="149" class="detail" style="font-size: 11px; fill: #c0e8e8;">📝 Note: "Alice confirmed she has an attorney…"</text>
+
+  <!-- Person: Bob -->
+  <line x1="45" y1="185" x2="75" y2="185" class="branch"/>
+  <rect x="80" y="169" width="290" height="32" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="189" class="label">👤 Person: Bob, arrested at 10:15pm</text>
+
+  <!-- Bob sub-branch -->
+  <line x1="115" y1="201" x2="115" y2="230" class="sub-branch"/>
+  <line x1="115" y1="222" x2="140" y2="222" class="sub-branch"/>
+  <rect x="145" y="207" width="310" height="30" class="node" fill="url(#subGrad)" stroke="#3a8888" stroke-width="1.5"/>
+  <text x="160" y="226" class="label">📄 Arrest Report: Charges: unlawful assembly</text>
+
+  <!-- Location -->
+  <line x1="45" y1="260" x2="75" y2="260" class="branch"/>
+  <rect x="80" y="245" width="240" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="264" class="label">📍 Location: MLK Ave &amp; 5th St</text>
+
+  <!-- Vehicle -->
+  <line x1="45" y1="300" x2="75" y2="300" class="branch"/>
+  <rect x="80" y="285" width="350" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="304" class="label">🚗 Vehicle: Unmarked gray Ford, plate partial: …</text>
+</svg>

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 520" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .diamond { }
+    .label { font-size: 13px; font-weight: 500; text-anchor: middle; }
+    .edge-label { font-size: 11px; fill: #a0d0cf; text-anchor: middle; }
+    .arrow { stroke: #51AFAE; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    .arrow-dash { stroke: #51AFAE; stroke-width: 2; fill: none; stroke-dasharray: 6,4; marker-end: url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#51AFAE"/>
+    </marker>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="decisionGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a7a7a" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#2a5a5a" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Incoming Call -->
+  <rect x="220" y="10" width="160" height="40" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="300" y="35" class="label">Incoming Call</text>
+
+  <!-- Arrow down -->
+  <line x1="300" y1="50" x2="300" y2="75" class="arrow"/>
+
+  <!-- Decision: Shift Active? -->
+  <polygon points="300,75 400,115 300,155 200,115" fill="url(#decisionGrad)" stroke="#5BC5C5" stroke-width="2"/>
+  <text x="300" y="120" class="label">Shift Active?</text>
+
+  <!-- Yes arrow left -->
+  <line x1="200" y1="115" x2="110" y2="115" class="arrow"/>
+  <line x1="110" y1="115" x2="110" y2="175" class="arrow"/>
+  <text x="155" y="108" class="edge-label">Yes</text>
+
+  <!-- No arrow right -->
+  <line x1="400" y1="115" x2="490" y2="115" class="arrow"/>
+  <line x1="490" y1="115" x2="490" y2="175" class="arrow"/>
+  <text x="445" y="108" class="edge-label">No</text>
+
+  <!-- Ring All On-Shift -->
+  <rect x="20" y="175" width="180" height="40" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="110" y="200" class="label">Ring All On-Shift Users</text>
+
+  <!-- Ring Fallback -->
+  <rect x="400" y="175" width="180" height="40" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="490" y="200" class="label">Ring Fallback Group</text>
+
+  <!-- Arrows converge -->
+  <line x1="110" y1="215" x2="110" y2="255" class="arrow"/>
+  <line x1="110" y1="255" x2="265" y2="255" class="arrow" style="marker-end: none"/>
+  <line x1="490" y1="215" x2="490" y2="255" class="arrow"/>
+  <line x1="490" y1="255" x2="335" y2="255" class="arrow" style="marker-end: none"/>
+
+  <!-- Decision: First Pickup -->
+  <polygon points="300,235 400,275 300,315 200,275" fill="url(#decisionGrad)" stroke="#5BC5C5" stroke-width="2"/>
+  <text x="300" y="280" class="label">First Pickup</text>
+
+  <!-- Answered arrow left -->
+  <line x1="200" y1="275" x2="110" y2="275" class="arrow"/>
+  <line x1="110" y1="275" x2="110" y2="345" class="arrow"/>
+  <text x="155" y="268" class="edge-label">Answered</text>
+
+  <!-- No Answer arrow right -->
+  <line x1="400" y1="275" x2="490" y2="275" class="arrow"/>
+  <line x1="490" y1="275" x2="490" y2="345" class="arrow"/>
+  <text x="448" y="268" class="edge-label">No Answer</text>
+
+  <!-- Connect Call -->
+  <rect x="30" y="345" width="160" height="40" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="110" y="370" class="label">Connect Call</text>
+
+  <!-- Voicemail -->
+  <rect x="410" y="345" width="160" height="40" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="490" y="370" class="label">Voicemail</text>
+
+  <!-- Arrow from Connect Call to Save -->
+  <line x1="110" y1="385" x2="110" y2="430" class="arrow"/>
+  <line x1="110" y1="430" x2="265" y2="430" class="arrow" style="marker-end: none"/>
+
+  <!-- Save Encrypted Note -->
+  <rect x="220" y="450" width="160" height="44" class="node" fill="#51AFAE" fill-opacity="0.3" stroke="#51AFAE" stroke-width="2.5"/>
+  <text x="300" y="470" class="label" style="fill: #ffffff;">🔒 Save Encrypted</text>
+  <text x="300" y="486" class="label" style="fill: #ffffff; font-size: 12px;">Note</text>
+
+  <!-- Arrow down to save -->
+  <line x1="300" y1="438" x2="300" y2="450" class="arrow"/>
+</svg>
