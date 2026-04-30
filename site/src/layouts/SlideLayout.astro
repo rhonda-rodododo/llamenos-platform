@@ -89,7 +89,7 @@ const formattedDate = date
       height: 100%;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
       padding: 80px 120px;
       background: var(--slide-bg);
       opacity: 0;
@@ -122,7 +122,7 @@ const formattedDate = date
     .slide-inner {
       max-width: 1600px;
       width: 100%;
-      flex: 1 1 0;
+      flex: 1 1 auto;
       min-height: 0;
       margin: 0 auto;
       display: flex;
@@ -133,6 +133,7 @@ const formattedDate = date
     .slide-layout-title {
       text-align: center;
       align-items: center;
+      justify-content: center;
       background: linear-gradient(
         160deg,
         oklch(0.12 0.015 250) 0%,
@@ -141,8 +142,7 @@ const formattedDate = date
       );
     }
     .slide-layout-title .slide-inner {
-      display: flex;
-      flex-direction: column;
+      flex: 0 1 auto;
       align-items: center;
       gap: 16px;
     }
@@ -202,12 +202,16 @@ const formattedDate = date
     }
 
     /* ─── Images / diagrams ──────────────────────────────────── */
-    .slide-inner img {
-      max-width: 100%;
-      flex: 1 1 0;
+    .slide-inner p:has(> img) {
+      flex: 1 1 0px;
       min-height: 0;
+      display: flex;
+    }
+    .slide-inner p:has(> img) img {
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
-      margin: 0 auto;
+      object-position: left top;
       display: block;
     }
 
