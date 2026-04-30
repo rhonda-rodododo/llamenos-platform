@@ -668,27 +668,36 @@ Solution: HMAC-hashed contact resolution
 
 ## Why Not Just Signal For Everything?
 
-:::columns
-:::left
-### Signal does well
-- End-to-end encrypted messages
-- Voice and video calls (E2EE)
-- Disappearing messages
-- Safety number verification
-- Widely deployed in activist communities
-:::right
-### Signal doesn't have
-- **Parallel ring** for voice routing
-- **Case management** and structured note-taking
-- **Role-based access** (volunteer vs. admin)
-- **Admin audit logs** (tamper-evident)
-- **Template-driven workflows**
-- **Multi-hub routing** (multiple orgs, one volunteer)
-- **On-call shift scheduling**
-- **Caller identity hashing** (you don't know who called Signal)
+**Signal is always preferable when everyone has it. But not everyone does.**
+
+- Someone calling from **jail** can't install Signal — they have a payphone
+- In an emergency, people call a **phone number** — they don't download an app first
+- Some phones can't fit additional apps — cheap prepaid burners, older devices
+- A family member checking if someone was released — that's **public information**, SMS is fine
+- Different situations have different threat models — not everything needs maximum security
+
+:::fragment
+*Don't exclude people from support because they don't have the right app installed.*
 :::
 
-<!-- notes: This comes up in every demo. "Why not just use Signal?" Signal is great for 1:1 and small group communication. It's not a call routing system. It doesn't know who's on shift. It doesn't have parallel ring. It doesn't have case management. And Signal's server knows your phone number — it's in their database. Llámenos doesn't store volunteer phone numbers in plaintext. They're hashed. Different threat models. -->
+<!-- notes: This comes up in every conversation. "Why not just Signal for everything?" And the answer is: because we serve people in crisis who don't get to choose their communication channel. Someone calling from a county jail is on a monitored payphone. They don't have Signal. A family member who just found out their kid was arrested is calling the number on a flyer — they're not going to download an app in that moment. An organizer texting jail support updates about who's been released — that's already public information the moment the person walks out. SMS is fine for that. WhatsApp, RCS, Telegram are better if they have them. Signal is best if they have it. We support ALL of them because every threat model is different, and the right channel depends on the sensitivity of the specific communication, not a blanket policy. -->
+
+---
+
+## Signal IS Our Preferred Channel — Here's How We Use It
+
+- **Account invites** go via Signal (not email — no metadata trail)
+- **Notifications** route through Signal by default (push via zero-knowledge sidecar)
+- **Field reporting** — legal observers text the hub directly from Signal
+- **Blast alerts** — jail support updates, rapid response coordination
+- **Password/PIN reset** flows use Signal, never email
+- **Receipts, reactions, typing indicators** — full Signal UX, not just text
+
+:::fragment
+*Email is a surveillance channel. We route account operations through Signal instead.*
+:::
+
+<!-- notes: We're not anti-Signal — we're deeply integrated with it. Account invites go via Signal, not email. Why? Because email leaves metadata everywhere. Your email provider knows you received an invite to a crisis hotline platform. That's the kind of thing that ends up in a fusion center database. Signal invites: the notifier sidecar uses HMAC-hashed contact identifiers, never stores plaintext phone numbers. The recipient gets a Signal message with an invite link. No email provider in the loop. Same with notifications — volunteer shift reminders, call alerts, they all go through Signal by default. PIN reset? Signal. Not email. The principle is: email is a surveillance channel. Every email provider is a potential subpoena target. Signal is the preferred transport for everything administrative. The other channels exist for the people you SERVE, not for your internal operations. -->
 
 ---
 
