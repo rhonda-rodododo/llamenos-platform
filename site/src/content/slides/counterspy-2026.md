@@ -726,57 +726,105 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 
 ---
 
-## What We Changed: v1 → v2
+## The Biggest Change: Why We Left the Browser
+
+**Web E2EE has a fatal problem for our threat model: server compromise.**
+
+- Your server delivers the JavaScript that does the encryption
+- A compromised server can deliver **modified JS** that exfiltrates keys
+- The user has **no way to verify** the code they're running
+- Keys in localStorage — accessible to XSS, browser extensions, devtools
+- Your "E2EE web app" is only as trustworthy as your server on every page load
+
+:::fragment
+*What's the point of E2EE if the server that's subpoenaed is the same server that delivers your crypto code?*
+:::
+
+<!-- notes: This is the question that killed v1. We had a perfectly good web-based E2EE system. The noble-curves library is audited, constant-time, the algorithms were correct. But it didn't matter. Because here's the scenario: a law enforcement agency serves a subpoena on your hosting provider. They don't ask for the encrypted data — they know they can't decrypt it. Instead, they ask the provider to modify the JavaScript that gets served to users on next page load. A tiny change: before encrypting, also POST the plaintext to a different endpoint. The user sees the same UI. The same green lock icon. The same "end-to-end encrypted" badge. But their notes are being exfiltrated in plaintext. This isn't theoretical. This is how web-based E2EE systems are attacked by sophisticated adversaries. ProtonMail has written about this. The Lavabit case established the precedent. For our threat model — activists facing law enforcement with subpoena power — a web app is a liability, not a protection. That's why v2 is native clients only. -->
+
+---
+
+## v2: Native Clients — No Webview on Mobile
+
+:::columns
+:::left
+### Desktop (Tauri v2)
+- Rust process holds device keys
+- Webview renders UI only — no key access
+- **Stronghold** encrypted vault
+- Code is the compiled binary you installed
+- Reproducible builds — verify the binary matches source
+:::right
+### iOS + Android (Fully Native)
+- **No webview.** SwiftUI / Kotlin Compose
+- iOS: **Keychain** (Secure Enclave backed)
+- Android: **Keystore** (hardware-backed)
+- Crypto via **shared Rust crate** (UniFFI/JNI)
+- Code is the app you installed from a signed build
+:::
+
+:::fragment
+*The server can't deliver malicious code. It only serves encrypted data. The crypto runs in your native app.*
+:::
+
+<!-- notes: On mobile there is NO webview. The iOS app is native SwiftUI. The Android app is native Kotlin Compose. The crypto layer is a shared Rust crate compiled to an XCFramework for iOS via UniFFI, and JNI shared library for Android. The UI code never touches private keys — CryptoService is a singleton, the ViewModel gets pubkeys for display, that's it. On desktop, Tauri has a webview for the React UI, but the Rust backend process holds the keys. The webview calls Rust via IPC. If someone finds an XSS in our React code, they can mess up the UI but they cannot exfiltrate keys — the keys are in a different process. The critical difference from a web app: the code running on your device is the binary you installed. It doesn't change on every page load. It can be reproducibly built and verified. Your server serves encrypted data to the client. It never serves code. That's the architecture that makes E2EE meaningful against our threat model. -->
+
+---
+
+## What Else Changed: Crypto Protocol v1 → v2
 
 :::columns
 :::left
 ### v1
-- secp256k1 ECIES (custom)
-- XChaCha20-Poly1305 (content)
-- Single nsec per user
+- secp256k1 ECIES (custom construction)
+- Single nsec per user, on every device
 - No domain separation
 - No per-note forward secrecy
-- No SAS verification
-- No sigchain
+- No device authorization chain
 :::right
 ### v2
-- **HPKE (RFC 9180)** — X25519-HKDF-SHA256-AES256-GCM
-- XChaCha20-Poly1305 (content, still fine)
+- **HPKE (RFC 9180)** — formally verified
 - **Per-device Ed25519/X25519 keys**
 - **57 domain separation labels** (Albrecht defense)
 - **Random key per note** (forward secrecy)
-- **SAS verification** on device provisioning
-- **Append-only hash-chained sigchain**
+- **Append-only sigchain** + SAS device provisioning
 :::
 
-<!-- notes: HPKE X25519-HKDF-SHA256-AES256-GCM is the same suite used in TLS 1.3's 0-RTT mode. It has a formal security proof. It's audited. It's not a custom construction. You can point a cryptographer at RFC 9180 and they can verify our implementation against a specification, not just against our own claims. -->
+<!-- notes: The platform shift is the headline, but the crypto protocol changed too. HPKE replaces our custom ECIES — you can point a cryptographer at RFC 9180 and they can verify our implementation against a specification, not against our own claims. Per-device keys mean compromising one device doesn't compromise all your other devices. The sigchain means you can revoke a compromised device without rotating your identity. These are all changes that came from the crypto review. -->
 
 ---
 
-## The Shared Rust Crypto Crate
+## Three Native Clients, One Crypto Crate
 
-**One implementation. Compiled to three targets. One audit surface.**
+**Same Rust code on every platform. Device keys stay in native memory.**
 
 ```
-packages/crypto/  (Rust crate)
-├── HPKE: RFC 9180 X25519-HKDF-SHA256-AES256-GCM
-├── Ed25519 / BIP-340 Schnorr signatures
-├── PBKDF2 / HKDF key derivation
-├── XChaCha20-Poly1305 content encryption
-├── SFrame key derivation (voice E2EE)
-└── MLS (behind feature flag)
+packages/crypto/  (Rust — single auditable crate)
+├── HPKE, Ed25519, Schnorr, PBKDF2, HKDF
+├── XChaCha20-Poly1305, SFrame, MLS
+└── 57 domain separation labels
 
-Compiled to:
-├── native     → Tauri desktop (via Cargo path dep)
-├── WASM       → browser builds
-└── UniFFI     → iOS XCFramework + Android JNI .so
+Desktop (Tauri v2):
+  Rust process ← IPC → Webview (UI only)
+  Keys in Stronghold encrypted vault
+  Webview CANNOT access private keys
+
+iOS (SwiftUI):
+  UniFFI XCFramework → CryptoService singleton
+  Keys in Keychain (Secure Enclave backed)
+  UI layer gets pubkeys only
+
+Android (Kotlin/Compose):
+  JNI .so → CryptoService singleton
+  Keys in Keystore (hardware-backed)
+  UI layer gets pubkeys only
 ```
 
 :::fragment
-*One implementation reviewed once. Platform-specific crypto libraries are where divergence hides.*
+*Signal's architecture: native crypto, thin UI shell. We adopted it wholesale.*
 :::
 
-<!-- notes: This is a principle from Signal's design: one audited implementation, not three implementations that drift from each other. The UniFFI bindings let the Rust crate be called from Swift (iOS) and Kotlin (Android) directly. The WASM build lets browser tests use the same crypto. One code path. One audit. One thing to review if you want to verify our claims. That's the right architecture for security-critical software. -->
+<!-- notes: This is Signal's design principle applied to a hotline platform. One Rust crate, compiled to native binary for desktop, XCFramework via UniFFI for iOS, JNI shared library for Android. WASM build exists too — but only for browser-based tests, not for the production app. The production app is ALWAYS native. Why does this matter? Because the security boundary is the process boundary. On desktop, the Tauri webview renders React — it handles UI, routing, forms. Every crypto operation goes through IPC to the Rust backend process. The webview literally does not have access to the device private key. It can ask Rust to sign something, decrypt something, but it never sees the key. Same on mobile — the CryptoService is a singleton that wraps the FFI. The ViewModel gets pubkeys for display. It never gets private keys. If someone finds an XSS in our React code — which is possible, we're not arrogant about that — they can mess up the UI. They cannot exfiltrate keys. That's the platform shift that matters. -->
 
 ---
 
