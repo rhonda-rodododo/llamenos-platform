@@ -120,7 +120,7 @@ Running `wrangler pages deploy dist` from the wrong directory deploys the Vite a
 The desktop app uses the Tauri updater to check for new versions. If updates are not being detected:
 
 - Check your internet connection
-- Verify that the update endpoint is reachable: `https://github.com/rhonda-rodododo/llamenos/releases/latest/download/latest.json`
+- Verify that the update endpoint is reachable: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
 - On Linux, AppImage auto-update requires the file to have write permissions in its directory
 - On macOS, the app must be in `/Applications` (not running from the DMG directly)
 
@@ -262,6 +262,6 @@ If hub events fail signature verification:
 
 If your issue is not covered here:
 
-- Check the [GitHub Issues](https://github.com/rhonda-rodododo/llamenos/issues) for known bugs and workarounds
+- Check the [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) for known bugs and workarounds
 - Search existing issues before creating a new one
 - When reporting a bug, include: your deployment mode (Cloudflare/Docker/Kubernetes), platform (Desktop/Mobile), and any error messages from the browser console or terminal

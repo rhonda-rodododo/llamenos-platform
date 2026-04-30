@@ -118,10 +118,10 @@ subtitle: ما هو محمي، ما هو مرئي، وما يمكن الحصول
 
 التوثيق التقني:
 
-- [مواصفات البروتوكول](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/protocol/llamenos-protocol.md)
-- [نموذج التهديدات](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/THREAT_MODEL.md)
-- [تصنيف البيانات](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [تدقيقات الأمان](https://github.com/rhonda-rodododo/llamenos/tree/main/docs/security)
+- [مواصفات البروتوكول](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [نموذج التهديدات](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
+- [تصنيف البيانات](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [تدقيقات الأمان](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [توثيق API](/api/docs)
 
-Llamenos مفتوح المصدر: [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)
+Llamenos مفتوح المصدر: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)

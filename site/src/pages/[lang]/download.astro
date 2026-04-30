@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { type Lang, nonDefaultLocales } from '../../i18n/config';
 import { getTranslation } from '../../i18n/utils';
 import { download } from '../../i18n/translations/download';
+import { siteConfig } from '../../config';
 
 export function getStaticPaths() {
   return nonDefaultLocales.map(lang => ({ params: { lang } }));
@@ -11,8 +12,7 @@ export function getStaticPaths() {
 const lang = Astro.params.lang as Lang;
 const t = getTranslation(download, lang);
 
-const REPO = 'rhonda-rodododo/llamenos';
-const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+const RELEASES_URL = siteConfig.github.releasesUrl;
 const LATEST_JSON = `${RELEASES_URL}/download/latest.json`;
 ---
 

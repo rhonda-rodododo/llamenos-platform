@@ -37,7 +37,7 @@ Ou crie um arquivo `values-production.yaml` para implantacoes reproduziveis:
 # values-production.yaml
 app:
   image:
-    repository: ghcr.io/rhonda-rodododo/llamenos
+    repository: ghcr.io/rhonda-rodododo/llamenos-platform
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   replicas: 2
@@ -139,7 +139,7 @@ Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de
 
 | Parametro | Descricao | Padrao |
 |-----------|-----------|--------|
-| `app.image.repository` | Imagem do container | `ghcr.io/rhonda-rodododo/llamenos` |
+| `app.image.repository` | Imagem do container | `ghcr.io/rhonda-rodododo/llamenos-platform` |
 | `app.image.tag` | Tag da imagem | appVersion do chart |
 | `app.port` | Porta do aplicativo | `3000` |
 | `app.replicas` | Replicas do pod | `2` |

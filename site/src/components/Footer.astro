@@ -2,6 +2,7 @@
 import { type Lang, defaultLang } from '../i18n/config';
 import { getTranslation, getLocalizedPath } from '../i18n/utils';
 import { common } from '../i18n/translations/common';
+import { siteConfig } from '../config';
 
 interface Props {
   lang?: Lang;
@@ -41,7 +42,7 @@ function lp(path: string) {
         <ul class="space-y-2 text-sm">
           <li><a href={lp('/features')} class="text-fg-muted hover:text-fg transition-colors">{t.nav.features}</a></li>
           <li><a href={lp('/security')} class="text-fg-muted hover:text-fg transition-colors">{t.footer.securityModel}</a></li>
-          <li><a href="https://github.com/rhonda-rodododo/llamenos" class="text-fg-muted hover:text-fg transition-colors" target="_blank" rel="noopener noreferrer">{t.nav.github}</a></li>
+          <li><a href={siteConfig.github.url} class="text-fg-muted hover:text-fg transition-colors" target="_blank" rel="noopener noreferrer">{t.nav.github}</a></li>
         </ul>
       </div>
 
