@@ -13,7 +13,8 @@
 import {
   decryptWithPin,
   lockCrypto,
-  encryptWithPin,
+  legacyImportNsec,
+  persistAndUnlockDeviceKeys,
   clearStoredKey as platformClearStoredKey,
   pubkeyFromNsec,
   hasStoredKey as platformHasStoredKey,
@@ -121,13 +122,23 @@ export function lock() {
 
 /**
  * Import a key (onboarding / recovery): encrypt and store, then load into CryptoState.
+ * Decodes the bech32 nsec to raw hex and uses legacyImportNsec (secp256k1 Schnorr key).
  */
 export async function importKey(nsec: string, pin: string): Promise<string> {
   const pubkeyHex = await pubkeyFromNsec(nsec)
   if (!pubkeyHex) throw new Error('Invalid nsec')
 
-  // encryptWithPin calls import_key_to_state — encrypts + loads into CryptoState
-  await encryptWithPin(nsec, pin, pubkeyHex)
+  // Decode bech32 nsec to raw hex for legacyImportNsec
+  const { nip19 } = await import('nostr-tools')
+  const decoded = nip19.decode(nsec)
+  if (decoded.type !== 'nsec') throw new Error('Invalid nsec format')
+  const { bytesToHex } = await import('@noble/hashes/utils.js')
+  const nsecHex = bytesToHex(decoded.data as Uint8Array)
+
+  // Import via legacy secp256k1 path, persist encrypted keys, and unlock
+  const deviceId = crypto.randomUUID()
+  const encrypted = await legacyImportNsec(nsecHex, pin, deviceId)
+  await persistAndUnlockDeviceKeys(encrypted, pin)
 
   publicKey = pubkeyHex
   unlocked = true

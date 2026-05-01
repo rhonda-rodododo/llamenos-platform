@@ -217,22 +217,24 @@ Given('I have a loaded keypair with known pubkey', async ({ page }) => {
 })
 
 When('I encrypt the key with PIN {string}', async ({ page }, pin: string) => {
-  // Generate a fresh ephemeral keypair and encrypt it with the given PIN.
-  // encryptWithPin(nsec, pin, publicKey) stores the encrypted blob to the
-  // Tauri store (localStorage-backed in tests) for decryptWithPin to read later.
-  const kp = await page.evaluate(async (p) => {
+  // Generate a new device keypair, encrypt with PIN, and persist to store.
+  // Uses deviceGenerateAndLoad + persistAndUnlockDeviceKeys (the v3 API).
+  const result = await page.evaluate(async (p) => {
     const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
-      generateEphemeralKeypair(): Promise<KP>
-      encryptWithPin(nsec: string, pin: string, pubkey: string): Promise<void>
+      deviceGenerateAndLoad(pin: string, deviceId: string): Promise<{
+        salt: string; nonce: string; ciphertext: string; iterations: number;
+        state: { deviceId: string; signingPubkeyHex: string; encryptionPubkeyHex: string }
+      }>
+      persistAndUnlockDeviceKeys(encrypted: unknown, pin: string): Promise<unknown>
     }
-    const keypair = await platform.generateEphemeralKeypair()
-    await platform.encryptWithPin(keypair.nsec, p, keypair.publicKey)
-    return keypair
+    const deviceId = crypto.randomUUID()
+    const encrypted = await platform.deviceGenerateAndLoad(p, deviceId)
+    await platform.persistAndUnlockDeviceKeys(encrypted, p)
+    return { publicKey: encrypted.state.signingPubkeyHex }
   }, pin)
-  await page.evaluate((k) => {
-    ;(window as Record<string, unknown>).__test_keypair = { nsec: '', npub: k.npub, publicKey: k.publicKey }
-    ;(window as Record<string, unknown>).__test_pin = k.nsec  // not needed, but keep slot
-  }, kp)
+  await page.evaluate((pubkey) => {
+    ;(window as Record<string, unknown>).__test_keypair = { nsec: '', npub: '', publicKey: pubkey }
+  }, result.publicKey)
 })
 
 When('I lock the crypto service', async ({ page }) => {
