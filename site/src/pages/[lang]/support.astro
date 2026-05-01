@@ -1,0 +1,27 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getEntry, render } from 'astro:content';
+import { type Lang, nonDefaultLocales } from '../../i18n/config';
+
+export function getStaticPaths() {
+  return nonDefaultLocales.map(lang => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+const entry = (await getEntry('pages', `${lang}/support`)) ?? (await getEntry('pages', 'en/support'))!;
+const { Content } = await render(entry);
+---
+
+<BaseLayout title={entry.data.title} description={entry.data.subtitle} lang={lang}>
+  <section class="pt-32 pb-20 md:pt-40">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="max-w-3xl mb-16">
+        <h1 class="text-3xl font-bold tracking-tight text-fg sm:text-4xl lg:text-5xl">{entry.data.title}</h1>
+        <p class="mt-4 text-lg text-fg-muted leading-relaxed">{entry.data.subtitle}</p>
+      </div>
+      <article class="prose max-w-3xl">
+        <Content />
+      </article>
+    </div>
+  </section>
+</BaseLayout>
