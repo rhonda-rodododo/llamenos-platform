@@ -39,7 +39,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
       strfry:
         condition: service_healthy

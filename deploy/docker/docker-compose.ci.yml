@@ -38,10 +38,10 @@ services:
     environment:
       - POSTGRES_PASSWORD=${PG_PASSWORD:-ci-pg-password}
 
-  minio:
+  rustfs:
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${STORAGE_PORT:-9000}:9000"
+      - "${STORAGE_CONSOLE_PORT:-9001}:9001"
 
   strfry:
     ports:

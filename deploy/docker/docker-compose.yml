@@ -4,7 +4,7 @@
 #   app      - Llamenos application (Bun)
 #   postgres - PostgreSQL database
 #   caddy    - Reverse proxy with automatic TLS
-#   minio    - S3-compatible blob storage
+#   rustfs   - S3-compatible object storage (RustFS)
 #   strfry   - Nostr relay for real-time events
 #
 # Optional services (via --profile):
@@ -26,7 +26,7 @@
 #   docker compose --profile monitoring up -d            # + GlitchTip
 #   COMPOSE_PROFILES=asterisk,telephony,signal docker compose up -d
 #
-# IMPORTANT: You MUST set PG_PASSWORD, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
+# IMPORTANT: You MUST set PG_PASSWORD, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY,
 # and BRIDGE_SECRET (if using Asterisk) in your .env file before starting.
 
 name: llamenos
@@ -50,10 +50,10 @@ services:
       - HOTLINE_NAME=${HOTLINE_NAME:-Hotline}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - "HMAC_SECRET=${HMAC_SECRET:?HMAC_SECRET is required — generate with openssl rand -hex 32}"
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
-      - MINIO_BUCKET=${MINIO_BUCKET:-llamenos-files}
+      - MINIO_ENDPOINT=http://rustfs:9000
+      - MINIO_ACCESS_KEY=${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
+      - MINIO_SECRET_KEY=${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
+      - MINIO_BUCKET=${STORAGE_BUCKET:-llamenos-files}
       - WHISPER_URL=${WHISPER_URL:-http://whisper:8080/v1/audio/transcriptions}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
@@ -72,7 +72,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
       strfry:
         condition: service_healthy
@@ -128,19 +128,19 @@ services:
       app:
         condition: service_healthy
 
-  minio:
-    image: minio/minio:RELEASE.2025-01-20T14-49-07Z@sha256:ed9be66eb5f2636c18289c34c3b725ddf57815f2777c77b5938543b78a44f144
+  rustfs:
+    image: rustfs/rustfs:latest
     command: server /data --console-address ":9001"
     restart: unless-stopped
     volumes:
-      - minio-data:/data
+      - rustfs-data:/data
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+      - RUSTFS_ROOT_USER=${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
+      - RUSTFS_ROOT_PASSWORD=${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/ || test $? -eq 22"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -393,7 +393,7 @@ volumes:
   postgres-data:
   caddy-data:
   caddy-config:
-  minio-data:
+  rustfs-data:
   nostr-data:
   signal-data:
   signal-notifier-data:

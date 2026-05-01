@@ -36,10 +36,14 @@ async function checkMinio(env: Record<string, unknown>): Promise<CheckResult> {
   if (!endpoint) return { status: 'failing', detail: 'MINIO_ENDPOINT not configured' }
   const t0 = Date.now()
   try {
-    const url = `${endpoint.replace(/\/$/, '')}/minio/health/live`
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
-    if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
-    return { status: 'ok', latencyMs: Date.now() - t0 }
+    // Try MinIO health endpoint first, fall back to root path for RustFS
+    // (RustFS doesn't support /minio/health/live but returns 403 on /)
+    const healthUrl = `${endpoint.replace(/\/$/, '')}/minio/health/live`
+    const res = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) })
+    if (res.ok) return { status: 'ok', latencyMs: Date.now() - t0 }
+    // If health endpoint returns 403, server is running (likely RustFS)
+    if (res.status === 403) return { status: 'ok', latencyMs: Date.now() - t0 }
+    return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
   } catch (err) {
     return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
   }

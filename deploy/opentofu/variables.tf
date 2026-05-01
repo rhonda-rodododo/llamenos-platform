@@ -1,7 +1,25 @@
+variable "provider_name" {
+  description = "Hosting provider: hetzner or 1984hosting"
+  type        = string
+  default     = "hetzner"
+
+  validation {
+    condition     = contains(["hetzner", "1984hosting"], var.provider_name)
+    error_message = "provider_name must be 'hetzner' or '1984hosting'."
+  }
+}
+
+variable "server_ip" {
+  description = "Required for 1984hosting provider. The assigned IPv4 address."
+  type        = string
+  default     = ""
+}
+
 variable "hcloud_token" {
   description = "Hetzner Cloud API token. Generate at https://console.hetzner.cloud/projects/*/security/tokens"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "ssh_public_key_path" {

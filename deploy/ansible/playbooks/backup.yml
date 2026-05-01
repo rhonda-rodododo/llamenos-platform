@@ -8,7 +8,7 @@
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags postgres
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags strfry
-#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags minio
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags rustfs
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags config
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags monitor
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass -e backup_type=manual
@@ -69,9 +69,9 @@
     - role: backup-strfry
       tags: [backup, strfry]
 
-    # 4. MinIO (file attachments — can be large, runs last)
-    - role: backup-minio
-      tags: [backup, minio]
+    # 4. RustFS (file attachments — can be large, runs last)
+    - role: backup-rustfs
+      tags: [backup, rustfs]
 
     # 5. Health monitoring (runs after all backups complete)
     - role: backup-monitor
@@ -134,10 +134,10 @@
           echo "" >> "${MANIFEST_FILE}"
 
           # Run in dependency order
-          run_backup "config" "${SCRIPTS_DIR}/backup-config.sh"
-          run_backup "postgres" "${SCRIPTS_DIR}/backup-postgres.sh"
-          run_backup "strfry" "${SCRIPTS_DIR}/backup-strfry.sh"
-          run_backup "minio" "${SCRIPTS_DIR}/backup-minio.sh"
+           run_backup "config" "${SCRIPTS_DIR}/backup-config.sh"
+           run_backup "postgres" "${SCRIPTS_DIR}/backup-postgres.sh"
+           run_backup "strfry" "${SCRIPTS_DIR}/backup-strfry.sh"
+           run_backup "rustfs" "${SCRIPTS_DIR}/backup-rustfs.sh"
 
           # Generate manifest checksum
           MANIFEST_SHA256="$(sha256sum "${MANIFEST_FILE}" | cut -d' ' -f1)"
@@ -204,18 +204,18 @@
           Backup orchestration deployed successfully.
 
           Scripts installed:
-            {{ app_dir }}/scripts/backup-all.sh      (orchestrator)
-            {{ app_dir }}/scripts/backup-postgres.sh  (PostgreSQL)
-            {{ app_dir }}/scripts/backup-strfry.sh    (Nostr relay)
-            {{ app_dir }}/scripts/backup-minio.sh     (MinIO objects)
-            {{ app_dir }}/scripts/backup-config.sh    (configuration)
-            {{ app_dir }}/scripts/backup-monitor.sh   (health check)
+             {{ app_dir }}/scripts/backup-all.sh      (orchestrator)
+             {{ app_dir }}/scripts/backup-postgres.sh  (PostgreSQL)
+             {{ app_dir }}/scripts/backup-strfry.sh    (Nostr relay)
+             {{ app_dir }}/scripts/backup-rustfs.sh    (RustFS objects)
+             {{ app_dir }}/scripts/backup-config.sh    (configuration)
+             {{ app_dir }}/scripts/backup-monitor.sh   (health check)
 
-          Backup directories:
-            {{ app_dir }}/backups/postgres/{daily,weekly,monthly}
-            {{ app_dir }}/backups/strfry/{daily,weekly,monthly}
-            {{ app_dir }}/backups/minio/{daily,weekly,monthly}
-            {{ app_dir }}/backups/config/{daily,weekly,monthly}
+           Backup directories:
+             {{ app_dir }}/backups/postgres/{daily,weekly,monthly}
+             {{ app_dir }}/backups/strfry/{daily,weekly,monthly}
+             {{ app_dir }}/backups/rustfs/{daily,weekly,monthly}
+             {{ app_dir }}/backups/config/{daily,weekly,monthly}
 
           Cron: Daily at {{ backup_cron_hour | default('3') }}:{{ backup_cron_minute | default('0') }} UTC
           Encryption: {{ 'ENABLED (age)' if backup_age_public_key | default('') | length > 0 else 'DISABLED — set backup_age_public_key' }}

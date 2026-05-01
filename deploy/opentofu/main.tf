@@ -1,20 +1,21 @@
 # Llamenos Infrastructure — Root Module
 #
-# Provisions a Hetzner Cloud VPS and generates an Ansible inventory
-# for subsequent configuration management.
+# Supports multiple hosting providers. Select via var.provider_name.
+#
+# Providers:
+#   - hetzner     — Hetzner Cloud (Germany/Finland)
+#   - 1984hosting — 1984 Hosting (Iceland) — manual provisioning
 #
 # Usage:
 #   cd deploy/opentofu
-#   tofu init
-#   tofu plan -var="hcloud_token=YOUR_TOKEN" -var="domain=hotline.example.org"
-#   tofu apply -var="hcloud_token=YOUR_TOKEN" -var="domain=hotline.example.org"
-#
-# Or with a .tfvars file:
 #   cp terraform.tfvars.example terraform.tfvars  # edit values
+#   tofu init
+#   tofu plan
 #   tofu apply
 
 module "hetzner" {
   source = "./modules/hetzner"
+  count  = var.provider_name == "hetzner" ? 1 : 0
 
   ssh_public_key_path = var.ssh_public_key_path
   server_type         = var.server_type
@@ -26,11 +27,20 @@ module "hetzner" {
   admin_ssh_cidrs     = var.admin_ssh_cidrs
 }
 
+module "hosting1984" {
+  source = "./modules/1984hosting"
+  count  = var.provider_name == "1984hosting" ? 1 : 0
+
+  server_ip   = var.server_ip
+  server_name = var.server_name
+  domain      = var.domain
+}
+
 module "inventory" {
   source = "./modules/generic"
 
-  server_ip   = module.hetzner.server_ip
-  server_name = module.hetzner.server_name
+  server_ip   = var.provider_name == "hetzner" ? module.hetzner[0].server_ip : module.hosting1984[0].server_ip
+  server_name = var.provider_name == "hetzner" ? module.hetzner[0].server_name : module.hosting1984[0].server_name
   domain      = var.domain
   ansible_dir = var.ansible_dir
 }

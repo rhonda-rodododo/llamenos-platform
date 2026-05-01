@@ -1,0 +1,9 @@
+---
+backup_rustfs_dir: "{{ app_dir }}/backups/rustfs"
+backup_rustfs_retain_daily: 7
+backup_rustfs_retain_weekly: 4
+backup_rustfs_retain_monthly: 3
+backup_rustfs_bucket: "{{ storage_bucket | default('llamenos-files') }}"
+backup_rustfs_endpoint: "{{ storage_endpoint | default('http://rustfs:9000') }}"
+backup_rustfs_access_key: "{{ storage_access_key | default('') }}"
+backup_rustfs_secret_key: "{{ storage_secret_key | default('') }}"
