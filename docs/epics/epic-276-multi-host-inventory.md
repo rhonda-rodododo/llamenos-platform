@@ -1,4 +1,6 @@
 # Epic 276: Multi-Host Ansible Inventory & Service Discovery
+> **Note**: MinIO has been replaced by RustFS as of PR #40. All references to MinIO in this document should be read as RustFS.
+
 
 **Status**: PENDING
 **Priority**: High
@@ -8,7 +10,7 @@
 
 ## Summary
 
-Transform the current single-host Ansible deployment into a matrix-docker-ansible-deploy style architecture where each service (app, postgres, caddy, minio, strfry, transcription, asterisk, signal) is a toggleable role with its own Docker Compose file. Multi-host inventory groups allow services to be distributed across machines, with automatic service discovery wiring cross-host connections.
+Transform the current single-host Ansible deployment into a matrix-docker-ansible-deploy style architecture where each service (app, postgres, caddy, rustfs, strfry, transcription, asterisk, signal) is a toggleable role with its own Docker Compose file. Multi-host inventory groups allow services to be distributed across machines, with automatic service discovery wiring cross-host connections.
 
 ## Problem Statement
 
@@ -88,7 +90,7 @@ all:
 llamenos_app_enabled: true
 llamenos_postgres_enabled: true
 llamenos_caddy_enabled: true
-llamenos_minio_enabled: true
+llamenos_rustfs_enabled: true
 llamenos_strfry_enabled: true
 llamenos_transcription_enabled: false
 llamenos_asterisk_enabled: false
@@ -100,7 +102,7 @@ llamenos_signal_enabled: false
 llamenos_app_image: ghcr.io/llamenos/llamenos:latest
 llamenos_postgres_image: postgres:17-alpine
 llamenos_caddy_image: caddy:2.9-alpine
-llamenos_minio_image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+llamenos_rustfs_image: rustfs/rustfs:RELEASE.2025-01-20T14-49-07Z
 llamenos_strfry_image: dockurr/strfry:latest
 llamenos_whisper_image: fedirz/faster-whisper-server:0.4.1
 llamenos_asterisk_image: andrius/asterisk:20
@@ -125,7 +127,7 @@ deploy/ansible/templates/
     app.j2
     postgres.j2
     caddy.j2
-    minio.j2
+    rustfs.j2
     strfry.j2
     whisper.j2
     asterisk.j2
@@ -134,7 +136,7 @@ deploy/ansible/templates/
   env/
     app.j2
     postgres.j2
-    minio.j2
+    rustfs.j2
     whisper.j2
     asterisk.j2
     signal.j2
@@ -267,14 +269,14 @@ Create a role `service-discovery` that runs before all service roles and compute
         5432
       {%- endif -%}
 
-- name: Determine MinIO connection target
+- name: Determine RustFS connection target
   ansible.builtin.set_fact:
-    llamenos_minio_endpoint: >-
+    llamenos_rustfs_endpoint: >-
       {%- if groups.get('llamenos_storage', []) | length > 0 and
              inventory_hostname not in groups.get('llamenos_storage', []) -%}
         http://{{ hostvars[groups['llamenos_storage'][0]]['ansible_host'] }}:9000
       {%- else -%}
-        http://minio:9000
+        http://rustfs:9000
       {%- endif -%}
 
 - name: Determine strfry relay connection target
@@ -306,7 +308,7 @@ Create a role `service-discovery` that runs before all service roles and compute
     msg: |
       Service topology for {{ inventory_hostname }}:
         PostgreSQL: {{ llamenos_pg_host }}:{{ llamenos_pg_port }}
-        MinIO: {{ llamenos_minio_endpoint }}
+        RustFS: {{ llamenos_rustfs_endpoint }}
         Relay: {{ llamenos_relay_url }}
         Whisper: {{ llamenos_whisper_url | default('disabled') }}
 ```
@@ -409,9 +411,9 @@ Create a new `deploy.yml` that replaces the current one, running roles in depend
     - role: llamenos-postgres
       tags: [postgres, deploy]
       when: llamenos_postgres_enabled | default(true)
-    - role: llamenos-minio
-      tags: [minio, deploy]
-      when: llamenos_minio_enabled | default(true)
+    - role: llamenos-rustfs
+      tags: [rustfs, deploy]
+      when: llamenos_rustfs_enabled | default(true)
     - role: llamenos-strfry
       tags: [strfry, deploy]
       when: llamenos_strfry_enabled | default(true)
@@ -456,7 +458,7 @@ When `llamenos_internal_tls_enabled: true`, generate a self-signed CA and per-ho
 ---
 # Internal TLS role
 # Generates a deployment-local CA and per-host certificates for
-# cross-host service communication (PostgreSQL, MinIO, strfry).
+# cross-host service communication (PostgreSQL, RustFS, strfry).
 
 - name: Create TLS directory
   ansible.builtin.file:
@@ -557,7 +559,7 @@ When `llamenos_internal_tls_enabled: true`, generate a self-signed CA and per-ho
         - app
         - postgres
         - caddy
-        - minio
+        - rustfs
         - strfry
 
     - name: Archive old compose file
@@ -590,14 +592,14 @@ When `llamenos_internal_tls_enabled: true`, generate a self-signed CA and per-ho
 | `deploy/ansible/templates/compose/app.j2` | Create | Per-service compose for app |
 | `deploy/ansible/templates/compose/postgres.j2` | Create | Per-service compose for PostgreSQL |
 | `deploy/ansible/templates/compose/caddy.j2` | Create | Per-service compose for Caddy |
-| `deploy/ansible/templates/compose/minio.j2` | Create | Per-service compose for MinIO |
+| `deploy/ansible/templates/compose/rustfs.j2` | Create | Per-service compose for RustFS |
 | `deploy/ansible/templates/compose/strfry.j2` | Create | Per-service compose for strfry |
 | `deploy/ansible/templates/compose/whisper.j2` | Create | Per-service compose for Whisper |
 | `deploy/ansible/templates/compose/asterisk.j2` | Create | Per-service compose for Asterisk |
 | `deploy/ansible/templates/compose/signal.j2` | Create | Per-service compose for Signal |
 | `deploy/ansible/templates/env/app.j2` | Create | App-specific env vars |
 | `deploy/ansible/templates/env/postgres.j2` | Create | PostgreSQL-specific env vars |
-| `deploy/ansible/templates/env/minio.j2` | Create | MinIO-specific env vars |
+| `deploy/ansible/templates/env/rustfs.j2` | Create | RustFS-specific env vars |
 | `deploy/ansible/templates/env/whisper.j2` | Create | Whisper-specific env vars |
 | `deploy/ansible/templates/env/asterisk.j2` | Create | Asterisk-specific env vars |
 | `deploy/ansible/templates/env/signal.j2` | Create | Signal-specific env vars |
@@ -607,7 +609,7 @@ When `llamenos_internal_tls_enabled: true`, generate a self-signed CA and per-ho
 | `deploy/ansible/roles/llamenos-postgres/tasks/main.yml` | Create | PostgreSQL service role |
 | `deploy/ansible/roles/llamenos-postgres/handlers/main.yml` | Create | PostgreSQL service handlers |
 | `deploy/ansible/roles/llamenos-caddy/tasks/main.yml` | Create | Caddy service role |
-| `deploy/ansible/roles/llamenos-minio/tasks/main.yml` | Create | MinIO service role |
+| `deploy/ansible/roles/llamenos-rustfs/tasks/main.yml` | Create | RustFS service role |
 | `deploy/ansible/roles/llamenos-strfry/tasks/main.yml` | Create | strfry service role |
 | `deploy/ansible/roles/llamenos-whisper/tasks/main.yml` | Create | Whisper service role |
 | `deploy/ansible/roles/llamenos-asterisk/tasks/main.yml` | Create | Asterisk service role |
@@ -623,9 +625,9 @@ When `llamenos_internal_tls_enabled: true`, generate a self-signed CA and per-ho
 
 1. **Single-host smoke test**: Deploy with unchanged single-host inventory. All services must start on one machine, health checks pass. Verify `docker compose ps` shows all enabled services running.
 
-2. **Multi-host topology test**: Use 2-host inventory (app+caddy on host A, postgres+minio+strfry on host B). Verify:
+2. **Multi-host topology test**: Use 2-host inventory (app+caddy on host A, postgres+rustfs+strfry on host B). Verify:
    - App connects to PostgreSQL via remote IP
-   - App connects to MinIO via remote IP
+   - App connects to RustFS via remote IP
    - App connects to strfry via remote IP
    - Health check passes end-to-end
 

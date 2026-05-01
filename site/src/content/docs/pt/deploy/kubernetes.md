@@ -3,7 +3,7 @@ title: "Implantar: Kubernetes (Helm)"
 description: Implante o Llamenos no Kubernetes usando o chart oficial do Helm.
 ---
 
-Este guia abrange a implantacao do Llamenos em um cluster Kubernetes usando o chart oficial do Helm. O chart gerencia o aplicativo e servicos opcionais de MinIO/Whisper como deployments separados. Voce fornece o banco de dados PostgreSQL.
+Este guia abrange a implantacao do Llamenos em um cluster Kubernetes usando o chart oficial do Helm. O chart gerencia o aplicativo e servicos opcionais de RustFS/Whisper como deployments separados. Voce fornece o banco de dados PostgreSQL.
 
 ## Pre-requisitos
 
@@ -15,20 +15,29 @@ Este guia abrange a implantacao do Llamenos em um cluster Kubernetes usando o ch
 - cert-manager (opcional, para certificados TLS automaticos)
 - [Bun](https://bun.sh/) instalado localmente (para gerar o par de chaves do administrador)
 
+## 1. Gerar o par de chaves do administrador
+
+```bash
+git clone https://github.com/your-org/llamenos.git
+cd llamenos
+bun install
+bun run bootstrap-admin
+```
+
+Guarde o **nsec** com seguranca. Copie a **chave publica hexadecimal** para os valores do Helm.
 
 ## 2. Instalar o chart
 
 ```bash
 helm install llamenos deploy/helm/llamenos/ \
-  --set secrets.postgresPassword=YOUR_PG_PASSWORD \
-  --set secrets.hmacSecret=YOUR_HMAC_HEX \
-  --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
-  --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
-  --set ingress.hosts[0].host=hotline.yourdomain.com \
+  --set secrets.adminPubkey=SUA_CHAVE_PUBLICA_HEX \
+  --set secrets.postgresPassword=SUA_SENHA_PG \
+  --set postgres.host=SEU_HOST_PG \
+  --set rustfs.credentials.accessKey=sua-chave-de-acesso \
+  --set rustfs.credentials.secretKey=sua-chave-secreta \
+  --set ingress.hosts[0].host=hotline.seudorustfs.com \
   --set ingress.tls[0].secretName=llamenos-tls \
-  --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
+  --set ingress.tls[0].hosts[0]=hotline.seudorustfs.com
 ```
 
 Ou crie um arquivo `values-production.yaml` para implantacoes reproduziveis:
@@ -37,55 +46,46 @@ Ou crie um arquivo `values-production.yaml` para implantacoes reproduziveis:
 # values-production.yaml
 app:
   image:
-    repository: ghcr.io/rhonda-rodododo/llamenos-platform
-    tag: "1.0.0"
-    pullPolicy: IfNotPresent
+    repository: ghcr.io/your-org/llamenos
+    tag: "0.14.0"
   replicas: 2
-  resources:
-    requests:
-      cpu: "500m"
-      memory: "512Mi"
-    limits:
-      cpu: "2"
-      memory: "1Gi"
   env:
-    HOTLINE_NAME: "Your Hotline"
-    NODE_ENV: "production"
+    HOTLINE_NAME: "Sua Linha"
 
 postgres:
-  host: my-rds-instance.region.rds.amazonaws.com
+  host: minha-instancia-rds.regiao.rds.amazonaws.com
   port: 5432
   database: llamenos
   user: llamenos
   poolSize: 10
 
 secrets:
-  postgresPassword: "your-strong-password"
-  hmacSecret: "64-hex-chars-hmac-signing-key"
-  serverNostrSecret: "64-hex-chars-nostr-identity-key"
+  adminPubkey: "sua_chave_publica_hex"
+  postgresPassword: "sua-senha-forte"
   # twilioAccountSid: ""
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
     storageClass: "gp3"
   credentials:
-    accessKey: "your-access-key"
-    secretKey: "your-secret-key-change-me"
+    accessKey: "sua-chave-de-acesso"
+    secretKey: "sua-chave-secreta-altere"
 
-strfry:
+whisper:
   enabled: true
-
-signalNotifier:
-  enabled: false
-
-monitoring:
-  enabled: true
-  serviceMonitor:
-    interval: 30s
+  model: "Systran/faster-whisper-base"
+  device: "cpu"
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1"
+    limits:
+      memory: "4Gi"
+      cpu: "2"
 
 ingress:
   enabled: true
@@ -93,14 +93,14 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
-    - host: hotline.yourdomain.com
+    - host: hotline.seudorustfs.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: llamenos-tls
       hosts:
-        - hotline.yourdomain.com
+        - hotline.seudorustfs.com
 ```
 
 Em seguida, instale:
@@ -117,13 +117,13 @@ kubectl get pods -l app.kubernetes.io/instance=llamenos
 
 # Verificar a saude do aplicativo
 kubectl port-forward svc/llamenos 3000:3000
-curl http://localhost:3000/health/ready
+curl http://localhost:3000/api/health
 # → {"status":"ok"}
 ```
 
 ## 4. Configurar DNS
 
-Aponte seu dominio para o IP externo ou load balancer do ingress controller:
+Aponte seu dorustfs para o IP externo ou load balancer do ingress controller:
 
 ```bash
 kubectl get ingress llamenos
@@ -131,7 +131,7 @@ kubectl get ingress llamenos
 
 ## 5. Primeiro login e configuracao
 
-Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de administrador e complete o assistente de configuracao.
+Abra `https://hotline.seudorustfs.com` no seu navegador. Faca login com o nsec de administrador e complete o assistente de configuracao.
 
 ## Referencia de configuracao do chart
 
@@ -139,7 +139,7 @@ Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de
 
 | Parametro | Descricao | Padrao |
 |-----------|-----------|--------|
-| `app.image.repository` | Imagem do container | `ghcr.io/rhonda-rodododo/llamenos-platform` |
+| `app.image.repository` | Imagem do container | `ghcr.io/your-org/llamenos` |
 | `app.image.tag` | Tag da imagem | appVersion do chart |
 | `app.port` | Porta do aplicativo | `3000` |
 | `app.replicas` | Replicas do pod | `2` |
@@ -160,8 +160,7 @@ Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de
 
 | Parametro | Descricao | Padrao |
 |-----------|-----------|--------|
-| `secrets.hmacSecret` | HMAC signing key — 64 hex chars (required) | `""` |
-| `secrets.serverNostrSecret` | Server Nostr identity key — 64 hex chars (required) | `""` |
+| `secrets.adminPubkey` | Chave publica hex Nostr do admin | `""` |
 | `secrets.postgresPassword` | Senha do PostgreSQL (obrigatorio) | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |
@@ -170,18 +169,18 @@ Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de
 
 > **Dica**: Para producao, use `secrets.existingSecret` para referenciar um Secret gerenciado pelo External Secrets Operator, Sealed Secrets ou Vault.
 
-### MinIO
+### RustFS
 
 | Parametro | Descricao | Padrao |
 |-----------|-----------|--------|
-| `minio.enabled` | Implantar MinIO | `true` |
-| `minio.image.repository` | Imagem do MinIO | `minio/minio` |
-| `minio.image.tag` | Tag do MinIO | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | Volume de dados do MinIO | `50Gi` |
-| `minio.persistence.storageClass` | Classe de armazenamento | `""` |
-| `minio.credentials.accessKey` | Usuario root do MinIO | `""` (obrigatorio) |
-| `minio.credentials.secretKey` | Senha root do MinIO | `""` (obrigatorio) |
-| `minio.resources` | Requests e limits de CPU/memoria | `{}` |
+| `rustfs.enabled` | Implantar RustFS | `true` |
+| `rustfs.image.repository` | Imagem do RustFS | `rustfs/rustfs` |
+| `rustfs.image.tag` | Tag do RustFS | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | Volume de dados do RustFS | `50Gi` |
+| `rustfs.persistence.storageClass` | Classe de armazenamento | `""` |
+| `rustfs.credentials.accessKey` | Usuario root do RustFS | `""` (obrigatorio) |
+| `rustfs.credentials.secretKey` | Senha root do RustFS | `""` (obrigatorio) |
+| `rustfs.resources` | Requests e limits de CPU/memoria | `{}` |
 
 ### Transcricao Whisper
 
@@ -229,26 +228,26 @@ Crie o Secret com sua ferramenta preferida:
 kubectl create secret generic llamenos-secrets \
   --from-literal=admin-pubkey=sua_chave \
   --from-literal=postgres-password=sua_senha \
-  --from-literal=minio-access-key=sua_chave \
-  --from-literal=minio-secret-key=sua_chave
+  --from-literal=rustfs-access-key=sua_chave \
+  --from-literal=rustfs-secret-key=sua_chave
 
 # Ou com External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
 
-## Usando um MinIO ou S3 externo
+## Usando um RustFS ou S3 externo
 
-Se voce ja tem MinIO ou um servico compativel com S3, desative o MinIO integrado e passe o endpoint:
+Se voce ja tem RustFS ou um servico compativel com S3, desative o RustFS integrado e passe o endpoint:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://seu-minio.exemplo.com"
-    MINIO_ACCESS_KEY: "sua-chave"
-    MINIO_SECRET_KEY: "seu-segredo"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://seu-rustfs.exemplo.com"
+    STORAGE_ACCESS_KEY: "sua-chave"
+    STORAGE_SECRET_KEY: "seu-segredo"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## Transcricao com GPU
@@ -277,6 +276,7 @@ kubectl scale deployment llamenos --replicas=3
 
 Ou defina `app.replicas` no seu arquivo de valores. Os advisory locks do PostgreSQL garantem a consistencia dos dados entre replicas.
 
+Para escalabilidade global automatica sem gerenciar infraestrutura, considere a [implantacao no Cloudflare Workers](/docs/getting-started).
 
 ## Monitoramento
 
@@ -288,19 +288,19 @@ O chart configura probes de liveness, readiness e startup contra `/api/health`:
 # Integrado ao template do deployment
 livenessProbe:
   httpGet:
-    path: /health/live
+    path: /api/health
     port: http
   initialDelaySeconds: 15
   periodSeconds: 15
 readinessProbe:
   httpGet:
-    path: /health/live
+    path: /api/health
     port: http
   initialDelaySeconds: 10
   periodSeconds: 10
 startupProbe:
   httpGet:
-    path: /health/live
+    path: /api/health
     port: http
   failureThreshold: 30
   periodSeconds: 5
@@ -340,7 +340,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Causas comuns: secrets ausentes, ADMIN_PUBKEY incorreto, PostgreSQL inacessivel, MinIO nao pronto.
+Causas comuns: secrets ausentes, ADMIN_PUBKEY incorreto, PostgreSQL inacessivel, RustFS nao pronto.
 
 ### Erros de conexao com o banco de dados
 
@@ -359,116 +359,8 @@ kubectl get ingress llamenos
 kubectl describe ingress llamenos
 ```
 
-
-## cert-manager integration
-
-If you have [cert-manager](https://cert-manager.io/) installed, configure the cluster issuer for automatic TLS:
-
-```yaml
-# cluster-issuer.yaml
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@yourdomain.com
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-      - http01:
-          ingress:
-            class: nginx
-```
-
-Reference it in your ingress annotations:
-
-```yaml
-ingress:
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-```
-
-## External Secrets Operator
-
-For production, use [External Secrets Operator](https://external-secrets.io/) to sync secrets from AWS SSM, Vault, GCP Secret Manager, etc.
-
-```yaml
-# llamenos-externalsecret.yaml
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: llamenos-secrets
-  namespace: llamenos
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: my-secret-store
-    kind: ClusterSecretStore
-  target:
-    name: llamenos-secrets
-    creationPolicy: Owner
-  data:
-    - secretKey: postgres-password
-      remoteRef:
-        key: llamenos/postgres-password
-    - secretKey: hmac-secret
-      remoteRef:
-        key: llamenos/hmac-secret
-    - secretKey: server-nostr-secret
-      remoteRef:
-        key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
-      remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
-      remoteRef:
-        key: llamenos/minio-secret-key
-```
-
-Then reference in Helm values:
-
-```yaml
-secrets:
-  existingSecret: llamenos-secrets
-```
-
-## Prometheus ServiceMonitor
-
-Enable the `ServiceMonitor` for Prometheus Operator:
-
-```yaml
-monitoring:
-  enabled: true
-  serviceMonitor:
-    namespace: monitoring
-    interval: 30s
-    scrapeTimeout: 10s
-    labels:
-      release: kube-prometheus-stack
-```
-
-## Production hardening checklist
-
-Before going live:
-
-- [ ] **Secrets via ESO or Sealed Secrets** — never commit secrets to values files
-- [ ] **Resource requests and limits** set on all deployments
-- [ ] **PodDisruptionBudget** configured (`minAvailable: 1`) for zero-downtime drains
-- [ ] **NetworkPolicy** restricting ingress to app pod from ingress controller only
-- [ ] **Read-only root filesystem** (`securityContext.readOnlyRootFilesystem: true`)
-- [ ] **Non-root user** (`securityContext.runAsNonRoot: true`)
-- [ ] **PostgreSQL TLS** enabled (`postgres.sslMode: require`)
-- [ ] **cert-manager ClusterIssuer** configured for automatic Let's Encrypt renewal
-- [ ] **Prometheus ServiceMonitor** enabled and scraping
-- [ ] **Liveness/readiness probes** verified after deploy
-- [ ] **Image pull policy** set to `IfNotPresent`
-- [ ] **Ingress rate limiting** annotations configured
-
-
 ## Proximos passos
 
 - [Guia do administrador](/docs/admin-guide) -- configurar a linha
-- [Visao geral do auto-hospedagem](/docs/deploy/self-hosting) -- comparar opcoes de implantacao
-- [Implantacao com Docker Compose](/docs/deploy/docker) -- alternativa mais simples
+- [Visao geral do auto-hospedagem](/docs/self-hosting) -- comparar opcoes de implantacao
+- [Implantacao com Docker Compose](/docs/deploy-docker) -- alternativa mais simples

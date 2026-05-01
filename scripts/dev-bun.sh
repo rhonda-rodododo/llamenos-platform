@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local Bun development server
 #
-# Starts backing services (PostgreSQL, MinIO, strfry) via Docker Compose,
+# Starts backing services (PostgreSQL, RustFS, strfry) via Docker Compose,
 # then runs the server directly with Bun's --watch mode (single process).
 #
 # Usage:
@@ -34,7 +34,7 @@ cmd_logs() {
 cmd_start() {
   # Ensure Docker Compose services are running
   if ! docker compose -f "$COMPOSE_FILE" ps --status running 2>/dev/null | grep -q postgres; then
-    log "Starting backing services (PostgreSQL, MinIO, strfry)..."
+    log "Starting backing services (PostgreSQL, RustFS, strfry)..."
     docker compose -f "$COMPOSE_FILE" up -d --wait
     log "Backing services ready"
   else
@@ -54,10 +54,10 @@ cmd_start() {
     warn "HMAC_SECRET not set. Generating random value for this session."
     export HMAC_SECRET=$(openssl rand -hex 32)
   fi
-  export MINIO_ENDPOINT=http://localhost:9000
-  export MINIO_ACCESS_KEY=minioadmin
-  export MINIO_SECRET_KEY=minioadmin
-  export MINIO_BUCKET=llamenos-files
+  export STORAGE_ENDPOINT=http://localhost:9000
+  export STORAGE_ACCESS_KEY=rustfsadmin
+  export STORAGE_SECRET_KEY=rustfsadmin
+  export STORAGE_BUCKET=llamenos-files
   export SERVER_NOSTR_SECRET="${SERVER_NOSTR_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}"
   export NOSTR_RELAY_URL=ws://localhost:7777
 

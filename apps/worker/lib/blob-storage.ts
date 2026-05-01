@@ -1,5 +1,5 @@
 /**
- * S3-compatible blob storage adapter for MinIO.
+ * S3-compatible blob storage adapter for RustFS.
  * Implements the BlobStorage interface using @aws-sdk/client-s3.
  */
 import {
@@ -17,20 +17,29 @@ export function createBlobStorage(opts?: {
   bucket?: string
   region?: string
 }): BlobStorage {
-  const endpoint = opts?.endpoint || process.env.MINIO_ENDPOINT || 'http://localhost:9000'
-  const accessKeyId = opts?.accessKeyId || process.env.MINIO_ACCESS_KEY
-  const secretAccessKey = opts?.secretAccessKey || process.env.MINIO_SECRET_KEY
-  if (!accessKeyId || !secretAccessKey) {
-    throw new Error('MinIO credentials required: set MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables')
+  // Backward-compat: read legacy MINIO_* env vars (deprecated)
+  const legacyEndpoint = process.env.STORAGE_ENDPOINT
+  const legacyAccessKey = process.env.STORAGE_ACCESS_KEY
+  const legacySecretKey = process.env.STORAGE_SECRET_KEY
+  const legacyBucket = process.env.STORAGE_BUCKET
+  if (legacyEndpoint || legacyAccessKey || legacySecretKey) {
+    console.warn('[blob-storage] DEPRECATED: MINIO_* env vars are deprecated. Use STORAGE_* instead.')
   }
-  const bucket = opts?.bucket || process.env.MINIO_BUCKET || 'llamenos-files'
+
+  const endpoint = opts?.endpoint || process.env.STORAGE_ENDPOINT || legacyEndpoint || 'http://localhost:9000'
+  const accessKeyId = opts?.accessKeyId || process.env.STORAGE_ACCESS_KEY || legacyAccessKey
+  const secretAccessKey = opts?.secretAccessKey || process.env.STORAGE_SECRET_KEY || legacySecretKey
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('Storage credentials required: set STORAGE_ACCESS_KEY and STORAGE_SECRET_KEY environment variables')
+  }
+  const bucket = opts?.bucket || process.env.STORAGE_BUCKET || legacyBucket || 'llamenos-files'
   const region = opts?.region || 'us-east-1'
 
   const client = new S3Client({
     endpoint,
     region,
     credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true, // Required for MinIO
+    forcePathStyle: true, // Required for S3-compatible storage (RustFS)
   })
 
   return {

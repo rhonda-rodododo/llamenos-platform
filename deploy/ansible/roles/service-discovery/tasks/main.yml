@@ -25,14 +25,14 @@
         5432
       {%- endif -%}
 
-- name: Determine MinIO connection target
+- name: Determine RustFS connection target
   ansible.builtin.set_fact:
-    llamenos_minio_endpoint: >-
+    llamenos_rustfs_endpoint: >-
       {%- if groups.get('llamenos_storage', []) | length > 0 and
              inventory_hostname not in groups.get('llamenos_storage', []) -%}
-        http://{{ hostvars[groups['llamenos_storage'][0]]['ansible_host'] }}:{{ llamenos_minio_port | default('9000') }}
+        http://{{ hostvars[groups['llamenos_storage'][0]]['ansible_host'] }}:{{ llamenos_rustfs_port | default('9000') }}
       {%- else -%}
-        http://minio:9000
+        http://rustfs:9000
       {%- endif -%}
 
 - name: Determine strfry relay connection target
@@ -76,7 +76,7 @@
     msg: |
       Service topology for {{ inventory_hostname }}:
         PostgreSQL:    {{ llamenos_pg_host | trim }}:{{ llamenos_pg_port | trim }}
-        MinIO:         {{ llamenos_minio_endpoint | trim }}
+        RustFS:        {{ llamenos_rustfs_endpoint | trim }}
         Relay:         {{ llamenos_relay_url | trim }}
         Whisper:       {{ llamenos_whisper_url | trim | default('disabled', true) }}
         App:           {{ llamenos_app_host | trim }}

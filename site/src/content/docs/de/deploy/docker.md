@@ -15,8 +15,8 @@ Diese Anleitung fuehrt Sie durch die Bereitstellung von Llamenos mit Docker Comp
 ## 1. Repository klonen
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/your-org/llamenos.git
+cd llamenos
 ```
 
 ## 2. Admin-Schluesselpaar generieren
@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=ihre_sid
 TWILIO_AUTH_TOKEN=ihr_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO-Anmeldedaten (Standardwerte aendern!)
-MINIO_ACCESS_KEY=ihr-zugangsschluessel
-MINIO_SECRET_KEY=ihr-geheimschluessel-min-8-zeichen
+# RustFS-Anmeldedaten (Standardwerte aendern!)
+STORAGE_ACCESS_KEY=ihr-zugangsschluessel
+STORAGE_SECRET_KEY=ihr-geheimschluessel-min-8-zeichen
 ```
 
-> **Wichtig**: Setzen Sie starke, einzigartige Passwoerter fuer `PG_PASSWORD`, `MINIO_ACCESS_KEY` und `MINIO_SECRET_KEY`.
+> **Wichtig**: Setzen Sie starke, einzigartige Passwoerter fuer `PG_PASSWORD`, `STORAGE_ACCESS_KEY` und `STORAGE_SECRET_KEY`.
 
 ## 4. Domain konfigurieren
 
@@ -94,7 +94,7 @@ Dies startet vier Kerndienste:
 | **app** | Llamenos-Anwendung | 3000 (intern) |
 | **postgres** | PostgreSQL-Datenbank | 5432 (intern) |
 | **caddy** | Reverse Proxy + TLS | 80, 443 |
-| **minio** | Datei-/Aufnahmespeicher | 9000, 9001 (intern) |
+| **rustfs** | Datei-/Aufnahmespeicher | 9000, 9001 (intern) |
 
 Ueberpruefen Sie, ob alles laeuft:
 
@@ -143,7 +143,7 @@ Dies startet einen `faster-whisper-server`-Container mit dem `base`-Modell auf d
 
 ## Optional: Asterisk aktivieren
 
-Fuer selbst gehostete SIP-Telefonie (siehe [Asterisk-Einrichtung](/docs/deploy/providers/asterisk)):
+Fuer selbst gehostete SIP-Telefonie (siehe [Asterisk-Einrichtung](/docs/setup-asterisk)):
 
 ```bash
 # Gemeinsames Bridge-Geheimnis setzen
@@ -154,13 +154,13 @@ docker compose --profile asterisk up -d
 
 ## Optional: Signal aktivieren
 
-Fuer Signal-Nachrichten (siehe [Signal-Einrichtung](/docs/deploy/providers/signal)):
+Fuer Signal-Nachrichten (siehe [Signal-Einrichtung](/docs/setup-signal)):
 
 ```bash
 docker compose --profile signal up -d
 ```
 
-Sie muessen die Signal-Nummer ueber den signal-cli-Container registrieren. Anweisungen finden Sie in der [Signal-Einrichtungsanleitung](/docs/deploy/providers/signal).
+Sie muessen die Signal-Nummer ueber den signal-cli-Container registrieren. Anweisungen finden Sie in der [Signal-Einrichtungsanleitung](/docs/setup-signal).
 
 ## Aktualisierung
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Ihre Daten werden in Docker-Volumes (`postgres-data`, `minio-data`, etc.) persistiert und ueberleben Container-Neustarts und Image-Aktualisierungen.
+Ihre Daten werden in Docker-Volumes (`postgres-data`, `rustfs-data`, etc.) persistiert und ueberleben Container-Neustarts und Image-Aktualisierungen.
 
 ## Backups
 
@@ -189,15 +189,15 @@ Zur Wiederherstellung:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### MinIO-Speicher
+### RustFS-Speicher
 
-MinIO speichert hochgeladene Dateien, Aufnahmen und Anhaenge:
+RustFS speichert hochgeladene Dateien, Aufnahmen und Anhaenge:
 
 ```bash
-# Mit dem MinIO-Client (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Mit dem RustFS-Client (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Automatisierte Backups
@@ -262,21 +262,28 @@ docker compose logs caddy
 curl -I http://hotline.ihredomain.com
 ```
 
-### MinIO-Verbindungsfehler
+### RustFS-Verbindungsfehler
 
-Stellen Sie sicher, dass der MinIO-Dienst gesund ist, bevor die App startet:
+Stellen Sie sicher, dass der RustFS-Dienst gesund ist, bevor die App startet:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Dienstarchitektur
 
-![Docker Architecture](/diagrams/docker-architecture.svg)
+```mermaid
+flowchart TD
+    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, Reverse Proxy)"]
+    Caddy -->|":3000"| App["App<br/>(Node.js)"]
+    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
+    App --> RustFS[("RustFS<br/>:9000")]
+    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
+```
 
 ## Naechste Schritte
 
 - [Administratorhandbuch](/docs/admin-guide) -- die Hotline konfigurieren
-- [Uebersicht Selbst-Hosting](/docs/deploy/self-hosting) -- Bereitstellungsoptionen vergleichen
-- [Kubernetes-Bereitstellung](/docs/deploy/kubernetes) -- zu Helm migrieren
+- [Uebersicht Selbst-Hosting](/docs/self-hosting) -- Bereitstellungsoptionen vergleichen
+- [Kubernetes-Bereitstellung](/docs/deploy-kubernetes) -- zu Helm migrieren

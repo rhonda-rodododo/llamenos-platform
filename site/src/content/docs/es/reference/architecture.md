@@ -194,7 +194,7 @@ El relay ve blobs cifrados y firmas validas, pero no puede leer el contenido de 
 - Autenticacion via pares de claves Nostr (firmas BIP-340 Schnorr)
 - Tokens de sesion WebAuthn para conveniencia multi-dispositivo
 - Control de acceso basado en roles (llamante, voluntario, reportero, admin)
-- Las 25 constantes de separacion de dominio criptografico definidas en `crypto-labels.ts` previenen ataques entre protocolos
+- Las 25 constantes de separacion de dorustfs criptografico definidas en `crypto-labels.ts` previenen ataques entre protocolos
 
 ### Cifrado en reposo
 

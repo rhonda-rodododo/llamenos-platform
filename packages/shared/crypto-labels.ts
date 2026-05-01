@@ -138,3 +138,8 @@ export const LABEL_FIREHOSE_BUFFER_ENCRYPT = 'llamenos:firehose:buffer-encrypt'
 
 /** Firehose extracted report envelope wrapping */
 export const LABEL_FIREHOSE_REPORT_WRAP = 'llamenos:firehose:report-wrap'
+
+// --- Storage Credential Encryption ---
+
+/** HKDF context for per-hub storage IAM credential encryption at rest */
+export const LABEL_STORAGE_CREDENTIAL_WRAP = 'llamenos:storage-credential-wrap'

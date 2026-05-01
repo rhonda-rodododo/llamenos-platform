@@ -268,10 +268,10 @@ scrape_configs:
 {% endfor %}
 {% endif %}
 
-  # ── MinIO metrics ──
-{% if llamenos_minio_enabled | default(true) %}
-  - job_name: 'minio'
-    metrics_path: '/minio/v2/metrics/cluster'
+  # ── RustFS metrics ──
+{% if llamenos_rustfs_enabled | default(true) %}
+  - job_name: 'rustfs'
+    metrics_path: '/rustfs/v2/metrics/cluster'
     static_configs:
 {% for host in groups.get('llamenos_storage', groups['llamenos_servers']) %}
       - targets: ['{{ hostvars[host]['ansible_host'] }}:9000']

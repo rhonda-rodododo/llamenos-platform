@@ -76,7 +76,7 @@ Llamenos e uma aplicacao de pagina unica (SPA) que pode ser executada no **Cloud
 |---|---|---|
 | Frontend | Vite + React + TanStack Router | Igual |
 | Backend | Cloudflare Workers + 6 Durable Objects | Node.js + PostgreSQL |
-| Armazenamento | R2 | MinIO (compativel com S3) |
+| Armazenamento | R2 | RustFS (compativel com S3) |
 | Voz | Twilio, SignalWire, Vonage, Plivo ou Asterisk | Igual |
 | Mensagens | SMS, WhatsApp Business, Signal | Igual |
 | Autenticacao | Chaves Nostr (BIP-340 Schnorr) + WebAuthn | Igual |

@@ -1,4 +1,6 @@
 # Epic 298: Disaster Recovery Runbook & Drills
+> **Note**: MinIO has been replaced by RustFS as of PR #40. All references to MinIO in this document should be read as RustFS.
+
 
 **Status**: PENDING
 **Priority**: Medium
@@ -14,7 +16,7 @@ Create an automated disaster recovery testing framework that can provision a fre
 
 The existing `RUNBOOK.md` has incident response procedures and `playbooks/test-restore.yml` validates that backups can be restored into a temporary PostgreSQL container. But there are critical gaps:
 
-1. **No full-stack DR test.** The test-restore playbook only validates PostgreSQL. It doesn't verify that the app can boot, that MinIO data is intact, that the Nostr relay has its event history, or that the telephony provider still routes calls.
+1. **No full-stack DR test.** The test-restore playbook only validates PostgreSQL. It doesn't verify that the app can boot, that RustFS data is intact, that the Nostr relay has its event history, or that the telephony provider still routes calls.
 2. **No time-to-recovery measurement.** Operators don't know if recovery takes 30 minutes or 4 hours. Without measured recovery times, there's no way to set SLAs or know if the DR process is improving or degrading.
 3. **No drill schedule.** DR testing happens ad hoc (if at all). Part-time operators forget to test unless there's a scheduled reminder.
 4. **No scenario coverage.** The runbook covers "restore from backup" but not "server is ransomwared," "hosting provider disappears overnight," or "admin key is compromised."
@@ -117,14 +119,14 @@ For a crisis hotline, the difference between 1-hour and 12-hour recovery could m
                 timeout: 3s
                 retries: 10
 
-            minio:
-              image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+            rustfs:
+              image: rustfs/rustfs:RELEASE.2025-01-20T14-49-07Z
               command: server /data --console-address ":9001"
               environment:
                 MINIO_ROOT_USER: drtest
                 MINIO_ROOT_PASSWORD: drtest-password
               volumes:
-                - dr-miniodata:/data
+                - dr-rustfsdata:/data
               healthcheck:
                 test: ["CMD", "mc", "ready", "local"]
                 interval: 5s
@@ -136,17 +138,17 @@ For a crisis hotline, the difference between 1-hour and 12-hour recovery could m
               depends_on:
                 postgres:
                   condition: service_healthy
-                minio:
+                rustfs:
                   condition: service_healthy
               environment:
                 PLATFORM: node
                 DATABASE_URL: postgresql://llamenos:dr-test-password@postgres:5432/llamenos
                 ENVIRONMENT: development
                 HMAC_SECRET: dr-test-hmac-secret-minimum-32-chars
-                MINIO_ENDPOINT: http://minio:9000
-                MINIO_ACCESS_KEY: drtest
-                MINIO_SECRET_KEY: drtest-password
-                MINIO_BUCKET: llamenos-files
+                STORAGE_ENDPOINT: http://rustfs:9000
+                STORAGE_ACCESS_KEY: drtest
+                STORAGE_SECRET_KEY: drtest-password
+                STORAGE_BUCKET: llamenos-files
               ports:
                 - "3333:3000"
               healthcheck:
@@ -158,7 +160,7 @@ For a crisis hotline, the difference between 1-hour and 12-hour recovery could m
 
           volumes:
             dr-pgdata:
-            dr-miniodata:
+            dr-rustfsdata:
       tags: [provision]
 
     - name: Start DR test environment

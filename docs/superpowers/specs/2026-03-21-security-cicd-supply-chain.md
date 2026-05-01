@@ -181,39 +181,39 @@ This ensures that a compromised step in a build matrix job (running on macOS/Win
 
 ---
 
-### HIGH-CI6 — MinIO not digest-pinned in CI (two paths)
+### HIGH-CI6 — RustFS not digest-pinned in CI (two paths)
 
 **Files**: `.github/workflows/ci.yml:304-318` (Linux Docker path), `.github/workflows/ci.yml:569-573` (macOS curl path)
 
-There are two MinIO setup paths in CI:
+There are two RustFS setup paths in CI:
 
-**Linux CI job (line 304)** — uses `docker run minio/minio:RELEASE.2025-01-20T14-49-07Z` (tag-only, no digest):
+**Linux CI job (line 304)** — uses `docker run rustfs/rustfs:RELEASE.2025-01-20T14-49-07Z` (tag-only, no digest):
 
 ```bash
-docker run -d --name minio \
+docker run -d --name rustfs \
   -p 9000:9000 \
   -e MINIO_ROOT_USER=testaccess \
   -e MINIO_ROOT_PASSWORD=testsecret123456 \
-  minio/minio:RELEASE.2025-01-20T14-49-07Z@sha256:ed9be66eb5f2636c18289c34c3b725ddf57815f2777c77b5938543b78a44f144 server /data
+  rustfs/rustfs:RELEASE.2025-01-20T14-49-07Z@sha256:ed9be66eb5f2636c18289c34c3b725ddf57815f2777c77b5938543b78a44f144 server /data
 ```
 
 Use the same digest already pinned in `docker-compose.yml`.
 
-**macOS/iOS CI job (line 569-573)** — macOS runners cannot run Docker, so this job downloads a MinIO binary via `curl` with no checksum verification:
+**macOS/iOS CI job (line 569-573)** — macOS runners cannot run Docker, so this job downloads a RustFS binary via `curl` with no checksum verification:
 
 ```bash
-curl -sSfL https://dl.min.io/server/minio/release/darwin-arm64/minio -o /tmp/minio
-chmod +x /tmp/minio
+curl -sSfL https://dl.min.io/server/rustfs/release/darwin-arm64/rustfs -o /tmp/rustfs
+chmod +x /tmp/rustfs
 ```
 
 This is the higher-risk path: a MITM on `dl.min.io` or a compromised CDN serves a malicious binary that executes on the macOS runner alongside iOS build secrets (code signing certificates, provisioning profile passphrases). The git-cliff download in the same workflow correctly verifies a SHA-256 checksum — apply the same pattern:
 
 ```bash
 MINIO_VERSION="RELEASE.2025-01-20T14-49-07Z"
-MINIO_SHA256="<sha256-of-minio-darwin-arm64-binary>"
-curl -sSfL "https://dl.min.io/server/minio/release/darwin-arm64/archive/minio.${MINIO_VERSION}" -o /tmp/minio
-echo "${MINIO_SHA256}  /tmp/minio" | sha256sum -c -
-chmod +x /tmp/minio
+MINIO_SHA256="<sha256-of-rustfs-darwin-arm64-binary>"
+curl -sSfL "https://dl.min.io/server/rustfs/release/darwin-arm64/archive/rustfs.${MINIO_VERSION}" -o /tmp/rustfs
+echo "${MINIO_SHA256}  /tmp/rustfs" | sha256sum -c -
+chmod +x /tmp/rustfs
 ```
 
 Record the expected SHA-256 at the time of the fix by downloading and verifying the binary locally before committing the hash.
@@ -289,7 +289,7 @@ All fixes in this epic are independent of each other and can be implemented in a
 3. HIGH-CI5 (per-job permissions — affects same files as CRIT-CI1)
 4. HIGH-CI1, HIGH-CI4 (one-line lockfile fixes)
 5. HIGH-CI2, HIGH-CI3 (image digest pinning — requires running docker pull)
-6. HIGH-CI6 (MinIO digest in CI)
+6. HIGH-CI6 (RustFS digest in CI)
 7. HIGH-CI7 (pre-commit hook + documentation)
 8. MED-CI1, MED-CI2, MED-CI3 (configuration hardening)
 
@@ -302,8 +302,8 @@ All fixes in this epic are independent of each other and can be implemented in a
 - [ ] `docker build deploy/docker/Dockerfile` with `oven/bun:1` (unpinned) replaced confirms the old tag still resolves — digest mismatch would fail
 - [ ] `bun install --frozen-lockfile` passes in all workflow contexts
 - [ ] GlitchTip container refuses to start without `GLITCHTIP_SECRET_KEY` set
-- [ ] Linux CI MinIO `docker run` uses digest-pinned image
-- [ ] macOS CI MinIO curl download verifies SHA-256 before `chmod +x`
+- [ ] Linux CI RustFS `docker run` uses digest-pinned image
+- [ ] macOS CI RustFS curl download verifies SHA-256 before `chmod +x`
 - [ ] `bun audit --audit-level=high` passes (or known exceptions are documented)
 - [ ] `git log --all -S "<any real secret value>" --source --all` returns no commits
 - [ ] All `cargo install` usages in all workflows use `--locked`

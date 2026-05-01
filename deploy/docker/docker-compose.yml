@@ -50,10 +50,10 @@ services:
       - HOTLINE_NAME=${HOTLINE_NAME:-Hotline}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - "HMAC_SECRET=${HMAC_SECRET:?HMAC_SECRET is required — generate with openssl rand -hex 32}"
-      - MINIO_ENDPOINT=http://rustfs:9000
-      - MINIO_ACCESS_KEY=${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
-      - MINIO_SECRET_KEY=${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
-      - MINIO_BUCKET=${STORAGE_BUCKET:-llamenos-files}
+      - STORAGE_ENDPOINT=http://rustfs:9000
+      - STORAGE_ACCESS_KEY=${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
+      - STORAGE_SECRET_KEY=${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-llamenos-files}
       - WHISPER_URL=${WHISPER_URL:-http://whisper:8080/v1/audio/transcriptions}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
@@ -129,14 +129,15 @@ services:
         condition: service_healthy
 
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:latest@sha256:0725587f6fcca83c1898f321424327d6e6da5e01ea20382905dd258ed5af3be4
     command: server /data --console-address ":9001"
     restart: unless-stopped
     volumes:
       - rustfs-data:/data
     environment:
-      - RUSTFS_ROOT_USER=${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
-      - RUSTFS_ROOT_PASSWORD=${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
+      - RUSTFS_ACCESS_KEY=${STORAGE_ACCESS_KEY:?STORAGE_ACCESS_KEY is required}
+      - RUSTFS_SECRET_KEY=${STORAGE_SECRET_KEY:?STORAGE_SECRET_KEY is required}
+      - RUSTFS_CONSOLE_ENABLE=true
     networks:
       - internal
     healthcheck:

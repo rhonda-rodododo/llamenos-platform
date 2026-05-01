@@ -230,6 +230,6 @@ All hardening from `lm-asterisk-bridge-hardening` is incorporated:
 
 6. **Kamailio as BridgeClient**: v1 implements it with all call-control methods throwing. Is this interface abuse? Alternative: separate `ProxyClient` interface with just `healthCheck()` + `listDispatcherEntries()`. **Recommendation**: Keep as BridgeClient with explicit "not supported" errors — it allows uniform lifecycle management in the bridge host.
 
-7. **Recording storage**: Recordings are currently stored on the PBX filesystem and fetched via the bridge. For multi-PBX deployments, should recordings go to MinIO/S3 directly? **Recommendation**: Not in this rewrite. Current flow (PBX stores → bridge fetches → Worker stores to MinIO) works. Direct PBX→S3 is a separate optimization.
+7. **Recording storage**: Recordings are currently stored on the PBX filesystem and fetched via the bridge. For multi-PBX deployments, should recordings go to RustFS/S3 directly? **Recommendation**: Not in this rewrite. Current flow (PBX stores → bridge fetches → Worker stores to RustFS) works. Direct PBX→S3 is a separate optimization.
 
 8. **Bridge port binding**: Currently binds to `127.0.0.1` only. In Docker, it needs to bind to `0.0.0.0` for inter-container communication. Use `BRIDGE_HOST` env var defaulting to `0.0.0.0` in Docker, `127.0.0.1` in dev.

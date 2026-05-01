@@ -1,6 +1,6 @@
 ---
-- name: Restart minio service
+- name: Restart rustfs service
   community.docker.docker_compose_v2:
-    project_src: "{{ app_dir }}/services/minio"
+    project_src: "{{ app_dir }}/services/rustfs"
     state: restarted
     recreate: always

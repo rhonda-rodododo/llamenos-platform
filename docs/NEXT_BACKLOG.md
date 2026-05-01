@@ -151,7 +151,7 @@ Deployment guide: [`docs/security/DEPLOYMENT_HARDENING.md`](security/DEPLOYMENT_
 - [x] Refactored Env interface with structural typing (DOStub, DONamespace, BlobStorage, TranscriptionService)
 - [x] esbuild Node.js build with `cloudflare:workers` → `src/platform/index.ts` alias
 - [x] Docker infrastructure (Dockerfile, docker-compose.yml with PostgreSQL, Caddyfile, .env.example)
-- [x] Helm chart for Kubernetes (app, PostgreSQL, MinIO, Whisper, optional Asterisk/Signal)
+- [x] Helm chart for Kubernetes (app, PostgreSQL, RustFS, Whisper, optional Asterisk/Signal)
 - [x] CI/CD GitHub Actions workflow for Docker image builds (GHCR)
 - [x] Health check endpoint (`/api/health`)
 - [x] PostgreSQL replaces SQLite — enables multi-replica RollingUpdate in Kubernetes
@@ -377,8 +377,8 @@ DRY up the cross-platform BDD test suite: consolidate shared specs, migrate desk
 Architecture audit (2026-03-03) identified that Node.js + PostgreSQL is the real production path, but CF Workers is still treated as primary in docs/tests. Also, the Mac M4 unblocks iOS builds.
 
 ### Node.js E2E & Documentation — COMPLETE
-- [x] **[Epic 235: Node.js Platform E2E Test Parity](epics/epic-235-nodejs-e2e-test-parity.md)** — 79 Node.js integration tests (PostgreSQL storage, alarm poller, WebSocket shim, MinIO, migrations), playwright.docker.config.ts, e2e-node + integration-node CI jobs
-- [x] **[Epic 236: Node.js Production Deployment Primacy & Infrastructure Hardening](epics/epic-236-production-deployment-primacy.md)** — Health endpoint with dependency checks (/health, /health/live, /health/ready), Helm MinIO→StatefulSet + HPA + PDB + ServiceMonitor (chart 0.2.0), Docker Compose rate limiting + JSON logging + first-run.sh, Ansible MinIO backup + restore test playbook, OpenTofu admin_ssh_cidrs variable, Prometheus /metrics endpoint, structured JSON logger, `bun run dev:node` local dev server, PRODUCTION_CHECKLIST.md
+- [x] **[Epic 235: Node.js Platform E2E Test Parity](epics/epic-235-nodejs-e2e-test-parity.md)** — 79 Node.js integration tests (PostgreSQL storage, alarm poller, WebSocket shim, RustFS, migrations), playwright.docker.config.ts, e2e-node + integration-node CI jobs
+- [x] **[Epic 236: Node.js Production Deployment Primacy & Infrastructure Hardening](epics/epic-236-production-deployment-primacy.md)** — Health endpoint with dependency checks (/health, /health/live, /health/ready), Helm RustFS→StatefulSet + HPA + PDB + ServiceMonitor (chart 0.2.0), Docker Compose rate limiting + JSON logging + first-run.sh, Ansible RustFS backup + restore test playbook, OpenTofu admin_ssh_cidrs variable, Prometheus /metrics endpoint, structured JSON logger, `bun run dev:node` local dev server, PRODUCTION_CHECKLIST.md
 
 ### iOS Build Pipeline (Mac M4) — COMPLETE
 - [x] **[Epic 237: iOS Build Pipeline on Local Mac M4](epics/epic-237-ios-mac-m4-build-pipeline.md)** — scripts/ios-build.sh (status/setup/sync/build/test/xcframework/uitest/all), npm scripts
@@ -500,7 +500,7 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 
 ### Track 1: Ansible Fleet Deployment — COMPLETE
 - [x] **[Epic 276: Multi-Host Ansible Inventory & Service Discovery](epics/epic-276-multi-host-inventory.md)** — matrix-docker-ansible-deploy style, per-service toggles, multi-host service discovery
-- [x] **[Epic 277: Backup Orchestration for Distributed Deployments](epics/epic-277-backup-orchestration.md)** — Per-service backup roles, cross-host aggregation, strfry/MinIO/config backup, restore playbook
+- [x] **[Epic 277: Backup Orchestration for Distributed Deployments](epics/epic-277-backup-orchestration.md)** — Per-service backup roles, cross-host aggregation, strfry/RustFS/config backup, restore playbook
 - [x] **[Epic 278: Observability Stack via Ansible](epics/epic-278-observability-stack.md)** — Prometheus + Grafana + Loki (full) or health-poll + ntfy (lightweight), pre-built dashboards
 - [x] **[Epic 279: Auto-Healing & Zero-Touch Operations](epics/epic-279-auto-healing.md)** — Container watchdog, stale data cleanup, NTP drift detection, disk management
 - [x] **[Epic 280: Rolling Updates with Rollback](epics/epic-280-rolling-updates.md)** — Health-gated updates, dependency-ordered multi-host, version history, automatic rollback

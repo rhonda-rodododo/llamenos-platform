@@ -191,8 +191,8 @@ automountServiceAccountToken: false
 networkPolicy:
   enabled: true  # Default: true
   # App pod: ingress only from ingress controller
-  # App pod: egress only to DNS, MinIO, Whisper, external HTTPS
-  # MinIO pod: ingress only from app pod
+  # App pod: egress only to DNS, RustFS, Whisper, external HTTPS
+  # RustFS pod: ingress only from app pod
 ```
 
 ### Required Values

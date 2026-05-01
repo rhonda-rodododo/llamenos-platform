@@ -1,4 +1,6 @@
 # Epic 280: Rolling Updates with Rollback
+> **Note**: MinIO has been replaced by RustFS as of PR #40. All references to MinIO in this document should be read as RustFS.
+
 
 **Status**: PENDING
 **Priority**: Medium
@@ -298,35 +300,35 @@ print(json.dumps(a))
           delay: 2
           until: pg_health.rc == 0
 
-    # ── MinIO ──
-    - name: Update MinIO
+    # ── RustFS ──
+    - name: Update RustFS
       when: >
-        llamenos_minio_enabled | default(true) and
+        llamenos_rustfs_enabled | default(true) and
         (groups.get('llamenos_storage', []) | length == 0 or
          inventory_hostname in groups.get('llamenos_storage', groups['llamenos_servers']))
-      tags: [minio, update]
+      tags: [rustfs, update]
       block:
-        - name: Pull MinIO image
+        - name: Pull RustFS image
           community.docker.docker_image:
-            name: "{{ llamenos_minio_image }}"
+            name: "{{ llamenos_rustfs_image }}"
             source: pull
             force_source: true
 
-        - name: Restart MinIO
+        - name: Restart RustFS
           community.docker.docker_compose_v2:
-            project_src: "{{ app_dir }}/services/minio"
+            project_src: "{{ app_dir }}/services/rustfs"
             state: restarted
             recreate: always
 
-        - name: Wait for MinIO health
+        - name: Wait for RustFS health
           ansible.builtin.command:
             cmd: >
-              docker compose -f {{ app_dir }}/services/minio/docker-compose.yml
-              exec -T minio mc ready local
-          register: minio_health
+              docker compose -f {{ app_dir }}/services/rustfs/docker-compose.yml
+              exec -T rustfs mc ready local
+          register: rustfs_health
           retries: 15
           delay: 2
-          until: minio_health.rc == 0
+          until: rustfs_health.rc == 0
 
     # ── strfry ──
     - name: Update strfry
@@ -835,7 +837,7 @@ version-pin:
 
 ## Testing
 
-1. **Basic update with health gate**: Deploy v1 of app. Run `just update`. Verify pre-update backup runs, new images are pulled, services restart in order (postgres -> minio -> strfry -> app -> caddy), health checks pass, version is recorded, notification is sent.
+1. **Basic update with health gate**: Deploy v1 of app. Run `just update`. Verify pre-update backup runs, new images are pulled, services restart in order (postgres -> rustfs -> strfry -> app -> caddy), health checks pass, version is recorded, notification is sent.
 
 2. **Automatic rollback**: Deploy v1. Prepare a broken v2 image (e.g., one that crashes on startup). Run `just update`. Verify: update detects health failure, pulls v1 back, restarts with v1, health passes, rollback notification is sent, playbook exits with failure.
 

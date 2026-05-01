@@ -15,8 +15,8 @@ Docker Compose xác thực tất cả dịch vụ khi khởi động, kể cả 
 
 ```bash
 PG_PASSWORD=your_postgres_password
-MINIO_ACCESS_KEY=your_minio_access_key
-MINIO_SECRET_KEY=your_minio_secret_key
+STORAGE_ACCESS_KEY=your_rustfs_access_key
+STORAGE_SECRET_KEY=your_rustfs_secret_key
 HMAC_SECRET=your_hmac_secret
 ARI_PASSWORD=your_ari_password       # Bắt buộc ngay cả khi không dùng Asterisk
 BRIDGE_SECRET=your_bridge_secret     # Bắt buộc ngay cả khi không dùng Asterisk
@@ -46,11 +46,11 @@ docker compose logs strfry
 docker compose restart strfry
 ```
 
-### Lỗi MinIO / S3
+### Lỗi RustFS / S3
 
-- Xác minh `MINIO_ACCESS_KEY` và `MINIO_SECRET_KEY`
-- Kiểm tra container MinIO: `docker compose ps minio`
-- Truy cập MinIO console tại `http://localhost:9001`
+- Xác minh `STORAGE_ACCESS_KEY` và `STORAGE_SECRET_KEY`
+- Kiểm tra container RustFS: `docker compose ps rustfs`
+- Truy cập RustFS console tại `http://localhost:9001`
 
 ## Vấn đề triển khai Cloudflare
 

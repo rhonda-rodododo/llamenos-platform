@@ -62,7 +62,7 @@ just backup              # Pre-update backup
 
 ```bash
 openssl rand -hex 32         # HMAC_SECRET, SERVER_NOSTR_SECRET
-openssl rand -base64 24      # PG_PASSWORD, MINIO credentials
+openssl rand -base64 24      # PG_PASSWORD, RustFS credentials
 just generate-secrets        # Generate all secrets at once
 ```
 

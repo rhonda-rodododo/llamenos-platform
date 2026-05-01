@@ -211,7 +211,7 @@ Symptom: Volunteers can't log in
 │
 Symptom: Notes not saving
 ├── Is storage healthy? → Check health endpoint for storage status
-│   ├── storage: failing → MinIO may be down: docker compose logs minio
+│   ├── storage: failing → RustFS may be down: docker compose logs rustfs
 │   └── storage: ok → Check browser console for encryption errors
 │       └── If E2EE error → volunteer may need to re-enter PIN
 │
@@ -265,7 +265,7 @@ Symptom: High disk usage alert
                     ┌──────┼──────┐
                     ▼      ▼      ▼
               ┌────────┐ ┌────┐ ┌───────┐
-              │ MinIO  │ │Nostr│ │ Caddy │
+              │ RustFS  │ │Nostr│ │ Caddy │
               │(files) │ │relay│ │(proxy)│
               └────────┘ └────┘ └───────┘
 ```
@@ -273,7 +273,7 @@ Symptom: High disk usage alert
 - **Caddy**: Reverse proxy, auto-TLS via Let's Encrypt
 - **App**: Node.js, serves API + desktop static files
 - **PostgreSQL**: All persistent data (via KV emulation layer)
-- **MinIO**: Encrypted file storage (recordings, attachments)
+- **RustFS**: Encrypted file storage (recordings, attachments)
 - **Nostr relay (strfry)**: Real-time events between app instances
 
 ---
@@ -305,7 +305,7 @@ Symptom: High disk usage alert
 | **age** | Modern encryption tool used for backup encryption |
 | **Caddy** | Reverse proxy that handles TLS certificates automatically |
 | **E2EE** | End-to-end encryption — data encrypted on the client, server cannot read it |
-| **MinIO** | S3-compatible object storage for files and recordings |
+| **RustFS** | S3-compatible object storage for files and recordings |
 | **Nostr** | Protocol for real-time events; Llamenos uses it for live updates |
 | **ntfy** | Self-hosted push notification service for operator alerts |
 | **rclone** | Tool for syncing backups to remote cloud storage |

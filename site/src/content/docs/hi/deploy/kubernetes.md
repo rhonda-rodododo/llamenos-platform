@@ -3,7 +3,7 @@ title: "Deploy: Kubernetes (Helm)"
 description: आधिकारिक Helm chart का उपयोग करके Llamenos को Kubernetes पर deploy करें।
 ---
 
-यह गाइड आधिकारिक Helm chart का उपयोग करके Llamenos को Kubernetes cluster पर deploy करने को कवर करती है। Chart अलग deployments के रूप में एप्लिकेशन और वैकल्पिक MinIO/Whisper services प्रबंधित करता है। आप एक PostgreSQL डेटाबेस प्रदान करते हैं।
+यह गाइड आधिकारिक Helm chart का उपयोग करके Llamenos को Kubernetes cluster पर deploy करने को कवर करती है। Chart अलग deployments के रूप में एप्लिकेशन और वैकल्पिक RustFS/Whisper services प्रबंधित करता है। आप एक PostgreSQL डेटाबेस प्रदान करते हैं।
 
 ## पूर्वापेक्षाएं
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -170,18 +170,18 @@ kubectl get ingress llamenos
 
 > **Tip**: Production के लिए, External Secrets Operator, Sealed Secrets, या Vault द्वारा प्रबंधित Secret को reference करने के लिए `secrets.existingSecret` उपयोग करें।
 
-### MinIO
+### RustFS
 
 | Parameter | विवरण | Default |
 |-----------|-------------|---------|
-| `minio.enabled` | MinIO deploy करें | `true` |
-| `minio.image.repository` | MinIO image | `minio/minio` |
-| `minio.image.tag` | MinIO tag | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | MinIO data volume | `50Gi` |
-| `minio.persistence.storageClass` | Storage class | `""` |
-| `minio.credentials.accessKey` | MinIO root user | `""` (आवश्यक) |
-| `minio.credentials.secretKey` | MinIO root password | `""` (आवश्यक) |
-| `minio.resources` | CPU/memory requests और limits | `{}` |
+| `rustfs.enabled` | RustFS deploy करें | `true` |
+| `rustfs.image.repository` | RustFS image | `rustfs/rustfs` |
+| `rustfs.image.tag` | RustFS tag | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | RustFS data volume | `50Gi` |
+| `rustfs.persistence.storageClass` | Storage class | `""` |
+| `rustfs.credentials.accessKey` | RustFS root user | `""` (आवश्यक) |
+| `rustfs.credentials.secretKey` | RustFS root password | `""` (आवश्यक) |
+| `rustfs.resources` | CPU/memory requests और limits | `{}` |
 
 ### Whisper transcription
 
@@ -230,26 +230,26 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=rustfs-access-key=your_key \
+  --from-literal=rustfs-secret-key=your_key
 
 # Or with External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
 
-## External MinIO या S3 उपयोग करना
+## External RustFS या S3 उपयोग करना
 
-यदि आपके पास पहले से MinIO या S3-compatible service है, built-in MinIO disable करें और endpoint pass करें:
+यदि आपके पास पहले से RustFS या S3-compatible service है, built-in RustFS disable करें और endpoint pass करें:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    STORAGE_ENDPOINT: "https://your-rustfs.example.com"
+    STORAGE_ACCESS_KEY: "your-key"
+    STORAGE_SECRET_KEY: "your-secret"
+    STORAGE_BUCKET: "llamenos"
 ```
 
 ## GPU transcription
@@ -341,7 +341,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-सामान्य कारण: missing secrets, गलत ADMIN_PUBKEY, PostgreSQL अनुपलब्ध, MinIO तैयार नहीं।
+सामान्य कारण: missing secrets, गलत ADMIN_PUBKEY, PostgreSQL अनुपलब्ध, RustFS तैयार नहीं।
 
 ### Database connection errors
 

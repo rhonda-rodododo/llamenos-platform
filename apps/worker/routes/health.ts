@@ -31,18 +31,16 @@ async function checkPostgres(): Promise<CheckResult> {
   }
 }
 
-async function checkMinio(env: Record<string, unknown>): Promise<CheckResult> {
-  const endpoint = env.MINIO_ENDPOINT as string | undefined
-  if (!endpoint) return { status: 'failing', detail: 'MINIO_ENDPOINT not configured' }
+async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> {
+  const endpoint = (env.STORAGE_ENDPOINT as string | undefined) || (env.MINIO_ENDPOINT as string | undefined)
+  if (!endpoint) return { status: 'failing', detail: 'STORAGE_ENDPOINT not configured' }
   const t0 = Date.now()
   try {
-    // Try MinIO health endpoint first, fall back to root path for RustFS
-    // (RustFS doesn't support /minio/health/live but returns 403 on /)
-    const healthUrl = `${endpoint.replace(/\/$/, '')}/minio/health/live`
-    const res = await fetch(healthUrl, { signal: AbortSignal.timeout(3000) })
-    if (res.ok) return { status: 'ok', latencyMs: Date.now() - t0 }
-    // If health endpoint returns 403, server is running (likely RustFS)
-    if (res.status === 403) return { status: 'ok', latencyMs: Date.now() - t0 }
+    // RustFS doesn't serve /minio/health/live — returns 403 on all unauthenticated paths.
+    // A 403 still proves the server is running and reachable.
+    const url = `${endpoint.replace(/\/$/, '')}/`
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
+    if (res.ok || res.status === 403) return { status: 'ok', latencyMs: Date.now() - t0 }
     return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
   } catch (err) {
     return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
@@ -81,14 +79,14 @@ async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult
 }
 
 async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
-  const [postgres, minio, relay, sipBridge] = await Promise.all([
+  const [postgres, storage, relay, sipBridge] = await Promise.all([
     checkPostgres(),
-    checkMinio(env),
+    checkStorage(env),
     checkNostrRelay(env),
     checkSipBridge(env),
   ])
 
-  const checks: Record<string, CheckResult> = { postgres, minio, relay }
+  const checks: Record<string, CheckResult> = { postgres, storage, relay }
   if (sipBridge !== null) checks.sipBridge = sipBridge
 
   const status = Object.values(checks).every(v => v.status === 'ok') ? 'ok' : 'degraded'

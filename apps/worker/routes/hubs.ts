@@ -11,6 +11,8 @@ import { authErrors, notFoundError } from '../openapi/helpers'
 import type { Hub } from '@shared/types'
 import { ServiceError } from '../services/settings'
 import { audit } from '../services/audit'
+import { encryptStorageCredential } from '../lib/crypto'
+import type { StorageManager } from '../lib/storage-manager'
 
 const routes = new Hono<AppEnv>()
 
@@ -100,6 +102,26 @@ routes.post('/',
       }
       const message = err instanceof Error ? err.message : 'Failed to create hub'
       return c.json({ error: message }, 500)
+    }
+
+    // Provision hub-scoped storage buckets and IAM
+    const storageManager = (c.env as unknown as Record<string, unknown>).STORAGE_MANAGER as StorageManager | undefined
+    if (storageManager) {
+      try {
+        const creds = await storageManager.provisionHub(hub.id)
+        if (creds) {
+          const hmacSecret = (c.env as unknown as Record<string, unknown>).HMAC_SECRET as string
+          await services.settings.storeHubStorageCredentials({
+            hubId: hub.id,
+            accessKeyId: creds.accessKeyId,
+            encryptedSecretKey: encryptStorageCredential(creds.secretAccessKey, hmacSecret),
+            policyName: creds.policyName,
+            userName: creds.userName,
+          })
+        }
+      } catch (storageErr) {
+        console.warn(`[hubs] Storage provisioning failed for hub ${hub.id}:`, storageErr)
+      }
     }
 
     return c.json({ hub })
@@ -279,6 +301,13 @@ routes.delete('/:hubId',
     const services = c.get('services')
 
     try {
+      // Destroy hub-scoped storage buckets and IAM before deleting the hub
+      const storageManager = (c.env as unknown as Record<string, unknown>).STORAGE_MANAGER as StorageManager | undefined
+      if (storageManager) {
+        const creds = await services.settings.getHubStorageCredentials(hubId)
+        await storageManager.destroyHub(hubId, creds?.userName)
+      }
+
       await services.settings.deleteHub(hubId)
       return c.json({ ok: true })
     } catch (err) {

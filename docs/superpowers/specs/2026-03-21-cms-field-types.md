@@ -53,9 +53,9 @@ Falls through to `default:` — renders a plain `<Input>`. No file picker, no up
 `JoinFieldType.File` renders as `TextInputField` with label suffix `" (desktop only)"` (lines 359–369). No upload UI.
 
 **File storage infrastructure:**
-MinIO is in the Docker Compose stack. Evidence file upload already exists (Epics 329/330) with a `/api/files` or similar upload endpoint. The exact upload endpoint path needs to be confirmed against the existing evidence service routes.
+RustFS is in the Docker Compose stack. Evidence file upload already exists (Epics 329/330) with a `/api/files` or similar upload endpoint. The exact upload endpoint path needs to be confirmed against the existing evidence service routes.
 
-> **Pre-implementation check required:** The implementer MUST verify `POST /api/files` exists before writing file field client code. Search `apps/worker/routes/` for the upload handler. If absent, adding it is in scope for this spec — implement as a multipart upload handler storing blobs in MinIO (`apps/worker/services/` storage service) and returning a `{ fileId, url }` response.
+> **Pre-implementation check required:** The implementer MUST verify `POST /api/files` exists before writing file field client code. Search `apps/worker/routes/` for the upload handler. If absent, adding it is in scope for this spec — implement as a multipart upload handler storing blobs in RustFS (`apps/worker/services/` storage service) and returning a `{ fileId, url }` response.
 
 ---
 
@@ -228,7 +228,7 @@ Confirm the existing file upload endpoint. Expected: `POST /api/files` (multipar
 The upload endpoint:
 - Accepts `multipart/form-data` with a `file` field.
 - Validates file size (max configurable, default 50 MB).
-- Stores to MinIO under hub-scoped prefix `/{hubId}/field-attachments/{fileId}`.
+- Stores to RustFS under hub-scoped prefix `/{hubId}/field-attachments/{fileId}`.
 - Returns `fileFieldValueSchema`-shaped response.
 
 Requires `notes:write` permission. File fields in CMS records are part of note/record content — no separate `files:upload` permission is introduced.
@@ -250,7 +250,7 @@ Behavior:
 1. Parse `value` as `FileFieldValue[]` JSON. Display uploaded files as chips with filename + size.
 2. A file picker area: `<input type="file">` wrapped in a drag-drop zone. Click or drag to select a file.
 3. On file select: `POST /api/files` as multipart (using `FormData`). Show upload progress (indeterminate spinner). On success, append the returned `FileFieldValue` to the array, serialize as JSON, call `onChange`.
-4. Each uploaded file has a remove button (X). Clicking remove removes it from the array and calls `onChange`. (The file remains in MinIO — deletion is handled by the record/evidence cleanup service, not by field editing.)
+4. Each uploaded file has a remove button (X). Clicking remove removes it from the array and calls `onChange`. (The file remains in RustFS — deletion is handled by the record/evidence cleanup service, not by field editing.)
 5. In read-only mode: show file names as download links (`GET /api/files/:fileId`).
 
 **Integrate into `schema-form.tsx`:**

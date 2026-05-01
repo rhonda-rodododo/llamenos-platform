@@ -638,7 +638,7 @@ Medium — 3 weeks total. The Nosflare fork is the largest piece of work. PoC sc
 - `src/worker/lib/do-access.ts` — `getScopedDOs()` pattern for wiring publisher into DO constructors
 
 ### Docker Compose
-- `docker-compose.yml` — current services include postgres, caddy, minio; strfry goes alongside these
+- `docker-compose.yml` — current services include postgres, caddy, rustfs; strfry goes alongside these
 - strfry image: `dockurr/strfry:latest`, port 7777, volume `nostr-data:/app/strfry-db`
 
 ### Server Event Signing

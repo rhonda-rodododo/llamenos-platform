@@ -241,7 +241,7 @@ blasts:manage             # Manage subscribers, import, settings
 **Signal inbound attachments — E2EE file pipeline**: Inbound Signal messages with file attachments (images, videos, documents) must be encrypted via the same ECIES pipeline used for report file uploads. This guarantees files captured in Signal remain encrypted end-to-end:
 1. Signal bridge receives attachment (already decrypted from Signal protocol)
 2. Worker re-encrypts file via ECIES with ephemeral key → dual envelopes (assigned volunteer + admin)
-3. Encrypted file stored in R2/MinIO with `FileRecord`
+3. Encrypted file stored in R2/RustFS with `FileRecord`
 4. Volunteer decrypts client-side using their nsec
 5. **No plaintext file ever stored at rest** — continuity of encryption from Signal capture to hotline decryption
 

@@ -15,8 +15,8 @@ description: نشر Llamenos على خادمك الخاص باستخدام Docke
 ## 1. استنساخ المستودع
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/your-org/llamenos.git
+cd llamenos
 ```
 
 ## 2. إنشاء زوج مفاتيح المسؤول
@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# بيانات اعتماد MinIO (غيّرها عن الافتراضي!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# بيانات اعتماد RustFS (غيّرها عن الافتراضي!)
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **مهم**: عيّن كلمات مرور قوية وفريدة لـ `PG_PASSWORD` و `MINIO_ACCESS_KEY` و `MINIO_SECRET_KEY`.
+> **مهم**: عيّن كلمات مرور قوية وفريدة لـ `PG_PASSWORD` و `STORAGE_ACCESS_KEY` و `STORAGE_SECRET_KEY`.
 
 ## 4. تكوين النطاق
 
@@ -94,7 +94,7 @@ docker compose up -d
 | **app** | تطبيق Llamenos | 3000 (داخلي) |
 | **postgres** | قاعدة بيانات PostgreSQL | 5432 (داخلي) |
 | **caddy** | وكيل عكسي + TLS | 80، 443 |
-| **minio** | تخزين الملفات/التسجيلات | 9000، 9001 (داخلي) |
+| **rustfs** | تخزين الملفات/التسجيلات | 9000، 9001 (داخلي) |
 
 تحقق من أن كل شيء يعمل:
 
@@ -143,7 +143,7 @@ docker compose --profile transcription up -d
 
 ## اختياري: تفعيل Asterisk
 
-للاتصال الهاتفي SIP المستضاف ذاتياً (راجع [إعداد Asterisk](/docs/deploy/providers/asterisk)):
+للاتصال الهاتفي SIP المستضاف ذاتياً (راجع [إعداد Asterisk](/docs/setup-asterisk)):
 
 ```bash
 # تعيين السر المشترك للجسر
@@ -154,13 +154,13 @@ docker compose --profile asterisk up -d
 
 ## اختياري: تفعيل Signal
 
-لرسائل Signal (راجع [إعداد Signal](/docs/deploy/providers/signal)):
+لرسائل Signal (راجع [إعداد Signal](/docs/setup-signal)):
 
 ```bash
 docker compose --profile signal up -d
 ```
 
-ستحتاج إلى تسجيل رقم Signal عبر حاوية signal-cli. راجع [دليل إعداد Signal](/docs/deploy/providers/signal) للتعليمات.
+ستحتاج إلى تسجيل رقم Signal عبر حاوية signal-cli. راجع [دليل إعداد Signal](/docs/setup-signal) للتعليمات.
 
 ## التحديث
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-بياناتك محفوظة في وحدات تخزين Docker (`postgres-data`، `minio-data`، إلخ) وتبقى بعد إعادة تشغيل الحاويات وتحديث الصور.
+بياناتك محفوظة في وحدات تخزين Docker (`postgres-data`، `rustfs-data`، إلخ) وتبقى بعد إعادة تشغيل الحاويات وتحديث الصور.
 
 ## النسخ الاحتياطي
 
@@ -189,15 +189,15 @@ docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### تخزين MinIO
+### تخزين RustFS
 
-يخزن MinIO الملفات المرفوعة والتسجيلات والمرفقات:
+يخزن RustFS الملفات المرفوعة والتسجيلات والمرفقات:
 
 ```bash
-# باستخدام عميل MinIO (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# باستخدام عميل RustFS (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### النسخ الاحتياطي التلقائي
@@ -262,21 +262,28 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### أخطاء اتصال MinIO
+### أخطاء اتصال RustFS
 
-تأكد من صحة خدمة MinIO قبل بدء التطبيق:
+تأكد من صحة خدمة RustFS قبل بدء التطبيق:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## بنية الخدمات
 
-![Docker Architecture](/diagrams/docker-architecture.svg)
+```mermaid
+flowchart TD
+    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
+    Caddy -->|":3000"| App["App<br/>(Node.js)"]
+    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
+    App --> RustFS[("RustFS<br/>:9000")]
+    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
+```
 
 ## الخطوات التالية
 
 - [دليل المسؤول](/docs/admin-guide) — تكوين خط الطوارئ
-- [نظرة عامة على الاستضافة الذاتية](/docs/deploy/self-hosting) — مقارنة خيارات النشر
-- [نشر Kubernetes](/docs/deploy/kubernetes) — الانتقال إلى Helm
+- [نظرة عامة على الاستضافة الذاتية](/docs/self-hosting) — مقارنة خيارات النشر
+- [نشر Kubernetes](/docs/deploy-kubernetes) — الانتقال إلى Helm

@@ -81,7 +81,7 @@ Rolling updates:
 
 Automated encrypted backups:
 - PostgreSQL dump (compressed, encrypted with age)
-- R2/MinIO bucket sync
+- R2/RustFS bucket sync
 - Retention policy (30 days default)
 - Optional remote backup (rclone to S3-compatible storage)
 

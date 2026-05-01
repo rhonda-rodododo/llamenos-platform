@@ -3,7 +3,7 @@ title: "Triển khai: Kubernetes (Helm)"
 description: Triển khai Llamenos lên Kubernetes sử dụng Helm chart chính thức.
 ---
 
-Hướng dẫn này bao gồm việc triển khai Llamenos lên cụm Kubernetes sử dụng Helm chart chính thức. Chart quản lý ứng dụng và các dịch vụ MinIO/Whisper tùy chọn dưới dạng các deployment riêng biệt. Bạn cung cấp cơ sở dữ liệu PostgreSQL.
+Hướng dẫn này bao gồm việc triển khai Llamenos lên cụm Kubernetes sử dụng Helm chart chính thức. Chart quản lý ứng dụng và các dịch vụ RustFS/Whisper tùy chọn dưới dạng các deployment riêng biệt. Bạn cung cấp cơ sở dữ liệu PostgreSQL.
 
 ## Yêu cầu tiên quyết
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -167,14 +167,14 @@ Mở `https://hotline.yourdomain.com` trong trình duyệt. Đăng nhập bằng
 
 > **Mẹo**: Cho production, sử dụng `secrets.existingSecret` để tham chiếu Secret được quản lý bởi External Secrets Operator, Sealed Secrets hoặc Vault.
 
-### MinIO
+### RustFS
 
 | Tham số | Mô tả | Mặc định |
 |---------|-------|----------|
-| `minio.enabled` | Triển khai MinIO | `true` |
-| `minio.persistence.size` | Dung lượng MinIO | `50Gi` |
-| `minio.credentials.accessKey` | MinIO root user | `""` (bắt buộc) |
-| `minio.credentials.secretKey` | MinIO root password | `""` (bắt buộc) |
+| `rustfs.enabled` | Triển khai RustFS | `true` |
+| `rustfs.persistence.size` | Dung lượng RustFS | `50Gi` |
+| `rustfs.credentials.accessKey` | RustFS root user | `""` (bắt buộc) |
+| `rustfs.credentials.secretKey` | RustFS root password | `""` (bắt buộc) |
 
 ### Whisper
 
@@ -198,8 +198,8 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=rustfs-access-key=your_key \
+  --from-literal=rustfs-secret-key=your_key
 ```
 
 ## GPU transcription
@@ -250,7 +250,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Nguyên nhân phổ biến: thiếu secrets, ADMIN_PUBKEY không đúng, không thể kết nối PostgreSQL, MinIO chưa sẵn sàng.
+Nguyên nhân phổ biến: thiếu secrets, ADMIN_PUBKEY không đúng, không thể kết nối PostgreSQL, RustFS chưa sẵn sàng.
 
 ### Lỗi kết nối cơ sở dữ liệu
 

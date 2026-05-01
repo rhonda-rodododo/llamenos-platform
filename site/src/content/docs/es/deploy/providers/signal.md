@@ -53,7 +53,7 @@ curl -X PUT http://localhost:8080/v1/about \
   -H "Content-Type: application/json" \
   -d '{
     "webhook": {
-      "url": "https://tu-worker.tu-dominio.com/api/messaging/signal/webhook",
+      "url": "https://tu-worker.tu-dorustfs.com/api/messaging/signal/webhook",
       "headers": {
         "Authorization": "Bearer tu-secreto-de-webhook"
       }

@@ -2,89 +2,104 @@
 #
 # Llamenos RustFS Backup Script — managed by Ansible
 #
-# Mirrors all objects from RustFS buckets using rclone S3 API,
-# compresses, optionally encrypts with age, and enforces retention.
+# Mirrors all objects from the RustFS bucket using rclone or aws s3 sync,
+# then tars and optionally encrypts the result.
 #
 # Usage:
 #   ./backup-rustfs.sh              # Run a daily backup
 #   ./backup-rustfs.sh --manual     # Run and tag as manual backup
-#   ./backup-rustfs.sh --manifest   # Output manifest line to stdout
+#   ./backup-rustfs.sh --manifest   # Output manifest entry to stdout
 
 set -euo pipefail
 
 BACKUP_DIR="{{ backup_rustfs_dir }}"
+COMPOSE_FILE="{{ backup_compose_file }}"
+AGE_RECIPIENT="{{ backup_age_public_key }}"
+RCLONE_REMOTE="{{ backup_rclone_remote }}"
+RUSTFS_BUCKET="{{ backup_rustfs_bucket }}"
 TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
 DAY_OF_WEEK="$(date -u +%u)"
 DAY_OF_MONTH="$(date -u +%d)"
-AGE_RECIPIENT="{{ backup_age_public_key | default('') }}"
-RCLONE_REMOTE="{{ backup_rclone_remote | default('') }}"
-BUCKET="{{ backup_rustfs_bucket }}"
-ENDPOINT="{{ backup_rustfs_endpoint }}"
-ACCESS_KEY="{{ backup_rustfs_access_key }}"
-SECRET_KEY="{{ backup_rustfs_secret_key }}"
+MANIFEST_MODE=false
 
 BACKUP_TYPE="daily"
-if [ "${1:-}" = "--manual" ]; then
-  BACKUP_TYPE="manual"
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --manual) BACKUP_TYPE="manual" ;;
+    --manifest) MANIFEST_MODE=true ;;
+  esac
+done
 
-MANIFEST_MODE=false
-if [ "${1:-}" = "--manifest" ]; then
-  MANIFEST_MODE=true
-fi
-
-FILENAME="llamenos-rustfs-${TIMESTAMP}.tar.gz"
 log() {
-  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] [rustfs] $*"
 }
-
-log "Starting ${BACKUP_TYPE} RustFS backup..."
 
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "${TMPDIR}"' EXIT
 
-# Mirror RustFS buckets via rclone S3
-if [ -n "${ACCESS_KEY}" ] && [ -n "${SECRET_KEY}" ]; then
-  log "Mirroring RustFS bucket: ${BUCKET}"
-  export RCLONE_CONFIG_RUSTFS_TYPE=s3
-  export RCLONE_CONFIG_RUSTFS_PROVIDER=Other
-  export RCLONE_CONFIG_RUSTFS_ENDPOINT="${ENDPOINT}"
-  export RCLONE_CONFIG_RUSTFS_ACCESS_KEY_ID="${ACCESS_KEY}"
-  export RCLONE_CONFIG_RUSTFS_SECRET_ACCESS_KEY="${SECRET_KEY}"
-  export RCLONE_CONFIG_RUSTFS_FORCE_PATH_STYLE=true
+SYNC_DIR="${TMPDIR}/rustfs-sync"
+mkdir -p "${SYNC_DIR}"
 
-  rclone copy "rustfs:${BUCKET}" "${TMPDIR}/blob-export/" 2>/dev/null || true
-  if [ -d "${TMPDIR}/blob-export" ] && [ "$(ls -A "${TMPDIR}/blob-export" 2>/dev/null)" ]; then
-    tar czf "${TMPDIR}/${FILENAME}" -C "${TMPDIR}/blob-export" .
-    rm -rf "${TMPDIR}/blob-export"
-  fi
+log "Starting ${BACKUP_TYPE} RustFS backup..."
 
-  if [ -f "${TMPDIR}/${FILENAME}" ]; then
-    BLOB_SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}")"
-    log "Blob storage dump: ${BLOB_SIZE} bytes (compressed)"
-  else
-    log "WARNING: Blob storage dump produced no output (empty or no buckets)"
-    touch "${TMPDIR}/${FILENAME}"
-  fi
+# Step 1: Sync bucket contents using rclone or aws CLI
+# Prefer rclone if available, fall back to aws s3 sync
+if command -v rclone &>/dev/null; then
+  rclone sync \
+    "s3:{{ backup_rustfs_bucket }}" \
+    "${SYNC_DIR}/" \
+    --s3-provider=Minio \
+    --s3-endpoint="http://localhost:9000" \
+    {% if backup_rustfs_remove_deleted %}--delete{% endif %} \
+    2>&1 || true
+elif command -v aws &>/dev/null; then
+  aws s3 sync \
+    "s3://{{ backup_rustfs_bucket }}/" \
+    "${SYNC_DIR}/" \
+    --endpoint-url="http://localhost:9000" \
+    {% if backup_rustfs_remove_deleted %}--delete{% endif %} \
+    2>&1 || true
 else
-  log "WARNING: No RustFS credentials configured. Skipping blob backup."
-  touch "${TMPDIR}/${FILENAME}"
+  log "WARNING: Neither rclone nor aws CLI available. Attempting docker-based sync..."
+  CONTAINER_NAME="$(docker compose -f "${COMPOSE_FILE}" ps -q rustfs)"
+  docker compose -f "${COMPOSE_FILE}" exec -T rustfs \
+    sh -c "aws s3 sync s3://${RUSTFS_BUCKET}/ /tmp/rustfs-sync/ --endpoint-url http://localhost:9000 {% if backup_rustfs_remove_deleted %}--delete{% endif %} 2>&1" || true
+  docker cp "${CONTAINER_NAME}:/tmp/rustfs-sync/." "${SYNC_DIR}/" 2>/dev/null || true
 fi
 
-# Encrypt with age
-if [ -n "${AGE_RECIPIENT}" ] && [ -s "${TMPDIR}/${FILENAME}" ]; then
+OBJECT_COUNT="$(find "${SYNC_DIR}" -type f | wc -l)"
+log "Synced ${OBJECT_COUNT} objects"
+
+# Step 2: Tar and compress
+TAR_FILE="${TMPDIR}/llamenos-rustfs-${TIMESTAMP}.tar.gz"
+tar -czf "${TAR_FILE}" -C "${SYNC_DIR}" .
+rm -rf "${SYNC_DIR}"
+
+DUMP_SIZE="$(stat -c%s "${TAR_FILE}")"
+log "Compressed archive: ${DUMP_SIZE} bytes"
+
+# Step 3: Compute checksum
+DUMP_SHA256="$(sha256sum "${TAR_FILE}" | cut -d' ' -f1)"
+
+# Step 4: Encrypt with age (if configured)
+if [ -n "${AGE_RECIPIENT}" ]; then
+  FILENAME="llamenos-rustfs-${TIMESTAMP}.tar.gz.age"
   log "Encrypting backup with age..."
-  age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}.age" "${TMPDIR}/${FILENAME}"
-  FILENAME="${FILENAME}.age"
+  age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}" "${TAR_FILE}"
+  rm -f "${TAR_FILE}"
 else
-  log "WARNING: No age public key configured. Backups are NOT encrypted."
+  FILENAME="llamenos-rustfs-${TIMESTAMP}.tar.gz"
+  mv "${TAR_FILE}" "${TMPDIR}/${FILENAME}"
+  log "WARNING: No age public key configured. Backup is NOT encrypted."
 fi
 
-# Store in daily directory
+FINAL_SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}")"
+
+# Step 5: Store in daily directory
 cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/daily/${FILENAME}"
 log "Saved to ${BACKUP_DIR}/daily/${FILENAME}"
 
-# Copy to weekly (on Sundays) and monthly (on 1st)
+# Step 6: Copy to weekly (Sundays) and monthly (1st)
 if [ "${DAY_OF_WEEK}" = "7" ]; then
   cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/weekly/${FILENAME}"
   log "Weekly backup saved"
@@ -95,28 +110,29 @@ if [ "${DAY_OF_MONTH}" = "01" ]; then
   log "Monthly backup saved"
 fi
 
-# Upload to remote storage via rclone
+# Step 7: Upload to remote storage via rclone
 if [ -n "${RCLONE_REMOTE}" ]; then
   log "Uploading to remote storage: ${RCLONE_REMOTE}"
-  rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/rustfs/daily/" --progress
+  rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/daily/" --no-traverse
   if [ "${DAY_OF_WEEK}" = "7" ]; then
-    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/rustfs/weekly/" --progress
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/weekly/" --no-traverse
   fi
   if [ "${DAY_OF_MONTH}" = "01" ]; then
-    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/rustfs/monthly/" --progress
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/monthly/" --no-traverse
   fi
   log "Remote upload complete"
 fi
 
-# Enforce retention
+# Step 8: Enforce retention
 enforce_retention() {
   local dir="$1"
   local keep="$2"
+  local pattern="$3"
   local count
-  count="$(find "${dir}" -maxdepth 1 -type f -name 'llamenos-rustfs-*' | wc -l)"
+  count="$(find "${dir}" -maxdepth 1 -type f -name "${pattern}" | wc -l)"
   if [ "${count}" -gt "${keep}" ]; then
     local to_delete=$(( count - keep ))
-    find "${dir}" -maxdepth 1 -type f -name 'llamenos-rustfs-*' -printf '%T@ %p\n' \
+    find "${dir}" -maxdepth 1 -type f -name "${pattern}" -printf '%T@ %p\n' \
       | sort -n \
       | head -n "${to_delete}" \
       | cut -d' ' -f2- \
@@ -125,22 +141,16 @@ enforce_retention() {
   fi
 }
 
-enforce_retention "${BACKUP_DIR}/daily" {{ backup_rustfs_retain_daily | default(7) }}
-enforce_retention "${BACKUP_DIR}/weekly" {{ backup_rustfs_retain_weekly | default(4) }}
-enforce_retention "${BACKUP_DIR}/monthly" {{ backup_rustfs_retain_monthly | default(3) }}
+enforce_retention "${BACKUP_DIR}/daily" {{ backup_rustfs_retain_daily }} 'llamenos-rustfs-*'
+enforce_retention "${BACKUP_DIR}/weekly" {{ backup_rustfs_retain_weekly }} 'llamenos-rustfs-*'
+enforce_retention "${BACKUP_DIR}/monthly" {{ backup_rustfs_retain_monthly }} 'llamenos-rustfs-*'
 
-# Remote retention
-if [ -n "${RCLONE_REMOTE}" ]; then
-  rclone delete "${RCLONE_REMOTE}/rustfs/daily/" --min-age "{{ backup_rustfs_retain_daily | default(7) }}d" 2>/dev/null || true
-  rclone delete "${RCLONE_REMOTE}/rustfs/weekly/" --min-age "{{ backup_rustfs_retain_weekly | default(4) * 7 }}d" 2>/dev/null || true
-  rclone delete "${RCLONE_REMOTE}/rustfs/monthly/" --min-age "{{ backup_rustfs_retain_monthly | default(3) * 30 }}d" 2>/dev/null || true
-fi
+# Step 9: Manifest entry
+MANIFEST_ENTRY="rustfs|${TIMESTAMP}|${FILENAME}|${FINAL_SIZE}|${DUMP_SHA256}|${BACKUP_TYPE}|objects=${OBJECT_COUNT}"
+echo "${MANIFEST_ENTRY}" >> "${BACKUP_DIR}/../manifest.log"
 
-# Manifest output
 if [ "${MANIFEST_MODE}" = true ]; then
-  SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}" 2>/dev/null || echo 0)"
-  SHA256="$(sha256sum "${TMPDIR}/${FILENAME}" 2>/dev/null | cut -d' ' -f1 || echo 'n/a')"
-  echo "rustfs|${TIMESTAMP}|${FILENAME}|${SIZE}|${SHA256}|${BACKUP_TYPE}"
+  echo "${MANIFEST_ENTRY}"
 fi
 
-log "Backup complete: ${FILENAME}"
+log "RustFS backup complete: ${FILENAME} (${FINAL_SIZE} bytes, ${OBJECT_COUNT} objects)"

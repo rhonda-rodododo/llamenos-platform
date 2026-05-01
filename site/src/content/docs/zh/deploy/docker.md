@@ -15,8 +15,8 @@ description: 使用 Docker Compose 在您自己的服务器上部署 Llamenos。
 ## 1. 克隆仓库
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/your-org/llamenos.git
+cd llamenos
 ```
 
 ## 2. 生成管理员密钥对
@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO 凭据（请修改默认值！）
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# RustFS 凭据（请修改默认值！）
+STORAGE_ACCESS_KEY=your-access-key
+STORAGE_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **重要**：请为 `PG_PASSWORD`、`MINIO_ACCESS_KEY` 和 `MINIO_SECRET_KEY` 设置强且唯一的密码。
+> **重要**：请为 `PG_PASSWORD`、`STORAGE_ACCESS_KEY` 和 `STORAGE_SECRET_KEY` 设置强且唯一的密码。
 
 ## 4. 配置您的域名
 
@@ -94,7 +94,7 @@ docker compose up -d
 | **app** | Llamenos 应用程序 | 3000（内部） |
 | **postgres** | PostgreSQL 数据库 | 5432（内部） |
 | **caddy** | 反向代理 + TLS | 80, 443 |
-| **minio** | 文件/录音存储 | 9000, 9001（内部） |
+| **rustfs** | 文件/录音存储 | 9000, 9001（内部） |
 
 检查所有服务是否正在运行：
 
@@ -143,7 +143,7 @@ docker compose --profile transcription up -d
 
 ## 可选：启用 Asterisk
 
-如需自托管 SIP 电话服务（请参阅 [Asterisk 配置](/docs/deploy/providers/asterisk)）：
+如需自托管 SIP 电话服务（请参阅 [Asterisk 配置](/docs/setup-asterisk)）：
 
 ```bash
 # 设置桥接共享密钥
@@ -154,13 +154,13 @@ docker compose --profile asterisk up -d
 
 ## 可选：启用 Signal
 
-如需 Signal 消息功能（请参阅 [Signal 配置](/docs/deploy/providers/signal)）：
+如需 Signal 消息功能（请参阅 [Signal 配置](/docs/setup-signal)）：
 
 ```bash
 docker compose --profile signal up -d
 ```
 
-您需要通过 signal-cli 容器注册 Signal 号码。请参阅 [Signal 配置指南](/docs/deploy/providers/signal)了解详细说明。
+您需要通过 signal-cli 容器注册 Signal 号码。请参阅 [Signal 配置指南](/docs/setup-signal)了解详细说明。
 
 ## 更新
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-您的数据保存在 Docker 卷（`postgres-data`、`minio-data` 等）中，在容器重启和镜像更新时不会丢失。
+您的数据保存在 Docker 卷（`postgres-data`、`rustfs-data` 等）中，在容器重启和镜像更新时不会丢失。
 
 ## 备份
 
@@ -189,15 +189,15 @@ docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### MinIO 存储
+### RustFS 存储
 
-MinIO 存储上传的文件、录音和附件：
+RustFS 存储上传的文件、录音和附件：
 
 ```bash
-# 使用 MinIO 客户端 (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# 使用 RustFS 客户端 (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $STORAGE_ACCESS_KEY $STORAGE_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### 自动备份
@@ -262,21 +262,28 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### MinIO 连接错误
+### RustFS 连接错误
 
-确保 MinIO 服务在应用程序启动前处于健康状态：
+确保 RustFS 服务在应用程序启动前处于健康状态：
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## 服务架构
 
-![Docker Architecture](/diagrams/docker-architecture.svg)
+```mermaid
+flowchart TD
+    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
+    Caddy -->|":3000"| App["App<br/>(Node.js)"]
+    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
+    App --> RustFS[("RustFS<br/>:9000")]
+    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
+```
 
 ## 后续步骤
 
 - [管理员指南](/docs/admin-guide) —— 配置热线
-- [自托管概览](/docs/deploy/self-hosting) —— 比较部署选项
-- [Kubernetes 部署](/docs/deploy/kubernetes) —— 迁移到 Helm
+- [自托管概览](/docs/self-hosting) —— 比较部署选项
+- [Kubernetes 部署](/docs/deploy-kubernetes) —— 迁移到 Helm
