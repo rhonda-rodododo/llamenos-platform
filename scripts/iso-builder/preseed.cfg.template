@@ -1,0 +1,105 @@
+#--- Llamenos FDE ISO preseed template ---
+# Rendered from scripts/iso-builder/preseed.cfg.template by build-inside.sh
+# via envsubst. All ${...} placeholders must be set in the environment.
+
+#--- Localization ---
+d-i debian-installer/locale string ${LOCALE}
+d-i keyboard-configuration/xkb-keymap select us
+
+#--- Network ---
+d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string ${HOSTNAME}
+d-i netcfg/get_domain string local
+d-i netcfg/wireless_wep string
+
+#--- Mirror (HTTPS-only, pinned to deb.debian.org) ---
+d-i mirror/protocol string https
+d-i mirror/country string manual
+d-i mirror/https/hostname string deb.debian.org
+d-i mirror/https/directory string /debian
+d-i mirror/https/proxy string
+
+#--- Account setup ---
+# Root login disabled — only the deploy user can log in, key-only.
+d-i passwd/root-login boolean false
+d-i passwd/make-user boolean true
+d-i passwd/user-fullname string ${USERNAME}
+d-i passwd/username string ${USERNAME}
+# Locked password — SSH key is the only access path
+d-i passwd/user-password-crypted password !
+d-i passwd/user-default-groups string sudo
+
+#--- Clock and timezone ---
+d-i clock-setup/utc boolean true
+d-i time/zone string ${TIMEZONE}
+d-i clock-setup/ntp boolean true
+
+#--- Partitioning: LUKS2 + LVM full disk encryption ---
+# IMPORTANT: passphrase is set INTERACTIVELY at install time via the provider
+# console. We do NOT preseed it — embedding the passphrase in the ISO would
+# defeat the entire purpose of FDE.
+d-i partman-auto/method string crypto
+d-i partman-auto/disk string ${DISK}
+d-i partman-auto-lvm/new_vg_name string vg0
+d-i partman-auto-lvm/guided_size string max
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-auto/purge_lvm_from_device boolean true
+
+d-i partman-auto/expert_recipe string                         \
+  custom ::                                                   \
+    1024 1024 1024 ext4                                       \
+      $primary{ } $bootable{ }                              \
+      method{ format } format{ }                              \
+      use_filesystem{ } filesystem{ ext4 }                    \
+      mountpoint{ /boot } .                                   \
+    2048 4096 200% linux-swap                                 \
+      $lvmok{ } lv_name{ swap }                              \
+      in_vg { vg0 }                                           \
+      method{ swap } format{ } .                              \
+    4096 100000 -1 ext4                                       \
+      $lvmok{ } lv_name{ root }                              \
+      in_vg { vg0 }                                           \
+      method{ format } format{ }                              \
+      use_filesystem{ } filesystem{ ext4 }                    \
+      mountpoint{ / } .
+
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+
+#--- Package selection ---
+tasksel tasksel/first multiselect standard, ssh-server
+d-i pkgsel/include string \
+  ca-certificates \
+  curl \
+  gnupg \
+  htop \
+  python3 \
+  python3-apt \
+  rsync \
+  sudo \
+  unattended-upgrades \
+  vim-tiny
+d-i pkgsel/upgrade select full-upgrade
+d-i pkgsel/update-policy select unattended-upgrades
+
+#--- GRUB ---
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean false
+d-i grub-installer/bootdev string ${DISK}
+
+#--- Late command ---
+# Both helper scripts live on the ISO root under /llamenos/ and are copied
+# into the installer chroot before being run.
+d-i preseed/late_command string \
+  cp /cdrom/llamenos/late-command.sh /cdrom/llamenos/dropbear-setup.sh /target/tmp/ && \
+  in-target chmod +x /tmp/late-command.sh /tmp/dropbear-setup.sh && \
+  in-target /tmp/late-command.sh "${USERNAME}" "${UNLOCK_MODE}" "${SSH_PUBKEY_B64}" "${STATIC_IP}" "${GATEWAY}" "${DNS}" && \
+  in-target rm /tmp/late-command.sh /tmp/dropbear-setup.sh
+
+#--- Reboot when done ---
+d-i finish-install/reboot_in_progress note
