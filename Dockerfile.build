@@ -32,7 +32,14 @@ ENV GITHUB_SHA=${GITHUB_SHA}
 WORKDIR /build
 
 # Install dependencies first (layer caching)
+# Copy workspace package.json files so bun can resolve all workspaces
 COPY package.json bun.lockb ./
+COPY site/package.json site/
+COPY apps/worker/package.json apps/worker/
+COPY packages/shared/package.json packages/shared/
+COPY packages/i18n/package.json packages/i18n/
+COPY packages/protocol/package.json packages/protocol/
+COPY packages/test-specs/package.json packages/test-specs/
 RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy source
