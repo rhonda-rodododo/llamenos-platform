@@ -11,23 +11,19 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    # DEVELOPMENT_TEAM is intentionally empty: the Apple Developer account
-    # must be logged in via Xcode > Settings > Accounts on the build Mac
-    # before this can be populated. Fill in the 10-character Team ID once
-    # available (e.g. "AB12CD34EF") and set the same value in
-    # ExportOptions.plist's `teamID` key. Both files use automatic signing,
-    # so no provisioning profile names need to be hardcoded — Xcode will
-    # request them via `xcodebuild -allowProvisioningUpdates`.
-    DEVELOPMENT_TEAM: ""
+    # DEVELOPMENT_TEAM matches the value in ExportOptions.plist's `teamID`.
+    # Both files use automatic signing — Xcode requests provisioning profiles
+    # via `xcodebuild -allowProvisioningUpdates`.
+    DEVELOPMENT_TEAM: "KN6NH935ZU"
     CODE_SIGN_STYLE: Automatic
     # The Rust XCFramework is only built for arm64 simulator slices.
     # Exclude x86_64 so Release builds on Apple Silicon Macs link cleanly.
     "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
-  configs:
-    Debug:
-      CODE_SIGN_IDENTITY: Apple Development
-    Release:
-      CODE_SIGN_IDENTITY: Apple Distribution
+    # CODE_SIGN_IDENTITY is intentionally not set per-config: with
+    # CODE_SIGN_STYLE=Automatic, Xcode selects the appropriate identity
+    # (Apple Development for Debug, Apple Distribution for Release Archive)
+    # based on the build action. Hardcoding it conflicts with automatic
+    # provisioning.
 
 targets:
   # ─── Main Application ───────────────────────────────────────
@@ -80,10 +76,8 @@ targets:
       configs:
         Debug:
           CODE_SIGN_ENTITLEMENTS: Sources/App/Llamenos.Debug.entitlements
-          CODE_SIGN_IDENTITY: Apple Development
         Release:
           CODE_SIGN_ENTITLEMENTS: Sources/App/Llamenos.Release.entitlements
-          CODE_SIGN_IDENTITY: Apple Distribution
     scheme:
       testTargets:
         - LlamenosTests

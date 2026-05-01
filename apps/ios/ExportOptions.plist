@@ -5,11 +5,8 @@
 
   Signing strategy: matches `apps/ios/project.yml` which sets
   CODE_SIGN_STYLE=Automatic. Xcode handles provisioning profiles via
-  `xcodebuild -allowProvisioningUpdates`. The only field that must be
-  populated post account activation is `teamID` — the 10-character Apple
-  Developer Team ID (e.g. "AB12CD34EF").
-
-  TODO (post account activation): set `teamID` below.
+  `xcodebuild -allowProvisioningUpdates`. `teamID` must match the
+  DEVELOPMENT_TEAM in project.yml.
 
   If you ever need to switch to manual signing, set `signingStyle` to
   `manual` and add a `provisioningProfiles` dictionary mapping bundle ID
@@ -36,6 +33,6 @@
     <key>stripSwiftSymbols</key>
     <true/>
     <key>teamID</key>
-    <string></string>
+    <string>KN6NH935ZU</string>
 </dict>
 </plist>
