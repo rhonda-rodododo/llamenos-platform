@@ -7,7 +7,7 @@ export const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d
 export const TEST_PIN = '123456'
 
 /** Decode a bech32 nsec to hex secret key (Node-side). */
-function nsecToHex(nsec: string): string {
+export function nsecToHex(nsec: string): string {
   const decoded = nip19.decode(nsec)
   if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
   return bytesToHex(decoded.data as Uint8Array)
