@@ -49,12 +49,12 @@ const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6 hours
  */
 function semverGte(a: string, b: string): boolean {
   const parse = (v: string) =>
-    v.split(/[.-]/)[0]?.split('.').map(Number) ?? [0, 0, 0]
-  const [aMaj, aMin, aPat] = parse(a)
-  const [bMaj, bMin, bPat] = parse(b)
-  if (aMaj !== bMaj) return (aMaj ?? 0) > (bMaj ?? 0)
-  if (aMin !== bMin) return (aMin ?? 0) > (bMin ?? 0)
-  return (aPat ?? 0) >= (bPat ?? 0)
+    v.split('-')[0].split('.').map(Number)
+  const [aMaj = 0, aMin = 0, aPat = 0] = parse(a)
+  const [bMaj = 0, bMin = 0, bPat = 0] = parse(b)
+  if (aMaj !== bMaj) return aMaj > bMaj
+  if (aMin !== bMin) return aMin > bMin
+  return aPat >= bPat
 }
 const STARTUP_DELAY_MS = 5_000 // 5 seconds after launch
 const SKIPPED_VERSIONS_KEY = 'skipped-update-versions'
