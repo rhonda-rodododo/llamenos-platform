@@ -285,7 +285,6 @@ function BulkImportForm({ onImported, onCancel }: {
               id="bulk-reason"
               value={reason}
               onChange={e => setReason(e.target.value)}
-              required
             />
           </div>
           <div className="flex gap-2">

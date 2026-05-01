@@ -55,7 +55,7 @@ bans.post('/',
     if (!isValidE164(body.phone)) {
       return c.json({ error: 'Invalid phone number. Use E.164 format (e.g. +12125551234)' }, 400)
     }
-    await services.records.addBan({
+    const ban = await services.records.addBan({
       hubId,
       phone: body.phone,
       reason: body.reason ?? '',
@@ -63,7 +63,7 @@ bans.post('/',
     })
     // HIGH-W3: Log phone hash, not raw phone number, to protect caller privacy in audit log
     await audit(services.audit, 'numberBanned', pubkey, { phoneHash: hashPhone(body.phone, c.env.HMAC_SECRET) }, undefined, hubId ?? undefined)
-    return c.json({ ok: true })
+    return c.json({ ban: { phone: ban.phone, reason: ban.reason, bannedBy: ban.bannedBy, bannedAt: ban.bannedAt } })
   },
 )
 
