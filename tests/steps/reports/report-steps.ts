@@ -84,8 +84,16 @@ Then('the report submit button should be disabled', async ({ page }) => {
 
 // --- Report detail / viewing ---
 
-When('I tap the first report card', async ({ page }) => {
-  // Reports should have been pre-seeded by the "view reports" step
+When('I tap the first report card', async ({ page, request }) => {
+  // Ensure at least one report exists so the tap has something to click.
+  // If the list is empty, create a report via API so the step has data to work with.
+  const existingReports = await listReportsViaApi(request).catch(() => ({ conversations: [], total: 0 }))
+  if (existingReports.conversations.length === 0) {
+    await createReportViaApi(request, { title: `Auto-seeded Report ${Date.now()}` })
+    // Refresh the page so the newly created report appears in the list
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+  }
   const reportCard = page.getByTestId(TestIds.REPORT_CARD).first()
   await expect(reportCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await reportCard.click()

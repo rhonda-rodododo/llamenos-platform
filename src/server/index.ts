@@ -5,6 +5,7 @@
  * The frontend is served by Tauri's webview — this server handles
  * only API routes. Real-time events use the Nostr relay (strfry).
  */
+import 'reflect-metadata' // Required by @peculiar/x509 → tsyringe (transitive dep of @simplewebauthn/server)
 import { Hono } from 'hono'
 import { createDatabase, closeDb } from '../../apps/worker/db'
 import { createServices, type Services } from '../../apps/worker/services'

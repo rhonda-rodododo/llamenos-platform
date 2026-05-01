@@ -990,7 +990,7 @@
     "error": "Error",
     "language": "Language",
     "loading": "Loading...",
-    "logout": "Log out",
+    "logout": "Log Out",
     "next": "Next",
     "no": "No",
     "noData": "No data available",
@@ -2371,7 +2371,8 @@
     "copyPubkey": "Copy Public Key",
     "signingPubkey": "Signing Public Key",
     "encryptionPubkey": "Encryption Public Key",
-    "deviceId": "Device ID"
+    "deviceId": "Device ID",
+    "lockApp": "Lock App"
   },
   "setup": {
     "autoResponse": "Auto-Response Template",

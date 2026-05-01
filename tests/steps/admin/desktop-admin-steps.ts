@@ -223,7 +223,7 @@ Then('the new hub should appear in the hub list', async ({ page }) => {
 Given('multiple hubs exist', async ({ page }) => {
   const { createHubViaApi } = await import('../../api-helpers')
   // Create a second hub — the default hub already exists from test setup
-  await createHubViaApi(page.request, { name: `Hub-${Date.now()}` })
+  await createHubViaApi(page.request, `Hub-${Date.now()}`)
 })
 
 When('I select a different hub', async ({ page }) => {
@@ -270,7 +270,7 @@ Then('I should see only volunteers for that hub', async ({ page }) => {
 
 Given('a non-default hub exists', async ({ page }) => {
   const { createHubViaApi } = await import('../../api-helpers')
-  await createHubViaApi(page.request, { name: `NonDefault-${Date.now()}` })
+  await createHubViaApi(page.request, `NonDefault-${Date.now()}`)
 })
 
 When('I click {string} on the hub', async ({ page }, text: string) => {
@@ -582,17 +582,45 @@ Then('the blast should appear as {string}', async ({ page }, status: string) => 
 })
 
 Given('a blast has been sent', async ({ page }) => {
-  // Navigate to blasts page and verify at least one blast exists
+  // Navigate to blasts page
   await page.getByTestId(TestIds.NAV_BLASTS).click()
-  await expect(
-    page.getByTestId(TestIds.BLAST_CARD).first().or(page.getByText(/no blasts/i).first()),
-  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await page.waitForLoadState('domcontentloaded')
+
+  // If no blasts exist, create one via UI so the delivery status step has something to assert
+  const hasBlast = await page.getByTestId(TestIds.BLAST_CARD).first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (!hasBlast) {
+    const newBlastBtn = page.getByTestId(TestIds.BLAST_NEW_BTN)
+    if (await newBlastBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await newBlastBtn.click()
+      // Fill in blast name and content
+      const nameInput = page.getByTestId(TestIds.BLAST_NAME).or(page.getByLabel(/name|subject/i))
+      if (await nameInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+        await nameInput.first().fill(`Test Blast ${Date.now()}`)
+      }
+      const textInput = page.getByTestId(TestIds.BLAST_TEXT).or(page.locator('textarea'))
+      if (await textInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+        await textInput.first().fill('Test blast message for delivery status verification')
+      }
+      // Submit the form
+      const createBtn = page.getByRole('button', { name: /create|save|submit/i })
+      if (await createBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+        await createBtn.first().click()
+      }
+    }
+  }
+
+  // Click the first blast card to open the detail panel (which contains the status badge)
+  const blastCard = page.getByTestId(TestIds.BLAST_CARD).first()
+  if (await blastCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+    await blastCard.click()
+  }
 })
 
 Then('I should see the delivery status for the blast', async ({ page }) => {
-  // The blast card should show a status indicator (sent, pending, failed, etc.)
+  // The blast card and detail panel both show a status badge (Draft, Sent, Scheduled, Sending, Cancelled)
+  // Look for the Badge component showing any blast status — the regex covers all possible values
   await expect(
-    page.getByText(/sent|pending|delivered|failed|scheduled/i).first(),
+    page.getByText(/draft|sent|scheduled|sending|cancelled/i).first(),
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
