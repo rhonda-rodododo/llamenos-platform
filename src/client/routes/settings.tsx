@@ -1,4 +1,4 @@
-import { createFileRoute, useSearch } from '@tanstack/react-router'
+import { createFileRoute, useSearch, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState, useRef } from 'react'
@@ -11,7 +11,7 @@ import {
 import * as keyManager from '@/lib/key-manager'
 import { nip19 } from 'nostr-tools'
 import { useToast } from '@/lib/toast'
-import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare } from 'lucide-react'
+import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare, LogOut, Lock } from 'lucide-react'
 import { isWebAuthnAvailable, registerCredential, listCredentials, deleteCredential, type WebAuthnCredentialInfo } from '@/lib/webauthn'
 import { PhoneInput } from '@/components/phone-input'
 import {
@@ -52,7 +52,8 @@ export const Route = createFileRoute('/settings')({
 function SettingsPage() {
   const { t } = useTranslation()
   const { section } = useSearch({ from: '/settings' })
-  const { transcriptionEnabled, name: authName, spokenLanguages, callPreference, refreshProfile, publicKey } = useAuth()
+  const { transcriptionEnabled, name: authName, spokenLanguages, callPreference, refreshProfile, publicKey, signOut } = useAuth()
+  const navigate = useNavigate()
   const { toast } = useToast()
   const [myTranscription, setMyTranscription] = useState(transcriptionEnabled)
   const [notifPrefs, setNotifPrefs] = useState(getNotificationPrefs)
@@ -496,6 +497,32 @@ function SettingsPage() {
       >
         <CrashReportingSettings />
       </SettingsSection>
+
+      {/* Lock & Logout */}
+      <div className="flex flex-col gap-2 pt-2">
+        <button
+          data-testid="lock-btn"
+          onClick={async () => {
+            keyManager.lock()
+            await navigate({ to: '/login' })
+          }}
+          className="flex w-full items-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+        >
+          <Lock className="h-4 w-4" />
+          {t('settings.lockApp', { defaultValue: 'Lock App' })}
+        </button>
+        <button
+          data-testid="logout-btn"
+          onClick={() => {
+            signOut()
+            void navigate({ to: '/login' })
+          }}
+          className="flex w-full items-center gap-2 rounded-md border border-destructive/40 px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4" />
+          {t('common.logout', { defaultValue: 'Log Out' })}
+        </button>
+      </div>
 
       {/* App version */}
       <p className="text-xs text-muted-foreground text-center pt-2">

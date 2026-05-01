@@ -8,6 +8,7 @@ import {
   loginAsAdmin,
   loginAsVolunteer,
   enterPin,
+  nsecToHex,
   ADMIN_NSEC,
   TEST_PIN,
   Timeouts,
@@ -24,62 +25,46 @@ Given('the app is freshly installed', async ({ page }) => {
 })
 
 Given('no identity exists on the device', async ({ page }) => {
-  // Ensure no encrypted key exists in storage
+  // Ensure no encrypted key exists in storage (clear both current and legacy key names)
   await page.evaluate(() => {
+    localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
     localStorage.removeItem('llamenos:llamenos-encrypted-key')
     localStorage.removeItem('llamenos-encrypted-key')
+    localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-device-keys')
     localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
   })
 })
 
 Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
-  // Pre-load the admin key encrypted with the given PIN
-  // This simulates a returning user who has already set up their identity
+  // Pre-load the admin key encrypted with the given PIN using the test platform shim.
+  // This simulates a returning user who has set up their identity and locked the app.
+  const secretHex = nsecToHex(ADMIN_NSEC)
+
   await page.goto('/login')
-  await page.evaluate(() => sessionStorage.clear())
-  // Use the standard preloadEncryptedKey flow via loginAsAdmin helper logic
-  // but we just need the key loaded, not fully logged in
-  const { xchacha20poly1305 } = await import('@noble/ciphers/chacha.js')
-  const { utf8ToBytes } = await import('@noble/ciphers/utils.js')
-  const { bytesToHex } = await import('@noble/hashes/utils.js')
-  const { getPublicKey, nip19 } = await import('nostr-tools')
+  await page.evaluate(() => {
+    sessionStorage.clear()
+    localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
+    localStorage.removeItem('llamenos:llamenos-encrypted-key')
+    localStorage.removeItem('llamenos-encrypted-key')
+  })
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
 
-  const encoder = new TextEncoder()
-  const pinBytes = encoder.encode(pin)
-  const salt = crypto.getRandomValues(new Uint8Array(16))
+  // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
 
-  const keyMaterial = await crypto.subtle.importKey('raw', pinBytes, 'PBKDF2', false, ['deriveBits'])
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 },
-    keyMaterial,
-    256,
-  )
-  const kek = new Uint8Array(derivedBits)
-
-  const nonce = crypto.getRandomValues(new Uint8Array(24))
-  const cipher = xchacha20poly1305(kek, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(ADMIN_NSEC))
-
-  const decoded = nip19.decode(ADMIN_NSEC)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  const pubkey = getPublicKey(decoded.data)
-  const hashInput = encoder.encode(`llamenos:keyid:${pubkey}`)
-  const pubkeyHashBuf = await crypto.subtle.digest('SHA-256', hashInput)
-  const pubkeyHash = bytesToHex(new Uint8Array(pubkeyHashBuf)).slice(0, 16)
-
-  const data = {
-    salt: bytesToHex(salt),
-    iterations: 600_000,
-    nonce: bytesToHex(nonce),
-    ciphertext: bytesToHex(ciphertext),
-    pubkey: pubkeyHash,
-  }
-
-  // platform.ts non-Tauri getStore() uses 'llamenos:' prefix
-  await page.evaluate(
-    (value) => { localStorage.setItem('llamenos:llamenos-encrypted-key', value) },
-    JSON.stringify(data),
-  )
+  // Import key via test platform shim: persists encrypted keys then locks — leaving the
+  // app in the "locked, PIN required" state that these scenarios test.
+  await page.evaluate(async ({ secretHex, pin }) => {
+    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+      legacyImportNsec: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
+      persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
+      lockCrypto: () => Promise<void>
+    }
+    const encrypted = await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
+    await platform.persistAndUnlockDeviceKeys(encrypted, pin)
+    await platform.lockCrypto()
+  }, { secretHex, pin })
 })
 
 Given('I am logged in', async ({ page }) => {
@@ -110,63 +95,43 @@ Given('I am on the login screen', async ({ page }) => {
 })
 
 Given('I have a stored identity with PIN {string}', async ({ page }, pin: string) => {
-  // Pre-load an encrypted key for the given PIN
-  // Normalize to 6 digits (app uses 6-digit PINs; feature files may use 4-digit for readability)
+  // Pre-load an encrypted key for the given PIN using the test platform shim.
+  // Normalize to 6 digits (app uses 6-digit PINs; feature files may use 4-digit for readability).
+  // Uses legacyImportNsec so the admin nsec is stored and locked — leaving the app in the
+  // "locked, PIN required" state that PIN setup/unlock scenarios test.
   const normalizedPin = pin.padEnd(6, '0')
+  const secretHex = nsecToHex(ADMIN_NSEC)
 
   await page.goto('/login')
   await page.evaluate(() => {
     localStorage.clear()
     sessionStorage.clear()
   })
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
 
-  const { xchacha20poly1305 } = await import('@noble/ciphers/chacha.js')
-  const { utf8ToBytes } = await import('@noble/ciphers/utils.js')
-  const { bytesToHex } = await import('@noble/hashes/utils.js')
-  const { getPublicKey, nip19 } = await import('nostr-tools')
+  // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
 
-  const encoder = new TextEncoder()
-  const pinBytes = encoder.encode(normalizedPin)
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-
-  const keyMaterial = await crypto.subtle.importKey('raw', pinBytes, 'PBKDF2', false, ['deriveBits'])
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 },
-    keyMaterial,
-    256,
-  )
-  const kek = new Uint8Array(derivedBits)
-
-  const nonce = crypto.getRandomValues(new Uint8Array(24))
-  const cipher = xchacha20poly1305(kek, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(ADMIN_NSEC))
-
-  const decoded = nip19.decode(ADMIN_NSEC)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  const pubkey = getPublicKey(decoded.data)
-  const hashInput = encoder.encode(`llamenos:keyid:${pubkey}`)
-  const pubkeyHashBuf = await crypto.subtle.digest('SHA-256', hashInput)
-  const pubkeyHash = bytesToHex(new Uint8Array(pubkeyHashBuf)).slice(0, 16)
-
-  const data = {
-    salt: bytesToHex(salt),
-    iterations: 600_000,
-    nonce: bytesToHex(nonce),
-    ciphertext: bytesToHex(ciphertext),
-    pubkey: pubkeyHash,
-  }
-
-  // platform.ts non-Tauri getStore() uses 'llamenos:' prefix
-  await page.evaluate(
-    (value) => { localStorage.setItem('llamenos:llamenos-encrypted-key', value) },
-    JSON.stringify(data),
-  )
+  await page.evaluate(async ({ secretHex, normalizedPin }) => {
+    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+      legacyImportNsec: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
+      persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
+      lockCrypto: () => Promise<void>
+    }
+    const encrypted = await platform.legacyImportNsec(secretHex, normalizedPin, crypto.randomUUID())
+    await platform.persistAndUnlockDeviceKeys(encrypted, normalizedPin)
+    await platform.lockCrypto()
+  }, { secretHex, normalizedPin })
 })
 
 Given('the app is restarted', async ({ page }) => {
-  // Reload the page to simulate an app restart
+  // Reload the page to simulate an app restart.
+  // Wait for 'load' (all scripts executed) rather than just 'domcontentloaded'
+  // so that the Tauri IPC mock (sets Symbol.for('llamenos_test_invoke') at module load)
+  // is guaranteed to be available before subsequent steps call page.waitForFunction.
   await page.reload()
-  await page.waitForLoadState('domcontentloaded')
+  await page.waitForLoadState('load')
 })
 
 When('the app launches', async ({ page }) => {
