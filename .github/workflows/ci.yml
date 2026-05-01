@@ -415,6 +415,56 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
 
+      # ── Start backend services ──────────────────────────────────
+      # Android E2E tests need a running backend for hub creation,
+      # authentication, and call/message simulation endpoints.
+      # The emulator reaches the host via 10.0.2.2 (Android's host loopback alias).
+      - name: Create .env for Docker Compose
+        run: |
+          printf '%s\n' \
+            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
+            "DOMAIN=localhost" \
+            "PG_PASSWORD=ci-test-password" \
+            "HMAC_SECRET=$(openssl rand -hex 32)" \
+            "MINIO_ACCESS_KEY=testaccess" \
+            "MINIO_SECRET_KEY=testsecret123456" \
+            "HOTLINE_NAME=Llámenos" \
+            "BRIDGE_SECRET=ci-test-bridge-secret" \
+            "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "NOTIFIER_API_KEY=ci-test-notifier-key" \
+            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+            "PBX_TYPE=asterisk" \
+            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            > .env
+
+      - name: Build and start Docker Compose (core services)
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --wait app
+        timeout-minutes: 10
+
+      - name: Wait for backend health
+        run: |
+          echo "Waiting for backend to be ready..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health/ready; then
+              echo "Backend is ready"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "::error::Backend did not become healthy after 120s"
+              docker compose --env-file .env \
+                -f deploy/docker/docker-compose.yml \
+                -f deploy/docker/docker-compose.test.yml \
+                logs --tail=50 || true
+              exit 1
+            fi
+            sleep 2
+          done
+
       - name: Cache AVD snapshot
         id: avd-cache
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -478,7 +528,11 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           emulator-boot-timeout: 600
-          script: cd apps/android && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}"
+          script: |
+            cd apps/android && ./gradlew connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" \
+              -Pandroid.testInstrumentationRunnerArguments.testHubUrl=http://10.0.2.2:3000 \
+              -Pandroid.testInstrumentationRunnerArguments.testSecret=test-reset-secret
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -489,6 +543,26 @@ jobs:
             apps/android/app/build/outputs/androidTest-results/
             apps/android/app/build/reports/androidTests/
           retention-days: 7
+
+      - name: Collect logcat on failure
+        if: failure()
+        run: adb logcat -d > /tmp/logcat.txt 2>/dev/null || true
+
+      - name: Upload logcat
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: android-e2e-logcat-shard-${{ matrix.shard }}
+          path: /tmp/logcat.txt
+          retention-days: 7
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v
 
   # ─── iOS Build & Test ──────────────────────────────────────
   ios-build-test:
