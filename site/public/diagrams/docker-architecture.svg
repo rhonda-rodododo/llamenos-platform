@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 420" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 500; text-anchor: middle; }
+    .sublabel { font-size: 10px; fill: #a0d0cf; text-anchor: middle; }
+    .arrow { stroke: #51AFAE; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    .arrow-dash { stroke: #51AFAE; stroke-width: 2; fill: none; stroke-dasharray: 6,4; marker-end: url(#arrowhead); }
+    .port { font-size: 10px; fill: #8ec8c8; text-anchor: middle; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#51AFAE"/>
+    </marker>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a6b8a" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#2a4a5a" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Internet -->
+  <rect x="245" y="10" width="160" height="40" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="325" y="33" class="label">🌐 Internet</text>
+
+  <!-- Arrow -->
+  <line x1="325" y1="50" x2="325" y2="80" class="arrow"/>
+  <text x="355" y="70" class="port">:80 / :443</text>
+
+  <!-- Caddy -->
+  <rect x="225" y="80" width="200" height="50" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="325" y="103" class="label" style="fill: #fff;">Caddy</text>
+  <text x="325" y="120" class="sublabel" style="fill: #c0e8e8;">TLS termination · reverse proxy</text>
+
+  <!-- Arrow to App -->
+  <line x1="275" y1="130" x2="275" y2="175" class="arrow"/>
+  <text x="255" y="155" class="port">:3000</text>
+
+  <!-- Arrow to strfry -->
+  <line x1="375" y1="130" x2="475" y2="175" class="arrow"/>
+  <text x="445" y="155" class="port">/nostr</text>
+
+  <!-- App (Bun) -->
+  <rect x="175" y="175" width="200" height="50" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="275" y="198" class="label" style="fill: #fff;">App (Bun)</text>
+  <text x="275" y="215" class="sublabel" style="fill: #c0e8e8;">Hono HTTP server</text>
+
+  <!-- strfry -->
+  <rect x="415" y="175" width="160" height="50" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="495" y="198" class="label" style="fill: #fff;">strfry</text>
+  <text x="495" y="215" class="sublabel" style="fill: #c0e8e8;">Nostr relay</text>
+
+  <!-- Arrow to PostgreSQL -->
+  <line x1="225" y1="225" x2="130" y2="290" class="arrow"/>
+
+  <!-- Arrow to MinIO -->
+  <line x1="325" y1="225" x2="325" y2="290" class="arrow"/>
+
+  <!-- PostgreSQL -->
+  <rect x="50" y="290" width="160" height="55" class="node" fill="url(#dbGrad)" stroke="#6b9ab8" stroke-width="2"/>
+  <text x="130" y="315" class="label">PostgreSQL</text>
+  <text x="130" y="332" class="sublabel">🗄️ Data store</text>
+
+  <!-- MinIO -->
+  <rect x="245" y="290" width="160" height="55" class="node" fill="url(#dbGrad)" stroke="#6b9ab8" stroke-width="2"/>
+  <text x="325" y="315" class="label">MinIO (S3)</text>
+  <text x="325" y="332" class="sublabel">📦 Object storage</text>
+
+  <!-- Optional services -->
+  <!-- Arrow to signal-notifier -->
+  <line x1="275" y1="225" x2="130" y2="385" class="arrow-dash"/>
+  <text x="155" y="370" class="port">--profile signal</text>
+
+  <!-- Arrow to sip-bridge -->
+  <line x1="325" y1="225" x2="420" y2="385" class="arrow-dash"/>
+  <text x="405" y="370" class="port">--profile telephony</text>
+
+  <!-- signal-notifier -->
+  <rect x="30" y="385" width="190" height="30" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="125" y="405" class="label" style="font-size: 12px;">signal-notifier :3100</text>
+
+  <!-- sip-bridge -->
+  <rect x="340" y="385" width="160" height="30" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="420" y="405" class="label" style="font-size: 12px;">sip-bridge</text>
+
+  <!-- Legend -->
+  <line x1="510" y1="395" x2="545" y2="395" stroke="#51AFAE" stroke-width="2" stroke-dasharray="6,4"/>
+  <text x="580" y="399" style="font-size: 10px; fill: #8ec8c8; text-anchor: start;">optional</text>
+</svg>

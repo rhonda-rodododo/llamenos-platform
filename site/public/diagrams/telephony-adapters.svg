@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 530 360" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 500; text-anchor: start; }
+    .root-label { font-size: 14px; font-weight: 700; text-anchor: start; fill: #ffffff; }
+    .risk { font-size: 10px; text-anchor: start; }
+    .risk-low { fill: #6dd672; }
+    .risk-mid { fill: #d6c86d; }
+    .risk-high { fill: #d68e6d; }
+    .branch { stroke: #51AFAE; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="selfGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#1a7b6b" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Root -->
+  <rect x="15" y="10" width="280" height="35" class="node" fill="#51AFAE" fill-opacity="0.3" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="30" y="32" class="root-label">📞 TelephonyAdapter (abstract)</text>
+
+  <!-- Trunk -->
+  <line x1="45" y1="45" x2="45" y2="340" class="branch"/>
+
+  <!-- Twilio -->
+  <line x1="45" y1="68" x2="75" y2="68" class="branch"/>
+  <rect x="80" y="52" width="430" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="71" class="label">TwilioAdapter</text>
+  <text x="265" y="71" class="risk risk-high">Easy. CDRs in dashboard. Okay for low-risk orgs.</text>
+
+  <!-- SignalWire -->
+  <line x1="45" y1="108" x2="75" y2="108" class="branch"/>
+  <rect x="80" y="92" width="430" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="111" class="label">SignalWireAdapter</text>
+  <text x="265" y="111" class="risk risk-mid">CDR-configurable. Better than Twilio.</text>
+
+  <!-- Telnyx -->
+  <line x1="45" y1="148" x2="75" y2="148" class="branch"/>
+  <rect x="80" y="132" width="430" height="30" class="node" fill="url(#leafGrad)" stroke="#5BC5C5" stroke-width="2"/>
+  <text x="95" y="151" class="label" style="fill: #fff;">TelnyxAdapter ★</text>
+  <text x="265" y="151" class="risk risk-low">CDR-free SIP trunk option. Recommended.</text>
+
+  <!-- Vonage -->
+  <line x1="45" y1="188" x2="75" y2="188" class="branch"/>
+  <rect x="80" y="172" width="430" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="191" class="label">VonageAdapter</text>
+
+  <!-- Plivo -->
+  <line x1="45" y1="228" x2="75" y2="228" class="branch"/>
+  <rect x="80" y="212" width="430" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="231" class="label">PlivoAdapter</text>
+
+  <!-- Bandwidth -->
+  <line x1="45" y1="268" x2="75" y2="268" class="branch"/>
+  <rect x="80" y="252" width="430" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="271" class="label">BandwidthAdapter</text>
+
+  <!-- Asterisk -->
+  <line x1="45" y1="308" x2="75" y2="308" class="branch"/>
+  <rect x="80" y="292" width="430" height="30" class="node" fill="url(#selfGrad)" stroke="#5BC5C5" stroke-width="2"/>
+  <text x="95" y="311" class="label" style="fill: #fff;">AsteriskAdapter</text>
+  <text x="265" y="311" class="risk risk-low">Self-hosted. No external CDRs at all.</text>
+
+  <!-- FreeSWITCH -->
+  <line x1="45" y1="340" x2="75" y2="340" class="branch"/>
+  <rect x="80" y="327" width="430" height="30" class="node" fill="url(#selfGrad)" stroke="#5BC5C5" stroke-width="2"/>
+  <text x="95" y="346" class="label" style="fill: #fff;">FreeSWITCHAdapter</text>
+  <text x="265" y="346" class="risk risk-low">Self-hosted alternative.</text>
+</svg>

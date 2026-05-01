@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450 260" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 600; text-anchor: start; }
+    .root-label { font-size: 14px; font-weight: 700; text-anchor: start; fill: #ffffff; }
+    .branch { stroke: #51AFAE; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Root -->
+  <rect x="20" y="15" width="170" height="38" class="node" fill="#51AFAE" fill-opacity="0.3" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="35" y="39" class="root-label">📋 Your template</text>
+
+  <!-- Branch lines -->
+  <line x1="50" y1="53" x2="50" y2="240" class="branch"/>
+
+  <!-- Entity types -->
+  <line x1="50" y1="78" x2="80" y2="78" class="branch"/>
+  <rect x="85" y="60" width="340" height="35" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="100" y="80" class="label">Entity types</text>
+  <text x="240" y="80" style="font-size: 11px; fill: #8ec8c8;">person, incident, location, vehicle…</text>
+
+  <!-- Report types -->
+  <line x1="50" y1="118" x2="80" y2="118" class="branch"/>
+  <rect x="85" y="100" width="340" height="35" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="100" y="120" class="label">Report types</text>
+  <text x="240" y="120" style="font-size: 11px; fill: #8ec8c8;">arrest_report, intake_form, incident_log…</text>
+
+  <!-- Custom fields -->
+  <line x1="50" y1="158" x2="80" y2="158" class="branch"/>
+  <rect x="85" y="140" width="340" height="35" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="100" y="160" class="label">Custom fields</text>
+  <text x="240" y="160" style="font-size: 11px; fill: #8ec8c8;">badge_number, charges, shelter_needed…</text>
+
+  <!-- Workflow steps -->
+  <line x1="50" y1="198" x2="80" y2="198" class="branch"/>
+  <rect x="85" y="180" width="340" height="35" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="100" y="200" class="label">Workflow steps</text>
+  <text x="240" y="200" style="font-size: 11px; fill: #8ec8c8;">intake → follow-up → closed</text>
+
+  <!-- Role-based visibility -->
+  <line x1="50" y1="238" x2="80" y2="238" class="branch"/>
+  <rect x="85" y="220" width="340" height="35" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="100" y="240" class="label">Role-based field visibility</text>
+  <text x="310" y="240" style="font-size: 11px; fill: #8ec8c8;">what each role can see</text>
+</svg>

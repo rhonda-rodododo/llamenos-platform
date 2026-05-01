@@ -14,12 +14,7 @@ Llamenos sipòte mesaj Signal via yon pon [signal-cli-rest-api](https://github.c
 
 ## Achitekti
 
-```mermaid
-flowchart LR
-    User["Itilizatè Signal"] --> Servers["Sèvè Signal"]
-    Servers --> Bridge["pon signal-cli<br/>(otojere)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 Pon signal-cli la kouri sou enfrastriktirè ou a epi transfere mesaj nan Worker ou a via webhooks HTTP. Sa a vle di ou kontwole tout chemen mesaj soti nan Signal nan aplikasyon ou a.
 

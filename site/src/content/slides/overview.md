@@ -68,25 +68,7 @@ Most crisis hotlines use tools designed for different threat models:
 
 ## The Architecture in One Slide
 
-```
-Caller dials your number
-        │
-        ▼
-SIP trunk (you control what's logged)
-        │
-        ▼
-Your server — Llámenos + SIP bridge
-        │
-        ▼
-Parallel ring → all on-shift volunteers simultaneously
-        │
-        ▼
-First pickup → encrypted call session
-        │
-        ▼
-Volunteer writes encrypted notes
-(only volunteer + admins can decrypt — server cannot)
-```
+![Call Flow Stack](/diagrams/call-flow-stack.svg)
 
 *Self-hosted. EU-compatible. No public IP exposed.*
 

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 500; text-anchor: start; }
+    .root-label { font-size: 14px; font-weight: 700; text-anchor: start; fill: #ffffff; }
+    .detail { font-size: 10px; fill: #a0d0cf; text-anchor: start; }
+    .branch { stroke: #51AFAE; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Root -->
+  <rect x="15" y="10" width="370" height="35" class="node" fill="#51AFAE" fill-opacity="0.3" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="30" y="32" class="root-label">🔐 packages/crypto/ — single auditable crate</text>
+
+  <!-- Trunk -->
+  <line x1="45" y1="45" x2="45" y2="180" class="branch"/>
+
+  <!-- Key exchange & signing -->
+  <line x1="45" y1="75" x2="75" y2="75" class="branch"/>
+  <rect x="80" y="58" width="380" height="33" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="78" class="label">HPKE · Ed25519 · Schnorr · PBKDF2 · HKDF</text>
+  <text x="95" y="88" class="detail" style="font-size: 9px;">Key exchange, signatures, key derivation</text>
+
+  <!-- Symmetric encryption -->
+  <line x1="45" y1="120" x2="75" y2="120" class="branch"/>
+  <rect x="80" y="103" width="380" height="33" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="123" class="label">XChaCha20-Poly1305 · SFrame · MLS</text>
+  <text x="95" y="133" class="detail" style="font-size: 9px;">Content encryption, voice E2EE, group messaging</text>
+
+  <!-- Domain separation -->
+  <line x1="45" y1="165" x2="75" y2="165" class="branch"/>
+  <rect x="80" y="148" width="380" height="33" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="168" class="label">57 domain separation labels</text>
+  <text x="95" y="178" class="detail" style="font-size: 9px;">Albrecht defense — label enforced at decrypt</text>
+</svg>

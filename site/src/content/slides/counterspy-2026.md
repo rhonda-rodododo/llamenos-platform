@@ -200,26 +200,7 @@ Notes in Google Docs
 
 ## The Call Flow
 
-```
-Caller dials PSTN number
-        │
-        ▼
-SIP trunk terminates at YOUR server
-  (Telnyx CDR-free / SignalWire / self-hosted)
-        │
-        ▼
-Llámenos SIP bridge
-  (Asterisk, FreeSWITCH, or Kamailio)
-        │
-        ▼
-Parallel ring → ALL on-shift volunteers
-  simultaneously
-        │
-        ▼
-First volunteer picks up → others hang up
-  ↳ Caller is connected
-  ↳ Volunteer logs encrypted notes
-```
+![PSTN SIP Call Flow](/diagrams/pstn-sip-flow.svg)
 
 <!-- notes: Walk through this slowly. The SIP bridge is the key piece — it's running on your server, behind a Cloudflare Tunnel for ingress, no public IP needed. The PSTN number is just a DID (Direct Inward Dial) from whatever SIP provider you chose. The caller's phone rings YOUR server. Not Twilio's server. Not Google's server. Yours. -->
 
@@ -255,17 +236,7 @@ One inbound call. Outbound legs all start at the same timestamp. First pickup wi
 
 ## 8 Telephony Adapters — Choose Your Trust Level
 
-```
-TelephonyAdapter (abstract interface)
-├── TwilioAdapter          ← Easy. CDRs in dashboard. Okay for low-risk orgs.
-├── SignalWireAdapter       ← CDR-configurable. Better than Twilio.
-├── TelnyxAdapter          ← CDR-free SIP trunk option. Recommended.
-├── VonageAdapter
-├── PlivoAdapter
-├── BandwidthAdapter
-├── AsteriskAdapter        ← Self-hosted. No external CDRs at all.
-└── FreeSWITCHAdapter      ← Self-hosted alternative.
-```
+![Telephony Adapters](/diagrams/telephony-adapters.svg)
 
 :::fragment
 *Every adapter implements the same interface. Switching providers is a config change, not a code rewrite.*
@@ -280,14 +251,9 @@ TelephonyAdapter (abstract interface)
 ```bash
 # What you run
 docker compose up -d
-
-# Services:
-# ├── PostgreSQL     — encrypted notes, call records, audit log
-# ├── Llamenos app   — Bun/Hono HTTP server
-# ├── strfry         — self-hosted Nostr relay (real-time events)
-# ├── sip-bridge     — Asterisk/FreeSWITCH/Kamailio SIP bridge
-# └── signal-notifier — zero-knowledge Signal sidecar (optional)
 ```
+
+![Docker Services](/diagrams/docker-services.svg)
 
 - **Cloudflare Tunnels** for ingress — no public IP exposed, ever
 - **EU hosting** compatible — Hetzner in Germany or Finland, GDPR by design
@@ -465,25 +431,7 @@ New model (v2):
 
 Same zero-knowledge pattern as notes — for inbound Signal, SMS, WhatsApp messages:
 
-```
-Inbound message arrives at webhook
-        │
-        ▼
-Server generates random message_key = random_bytes(32)
-        │
-        ▼
-Encrypt plaintext: XChaCha20-Poly1305(message_key, nonce)
-        │
-        ▼
-HPKE-wrap message_key for: assigned volunteer + all admins
-        │
-        ▼
-Store { ciphertext, readerEnvelopes[] }
-Discard plaintext from memory immediately
-        │
-        ▼
-Server cannot read stored messages
-```
+![Per-Message Envelope Encryption](/diagrams/envelope-encryption.svg)
 
 :::fragment
 *The server is a blind relay. It routes messages it cannot read.*
@@ -807,11 +755,7 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 
 **Same Rust code on every platform. Device keys stay in native memory.**
 
-```
-packages/crypto/  (Rust — single auditable crate)
-├── HPKE, Ed25519, Schnorr, PBKDF2, HKDF
-├── XChaCha20-Poly1305, SFrame, MLS
-└── 57 domain separation labels
+![Crypto Primitives](/diagrams/crypto-primitives.svg)
 
 Desktop (Tauri v2):
   Rust process ← IPC → Webview (UI only)

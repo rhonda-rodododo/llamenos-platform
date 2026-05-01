@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 240" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 500; text-anchor: start; }
+    .root-label { font-size: 14px; font-weight: 700; text-anchor: start; fill: #ffffff; }
+    .detail { font-size: 10px; fill: #8ec8c8; text-anchor: start; }
+    .branch { stroke: #51AFAE; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <linearGradient id="leafGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Root -->
+  <rect x="15" y="10" width="220" height="35" class="node" fill="#51AFAE" fill-opacity="0.3" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="30" y="32" class="root-label">🐳 docker compose services</text>
+
+  <!-- Trunk -->
+  <line x1="45" y1="45" x2="45" y2="220" class="branch"/>
+
+  <!-- PostgreSQL -->
+  <line x1="45" y1="68" x2="75" y2="68" class="branch"/>
+  <rect x="80" y="52" width="360" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="71" class="label">PostgreSQL</text>
+  <text x="210" y="71" class="detail">encrypted notes, call records, audit log</text>
+
+  <!-- Llamenos app -->
+  <line x1="45" y1="108" x2="75" y2="108" class="branch"/>
+  <rect x="80" y="92" width="360" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="111" class="label">Llámenos app</text>
+  <text x="210" y="111" class="detail">Bun/Hono HTTP server</text>
+
+  <!-- strfry -->
+  <line x1="45" y1="148" x2="75" y2="148" class="branch"/>
+  <rect x="80" y="132" width="360" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="151" class="label">strfry</text>
+  <text x="210" y="151" class="detail">self-hosted Nostr relay (real-time events)</text>
+
+  <!-- sip-bridge -->
+  <line x1="45" y1="188" x2="75" y2="188" class="branch"/>
+  <rect x="80" y="172" width="360" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
+  <text x="95" y="191" class="label">sip-bridge</text>
+  <text x="210" y="191" class="detail">Asterisk/FreeSWITCH/Kamailio SIP bridge</text>
+
+  <!-- signal-notifier -->
+  <line x1="45" y1="220" x2="75" y2="220" class="branch"/>
+  <rect x="80" y="207" width="360" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="95" y="226" class="label">signal-notifier</text>
+  <text x="210" y="226" class="detail">zero-knowledge Signal sidecar (optional)</text>
+</svg>

@@ -14,12 +14,7 @@ O Llamenos suporta mensagens Signal via um bridge [signal-cli-rest-api](https://
 
 ## Arquitetura
 
-```mermaid
-flowchart LR
-    User["Usuario Signal"] --> Servers["Servidores Signal"]
-    Servers --> Bridge["bridge signal-cli<br/>(auto-hospedado)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 O bridge signal-cli roda na sua infraestrutura e encaminha mensagens para o seu Worker via webhooks HTTP. Isso significa que voce controla todo o caminho da mensagem, do Signal ate o seu aplicativo.
 

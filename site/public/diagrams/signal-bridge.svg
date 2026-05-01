@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 120" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 500; text-anchor: middle; }
+    .sublabel { font-size: 10px; fill: #a0d0cf; text-anchor: middle; }
+    .arrow { stroke: #51AFAE; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#51AFAE"/>
+    </marker>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Signal User -->
+  <rect x="10" y="30" width="140" height="55" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="80" y="55" class="label">Signal User</text>
+  <text x="80" y="72" class="sublabel">📱 Mobile app</text>
+
+  <!-- Arrow -->
+  <line x1="150" y1="57" x2="195" y2="57" class="arrow"/>
+
+  <!-- Signal Servers -->
+  <rect x="195" y="30" width="150" height="55" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="270" y="55" class="label">Signal Servers</text>
+  <text x="270" y="72" class="sublabel">☁️ E2EE relay</text>
+
+  <!-- Arrow -->
+  <line x1="345" y1="57" x2="390" y2="57" class="arrow"/>
+
+  <!-- signal-cli bridge -->
+  <rect x="390" y="25" width="150" height="65" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="465" y="50" class="label" style="fill: #ffffff;">signal-cli bridge</text>
+  <text x="465" y="67" class="sublabel" style="fill: #c0e8e8;">🏠 Self-hosted</text>
+  <text x="465" y="80" class="sublabel" style="fill: #c0e8e8;">Docker container</text>
+
+  <!-- Arrow -->
+  <line x1="540" y1="57" x2="585" y2="57" class="arrow"/>
+
+  <!-- Llamenos Server -->
+  <rect x="585" y="25" width="105" height="65" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="637" y="50" class="label" style="fill: #ffffff;">Llámenos</text>
+  <text x="637" y="67" class="label" style="fill: #ffffff; font-size: 12px;">Server</text>
+  <text x="637" y="80" class="sublabel" style="fill: #c0e8e8;">HTTP webhooks</text>
+</svg>

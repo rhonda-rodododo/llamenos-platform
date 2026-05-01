@@ -14,12 +14,7 @@ Sinusuportahan ng Llamenos ang Signal messaging sa pamamagitan ng self-hosted na
 
 ## Arkitektura
 
-```mermaid
-flowchart LR
-    User["Signal User"] --> Servers["Signal Servers"]
-    Servers --> Bridge["signal-cli bridge<br/>(self-hosted)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 Ang signal-cli bridge ay tumatakbo sa iyong infrastructure at nagfo-forward ng mga mensahe sa iyong Worker sa pamamagitan ng HTTP webhooks. Ibig sabihin nito, kontrolado mo ang buong daan ng mensahe mula sa Signal hanggang sa iyong application.
 

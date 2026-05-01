@@ -14,12 +14,7 @@ Llamenos एक self-hosted [signal-cli-rest-api](https://github.com/bbernhard/s
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    User["Signal User"] --> Servers["Signal Servers"]
-    Servers --> Bridge["signal-cli bridge<br/>(self-hosted)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 Signal-cli bridge आपके infrastructure पर चलता है और HTTP webhooks के माध्यम से आपके Worker को messages forward करता है। इसका मतलब है कि आप Signal से आपके application तक पूरे message path को control करते हैं।
 

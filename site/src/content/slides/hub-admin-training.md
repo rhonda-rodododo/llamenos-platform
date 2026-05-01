@@ -547,18 +547,9 @@ docker compose exec signal-notifier signal-cli \
 
 Nothing is hardcoded. Your hub template defines everything:
 
-```
-Your template:
-  ├── Entity types (person, incident, location, vehicle...)
-  ├── Report types (arrest_report, intake_form, incident_log...)
-  ├── Custom fields (badge_number, charges, shelter_needed...)
-  ├── Workflow steps (intake → follow-up → closed)
-  └── Role-based field visibility (what each role can see)
-```
+![Hub Configuration Template](/diagrams/hub-config-tree.svg)
 
-```
-Admin dashboard → Settings → Templates → Edit Template
-```
+*Admin dashboard → Settings → Templates → Edit Template*
 
 **Start minimal**: Define only the fields your volunteers actually need during a call. Add fields later as you learn what's useful in practice.
 
@@ -568,18 +559,7 @@ Admin dashboard → Settings → Templates → Edit Template
 
 ## Linking Records: Building a Picture Across Calls
 
-```
-Scenario: Protest incident response
-
-  Incident: [MLK Ave Protest, 2026-05-01]
-    └── Person: [Alice, arrested at 10pm]
-         └── Arrest Report: [Charges: disorderly conduct]
-              └── Note: "Alice confirmed she has an attorney..."
-    └── Person: [Bob, arrested at 10:15pm]
-         └── Arrest Report: [Charges: unlawful assembly]
-    └── Location: [MLK Ave & 5th St]
-    └── Vehicle: [Unmarked gray Ford, plate partial: ...]
-```
+![Incident Record Tree](/diagrams/incident-record-tree.svg)
 
 When multiple calls come in about the same incident, volunteers link to the same incident record. You see the full picture across all calls.
 

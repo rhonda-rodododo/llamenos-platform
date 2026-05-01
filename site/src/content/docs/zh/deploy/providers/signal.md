@@ -14,12 +14,7 @@ Llamenos 通过自托管的 [signal-cli-rest-api](https://github.com/bbernhard/s
 
 ## 架构
 
-```mermaid
-flowchart LR
-    User["Signal User"] --> Servers["Signal Servers"]
-    Servers --> Bridge["signal-cli bridge<br/>(self-hosted)"]
-    Bridge --> Worker["Llamenos Worker<br/>(Cloudflare)"]
-```
+![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
 signal-cli 桥接运行在您的基础设施上，通过 HTTP Webhook 将消息转发到您的 Worker。这意味着您控制着从 Signal 到应用程序的整个消息路径。
 

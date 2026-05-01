@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 600; text-anchor: middle; }
+    .sublabel { font-size: 10px; fill: #a0d0cf; text-anchor: middle; }
+    .arrow { stroke: #51AFAE; stroke-width: 2.5; fill: none; marker-end: url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#51AFAE"/>
+    </marker>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="highlightGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#51AFAE" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#2D9B9B" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Caller -->
+  <rect x="100" y="10" width="200" height="45" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="200" y="30" class="label">📞 Caller dials your number</text>
+  <text x="200" y="46" class="sublabel">PSTN phone call</text>
+
+  <line x1="200" y1="55" x2="200" y2="85" class="arrow"/>
+
+  <!-- SIP trunk -->
+  <rect x="100" y="85" width="200" height="50" class="node" fill="url(#highlightGrad)" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="200" y="108" class="label" style="fill: #fff;">SIP trunk</text>
+  <text x="200" y="125" class="sublabel" style="fill: #c0e8e8;">You control what's logged</text>
+
+  <line x1="200" y1="135" x2="200" y2="165" class="arrow"/>
+
+  <!-- Your server -->
+  <rect x="65" y="165" width="270" height="55" class="node" fill="url(#highlightGrad)" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="200" y="188" class="label" style="fill: #fff;">Your server</text>
+  <text x="200" y="208" class="sublabel" style="fill: #c0e8e8;">Llámenos + SIP bridge</text>
+
+  <line x1="200" y1="220" x2="200" y2="250" class="arrow"/>
+
+  <!-- Parallel ring -->
+  <rect x="60" y="250" width="280" height="50" class="node" fill="url(#highlightGrad)" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="200" y="273" class="label" style="fill: #fff;">Parallel ring</text>
+  <text x="200" y="290" class="sublabel" style="fill: #c0e8e8;">All on-shift volunteers simultaneously</text>
+
+  <line x1="200" y1="300" x2="200" y2="330" class="arrow"/>
+
+  <!-- First pickup -->
+  <rect x="85" y="330" width="230" height="50" class="node" fill="url(#highlightGrad)" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="200" y="353" class="label" style="fill: #fff;">First pickup</text>
+  <text x="200" y="370" class="sublabel" style="fill: #c0e8e8;">Encrypted call session</text>
+
+  <line x1="200" y1="380" x2="200" y2="410" class="arrow"/>
+
+  <!-- Encrypted notes -->
+  <rect x="65" y="410" width="270" height="60" class="node" fill="#51AFAE" fill-opacity="0.3" stroke="#51AFAE" stroke-width="2.5"/>
+  <text x="200" y="435" class="label" style="fill: #fff;">🔒 Encrypted notes</text>
+  <text x="200" y="455" class="sublabel" style="fill: #c0e8e8;">Only volunteer + admins can decrypt</text>
+  <text x="200" y="467" class="sublabel" style="fill: #c0e8e8;">Server cannot read</text>
+
+  <!-- Side annotation -->
+  <text x="370" y="200" style="font-size: 10px; fill: #6b9b9b; text-anchor: start; writing-mode: tb;">Self-hosted · EU-compatible · No public IP</text>
+</svg>

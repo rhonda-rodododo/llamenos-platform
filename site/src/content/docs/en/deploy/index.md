@@ -9,17 +9,7 @@ Get a Llamenos hotline running locally or on a server. Only Docker is required â
 
 When someone calls your hotline number, Llamenos routes the call to all on-shift users simultaneously. The first user to answer gets connected, and the others stop ringing. After the call ends, the user can save encrypted notes about the conversation.
 
-```mermaid
-flowchart TD
-    A["Incoming Call"] --> B{"Shift Active?"}
-    B -->|Yes| C["Ring All On-Shift Users"]
-    B -->|No| D["Ring Fallback Group"]
-    C --> E{"First Pickup"}
-    D --> E
-    E -->|"Answered"| F["Connect Call"]
-    E -->|"No Answer"| G["Voicemail"]
-    F --> H["Save Encrypted Note"]
-```
+![Call Routing](/diagrams/call-routing.svg)
 
 The same routing applies to SMS, WhatsApp, Signal, and other messaging channels â€” they appear in a unified **Conversations** view.
 

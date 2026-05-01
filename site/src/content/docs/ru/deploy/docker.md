@@ -273,14 +273,7 @@ docker compose logs minio
 
 ## Архитектура сервисов
 
-```mermaid
-flowchart TD
-    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
-    Caddy -->|":3000"| App["App<br/>(Node.js)"]
-    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
-    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
-```
+![Docker Architecture](/diagrams/docker-architecture.svg)
 
 ## Следующие шаги
 
@@ -555,20 +548,3 @@ curl -I http://hotline.yourdomain.com
 docker compose ps minio
 docker compose logs minio
 ```
-
-## Архитектура сервисов
-
-```mermaid
-flowchart TD
-    Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
-    Caddy -->|":3000"| App["App<br/>(Node.js)"]
-    App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
-    App -.->|"optional"| Whisper["Whisper<br/>:8080"]
-```
-
-## Следующие шаги
-
-- [Руководство администратора](/docs/admin-guide) — настройка горячей линии
-- [Обзор самостоятельного хостинга](/docs/deploy/self-hosting) — сравнение вариантов развёртывания
-- [Развёртывание в Kubernetes](/docs/deploy/kubernetes) — миграция на Helm

@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 460" fill="none">
+  <style>
+    text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #e8e8e8; }
+    .node { rx: 8; ry: 8; }
+    .label { font-size: 13px; font-weight: 500; text-anchor: middle; }
+    .sublabel { font-size: 10px; fill: #a0d0cf; text-anchor: middle; }
+    .arrow { stroke: #51AFAE; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    .arrow-dash { stroke: #51AFAE; stroke-width: 2; fill: none; stroke-dasharray: 6,4; marker-end: url(#arrowhead); }
+    .port { font-size: 10px; fill: #8ec8c8; text-anchor: middle; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#51AFAE"/>
+    </marker>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D9B9B" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#1a6b6b" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a6b8a" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#2a4a5a" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Internet -->
+  <rect x="265" y="10" width="160" height="40" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="2"/>
+  <text x="345" y="33" class="label">🌐 Internet</text>
+
+  <!-- Arrow to Traefik -->
+  <line x1="345" y1="50" x2="345" y2="80" class="arrow"/>
+  <text x="375" y="70" class="port">:443</text>
+
+  <!-- Traefik -->
+  <rect x="245" y="80" width="200" height="50" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="345" y="103" class="label" style="fill: #fff;">Traefik</text>
+  <text x="345" y="120" class="sublabel" style="fill: #c0e8e8;">TLS termination</text>
+
+  <!-- Arrow to Nginx -->
+  <line x1="345" y1="130" x2="345" y2="160" class="arrow"/>
+  <text x="365" y="150" class="port">:80</text>
+
+  <!-- Nginx -->
+  <rect x="245" y="160" width="200" height="50" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="345" y="183" class="label" style="fill: #fff;">Nginx</text>
+  <text x="345" y="200" class="sublabel" style="fill: #c0e8e8;">Reverse proxy</text>
+
+  <!-- Arrow to App -->
+  <line x1="295" y1="210" x2="200" y2="255" class="arrow"/>
+  <text x="225" y="235" class="port">:3000</text>
+
+  <!-- Arrow to strfry -->
+  <line x1="395" y1="210" x2="490" y2="255" class="arrow"/>
+  <text x="465" y="235" class="port">/nostr</text>
+
+  <!-- App (Bun) -->
+  <rect x="100" y="255" width="200" height="50" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="200" y="278" class="label" style="fill: #fff;">App (Bun)</text>
+  <text x="200" y="295" class="sublabel" style="fill: #c0e8e8;">Hono HTTP server</text>
+
+  <!-- strfry -->
+  <rect x="420" y="255" width="160" height="50" class="node" fill="#51AFAE" fill-opacity="0.25" stroke="#5BC5C5" stroke-width="2.5"/>
+  <text x="500" y="278" class="label" style="fill: #fff;">strfry</text>
+  <text x="500" y="295" class="sublabel" style="fill: #c0e8e8;">Nostr relay</text>
+
+  <!-- Arrow to PostgreSQL -->
+  <line x1="150" y1="305" x2="100" y2="350" class="arrow"/>
+
+  <!-- Arrow to MinIO -->
+  <line x1="250" y1="305" x2="300" y2="350" class="arrow"/>
+
+  <!-- PostgreSQL -->
+  <rect x="15" y="350" width="160" height="50" class="node" fill="url(#dbGrad)" stroke="#6b9ab8" stroke-width="2"/>
+  <text x="95" y="373" class="label">PostgreSQL</text>
+  <text x="95" y="390" class="sublabel">:5432</text>
+
+  <!-- MinIO -->
+  <rect x="220" y="350" width="160" height="50" class="node" fill="url(#dbGrad)" stroke="#6b9ab8" stroke-width="2"/>
+  <text x="300" y="373" class="label">MinIO (S3)</text>
+  <text x="300" y="390" class="sublabel">:9000</text>
+
+  <!-- Optional services -->
+  <line x1="200" y1="305" x2="100" y2="425" class="arrow-dash"/>
+  <rect x="15" y="415" width="170" height="30" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="100" y="435" class="label" style="font-size: 11px;">signal-notifier :3100</text>
+
+  <line x1="200" y1="305" x2="310" y2="425" class="arrow-dash"/>
+  <rect x="230" y="415" width="150" height="30" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="305" y="435" class="label" style="font-size: 11px;">sip-bridge</text>
+
+  <line x1="200" y1="305" x2="510" y2="425" class="arrow-dash"/>
+  <rect x="425" y="415" width="160" height="30" class="node" fill="url(#nodeGrad)" stroke="#51AFAE" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="505" y="435" class="label" style="font-size: 11px;">Whisper :8080</text>
+
+  <!-- Legend -->
+  <line x1="600" y1="425" x2="635" y2="425" stroke="#51AFAE" stroke-width="2" stroke-dasharray="6,4"/>
+  <text x="645" y="429" style="font-size: 10px; fill: #8ec8c8; text-anchor: start;">optional</text>
+</svg>
