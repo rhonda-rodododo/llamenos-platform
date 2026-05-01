@@ -32,11 +32,16 @@ ENV GITHUB_SHA=${GITHUB_SHA}
 WORKDIR /build
 
 # Install dependencies first (layer caching)
+# Copy workspace package.json files so bun can resolve the lockfile.
+# packages/shared and packages/crypto have no package.json — bun's
+# workspace glob skips directories without one, so they don't need stubs.
 COPY package.json bun.lockb ./
-# Strip workspace references — this Dockerfile only builds frontend + server bundle,
-# not the full monorepo. Remove workspaces and let bun resolve fresh.
-RUN bun -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf-8'));delete p.workspaces;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))"
-RUN rm -f bun.lockb && bun install --ignore-scripts
+COPY site/package.json site/
+COPY apps/worker/package.json apps/worker/
+COPY packages/i18n/package.json packages/i18n/
+COPY packages/protocol/package.json packages/protocol/
+COPY packages/test-specs/package.json packages/test-specs/
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy source and workspace packages (Vite aliases resolve to ./packages/*)
 COPY src/ src/
