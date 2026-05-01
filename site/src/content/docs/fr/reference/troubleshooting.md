@@ -16,8 +16,8 @@ Docker Compose valide tous les services au démarrage, même ceux avec profil. S
 ```bash
 # Requis dans .env pour Docker Compose
 PG_PASSWORD=your_postgres_password
-MINIO_ACCESS_KEY=your_minio_access_key
-MINIO_SECRET_KEY=your_minio_secret_key
+S3_ACCESS_KEY=your_s3_access_key
+S3_SECRET_KEY=your_s3_secret_key
 HMAC_SECRET=your_hmac_secret
 ARI_PASSWORD=your_ari_password       # Requis même si vous n'utilisez pas Asterisk
 BRIDGE_SECRET=your_bridge_secret     # Requis même si vous n'utilisez pas Asterisk
@@ -37,7 +37,7 @@ sudo lsof -i :8787
 # Vérifier ce qui utilise le port 5432 (PostgreSQL)
 sudo lsof -i :5432
 
-# Vérifier ce qui utilise le port 9000 (MinIO)
+# Vérifier ce qui utilise le port 9000 (RustFS)
 sudo lsof -i :9000
 ```
 
@@ -65,11 +65,11 @@ docker compose restart strfry
 
 Si le relais ne démarre pas, vérifiez les conflits sur le port 7777 ou les permissions insuffisantes sur le répertoire de données.
 
-### Erreurs de stockage MinIO / S3
+### Erreurs de stockage RustFS / S3
 
-- Vérifiez que `MINIO_ACCESS_KEY` et `MINIO_SECRET_KEY` sont corrects
-- Vérifiez que le conteneur MinIO fonctionne : `docker compose ps minio`
-- Accédez à la console MinIO sur `http://localhost:9001` pour vérifier la création du bucket
+- Vérifiez que `S3_ACCESS_KEY` et `S3_SECRET_KEY` sont corrects
+- Vérifiez que le conteneur RustFS fonctionne : `docker compose ps rustfs`
+- Accédez à la console RustFS sur `http://localhost:9001` pour vérifier la création du bucket
 
 ## Problèmes de déploiement Cloudflare
 

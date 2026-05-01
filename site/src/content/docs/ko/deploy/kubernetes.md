@@ -3,7 +3,7 @@ title: "배포: Kubernetes (Helm)"
 description: 공식 Helm 차트를 사용하여 Kubernetes에 Llamenos를 배포합니다.
 ---
 
-이 가이드는 공식 Helm 차트를 사용하여 Kubernetes 클러스터에 Llamenos를 배포하는 방법을 다룹니다. 차트는 애플리케이션과 선택적 MinIO/Whisper 서비스를 별도의 배포로 관리합니다. PostgreSQL 데이터베이스는 사용자가 제공해야 합니다.
+이 가이드는 공식 Helm 차트를 사용하여 Kubernetes 클러스터에 Llamenos를 배포하는 방법을 다룹니다. 차트는 애플리케이션과 선택적 RustFS/Whisper 서비스를 별도의 배포로 관리합니다. PostgreSQL 데이터베이스는 사용자가 제공해야 합니다.
 
 ## 사전 요구 사항
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -170,18 +170,18 @@ kubectl get ingress llamenos
 
 > **팁**: 프로덕션 환경에서는 `secrets.existingSecret`을 사용하여 External Secrets Operator, Sealed Secrets 또는 Vault로 관리되는 Secret을 참조하세요.
 
-### MinIO
+### RustFS
 
 | 파라미터 | 설명 | 기본값 |
 |----------|------|--------|
-| `minio.enabled` | MinIO 배포 | `true` |
-| `minio.image.repository` | MinIO 이미지 | `minio/minio` |
-| `minio.image.tag` | MinIO 태그 | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | MinIO 데이터 볼륨 | `50Gi` |
-| `minio.persistence.storageClass` | 스토리지 클래스 | `""` |
-| `minio.credentials.accessKey` | MinIO 루트 사용자 | `""` (필수) |
-| `minio.credentials.secretKey` | MinIO 루트 비밀번호 | `""` (필수) |
-| `minio.resources` | CPU/메모리 요청 및 제한 | `{}` |
+| `rustfs.enabled` | RustFS 배포 | `true` |
+| `rustfs.image.repository` | RustFS 이미지 | `rustfs/rustfs` |
+| `rustfs.image.tag` | RustFS 태그 | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | RustFS 데이터 볼륨 | `50Gi` |
+| `rustfs.persistence.storageClass` | 스토리지 클래스 | `""` |
+| `rustfs.credentials.accessKey` | RustFS 루트 사용자 | `""` (필수) |
+| `rustfs.credentials.secretKey` | RustFS 루트 비밀번호 | `""` (필수) |
+| `rustfs.resources` | CPU/메모리 요청 및 제한 | `{}` |
 
 ### Whisper 음성 변환
 
@@ -230,26 +230,26 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=s3-access-key=your_key \
+  --from-literal=s3-secret-key=your_key
 
 # 또는 External Secrets Operator, Sealed Secrets, Vault 등 사용
 ```
 
-## 외부 MinIO 또는 S3 사용
+## 외부 RustFS 또는 S3 사용
 
-이미 MinIO나 S3 호환 서비스가 있다면, 내장 MinIO를 비활성화하고 엔드포인트를 전달하세요:
+이미 RustFS나 S3 호환 서비스가 있다면, 내장 RustFS를 비활성화하고 엔드포인트를 전달하세요:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    S3_ENDPOINT: "https://your-s3.example.com"
+    S3_ACCESS_KEY: "your-key"
+    S3_SECRET_KEY: "your-secret"
+    S3_BUCKET: "llamenos"
 ```
 
 ## GPU 음성 변환
@@ -341,7 +341,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-일반적인 원인: 누락된 시크릿, 잘못된 ADMIN_PUBKEY, PostgreSQL 연결 불가, MinIO 미준비.
+일반적인 원인: 누락된 시크릿, 잘못된 ADMIN_PUBKEY, PostgreSQL 연결 불가, RustFS 미준비.
 
 ### 데이터베이스 연결 오류
 
@@ -420,12 +420,12 @@ spec:
     - secretKey: server-nostr-secret
       remoteRef:
         key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+    - secretKey: s3-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/s3-access-key
+    - secretKey: s3-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/s3-secret-key
 ```
 
 Then reference in Helm values:

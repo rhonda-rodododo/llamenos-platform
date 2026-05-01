@@ -14,11 +14,11 @@ HMAC_SECRET={{ hmac_secret }}
 DATABASE_URL={{ llamenos_database_url }}
 PG_POOL_SIZE={{ pg_pool_size }}
 
-# ─── Object Storage ─────────────────────────────────────────
-MINIO_ENDPOINT={{ llamenos_minio_endpoint }}
-MINIO_ACCESS_KEY={{ minio_access_key }}
-MINIO_SECRET_KEY={{ minio_secret_key }}
-MINIO_BUCKET={{ minio_bucket }}
+# ─── Object Storage (S3-compatible / RustFS) ───────────────
+S3_ENDPOINT={{ llamenos_s3_endpoint }}
+S3_ACCESS_KEY={{ s3_access_key }}
+S3_SECRET_KEY={{ s3_secret_key }}
+S3_BUCKET={{ s3_bucket }}
 
 # ─── Telephony ───────────────────────────────────────────────
 TWILIO_ACCOUNT_SID={{ twilio_account_sid }}

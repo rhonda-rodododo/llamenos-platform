@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO 凭据（请修改默认值！）
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# RustFS 凭据（请修改默认值！）
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **重要**：请为 `PG_PASSWORD`、`MINIO_ACCESS_KEY` 和 `MINIO_SECRET_KEY` 设置强且唯一的密码。
+> **重要**：请为 `PG_PASSWORD`、`S3_ACCESS_KEY` 和 `S3_SECRET_KEY` 设置强且唯一的密码。
 
 ## 4. 配置您的域名
 
@@ -94,7 +94,7 @@ docker compose up -d
 | **app** | Llamenos 应用程序 | 3000（内部） |
 | **postgres** | PostgreSQL 数据库 | 5432（内部） |
 | **caddy** | 反向代理 + TLS | 80, 443 |
-| **minio** | 文件/录音存储 | 9000, 9001（内部） |
+| **rustfs** | 文件/录音存储 | 9000, 9001（内部） |
 
 检查所有服务是否正在运行：
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-您的数据保存在 Docker 卷（`postgres-data`、`minio-data` 等）中，在容器重启和镜像更新时不会丢失。
+您的数据保存在 Docker 卷（`postgres-data`、`rustfs-data` 等）中，在容器重启和镜像更新时不会丢失。
 
 ## 备份
 
@@ -189,15 +189,15 @@ docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### MinIO 存储
+### RustFS 存储
 
-MinIO 存储上传的文件、录音和附件：
+RustFS 存储上传的文件、录音和附件：
 
 ```bash
-# 使用 MinIO 客户端 (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# 使用 RustFS 客户端 (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $S3_ACCESS_KEY $S3_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### 自动备份
@@ -262,13 +262,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### MinIO 连接错误
+### RustFS 连接错误
 
-确保 MinIO 服务在应用程序启动前处于健康状态：
+确保 RustFS 服务在应用程序启动前处于健康状态：
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## 服务架构
@@ -278,7 +278,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 

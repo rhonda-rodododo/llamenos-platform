@@ -16,8 +16,8 @@ Docker Compose validates all services at startup, even profiled ones. If you see
 ```bash
 # Required in .env for Docker Compose
 PG_PASSWORD=your_postgres_password
-MINIO_ACCESS_KEY=your_minio_access_key
-MINIO_SECRET_KEY=your_minio_secret_key
+S3_ACCESS_KEY=your_s3_access_key
+S3_SECRET_KEY=your_s3_secret_key
 HMAC_SECRET=your_hmac_secret
 ARI_PASSWORD=your_ari_password       # Required even if not using Asterisk
 BRIDGE_SECRET=your_bridge_secret     # Required even if not using Asterisk
@@ -37,7 +37,7 @@ sudo lsof -i :8787
 # Check what's using port 5432 (PostgreSQL)
 sudo lsof -i :5432
 
-# Check what's using port 9000 (MinIO)
+# Check what's using port 9000 (RustFS)
 sudo lsof -i :9000
 ```
 
@@ -65,11 +65,11 @@ docker compose restart strfry
 
 If the relay fails to start, check for port 7777 conflicts or insufficient permissions on the data directory.
 
-### MinIO / S3 storage errors
+### RustFS / S3 storage errors
 
-- Verify `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` are correct
-- Check that the MinIO container is running: `docker compose ps minio`
-- Access the MinIO console at `http://localhost:9001` to verify bucket creation
+- Verify `S3_ACCESS_KEY` and `S3_SECRET_KEY` are correct
+- Check that the RustFS container is running: `docker compose ps rustfs`
+- Access the RustFS console at `http://localhost:9001` to verify bucket creation
 
 ## Cloudflare deployment issues
 

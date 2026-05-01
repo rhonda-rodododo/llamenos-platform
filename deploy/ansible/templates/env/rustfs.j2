@@ -1,6 +1,6 @@
-# MinIO Environment — managed by Ansible
+# RustFS Environment — managed by Ansible
 # Do not edit manually; changes will be overwritten on next deploy.
 # Generated: {{ ansible_date_time.iso8601 | default('unknown') }}
 
-MINIO_ROOT_USER={{ minio_access_key }}
-MINIO_ROOT_PASSWORD={{ minio_secret_key }}
+RUSTFS_ROOT_USER={{ s3_access_key }}
+RUSTFS_ROOT_PASSWORD={{ s3_secret_key }}

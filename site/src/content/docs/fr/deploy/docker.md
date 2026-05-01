@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Identifiants MinIO (changez les valeurs par défaut !)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# Identifiants RustFS (changez les valeurs par défaut !)
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Important** : Définissez des mots de passe forts et uniques pour `PG_PASSWORD`, `MINIO_ACCESS_KEY` et `MINIO_SECRET_KEY`.
+> **Important** : Définissez des mots de passe forts et uniques pour `PG_PASSWORD`, `S3_ACCESS_KEY` et `S3_SECRET_KEY`.
 
 ## 4. Configurer votre domaine
 
@@ -94,7 +94,7 @@ Cela démarre quatre services principaux :
 | **app** | Application Llamenos | 3000 (interne) |
 | **postgres** | Base de données PostgreSQL | 5432 (interne) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
-| **minio** | Stockage fichiers/enregistrements | 9000, 9001 (interne) |
+| **rustfs** | Stockage fichiers/enregistrements | 9000, 9001 (interne) |
 
 Vérifiez que tout fonctionne :
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Vos données sont persistées dans les volumes Docker (`postgres-data`, `minio-data`, etc.) et survivent aux redémarrages de conteneurs et aux mises à jour d'images.
+Vos données sont persistées dans les volumes Docker (`postgres-data`, `rustfs-data`, etc.) et survivent aux redémarrages de conteneurs et aux mises à jour d'images.
 
 ## Sauvegardes
 
@@ -189,15 +189,15 @@ Pour restaurer :
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Stockage MinIO
+### Stockage RustFS
 
-MinIO stocke les fichiers téléchargés, les enregistrements et les pièces jointes :
+RustFS stocke les fichiers téléchargés, les enregistrements et les pièces jointes :
 
 ```bash
-# En utilisant le client MinIO (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# En utilisant le client RustFS (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $S3_ACCESS_KEY $S3_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Sauvegardes automatisées
@@ -262,13 +262,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Erreurs de connexion MinIO
+### Erreurs de connexion RustFS
 
-Assurez-vous que le service MinIO est sain avant le démarrage de l'application :
+Assurez-vous que le service RustFS est sain avant le démarrage de l'application :
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Architecture des services
@@ -278,7 +278,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 

@@ -3,7 +3,7 @@ title: "部署：Kubernetes (Helm)"
 description: 使用官方 Helm Chart 将 Llamenos 部署到 Kubernetes。
 ---
 
-本指南介绍如何使用官方 Helm Chart 将 Llamenos 部署到 Kubernetes 集群。Chart 将应用程序和可选的 MinIO/Whisper 服务作为独立部署进行管理。您需要自行提供 PostgreSQL 数据库。
+本指南介绍如何使用官方 Helm Chart 将 Llamenos 部署到 Kubernetes 集群。Chart 将应用程序和可选的 RustFS/Whisper 服务作为独立部署进行管理。您需要自行提供 PostgreSQL 数据库。
 
 ## 前置条件
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -170,18 +170,18 @@ kubectl get ingress llamenos
 
 > **提示**：在生产环境中，使用 `secrets.existingSecret` 引用由 External Secrets Operator、Sealed Secrets 或 Vault 管理的 Secret。
 
-### MinIO
+### RustFS
 
 | 参数 | 描述 | 默认值 |
 |------|------|--------|
-| `minio.enabled` | 部署 MinIO | `true` |
-| `minio.image.repository` | MinIO 镜像 | `minio/minio` |
-| `minio.image.tag` | MinIO 标签 | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | MinIO 数据卷 | `50Gi` |
-| `minio.persistence.storageClass` | 存储类 | `""` |
-| `minio.credentials.accessKey` | MinIO root 用户 | `""`（必填） |
-| `minio.credentials.secretKey` | MinIO root 密码 | `""`（必填） |
-| `minio.resources` | CPU/内存请求和限制 | `{}` |
+| `rustfs.enabled` | 部署 RustFS | `true` |
+| `rustfs.image.repository` | RustFS 镜像 | `rustfs/rustfs` |
+| `rustfs.image.tag` | RustFS 标签 | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | RustFS 数据卷 | `50Gi` |
+| `rustfs.persistence.storageClass` | 存储类 | `""` |
+| `rustfs.credentials.accessKey` | RustFS root 用户 | `""`（必填） |
+| `rustfs.credentials.secretKey` | RustFS root 密码 | `""`（必填） |
+| `rustfs.resources` | CPU/内存请求和限制 | `{}` |
 
 ### Whisper 语音转文字
 
@@ -230,26 +230,26 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=s3-access-key=your_key \
+  --from-literal=s3-secret-key=your_key
 
 # 或使用 External Secrets Operator、Sealed Secrets、Vault 等
 ```
 
-## 使用外部 MinIO 或 S3
+## 使用外部 RustFS 或 S3
 
-如果您已有 MinIO 或兼容 S3 的服务，可以禁用内置 MinIO 并传入端点：
+如果您已有 RustFS 或兼容 S3 的服务，可以禁用内置 RustFS 并传入端点：
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    S3_ENDPOINT: "https://your-s3.example.com"
+    S3_ACCESS_KEY: "your-key"
+    S3_SECRET_KEY: "your-secret"
+    S3_BUCKET: "llamenos"
 ```
 
 ## GPU 语音转文字
@@ -341,7 +341,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-常见原因：缺少密钥、ADMIN_PUBKEY 不正确、无法连接 PostgreSQL、MinIO 未就绪。
+常见原因：缺少密钥、ADMIN_PUBKEY 不正确、无法连接 PostgreSQL、RustFS 未就绪。
 
 ### 数据库连接错误
 
@@ -420,12 +420,12 @@ spec:
     - secretKey: server-nostr-secret
       remoteRef:
         key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+    - secretKey: s3-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/s3-access-key
+    - secretKey: s3-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/s3-secret-key
 ```
 
 Then reference in Helm values:

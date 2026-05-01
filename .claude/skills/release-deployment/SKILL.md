@@ -35,7 +35,7 @@ Required env vars: PG_PASSWORD, SERVER_NOSTR_SECRET (64 hex), HMAC_SECRET, ADMIN
 ## Helm (deploy/helm/)
 - Multi-replica RollingUpdate
 - External PostgreSQL required
-- MinIO for blob storage
+- RustFS for blob storage
 - Optional Whisper sidecar
 
 ## Ansible (deploy/ansible/)

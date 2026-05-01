@@ -224,34 +224,34 @@
             openssl rand -base64 24
         success_msg: "pg_password: [set, {{ pg_password | length }} chars]"
 
-    - name: Assert minio_access_key is set
+    - name: Assert s3_access_key is set
       ansible.builtin.assert:
         that:
-          - minio_access_key is defined
-          - minio_access_key | length > 0
+          - s3_access_key is defined
+          - s3_access_key | length > 0
         fail_msg: |
-          REQUIRED: 'minio_access_key' must be set.
-          
-          Current value: {{ minio_access_key | default('NOT SET') }}
-          
-          To generate:
-            openssl rand -base64 24
-        success_msg: "minio_access_key: [set]"
+          REQUIRED: 's3_access_key' must be set.
 
-    - name: Assert minio_secret_key meets minimum length
-      ansible.builtin.assert:
-        that:
-          - minio_secret_key is defined
-          - minio_secret_key | length >= 16
-        fail_msg: |
-          REQUIRED: 'minio_secret_key' must be at least 16 characters long.
-          
-          Current value: {{ minio_secret_key | default('NOT SET') }}
-          Length: {{ minio_secret_key | default('') | length }} chars (expected: >= 16)
-          
+          Current value: {{ s3_access_key | default('NOT SET') }}
+
           To generate:
             openssl rand -base64 24
-        success_msg: "minio_secret_key: [set, {{ minio_secret_key | length }} chars]"
+        success_msg: "s3_access_key: [set]"
+
+    - name: Assert s3_secret_key meets minimum length
+      ansible.builtin.assert:
+        that:
+          - s3_secret_key is defined
+          - s3_secret_key | length >= 16
+        fail_msg: |
+          REQUIRED: 's3_secret_key' must be at least 16 characters long.
+
+          Current value: {{ s3_secret_key | default('NOT SET') }}
+          Length: {{ s3_secret_key | default('') | length }} chars (expected: >= 16)
+
+          To generate:
+            openssl rand -base64 24
+        success_msg: "s3_secret_key: [set, {{ s3_secret_key | length }} chars]"
 
     - name: Assert bridge_secret is set when Asterisk is enabled
       ansible.builtin.assert:
@@ -313,8 +313,8 @@
           Admin Pubkey: {{ admin_pubkey[:16] }}...
           Server Nostr Secret: {{ server_nostr_secret[:8] }}...
           PostgreSQL Password: [set, {{ pg_password | length }} chars]
-          MinIO Access Key: [set]
-          MinIO Secret Key: [set, {{ minio_secret_key | length }} chars]
+          S3 Access Key: [set]
+          S3 Secret Key: [set, {{ s3_secret_key | length }} chars]
           HMAC Secret: [set, {{ hmac_secret | length }} chars]
           Backup Encryption: {{ 'ENABLED' if backup_age_public_key | default('') | length > 0 else 'DISABLED (set backup_age_public_key to enable)' }}
           ===========================================

@@ -80,7 +80,7 @@ docker compose exec app curl -sf http://localhost:3000/api/health
 
 After rotation, re-add banned phone numbers through the admin UI so they are hashed with the new secret.
 
-### 1.3 MinIO Credentials Rotation
+### 1.3 RustFS Credentials Rotation
 
 **Frequency**: Annually, or after suspected compromise.
 
@@ -91,18 +91,18 @@ cd /opt/llamenos/deploy/docker
 NEW_ACCESS_KEY=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9' | head -c 20)
 NEW_SECRET_KEY=$(openssl rand -base64 24)
 
-# 2. Update MinIO credentials via mc (MinIO client)
-docker compose exec minio mc alias set local http://localhost:9000 \
-  "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"
-docker compose exec minio mc admin user svcacct add local "${NEW_ACCESS_KEY}" \
+# 2. Update RustFS credentials via mc (RustFS client)
+docker compose exec rustfs mc alias set local http://localhost:9000 \
+  "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}"
+docker compose exec rustfs mc admin user svcacct add local "${NEW_ACCESS_KEY}" \
   --secret-key "${NEW_SECRET_KEY}"
 
 # 3. Update .env with new credentials
-sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=${NEW_ACCESS_KEY}|" .env
-sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=${NEW_SECRET_KEY}|" .env
+sed -i "s|^S3_ACCESS_KEY=.*|S3_ACCESS_KEY=${NEW_ACCESS_KEY}|" .env
+sed -i "s|^S3_SECRET_KEY=.*|S3_SECRET_KEY=${NEW_SECRET_KEY}|" .env
 
-# 4. Restart both MinIO and the app
-docker compose restart minio app
+# 4. Restart both RustFS and the app
+docker compose restart rustfs app
 
 # 5. Verify
 docker compose exec app curl -sf http://localhost:3000/api/health
@@ -425,20 +425,20 @@ docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
 
 **Note**: If all events are ephemeral (kind 20001), the relay database is small and contains only relay state — not user data. Backup is recommended but not critical.
 
-### 4.6 MinIO Blob Backup
+### 4.6 RustFS Blob Backup
 
-MinIO stores uploaded files (encrypted reports, IVR audio). Back it up separately:
+RustFS stores uploaded files (encrypted reports, IVR audio). Back it up separately:
 
 ```bash
-# Install MinIO client if needed
-docker compose exec minio mc alias set local http://localhost:9000 \
-  "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
+# Install RustFS client if needed
+docker compose exec rustfs mc alias set local http://localhost:9000 \
+  "$S3_ACCESS_KEY" "$S3_SECRET_KEY"
 
 # Mirror to local directory
-docker compose exec minio mc mirror local/llamenos-files /tmp/minio-backup/
+docker compose exec rustfs mc mirror local/llamenos-files /tmp/rustfs-backup/
 
 # Or use rclone for remote backup
-# rclone sync minio:llamenos-files remote:llamenos-minio-backup/
+# rclone sync rustfs:llamenos-files remote:llamenos-rustfs-backup/
 ```
 
 ---
@@ -533,7 +533,7 @@ This is the most severe account compromise scenario.
    sed -i "s|^ADMIN_PUBKEY=.*|ADMIN_PUBKEY=<new_pubkey>|" .env
    ```
 
-4. Rotate all secrets (database, HMAC, MinIO, telephony).
+4. Rotate all secrets (database, HMAC, RustFS, telephony).
 
 5. Restart the application:
    ```bash
@@ -557,7 +557,7 @@ The VPS itself has been compromised (SSH breach, container escape, provider-leve
 3. **Rotate ALL secrets**:
    - Database password
    - HMAC secret
-   - MinIO credentials
+   - RustFS credentials
    - Twilio/telephony credentials
    - Asterisk credentials (if applicable)
    - SSH keys (generate new key pairs for the new server)
@@ -717,7 +717,7 @@ docker compose exec postgres pg_isready -U llamenos
 | `ADMIN_PUBKEY is required` | Missing admin key | Run `bun run bootstrap-admin` and set the key |
 | `HMAC_SECRET is required` | Missing HMAC secret | Generate with `openssl rand -hex 32` |
 | `Connection refused` (postgres) | Database not ready | Wait for postgres health check; check `docker compose ps` |
-| `ECONNREFUSED` (minio) | MinIO not ready | Wait for MinIO health check |
+| `ECONNREFUSED` (minio) | RustFS not ready | Wait for RustFS health check |
 | `out of memory` | Insufficient RAM | Increase VPS RAM or reduce `PG_POOL_SIZE` |
 
 ### 7.2 Caddy Returns 502 Bad Gateway
@@ -796,8 +796,8 @@ docker compose exec app curl -v http://localhost:3000/api/health
 # If database connection is failing
 docker compose exec postgres pg_isready -U llamenos
 
-# If MinIO is failing
-docker compose exec minio mc ready local
+# If RustFS is failing
+docker compose exec rustfs curl -f http://localhost:9000/health
 ```
 
 ### 7.6 Docker Image Build Fails
@@ -969,7 +969,7 @@ If you need to rebuild from scratch (server unrecoverable, no trust in existing 
 
 # 1. Follow the Quick Start Guide sections 1-4
 # 2. Restore database from off-site backup
-# 3. Restore MinIO blobs from off-site backup
+# 3. Restore RustFS blobs from off-site backup
 # 4. Generate new admin keypair (bun run bootstrap-admin)
 # 5. Rotate ALL secrets
 # 6. Update DNS to point to new server

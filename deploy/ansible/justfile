@@ -80,9 +80,9 @@ deploy-postgres *ARGS:
 deploy-caddy *ARGS:
     ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags caddy {{ARGS}}
 
-# Deploy only MinIO object storage
-deploy-minio *ARGS:
-    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags minio {{ARGS}}
+# Deploy only RustFS object storage
+deploy-rustfs *ARGS:
+    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags rustfs {{ARGS}}
 
 # Deploy only strfry Nostr relay
 deploy-strfry *ARGS:
@@ -108,11 +108,11 @@ migrate *ARGS:
 
 # ── Backup ──────────────────────────────────────────────────────
 
-# Run all backups (postgres, strfry, minio, config) with monitoring
+# Run all backups (postgres, strfry, rustfs, config) with monitoring
 backup *ARGS:
     ansible-playbook playbooks/backup.yml --ask-vault-pass {{ARGS}}
 
-# Run backup for a specific service only (postgres, strfry, minio, config)
+# Run backup for a specific service only (postgres, strfry, rustfs, config)
 backup-service SERVICE *ARGS:
     ansible-playbook playbooks/backup.yml --ask-vault-pass --tags {{SERVICE}} {{ARGS}}
 
@@ -276,8 +276,8 @@ generate-secrets:
     echo ""
     echo "pg_password: $(openssl rand -base64 24)"
     echo "hmac_secret: $(openssl rand -hex 32)"
-    echo "minio_access_key: $(openssl rand -base64 24)"
-    echo "minio_secret_key: $(openssl rand -base64 24)"
+    echo "s3_access_key: $(openssl rand -base64 24)"
+    echo "s3_secret_key: $(openssl rand -base64 24)"
     echo "server_nostr_secret: $(openssl rand -hex 32)"
     echo "ari_password: $(openssl rand -base64 24)"
     echo "bridge_secret: $(openssl rand -base64 24)"

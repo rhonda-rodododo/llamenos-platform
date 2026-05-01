@@ -74,7 +74,7 @@ The Docker setup starts these core services:
 | **app** | Llamenos application (Bun) | 3000 (internal) |
 | **postgres** | PostgreSQL database | 5432 (internal) |
 | **caddy** | Reverse proxy + automatic TLS | 8000 (local), 80/443 (production) |
-| **minio** | S3-compatible file storage | 9000 (internal) |
+| **rustfs** | S3-compatible file storage | 9000 (internal) |
 | **strfry** | Nostr relay for real-time events | 7777 (internal) |
 
 Optional profiles add: signal-notifier sidecar, sip-bridge (Asterisk/FreeSWITCH/Kamailio), Ollama/vLLM inference, Prometheus monitoring.

@@ -16,8 +16,8 @@ Docker Compose validiert alle Dienste beim Start, auch profilierte. Wenn Sie Feh
 ```bash
 # Erforderlich in .env fuer Docker Compose
 PG_PASSWORD=ihr_postgres_passwort
-MINIO_ACCESS_KEY=ihr_minio_zugangsschluessel
-MINIO_SECRET_KEY=ihr_minio_geheimschluessel
+S3_ACCESS_KEY=ihr_s3_zugangsschluessel
+S3_SECRET_KEY=ihr_s3_geheimschluessel
 HMAC_SECRET=ihr_hmac_geheimnis
 ARI_PASSWORD=ihr_ari_passwort       # Erforderlich auch ohne Asterisk
 BRIDGE_SECRET=ihr_bridge_geheimnis  # Erforderlich auch ohne Asterisk
@@ -37,7 +37,7 @@ sudo lsof -i :8787
 # Pruefen, was Port 5432 verwendet (PostgreSQL)
 sudo lsof -i :5432
 
-# Pruefen, was Port 9000 verwendet (MinIO)
+# Pruefen, was Port 9000 verwendet (RustFS)
 sudo lsof -i :9000
 ```
 
@@ -65,11 +65,11 @@ docker compose restart strfry
 
 Wenn das Relay nicht startet, pruefen Sie auf Konflikte an Port 7777 oder unzureichende Berechtigungen im Datenverzeichnis.
 
-### MinIO / S3-Speicherfehler
+### RustFS / S3-Speicherfehler
 
-- Ueberpruefen Sie, ob `MINIO_ACCESS_KEY` und `MINIO_SECRET_KEY` korrekt sind
-- Pruefen Sie, ob der MinIO-Container laeuft: `docker compose ps minio`
-- Greifen Sie auf die MinIO-Konsole unter `http://localhost:9001` zu, um die Bucket-Erstellung zu ueberpruefen
+- Ueberpruefen Sie, ob `S3_ACCESS_KEY` und `S3_SECRET_KEY` korrekt sind
+- Pruefen Sie, ob der RustFS-Container laeuft: `docker compose ps rustfs`
+- Greifen Sie auf die RustFS-Konsole unter `http://localhost:9001` zu, um die Bucket-Erstellung zu ueberpruefen
 
 ## Cloudflare-Bereitstellungsprobleme
 

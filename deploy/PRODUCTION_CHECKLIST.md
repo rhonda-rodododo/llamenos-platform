@@ -19,7 +19,7 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] `PG_PASSWORD` is cryptographically random (≥24 chars)
 - [ ] `HMAC_SECRET` is 64 hex chars (`openssl rand -hex 32`)
 - [ ] `SERVER_NOSTR_SECRET` is 64 hex chars
-- [ ] `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` are unique
+- [ ] `S3_ACCESS_KEY` and `S3_SECRET_KEY` are unique
 - [ ] `ADMIN_PUBKEY` set to real admin's Nostr pubkey
 - [ ] `DOMAIN` set to actual production domain
 - [ ] `ACME_EMAIL` set for Let's Encrypt notifications
@@ -85,7 +85,7 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] Secrets stored in Kubernetes Secrets (not values.yaml)
 - [ ] PodDisruptionBudget configured for app and strfry
 - [ ] Resource limits set for all containers
-- [ ] MinIO uses StatefulSet (not Deployment)
+- [ ] RustFS uses StatefulSet (not Deployment)
 - [ ] Liveness probe: `/api/health/live`
 - [ ] Readiness probe: `/api/health/ready`
 - [ ] NetworkPolicy restricts pod-to-pod traffic

@@ -183,7 +183,7 @@ docs/
 **Always use dev compose (backing services) + `bun run dev:server` (app with file watching):**
 
 ```bash
-# 1. Start backing services (PostgreSQL, MinIO, strfry)
+# 1. Start backing services (PostgreSQL, RustFS, strfry)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # Optional profiles: --profile signal  --profile telephony  --profile inference  --profile monitoring

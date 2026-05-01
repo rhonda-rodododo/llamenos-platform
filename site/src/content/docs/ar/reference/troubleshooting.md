@@ -16,8 +16,8 @@ description: حلول للمشاكل الشائعة مع النشر، تطبيق
 ```bash
 # مطلوب في .env لـ Docker Compose
 PG_PASSWORD=your_postgres_password
-MINIO_ACCESS_KEY=your_minio_access_key
-MINIO_SECRET_KEY=your_minio_secret_key
+S3_ACCESS_KEY=your_s3_access_key
+S3_SECRET_KEY=your_s3_secret_key
 HMAC_SECRET=your_hmac_secret
 ARI_PASSWORD=your_ari_password       # مطلوب حتى لو لم تستخدم Asterisk
 BRIDGE_SECRET=your_bridge_secret     # مطلوب حتى لو لم تستخدم Asterisk
@@ -37,7 +37,7 @@ sudo lsof -i :8787
 # تحقق مما يستخدم المنفذ 5432 (PostgreSQL)
 sudo lsof -i :5432
 
-# تحقق مما يستخدم المنفذ 9000 (MinIO)
+# تحقق مما يستخدم المنفذ 9000 (RustFS)
 sudo lsof -i :9000
 ```
 
@@ -65,11 +65,11 @@ docker compose restart strfry
 
 إذا فشل المرحّل في البدء، تحقق من تعارضات المنفذ 7777 أو صلاحيات غير كافية على مجلد البيانات.
 
-### أخطاء تخزين MinIO / S3
+### أخطاء تخزين RustFS / S3
 
-- تحقق من صحة `MINIO_ACCESS_KEY` و `MINIO_SECRET_KEY`
-- تحقق من أن حاوية MinIO تعمل: `docker compose ps minio`
-- ادخل إلى وحدة تحكم MinIO على `http://localhost:9001` للتحقق من إنشاء الحاوية
+- تحقق من صحة `S3_ACCESS_KEY` و `S3_SECRET_KEY`
+- تحقق من أن حاوية RustFS تعمل: `docker compose ps rustfs`
+- ادخل إلى وحدة تحكم RustFS على `http://localhost:9001` للتحقق من إنشاء الحاوية
 
 ## مشاكل نشر Cloudflare
 

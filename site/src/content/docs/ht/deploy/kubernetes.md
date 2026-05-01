@@ -3,7 +3,7 @@ title: "Depoze: Kubernetes (Helm)"
 description: Depoze Llamenos nan Kubernetes lè l sèvi ak chèt Helm ofisyèl la.
 ---
 
-Gid sa a kouvri depoze Llamenos nan yon klastè Kubernetes lè l sèvi ak chèt Helm ofisyèl la. Chèt la jere aplikasyon an ak sèvis MinIO/Whisper opsyonèl kòm depoze separe. Ou mete yon baz done PostgreSQL.
+Gid sa a kouvri depoze Llamenos nan yon klastè Kubernetes lè l sèvi ak chèt Helm ofisyèl la. Chèt la jere aplikasyon an ak sèvis RustFS/Whisper opsyonèl kòm depoze separe. Ou mete yon baz done PostgreSQL.
 
 ## Prérequi
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -170,18 +170,18 @@ Ouvri `https://hotline.yourdomain.com` nan navigatè ou a. Konekte ak nsec admin
 
 > **Konsèy**: Pou pwodiksyon, itilize `secrets.existingSecret` pou refere yon Sekrè jere pa External Secrets Operator, Sealed Secrets, oswa Vault.
 
-### MinIO
+### RustFS
 
 | Paramèt | Deskripsyon | Default |
 |-----------|-------------|---------|
-| `minio.enabled` | Depoze MinIO | `true` |
-| `minio.image.repository` | Imaj MinIO | `minio/minio` |
-| `minio.image.tag` | Tag MinIO | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | Volim done MinIO | `50Gi` |
-| `minio.persistence.storageClass` | Klas depo | `""` |
-| `minio.credentials.accessKey` | Itilizatè rasin MinIO | `""` (obligatwa) |
-| `minio.credentials.secretKey` | Modpas rasin MinIO | `""` (obligatwa) |
-| `minio.resources` | Demann ak limit CPU/memwa | `{}` |
+| `rustfs.enabled` | Depoze RustFS | `true` |
+| `rustfs.image.repository` | Imaj RustFS | `rustfs/rustfs` |
+| `rustfs.image.tag` | Tag RustFS | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | Volim done RustFS | `50Gi` |
+| `rustfs.persistence.storageClass` | Klas depo | `""` |
+| `rustfs.credentials.accessKey` | Itilizatè rasin RustFS | `""` (obligatwa) |
+| `rustfs.credentials.secretKey` | Modpas rasin RustFS | `""` (obligatwa) |
+| `rustfs.resources` | Demann ak limit CPU/memwa | `{}` |
 
 ### Trankskripsyon Whisper
 
@@ -230,26 +230,26 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=s3-access-key=your_key \
+  --from-literal=s3-secret-key=your_key
 
 # Oswa ak External Secrets Operator, Sealed Secrets, Vault, elatriye
 ```
 
-## Itilize MinIO oswa S3 ekstèn
+## Itilize RustFS oswa S3 ekstèn
 
-Si ou deja gen MinIO oswa yon sèvis ki konpatib ak S3, deaktive MinIO entegre a epi pase pwen final la:
+Si ou deja gen RustFS oswa yon sèvis ki konpatib ak S3, deaktive RustFS entegre a epi pase pwen final la:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    S3_ENDPOINT: "https://your-s3.example.com"
+    S3_ACCESS_KEY: "your-key"
+    S3_SECRET_KEY: "your-secret"
+    S3_BUCKET: "llamenos"
 ```
 
 ## Trankskripsyon GPU
@@ -341,7 +341,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Kòz komen: sekrè ki manke, ADMIN_PUBKEY enkòrèk, PostgreSQL pa ateyab, MinIO pa pare.
+Kòz komen: sekrè ki manke, ADMIN_PUBKEY enkòrèk, PostgreSQL pa ateyab, RustFS pa pare.
 
 ### Erè koneksyon baz done
 
@@ -420,12 +420,12 @@ spec:
     - secretKey: server-nostr-secret
       remoteRef:
         key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+    - secretKey: s3-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/s3-access-key
+    - secretKey: s3-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/s3-secret-key
 ```
 
 Then reference in Helm values:

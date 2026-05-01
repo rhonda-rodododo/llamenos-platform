@@ -49,7 +49,7 @@ All deployment targets run these core services:
 |-----------|---------|
 | **Bun application** | Hono API server + static file serving |
 | **PostgreSQL** | Primary database |
-| **MinIO** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **RustFS** | S3-compatible blob storage (voicemail, attachments, exports) |
 | **strfry** | Nostr relay for real-time events (always required) |
 | **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
@@ -98,7 +98,7 @@ Self-hosting gives you more control but also more responsibility:
 - **Network security**: Use a firewall. Only ports 80/443 should be publicly accessible.
 - **Secrets**: Never put secrets in Docker Compose files or version control. Use `.env` files (gitignored) or Docker/Kubernetes secrets.
 - **Updates**: Pull new images regularly. Watch the changelog for security fixes.
-- **Backups**: Back up the PostgreSQL database and MinIO storage regularly.
+- **Backups**: Back up the PostgreSQL database and RustFS storage regularly.
 
 ## Ansible playbooks
 

@@ -225,7 +225,7 @@ export const home: Record<string, {
             {
               icon: icons.docker,
               title: 'Docker Compose',
-              description: 'Single-server deployment in minutes. PostgreSQL, MinIO, strfry Nostr relay, and all sidecars included.',
+              description: 'Single-server deployment in minutes. PostgreSQL, RustFS, strfry Nostr relay, and all sidecars included.',
             },
             {
               icon: icons.gear,

@@ -6,7 +6,7 @@
  *   bunx playwright test tests/screenshots.spec.ts --project=chromium --workers=1
  *
  * Prerequisites:
- *   - Docker Compose dev stack running (PostgreSQL, MinIO, strfry)
+ *   - Docker Compose dev stack running (PostgreSQL, RustFS, strfry)
  *   - bun run dev:server running (backend on :3000)
  *   - PLAYWRIGHT_TEST=true build served on :8788 (handled by playwright webServer)
  */

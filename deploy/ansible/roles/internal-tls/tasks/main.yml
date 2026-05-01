@@ -2,7 +2,7 @@
 # Internal TLS role
 #
 # Generates a deployment-local CA and per-host certificates for
-# cross-host service communication (PostgreSQL, MinIO, strfry).
+# cross-host service communication (PostgreSQL, RustFS, strfry).
 # Only runs when llamenos_internal_tls_enabled is true.
 
 - name: Skip if internal TLS not enabled

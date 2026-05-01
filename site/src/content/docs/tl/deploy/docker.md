@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# MinIO credentials (palitan ang mga default!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# RustFS credentials (palitan ang mga default!)
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Mahalaga**: Magtakda ng matibay at natatanging mga password para sa `PG_PASSWORD`, `MINIO_ACCESS_KEY`, at `MINIO_SECRET_KEY`.
+> **Mahalaga**: Magtakda ng matibay at natatanging mga password para sa `PG_PASSWORD`, `S3_ACCESS_KEY`, at `S3_SECRET_KEY`.
 
 ## 4. I-configure ang iyong domain
 
@@ -94,7 +94,7 @@ Magsisimula ito ng apat na pangunahing serbisyo:
 | **app** | Llamenos application | 3000 (internal) |
 | **postgres** | PostgreSQL database | 5432 (internal) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
-| **minio** | File/recording storage | 9000, 9001 (internal) |
+| **rustfs** | File/recording storage | 9000, 9001 (internal) |
 
 Suriin kung gumagana ang lahat:
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Ang iyong data ay naka-persist sa Docker volumes (`postgres-data`, `minio-data`, atbp.) at mananatili sa container restarts at image updates.
+Ang iyong data ay naka-persist sa Docker volumes (`postgres-data`, `rustfs-data`, atbp.) at mananatili sa container restarts at image updates.
 
 ## Mga backup
 
@@ -189,15 +189,15 @@ Para i-restore:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### MinIO storage
+### RustFS storage
 
-Iniimbak ng MinIO ang mga na-upload na file, recording, at attachment:
+Iniimbak ng RustFS ang mga na-upload na file, recording, at attachment:
 
 ```bash
-# Gamit ang MinIO client (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Gamit ang RustFS client (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $S3_ACCESS_KEY $S3_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Automated backups
@@ -262,13 +262,13 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Mga MinIO connection error
+### Mga RustFS connection error
 
-Siguraduhing healthy ang MinIO service bago magsimula ang app:
+Siguraduhing healthy ang RustFS service bago magsimula ang app:
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Arkitektura ng serbisyo
@@ -278,7 +278,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 

@@ -25,14 +25,14 @@
         5432
       {%- endif -%}
 
-- name: Determine MinIO connection target
+- name: Determine S3 object storage connection target
   ansible.builtin.set_fact:
-    llamenos_minio_endpoint: >-
+    llamenos_s3_endpoint: >-
       {%- if groups.get('llamenos_storage', []) | length > 0 and
              inventory_hostname not in groups.get('llamenos_storage', []) -%}
-        http://{{ hostvars[groups['llamenos_storage'][0]]['ansible_host'] }}:{{ llamenos_minio_port | default('9000') }}
+        http://{{ hostvars[groups['llamenos_storage'][0]]['ansible_host'] }}:{{ llamenos_rustfs_port | default('9000') }}
       {%- else -%}
-        http://minio:9000
+        http://rustfs:9000
       {%- endif -%}
 
 - name: Determine strfry relay connection target

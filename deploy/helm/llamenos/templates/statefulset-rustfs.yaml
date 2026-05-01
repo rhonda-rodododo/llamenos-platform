@@ -1,27 +1,27 @@
-{{- if .Values.minio.enabled }}
+{{- if .Values.rustfs.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "llamenos.fullname" . }}-minio
+  name: {{ include "llamenos.fullname" . }}-rustfs
   labels:
     {{- include "llamenos.labels" . | nindent 4 }}
-    app.kubernetes.io/component: minio
+    app.kubernetes.io/component: rustfs
 spec:
-  serviceName: {{ include "llamenos.fullname" . }}-minio
+  serviceName: {{ include "llamenos.fullname" . }}-rustfs
   replicas: 1
   selector:
     matchLabels:
       {{- include "llamenos.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: minio
+      app.kubernetes.io/component: rustfs
   template:
     metadata:
       labels:
         {{- include "llamenos.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: minio
+        app.kubernetes.io/component: rustfs
     spec:
       containers:
-        - name: minio
-          image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+        - name: rustfs
+          image: "{{ .Values.rustfs.image.repository }}:{{ .Values.rustfs.image.tag }}"
           args: ["server", "/data", "--console-address", ":9001"]
           ports:
             - containerPort: 9000
@@ -29,29 +29,29 @@ spec:
             - containerPort: 9001
               name: console
           env:
-            - name: MINIO_ROOT_USER
+            - name: RUSTFS_ROOT_USER
               valueFrom:
                 secretKeyRef:
                   name: {{ include "llamenos.secretName" . }}
-                  key: minio-access-key
-            - name: MINIO_ROOT_PASSWORD
+                  key: s3-access-key
+            - name: RUSTFS_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "llamenos.secretName" . }}
-                  key: minio-secret-key
+                  key: s3-secret-key
           livenessProbe:
             httpGet:
-              path: /minio/health/live
+              path: /health
               port: api
             initialDelaySeconds: 10
             periodSeconds: 15
           readinessProbe:
             httpGet:
-              path: /minio/health/ready
+              path: /health
               port: api
             initialDelaySeconds: 10
             periodSeconds: 10
-          {{- with .Values.minio.resources }}
+          {{- with .Values.rustfs.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -63,24 +63,24 @@ spec:
         name: data
         labels:
           {{- include "llamenos.labels" . | nindent 10 }}
-          app.kubernetes.io/component: minio
+          app.kubernetes.io/component: rustfs
       spec:
         accessModes:
           - ReadWriteOnce
-        {{- if .Values.minio.persistence.storageClass }}
-        storageClassName: {{ .Values.minio.persistence.storageClass | quote }}
+        {{- if .Values.rustfs.persistence.storageClass }}
+        storageClassName: {{ .Values.rustfs.persistence.storageClass | quote }}
         {{- end }}
         resources:
           requests:
-            storage: {{ .Values.minio.persistence.size }}
+            storage: {{ .Values.rustfs.persistence.size }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "llamenos.fullname" . }}-minio
+  name: {{ include "llamenos.fullname" . }}-rustfs
   labels:
     {{- include "llamenos.labels" . | nindent 4 }}
-    app.kubernetes.io/component: minio
+    app.kubernetes.io/component: rustfs
 spec:
   type: ClusterIP
   ports:
@@ -92,5 +92,5 @@ spec:
       name: console
   selector:
     {{- include "llamenos.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: minio
+    app.kubernetes.io/component: rustfs
 {{- end }}

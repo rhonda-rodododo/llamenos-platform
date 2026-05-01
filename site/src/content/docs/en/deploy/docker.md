@@ -55,7 +55,7 @@ Edit `.env` and fill in the required secrets:
 # Hex secrets (HMAC_SECRET, SERVER_NOSTR_SECRET):
 openssl rand -hex 32
 
-# Passwords (PG_PASSWORD, MINIO_ACCESS_KEY, MINIO_SECRET_KEY):
+# Passwords (PG_PASSWORD, S3_ACCESS_KEY, S3_SECRET_KEY):
 openssl rand -base64 24
 ```
 
@@ -89,7 +89,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 | **app** | Llamenos application (Bun + Hono) | 3000 (internal) |
 | **postgres** | PostgreSQL database | 5432 (internal) |
 | **caddy** | Reverse proxy + automatic TLS | 8000 (local), 80/443 (production) |
-| **minio** | S3-compatible file storage | 9000 (internal) |
+| **rustfs** | S3-compatible file storage | 9000 (internal) |
 | **strfry** | Nostr relay for real-time events | 7777 (internal) |
 
 ## Optional profiles
@@ -171,7 +171,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml build
 docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 ```
 
-Data persists in Docker volumes (`postgres-data`, `minio-data`, etc.) across restarts and rebuilds.
+Data persists in Docker volumes (`postgres-data`, `rustfs-data`, etc.) across restarts and rebuilds.
 
 ## Backups
 
@@ -240,7 +240,7 @@ flowchart TD
     Caddy -->|":3000"| App["App (Bun)"]
     Caddy -->|"/nostr"| Strfry["strfry (Nostr relay)"]
     App --> PostgreSQL[("PostgreSQL")]
-    App --> MinIO[("MinIO (S3)")]
+    App --> RustFS[("RustFS (S3)")]
     App -.->|"--profile signal"| SignalNotifier["signal-notifier :3100"]
     App -.->|"--profile telephony"| SipBridge["sip-bridge"]
 ```

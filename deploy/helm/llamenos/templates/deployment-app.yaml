@@ -81,21 +81,21 @@ spec:
                   name: {{ include "llamenos.secretName" . }}
                   key: twilio-phone-number
                   optional: true
-            {{- if .Values.minio.enabled }}
-            - name: MINIO_ENDPOINT
-              value: "http://{{ include "llamenos.fullname" . }}-minio:9000"
-            - name: MINIO_ACCESS_KEY
+            {{- if .Values.rustfs.enabled }}
+            - name: S3_ENDPOINT
+              value: "http://{{ include "llamenos.fullname" . }}-rustfs:9000"
+            - name: S3_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "llamenos.secretName" . }}
-                  key: minio-access-key
-            - name: MINIO_SECRET_KEY
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "llamenos.secretName" . }}
-                  key: minio-secret-key
-            - name: MINIO_BUCKET
-              value: {{ .Values.minio.bucket | quote }}
+                  key: s3-secret-key
+            - name: S3_BUCKET
+              value: {{ .Values.rustfs.bucket | quote }}
             {{- end }}
             {{- if .Values.whisper.enabled }}
             - name: WHISPER_URL

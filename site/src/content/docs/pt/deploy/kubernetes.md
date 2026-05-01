@@ -3,7 +3,7 @@ title: "Implantar: Kubernetes (Helm)"
 description: Implante o Llamenos no Kubernetes usando o chart oficial do Helm.
 ---
 
-Este guia abrange a implantacao do Llamenos em um cluster Kubernetes usando o chart oficial do Helm. O chart gerencia o aplicativo e servicos opcionais de MinIO/Whisper como deployments separados. Voce fornece o banco de dados PostgreSQL.
+Este guia abrange a implantacao do Llamenos em um cluster Kubernetes usando o chart oficial do Helm. O chart gerencia o aplicativo e servicos opcionais de RustFS/Whisper como deployments separados. Voce fornece o banco de dados PostgreSQL.
 
 ## Pre-requisitos
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -170,18 +170,18 @@ Abra `https://hotline.seudominio.com` no seu navegador. Faca login com o nsec de
 
 > **Dica**: Para producao, use `secrets.existingSecret` para referenciar um Secret gerenciado pelo External Secrets Operator, Sealed Secrets ou Vault.
 
-### MinIO
+### RustFS
 
 | Parametro | Descricao | Padrao |
 |-----------|-----------|--------|
-| `minio.enabled` | Implantar MinIO | `true` |
-| `minio.image.repository` | Imagem do MinIO | `minio/minio` |
-| `minio.image.tag` | Tag do MinIO | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | Volume de dados do MinIO | `50Gi` |
-| `minio.persistence.storageClass` | Classe de armazenamento | `""` |
-| `minio.credentials.accessKey` | Usuario root do MinIO | `""` (obrigatorio) |
-| `minio.credentials.secretKey` | Senha root do MinIO | `""` (obrigatorio) |
-| `minio.resources` | Requests e limits de CPU/memoria | `{}` |
+| `rustfs.enabled` | Implantar RustFS | `true` |
+| `rustfs.image.repository` | Imagem do RustFS | `rustfs/rustfs` |
+| `rustfs.image.tag` | Tag do RustFS | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | Volume de dados do RustFS | `50Gi` |
+| `rustfs.persistence.storageClass` | Classe de armazenamento | `""` |
+| `rustfs.credentials.accessKey` | Usuario root do RustFS | `""` (obrigatorio) |
+| `rustfs.credentials.secretKey` | Senha root do RustFS | `""` (obrigatorio) |
+| `rustfs.resources` | Requests e limits de CPU/memoria | `{}` |
 
 ### Transcricao Whisper
 
@@ -229,26 +229,26 @@ Crie o Secret com sua ferramenta preferida:
 kubectl create secret generic llamenos-secrets \
   --from-literal=admin-pubkey=sua_chave \
   --from-literal=postgres-password=sua_senha \
-  --from-literal=minio-access-key=sua_chave \
-  --from-literal=minio-secret-key=sua_chave
+  --from-literal=s3-access-key=sua_chave \
+  --from-literal=s3-secret-key=sua_chave
 
 # Ou com External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
 
-## Usando um MinIO ou S3 externo
+## Usando um RustFS ou S3 externo
 
-Se voce ja tem MinIO ou um servico compativel com S3, desative o MinIO integrado e passe o endpoint:
+Se voce ja tem RustFS ou um servico compativel com S3, desative o RustFS integrado e passe o endpoint:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://seu-minio.exemplo.com"
-    MINIO_ACCESS_KEY: "sua-chave"
-    MINIO_SECRET_KEY: "seu-segredo"
-    MINIO_BUCKET: "llamenos"
+    S3_ENDPOINT: "https://seu-s3.exemplo.com"
+    S3_ACCESS_KEY: "sua-chave"
+    S3_SECRET_KEY: "seu-segredo"
+    S3_BUCKET: "llamenos"
 ```
 
 ## Transcricao com GPU
@@ -340,7 +340,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Causas comuns: secrets ausentes, ADMIN_PUBKEY incorreto, PostgreSQL inacessivel, MinIO nao pronto.
+Causas comuns: secrets ausentes, ADMIN_PUBKEY incorreto, PostgreSQL inacessivel, RustFS nao pronto.
 
 ### Erros de conexao com o banco de dados
 
@@ -419,12 +419,12 @@ spec:
     - secretKey: server-nostr-secret
       remoteRef:
         key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+    - secretKey: s3-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/s3-access-key
+    - secretKey: s3-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/s3-secret-key
 ```
 
 Then reference in Helm values:

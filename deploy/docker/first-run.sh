@@ -44,15 +44,15 @@ else
   # Auto-generate all secrets
   PG_PASS="$(openssl rand -base64 24)"
   HMAC="$(openssl rand -hex 32)"
-  MINIO_AK="$(openssl rand -base64 16 | tr -d '=/+')"
-  MINIO_SK="$(openssl rand -base64 24)"
+  S3_AK="$(openssl rand -base64 16 | tr -d '=/+')"
+  S3_SK="$(openssl rand -base64 24)"
   NOSTR_SECRET="$(openssl rand -hex 32)"
 
   # Use sed to fill in generated values
   sed -i "s|^PG_PASSWORD=.*|PG_PASSWORD=${PG_PASS}|" .env
   sed -i "s|^HMAC_SECRET=.*|HMAC_SECRET=${HMAC}|" .env
-  sed -i "s|^MINIO_ACCESS_KEY=.*|MINIO_ACCESS_KEY=${MINIO_AK}|" .env
-  sed -i "s|^MINIO_SECRET_KEY=.*|MINIO_SECRET_KEY=${MINIO_SK}|" .env
+  sed -i "s|^S3_ACCESS_KEY=.*|S3_ACCESS_KEY=${S3_AK}|" .env
+  sed -i "s|^S3_SECRET_KEY=.*|S3_SECRET_KEY=${S3_SK}|" .env
   sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=${NOSTR_SECRET}|" .env
 
   echo "Generated .env with random secrets."

@@ -1,5 +1,5 @@
 /**
- * S3-compatible blob storage adapter for MinIO.
+ * S3-compatible blob storage adapter (RustFS / any S3-compatible store).
  * Implements the BlobStorage interface using @aws-sdk/client-s3.
  */
 import {
@@ -17,20 +17,20 @@ export function createBlobStorage(opts?: {
   bucket?: string
   region?: string
 }): BlobStorage {
-  const endpoint = opts?.endpoint || process.env.MINIO_ENDPOINT || 'http://localhost:9000'
-  const accessKeyId = opts?.accessKeyId || process.env.MINIO_ACCESS_KEY
-  const secretAccessKey = opts?.secretAccessKey || process.env.MINIO_SECRET_KEY
+  const endpoint = opts?.endpoint || process.env.S3_ENDPOINT || 'http://localhost:9000'
+  const accessKeyId = opts?.accessKeyId || process.env.S3_ACCESS_KEY
+  const secretAccessKey = opts?.secretAccessKey || process.env.S3_SECRET_KEY
   if (!accessKeyId || !secretAccessKey) {
-    throw new Error('MinIO credentials required: set MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables')
+    throw new Error('S3 credentials required: set S3_ACCESS_KEY and S3_SECRET_KEY environment variables')
   }
-  const bucket = opts?.bucket || process.env.MINIO_BUCKET || 'llamenos-files'
+  const bucket = opts?.bucket || process.env.S3_BUCKET || 'llamenos-files'
   const region = opts?.region || 'us-east-1'
 
   const client = new S3Client({
     endpoint,
     region,
     credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true, // Required for MinIO
+    forcePathStyle: true, // Required for S3-compatible stores (RustFS, MinIO, etc.)
   })
 
   return {

@@ -80,7 +80,7 @@ const env: Record<string, unknown> = {
   DEMO_MODE: process.env.DEMO_MODE || undefined,
   AI: createTranscriptionService(),
   R2_BUCKET: createBlobStorage(),
-  MINIO_ENDPOINT: process.env.MINIO_ENDPOINT || undefined,
+  S3_ENDPOINT: process.env.S3_ENDPOINT || undefined,
   SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
   NOSTR_RELAY_URL: nostrRelayUrl || undefined,
   NOSTR_RELAY_PUBLIC_URL: process.env.NOSTR_RELAY_PUBLIC_URL || undefined,

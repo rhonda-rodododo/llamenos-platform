@@ -55,12 +55,12 @@ TWILIO_ACCOUNT_SID=your_sid
 TWILIO_AUTH_TOKEN=your_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Thông tin MinIO (hãy thay đổi giá trị mặc định!)
-MINIO_ACCESS_KEY=your-access-key
-MINIO_SECRET_KEY=your-secret-key-min-8-chars
+# Thông tin RustFS (hãy thay đổi giá trị mặc định!)
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key-min-8-chars
 ```
 
-> **Quan trọng**: Đặt mật khẩu mạnh và duy nhất cho `PG_PASSWORD`, `MINIO_ACCESS_KEY` và `MINIO_SECRET_KEY`.
+> **Quan trọng**: Đặt mật khẩu mạnh và duy nhất cho `PG_PASSWORD`, `S3_ACCESS_KEY` và `S3_SECRET_KEY`.
 
 ## 4. Cấu hình tên miền
 
@@ -94,7 +94,7 @@ Lệnh này khởi động bốn dịch vụ cốt lõi:
 | **app** | Ứng dụng Llamenos | 3000 (nội bộ) |
 | **postgres** | Cơ sở dữ liệu PostgreSQL | 5432 (nội bộ) |
 | **caddy** | Reverse proxy + TLS | 80, 443 |
-| **minio** | Lưu trữ file/bản ghi | 9000, 9001 (nội bộ) |
+| **rustfs** | Lưu trữ file/bản ghi | 9000, 9001 (nội bộ) |
 
 Kiểm tra tất cả đang chạy:
 
@@ -171,7 +171,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Dữ liệu của bạn được lưu trữ trong Docker volumes (`postgres-data`, `minio-data`, v.v.) và được giữ lại khi khởi động lại container và cập nhật image.
+Dữ liệu của bạn được lưu trữ trong Docker volumes (`postgres-data`, `rustfs-data`, v.v.) và được giữ lại khi khởi động lại container và cập nhật image.
 
 ## Sao lưu
 
@@ -189,15 +189,15 @@ docker compose exec postgres pg_dump -U llamenos llamenos > backup-$(date +%Y%m%
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Lưu trữ MinIO
+### Lưu trữ RustFS
 
-MinIO lưu trữ các file đã tải lên, bản ghi và tệp đính kèm:
+RustFS lưu trữ các file đã tải lên, bản ghi và tệp đính kèm:
 
 ```bash
-# Sử dụng MinIO client (mc)
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+# Sử dụng RustFS client (mc)
+docker compose exec rustfs mc alias set local http://localhost:9000 $S3_ACCESS_KEY $S3_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ### Sao lưu tự động
@@ -254,11 +254,11 @@ docker compose logs caddy
 curl -I http://hotline.yourdomain.com
 ```
 
-### Lỗi kết nối MinIO
+### Lỗi kết nối RustFS
 
 ```bash
-docker compose ps minio
-docker compose logs minio
+docker compose ps rustfs
+docker compose logs rustfs
 ```
 
 ## Kiến trúc dịch vụ
@@ -268,7 +268,7 @@ flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, reverse proxy)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]
 ```
 

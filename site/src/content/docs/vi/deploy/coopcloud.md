@@ -47,7 +47,7 @@ The recipe deploys five services:
 | **web** | `nginx:1.27-alpine` | Reverse proxy with Traefik labels |
 | **app** | `ghcr.io/rhonda-rodododo/llamenos` | Bun application server |
 | **db** | `postgres:17-alpine` | PostgreSQL database |
-| **minio** | `minio/minio` | S3-compatible file storage |
+| **rustfs** | `rustfs/rustfs` | S3-compatible file storage |
 | **relay** | `dockurr/strfry` | Nostr relay for real-time events |
 
 ## Secrets
@@ -59,8 +59,8 @@ All secrets are managed via Docker Swarm secrets (versioned, immutable):
 | `hmac_secret` | hex (64 chars) | HMAC signing key for session tokens |
 | `server_nostr` | hex (64 chars) | Server Nostr identity key |
 | `db_password` | alnum (32 chars) | PostgreSQL password |
-| `minio_access` | alnum (20 chars) | MinIO access key |
-| `minio_secret` | alnum (40 chars) | MinIO secret key |
+| `s3_access` | alnum (20 chars) | RustFS access key |
+| `s3_secret` | alnum (40 chars) | RustFS secret key |
 
 Generate all secrets at once:
 
@@ -116,8 +116,8 @@ HOTLINE_NAME=My Hotline
 SECRET_HMAC_SECRET_VERSION=v1
 SECRET_SERVER_NOSTR_VERSION=v1
 SECRET_DB_PASSWORD_VERSION=v1
-SECRET_MINIO_ACCESS_VERSION=v1
-SECRET_MINIO_SECRET_VERSION=v1
+SECRET_S3_ACCESS_VERSION=v1
+SECRET_S3_SECRET_VERSION=v1
 ```
 
 ## First login
@@ -224,7 +224,7 @@ This pulls the latest recipe version and redeploys. Data is persisted in Docker 
 
 ### Backupbot integration
 
-The recipe includes [backupbot](https://docs.coopcloud.tech/backupbot/) labels for automated PostgreSQL and MinIO backups. If your server runs backupbot, backups happen automatically.
+The recipe includes [backupbot](https://docs.coopcloud.tech/backupbot/) labels for automated PostgreSQL and RustFS backups. If your server runs backupbot, backups happen automatically.
 
 ### Manual backup
 
@@ -243,11 +243,11 @@ Or back up directly:
 docker exec $(docker ps -q -f name=<stack-name>_db) \
   pg_dump -U llamenos llamenos | gzip > backup-$(date +%Y%m%d).sql.gz
 
-# MinIO (object storage)
+# RustFS (object storage)
 docker run --rm \
-  -v <stack-name>_minio-data:/data \
+  -v <stack-name>_rustfs-data:/data \
   -v /backups:/backups \
-  alpine tar czf /backups/minio-$(date +%Y%m%d).tar.gz /data
+  alpine tar czf /backups/rustfs-$(date +%Y%m%d).tar.gz /data
 ```
 
 Restore PostgreSQL:
@@ -316,7 +316,7 @@ flowchart TD
     Nginx -->|":3000"| App["App<br/>(Bun)"]
     Nginx -->|"/nostr"| Relay["strfry<br/>(Nostr relay)"]
     App --> PostgreSQL[("PostgreSQL<br/>:5432")]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"optional"| SignalNotifier["signal-notifier<br/>:3100"]
     App -.->|"optional"| SipBridge["sip-bridge"]
     App -.->|"optional"| Whisper["Whisper<br/>:8080"]

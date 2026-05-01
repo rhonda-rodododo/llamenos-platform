@@ -3,7 +3,7 @@ title: "Déploiement : Kubernetes (Helm)"
 description: Déployez Llamenos sur Kubernetes avec le chart Helm officiel.
 ---
 
-Ce guide couvre le déploiement de Llamenos sur un cluster Kubernetes en utilisant le chart Helm officiel. Le chart gère l'application et les services optionnels MinIO/Whisper en tant que deployments séparés. Vous fournissez une base de données PostgreSQL.
+Ce guide couvre le déploiement de Llamenos sur un cluster Kubernetes en utilisant le chart Helm officiel. Le chart gère l'application et les services optionnels RustFS/Whisper en tant que deployments séparés. Vous fournissez une base de données PostgreSQL.
 
 ## Prérequis
 
@@ -24,8 +24,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -67,7 +67,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -170,18 +170,18 @@ Ouvrez `https://hotline.yourdomain.com` dans votre navigateur. Follow the setup 
 
 > **Conseil** : En production, utilisez `secrets.existingSecret` pour référencer un Secret géré par External Secrets Operator, Sealed Secrets ou Vault.
 
-### MinIO
+### RustFS
 
 | Paramètre | Description | Défaut |
 |-----------|-------------|--------|
-| `minio.enabled` | Déployer MinIO | `true` |
-| `minio.image.repository` | Image MinIO | `minio/minio` |
-| `minio.image.tag` | Tag MinIO | `RELEASE.2025-01-20T14-49-07Z` |
-| `minio.persistence.size` | Volume de données MinIO | `50Gi` |
-| `minio.persistence.storageClass` | Classe de stockage | `""` |
-| `minio.credentials.accessKey` | Utilisateur root MinIO | `""` (requis) |
-| `minio.credentials.secretKey` | Mot de passe root MinIO | `""` (requis) |
-| `minio.resources` | Requêtes et limites CPU/mémoire | `{}` |
+| `rustfs.enabled` | Déployer RustFS | `true` |
+| `rustfs.image.repository` | Image RustFS | `rustfs/rustfs` |
+| `rustfs.image.tag` | Tag RustFS | `RELEASE.2025-01-20T14-49-07Z` |
+| `rustfs.persistence.size` | Volume de données RustFS | `50Gi` |
+| `rustfs.persistence.storageClass` | Classe de stockage | `""` |
+| `rustfs.credentials.accessKey` | Utilisateur root RustFS | `""` (requis) |
+| `rustfs.credentials.secretKey` | Mot de passe root RustFS | `""` (requis) |
+| `rustfs.resources` | Requêtes et limites CPU/mémoire | `{}` |
 
 ### Transcription Whisper
 
@@ -230,26 +230,26 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
   --from-literal=postgres-password=your_password \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_key
+  --from-literal=s3-access-key=your_key \
+  --from-literal=s3-secret-key=your_key
 
 # Ou avec External Secrets Operator, Sealed Secrets, Vault, etc.
 ```
 
-## Utiliser un MinIO ou S3 externe
+## Utiliser un RustFS ou S3 externe
 
-Si vous disposez déjà de MinIO ou d'un service compatible S3, désactivez le MinIO intégré et passez le endpoint :
+Si vous disposez déjà de RustFS ou d'un service compatible S3, désactivez le RustFS intégré et passez le endpoint :
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
   env:
-    MINIO_ENDPOINT: "https://your-minio.example.com"
-    MINIO_ACCESS_KEY: "your-key"
-    MINIO_SECRET_KEY: "your-secret"
-    MINIO_BUCKET: "llamenos"
+    S3_ENDPOINT: "https://your-s3.example.com"
+    S3_ACCESS_KEY: "your-key"
+    S3_SECRET_KEY: "your-secret"
+    S3_BUCKET: "llamenos"
 ```
 
 ## Transcription GPU
@@ -341,7 +341,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Causes courantes : secrets manquants, PostgreSQL injoignable, MinIO non prêt.
+Causes courantes : secrets manquants, PostgreSQL injoignable, RustFS non prêt.
 
 ### Erreurs de connexion à la base
 
@@ -420,12 +420,12 @@ spec:
     - secretKey: server-nostr-secret
       remoteRef:
         key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+    - secretKey: s3-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/s3-access-key
+    - secretKey: s3-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/s3-secret-key
 ```
 
 Then reference in Helm values:

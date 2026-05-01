@@ -268,7 +268,7 @@ Llámenos is not hardcoded to any specific use case. Everything is template-driv
 
 ### Docker Compose (Single Server)
 
-- Full stack: Bun HTTP server, PostgreSQL, MinIO (object storage), strfry (Nostr relay)
+- Full stack: Bun HTTP server, PostgreSQL, RustFS (object storage), strfry (Nostr relay)
 - Optional profiles: `--profile signal` (signal-cli sidecar), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (LLM firehose agent), `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` for local development with file watching
 - `docker-compose.production.yml` overlay for production hardening

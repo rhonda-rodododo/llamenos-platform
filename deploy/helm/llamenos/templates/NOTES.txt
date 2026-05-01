@@ -25,9 +25,9 @@ Run 'bun run bootstrap-admin' to generate one, then update your values:
 {{- end }}
 {{- end }}
 
-{{- if .Values.minio.enabled }}
+{{- if .Values.rustfs.enabled }}
 
-MinIO console (internal):
-  kubectl port-forward svc/{{ include "llamenos.fullname" . }}-minio 9001:9001
-  Then open: http://localhost:9001 ({{ .Values.minio.credentials.accessKey }}/{{ .Values.minio.credentials.secretKey }})
+RustFS console (internal):
+  kubectl port-forward svc/{{ include "llamenos.fullname" . }}-rustfs 9001:9001
+  Then open: http://localhost:9001 ({{ .Values.rustfs.credentials.accessKey }}/{{ .Values.rustfs.credentials.secretKey }})
 {{- end }}

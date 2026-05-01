@@ -1,7 +1,7 @@
 ---
-# MinIO backup role
+# RustFS backup role
 #
-# Mirrors all objects from the MinIO bucket using mc mirror:
+# Mirrors all objects from the RustFS bucket using mc mirror:
 # - Archives as compressed tarball
 # - Optional age encryption
 # - Retention policy (daily/weekly/monthly)
@@ -13,9 +13,9 @@
     name: age
     state: present
 
-- name: Create MinIO backup directories
+- name: Create RustFS backup directories
   ansible.builtin.file:
-    path: "{{ backup_minio_dir }}/{{ item }}"
+    path: "{{ backup_rustfs_dir }}/{{ item }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
@@ -25,22 +25,22 @@
     - weekly
     - monthly
 
-- name: Template MinIO backup script
+- name: Template RustFS backup script
   ansible.builtin.template:
-    src: backup-minio.sh.j2
-    dest: "{{ app_dir }}/scripts/backup-minio.sh"
+    src: backup-rustfs.sh.j2
+    dest: "{{ app_dir }}/scripts/backup-rustfs.sh"
     owner: "{{ deploy_user }}"
     group: "{{ deploy_group }}"
     mode: "0750"
 
-- name: Run initial MinIO backup
-  ansible.builtin.command: "{{ app_dir }}/scripts/backup-minio.sh --manifest"
+- name: Run initial RustFS backup
+  ansible.builtin.command: "{{ app_dir }}/scripts/backup-rustfs.sh --manifest"
   become_user: "{{ deploy_user }}"
-  register: initial_minio_backup
-  changed_when: "'Backup complete' in initial_minio_backup.stdout"
+  register: initial_rustfs_backup
+  changed_when: "'Backup complete' in initial_rustfs_backup.stdout"
   ignore_errors: true
 
 - name: Display initial backup result
   ansible.builtin.debug:
-    msg: "{{ initial_minio_backup.stdout_lines | default(['No output']) }}"
-  when: initial_minio_backup is defined
+    msg: "{{ initial_rustfs_backup.stdout_lines | default(['No output']) }}"
+  when: initial_rustfs_backup is defined

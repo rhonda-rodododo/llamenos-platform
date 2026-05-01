@@ -3,7 +3,7 @@ title: "Deploy: Kubernetes (Helm)"
 description: Deploy Llamenos to Kubernetes using the official Helm chart.
 ---
 
-This guide covers deploying Llamenos to a Kubernetes cluster using the official Helm chart. The chart manages the application, MinIO storage, strfry Nostr relay, and optional signal-notifier/sip-bridge services as separate deployments. You provide a PostgreSQL database.
+This guide covers deploying Llamenos to a Kubernetes cluster using the official Helm chart. The chart manages the application, RustFS storage, strfry Nostr relay, and optional signal-notifier/sip-bridge services as separate deployments. You provide a PostgreSQL database.
 
 ## Prerequisites
 
@@ -22,8 +22,8 @@ helm install llamenos deploy/helm/llamenos/ \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
   --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
-  --set minio.credentials.accessKey=your-access-key \
-  --set minio.credentials.secretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com \
   --set ingress.tls[0].secretName=llamenos-tls \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
@@ -66,7 +66,7 @@ secrets:
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
 
-minio:
+rustfs:
   enabled: true
   persistence:
     size: 50Gi
@@ -222,12 +222,12 @@ spec:
     - secretKey: server-nostr-secret
       remoteRef:
         key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+    - secretKey: s3-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/s3-access-key
+    - secretKey: s3-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/s3-secret-key
 ```
 
 ### 2. Reference in Helm values
@@ -244,8 +244,8 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=postgres-password=your_password \
   --from-literal=hmac-secret=your_hmac_hex \
   --from-literal=server-nostr-secret=your_nostr_hex \
-  --from-literal=minio-access-key=your_key \
-  --from-literal=minio-secret-key=your_secret
+  --from-literal=s3-access-key=your_key \
+  --from-literal=s3-secret-key=your_secret
 ```
 
 ## Prometheus monitoring
@@ -336,18 +336,18 @@ kubectl logs -l app.kubernetes.io/instance=llamenos -c app -f
 
 > **Tip**: For production, use `secrets.existingSecret` with External Secrets Operator, Sealed Secrets, or Vault.
 
-### MinIO
+### RustFS
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `minio.enabled` | Deploy MinIO | `true` |
-| `minio.image.repository` | MinIO image | `minio/minio` |
-| `minio.image.tag` | MinIO tag | `latest` |
-| `minio.persistence.size` | Data volume size | `50Gi` |
-| `minio.persistence.storageClass` | Storage class | `""` |
-| `minio.credentials.accessKey` | MinIO root user (required) | `""` |
-| `minio.credentials.secretKey` | MinIO root password (required) | `""` |
-| `minio.resources` | CPU/memory requests and limits | `{}` |
+| `rustfs.enabled` | Deploy RustFS | `true` |
+| `rustfs.image.repository` | RustFS image | `rustfs/rustfs` |
+| `rustfs.image.tag` | RustFS tag | `latest` |
+| `rustfs.persistence.size` | Data volume size | `50Gi` |
+| `rustfs.persistence.storageClass` | Storage class | `""` |
+| `rustfs.credentials.accessKey` | RustFS root user (required) | `""` |
+| `rustfs.credentials.secretKey` | RustFS root password (required) | `""` |
+| `rustfs.resources` | CPU/memory requests and limits | `{}` |
 
 ### strfry (Nostr relay)
 
@@ -406,10 +406,10 @@ kubectl logs -l app.kubernetes.io/instance=llamenos -c app -f
 
 ## Using an external S3-compatible store
 
-If you already have MinIO, RustFS, or another S3-compatible service, disable the built-in MinIO:
+If you already have RustFS, RustFS, or another S3-compatible service, disable the built-in RustFS:
 
 ```yaml
-minio:
+rustfs:
   enabled: false
 
 app:
@@ -431,7 +431,7 @@ Before going live:
 - [ ] **Read-only root filesystem** on app container (`securityContext.readOnlyRootFilesystem: true`)
 - [ ] **Non-root user** in container (`securityContext.runAsNonRoot: true`)
 - [ ] **PostgreSQL TLS** enabled (set `postgres.sslMode: require` in values)
-- [ ] **MinIO TLS** or mTLS between app and MinIO
+- [ ] **RustFS TLS** or mTLS between app and RustFS
 - [ ] **cert-manager ClusterIssuer** configured for automatic Let's Encrypt renewal
 - [ ] **Prometheus ServiceMonitor** enabled and scraping
 - [ ] **Liveness/readiness probes** verified after deploy
@@ -499,7 +499,7 @@ kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Common causes: missing secrets (`hmacSecret`, `serverNostrSecret`), PostgreSQL unreachable, MinIO not ready.
+Common causes: missing secrets (`hmacSecret`, `serverNostrSecret`), PostgreSQL unreachable, RustFS not ready.
 
 ### Database connection errors
 

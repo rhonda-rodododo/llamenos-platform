@@ -9,7 +9,7 @@
 #   ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags postgres
 #   ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags app
 #
-# Tags: docker, service-discovery, internal-tls, postgres, minio, strfry,
+# Tags: docker, service-discovery, internal-tls, postgres, rustfs, strfry,
 #       app, caddy, whisper, asterisk, signal, deploy
 
 - name: Gather facts and run service discovery
@@ -46,9 +46,9 @@
     - role: llamenos-postgres
       tags: [postgres, deploy]
       when: llamenos_postgres_enabled | default(true)
-    - role: llamenos-minio
-      tags: [minio, deploy]
-      when: llamenos_minio_enabled | default(true)
+    - role: llamenos-rustfs
+      tags: [rustfs, deploy]
+      when: llamenos_rustfs_enabled | default(true)
     - role: llamenos-strfry
       tags: [strfry, deploy]
       when: llamenos_strfry_enabled | default(true)

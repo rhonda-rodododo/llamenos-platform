@@ -195,7 +195,7 @@ bun run deploy:api
 
 ### Option B: Self-Hosted (Docker Compose)
 
-Run the API on your own server with Docker Compose. Includes Caddy (automatic HTTPS), PostgreSQL, MinIO (file storage), strfry (Nostr relay), and optional Whisper transcription.
+Run the API on your own server with Docker Compose. Includes Caddy (automatic HTTPS), PostgreSQL, RustFS (S3-compatible file storage), strfry (Nostr relay), and optional Whisper transcription.
 
 ```bash
 cd deploy/docker
@@ -220,8 +220,8 @@ docker compose --profile signal up -d           # + Signal messaging
 ```bash
 helm install llamenos deploy/helm/llamenos/ \
   --set secrets.adminPubkey=YOUR_HEX_PUBLIC_KEY \
-  --set secrets.minioAccessKey=your-access-key \
-  --set secrets.minioSecretKey=your-secret-key \
+  --set rustfs.credentials.accessKey=your-access-key \
+  --set rustfs.credentials.secretKey=your-secret-key \
   --set ingress.hosts[0].host=hotline.yourdomain.com
 ```
 

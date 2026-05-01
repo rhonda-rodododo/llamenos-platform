@@ -3,7 +3,7 @@ title: "Desplegar: Kubernetes (Helm)"
 description: Despliega Llamenos en Kubernetes usando el chart oficial de Helm.
 ---
 
-Esta guia cubre el despliegue de Llamenos en un cluster de Kubernetes usando el chart oficial de Helm. El chart gestiona la aplicacion, almacenamiento de objetos MinIO y transcripcion Whisper opcional como despliegues separados.
+Esta guia cubre el despliegue de Llamenos en un cluster de Kubernetes usando el chart oficial de Helm. El chart gestiona la aplicacion, almacenamiento de objetos RustFS y transcripcion Whisper opcional como despliegues separados.
 
 ## Requisitos previos
 
@@ -103,12 +103,12 @@ spec:
     - secretKey: server-nostr-secret
       remoteRef:
         key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+    - secretKey: s3-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/s3-access-key
+    - secretKey: s3-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/s3-secret-key
 ```
 
 Then reference in Helm values:

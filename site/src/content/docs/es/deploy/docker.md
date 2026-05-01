@@ -52,16 +52,16 @@ TWILIO_ACCOUNT_SID=tu_sid
 TWILIO_AUTH_TOKEN=tu_token
 TWILIO_PHONE_NUMBER=+1234567890
 
-# Credenciales MinIO (cambia los valores por defecto!)
-MINIO_ACCESS_KEY=tu-clave-de-acceso
-MINIO_SECRET_KEY=tu-clave-secreta-min-8-caracteres
+# Credenciales RustFS (cambia los valores por defecto!)
+S3_ACCESS_KEY=tu-clave-de-acceso
+S3_SECRET_KEY=tu-clave-secreta-min-8-caracteres
 ```
 
-> **Importante**: Cambia las credenciales de MinIO de los valores por defecto. Estas controlan el acceso a archivos subidos y grabaciones.
+> **Importante**: Cambia las credenciales de RustFS de los valores por defecto. Estas controlan el acceso a archivos subidos y grabaciones.
 
 ## 4. Configurar tu dominio
 
-Edita el `Caddyfile` para establecer tu dominio:
+Edita el `Caddyfile` para establecer tu dorustfs:
 
 ```
 linea.tudominio.com {
@@ -90,7 +90,7 @@ Esto inicia tres servicios principales:
 |----------|-----------|--------|
 | **app** | Aplicacion Llamenos | 3000 (interno) |
 | **caddy** | Proxy inverso + TLS | 80, 443 |
-| **minio** | Almacenamiento de archivos/grabaciones | 9000, 9001 (interno) |
+| **rustfs** | Almacenamiento de archivos/grabaciones | 9000, 9001 (interno) |
 
 Verifica que todo este funcionando:
 
@@ -158,7 +158,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Tus datos se mantienen en volumenes Docker (`app-data`, `minio-data`, etc.) y sobreviven a reinicios de contenedores y actualizaciones de imagenes.
+Tus datos se mantienen en volumenes Docker (`app-data`, `rustfs-data`, etc.) y sobreviven a reinicios de contenedores y actualizaciones de imagenes.
 
 ## Respaldos
 
@@ -176,14 +176,14 @@ Para restaurar:
 docker compose exec -T postgres psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Almacenamiento MinIO
+### Almacenamiento RustFS
 
-MinIO almacena archivos subidos, grabaciones y adjuntos:
+RustFS almacena archivos subidos, grabaciones y adjuntos:
 
 ```bash
-docker compose exec minio mc alias set local http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY
-docker compose exec minio mc mirror local/llamenos /tmp/minio-backup
-docker compose cp minio:/tmp/minio-backup ./minio-backup-$(date +%Y%m%d)
+docker compose exec rustfs mc alias set local http://localhost:9000 $S3_ACCESS_KEY $S3_SECRET_KEY
+docker compose exec rustfs mc mirror local/llamenos /tmp/rustfs-backup
+docker compose cp rustfs:/tmp/rustfs-backup ./rustfs-backup-$(date +%Y%m%d)
 ```
 
 ## Solucion de problemas
@@ -211,7 +211,7 @@ curl -I http://linea.tudominio.com
 flowchart TD
     Internet -->|":80/:443"| Caddy["Caddy<br/>(TLS, proxy inverso)"]
     Caddy -->|":3000"| App["App<br/>(Node.js)"]
-    App --> MinIO[("MinIO<br/>:9000")]
+    App --> RustFS[("RustFS<br/>:9000")]
     App -.->|"opcional"| Whisper["Whisper<br/>:8080"]
 ```
 
