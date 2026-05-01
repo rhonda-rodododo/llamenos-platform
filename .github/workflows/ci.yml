@@ -872,10 +872,7 @@ jobs:
           check_job "wasm-build" "${{ needs.wasm-build.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
           check_job "android-build-test" "${{ needs.android-build-test.result }}"
-          # android-e2e: emulator infra is flaky on GHA — report but don't block CI
-          if [[ "${{ needs.android-e2e.result }}" != "success" && "${{ needs.android-e2e.result }}" != "skipped" ]]; then
-            echo "::warning::android-e2e result: ${{ needs.android-e2e.result }} (non-blocking)"
-          fi
+          check_job "android-e2e" "${{ needs.android-e2e.result }}"
           check_job "ios-build-test" "${{ needs.ios-build-test.result }}"
           check_job "crypto-guardrails" "${{ needs.crypto-guardrails.result }}"
 
