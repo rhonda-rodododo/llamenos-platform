@@ -46,6 +46,10 @@ Then('I should see a {string} input in the form', async ({ page }, fieldLabel: s
 When('I create a note with {string} set to {string}', async ({ page }, fieldLabel: string, value: string) => {
   await Navigation.goToNotes(page)
   await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
+  const callIdInput = page.getByTestId(TestIds.NOTE_CALL_ID)
+  if (await callIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await callIdInput.fill(`CALL-${Date.now()}`)
+  }
   await page.getByTestId(TestIds.NOTE_CONTENT).fill('Test note with custom field')
   const customInput = page.getByLabel(fieldLabel)
   await expect(customInput).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -61,6 +65,10 @@ Then('I should see {string} as a badge', async ({ page }, text: string) => {
 Given('a note exists with {string} set to {string}', async ({ page }, fieldLabel: string, value: string) => {
   await Navigation.goToNotes(page)
   await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
+  const callIdInput = page.getByTestId(TestIds.NOTE_CALL_ID)
+  if (await callIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await callIdInput.fill(`CALL-${Date.now()}`)
+  }
   await page.getByTestId(TestIds.NOTE_CONTENT).fill('Note with custom field')
   const customInput = page.getByLabel(fieldLabel)
   await expect(customInput).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -71,6 +79,10 @@ Given('a note exists with {string} set to {string}', async ({ page }, fieldLabel
 Given('a note exists with text {string} and {string} set to {string}', async ({ page }, noteText: string, fieldLabel: string, value: string) => {
   await Navigation.goToNotes(page)
   await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
+  const callIdInput = page.getByTestId(TestIds.NOTE_CALL_ID)
+  if (await callIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await callIdInput.fill(`CALL-${Date.now()}`)
+  }
   await page.getByTestId(TestIds.NOTE_CONTENT).fill(noteText)
   const customInput = page.getByLabel(fieldLabel)
   await expect(customInput).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -161,6 +173,10 @@ Given('a note exists', async ({ page, request }) => {
   if (notes.length === 0) {
     await Navigation.goToNotes(page)
     await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
+    const callIdInput = page.getByTestId(TestIds.NOTE_CALL_ID)
+    if (await callIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await callIdInput.fill(`CALL-${Date.now()}`)
+    }
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Existing note for testing')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   }

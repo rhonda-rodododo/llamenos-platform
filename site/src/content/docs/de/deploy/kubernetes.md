@@ -37,7 +37,7 @@ Oder erstellen Sie eine `values-production.yaml`-Datei fuer reproduzierbare Bere
 # values-production.yaml
 app:
   image:
-    repository: ghcr.io/rhonda-rodododo/llamenos
+    repository: ghcr.io/rhonda-rodododo/llamenos-platform
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   replicas: 2
@@ -139,7 +139,7 @@ Oeffnen Sie `https://hotline.ihredomain.com` in Ihrem Browser. Melden Sie sich m
 
 | Parameter | Beschreibung | Standard |
 |-----------|-------------|----------|
-| `app.image.repository` | Container-Image | `ghcr.io/rhonda-rodododo/llamenos` |
+| `app.image.repository` | Container-Image | `ghcr.io/rhonda-rodododo/llamenos-platform` |
 | `app.image.tag` | Image-Tag | Chart appVersion |
 | `app.port` | Anwendungsport | `3000` |
 | `app.replicas` | Pod-Replikate | `2` |

@@ -51,7 +51,8 @@ fi
 reporter_record_suite "typecheck" 1 0 0
 
 # Step 3: Test build (Vite with Tauri IPC mocks)
-if ! reporter_run_step "test:build" bun run test:build; then
+export PLAYWRIGHT_TEST=true
+if ! reporter_run_step "test:build" bun run build; then
   overall_result="fail"
   reporter_record_suite "build" 0 1 0
   reporter_summary "$overall_result"
@@ -59,8 +60,24 @@ if ! reporter_run_step "test:build" bun run test:build; then
 fi
 reporter_record_suite "build" 1 0 0
 
-# Step 4: Playwright E2E tests
-if reporter_run_step "playwright" env PLAYWRIGHT_TEST=true bunx playwright test; then
+# Step 4: Start vite preview server and run Playwright E2E tests
+# Start the server in the background — set PLAYWRIGHT_BASE_URL so Playwright
+# skips its own webServer (which uses Unix env-var syntax incompatible with Windows).
+bunx vite preview --port 8788 --strictPort &
+PREVIEW_PID=$!
+cleanup_preview() { kill "$PREVIEW_PID" 2>/dev/null || true; wait "$PREVIEW_PID" 2>/dev/null || true; }
+trap cleanup_preview EXIT
+
+# Wait for the preview server to be ready (use bun for portability on Windows)
+for _i in $(seq 1 30); do
+  if bun -e "try{await fetch('http://localhost:8788');process.exit(0)}catch{process.exit(1)}" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+export PLAYWRIGHT_BASE_URL="http://localhost:8788"
+if reporter_run_step "playwright" bunx playwright test; then
   parse_playwright_results "$REPORTER_LOG_FILE"
   reporter_record_suite "playwright" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
 else

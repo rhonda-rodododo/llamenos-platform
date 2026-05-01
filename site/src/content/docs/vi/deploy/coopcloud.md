@@ -45,7 +45,7 @@ The recipe deploys five services:
 | Service | Image | Purpose |
 |---------|-------|---------|
 | **web** | `nginx:1.27-alpine` | Reverse proxy with Traefik labels |
-| **app** | `ghcr.io/rhonda-rodododo/llamenos` | Bun application server |
+| **app** | `ghcr.io/rhonda-rodododo/llamenos-platform` | Bun application server |
 | **db** | `postgres:17-alpine` | PostgreSQL database |
 | **minio** | `minio/minio` | S3-compatible file storage |
 | **relay** | `dockurr/strfry` | Nostr relay for real-time events |

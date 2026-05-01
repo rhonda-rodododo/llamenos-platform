@@ -15,7 +15,7 @@ Este guia orienta voce na implantacao do Llamenos com Docker Compose em um unico
 ## 1. Clonar o repositorio
 
 ```bash
-git clone https://github.com/your-org/llamenos-platform.git
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
 cd llamenos-platform
 ```
 

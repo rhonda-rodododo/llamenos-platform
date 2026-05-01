@@ -118,10 +118,10 @@ Ces améliorations sont disponibles aujourd'hui :
 
 Documentation technique :
 
-- [Spécification du protocole](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/protocol/llamenos-protocol.md)
-- [Modèle de menace](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/THREAT_MODEL.md)
-- [Classification des données](https://github.com/rhonda-rodododo/llamenos/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Audits de sécurité](https://github.com/rhonda-rodododo/llamenos/tree/main/docs/security)
+- [Spécification du protocole](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Modèle de menace](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
+- [Classification des données](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Audits de sécurité](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [Documentation API](/api/docs)
 
-Llamenos est open source : [github.com/rhonda-rodododo/llamenos](https://github.com/rhonda-rodododo/llamenos)
+Llamenos est open source : [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)

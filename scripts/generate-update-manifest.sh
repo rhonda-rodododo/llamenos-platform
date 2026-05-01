@@ -20,7 +20,7 @@ else
   exit 1
 fi
 
-REPO="${GITHUB_REPOSITORY:-rhonda-rodododo/llamenos}"
+REPO="${GITHUB_REPOSITORY:-rhonda-rodododo/llamenos-platform}"
 BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
 ARTIFACTS_DIR="${1:-artifacts}"
 

@@ -29,27 +29,46 @@ import {
 
 // State is now in casesWorld fixture (casesWorld.eventEntityTypeId, casesWorld.lastEventId, casesWorld.lastEventName)
 
-// --- Background: event entity type exists ---
+// ── Shared helper ────────────────────────────────────────────────────────────
 
-Given('an event entity type exists', async ({ backendRequest: request, casesWorld }) => {
+import type { APIRequestContext } from '@playwright/test'
+
+/**
+ * Ensure an event entity type exists in the backend.
+ * Returns the entity type ID. Creates one if it doesn't exist yet.
+ * Used by multiple Given steps so they don't silently no-op when
+ * casesWorld.eventEntityTypeId hasn't been seeded by a Background step.
+ */
+async function ensureEventEntityType(
+  request: APIRequestContext,
+  casesWorld: { eventEntityTypeId?: string },
+): Promise<string> {
+  if (casesWorld.eventEntityTypeId) return casesWorld.eventEntityTypeId
+
   const types = await listEntityTypesViaApi(request)
   const eventType = types.find(et => {
     const cat = (et as { category?: string }).category
     const name = (et as { name?: string }).name
     return cat === 'event' || name === 'event' || name === 'protest'
   })
-  if (eventType) {
-    casesWorld.eventEntityTypeId = (eventType as { id: string }).id
-  } else {
-    const created = await createEntityTypeViaApi(request, 'event', {
-      category: 'event',
-      statuses: [
-        { value: 'active', label: 'Active', color: '#3b82f6', order: 0 },
-        { value: 'concluded', label: 'Concluded', color: '#22c55e', order: 1, isClosed: true },
-      ],
-    })
-    casesWorld.eventEntityTypeId = (created as { id: string }).id
-  }
+  const id = eventType
+    ? (eventType as { id: string }).id
+    : ((await createEntityTypeViaApi(request, 'event', {
+        category: 'event',
+        statuses: [
+          { value: 'active', label: 'Active', color: '#3b82f6', order: 0 },
+          { value: 'concluded', label: 'Concluded', color: '#22c55e', order: 1, isClosed: true },
+        ],
+      })) as { id: string }).id
+
+  casesWorld.eventEntityTypeId = id
+  return id
+}
+
+// --- Background: event entity type exists ---
+
+Given('an event entity type exists', async ({ backendRequest: request, casesWorld }) => {
+  await ensureEventEntityType(request, casesWorld)
 })
 
 // --- Events page ---
@@ -62,17 +81,17 @@ Then('the new event button should be visible', async ({ page }) => {
 })
 
 Given('no events have been created', async ({ backendRequest: request, casesWorld }) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId })
+  await ensureEventEntityType(request, casesWorld)
+  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId! })
   // Accept current state — we just need the empty state to be possible
   void records
 })
 
 Given('events exist', async ({ backendRequest: request, casesWorld }) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId })
+  const entityTypeId = await ensureEventEntityType(request, casesWorld)
+  const records = await listRecordsViaApi(request, { entityTypeId })
   if (records.records.length === 0) {
-    const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+    const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
     casesWorld.lastEventId = (event as { id: string }).id
   } else {
     casesWorld.lastEventId = (records.records[0] as { id: string }).id
@@ -138,8 +157,8 @@ Then('the new event should appear in the event list', async ({ page }) => {
 // --- Event detail ---
 
 Given('an event {string} exists', async ({ backendRequest: request, casesWorld },eventName: string) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+  const entityTypeId = await ensureEventEntityType(request, casesWorld)
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
   casesWorld.lastEventId = (event as { id: string }).id
   casesWorld.lastEventName = eventName
 })
@@ -165,10 +184,10 @@ Then('the event start date should be displayed', async ({ page }) => {
 })
 
 Given('an event with linked cases exists', async ({ backendRequest: request, casesWorld }) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const event = await createEventViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld)
+  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active' }).catch(async () => {
     // Fallback: create as a record
-    return createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+    return createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
   })
   casesWorld.lastEventId = (event as { id: string }).id
 
@@ -178,14 +197,14 @@ Given('an event with linked cases exists', async ({ backendRequest: request, cas
   if (arrestType) {
     const etId = (arrestType as { id: string }).id
     const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-    await linkRecordToEventViaApi(request, casesWorld.lastEventId, (record as { id: string }).id).catch(() => {})
+    await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id).catch(() => {})
   }
 })
 
 Given('an event with {int} linked cases exists', async ({ backendRequest: request, casesWorld },count: number) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const event = await createEventViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
-    return createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+  const entityTypeId = await ensureEventEntityType(request, casesWorld)
+  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active' }).catch(async () => {
+    return createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
   })
   casesWorld.lastEventId = (event as { id: string }).id
 
@@ -195,20 +214,20 @@ Given('an event with {int} linked cases exists', async ({ backendRequest: reques
     const etId = (arrestType as { id: string }).id
     for (let i = 0; i < count; i++) {
       const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-      await linkRecordToEventViaApi(request, casesWorld.lastEventId, (record as { id: string }).id).catch(() => {})
+      await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id).catch(() => {})
     }
   }
 })
 
 Given('an event with linked reports exists', async ({ backendRequest: request, casesWorld }) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const event = await createEventViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' }).catch(async () => {
-    return createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+  const entityTypeId = await ensureEventEntityType(request, casesWorld)
+  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active' }).catch(async () => {
+    return createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
   })
   casesWorld.lastEventId = (event as { id: string }).id
 
   const report = await createReportViaApi(request, { title: `Event Report ${Date.now()}` })
-  await linkReportToEventViaApi(request, casesWorld.lastEventId, (report as { id: string }).id).catch(() => {})
+  await linkReportToEventViaApi(request, casesWorld.lastEventId!, (report as { id: string }).id).catch(() => {})
 })
 
 When('I view the event detail', async ({ page, backendRequest: request, casesWorld }) => {
@@ -256,10 +275,10 @@ Then('linked reports should be visible', async ({ page }) => {
 // --- Link cases to events ---
 
 Given('an event exists', async ({ backendRequest: request, casesWorld }) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId })
+  const entityTypeId = await ensureEventEntityType(request, casesWorld)
+  const records = await listRecordsViaApi(request, { entityTypeId })
   if (records.records.length === 0) {
-    const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: 'active' })
+    const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
     casesWorld.lastEventId = (event as { id: string }).id
   } else {
     casesWorld.lastEventId = (records.records[0] as { id: string }).id
@@ -303,8 +322,8 @@ Then('the report should appear in the event\'s linked reports', async ({ page })
 // --- Event status ---
 
 Given('an event with status {string} exists', async ({ backendRequest: request, casesWorld },status: string) => {
-  if (!casesWorld.eventEntityTypeId) return
-  const event = await createRecordViaApi(request, casesWorld.eventEntityTypeId, { statusHash: status })
+  const entityTypeId = await ensureEventEntityType(request, casesWorld)
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: status })
   casesWorld.lastEventId = (event as { id: string }).id
 })
 

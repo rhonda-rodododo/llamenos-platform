@@ -120,7 +120,7 @@ Executar `wrangler pages deploy dist` do diretorio errado implanta o build do ap
 O aplicativo desktop usa o Tauri updater para verificar novas versoes. Se as atualizacoes nao estao sendo detectadas:
 
 - Verifique sua conexao com a internet
-- Verifique se o endpoint de atualizacao esta acessivel: `https://github.com/rhonda-rodododo/llamenos/releases/latest/download/latest.json`
+- Verifique se o endpoint de atualizacao esta acessivel: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
 - No Linux, AppImage requer permissoes de escrita no diretorio onde esta o arquivo para atualizacao automatica
 - No macOS, o aplicativo deve estar em `/Applications` (nao rodando diretamente do DMG)
 
@@ -262,6 +262,6 @@ Se os eventos do hub falham na verificacao de assinatura:
 
 Se o seu problema nao esta coberto aqui:
 
-- Verifique as [Issues do GitHub](https://github.com/rhonda-rodododo/llamenos/issues) para bugs conhecidos e solucoes alternativas
+- Verifique as [Issues do GitHub](https://github.com/rhonda-rodododo/llamenos-platform/issues) para bugs conhecidos e solucoes alternativas
 - Pesquise issues existentes antes de criar uma nova
 - Ao reportar um bug, inclua: seu modo de implantacao (Cloudflare/Docker/Kubernetes), plataforma (Desktop/Mobile) e quaisquer mensagens de erro do console do navegador ou terminal
