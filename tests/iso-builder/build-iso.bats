@@ -12,6 +12,8 @@ setup() {
   TEST_KEY="${TEST_TMPDIR}/test_ed25519.pub"
   # Path to the script under test
   SCRIPT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)/scripts/build-iso.sh"
+  # Enable dry-run mode for all tests so Docker is never invoked
+  export BUILD_ISO_DRY_RUN=1
 }
 
 teardown() {
@@ -20,7 +22,7 @@ teardown() {
 
 # Helper: run with dry-run + required args + extra args
 run_dry() {
-  BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" \
+  bash "$SCRIPT" \
     --hostname test-host \
     --ssh-key "$TEST_KEY" \
     "$@"
@@ -29,13 +31,13 @@ run_dry() {
 # ── Required arguments ───────────────────────────────────────────────
 
 @test "missing --hostname exits with error" {
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" --ssh-key "$TEST_KEY"
+  run bash "$SCRIPT" --ssh-key "$TEST_KEY"
   [ "$status" -ne 0 ]
   [[ "$output" =~ "--hostname is required" ]]
 }
 
 @test "missing --ssh-key exits with error" {
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" --hostname test-host
+  run bash "$SCRIPT" --hostname test-host
   [ "$status" -ne 0 ]
   [[ "$output" =~ "--ssh-key is required" ]]
 }
@@ -49,19 +51,19 @@ run_dry() {
 # ── Hostname validation ──────────────────────────────────────────────
 
 @test "hostname with invalid chars is rejected" {
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" --hostname "invalid_host!" --ssh-key "$TEST_KEY"
+  run bash "$SCRIPT" --hostname "invalid_host!" --ssh-key "$TEST_KEY"
   [ "$status" -ne 0 ]
   [[ "$output" =~ "invalid hostname" ]]
 }
 
 @test "hostname starting with hyphen is rejected" {
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" --hostname "-badhost" --ssh-key "$TEST_KEY"
+  run bash "$SCRIPT" --hostname "-badhost" --ssh-key "$TEST_KEY"
   [ "$status" -ne 0 ]
   [[ "$output" =~ "invalid hostname" ]]
 }
 
 @test "uppercase hostname is rejected" {
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" --hostname "MYHOST" --ssh-key "$TEST_KEY"
+  run bash "$SCRIPT" --hostname "MYHOST" --ssh-key "$TEST_KEY"
   [ "$status" -ne 0 ]
   [[ "$output" =~ "invalid hostname" ]]
 }
@@ -74,7 +76,7 @@ run_dry() {
 # ── SSH key type validation ──────────────────────────────────────────
 
 @test "missing ssh key file exits with error" {
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" --hostname test-host --ssh-key /nonexistent/key.pub
+  run bash "$SCRIPT" --hostname test-host --ssh-key /nonexistent/key.pub
   [ "$status" -ne 0 ]
   [[ "$output" =~ "ssh key not found" ]]
 }
@@ -82,7 +84,7 @@ run_dry() {
 @test "rsa key is rejected" {
   # Create a fake RSA key file (just the type prefix is what matters)
   echo "ssh-rsa AAAA... user@host" > "${TEST_TMPDIR}/rsa.pub"
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" --hostname test-host --ssh-key "${TEST_TMPDIR}/rsa.pub"
+  run bash "$SCRIPT" --hostname test-host --ssh-key "${TEST_TMPDIR}/rsa.pub"
   [ "$status" -ne 0 ]
   [[ "$output" =~ "ssh-rsa" ]]
 }
@@ -204,7 +206,7 @@ run_dry() {
 # ── Help ─────────────────────────────────────────────────────────────
 
 @test "--help exits cleanly" {
-  run BUILD_ISO_DRY_RUN=1 bash "$SCRIPT" -h
+  run bash "$SCRIPT" -h
   [ "$status" -eq 0 ]
   [[ "$output" =~ "Usage:" ]]
 }
