@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "सुझाव के लिए कोई स्वयंसेवक उपलब्ध नहीं।";
 "cases_not_enabled" = "मामला प्रबंधन सक्षम नहीं है";
 "cases_not_enabled_hint" = "व्यवस्थापक को मामला प्रबंधन सक्षम करना होगा।";
-"cases_page_info" = "पृष्ठ %@ / %2$@";
+"cases_page_info" = "पृष्ठ %1$d / %2$d";
 "cases_related_hint" = "संबंधित मामले और जुड़े रिकॉर्ड यहाँ दिखाई देंगे।";
 "cases_related_placeholder" = "संबंधित";
 "cases_restricted" = "प्रतिबंधित";

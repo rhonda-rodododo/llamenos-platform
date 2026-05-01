@@ -1,5 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ExportOptions for App Store distribution.
+
+  TODO (post account activation): Fill in `teamID` with the 10-character
+  Apple Developer Team ID, and add a `provisioningProfiles` dictionary that
+  maps the bundle identifier `org.llamenos.hotline` to the App Store
+  provisioning profile name once it is created in the developer portal.
+
+  Example once known:
+      <key>teamID</key>
+      <string>AB12CD34EF</string>
+      <key>provisioningProfiles</key>
+      <dict>
+          <key>org.llamenos.hotline</key>
+          <string>Llamenos App Store</string>
+      </dict>
+-->
 <plist version="1.0">
 <dict>
     <key>method</key>
@@ -12,5 +29,9 @@
     <true/>
     <key>compileBitcode</key>
     <false/>
+    <key>stripSwiftSymbols</key>
+    <true/>
+    <key>teamID</key>
+    <string></string>
 </dict>
 </plist>

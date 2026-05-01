@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "لا يوجد متطوعون متاحون للاقتراح.";
 "cases_not_enabled" = "إدارة القضايا غير مفعّلة";
 "cases_not_enabled_hint" = "يحتاج مسؤول لتفعيل إدارة القضايا.";
-"cases_page_info" = "الصفحة %@ من %2$@";
+"cases_page_info" = "الصفحة %1$d من %2$d";
 "cases_related_hint" = "ستظهر هنا القضايا ذات الصلة والسجلات المرتبطة.";
 "cases_related_placeholder" = "ذات صلة";
 "cases_restricted" = "مقيَّد";

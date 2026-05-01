@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "Нет доступных волонтёров для предложения.";
 "cases_not_enabled" = "Управление делами не включено";
 "cases_not_enabled_hint" = "Администратор должен включить управление делами.";
-"cases_page_info" = "Страница %@ из %2$@";
+"cases_page_info" = "Страница %1$d из %2$d";
 "cases_related_hint" = "Связанные дела и записи появятся здесь.";
 "cases_related_placeholder" = "Связанные";
 "cases_restricted" = "Ограничено";
