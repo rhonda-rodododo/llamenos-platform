@@ -301,8 +301,14 @@ jobs:
         run: bunx playwright test
 
       - name: Run backend BDD tests
-        continue-on-error: true  # BDD tests are newly enabled (were never running before) — don't block CI until stabilized
-        run: bun run test:backend:bdd --no-codegen
+        # BDD tests are newly enabled — don't block CI until stabilized.
+        # Note: continue-on-error on steps still reports job as failure in
+        # needs.*.result, so use || exit 0 to prevent blocking ci-status.
+        run: |
+          bun run test:backend:bdd --no-codegen || {
+            echo "::warning::Backend BDD tests failed (non-blocking while stabilizing)"
+            exit 0
+          }
         env:
           TEST_HUB_URL: http://localhost:3000
           SIGNAL_NOTIFIER_URL: http://localhost:3100

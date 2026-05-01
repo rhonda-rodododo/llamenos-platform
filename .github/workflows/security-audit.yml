@@ -108,7 +108,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Scan Dockerfile.build with Trivy
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e7f3b01b8e110e21 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'config'
           scan-ref: 'Dockerfile.build'
@@ -118,7 +118,7 @@ jobs:
           exit-code: '0'
 
       - name: Scan deploy/docker/Dockerfile with Trivy
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e7f3b01b8e110e21 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'config'
           scan-ref: 'deploy/docker/Dockerfile'
@@ -128,7 +128,7 @@ jobs:
           exit-code: '0'
 
       - name: Scan Docker Compose files with Trivy
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e7f3b01b8e110e21 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'config'
           scan-ref: 'deploy/docker'
@@ -187,7 +187,7 @@ jobs:
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Build image for scanning
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198571cfb76f00 # v6.12.0
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: .
           file: ${{ matrix.image.dockerfile }}
@@ -197,7 +197,7 @@ jobs:
           cache-from: type=gha
 
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e7f3b01b8e110e21 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: 'llamenos-scan:latest'
           format: 'sarif'
@@ -213,7 +213,7 @@ jobs:
           category: 'image-scan'
 
       - name: Scan image with Trivy (table output for review)
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e7f3b01b8e110e21 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: 'llamenos-scan:latest'
           format: 'table'
