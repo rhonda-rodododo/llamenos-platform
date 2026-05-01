@@ -68,10 +68,10 @@ class HubManagementSteps : BaseSteps() {
             .fetchSemanticsNodes().isNotEmpty()
         if (hasList) {
             // Verify at least one hub card exists
-            val hubCards = composeRule.onAllNodes(hasTestTagPrefix("hub-card-"))
+            val hubCards = composeRule.onAllNodesWithTag("hub-row")
                 .fetchSemanticsNodes()
             if (hubCards.isNotEmpty()) {
-                onAllNodes(hasTestTagPrefix("hub-card-")).onFirst().assertIsDisplayed()
+                composeRule.onAllNodesWithTag("hub-row").onFirst().assertIsDisplayed()
             }
         }
         // Empty state or loading is also valid

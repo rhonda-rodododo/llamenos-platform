@@ -304,6 +304,7 @@ class EventsViewModel @Inject constructor(
     }
 
     fun refresh() {
+        checkCmsEnabled()
         loadEntityTypes()
     }
 

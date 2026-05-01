@@ -51,9 +51,17 @@ class ActiveCallSteps : BaseSteps() {
             Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}")
         }
 
-        // Navigate to dashboard to see the active call card
+        // Navigate to dashboard and wait for the active call card to appear.
+        // The card arrives via WebSocket/Nostr relay event — give it time to deliver.
         navigateToTab(NAV_DASHBOARD)
         composeRule.waitForIdle()
+        try {
+            composeRule.waitUntil(15_000) {
+                composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (_: Throwable) {
+            Log.w("ActiveCallSteps", "active-call-card did not appear within 15 s — relay event may be delayed")
+        }
     }
 
     // ---- Then ----
