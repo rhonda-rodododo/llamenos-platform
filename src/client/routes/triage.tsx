@@ -173,8 +173,16 @@ function TriagePage() {
   // Loading CMS status
   if (cmsEnabled === null) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Inbox className="h-6 w-6 text-primary" />
+          <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">
+            {t('triage.title', { defaultValue: 'Triage' })}
+          </h1>
+        </div>
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
       </div>
     )
   }
