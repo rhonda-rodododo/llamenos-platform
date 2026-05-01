@@ -1,7 +1,7 @@
-# CI workflow for desktop (Tauri) E2E tests.
-# Runs WebdriverIO tests against the Tauri debug binary.
+# CI workflow for desktop Playwright E2E tests.
+# Runs Playwright tests against a Vite build with mocked Tauri IPC.
 #
-# Trigger: PRs touching apps/desktop/ or tests/desktop/, manual dispatch.
+# Trigger: PRs touching apps/desktop/, src/client/, tests/, or packages/, manual dispatch.
 # Epic 88: Desktop & Mobile E2E Tests.
 
 name: Desktop E2E Tests
@@ -11,7 +11,9 @@ on:
     paths:
       - 'apps/desktop/**'
       - 'packages/crypto/**'
-      - 'tests/desktop/**'
+      - 'packages/protocol/**'
+      - 'packages/shared/**'
+      - 'tests/**'
       - 'src/client/**'
   workflow_dispatch:
 
@@ -37,49 +39,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
-        with:
-          toolchain: stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
-        with:
-          workspaces: apps/desktop
-
-      - name: Install Linux deps
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libgtk-3-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            webkit2gtk-driver \
-            xvfb
-
-      # Install msedgedriver on Windows for WebView2 testing
-      - name: Install msedgedriver (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          $edgeVersion = (Get-Item "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.FileVersion
-          $majorVersion = $edgeVersion.Split('.')[0]
-          Write-Host "Edge version: $edgeVersion (major: $majorVersion)"
-          $url = "https://msedgedriver.azureedge.net/$edgeVersion/edgedriver_win64.zip"
-          $fallbackUrl = "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip"
-          try { Invoke-WebRequest -Uri $url -OutFile edgedriver.zip } catch { Invoke-WebRequest -Uri $fallbackUrl -OutFile edgedriver.zip }
-          Expand-Archive -Path edgedriver.zip -DestinationPath "$PWD\edgedriver"
-          "$PWD\edgedriver" >> $env:GITHUB_PATH
-          Write-Host "msedgedriver installed at $PWD\edgedriver"
-        shell: pwsh
-
-      - name: Install tauri-driver
-        run: cargo install tauri-driver --locked
-
       - name: Install Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
         with:
@@ -88,17 +47,34 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # wdio.conf.ts onPrepare() handles building the debug binary
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
 
-      # Run tests on Linux with xvfb for headless display
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Install Playwright deps (cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
+      # Linux needs xvfb for headless Chromium
       - name: Run desktop E2E tests (Linux)
         if: matrix.platform == 'ubuntu-24.04'
+        run: xvfb-run bash scripts/test-desktop.sh
         env:
-          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
-          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
-        run: xvfb-run bun run test:desktop
+          CI: "true"
+          PLAYWRIGHT_TEST: "true"
 
-      # Run tests on Windows directly
+      # Windows: invoke bash explicitly for the shell script
       - name: Run desktop E2E tests (Windows)
         if: matrix.platform == 'windows-latest'
-        run: bun run test:desktop
+        run: bash scripts/test-desktop.sh
+        shell: bash
+        env:
+          CI: "true"
+          PLAYWRIGHT_TEST: "true"
