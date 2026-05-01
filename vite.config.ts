@@ -42,6 +42,9 @@ export default defineConfig({
         '@tauri-apps/api/core': path.resolve(__dirname, 'tests/mocks/tauri-core.ts'),
         '@tauri-apps/plugin-store': path.resolve(__dirname, 'tests/mocks/tauri-store.ts'),
         '@tauri-apps/plugin-updater': path.resolve(__dirname, 'tests/mocks/tauri-updater.ts'),
+        '@tauri-apps/plugin-process': path.resolve(__dirname, 'tests/mocks/tauri-process.ts'),
+        // Note: @tauri-apps/api/event is handled inline by platformListen in platform.ts
+        // for PLAYWRIGHT_TEST builds — no separate mock file needed.
       } : {}),
     },
     conditions: ['import', 'module', 'default'],
@@ -50,6 +53,7 @@ export default defineConfig({
     '__BUILD_TIME__': JSON.stringify(buildTime),
     '__BUILD_COMMIT__': JSON.stringify(buildCommit),
     '__BUILD_VERSION__': JSON.stringify(buildVersion),
+    '__VERSION_FLOOR__': JSON.stringify(buildVersion),
     // Make PLAYWRIGHT_TEST available as import.meta.env.PLAYWRIGHT_TEST in the browser
     ...(isTestBuild ? { 'import.meta.env.PLAYWRIGHT_TEST': JSON.stringify('true') } : {}),
   },

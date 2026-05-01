@@ -12,6 +12,7 @@
  */
 
 import type { Update } from '@tauri-apps/plugin-updater'
+import { platformListen, platformRelaunch } from '@/lib/platform'
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -39,6 +40,22 @@ export type UpdateStatus =
 // ── Constants ────────────────────────────────────────────────────
 
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6 hours
+
+// ── Version comparison ────────────────────────────────────────────
+
+/**
+ * Returns true if `a` is semantically >= `b`.
+ * Supports standard semver (MAJOR.MINOR.PATCH) and ignores pre-release tags.
+ */
+function semverGte(a: string, b: string): boolean {
+  const parse = (v: string) =>
+    v.split('-')[0].split('.').map(Number)
+  const [aMaj = 0, aMin = 0, aPat = 0] = parse(a)
+  const [bMaj = 0, bMin = 0, bPat = 0] = parse(b)
+  if (aMaj !== bMaj) return aMaj > bMaj
+  if (aMin !== bMin) return aMin > bMin
+  return aPat >= bPat
+}
 const STARTUP_DELAY_MS = 5_000 // 5 seconds after launch
 const SKIPPED_VERSIONS_KEY = 'skipped-update-versions'
 
@@ -105,6 +122,15 @@ export async function checkForUpdate(opts?: {
 
   if (!update) return null
 
+  // Anti-rollback: reject updates below the compiled-in version floor.
+  // Prevents a compromised update endpoint from serving an older, vulnerable build.
+  if (!semverGte(update.version, __VERSION_FLOOR__)) {
+    console.warn(
+      `[updater] Rejected update v${update.version} — below version floor v${__VERSION_FLOOR__}`,
+    )
+    return null
+  }
+
   // Respect skipped versions unless explicitly overridden (e.g. manual check from tray)
   if (!opts?.ignoreSkipped && (await isVersionSkipped(update.version))) {
     return null
@@ -149,10 +175,10 @@ export async function downloadAndInstall(
 
 /**
  * Relaunch the application after update installation.
+ * Routes through platform.ts — never imports from @tauri-apps/* directly.
  */
 export async function relaunchApp(): Promise<void> {
-  const { relaunch } = await import('@tauri-apps/plugin-process')
-  await relaunch()
+  await platformRelaunch()
 }
 
 // ── Scheduled checker ────────────────────────────────────────────
@@ -200,11 +226,9 @@ export function startUpdateScheduler(
   // Listen for tray "Check for Updates" event from Rust
   ;(async () => {
     try {
-      const { listen } = await import('@tauri-apps/api/event')
-      const unlisten = await listen('check-for-updates', () => {
+      unlistenFn = await platformListen('check-for-updates', () => {
         doCheck({ ignoreSkipped: true })
       })
-      unlistenFn = unlisten
     } catch {
       // Not in Tauri context — no-op
     }

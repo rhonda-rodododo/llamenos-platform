@@ -120,4 +120,97 @@ test.describe('Auto-Update (Epic 289)', () => {
     // Should show restart button when done
     await expect(page.locator('[data-testid="update-restart-btn"]')).toBeVisible({ timeout: 10000 })
   })
+
+  test('clicking restart relaunch calls platformRelaunch', async ({ page }) => {
+    const mockUpdate = {
+      version: '99.0.0',
+      body: 'Test',
+      downloadSize: 512 * 1024,
+    }
+
+    await reloadWithMockUpdate(page, mockUpdate)
+
+    const banner = page.locator('[data-testid="update-banner"]')
+    await expect(banner).toBeVisible({ timeout: 15000 })
+
+    // Trigger download
+    await page.locator('[data-testid="update-download-btn"]').click()
+    await expect(page.locator('[data-testid="update-restart-btn"]')).toBeVisible({ timeout: 10000 })
+
+    // Clear any previous relaunch flag
+    await page.evaluate(() => {
+      delete (window as Record<string, unknown>).__RELAUNCH_CALLED__
+    })
+
+    // Click restart
+    await page.locator('[data-testid="update-restart-btn"]').click()
+
+    // platform.ts sets __RELAUNCH_CALLED__ = true in test builds
+    const relaunched = await page.evaluate(() =>
+      (window as Record<string, unknown>).__RELAUNCH_CALLED__ === true,
+    )
+    expect(relaunched).toBe(true)
+  })
+
+  test('failed download reverts banner to "available" state', async ({ page }) => {
+    const mockUpdate = {
+      version: '99.0.0',
+      body: 'Test release',
+      failDownload: true,
+    }
+
+    await reloadWithMockUpdate(page, mockUpdate)
+
+    const banner = page.locator('[data-testid="update-banner"]')
+    await expect(banner).toBeVisible({ timeout: 15000 })
+
+    // Trigger download (will fail)
+    await page.locator('[data-testid="update-download-btn"]').click()
+
+    // After failure, banner should revert — download button should reappear
+    await expect(page.locator('[data-testid="update-download-btn"]')).toBeVisible({ timeout: 10000 })
+
+    // Restart button must NOT appear after a failed download
+    await expect(page.locator('[data-testid="update-restart-btn"]')).not.toBeVisible()
+  })
+
+  test('skipped version is not shown again after reload', async ({ page }) => {
+    const mockUpdate = {
+      version: '99.0.0',
+      body: 'Security release',
+    }
+
+    await reloadWithMockUpdate(page, mockUpdate)
+
+    const banner = page.locator('[data-testid="update-banner"]')
+    await expect(banner).toBeVisible({ timeout: 15000 })
+
+    // Open dialog and skip
+    await page.locator('[data-testid="update-details-btn"]').click()
+    await page.locator('[data-testid="update-skip-btn"]').click()
+    await expect(banner).not.toBeVisible()
+
+    // Reload with same version — should NOT reappear
+    await reloadWithMockUpdate(page, mockUpdate)
+
+    // Wait for the startup delay + check to run, then assert banner absent
+    await page.waitForTimeout(8000)
+    await expect(page.locator('[data-testid="update-banner"]')).not.toBeVisible()
+  })
+
+  test('update below version floor is silently rejected', async ({ page }) => {
+    // Set a version far below the current app version — should be rejected by floor check
+    const mockUpdate = {
+      version: '0.0.1',
+      body: 'Rollback attempt',
+    }
+
+    await reloadWithMockUpdate(page, mockUpdate)
+
+    // Wait longer than the startup delay + one check interval
+    await page.waitForTimeout(8000)
+
+    // Banner must NOT appear — floor check rejected the downgrade
+    await expect(page.locator('[data-testid="update-banner"]')).not.toBeVisible()
+  })
 })
