@@ -8,7 +8,11 @@
  */
 import postgres from 'postgres'
 
-const sql = postgres(process.env.DATABASE_URL || 'postgres://llamenos:dev@localhost:5432/llamenos')
+const databaseUrl = process.env.DATABASE_URL || 'postgres://llamenos:dev@localhost:5432/llamenos'
+const sql = postgres(databaseUrl, {
+  connect_timeout: 10,
+  onnotice: () => {},
+})
 
 /** Validate a SQL identifier (table/column name) to prevent injection. */
 function validateIdentifier(name: string): void {
