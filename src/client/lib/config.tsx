@@ -82,7 +82,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setNeedsBootstrap(!!config.needsBootstrap)
         if (config.hubs?.length) {
           setHubs(config.hubs)
-          const hubId = config.defaultHubId || config.hubs[0].id
+          // In test builds, the Before hook injects __TEST_WORKER_HUB via addInitScript
+          // so each Playwright worker uses its isolated hub instead of the server default.
+          const testHub = (window as unknown as Record<string, unknown>).__TEST_WORKER_HUB as string | undefined
+          const hubId = testHub || config.defaultHubId || config.hubs[0].id
           setDefaultHubId(hubId)
           setCurrentHubIdState(hubId)
           setActiveHub(hubId)
