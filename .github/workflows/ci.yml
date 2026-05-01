@@ -301,7 +301,7 @@ jobs:
         run: bunx playwright test
         env:
           TEST_HUB_URL: http://localhost:3000
-          TEST_RELAY_URL: ws://localhost:7777
+          TEST_RELAY_URL: ws://127.0.0.1:7777
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
@@ -311,7 +311,7 @@ jobs:
         timeout-minutes: 15
         env:
           TEST_HUB_URL: http://localhost:3000
-          TEST_RELAY_URL: ws://localhost:7777
+          TEST_RELAY_URL: ws://127.0.0.1:7777
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
