@@ -6,6 +6,7 @@ dist
 *.log
 tests
 site
+!site/package.json
 docs
 .playwright
 data

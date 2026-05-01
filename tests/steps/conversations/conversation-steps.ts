@@ -12,21 +12,36 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
+import { simulateIncomingMessage } from '../../simulation-helpers'
 
 Given('I navigate to the conversations tab', async ({ page }) => {
   const { Navigation } = await import('../../pages/index')
   await Navigation.goToConversations(page)
 })
 
-Given('I open a conversation', async ({ page }) => {
+Given('I open a conversation', async ({ page, backendRequest }) => {
   const conversationItem = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
   const hasItem = await conversationItem.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (!hasItem) {
-    // No conversations exist in this hub — store flag so downstream assertions can skip
+    // No conversations in this hub — create one via simulation so the step can proceed.
+    await simulateIncomingMessage(backendRequest, {
+      senderNumber: `+1555${Date.now().toString().slice(-7)}`,
+      body: 'Auto-seeded test message',
+      channel: 'sms',
+    }).catch(() => { /* ignore if simulation endpoint is unavailable */ })
+
+    // Reload to show the new conversation
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+  }
+  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
+  const exists = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (!exists) {
+    // Simulation may not be available — record flag for downstream steps to handle
     await page.evaluate(() => { (window as Record<string, unknown>).__test_no_conversations = true })
     return
   }
-  await conversationItem.click()
+  await item.click()
 })
 
 Then('the filter chips should be visible', async ({ page }) => {

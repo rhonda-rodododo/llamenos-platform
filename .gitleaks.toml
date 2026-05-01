@@ -1,0 +1,12 @@
+# Gitleaks configuration — allowlist for false positives.
+# Documentation files contain placeholder/example credentials that are not real secrets.
+
+[allowlist]
+  description = "Documentation and test example values"
+
+  # Translated deployment docs contain example env vars like TWILIO_AUTH_TOKEN=ihr_token
+  paths = [
+    '''site/src/content/docs/.*/deploy.*\.md$''',
+    '''site/src/content/docs/.*/setup.*\.md$''',
+    '''\.env\.example$''',
+  ]
