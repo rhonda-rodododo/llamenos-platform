@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "没有可建议的志愿者。";
 "cases_not_enabled" = "案件管理未启用";
 "cases_not_enabled_hint" = "管理员需要启用案件管理。";
-"cases_page_info" = "第 %@ 页，共 %2$@ 页";
+"cases_page_info" = "第 %1$d 页，共 %2$d 页";
 "cases_related_hint" = "相关案件和关联记录将显示在此处。";
 "cases_related_placeholder" = "相关";
 "cases_restricted" = "受限";

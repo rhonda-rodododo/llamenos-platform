@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "No hay voluntarios disponibles para sugerir.";
 "cases_not_enabled" = "La gestión de casos no está habilitada";
 "cases_not_enabled_hint" = "Un admin necesita habilitar la gestión de casos.";
-"cases_page_info" = "Página %@ de %2$@";
+"cases_page_info" = "Página %1$d de %2$d";
 "cases_related_hint" = "Los casos relacionados y registros vinculados aparecerán aquí.";
 "cases_related_placeholder" = "Relacionados";
 "cases_restricted" = "Restringido";

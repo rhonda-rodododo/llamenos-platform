@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "Không có tình nguyện viên khả dụng.";
 "cases_not_enabled" = "Quản lý hồ sơ chưa bật";
 "cases_not_enabled_hint" = "Quản trị viên cần bật quản lý hồ sơ.";
-"cases_page_info" = "Trang %@ / %2$@";
+"cases_page_info" = "Trang %1$d / %2$d";
 "cases_related_hint" = "Hồ sơ liên quan và bản ghi liên kết sẽ xuất hiện ở đây.";
 "cases_related_placeholder" = "Liên quan";
 "cases_restricted" = "Hạn chế";

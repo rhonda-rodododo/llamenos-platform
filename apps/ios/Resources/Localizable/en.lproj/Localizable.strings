@@ -765,7 +765,7 @@
 "cases_not_enabled" = "Case management is not enabled";
 "cases_not_enabled_hint" = "An admin needs to enable case management.";
 "cases_oldest_first" = "Oldest first";
-"cases_page_info" = "Page %@ of %2$@";
+"cases_page_info" = "Page %1$d of %2$d";
 "cases_related_hint" = "Related cases and linked records will appear here.";
 "cases_related_placeholder" = "Related";
 "cases_restricted" = "Restricted";

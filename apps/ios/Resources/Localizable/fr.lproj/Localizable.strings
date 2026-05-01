@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "Aucun volontaire disponible à suggérer.";
 "cases_not_enabled" = "La gestion des dossiers n'est pas activée";
 "cases_not_enabled_hint" = "Un admin doit activer la gestion des dossiers.";
-"cases_page_info" = "Page %@ sur %2$@";
+"cases_page_info" = "Page %1$d sur %2$d";
 "cases_related_hint" = "Les dossiers liés et enregistrements associés apparaîtront ici.";
 "cases_related_placeholder" = "Liés";
 "cases_restricted" = "Restreint";
