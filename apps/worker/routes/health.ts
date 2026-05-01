@@ -32,15 +32,16 @@ async function checkPostgres(): Promise<CheckResult> {
 }
 
 async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> {
-  // Backward-compat: accept legacy STORAGE_ENDPOINT (deprecated)
-  const endpoint = (env.STORAGE_ENDPOINT as string | undefined) || (env.STORAGE_ENDPOINT as string | undefined)
+  const endpoint = (env.STORAGE_ENDPOINT as string | undefined) || (env.MINIO_ENDPOINT as string | undefined)
   if (!endpoint) return { status: 'failing', detail: 'STORAGE_ENDPOINT not configured' }
   const t0 = Date.now()
   try {
-    const url = `${endpoint.replace(/\/$/, '')}/health`
+    // RustFS doesn't serve /minio/health/live — returns 403 on all unauthenticated paths.
+    // A 403 still proves the server is running and reachable.
+    const url = `${endpoint.replace(/\/$/, '')}/`
     const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
-    if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
-    return { status: 'ok', latencyMs: Date.now() - t0 }
+    if (res.ok || res.status === 403) return { status: 'ok', latencyMs: Date.now() - t0 }
+    return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
   } catch (err) {
     return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
   }
