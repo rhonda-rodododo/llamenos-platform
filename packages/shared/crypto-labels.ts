@@ -11,6 +11,11 @@
  * 3. All constants are prefixed with 'llamenos:' for collision avoidance
  */
 
+// --- ECIES V2 Key Derivation ---
+
+/** HKDF salt for ECIES V2 symmetric key derivation (secp256k1 ECDH + XChaCha20-Poly1305) */
+export const LABEL_ECIES_V2_SALT = 'llamenos:ecies:v2'
+
 // --- ECIES Key Wrapping ---
 
 /** Per-note symmetric key wrapping (V2 forward secrecy) */
@@ -73,6 +78,9 @@ export const SAS_INFO = 'llamenos:provisioning-sas'
 
 /** Schnorr auth token message prefix */
 export const AUTH_PREFIX = 'llamenos:auth:'
+
+/** Ed25519 device auth token message binding (v1) */
+export const LABEL_DEVICE_AUTH = 'llamenos:device-auth:v1'
 
 // --- HMAC Domain Separation ---
 

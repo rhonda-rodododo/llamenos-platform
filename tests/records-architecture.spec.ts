@@ -159,7 +159,6 @@ test.describe('Records Architecture', () => {
     // After loading, the page must show either contact rows or an empty state — never blank
     const content = page.getByTestId(TestIds.CONTACT_ROW).first()
       .or(page.getByTestId(TestIds.EMPTY_STATE))
-      .or(page.getByText(/no contacts found/i).first())
     await expect(content).toBeVisible({ timeout: 10000 })
   })
 
