@@ -1,12 +1,23 @@
 # Gitleaks configuration — allowlist for false positives.
-# Documentation files contain placeholder/example credentials that are not real secrets.
+# See: https://github.com/gitleaks/gitleaks#configuration
+
+[extend]
+useDefault = true
 
 [allowlist]
-  description = "Documentation and test example values"
+description = "Documentation examples and development-only credential defaults"
 
-  # Translated deployment docs contain example env vars like TWILIO_AUTH_TOKEN=ihr_token
-  paths = [
-    '''site/src/content/docs/.*/deploy.*\.md$''',
-    '''site/src/content/docs/.*/setup.*\.md$''',
-    '''\.env\.example$''',
-  ]
+# Translated deployment docs contain placeholder/example credentials
+paths = [
+  '''site/src/content/docs/.*/deploy.*\.md$''',
+  '''site/src/content/docs/.*/setup.*\.md$''',
+  '''\.env\.example$''',
+]
+
+# Dev-only credential defaults in Docker Compose configs (not used in production)
+regexes = [
+  # RustFS local dev default — mirrors docker-compose.dev.yml RUSTFS_*_KEY values
+  '''(STORAGE|RUSTFS)_(ACCESS|SECRET)_KEY\s*[:=]\s*rustfsadmin''',
+  # MinIO local dev default — standard minioadmin default, no production use
+  '''MINIO_(ACCESS|SECRET)_KEY\s*[:=]\s*minioadmin''',
+]
