@@ -79,3 +79,13 @@ build → e2e-cf + e2e-docker (parallel) → version → deploy-app + deploy-sit
 | Version desync across platforms | Build failures | Always use bun run version:bump |
 | Missing ADMIN_PUBKEY | No bootstrap admin | Run bun run bootstrap-admin first |
 | Pushing without E2E passing | Broken deploy | CI gates on both CF + Docker E2E |
+
+
+## Offline Signing Workflow
+
+For the complete offline artifact signing and release promotion workflow, use the `/release` skill.
+That skill handles: fetching staging artifacts from RustFS, reproducible build verification,
+minisign signing, promoting to the release bucket, generating the Tauri updater manifest,
+committing to the `llamenos-releases` audit repo, and verifying the live endpoint.
+
+See: `.claude/skills/release-signing/SKILL.md`
