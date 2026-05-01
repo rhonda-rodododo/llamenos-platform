@@ -175,6 +175,7 @@ struct ConversationsView: View {
 /// unread count, status, and last message time.
 struct ConversationRowView: View {
     let conversation: AppConversation
+    @Environment(\.layoutDirection) private var layoutDirection
 
     var body: some View {
         HStack(spacing: 12) {
@@ -187,7 +188,7 @@ struct ConversationRowView: View {
                     .foregroundStyle(.white)
                     .frame(width: 16, height: 16)
                     .background(Circle().fill(channelColor))
-                    .offset(x: 2, y: 2)
+                    .offset(x: layoutDirection == .rightToLeft ? -2 : 2, y: 2)
                     .accessibilityLabel(conversation.channel.displayName)
             }
 
