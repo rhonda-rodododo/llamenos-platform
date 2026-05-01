@@ -82,6 +82,11 @@ export default defineConfig({
       },
       fullyParallel: true,
       workers: 3,
+      // Wait for bootstrap tests to finish before starting.
+      // backend-bdd scenarios create a hub per-scenario via workerHub fixture —
+      // if bootstrap's test-reset-no-admin runs concurrently, the admin is gone
+      // and hub creation returns 401.
+      dependencies: ["bootstrap"],
     },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
