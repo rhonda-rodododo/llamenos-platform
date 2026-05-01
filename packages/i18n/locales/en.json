@@ -2790,7 +2790,8 @@
     "updateRequiredButton": "Update Now",
     "updateRequiredMessage": "Your app is out of date and can no longer connect to the server. Please update to continue.",
     "updateRequiredTitle": "Update Required",
-    "versionChange": "{{current}} → {{new}}"
+    "versionChange": "{{current}} → {{new}}",
+    "errorRetry": "Update check failed. Try again from the tray menu."
   },
   "useBiometric": "Use Biometric",
   "webauthn": {

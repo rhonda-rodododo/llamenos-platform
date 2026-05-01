@@ -1024,3 +1024,47 @@ export async function decryptProvisionedNsec(
 ): Promise<ProvisioningDecryptResult> {
   throw new Error('decryptProvisionedNsec removed in v3')
 }
+
+// ── Updater platform support ─────────────────────────────────────────
+
+/**
+ * Listen for a Tauri event emitted by the native side (e.g. tray menu items).
+ * Returns an unlisten function. Registers in-process in test builds.
+ */
+export async function platformListen(
+  event: string,
+  handler: () => void,
+): Promise<() => void> {
+  if (import.meta.env.PLAYWRIGHT_TEST) {
+    const win = window as unknown as Record<string, unknown>
+    if (!win.__TAURI_EVENT_LISTENERS__) win.__TAURI_EVENT_LISTENERS__ = {}
+    const map = win.__TAURI_EVENT_LISTENERS__ as Record<string, Array<() => void>>
+    if (!map[event]) map[event] = []
+    map[event].push(handler)
+    return () => {
+      map[event] = (map[event] ?? []).filter(h => h !== handler)
+    }
+  }
+  if (useTauri) {
+    const { listen } = await import('@tauri-apps/api/event')
+    return listen(event, handler)
+  }
+  return () => {}
+}
+
+/**
+ * Relaunch the application (used after update installation).
+ * Sets window.__RELAUNCH_CALLED__ = true in test builds for assertion.
+ */
+export async function platformRelaunch(): Promise<void> {
+  if (import.meta.env.PLAYWRIGHT_TEST) {
+    ;(window as unknown as Record<string, unknown>).__RELAUNCH_CALLED__ = true
+    return
+  }
+  if (useTauri) {
+    const { relaunch } = await import('@tauri-apps/plugin-process')
+    await relaunch()
+    return
+  }
+  throw new Error('platformRelaunch: not in Tauri context')
+}
