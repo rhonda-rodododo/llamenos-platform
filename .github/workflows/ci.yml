@@ -680,9 +680,9 @@ jobs:
 
       - name: Start S3-compatible storage for tests
         env:
-          S3_COMPAT_VERSION: "RELEASE.2025-01-20T14-49-07Z"
+          S3_COMPAT_VERSION: "RELEASE.2025-09-07T16-13-09Z"
           # SHA-256 of darwin-arm64 binary for S3_COMPAT_VERSION above.
-          S3_COMPAT_SHA256: "8b790ea8e3819a8c7d0e2fd2ff90e879a5e0e6df6f9def07e9459d45fe29c5ac"
+          S3_COMPAT_SHA256: "7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
         run: |
           # Download URL base64-encoded to avoid literal upstream vendor name in source
           # Decode: echo "aHR0cHM6Ly9kbC5taW4uaW8vc2VydmVyL21pbmlvL3JlbGVhc2UvZGFyd2luLWFybTY0L2FyY2hpdmUvbWluaW8u" | base64 -d
