@@ -980,7 +980,13 @@ export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
   if (useTauri) {
     // Use the mock/Rust to generate a random Ed25519 seed and derive pubkey
     const result = await tauriInvoke<{ signingPubkeyHex: string; seedHex: string }>('generate_ephemeral_ed25519')
-    return { publicKey: result.signingPubkeyHex, npub: '', nsec: result.seedHex }
+    // Encode the 32-byte seed as bech32 nsec1... format so callers see the
+    // canonical nsec representation (63 chars, starts with "nsec1").
+    // loginAsVolunteer accepts both bech32 and raw hex via nsecToHex().
+    const { nip19 } = await import('nostr-tools')
+    const seedBytes = new Uint8Array(result.seedHex.match(/.{2}/g)!.map(h => parseInt(h, 16)))
+    const nsec = nip19.nsecEncode(seedBytes)
+    return { publicKey: result.signingPubkeyHex, npub: '', nsec }
   }
   throw new Error('WASM ephemeral keypair not yet implemented')
 }
