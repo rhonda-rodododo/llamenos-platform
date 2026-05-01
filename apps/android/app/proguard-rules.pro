@@ -64,3 +64,38 @@
 -keep class androidx.security.crypto.EncryptedSharedPreferences { *; }
 -keep class androidx.security.crypto.MasterKey { *; }
 -keep class androidx.security.crypto.MasterKey$Builder { *; }
+
+# Compose — keep lambda group classes and stability annotations intact
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}
+
+# Firebase Messaging — keep service and message handler entry points
+-keep class com.google.firebase.messaging.FirebaseMessagingService { *; }
+-keep class * extends com.google.firebase.messaging.FirebaseMessagingService { *; }
+-dontwarn com.google.firebase.**
+
+# CameraX — keep use-case and lifecycle integration classes
+-keep class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
+
+# ML Kit barcode scanning
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+-keep class com.google.android.gms.internal.mlkit_vision_barcode.** { *; }
+
+# Linphone SDK — native bridge and listener interfaces must survive shrinking
+-keep class org.linphone.** { *; }
+-dontwarn org.linphone.**
+
+# DataStore Preferences — keep generated Proto/Preferences serialization
+-keep class androidx.datastore.** { *; }
+-dontwarn androidx.datastore.**
+
+# Kotlin coroutines — keep debug metadata and continuation classes
+-keepclassmembernames class kotlinx.** {
+    volatile <fields>;
+}
+-dontwarn kotlinx.coroutines.**
