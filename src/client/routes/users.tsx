@@ -367,6 +367,11 @@ function AddUserForm({ roles, onCreated, onCancel }: {
     try {
       const keyPair = await generateEphemeralKeypair()
       const user = await createUser({ name, phone, roleIds: [roleId], pubkey: keyPair.publicKey })
+      // Expose seedHex for test infrastructure (deviceImportAndLoad requires Ed25519 seed, not secp256k1)
+      const win = window as unknown as Record<string, unknown>
+      if (typeof window !== 'undefined' && win.__TEST_PLATFORM) {
+        win.__last_vol_seed_hex = keyPair.seedHex
+      }
       onCreated(user, keyPair.nsec)
       toast(t('users.userAdded'), 'success')
     } catch {

@@ -238,6 +238,18 @@ export async function logout(page: Page) {
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
 }
 
+/**
+ * Create a volunteer via UI and return the raw Ed25519 seed hex for login.
+ *
+ * The displayed nsec (bech32 "nsec1...") is only for user display. Internally,
+ * the volunteer was created with an Ed25519 keypair. We return the raw seedHex
+ * so that `loginAsVolunteer` uses `deviceImportAndLoad` (Ed25519), not
+ * `legacyImportNsec` (secp256k1), which would derive a different pubkey and
+ * break auth.
+ *
+ * The seedHex is stored in `window.__last_vol_seed_hex` by users.tsx after
+ * calling generateEphemeralKeypair().
+ */
 export async function createUserAndGetNsec(page: Page, name: string, phone: string): Promise<string> {
   await page.getByTestId(TestIds.NAV_VOLUNTEERS).click()
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible()
@@ -250,6 +262,17 @@ export async function createUserAndGetNsec(page: Page, name: string, phone: stri
 
   const nsecCode = page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)
   await expect(nsecCode).toBeVisible({ timeout: Timeouts.API })
+
+  // Try to get the raw Ed25519 seedHex from window state (set by users.tsx).
+  // If available, return it so loginAsVolunteer uses deviceImportAndLoad (Ed25519).
+  // If not available (e.g., pre-test reload), fall back to bech32 nsec from DOM.
+  const seedHex = await page.evaluate(
+    () => (window as Record<string, unknown>).__last_vol_seed_hex as string | undefined,
+  )
+  if (seedHex && /^[0-9a-f]{64}$/.test(seedHex)) {
+    return seedHex
+  }
+
   const nsec = await nsecCode.textContent()
   if (!nsec) throw new Error('Failed to get nsec')
   return nsec
