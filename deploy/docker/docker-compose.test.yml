@@ -15,6 +15,17 @@ services:
   # Fix strfry for CI: mount config with nofiles=0 (don't attempt to set ulimit)
   # Override ulimits from base compose (1M exceeds GitHub Actions limit of 65536)
   # Expose port 7777 so backend-bdd relay tests can connect from the test process host.
+  # Expose PostgreSQL to the host so backend-bdd tests (db-helpers.ts) can
+  # query the database directly from the Playwright test runner.
+  postgres:
+    ports:
+      - "5432:5432"
+    # Base compose puts postgres on `internal` only (internal: true blocks host
+    # port exposure). Add `web` so the port mapping actually works in CI.
+    networks:
+      - internal
+      - web
+
   strfry:
     ports:
       - "7777:7777"
