@@ -232,9 +232,9 @@ export const TestIds = {
 
   // ============ Settings Sections ============
   SETTINGS_CUSTOM_FIELDS: 'custom-fields',
-  SETTINGS_TELEPHONY: 'telephony',
+  SETTINGS_TELEPHONY: 'telephony-provider',
   SETTINGS_TRANSCRIPTION: 'transcription',
-  SETTINGS_SPAM: 'spam-section',
+  SETTINGS_SPAM: 'spam',
   SETTINGS_KEY_BACKUP: 'key-backup',
   SETTINGS_LINKED_DEVICES: 'linked-devices',
   SETTINGS_ADVANCED: 'advanced',

@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
-import { pubkeyFromNsec, encryptWithPin, createAuthToken, hasStoredKey } from './platform'
+import {
+  pubkeyFromNsec,
+  legacyImportNsec,
+  persistAndUnlockDeviceKeys,
+  lockCrypto,
+  createAuthToken,
+  hasStoredKey,
+} from './platform'
 import * as keyManager from './key-manager'
 import { getMe, login, logout as apiLogout, updateMyAvailability, setOnAuthExpired, setOnApiActivity } from './api'
 import { permissionGranted } from '@shared/permissions'
@@ -206,8 +213,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { mounted = false }
   }, [])
 
-  // Sign in with nsec + PIN (import flow — onboarding/recovery only)
-  // The nsec is encrypted with the PIN and loaded into CryptoState; auth token created from state.
+  // Sign in with nsec + PIN (legacy recovery — secp256k1 Nostr key import)
+  // Decodes the bech32 nsec, imports via legacy_import_nsec IPC, persists encrypted.
   const signIn = useCallback(async (nsec: string, pin: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }))
     const pubkeyHex = await pubkeyFromNsec(nsec)
@@ -216,8 +223,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     try {
-      // Load nsec into CryptoState (nsec stays in Rust/WASM — never enters JS from this point)
-      await encryptWithPin(nsec, pin, pubkeyHex)
+      // Decode nsec bech32 to raw hex secret key, import via legacy path
+      const { nip19 } = await import('nostr-tools')
+      const { bytesToHex } = await import('@noble/hashes/utils.js')
+      const decoded = nip19.decode(nsec)
+      if (decoded.type !== 'nsec') throw new Error('Invalid nsec format')
+      const nsecHex = bytesToHex(decoded.data as Uint8Array)
+      // Import and persist the legacy key — key stays unlocked in CryptoState
+      const encrypted = await legacyImportNsec(nsecHex, pin, crypto.randomUUID())
+      await persistAndUnlockDeviceKeys(encrypted, pin)
+      keyManager.markUnlocked(pubkeyHex)
       // Create auth token using CryptoState (nsec never leaves Rust)
       const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/login')
       const parsed = JSON.parse(tokenJson)
