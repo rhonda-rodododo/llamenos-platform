@@ -406,6 +406,35 @@ jobs:
       - name: Install dependencies and run codegen
         run: bun install --frozen-lockfile && bun run codegen
 
+      - name: Create .env for Docker Compose
+        env:
+          TEST_ADMIN_PUBKEY: ${{ env.TEST_ADMIN_PUBKEY }}
+        run: |
+          printf '%s\n' \
+            "ADMIN_PUBKEY=$TEST_ADMIN_PUBKEY" \
+            "DOMAIN=localhost" \
+            "PG_PASSWORD=ci-test-password" \
+            "HMAC_SECRET=$(openssl rand -hex 32)" \
+            "MINIO_ACCESS_KEY=testaccess" \
+            "MINIO_SECRET_KEY=testsecret123456" \
+            "HOTLINE_NAME=Llámenos" \
+            "BRIDGE_SECRET=ci-test-bridge-secret" \
+            "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "NOTIFIER_API_KEY=ci-test-notifier-key" \
+            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+            "PBX_TYPE=asterisk" \
+            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            > .env
+
+      - name: Start backend services
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --wait app
+        timeout-minutes: 10
+
       - name: Setup Java 17
         uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
@@ -478,7 +507,11 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           emulator-boot-timeout: 600
-          script: cd apps/android && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}"
+          script: |
+            cd apps/android && ./gradlew connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" \
+              -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" \
+              -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
