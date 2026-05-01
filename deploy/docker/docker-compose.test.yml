@@ -20,6 +20,11 @@ services:
   postgres:
     ports:
       - "5432:5432"
+    # Base compose puts postgres on `internal` only (internal: true blocks host
+    # port exposure). Add `web` so the port mapping actually works in CI.
+    networks:
+      - internal
+      - web
 
   strfry:
     ports:
