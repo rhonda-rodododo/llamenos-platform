@@ -3,18 +3,14 @@
 <!--
   ExportOptions for App Store distribution.
 
-  Signing strategy: matches `apps/ios/project.yml` which sets
-  CODE_SIGN_STYLE=Automatic. Xcode handles provisioning profiles via
-  `xcodebuild -allowProvisioningUpdates`. The only field that must be
-  populated post account activation is `teamID` — the 10-character Apple
-  Developer Team ID (e.g. "AB12CD34EF").
+  TODO (post account activation): Fill in `teamID` with the 10-character
+  Apple Developer Team ID, and add a `provisioningProfiles` dictionary that
+  maps the bundle identifier `org.llamenos.hotline` to the App Store
+  provisioning profile name once it is created in the developer portal.
 
-  TODO (post account activation): set `teamID` below.
-
-  If you ever need to switch to manual signing, set `signingStyle` to
-  `manual` and add a `provisioningProfiles` dictionary mapping bundle ID
-  to profile name:
-
+  Example once known:
+      <key>teamID</key>
+      <string>AB12CD34EF</string>
       <key>provisioningProfiles</key>
       <dict>
           <key>org.llamenos.hotline</key>
@@ -28,7 +24,7 @@
     <key>destination</key>
     <string>upload</string>
     <key>signingStyle</key>
-    <string>automatic</string>
+    <string>manual</string>
     <key>uploadSymbols</key>
     <true/>
     <key>compileBitcode</key>
