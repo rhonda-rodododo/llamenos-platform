@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "Keine Freiwilligen verfügbar.";
 "cases_not_enabled" = "Fallverwaltung ist nicht aktiviert";
 "cases_not_enabled_hint" = "Ein Admin muss die Fallverwaltung aktivieren.";
-"cases_page_info" = "Seite %@ von %2$@";
+"cases_page_info" = "Seite %1$d von %2$d";
 "cases_related_hint" = "Verwandte Fälle und verknüpfte Einträge erscheinen hier.";
 "cases_related_placeholder" = "Verknüpft";
 "cases_restricted" = "Eingeschränkt";

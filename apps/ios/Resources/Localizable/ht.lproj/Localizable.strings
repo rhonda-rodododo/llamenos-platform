@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "Pa gen volontè disponib pou sigjere.";
 "cases_not_enabled" = "Jesyon dosye pa aktive";
 "cases_not_enabled_hint" = "Yon admin dwe aktive jesyon dosye.";
-"cases_page_info" = "Paj %@ sou %2$@";
+"cases_page_info" = "Paj %1$d sou %2$d";
 "cases_related_hint" = "Dosye ki gen rapò ak anrejistreman lye yo ap parèt isit la.";
 "cases_related_placeholder" = "Ki gen rapò";
 "cases_restricted" = "Restrenn";

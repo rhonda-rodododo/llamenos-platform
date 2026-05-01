@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "추천할 자원봉사자가 없습니다.";
 "cases_not_enabled" = "사건 관리가 활성화되지 않았습니다";
 "cases_not_enabled_hint" = "관리자가 사건 관리를 활성화해야 합니다.";
-"cases_page_info" = "%@ 중 %2$@ 페이지";
+"cases_page_info" = "%1$d 중 %2$d 페이지";
 "cases_related_hint" = "관련 사건과 연결된 기록이 여기에 표시됩니다.";
 "cases_related_placeholder" = "관련";
 "cases_restricted" = "제한됨";

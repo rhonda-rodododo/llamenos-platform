@@ -730,7 +730,7 @@
 "cases_no_suggestions_hint" = "Walang available na volunteer.";
 "cases_not_enabled" = "Hindi naka-enable ang pamamahala ng kaso";
 "cases_not_enabled_hint" = "Kailangan ng admin na i-enable ang pamamahala ng kaso.";
-"cases_page_info" = "Pahina %@ ng %2$@";
+"cases_page_info" = "Pahina %1$d ng %2$d";
 "cases_related_hint" = "Ang mga kaugnay na kaso at naka-link na talaan ay lalabas dito.";
 "cases_related_placeholder" = "Kaugnay";
 "cases_restricted" = "Limitado";
