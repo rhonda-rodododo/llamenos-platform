@@ -173,7 +173,7 @@ const LATEST_JSON = `${RELEASES_URL}/download/latest.json`;
     .then(r => r.ok ? r.json() : Promise.reject('No releases'))
     .then(data => {
       const version = data.version;
-      const baseUrl = `https://github.com/rhonda-rodododo/llamenos/releases/download/v${version}`;
+      const baseUrl = `https://github.com/rhonda-rodododo/llamenos-platform/releases/download/v${version}`;
 
       // Map platform keys to download links and buttons
       const platformMap = {

@@ -11,7 +11,7 @@
  *     --version 0.18.0 \
  *     --notes "Bug fixes and improvements" \
  *     --output dist/latest.json \
- *     --url-base "https://github.com/rhonda-rodododo/llamenos/releases/download/v0.18.0"
+ *     --url-base "https://github.com/rhonda-rodododo/llamenos-platform/releases/download/v0.18.0"
  *
  * In CI, artifact signatures are read from .sig files produced by
  * `tauri build` with `createUpdaterArtifacts: true`.
@@ -60,7 +60,7 @@ function parseArgs(): ManifestArgs {
     version,
     notes: flags['notes'] ?? '',
     output: flags['output'] ?? 'dist/latest.json',
-    urlBase: flags['url-base'] ?? `https://github.com/rhonda-rodododo/llamenos/releases/download/v${version}`,
+    urlBase: flags['url-base'] ?? `https://github.com/rhonda-rodododo/llamenos-platform/releases/download/v${version}`,
     sigDir: flags['sig-dir'],
   }
 }
