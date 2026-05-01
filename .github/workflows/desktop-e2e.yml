@@ -1,8 +1,14 @@
-# CI workflow for desktop (Tauri) E2E tests.
-# Runs WebdriverIO tests against the Tauri debug binary.
+# CI workflow for desktop Playwright E2E tests.
+# Runs Playwright tests against a Vite build with mocked Tauri IPC.
+# Backend services (PostgreSQL, MinIO, strfry) via Docker Compose — globalSetup
+# requires a running backend for state reset and admin bootstrap.
 #
-# Trigger: PRs touching apps/desktop/ or tests/desktop/, manual dispatch.
+# Trigger: PRs touching apps/desktop/, src/client/, tests/, or packages/, manual dispatch.
 # Epic 88: Desktop & Mobile E2E Tests.
+#
+# Note: Windows matrix removed — Docker Compose backend is not reliably available
+# on Windows GHA runners. The ci.yml e2e job provides Linux coverage on ALL PRs;
+# this workflow adds path-filtered coverage with the test-desktop.sh pipeline.
 
 name: Desktop E2E Tests
 
@@ -11,12 +17,18 @@ on:
     paths:
       - 'apps/desktop/**'
       - 'packages/crypto/**'
-      - 'tests/desktop/**'
+      - 'packages/protocol/**'
+      - 'packages/shared/**'
+      - 'tests/**'
       - 'src/client/**'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  BUN_VERSION: "1.3.5"
+  TEST_ADMIN_PUBKEY: "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
 
 jobs:
   test:
@@ -26,8 +38,6 @@ jobs:
         include:
           - platform: ubuntu-24.04
             os_label: Linux
-          - platform: windows-latest
-            os_label: Windows
 
     runs-on: ${{ matrix.platform }}
     name: E2E (${{ matrix.os_label }})
@@ -37,68 +47,96 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
-        with:
-          toolchain: stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
-        with:
-          workspaces: apps/desktop
-
-      - name: Install Linux deps
-        if: matrix.platform == 'ubuntu-24.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libgtk-3-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            webkit2gtk-driver \
-            xvfb
-
-      # Install msedgedriver on Windows for WebView2 testing
-      - name: Install msedgedriver (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          $edgeVersion = (Get-Item "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.FileVersion
-          $majorVersion = $edgeVersion.Split('.')[0]
-          Write-Host "Edge version: $edgeVersion (major: $majorVersion)"
-          $url = "https://msedgedriver.azureedge.net/$edgeVersion/edgedriver_win64.zip"
-          $fallbackUrl = "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip"
-          try { Invoke-WebRequest -Uri $url -OutFile edgedriver.zip } catch { Invoke-WebRequest -Uri $fallbackUrl -OutFile edgedriver.zip }
-          Expand-Archive -Path edgedriver.zip -DestinationPath "$PWD\edgedriver"
-          "$PWD\edgedriver" >> $env:GITHUB_PATH
-          Write-Host "msedgedriver installed at $PWD\edgedriver"
-        shell: pwsh
-
-      - name: Install tauri-driver
-        run: cargo install tauri-driver --locked
-
       - name: Install Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
         with:
-          bun-version: "1.3.5"
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # wdio.conf.ts onPrepare() handles building the debug binary
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
 
-      # Run tests on Linux with xvfb for headless display
-      - name: Run desktop E2E tests (Linux)
-        if: matrix.platform == 'ubuntu-24.04'
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Install Playwright deps (cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
+      # ── Start backend services ──────────────────────────────────
+      - name: Create .env for Docker Compose
+        run: |
+          printf '%s\n' \
+            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
+            "DOMAIN=localhost" \
+            "PG_PASSWORD=ci-test-password" \
+            "HMAC_SECRET=$(openssl rand -hex 32)" \
+            "MINIO_ACCESS_KEY=testaccess" \
+            "MINIO_SECRET_KEY=testsecret123456" \
+            "HOTLINE_NAME=Llámenos" \
+            "BRIDGE_SECRET=ci-test-bridge-secret" \
+            "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "NOTIFIER_API_KEY=ci-test-notifier-key" \
+            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+            "PBX_TYPE=asterisk" \
+            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            > .env
+
+      - name: Build and start Docker Compose (core services)
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --wait app
+        timeout-minutes: 10
+
+      - name: Wait for backend health
+        run: |
+          echo "Waiting for backend to be ready..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/api/health/ready; then
+              echo "Backend is ready"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "::error::Backend did not become healthy after 120s"
+              docker compose --env-file .env \
+                -f deploy/docker/docker-compose.yml \
+                -f deploy/docker/docker-compose.test.yml \
+                logs --tail=50 || true
+              exit 1
+            fi
+            sleep 2
+          done
+
+      # ── Run tests ───────────────────────────────────────────────
+      - name: Run desktop E2E tests
+        run: xvfb-run bash scripts/test-desktop.sh
         env:
-          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
-          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
-        run: xvfb-run bun run test:desktop
+          CI: "true"
+          PLAYWRIGHT_TEST: "true"
+          E2E_TEST_SECRET: "test-reset-secret"
 
-      # Run tests on Windows directly
-      - name: Run desktop E2E tests (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: bun run test:desktop
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: desktop-e2e-playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v

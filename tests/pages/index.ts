@@ -54,6 +54,9 @@ export const Navigation = {
   async goToShifts(page: Page): Promise<void> {
     await page.getByTestId(TestIds.NAV_SHIFTS).click()
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    // Wait for page data to finish loading so button click targets don't get detached
+    // during in-flight API re-renders (shifts + users + fallback group are loaded in parallel)
+    await waitForApiAndUi(page)
   },
 
   async goToBanList(page: Page): Promise<void> {
