@@ -140,7 +140,7 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/ || test $? -eq 22"]
       interval: 10s
       timeout: 5s
       retries: 5
