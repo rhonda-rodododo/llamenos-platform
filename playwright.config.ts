@@ -62,6 +62,10 @@ export default defineConfig({
       }),
       use: { ...devices["Desktop Chrome"] },
       fullyParallel: true,
+      // Wait for bootstrap tests to complete and restore admin before BDD workers start.
+      // workerHub fixture calls POST /api/hubs at worker startup — if bootstrap's
+      // test-reset-no-admin runs concurrently, the admin user is missing and the call gets 401.
+      dependencies: ["bootstrap"],
     },
     {
       ...defineBddProject({
@@ -78,6 +82,11 @@ export default defineConfig({
       },
       fullyParallel: true,
       workers: 3,
+      // Wait for bootstrap tests to finish before starting.
+      // backend-bdd scenarios create a hub per-scenario via workerHub fixture —
+      // if bootstrap's test-reset-no-admin runs concurrently, the admin is gone
+      // and hub creation returns 401.
+      dependencies: ["bootstrap"],
     },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL

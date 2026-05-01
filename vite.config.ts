@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import wasm from 'vite-plugin-wasm'
-import topLevelAwait from 'vite-plugin-top-level-await'
 import path from 'path'
 import { readFileSync } from 'fs'
 
@@ -29,7 +28,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
     wasm(),
-    topLevelAwait(),
   ],
   root: '.',
   publicDir: 'public',

@@ -549,6 +549,8 @@ export interface EphemeralKeyPair {
   publicKey: string
   npub: string
   nsec: string
+  /** Raw 32-byte Ed25519 seed as hex (64 chars). Use this for deviceImportAndLoad. */
+  seedHex: string
 }
 
 /** @deprecated Removed in v3 — use Ed25519 signing. */
@@ -624,14 +626,33 @@ export async function getPublicKeyFromState(): Promise<string | null> {
   return state?.signingPubkeyHex ?? null
 }
 
-/** @deprecated No more nsec in v3. */
-export async function pubkeyFromNsec(_nsec: string): Promise<string | null> {
-  throw new Error('pubkeyFromNsec removed in v3 — no more Nostr nsec/npub')
+/**
+ * Derive the secp256k1 x-only pubkey hex from a bech32 nsec string.
+ * Used for legacy recovery login. Returns null if the nsec is invalid.
+ */
+export async function pubkeyFromNsec(nsec: string): Promise<string | null> {
+  try {
+    const { nip19, getPublicKey } = await import('nostr-tools')
+    const decoded = nip19.decode(nsec)
+    if (decoded.type !== 'nsec') return null
+    return getPublicKey(decoded.data as Uint8Array)
+  } catch {
+    return null
+  }
 }
 
-/** @deprecated No more nsec validation in v3. */
-export async function isValidNsec(_nsec: string): Promise<boolean> {
-  return false
+/**
+ * Validate a bech32 nsec string.
+ * Returns true if the string is a valid nsec (secp256k1 private key).
+ */
+export async function isValidNsec(nsec: string): Promise<boolean> {
+  try {
+    const { nip19 } = await import('nostr-tools')
+    const decoded = nip19.decode(nsec)
+    return decoded.type === 'nsec'
+  } catch {
+    return false
+  }
 }
 
 /** @deprecated Use ed25519Verify instead. */
@@ -961,7 +982,13 @@ export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
   if (useTauri) {
     // Use the mock/Rust to generate a random Ed25519 seed and derive pubkey
     const result = await tauriInvoke<{ signingPubkeyHex: string; seedHex: string }>('generate_ephemeral_ed25519')
-    return { publicKey: result.signingPubkeyHex, npub: '', nsec: result.seedHex }
+    // Encode the 32-byte seed as bech32 nsec1... format for display purposes.
+    // seedHex is exposed separately so loginAsVolunteer can use deviceImportAndLoad (Ed25519).
+    const { nip19 } = await import('nostr-tools')
+    const seedBytes = new Uint8Array(result.seedHex.match(/.{2}/g)!.map(h => parseInt(h, 16)))
+    const nsec = nip19.nsecEncode(seedBytes)
+    const npub = nip19.npubEncode(result.signingPubkeyHex)
+    return { publicKey: result.signingPubkeyHex, npub, nsec, seedHex: result.seedHex }
   }
   throw new Error('WASM ephemeral keypair not yet implemented')
 }
