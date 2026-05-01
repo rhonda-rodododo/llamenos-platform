@@ -20,6 +20,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js'
 import { secp256k1, schnorr } from '@noble/curves/secp256k1.js'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import * as labels from '../packages/shared/crypto-labels'
 
@@ -124,12 +125,12 @@ test.describe('Cross-platform crypto interop', () => {
   test('JS can verify auth token produced by Rust', () => {
     const { token, method, path } = vectors.auth
 
-    // Reconstruct the message
-    const message = `${labels.AUTH_PREFIX}${token.pubkey}:${token.timestamp}:${method}:${path}`
+    // Reconstruct the Ed25519 auth message (v1: LABEL_DEVICE_AUTH:timestamp:method:path)
+    const message = `${labels.LABEL_DEVICE_AUTH}:${token.timestamp}:${method}:${path}`
     const messageHash = sha256(utf8ToBytes(message))
 
-    // Verify Schnorr signature — v2: schnorr is a separate named export
-    const valid = schnorr.verify(hexToBytes(token.token), messageHash, hexToBytes(token.pubkey))
+    // Verify Ed25519 signature
+    const valid = ed25519.verify(hexToBytes(token.token), messageHash, hexToBytes(token.pubkey))
     expect(valid).toBe(true)
   })
 
@@ -350,18 +351,18 @@ test.describe('Cross-platform crypto interop', () => {
   test('Auth token with wrong method fails verification', () => {
     const { validToken, validPath, wrongMethod } = vectors.adversarial.auth
 
-    const message = `${labels.AUTH_PREFIX}${validToken.pubkey}:${validToken.timestamp}:${wrongMethod}:${validPath}`
+    const message = `${labels.LABEL_DEVICE_AUTH}:${validToken.timestamp}:${wrongMethod}:${validPath}`
     const messageHash = sha256(utf8ToBytes(message))
-    const valid = schnorr.verify(hexToBytes(validToken.token), messageHash, hexToBytes(validToken.pubkey))
+    const valid = ed25519.verify(hexToBytes(validToken.token), messageHash, hexToBytes(validToken.pubkey))
     expect(valid).toBe(false)
   })
 
   test('Auth token with wrong path fails verification', () => {
     const { validToken, validMethod, wrongPath } = vectors.adversarial.auth
 
-    const message = `${labels.AUTH_PREFIX}${validToken.pubkey}:${validToken.timestamp}:${validMethod}:${wrongPath}`
+    const message = `${labels.LABEL_DEVICE_AUTH}:${validToken.timestamp}:${validMethod}:${wrongPath}`
     const messageHash = sha256(utf8ToBytes(message))
-    const valid = schnorr.verify(hexToBytes(validToken.token), messageHash, hexToBytes(validToken.pubkey))
+    const valid = ed25519.verify(hexToBytes(validToken.token), messageHash, hexToBytes(validToken.pubkey))
     expect(valid).toBe(false)
   })
 
@@ -396,8 +397,8 @@ function eciesUnwrap(
   const sharedPoint = secp256k1.getSharedSecret(hexToBytes(secretKeyHex), ephPubkey)
   const sharedX = sharedPoint.slice(1, 33)
 
-  // v2: HKDF-SHA256 with IKM=sharedX, no salt, info=label
-  const symmetricKey = hkdf(sha256, sharedX, undefined, utf8ToBytes(label), 32)
+  // v2: HKDF-SHA256 with salt=LABEL_ECIES_V2_SALT, IKM=sharedX, info=label
+  const symmetricKey = hkdf(sha256, sharedX, utf8ToBytes(labels.LABEL_ECIES_V2_SALT), utf8ToBytes(label), 32)
 
   const cipher = xchacha20poly1305(symmetricKey, nonce)
   return cipher.decrypt(ciphertext)
