@@ -28,6 +28,13 @@ apps/android/local.properties
 apps/android/app/src/main/jniLibs/
 apps/android/app/src/androidTest/assets/features/
 
+# Android signing — keystore credentials (never commit real passwords)
+apps/android/keystore.properties
+apps/android/*.jks
+apps/android/*.keystore
+apps/android/app/*.jks
+apps/android/app/*.keystore
+
 
 # iOS build
 apps/ios/.build/

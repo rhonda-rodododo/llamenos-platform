@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -36,12 +38,24 @@ android {
         }
     }
 
+    // Signing credentials resolution order:
+    //   1. keystore.properties file (local dev — gitignored)
+    //   2. Environment variables (CI/CD)
+    // keystore.properties lives at apps/android/keystore.properties (see keystore.properties.example)
+    val keystoreProps = Properties().also { props ->
+        rootProject.file("keystore.properties").takeIf { it.exists() }?.reader()?.use { props.load(it) }
+    }
+    fun signingProp(propKey: String, envKey: String, default: String = "") =
+        keystoreProps.getProperty(propKey)?.takeIf { it.isNotEmpty() }
+            ?: System.getenv(envKey)?.takeIf { it.isNotEmpty() }
+            ?: default
+
     signingConfigs {
         create("release") {
-            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "release.keystore")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-            keyAlias = System.getenv("KEY_ALIAS") ?: "llamenos"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            storeFile = file(signingProp("storeFile", "KEYSTORE_PATH", "../upload-keystore.jks"))
+            storePassword = signingProp("storePassword", "KEYSTORE_PASSWORD")
+            keyAlias = signingProp("keyAlias", "KEY_ALIAS", "upload")
+            keyPassword = signingProp("keyPassword", "KEY_PASSWORD")
         }
     }
 
@@ -53,10 +67,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Use release signing config when env vars are present (CI),
-            // otherwise falls back to debug signing for local builds
-            val hasSigningEnv = System.getenv("KEYSTORE_PASSWORD")?.isNotEmpty() == true
-            if (hasSigningEnv) {
+            // Apply release signing when credentials are available (local keystore.properties or CI env vars).
+            // Falls back to debug signing for unsigned local builds.
+            val hasCredentials = signingProp("storePassword", "KEYSTORE_PASSWORD").isNotEmpty()
+            if (hasCredentials) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
