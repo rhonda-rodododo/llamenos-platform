@@ -70,7 +70,7 @@
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUxRjM1RTU4QkQ4MzE0MkYKUldRdkZJTzlXRjd6NFNTREVwZ0ZXYlVlVUtPd2JxVkplTmZ1SUZoaGhNa1MvMEs4WEdNWEo5TTIK",
       "endpoints": [
         "https://updates.llamenos.org/desktop/latest.json",
-        "https://github.com/rhonda-rodododo/llamenos/releases/latest/download/latest.json"
+        "https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json"
       ]
     }
   }
