@@ -202,7 +202,7 @@ private fun HubCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .testTag("hub-card-${hub.id}"),
+            .testTag("hub-row"),
         colors = CardDefaults.cardColors(
             containerColor = if (isActive) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
