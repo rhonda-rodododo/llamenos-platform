@@ -746,13 +746,15 @@ jobs:
       - name: Run UI tests
         working-directory: apps/ios
         run: |
+          # TEST_HUB_URL defaults to http://localhost:3000 in BaseUITest.swift,
+          # which matches the backend started above. No -testenv flag needed
+          # (-testenv is not a valid xcodebuild option).
           xcodebuild test \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build \
-            -testenv "TEST_HUB_URL=http://localhost:3000"
+            -derivedDataPath /tmp/llamenos-build
 
       - name: Stop backend services
         if: always()
