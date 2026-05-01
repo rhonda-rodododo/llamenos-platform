@@ -164,9 +164,12 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
 })
 
 Given('the app is restarted', async ({ page }) => {
-  // Reload the page to simulate an app restart
+  // Reload the page to simulate an app restart.
+  // Wait for 'load' (all scripts executed) rather than just 'domcontentloaded'
+  // so that the Tauri IPC mock (sets Symbol.for('llamenos_test_invoke') at module load)
+  // is guaranteed to be available before subsequent steps call page.waitForFunction.
   await page.reload()
-  await page.waitForLoadState('domcontentloaded')
+  await page.waitForLoadState('load')
 })
 
 When('the app launches', async ({ page }) => {

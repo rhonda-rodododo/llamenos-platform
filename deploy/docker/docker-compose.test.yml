@@ -14,7 +14,10 @@
 services:
   # Fix strfry for CI: mount config with nofiles=0 (don't attempt to set ulimit)
   # Override ulimits from base compose (1M exceeds GitHub Actions limit of 65536)
+  # Expose port 7777 so backend-bdd relay tests can connect from the test process host.
   strfry:
+    ports:
+      - "7777:7777"
     ulimits:
       nofile:
         soft: 65536
