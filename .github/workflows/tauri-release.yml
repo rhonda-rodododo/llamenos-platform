@@ -231,6 +231,28 @@ jobs:
           find artifacts -type f \( -name '*.tar.gz' -o -name '*.tar.gz.sig' -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' -o -name '*.AppImage' -o -name '*.AppImage.sig' -o -name '*.dmg' -o -name '*.deb' -o -name '*.flatpak' \) -exec cp {} flat-artifacts/ \;
           ls -la flat-artifacts/
 
+      # Determine version for release (moved before staging upload)
+      - name: Determine version
+        id: version
+        env:
+          INPUT_VER: ${{ env.INPUT_VERSION }}
+        run: |
+          echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
+
+      # Upload artifacts to RustFS staging for offline signing
+      - name: Upload to RustFS staging
+        if: env.RUSTFS_ENDPOINT != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          aws s3 cp flat-artifacts/ "s3://${RUSTFS_BUCKET:-llamenos-releases}/staging/v${VERSION}/" \
+            --endpoint-url "${{ secrets.RUSTFS_ENDPOINT }}" \
+            --recursive
+          echo "Staged artifacts at s3://${RUSTFS_BUCKET:-llamenos-releases}/staging/v${VERSION}/"
+
       # Generate SBOM for desktop artifacts
       - name: Generate CycloneDX SBOM
         run: |
@@ -247,14 +269,6 @@ jobs:
         run: ./scripts/generate-update-manifest.sh flat-artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Determine version for release
-      - name: Determine version
-        id: version
-        env:
-          INPUT_VER: ${{ env.INPUT_VERSION }}
-        run: |
-          echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
 
       # Create GitHub Release (or add to existing release from ci.yml)
       - name: Upload desktop artifacts to release
