@@ -10,9 +10,16 @@
 #   tofu plan
 #   tofu apply
 
-# Required: Hetzner Cloud API token
-# Generate at: https://console.hetzner.cloud/projects/*/security/tokens
-hcloud_token = ""
+# Hosting provider selection
+provider_name = "1984hosting"  # or "hetzner"
+
+# For 1984 Hosting (manual provisioning required)
+server_ip = "203.0.113.10"  # Fill in after ordering VPS
+
+# For Hetzner (automated provisioning)
+# hcloud_token = "YOUR_TOKEN"
+# server_type  = "cx21"
+# location     = "hel1"
 
 # Required: Domain for the deployment
 domain = "hotline.example.org"

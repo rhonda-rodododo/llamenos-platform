@@ -1,0 +1,42 @@
+---
+# Demo Instance Deployment Playbook
+#
+# Deploys the Llamenos demo instance to the 'demo' inventory group.
+# Loads demo_vars.yml (or a custom vars file) before running.
+#
+# Usage:
+#   ansible-playbook playbooks/deploy-demo.yml --ask-vault-pass
+#   ansible-playbook playbooks/deploy-demo.yml --ask-vault-pass -e demo_vars_file=../demo_vars.yml
+
+- name: Load demo configuration variables
+  hosts: demo
+  gather_facts: false
+  tasks:
+    - name: Include demo vars file
+      ansible.builtin.include_vars:
+        file: "{{ demo_vars_file | default('../demo_vars.yml') }}"
+      tags: always
+
+- name: Harden demo server
+  hosts: demo
+  become: true
+  roles:
+    - role: common
+      tags: [common, harden]
+    - role: ssh-hardening
+      tags: [ssh, harden]
+    - role: firewall
+      tags: [firewall, harden]
+    - role: kernel-hardening
+      tags: [kernel, harden]
+    - role: fail2ban
+      tags: [fail2ban, harden]
+
+- name: Deploy demo instance
+  hosts: demo
+  become: true
+  roles:
+    - role: docker
+      tags: [docker, deploy]
+    - role: llamenos
+      tags: [llamenos, deploy]

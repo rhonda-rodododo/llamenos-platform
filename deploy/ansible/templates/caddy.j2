@@ -85,7 +85,7 @@
 	# Compression
 	encode gzip zstd
 
-	# Access logging
+  # Access logging
 	log {
 		output file /data/access.log {
 			roll_size 10mb
@@ -95,3 +95,75 @@
 		format json
 	}
 }
+
+{% if downloads_domain is defined %}
+# ─── Downloads origin — downloads.<parent> ────────────────────────
+{{ downloads_domain }} {
+	encode gzip zstd
+
+	# Proxy to RustFS S3 API for /releases/ bucket
+	handle /releases/* {
+		reverse_proxy rustfs:9000 {
+			header_up Host rustfs:9000
+		}
+		uri strip_prefix /releases
+	}
+
+	# Default: redirect / to latest release page on GitHub
+	handle {
+		redir https://github.com/llamenos/llamenos/releases/latest permanent
+	}
+
+	header {
+		Content-Security-Policy "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'self'; font-src 'none'; connect-src 'none'; media-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "cross-origin"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}
+{% endif %}
+
+{% if updates_domain is defined %}
+# ─── Updates origin — updates.<parent> ────────────────────────────
+{{ updates_domain }} {
+	encode gzip zstd
+
+	# Staging bucket — pre-release builds for testing
+	handle /staging/* {
+		reverse_proxy rustfs:9000 {
+			header_up Host rustfs:9000
+		}
+		uri strip_prefix /staging
+	}
+
+	# Releases bucket — production updater artifacts
+	handle /releases/* {
+		reverse_proxy rustfs:9000 {
+			header_up Host rustfs:9000
+		}
+		uri strip_prefix /releases
+	}
+
+	# Updater JSON endpoint
+	handle /latest.json {
+		reverse_proxy rustfs:9000 {
+			header_up Host rustfs:9000
+		}
+	}
+
+	header {
+		Access-Control-Allow-Origin "https://{{ app_domain | default(domain) }}"
+		Access-Control-Allow-Methods "GET, HEAD"
+		Vary "Origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "cross-origin"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}
+{% endif %}

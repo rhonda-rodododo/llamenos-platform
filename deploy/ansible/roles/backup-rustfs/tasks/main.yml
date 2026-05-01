@@ -1,7 +1,7 @@
 ---
 # RustFS backup role
 #
-# Mirrors all objects from the RustFS bucket using mc mirror:
+# Mirrors all objects from the RustFS buckets using rclone:
 # - Archives as compressed tarball
 # - Optional age encryption
 # - Retention policy (daily/weekly/monthly)

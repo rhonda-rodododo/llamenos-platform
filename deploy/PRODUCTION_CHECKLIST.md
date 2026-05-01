@@ -4,13 +4,14 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 
 ## Infrastructure
 
-- [ ] Server provisioned in EU datacenter (GDPR compliance)
+- [ ] Server provisioned in Iceland (1984 Hosting) — GDPR compliance + privacy jurisdiction
 - [ ] SSH access restricted to admin IPs only (not 0.0.0.0/0)
 - [ ] SSH key authentication only (password auth disabled)
 - [ ] Firewall rules: only 80, 443, and SSH port open
 - [ ] Unattended security updates enabled
 - [ ] fail2ban configured and running
 - [ ] NTP synchronized (critical for Schnorr token validation)
+- [ ] LUKS2 disk encryption active (verify: `cryptsetup status`)
 
 ## Docker Compose
 
@@ -19,7 +20,7 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] `PG_PASSWORD` is cryptographically random (≥24 chars)
 - [ ] `HMAC_SECRET` is 64 hex chars (`openssl rand -hex 32`)
 - [ ] `SERVER_NOSTR_SECRET` is 64 hex chars
-- [ ] `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` are unique
+- [ ] `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY` are unique and >= 24 chars
 - [ ] `ADMIN_PUBKEY` set to real admin's Nostr pubkey
 - [ ] `DOMAIN` set to actual production domain
 - [ ] `ACME_EMAIL` set for Let's Encrypt notifications
@@ -53,6 +54,27 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] Off-site backup destination configured (rclone)
 - [ ] Backup retention policy: 7 daily, 4 weekly, 3 monthly
 
+## RustFS (Object Storage)
+
+- [ ] RustFS container running and healthy
+- [ ] `llamenos-files` bucket created (for app uploads)
+- [ ] `llamenos-staging` bucket created (for pre-release builds)
+- [ ] `llamenos-releases` bucket created (for release artifacts)
+- [ ] `llamenos-releases` bucket has public read policy (for downloads domain)
+- [ ] `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY` are unique and >= 24 chars
+- [ ] SSE (server-side encryption) enabled on all buckets
+
+## Desktop Distribution
+
+- [ ] `downloads.{{ domain }}` DNS A record points to server IP
+- [ ] `updates.{{ domain }}` DNS A record points to server IP
+- [ ] Caddy vhosts for downloads and updates are active
+- [ ] Release artifacts uploaded to RustFS /releases/ bucket
+- [ ] Tauri updater JSON (`latest.json`) accessible at `https://updates.{{ domain }}/latest.json`
+- [ ] Code signing certificates configured (Windows: Authenticode, macOS: Developer ID)
+- [ ] SLSA provenance attestation generated for each release
+- [ ] CHECKSUMS.txt published with each release
+
 ## Telephony
 
 - [ ] Twilio account configured (or Asterisk PBX set up)
@@ -85,7 +107,7 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] Secrets stored in Kubernetes Secrets (not values.yaml)
 - [ ] PodDisruptionBudget configured for app and strfry
 - [ ] Resource limits set for all containers
-- [ ] MinIO uses StatefulSet (not Deployment)
+- [ ] RustFS uses StatefulSet (not Deployment)
 - [ ] Liveness probe: `/api/health/live`
 - [ ] Readiness probe: `/api/health/ready`
 - [ ] NetworkPolicy restricts pod-to-pod traffic

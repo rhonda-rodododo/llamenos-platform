@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+#
+# Llamenos RustFS Backup Script — managed by Ansible
+#
+# Mirrors all objects from RustFS buckets using rclone S3 API,
+# compresses, optionally encrypts with age, and enforces retention.
+#
+# Usage:
+#   ./backup-rustfs.sh              # Run a daily backup
+#   ./backup-rustfs.sh --manual     # Run and tag as manual backup
+#   ./backup-rustfs.sh --manifest   # Output manifest line to stdout
+
+set -euo pipefail
+
+BACKUP_DIR="{{ backup_rustfs_dir }}"
+TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+DAY_OF_WEEK="$(date -u +%u)"
+DAY_OF_MONTH="$(date -u +%d)"
+AGE_RECIPIENT="{{ backup_age_public_key | default('') }}"
+RCLONE_REMOTE="{{ backup_rclone_remote | default('') }}"
+BUCKET="{{ backup_rustfs_bucket }}"
+ENDPOINT="{{ backup_rustfs_endpoint }}"
+ACCESS_KEY="{{ backup_rustfs_access_key }}"
+SECRET_KEY="{{ backup_rustfs_secret_key }}"
+
+BACKUP_TYPE="daily"
+if [ "${1:-}" = "--manual" ]; then
+  BACKUP_TYPE="manual"
+fi
+
+MANIFEST_MODE=false
+if [ "${1:-}" = "--manifest" ]; then
+  MANIFEST_MODE=true
+fi
+
+FILENAME="llamenos-rustfs-${TIMESTAMP}.tar.gz"
+log() {
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
+}
+
+log "Starting ${BACKUP_TYPE} RustFS backup..."
+
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR}"' EXIT
+
+# Mirror RustFS buckets via rclone S3
+if [ -n "${ACCESS_KEY}" ] && [ -n "${SECRET_KEY}" ]; then
+  log "Mirroring RustFS bucket: ${BUCKET}"
+  export RCLONE_CONFIG_RUSTFS_TYPE=s3
+  export RCLONE_CONFIG_RUSTFS_PROVIDER=Other
+  export RCLONE_CONFIG_RUSTFS_ENDPOINT="${ENDPOINT}"
+  export RCLONE_CONFIG_RUSTFS_ACCESS_KEY_ID="${ACCESS_KEY}"
+  export RCLONE_CONFIG_RUSTFS_SECRET_ACCESS_KEY="${SECRET_KEY}"
+  export RCLONE_CONFIG_RUSTFS_FORCE_PATH_STYLE=true
+
+  rclone copy "rustfs:${BUCKET}" "${TMPDIR}/blob-export/" 2>/dev/null || true
+  if [ -d "${TMPDIR}/blob-export" ] && [ "$(ls -A "${TMPDIR}/blob-export" 2>/dev/null)" ]; then
+    tar czf "${TMPDIR}/${FILENAME}" -C "${TMPDIR}/blob-export" .
+    rm -rf "${TMPDIR}/blob-export"
+  fi
+
+  if [ -f "${TMPDIR}/${FILENAME}" ]; then
+    BLOB_SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}")"
+    log "Blob storage dump: ${BLOB_SIZE} bytes (compressed)"
+  else
+    log "WARNING: Blob storage dump produced no output (empty or no buckets)"
+    touch "${TMPDIR}/${FILENAME}"
+  fi
+else
+  log "WARNING: No RustFS credentials configured. Skipping blob backup."
+  touch "${TMPDIR}/${FILENAME}"
+fi
+
+# Encrypt with age
+if [ -n "${AGE_RECIPIENT}" ] && [ -s "${TMPDIR}/${FILENAME}" ]; then
+  log "Encrypting backup with age..."
+  age -r "${AGE_RECIPIENT}" -o "${TMPDIR}/${FILENAME}.age" "${TMPDIR}/${FILENAME}"
+  FILENAME="${FILENAME}.age"
+else
+  log "WARNING: No age public key configured. Backups are NOT encrypted."
+fi
+
+# Store in daily directory
+cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/daily/${FILENAME}"
+log "Saved to ${BACKUP_DIR}/daily/${FILENAME}"
+
+# Copy to weekly (on Sundays) and monthly (on 1st)
+if [ "${DAY_OF_WEEK}" = "7" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/weekly/${FILENAME}"
+  log "Weekly backup saved"
+fi
+
+if [ "${DAY_OF_MONTH}" = "01" ]; then
+  cp "${TMPDIR}/${FILENAME}" "${BACKUP_DIR}/monthly/${FILENAME}"
+  log "Monthly backup saved"
+fi
+
+# Upload to remote storage via rclone
+if [ -n "${RCLONE_REMOTE}" ]; then
+  log "Uploading to remote storage: ${RCLONE_REMOTE}"
+  rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/rustfs/daily/" --progress
+  if [ "${DAY_OF_WEEK}" = "7" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/rustfs/weekly/" --progress
+  fi
+  if [ "${DAY_OF_MONTH}" = "01" ]; then
+    rclone copy "${TMPDIR}/${FILENAME}" "${RCLONE_REMOTE}/rustfs/monthly/" --progress
+  fi
+  log "Remote upload complete"
+fi
+
+# Enforce retention
+enforce_retention() {
+  local dir="$1"
+  local keep="$2"
+  local count
+  count="$(find "${dir}" -maxdepth 1 -type f -name 'llamenos-rustfs-*' | wc -l)"
+  if [ "${count}" -gt "${keep}" ]; then
+    local to_delete=$(( count - keep ))
+    find "${dir}" -maxdepth 1 -type f -name 'llamenos-rustfs-*' -printf '%T@ %p\n' \
+      | sort -n \
+      | head -n "${to_delete}" \
+      | cut -d' ' -f2- \
+      | xargs rm -f
+    log "Removed ${to_delete} old backups from ${dir}"
+  fi
+}
+
+enforce_retention "${BACKUP_DIR}/daily" {{ backup_rustfs_retain_daily | default(7) }}
+enforce_retention "${BACKUP_DIR}/weekly" {{ backup_rustfs_retain_weekly | default(4) }}
+enforce_retention "${BACKUP_DIR}/monthly" {{ backup_rustfs_retain_monthly | default(3) }}
+
+# Remote retention
+if [ -n "${RCLONE_REMOTE}" ]; then
+  rclone delete "${RCLONE_REMOTE}/rustfs/daily/" --min-age "{{ backup_rustfs_retain_daily | default(7) }}d" 2>/dev/null || true
+  rclone delete "${RCLONE_REMOTE}/rustfs/weekly/" --min-age "{{ backup_rustfs_retain_weekly | default(4) * 7 }}d" 2>/dev/null || true
+  rclone delete "${RCLONE_REMOTE}/rustfs/monthly/" --min-age "{{ backup_rustfs_retain_monthly | default(3) * 30 }}d" 2>/dev/null || true
+fi
+
+# Manifest output
+if [ "${MANIFEST_MODE}" = true ]; then
+  SIZE="$(stat -c%s "${TMPDIR}/${FILENAME}" 2>/dev/null || echo 0)"
+  SHA256="$(sha256sum "${TMPDIR}/${FILENAME}" 2>/dev/null | cut -d' ' -f1 || echo 'n/a')"
+  echo "rustfs|${TIMESTAMP}|${FILENAME}|${SIZE}|${SHA256}|${BACKUP_TYPE}"
+fi
+
+log "Backup complete: ${FILENAME}"

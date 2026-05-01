@@ -1,0 +1,73 @@
+name: ISO Builder
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build-iso.sh'
+      - 'scripts/verify-iso.sh'
+      - 'scripts/iso-builder/**'
+      - 'tests/iso-builder/**'
+      - '.github/workflows/iso-builder.yml'
+  pull_request:
+    paths:
+      - 'scripts/build-iso.sh'
+      - 'scripts/verify-iso.sh'
+      - 'scripts/iso-builder/**'
+      - 'tests/iso-builder/**'
+      - '.github/workflows/iso-builder.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bats:
+    name: Bats tests (arg parsing + template rendering)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Install bats and gettext
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats gettext-base shellcheck
+      - name: Shellcheck builder scripts
+        run: |
+          shellcheck --severity=warning scripts/build-iso.sh scripts/verify-iso.sh
+          shellcheck --severity=warning -s sh scripts/iso-builder/late-command.sh scripts/iso-builder/dropbear-setup.sh
+          shellcheck --severity=warning scripts/iso-builder/build-inside.sh
+      - name: Run bats
+        run: bats tests/iso-builder/
+
+  build:
+    name: Full ISO build + reproducibility
+    runs-on: ubuntu-latest
+    needs: bats
+    concurrency:
+      group: iso-build-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Generate test SSH key
+        run: |
+          mkdir -p ${{ runner.temp }}/key
+          ssh-keygen -t ed25519 -N '' -f ${{ runner.temp }}/key/test_ed25519 -C ci-test
+      - name: Build ISO
+        run: |
+          ./scripts/build-iso.sh \
+            --hostname ci-test-host \
+            --ssh-key ${{ runner.temp }}/key/test_ed25519.pub \
+            --unlock dropbear \
+            --out ${{ runner.temp }}/out
+      - name: Verify output
+        run: |
+          ls -lh ${{ runner.temp }}/out/
+          test -f ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso
+          test -f ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso.sha256
+          ( cd ${{ runner.temp }}/out && sha256sum -c llamenos-fde-debian13-dropbear.iso.sha256 )
+          test "$(stat -c%s ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso)" -gt 100000000
+      - name: Reproducibility check
+        run: |
+          ./scripts/verify-iso.sh ${{ runner.temp }}/out/llamenos-fde-debian13-dropbear.iso -- \
+            --hostname ci-test-host \
+            --ssh-key ${{ runner.temp }}/key/test_ed25519.pub \
+            --unlock dropbear
