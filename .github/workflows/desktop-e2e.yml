@@ -78,8 +78,8 @@ jobs:
             "DOMAIN=localhost" \
             "PG_PASSWORD=ci-test-password" \
             "HMAC_SECRET=$(openssl rand -hex 32)" \
-            "MINIO_ACCESS_KEY=testaccess" \
-            "MINIO_SECRET_KEY=testsecret123456" \
+            "STORAGE_ACCESS_KEY=testaccess" \
+            "STORAGE_SECRET_KEY=testsecret123456" \
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
