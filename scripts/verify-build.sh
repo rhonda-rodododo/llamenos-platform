@@ -83,30 +83,50 @@ trap 'rm -rf "$WORKDIR"' EXIT
 echo "Working directory: $WORKDIR"
 echo ""
 
-# ─── Step 1: Download release artifacts ─────────────────────────
-echo "--- Downloading release artifacts ---"
-PATTERNS=(
+# ─── Step 1: Download metadata from llamenos-releases repo ──────
+echo "--- Downloading metadata from llamenos-releases ---"
+METADATA_PATTERNS=(
   "CHECKSUMS.txt"
-  "CHECKSUMS.txt.asc"
-  "CHECKSUMS.txt.cosign.sig"
-  "CHECKSUMS.txt.cosign.pem"
-  "provenance.json"
-  "provenance.json.cosign.sig"
-  "provenance.json.cosign.pem"
-  "sbom.cdx.json"
-  "sbom.cdx.json.att"
+  "sbom-desktop.cdx.json"
+  "build-info.json"
 )
 
-for pat in "${PATTERNS[@]}"; do
-  if gh release download "$VERSION" --repo "$REPO" --pattern "$pat" --dir "$WORKDIR" 2>/dev/null; then
+RELEASES_REPO="rhonda-rodododo/llamenos-releases"
+VERSION_NO_V="${VERSION#v}"
+
+for pat in "${METADATA_PATTERNS[@]}"; do
+  URL="https://raw.githubusercontent.com/${RELEASES_REPO}/main/desktop/${VERSION}/${pat}"
+  if curl -sSfL "$URL" -o "$WORKDIR/$pat" 2>/dev/null; then
     echo "  Downloaded: $pat"
+  else
+    echo "  Not found: $pat"
   fi
 done
 
 if [ ! -f "$WORKDIR/CHECKSUMS.txt" ]; then
-  echo "ERROR: CHECKSUMS.txt not found in release $VERSION"
+  echo "ERROR: CHECKSUMS.txt not found for ${VERSION} in llamenos-releases"
   exit 1
 fi
+
+# Download cosign signatures from GitHub Release (metadata-only release)
+COSIGN_PATTERNS=(
+  "CHECKSUMS.txt.cosign.sig"
+  "CHECKSUMS.txt.cosign.pem"
+)
+
+for pat in "${COSIGN_PATTERNS[@]}"; do
+  if gh release download "$VERSION" --repo "$REPO" --pattern "$pat" --dir "$WORKDIR" 2>/dev/null; then
+    echo "  Downloaded: $pat (from GitHub Release)"
+  fi
+done
+
+# ─── Step 1b: Download binaries from RustFS for verification ─────
+RUSTFS_BASE="${RUSTFS_PUBLIC_URL:-https://releases.llamenos.org}/desktop/${VERSION}"
+echo ""
+echo "--- Binary artifacts available at: ${RUSTFS_BASE} ---"
+echo "  To verify a specific binary:"
+echo "    curl -O ${RUSTFS_BASE}/<filename>"
+echo "    sha256sum -c $WORKDIR/CHECKSUMS.txt --ignore-missing"
 
 # ─── Step 2: Cosign signature verification (optional) ────────────
 echo ""

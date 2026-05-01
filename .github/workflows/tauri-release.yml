@@ -198,11 +198,11 @@ jobs:
           path: llamenos-hotline.flatpak
           retention-days: 5
 
-  # ─── Publish Release ──────────────────────────────────────────
+  # ─── Publish to RustFS + Metadata Repo ───────────────────────────
   release:
     needs: [build, build-flatpak]
     runs-on: ubuntu-latest
-    name: Publish Release
+    name: Publish to RustFS
     permissions:
       contents: write
       id-token: write
@@ -215,83 +215,226 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Validate version format
+        env:
+          RELEASE_VERSION: ${{ env.INPUT_VERSION }}
+        run: |
+          if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Invalid version format: $RELEASE_VERSION (expected semver)"
+            exit 1
+          fi
+          echo "VERSION=${RELEASE_VERSION}" >> "$GITHUB_ENV"
+          echo "Releasing v${RELEASE_VERSION}"
+
       - name: Download all artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: List artifacts
-        run: find artifacts -type f | sort
-
-      # Flatten artifacts to a single directory for the manifest script
       - name: Flatten artifact structure
         run: |
           mkdir -p flat-artifacts
-          find artifacts -type f \( -name '*.tar.gz' -o -name '*.tar.gz.sig' -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' -o -name '*.AppImage' -o -name '*.AppImage.sig' -o -name '*.dmg' -o -name '*.deb' -o -name '*.flatpak' \) -exec cp {} flat-artifacts/ \;
+          find artifacts -type f \( \
+            -name '*.tar.gz' -o -name '*.tar.gz.sig' \
+            -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' \
+            -o -name '*.AppImage' -o -name '*.AppImage.sig' \
+            -o -name '*.dmg' -o -name '*.deb' -o -name '*.flatpak' \
+          \) -exec cp {} flat-artifacts/ \;
+          echo "--- Artifacts ---"
           ls -la flat-artifacts/
 
-      # Determine version for release (moved before staging upload)
-      - name: Determine version
-        id: version
-        env:
-          INPUT_VER: ${{ env.INPUT_VERSION }}
+      # ── Generate checksums ──────────────────────────────────────
+      - name: Generate SHA-256 checksums
         run: |
-          echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
+          cd flat-artifacts
+          sha256sum * | sort > ../CHECKSUMS.txt
+          cd ..
+          echo "$(wc -l < CHECKSUMS.txt) files checksummed"
+          cat CHECKSUMS.txt
 
-      # Upload artifacts to RustFS staging for offline signing
-      - name: Upload to RustFS staging
-        if: env.RUSTFS_ENDPOINT != ''
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          aws s3 cp flat-artifacts/ "s3://${RUSTFS_BUCKET:-llamenos-releases}/staging/v${VERSION}/" \
-            --endpoint-url "${{ secrets.RUSTFS_ENDPOINT }}" \
-            --recursive
-          echo "Staged artifacts at s3://${RUSTFS_BUCKET:-llamenos-releases}/staging/v${VERSION}/"
-
-      # Generate SBOM for desktop artifacts
+      # ── Generate SBOM ───────────────────────────────────────────
       - name: Generate CycloneDX SBOM
         run: |
           npx --yes @cyclonedx/cdxgen -o sbom-desktop.cdx.json --spec-version 1.5
           echo "SBOM generated: $(jq '.components | length' sbom-desktop.cdx.json) components"
 
+      # ── SLSA attestation ────────────────────────────────────────
       - name: Generate SLSA build provenance attestation
         uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v2.1.0
         with:
           subject-path: flat-artifacts/*
 
-      # Generate update manifest
+      # ── Build provenance metadata ──────────────────────────────
+      - name: Generate build-info.json
+        env:
+          MERGE_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          cat > build-info.json << BUILDEOF
+          {
+            "version": "${VERSION}",
+            "commit": "${MERGE_SHA}",
+            "repository": "${REPO}",
+            "workflow": "tauri-release.yml",
+            "run_id": "${RUN_ID}",
+            "run_url": "https://github.com/${REPO}/actions/runs/${RUN_ID}",
+            "build_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "source_date_epoch": "$(git log -1 --format=%ct)",
+            "platforms": {
+              "macos": "universal-apple-darwin",
+              "windows": "x86_64-pc-windows-msvc",
+              "linux": "x86_64-unknown-linux-gnu",
+              "flatpak": "x86_64"
+            }
+          }
+          BUILDEOF
+          python3 -c "
+          import json
+          with open('build-info.json') as f:
+              data = json.load(f)
+          with open('build-info.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          "
+          echo "--- build-info.json ---"
+          cat build-info.json
+
+      # ── Generate update manifest ────────────────────────────────
       - name: Generate latest.json
         run: ./scripts/generate-update-manifest.sh flat-artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Create GitHub Release (or add to existing release from ci.yml)
-      - name: Upload desktop artifacts to release
+      # ── Upload binaries to RustFS ───────────────────────────────
+      - name: Install AWS CLI
+        run: |
+          curl -sSf "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+          unzip -q /tmp/awscliv2.zip -d /tmp
+          sudo /tmp/aws/install --update
+          aws --version
+
+      - name: Upload artifacts to RustFS staging bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+          RUSTFS_ENDPOINT: ${{ secrets.RUSTFS_ENDPOINT }}
+          RUSTFS_BUCKET: ${{ secrets.RUSTFS_STAGING_BUCKET }}
+        run: |
+          S3_PREFIX="s3://${RUSTFS_BUCKET}/desktop/v${VERSION}"
+          echo "Uploading to ${S3_PREFIX} via ${RUSTFS_ENDPOINT}..."
+
+          # Upload all binary artifacts
+          for f in flat-artifacts/*; do
+            filename=$(basename "$f")
+            aws s3 cp "$f" "${S3_PREFIX}/${filename}" \
+              --endpoint-url "${RUSTFS_ENDPOINT}" \
+              --no-progress
+            echo "  Uploaded: ${filename}"
+          done
+
+          # Upload latest.json to both versioned and root path
+          aws s3 cp latest.json "${S3_PREFIX}/latest.json" \
+            --endpoint-url "${RUSTFS_ENDPOINT}" \
+            --content-type "application/json" \
+            --no-progress
+
+          aws s3 cp latest.json "s3://${RUSTFS_BUCKET}/desktop/latest.json" \
+            --endpoint-url "${RUSTFS_ENDPOINT}" \
+            --content-type "application/json" \
+            --no-progress
+
+          echo "All artifacts uploaded to RustFS."
+
+          # Verify uploads
+          echo "--- Verifying uploads ---"
+          aws s3 ls "${S3_PREFIX}/" \
+            --endpoint-url "${RUSTFS_ENDPOINT}"
+
+      # ── Commit metadata to llamenos-releases ────────────────────
+      - name: Commit metadata to llamenos-releases repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_PAT }}
+        run: |
+          RELEASES_DIR=$(mktemp -d)
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/rhonda-rodododo/llamenos-releases.git" "$RELEASES_DIR"
+
+          VERSION_DIR="${RELEASES_DIR}/desktop/v${VERSION}"
+          mkdir -p "$VERSION_DIR"
+
+          # Copy metadata files
+          cp CHECKSUMS.txt "$VERSION_DIR/"
+          cp sbom-desktop.cdx.json "$VERSION_DIR/"
+          cp build-info.json "$VERSION_DIR/"
+          cp latest.json "$VERSION_DIR/"
+
+          # Commit and push
+          cd "$RELEASES_DIR"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "desktop/v${VERSION}/"
+          git commit -m "desktop: v${VERSION} build metadata
+
+          Workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Commit: ${{ github.sha }}"
+          git push origin main
+
+          echo "Metadata committed to llamenos-releases repo."
+          rm -rf "$RELEASES_DIR"
+
+      # ── Create metadata-only GitHub Release ─────────────────────
+      - name: Create metadata-only GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           TAG="v${VERSION}"
 
-          # Check if release already exists (created by ci.yml)
+          # Build release body
+          cat > release-body.md << BODYEOF
+          ## Desktop v${VERSION}
+
+          ### Download Binaries
+
+          Binaries are hosted on our self-hosted infrastructure:
+
+          | Platform | Download |
+          |----------|----------|
+          | macOS (Universal) | [DMG](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_universal.dmg) |
+          | Windows (x64) | [NSIS Installer](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_x64-setup.nsis.zip) |
+          | Linux (x64) | [AppImage](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_amd64.AppImage) \| [deb](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_amd64.deb) |
+          | Linux (Flatpak) | [Flatpak](https://releases.llamenos.org/desktop/v${VERSION}/llamenos-hotline.flatpak) |
+
+          ### Verification
+
+          \`\`\`bash
+          # Download the checksum file
+          curl -O https://raw.githubusercontent.com/rhonda-rodododo/llamenos-releases/main/desktop/v${VERSION}/CHECKSUMS.txt
+
+          # Verify your download
+          sha256sum -c CHECKSUMS.txt --ignore-missing
+          \`\`\`
+
+          ### Build Metadata
+
+          - [CHECKSUMS.txt](https://github.com/rhonda-rodododo/llamenos-releases/blob/main/desktop/v${VERSION}/CHECKSUMS.txt)
+          - [SBOM (CycloneDX)](https://github.com/rhonda-rodododo/llamenos-releases/blob/main/desktop/v${VERSION}/sbom-desktop.cdx.json)
+          - [Build Info](https://github.com/rhonda-rodododo/llamenos-releases/blob/main/desktop/v${VERSION}/build-info.json)
+          BODYEOF
+
+          # Create release (or upload to existing)
           if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
-            echo "Release ${TAG} exists — uploading desktop artifacts..."
+            echo "Release ${TAG} exists — uploading metadata..."
             gh release upload "${TAG}" \
-              flat-artifacts/* \
-              latest.json \
+              CHECKSUMS.txt \
               sbom-desktop.cdx.json \
+              build-info.json \
               --clobber
           else
-            echo "Creating new release ${TAG}..."
+            echo "Creating new metadata-only release ${TAG}..."
             gh release create "${TAG}" \
               --title "v${VERSION}" \
-              --generate-notes \
-              flat-artifacts/* \
-              latest.json \
-              sbom-desktop.cdx.json
+              --notes-file release-body.md \
+              CHECKSUMS.txt \
+              sbom-desktop.cdx.json \
+              build-info.json
           fi

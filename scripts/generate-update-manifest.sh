@@ -21,7 +21,8 @@ else
 fi
 
 REPO="${GITHUB_REPOSITORY:-rhonda-rodododo/llamenos-platform}"
-BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
+RUSTFS_PUBLIC_URL="${RUSTFS_PUBLIC_URL:-https://releases.llamenos.org}"
+BASE_URL="${RUSTFS_PUBLIC_URL}/desktop/v${VERSION}"
 ARTIFACTS_DIR="${1:-artifacts}"
 
 echo "Generating update manifest for version ${VERSION}..."

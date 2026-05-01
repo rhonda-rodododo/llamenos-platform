@@ -267,6 +267,18 @@ jobs:
             echo "::warning::No changelog section found for v${NEW_VERSION}"
           fi
           echo "$BODY" > release-notes.md
+
+          # Append desktop download info to release notes
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Desktop Downloads"
+            echo ""
+            echo "Desktop binaries are hosted on our self-hosted infrastructure at \`releases.llamenos.org\`."
+            echo "See the [desktop release metadata](https://github.com/rhonda-rodododo/llamenos-releases) for checksums and SBOM."
+          } >> release-notes.md
+
           echo "--- Release notes ---"
           cat release-notes.md
 
