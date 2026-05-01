@@ -987,7 +987,8 @@ export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
     const { nip19 } = await import('nostr-tools')
     const seedBytes = new Uint8Array(result.seedHex.match(/.{2}/g)!.map(h => parseInt(h, 16)))
     const nsec = nip19.nsecEncode(seedBytes)
-    return { publicKey: result.signingPubkeyHex, npub: '', nsec, seedHex: result.seedHex }
+    const npub = nip19.npubEncode(result.signingPubkeyHex)
+    return { publicKey: result.signingPubkeyHex, npub, nsec, seedHex: result.seedHex }
   }
   throw new Error('WASM ephemeral keypair not yet implemented')
 }
