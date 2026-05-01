@@ -624,14 +624,33 @@ export async function getPublicKeyFromState(): Promise<string | null> {
   return state?.signingPubkeyHex ?? null
 }
 
-/** @deprecated No more nsec in v3. */
-export async function pubkeyFromNsec(_nsec: string): Promise<string | null> {
-  throw new Error('pubkeyFromNsec removed in v3 — no more Nostr nsec/npub')
+/**
+ * Derive the secp256k1 x-only pubkey hex from a bech32 nsec string.
+ * Used for legacy recovery login. Returns null if the nsec is invalid.
+ */
+export async function pubkeyFromNsec(nsec: string): Promise<string | null> {
+  try {
+    const { nip19, getPublicKey } = await import('nostr-tools')
+    const decoded = nip19.decode(nsec)
+    if (decoded.type !== 'nsec') return null
+    return getPublicKey(decoded.data as Uint8Array)
+  } catch {
+    return null
+  }
 }
 
-/** @deprecated No more nsec validation in v3. */
-export async function isValidNsec(_nsec: string): Promise<boolean> {
-  return false
+/**
+ * Validate a bech32 nsec string.
+ * Returns true if the string is a valid nsec (secp256k1 private key).
+ */
+export async function isValidNsec(nsec: string): Promise<boolean> {
+  try {
+    const { nip19 } = await import('nostr-tools')
+    const decoded = nip19.decode(nsec)
+    return decoded.type === 'nsec'
+  } catch {
+    return false
+  }
 }
 
 /** @deprecated Use ed25519Verify instead. */
