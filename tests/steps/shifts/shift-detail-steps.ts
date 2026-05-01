@@ -8,8 +8,17 @@ import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
+import { listShiftsViaApi, createShiftViaApi } from '../../api-helpers'
 
-When('I tap a shift card', async ({ page }) => {
+When('I tap a shift card', async ({ page, request }) => {
+  // Ensure at least one shift exists so the tap has something to click.
+  const existingShifts = await listShiftsViaApi(request).catch(() => [])
+  if (existingShifts.length === 0) {
+    await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}` })
+    // Reload so the newly created shift appears in the list
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+  }
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await shiftCard.click()
