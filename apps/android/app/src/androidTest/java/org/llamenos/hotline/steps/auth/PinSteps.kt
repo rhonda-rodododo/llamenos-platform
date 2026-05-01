@@ -62,12 +62,9 @@ class PinSteps : BaseSteps() {
 
     @Given("I have confirmed my nsec backup")
     fun iHaveConfirmedMyNsecBackup() {
-        try {
-            onNodeWithTag("confirm-backup").performClick()
-            composeRule.waitForIdle()
-        } catch (_: Throwable) {
-            // Backup confirmation not available
-        }
+        // v3 device key model: no Onboarding/confirm-backup screen.
+        // Login navigates directly to PINSet. This step is a no-op.
+        composeRule.waitForIdle()
     }
 
     @Given("I am on the PIN setup screen")

@@ -38,7 +38,7 @@ class LoginSteps : BaseSteps() {
         val tag = when (buttonText) {
             "Create New Identity" -> "create-identity"
             "Import Key" -> "import-key"
-            "I've Backed Up My Key" -> "confirm-backup"
+            "I've Backed Up My Key" -> "continue-to-pin"
             "Lock App" -> "settings-lock-button"
             "Log Out" -> "settings-logout-button"
             "Request Camera Permission" -> "camera-permission-prompt"
@@ -109,7 +109,7 @@ class LoginSteps : BaseSteps() {
         val tag = when (buttonText) {
             "Import Key" -> "import-key"
             "Create New Identity" -> "create-identity"
-            "I've Backed Up My Key" -> "confirm-backup"
+            "I've Backed Up My Key" -> "continue-to-pin"
             "Lock App" -> "settings-lock-button"
             "Log Out" -> "settings-logout-button"
             "Clock In" -> "clock-in-button"
