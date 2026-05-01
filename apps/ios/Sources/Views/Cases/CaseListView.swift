@@ -274,7 +274,7 @@ struct CaseListView: View {
 
     private func paginationBar(vm: CaseManagementViewModel) -> some View {
         HStack {
-            Text("Page \(vm.currentPage) of \(vm.totalPages)")
+            Text(String(format: NSLocalizedString("cases_page_info", comment: "Page X of Y"), vm.currentPage, vm.totalPages))
                 .font(.brand(.caption2))
                 .foregroundStyle(.secondary)
 

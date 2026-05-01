@@ -14,6 +14,7 @@ struct PINPadView: View {
     let maxLength: Int
     let onComplete: (String) -> Void
     var shake: Binding<Bool>?
+    @Environment(\.layoutDirection) private var layoutDirection
 
     @State private var shakeOffset: CGFloat = 0
     @State private var dotScales: [CGFloat] = []
@@ -59,7 +60,7 @@ struct PINPadView: View {
                         .animation(.easeInOut(duration: 0.15), value: pin.count)
                 }
             }
-            .offset(x: shakeOffset)
+            .offset(x: layoutDirection == .rightToLeft ? -shakeOffset : shakeOffset)
             .accessibilityIdentifier("pin-dots")
             .padding(.bottom, 4)
 
