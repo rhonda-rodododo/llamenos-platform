@@ -223,7 +223,7 @@ Then('the new hub should appear in the hub list', async ({ page }) => {
 Given('multiple hubs exist', async ({ page }) => {
   const { createHubViaApi } = await import('../../api-helpers')
   // Create a second hub — the default hub already exists from test setup
-  await createHubViaApi(page.request, { name: `Hub-${Date.now()}` })
+  await createHubViaApi(page.request, `Hub-${Date.now()}`)
 })
 
 When('I select a different hub', async ({ page }) => {
@@ -270,7 +270,7 @@ Then('I should see only volunteers for that hub', async ({ page }) => {
 
 Given('a non-default hub exists', async ({ page }) => {
   const { createHubViaApi } = await import('../../api-helpers')
-  await createHubViaApi(page.request, { name: `NonDefault-${Date.now()}` })
+  await createHubViaApi(page.request, `NonDefault-${Date.now()}`)
 })
 
 When('I click {string} on the hub', async ({ page }, text: string) => {
