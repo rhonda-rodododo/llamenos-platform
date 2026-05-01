@@ -81,8 +81,7 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
                 composeRule.waitForIdle()
             }
             onNodeWithTag("create-identity").performClick()
-            waitForNode("confirm-backup")
-            onNodeWithTag("confirm-backup").performClick()
+            // v3 device key model: Login → PINSet directly (no Onboarding/confirm-backup step)
             waitForNode("pin-pad")
             enterPin("123456")
             enterPin("123456")
