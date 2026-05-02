@@ -28,19 +28,18 @@ Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-st
 ## Setup
 
 ```bash
-# Clone both repos as siblings
-git clone git@github.com:rhonda-rodododo/llamenos.git
-git clone git@github.com:rhonda-rodododo/llamenos-core.git
+# Clone the monorepo
+git clone git@github.com:rhonda-rodododo/llamenos-platform.git
 
 # Install dependencies
-cd llamenos
+cd llamenos-platform
 bun install
 
 # Or use the setup script
 ./scripts/dev-setup.sh
 ```
 
-Both `llamenos` and `llamenos-core` must be in the same parent directory — `src-tauri/Cargo.toml` references `../../llamenos-core` as a path dependency.
+The shared crypto crate lives in-repo at `packages/crypto/`. `apps/desktop/Cargo.toml` references it as a path dependency (`../../packages/crypto`) — no separate repo clone needed.
 
 ## Development
 
@@ -60,7 +59,7 @@ Hot reloading works for the frontend. Rust changes require a restart.
 bun run tauri:build
 ```
 
-Outputs platform-specific installers to `src-tauri/target/release/bundle/`.
+Outputs platform-specific installers to `apps/desktop/target/release/bundle/`.
 
 ## Type Checking
 
@@ -82,9 +81,9 @@ bun run test:ui           # Playwright UI mode
 bun run test -- --grep "smoke"  # Run specific tests
 ```
 
-### WebdriverIO (Desktop)
+### Real Tauri app
 
-Tests run against the real Tauri app:
+To run the full desktop E2E suite against the real Tauri app:
 
 ```bash
 bun run test:desktop
@@ -100,29 +99,22 @@ Requires `flatpak-builder` and GNOME Platform 47 runtime.
 
 ## Version Management
 
-All version files are synced from `package.json`:
+Versions are managed by **knope** — never edit `package.json`, `apps/desktop/tauri.conf.json`, or `Cargo.toml` version fields manually. knope keeps them in sync and maintains `CHANGELOG.md`.
 
 ```bash
-# Check version sync
-./scripts/sync-versions.sh
-
-# Fix mismatches
-./scripts/sync-versions.sh --fix
-
-# Bump version (updates all files, tags, changelog)
+# Bump version (updates package.json, tauri.conf.json, and CHANGELOG.md)
 bun run version:bump patch "Bug fix release"
+bun run version:bump minor "New feature"
+bun run version:bump major "Breaking change"
 ```
+
+The release PR (branch `release`) is created automatically by the `knope-release-pr.yml` workflow. Merging it to `main` triggers the full release pipeline.
 
 ## Troubleshooting
 
-### `llamenos-core` not found
+### Rust crypto crate not found
 
-Ensure `llamenos-core` is cloned as a sibling:
-```
-parent/
-  llamenos/          # this repo
-  llamenos-core/     # crypto crate
-```
+`packages/crypto/` is part of the monorepo — it is not a separate repo. If you see path dependency errors, ensure you are inside the `llamenos-platform` repo root and have run `bun install`.
 
 ### Rust compilation slow
 
