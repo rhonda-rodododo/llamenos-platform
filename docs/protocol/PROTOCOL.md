@@ -22,11 +22,13 @@ This document is the definitive wire-format specification for interoperating wit
 
 ## 1. Authentication Protocol
 
-Llamenos supports two authentication mechanisms. Clients MUST implement Schnorr signature auth. Session token auth is optional and requires WebAuthn support.
+Llamenos supports two authentication mechanisms. Clients MUST implement signature auth (Schnorr or Ed25519). Session token auth is optional and requires WebAuthn support.
 
-### 1.1 Schnorr Signature Authentication
+### 1.1 Schnorr Signature Authentication (Legacy)
 
-Every authenticated API request carries a self-signed token proving possession of a secp256k1 private key. The token is bound to the specific HTTP method and path to prevent cross-endpoint replay attacks.
+Every authenticated API request carries a self-signed token proving possession of a private key. The token is bound to the specific HTTP method and path to prevent cross-endpoint replay attacks.
+
+> **Phase 6 Note:** Clients with per-device Ed25519 keys (Section 2.11) use Ed25519 signatures instead of Schnorr. The token construction is identical (same message format and binding), but the signature algorithm differs. The server tries Schnorr verification first, then falls back to Ed25519. New client implementations SHOULD use Ed25519 with the `LABEL_DEVICE_AUTH` prefix (see Section 1.1.1).
 
 #### Token Construction
 
@@ -80,6 +82,36 @@ Authorization: Bearer {"pubkey":"a1b2c3d4e5f6...","timestamp":1709318400000,"tok
 6. Verify the Schnorr signature: `schnorr.verify(hex_to_bytes(token), message_hash, hex_to_bytes(pubkey))`.
 7. Look up the pubkey in the identity store to resolve the user record.
 
+#### 1.1.1 Ed25519 Device Authentication (Phase 6)
+
+For clients using per-device Ed25519 keys (Section 2.11), the auth token uses a different message prefix and Ed25519 signatures:
+
+```
+Step 1: Build the message string
+  message = "llamenos:device-auth:v1:" + timestamp_ms + ":" + HTTP_METHOD + ":" + path
+
+  Where:
+    timestamp_ms = Unix epoch in milliseconds (integer)
+    HTTP_METHOD  = uppercase string ("GET", "POST", "PATCH", "PUT", "DELETE")
+    path         = URL pathname starting with "/" (e.g., "/api/auth/me")
+
+Step 2: Hash the message
+  message_hash = SHA-256(UTF-8(message))
+
+Step 3: Sign with Ed25519
+  signature = ed25519.sign(message_hash, device_signing_key)
+  // Result: 64 bytes
+
+Step 4: Encode as JSON (same format as Schnorr)
+  token_json = JSON.stringify({
+    "pubkey": ed25519_pubkey_hex,   // 64-char hex string (32-byte Ed25519 public key)
+    "timestamp": timestamp_ms,
+    "token": hex(signature)         // 128-char hex string
+  })
+```
+
+The server validates Ed25519 tokens the same way as Schnorr tokens, resolving the Ed25519 pubkey to a user via the device registry or sigchain.
+
 ### 1.2 Session Token Authentication (WebAuthn)
 
 After a successful WebAuthn authentication ceremony, the server issues a random 256-bit session token with an 8-hour expiry. Clients send it on subsequent requests:
@@ -109,18 +141,27 @@ All cryptographic operations in Llamenos use domain separation constants to prev
 
 ### 2.1 Domain Separation Constants
 
-Every ECIES derivation, HKDF context, HMAC key, and Schnorr signature binding uses a unique context string from this list. Clients MUST use these exact strings. Using raw string literals instead of these constants is a protocol violation.
+Every HPKE/ECIES derivation, HKDF context, HMAC key, and signature binding uses a unique context string from this list. Clients MUST use these exact strings. Using raw string literals instead of these constants is a protocol violation.
 
-#### ECIES Key Wrapping Labels
+> **Note:** The authoritative source of truth for all 57 domain separation constants is `packages/protocol/crypto-labels.json`. The tables below list the most commonly used labels. Refer to the source file for the complete set.
+
+#### Device Authentication
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `LABEL_DEVICE_AUTH` | `llamenos:device-auth:v1` | Ed25519 device auth token message prefix (Phase 6) |
+| `AUTH_PREFIX` | `llamenos:auth:` | Schnorr auth token message prefix (legacy) |
+
+#### HPKE / ECIES Key Wrapping Labels
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
 | `LABEL_NOTE_KEY` | `llamenos:note-key` | Per-note symmetric key wrapping (V2 forward secrecy) |
 | `LABEL_FILE_KEY` | `llamenos:file-key` | Per-file symmetric key wrapping |
-| `LABEL_FILE_METADATA` | `llamenos:file-metadata` | File metadata ECIES wrapping |
-| `LABEL_HUB_KEY_WRAP` | `llamenos:hub-key-wrap` | Hub key ECIES distribution wrapping |
+| `LABEL_FILE_METADATA` | `llamenos:file-metadata` | File metadata wrapping |
+| `LABEL_HUB_KEY_WRAP` | `llamenos:hub-key-wrap` | Hub key distribution wrapping |
 
-#### ECIES Content Encryption Labels
+#### Content Encryption Labels
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
@@ -152,11 +193,31 @@ Every ECIES derivation, HKDF context, HMAC key, and Schnorr signature binding us
 | `SAS_SALT` | `llamenos:sas` | SAS HKDF salt for provisioning verification |
 | `SAS_INFO` | `llamenos:provisioning-sas` | SAS HKDF info parameter |
 
-#### Auth Token
+#### PUK (Per-User Key) Labels
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| `AUTH_PREFIX` | `llamenos:auth:` | Schnorr auth token message prefix |
+| `LABEL_PUK_SIGN` | `llamenos:puk:sign:v1` | PUK signing key derivation |
+| `LABEL_PUK_DH` | `llamenos:puk:dh:v1` | PUK Diffie-Hellman key derivation |
+| `LABEL_PUK_SECRETBOX` | `llamenos:puk:secretbox:v1` | PUK symmetric encryption |
+| `LABEL_PUK_WRAP_TO_DEVICE` | `llamenos:puk:wrap:device:v1` | PUK wrapping for device distribution |
+| `LABEL_PUK_PREVIOUS_GEN` | `llamenos:puk:prev-gen:v1` | Previous PUK generation chain link |
+
+#### Push Notification Labels
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `LABEL_PUSH_WAKE` | `llamenos:push-wake` | Push notification wake key encryption |
+| `LABEL_PUSH_FULL` | `llamenos:push-full` | Push notification full content encryption |
+
+#### CMS (Case Management) Labels
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `LABEL_CONTACT_ID` | `llamenos:contact-id` | Contact identifier encryption |
+| `LABEL_CONTACT_PROFILE` | `llamenos:contact-profile` | Contact profile data encryption |
+| `LABEL_CASE_SUMMARY` | `llamenos:case-summary` | Case summary encryption |
+| `LABEL_CASE_FIELDS` | `llamenos:case-fields` | Case custom field encryption |
 
 #### HMAC Domain Separation
 
@@ -182,9 +243,66 @@ Every ECIES derivation, HKDF context, HMAC key, and Schnorr signature binding us
 | `LABEL_SERVER_NOSTR_KEY` | `llamenos:server-nostr-key` | HKDF salt for server Nostr keypair derivation |
 | `LABEL_SERVER_NOSTR_KEY_INFO` | `llamenos:server-nostr-key:v1` | HKDF info parameter (versioned for rotation) |
 
-### 2.2 ECIES Key Wrapping
+### 2.2 HPKE Envelope Encryption (Current)
 
-ECIES (Elliptic Curve Integrated Encryption Scheme) is the core primitive for encrypting symmetric keys for specific recipients. It is used by notes, messages, files, hub keys, and all other envelope-pattern encryption.
+HPKE (Hybrid Public Key Encryption, RFC 9180) is the current envelope encryption primitive for wrapping symmetric keys for specific recipients. It replaces the legacy ECIES scheme (Section 2.2.1) for all new encryption operations.
+
+#### Algorithm
+
+```
+Suite:     DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM
+KEM ID:    0x0020 (X25519)
+KDF ID:    0x0001 (HKDF-SHA256)
+AEAD ID:   0x0002 (AES-256-GCM)
+```
+
+#### Wire Format (v3 Envelope)
+
+```json
+{
+  "v": 3,
+  "labelId": 1,
+  "enc": "<base64url — 32-byte HPKE encapsulated key>",
+  "ct": "<base64url — AEAD ciphertext>"
+}
+```
+
+Where:
+- `v`: Envelope version (always 3 for HPKE)
+- `labelId`: Integer ID mapping to a domain separation label (see `crypto-labels.json`)
+- `enc`: The HPKE KEM encapsulated shared secret (32 bytes, base64url-encoded)
+- `ct`: The AEAD ciphertext (base64url-encoded)
+
+#### Albrecht Defense (Label Enforcement)
+
+Before decryption, the `labelId` in the envelope MUST match the expected label for the operation context. This prevents ciphertext misuse attacks where an attacker substitutes an envelope from one context into another (e.g., using a note key envelope as a hub key envelope). Mismatched labels MUST cause decryption to fail.
+
+#### Encryption
+
+```
+hpkeWrapKey(plaintext_key[32], recipient_x25519_pubkey[32], label_string):
+
+  1. Look up label ID from crypto-labels.json
+  2. HPKE.Seal(recipient_x25519_pubkey, plaintext_key, info=label_string)
+  3. Return v3 envelope JSON
+```
+
+#### Decryption
+
+```
+hpkeUnwrapKey(envelope, device_x25519_secret_key[32], expected_label_string):
+
+  1. Verify envelope.v === 3
+  2. Verify envelope.labelId matches expected label
+  3. HPKE.Open(device_x25519_secret_key, envelope.enc, envelope.ct, info=expected_label_string)
+  4. Return plaintext key (32 bytes)
+```
+
+### 2.2.1 ECIES Key Wrapping (Legacy)
+
+> **Deprecation Notice:** ECIES is retained for backwards compatibility with existing encrypted data. All new encryption operations SHOULD use HPKE (Section 2.2). ECIES uses secp256k1 ECDH + XChaCha20-Poly1305 while HPKE uses X25519 + AES-256-GCM.
+
+ECIES (Elliptic Curve Integrated Encryption Scheme) is the legacy primitive for encrypting symmetric keys for specific recipients.
 
 #### Algorithm
 
@@ -681,7 +799,48 @@ hashIP(ip_string, hmac_secret_hex):
   // Truncated to 96 bits (24 hex chars)
 ```
 
-### 2.11 Audit Log Hash Chain
+### 2.11 Per-Device Keys (Phase 6)
+
+Phase 6 replaces the single nsec-per-user model with per-device keypairs. Each device generates two independent keypairs on first launch:
+
+```
+Device Key Generation:
+  1. signing_seed = random(32)
+     ed25519_signing_key = Ed25519.from_seed(signing_seed)
+     ed25519_pubkey = ed25519_signing_key.public_key()
+     // Used for: auth tokens, sigchain entries, MLS leaf credentials
+
+  2. encryption_seed = random(32)
+     x25519_encryption_key = X25519.from(encryption_seed)
+     x25519_pubkey = x25519_encryption_key.public_key()
+     // Used for: HPKE decapsulation, PUK envelope decryption
+```
+
+Device private keys are stored encrypted with the user's PIN using AES-256-GCM (not XChaCha20-Poly1305 as in legacy nsec storage):
+
+```
+PIN Encryption (Phase 6):
+  KDF:    PBKDF2-SHA256, 600,000 iterations
+  AEAD:   AES-256-GCM (12-byte nonce, 16-byte tag)
+```
+
+#### Platform Storage
+
+| Platform | Storage | Access Control |
+|----------|---------|----------------|
+| Desktop (Tauri) | Tauri Stronghold (encrypted vault) | Rust `CryptoState`; keys never enter webview |
+| iOS | Keychain Services | `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` |
+| Android | EncryptedSharedPreferences | AndroidKeyStore-backed |
+
+#### Device Authorization (Sigchain)
+
+New devices are authorized via an append-only hash-chained sigchain. Each sigchain entry is Ed25519-signed by an existing authorized device and contains the new device's Ed25519 + X25519 public keys. The PUK (Per-User Key) is wrapped for each authorized device via `LABEL_PUK_WRAP_TO_DEVICE`.
+
+#### Relationship to Nostr Identity
+
+Nostr identity keys (secp256k1 nsec/npub) remain separate from device keys. The nsec is used for Nostr protocol compatibility (relay auth, event signing). Device Ed25519 keys handle application-level auth and sigchain. Device X25519 keys handle HPKE encryption. These are NOT derived from the nsec.
+
+### 2.12 Audit Log Hash Chain
 
 Each audit log entry contains a SHA-256 hash linking it to the previous entry, forming a tamper-evident chain:
 
@@ -701,7 +860,7 @@ Each entry stores:
 - `previousEntryHash`: SHA-256 of the prior entry (empty string for the first entry)
 - `entryHash`: SHA-256 of this entry's content
 
-### 2.12 Legacy V1 Note Decryption
+### 2.13 Legacy V1 Note Decryption
 
 V1 notes (pre-forward-secrecy) are encrypted with a key derived from the user's secret key via HKDF. No new V1 notes are created; this exists only for backward compatibility.
 
@@ -942,7 +1101,10 @@ Response: {
   "hubs": [{ "id": "...", "name": "...", "slug": "...", ... }],
   "defaultHubId": "...",
   "serverNostrPubkey": "hex_64",
-  "nostrRelayUrl": "wss://..."
+  "nostrRelayUrl": "wss://...",
+  "apiVersion": "1.0.0",
+  "minApiVersion": "0.9.0",
+  "sentryDsn"?: "https://..."   // Optional, only if GlitchTip/Sentry is configured
 }
 ```
 
@@ -1008,7 +1170,7 @@ Response: {
   "pubkey": "hex64",
   "roles": ["role-super-admin"],
   "permissions": ["*"],
-  "primaryRole": { "id": "role-super-admin", "name": "Super Admin", "slug": "super-admin" },
+  "primaryRole": { "id": "role-super-admin", "name": "Super Admin", "slug": "super-admin" } | null,
   "name": "Admin",
   "transcriptionEnabled": true,
   "spokenLanguages": ["en", "es"],
@@ -1018,8 +1180,8 @@ Response: {
   "callPreference": "phone",
   "webauthnRequired": false,
   "webauthnRegistered": true,
-  "adminPubkey": "hex64",
-  "adminDecryptionPubkey": "hex64"
+  "adminDecryptionPubkey"?: "hex64",    // Optional, present for admins
+  "serverEventKeyHex"?: "hex64"         // Optional, server event signing key
 }
 ```
 
@@ -1254,17 +1416,18 @@ Response: { "calls": EncryptedCallRecord[], "total": number }
 
 POST /api/calls/:callId/answer
 Permission: calls:answer
-Response: { "ok": true }
+Response: { "call": CallRecord }
 Error: 409 "Call already answered"
 
 POST /api/calls/:callId/hangup
-Permission: calls:answer
-Response: { "ok": true }
-Error: 403 "Not your call"
+Permission: calls:hangup
+Response: { "call": CallRecord }
+Error: 403 "Not your call", 404 "Call not found"
 
 POST /api/calls/:callId/spam
-Permission: calls:answer
-Response: { "ok": true }
+Permission: calls:report-spam
+Response: { ...spamResult }
+Error: 403 "Not your call", 404 "Call not found"
 
 GET /api/calls/:callId/recording
 Permission: calls:read-recording or answering volunteer
@@ -1896,7 +2059,7 @@ All of the following routes are also available with a `/api/hubs/:hubId/` prefix
 /api/hubs/:hubId/blasts/*
 ```
 
-When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user and routes to hub-scoped Durable Objects.
+When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user and scopes all queries to the specified hub.
 
 ---
 
@@ -1911,31 +2074,29 @@ POST /api/devices/register
 Auth: Required
 Body: {
   "platform": "ios" | "android",
-  "pushToken": string,         // APNs device token or FCM registration token
-  "voipToken"?: string,        // iOS VoIP push token (for call notifications)
-  "wakeKeyEnvelope": {         // ECIES-wrapped wake key (no PIN required to decrypt)
-    "wrappedKey": hex,
-    "ephemeralPubkey": hex
-  }
+  "pushToken": string,              // APNs device token or FCM registration token
+  "wakeKeyPublic": hex,             // 33-byte compressed secp256k1 pubkey (66 hex chars)
+  "ed25519Pubkey"?: hex,            // Phase 6: 32-byte Ed25519 signing pubkey (64 hex chars)
+  "x25519Pubkey"?: hex              // Phase 6: 32-byte X25519 encryption pubkey (64 hex chars)
 }
-Response: { "deviceId": "uuid" }
+Response: 204 No Content (empty body)
 ```
 
 ### 5.2 Two-Tier Encryption
 
 Push notifications use a two-tier encryption scheme to balance security with usability:
 
-**Tier 1 -- Wake Key (No PIN Required)**
+**Tier 1 -- Wake Key (No PIN Required)** (`LABEL_PUSH_WAKE`)
 - A symmetric "wake key" is generated per-device at registration time.
-- It is ECIES-wrapped for the device's pubkey and stored server-side.
+- It is HPKE-wrapped for the device's X25519 pubkey and stored server-side.
 - Push payloads are encrypted with this wake key.
 - The app can decrypt the push payload without requiring PIN entry.
 - Contains only: notification type, conversation/call ID, and display-safe metadata.
 
-**Tier 2 -- Full Decryption (PIN Required)**
-- Message content, caller details, and other sensitive data remain encrypted with the user's identity key.
+**Tier 2 -- Full Decryption (PIN Required)** (`LABEL_PUSH_FULL`)
+- Message content, caller details, and other sensitive data remain encrypted with the device's identity key.
 - The app must prompt for PIN unlock to decrypt the full content.
-- This mirrors the behavior of the web app's locked/unlocked states.
+- This mirrors the behavior of the desktop app's locked/unlocked states.
 
 ### 5.3 Push Payload Format
 
@@ -2445,7 +2606,7 @@ interface CustomFieldDefinition {
 
 ```typescript
 interface TelephonyProviderConfig {
-  type: 'twilio' | 'signalwire' | 'vonage' | 'plivo' | 'asterisk'
+  type: 'twilio' | 'signalwire' | 'vonage' | 'plivo' | 'asterisk' | 'telnyx' | 'bandwidth' | 'freeswitch'
   phoneNumber: string        // E.164
   accountSid?: string
   authToken?: string
