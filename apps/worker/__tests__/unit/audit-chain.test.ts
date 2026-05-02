@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { hashAuditEntry } from '@worker/lib/crypto'
-import type { AuditLogEntry } from '@worker/types'
+import { hashAuditEntry, stableJsonStringify } from '../../lib/crypto'
+import type { AuditLogEntry } from '../../types'
 
 describe('Audit chain integrity', () => {
   function createEntry(
@@ -200,6 +200,83 @@ describe('Audit chain integrity', () => {
     it('single entry chain is valid', () => {
       const e1 = createEntry('001', 'login')
       expect(verifyChain([e1])).toEqual({ valid: true })
+    })
+  })
+
+  describe('stableJsonStringify', () => {
+    it('produces identical output regardless of key insertion order', () => {
+      const a = { zebra: 1, alpha: 2, middle: 3 }
+      const b = { alpha: 2, middle: 3, zebra: 1 }
+      expect(stableJsonStringify(a)).toBe(stableJsonStringify(b))
+      // Keys should be sorted alphabetically
+      expect(stableJsonStringify(a)).toBe('{"alpha":2,"middle":3,"zebra":1}')
+    })
+
+    it('sorts nested objects recursively', () => {
+      const obj = { z: { b: 2, a: 1 }, a: { d: 4, c: 3 } }
+      const result = stableJsonStringify(obj)
+      expect(result).toBe('{"a":{"c":3,"d":4},"z":{"a":1,"b":2}}')
+    })
+
+    it('preserves array order (arrays are not sorted)', () => {
+      const obj = { items: [3, 1, 2] }
+      expect(stableJsonStringify(obj)).toBe('{"items":[3,1,2]}')
+    })
+
+    it('handles null and primitive values', () => {
+      expect(stableJsonStringify(null)).toBe('null')
+      expect(stableJsonStringify('hello')).toBe('"hello"')
+      expect(stableJsonStringify(42)).toBe('42')
+    })
+  })
+
+  describe('computeEntryHash determinism', () => {
+    it('produces deterministic hash for same inputs', () => {
+      const entry = createEntry('audit-100', 'note.created')
+      const hash1 = hashAuditEntry(entry)
+      const hash2 = hashAuditEntry(entry)
+      expect(hash1).toBe(hash2)
+    })
+
+    it('hash includes previousEntryHash (chain linkage)', () => {
+      const entry = createEntry('audit-100', 'note.created')
+      const withPrev = { ...entry, previousEntryHash: 'abc123' }
+      const withoutPrev = { ...entry, previousEntryHash: undefined }
+      expect(hashAuditEntry(withPrev)).not.toBe(hashAuditEntry(withoutPrev))
+    })
+
+    it('details key order does not affect hash (stable stringify)', () => {
+      const entry1: AuditLogEntry = {
+        id: 'audit-200',
+        action: 'test',
+        actorPubkey: 'pk1',
+        details: { zebra: 'z', alpha: 'a' },
+        createdAt: '2026-01-01T00:00:00Z',
+      }
+      const entry2: AuditLogEntry = {
+        id: 'audit-200',
+        action: 'test',
+        actorPubkey: 'pk1',
+        details: { alpha: 'a', zebra: 'z' },
+        createdAt: '2026-01-01T00:00:00Z',
+      }
+      expect(hashAuditEntry(entry1)).toBe(hashAuditEntry(entry2))
+    })
+
+    it('round-trip: compute hash, verify it matches', () => {
+      const entry = createEntry('audit-300', 'call.answered', 'prevhash123')
+      const hash = hashAuditEntry(entry)
+
+      // Re-creating entry with same data should produce same hash
+      const rebuilt: AuditLogEntry = {
+        id: entry.id,
+        action: entry.action,
+        actorPubkey: entry.actorPubkey,
+        details: { ...entry.details },
+        createdAt: entry.createdAt,
+        previousEntryHash: entry.previousEntryHash,
+      }
+      expect(hashAuditEntry(rebuilt)).toBe(hash)
     })
   })
 })

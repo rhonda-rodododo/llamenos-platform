@@ -221,7 +221,24 @@ export function migrateContactIfNeeded(stored: string, hmacSecret: string): {
 }
 
 /**
+ * Deterministic JSON serialization with sorted keys.
+ * Matches the implementation in services/audit.ts — both must produce
+ * identical output so hashes computed at write time match verification.
+ */
+export function stableJsonStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown) => {
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      return Object.fromEntries(
+        Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)),
+      )
+    }
+    return val
+  })
+}
+
+/**
  * Compute SHA-256 hash of an audit entry's core content for chain linking.
+ * Uses stableJsonStringify for deterministic output regardless of key order.
  */
 export function hashAuditEntry(entry: {
   id: string
@@ -231,7 +248,7 @@ export function hashAuditEntry(entry: {
   createdAt: string
   previousEntryHash?: string
 }): string {
-  const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:${entry.previousEntryHash || ''}`
+  const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${stableJsonStringify(entry.details ?? {})}:${entry.previousEntryHash || ''}`
   return bytesToHex(sha256(utf8ToBytes(content)))
 }
 
