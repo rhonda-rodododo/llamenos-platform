@@ -1,6 +1,10 @@
 # Architecture Overview
 
-## Three-Repo Structure
+> **Note:** This document reflects the original pre-monorepo architecture (three separate repos, React Native, Cloudflare Durable Objects).
+> The current architecture is a monorepo (`apps/`, `packages/`) with native iOS/Android, Bun+PostgreSQL backend, and a Rust crypto crate.
+> See `CLAUDE.md` for the authoritative current architecture description.
+
+## Three-Repo Structure (Historical)
 
 ```
 llamenos/           Desktop app (Tauri v2) + API + protocol spec
