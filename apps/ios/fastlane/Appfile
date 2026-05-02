@@ -1,0 +1,4 @@
+app_identifier("org.llamenos.hotline")
+apple_id(ENV["APPLE_ID"]) # Set in CI or .env
+team_id("KN6NH935ZU")
+itc_team_id("KN6NH935ZU") # App Store Connect team ID (same as dev portal team)
