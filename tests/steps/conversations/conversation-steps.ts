@@ -30,9 +30,18 @@ Given('I open a conversation', async ({ page, backendRequest }) => {
       channel: 'sms',
     }).catch(() => { /* ignore if simulation endpoint is unavailable */ })
 
-    // Reload to show the new conversation
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
+    // SPA-navigate away and back to refresh without a full reload
+    // (reload triggers PIN re-entry which this step doesn't handle)
+    await page.evaluate(() => {
+      const router = (window as any).__TEST_ROUTER
+      if (router) router.navigate({ to: '/' })
+    })
+    await page.waitForURL(u => !u.toString().includes('/conversations'), { timeout: 5000 }).catch(() => {})
+    await page.evaluate(() => {
+      const router = (window as any).__TEST_ROUTER
+      if (router) router.navigate({ to: '/conversations' })
+    })
+    await page.waitForURL(/\/conversations/, { timeout: 5000 }).catch(() => {})
   }
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
   const exists = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)

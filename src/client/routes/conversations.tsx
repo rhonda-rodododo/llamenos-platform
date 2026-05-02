@@ -18,7 +18,7 @@ import { ConversationList } from '@/components/ConversationList'
 import { ConversationThread } from '@/components/ConversationThread'
 import { MessageComposer } from '@/components/MessageComposer'
 import { ChannelBadge } from '@/components/ChannelBadge'
-import { MessageSquare, X, UserCheck, Lock, UserCog, StickyNote } from 'lucide-react'
+import { MessageSquare, X, UserCheck, Lock, UserCog, StickyNote, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ReassignDialog } from '@/components/ReassignDialog'
@@ -87,6 +87,15 @@ function ConversationsPage() {
       toast(t('conversations.closeError', { defaultValue: 'Failed to close conversation' }), 'error')
     }
   }, [selectedId, t, toast])
+
+  const handleReopen = useCallback(async (convId: string) => {
+    try {
+      await updateConversation(convId, { status: 'active' })
+      toast(t('conversations.reopened', { defaultValue: 'Conversation reopened' }))
+    } catch {
+      toast(t('conversations.reopenError', { defaultValue: 'Failed to reopen conversation' }), 'error')
+    }
+  }, [t, toast])
 
   // Encrypt and send a message using envelope pattern
   const handleComposerSend = useCallback(async (plaintext: string) => {
@@ -204,6 +213,12 @@ function ConversationsPage() {
                   <Button size="sm" variant="outline" data-testid="conv-close-btn" onClick={() => handleClose(selectedConv.id)}>
                     <X className="h-3.5 w-3.5 mr-1" />
                     {t('conversations.close', { defaultValue: 'Close' })}
+                  </Button>
+                )}
+                {selectedConv.status === 'closed' && (
+                  <Button size="sm" variant="outline" data-testid="conv-reopen-btn" onClick={() => handleReopen(selectedConv.id)}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                    {t('conversations.reopen', { defaultValue: 'Reopen' })}
                   </Button>
                 )}
               </div>
