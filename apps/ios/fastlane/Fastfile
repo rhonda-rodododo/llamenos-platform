@@ -1,21 +1,152 @@
 default_platform(:ios)
 
+# ── Constants ────────────────────────────────────────────────────────────────
+APP_IDENTIFIER = "org.llamenos.hotline"
+SCHEME         = "Llamenos"
+BUILD_DIR      = "../build"
+IPA_PATH       = "#{BUILD_DIR}/export/Llamenos.ipa"
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+# Generates the Xcode project from project.yml (xcodegen required)
+def regenerate_xcodeproj
+  sh("xcodegen generate", chdir: "../")
+end
+
+# Builds the app archive and exports the IPA using App Store Connect signing.
+# Requires match (appstore) certs to already be installed.
+def build_ipa(export_method: "app-store-connect")
+  build_app(
+    scheme: SCHEME,
+    project: "../Llamenos.xcodeproj",
+    configuration: "Release",
+    export_method: export_method,
+    export_options: {
+      method: export_method,
+      teamID: "KN6NH935ZU",
+      signingStyle: "manual",
+      uploadSymbols: true,
+      compileBitcode: false,
+      stripSwiftSymbols: true,
+      provisioningProfiles: {
+        APP_IDENTIFIER => "match AppStore #{APP_IDENTIFIER}"
+      }
+    },
+    output_directory: "#{BUILD_DIR}/export",
+    output_name: "Llamenos",
+    clean: true,
+    xcargs: "DEVELOPMENT_TEAM=KN6NH935ZU"
+  )
+end
+
+# ── Platform ─────────────────────────────────────────────────────────────────
 platform :ios do
-  desc "Upload to TestFlight"
-  lane :beta do
-    upload_to_testflight(
-      ipa: "../build/export/Llamenos.ipa",
-      skip_waiting_for_build_processing: true
+
+  # ── certificates ──────────────────────────────────────────────────────────
+  desc "Sync App Store certificates and provisioning profiles via match"
+  lane :certificates do
+    api_key = app_store_connect_api_key(
+      key_id:        ENV["ASC_KEY_ID"],
+      issuer_id:     ENV["ASC_ISSUER_ID"],
+      key_content:   ENV["ASC_KEY"],      # PEM or p8 contents (not a path)
+      in_house:      false
+    )
+
+    match(
+      type: "appstore",
+      app_identifier: APP_IDENTIFIER,
+      api_key: api_key,
+      readonly: is_ci   # Download-only in CI; allow writes locally
     )
   end
 
-  desc "Submit to App Store Review"
-  lane :release do
-    upload_to_app_store(
-      ipa: "../build/export/Llamenos.ipa",
-      submit_for_review: true,
-      automatic_release: false,
-      force: true
+  # ── beta ──────────────────────────────────────────────────────────────────
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id:        ENV["ASC_KEY_ID"],
+      issuer_id:     ENV["ASC_ISSUER_ID"],
+      key_content:   ENV["ASC_KEY"],
+      in_house:      false
+    )
+
+    regenerate_xcodeproj
+
+    match(
+      type: "appstore",
+      app_identifier: APP_IDENTIFIER,
+      api_key: api_key,
+      readonly: true
+    )
+
+    build_ipa
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: IPA_PATH,
+      skip_waiting_for_build_processing: true,
+      changelog: ENV["TESTFLIGHT_CHANGELOG"] || "Internal build"
     )
   end
+
+  # ── release ───────────────────────────────────────────────────────────────
+  desc "Build and submit to App Store Review"
+  lane :release do
+    api_key = app_store_connect_api_key(
+      key_id:        ENV["ASC_KEY_ID"],
+      issuer_id:     ENV["ASC_ISSUER_ID"],
+      key_content:   ENV["ASC_KEY"],
+      in_house:      false
+    )
+
+    regenerate_xcodeproj
+
+    match(
+      type: "appstore",
+      app_identifier: APP_IDENTIFIER,
+      api_key: api_key,
+      readonly: true
+    )
+
+    build_ipa
+
+    upload_to_app_store(
+      api_key: api_key,
+      ipa: IPA_PATH,
+      submit_for_review: true,
+      automatic_release: false,
+      force: true,                    # Skip HTML report prompt
+      precheck_include_in_app_purchases: false,
+      submission_information: {
+        add_id_info_uses_idfa: false
+      }
+    )
+  end
+
+  # ── screenshots ───────────────────────────────────────────────────────────
+  desc "Capture App Store screenshots via snapshot"
+  lane :screenshots do
+    regenerate_xcodeproj
+
+    capture_screenshots(
+      scheme: "LlamenosUITests",
+      project: "../Llamenos.xcodeproj",
+      devices: [
+        "iPhone 16 Pro Max",
+        "iPhone 16 Pro",
+        "iPhone SE (3rd generation)",
+        "iPad Pro 13-inch (M4)"
+      ],
+      languages: ["en-US", "es-419", "fr-FR", "de-DE", "zh-Hans"],
+      output_directory: "./screenshots",
+      clear_previous_screenshots: true,
+      stop_after_first_error: false
+    )
+
+    frame_screenshots(
+      white: false,
+      path: "./screenshots"
+    )
+  end
+
 end

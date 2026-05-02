@@ -32,6 +32,11 @@
     <key>stripSwiftSymbols</key>
     <true/>
     <key>teamID</key>
-    <string></string>
+    <string>KN6NH935ZU</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>org.llamenos.hotline</key>
+        <string>match AppStore org.llamenos.hotline</string>
+    </dict>
 </dict>
 </plist>

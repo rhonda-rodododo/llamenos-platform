@@ -11,10 +11,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    # DEVELOPMENT_TEAM is intentionally empty: the Apple Developer account is
-    # pending activation. Fill in the 10-character Team ID once available
-    # (e.g. "AB12CD34EF") and update ExportOptions.plist accordingly.
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: "KN6NH935ZU"
     CODE_SIGN_STYLE: Automatic
     # The Rust XCFramework is only built for arm64 simulator slices.
     # Exclude x86_64 so Release builds on Apple Silicon Macs link cleanly.
