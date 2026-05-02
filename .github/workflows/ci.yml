@@ -424,6 +424,50 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
 
+      # ── Build native crypto library for emulator (x86_64) ───────
+      # The Android app requires the Rust crypto .so to function —
+      # without it, CryptoService.nativeLibLoaded=false and identity
+      # creation fails (no key generation possible).
+      - name: Cache native crypto .so
+        id: crypto-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
+          key: android-crypto-x86_64-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
+
+      - name: Install Rust stable (for crypto build)
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        with:
+          toolchain: stable
+          targets: x86_64-linux-android
+
+      - name: Rust cache
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+        with:
+          workspaces: packages/crypto
+
+      - name: Install cargo-ndk
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-ndk --locked
+
+      - name: Build crypto .so for x86_64 emulator
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        run: |
+          cd packages/crypto
+          export ANDROID_NDK_HOME="$(ls -1d $ANDROID_HOME/ndk/*/ 2>/dev/null | sort -V | tail -1)"
+          echo "Using NDK: $ANDROID_NDK_HOME"
+          mkdir -p ../../apps/android/app/src/main/jniLibs
+          cargo ndk -t x86_64 --platform 24 \
+            -o ../../apps/android/app/src/main/jniLibs \
+            build --release --features mobile
+
+      - name: Verify crypto .so exists
+        run: |
+          ls -la apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
+          file apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
+
       # ── Start backend services ──────────────────────────────────
       # Android E2E tests need a running backend for hub creation,
       # authentication, and call/message simulation endpoints.
@@ -537,7 +581,15 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           emulator-boot-timeout: 600
-          script: cd apps/android && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
+          script: |
+            # Forward host port 3000 into emulator so localhost:3000 works inside the app
+            adb reverse tcp:3000 tcp:3000
+            # Verify backend is reachable from host before running tests
+            curl -sf http://localhost:3000/api/health/ready || { echo "::error::Backend not reachable"; exit 1; }
+            cd apps/android && ./gradlew connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" \
+              -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" \
+              -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
