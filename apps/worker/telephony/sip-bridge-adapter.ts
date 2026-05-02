@@ -86,25 +86,25 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
   // --- Call management (shared — REST calls to bridge) ---
 
   async hangupCall(callSid: string): Promise<void> {
-    await this.bridgeRequest('POST', '/commands/hangup', { channelId: callSid })
+    await this.bridgeRequest('POST', '/hangup', { channelId: callSid })
   }
 
   async ringVolunteers(params: RingVolunteersParams): Promise<string[]> {
     const { callSid, callerNumber, volunteers, callbackUrl, hubId } = params
-    const result = await this.bridgeRequest('POST', '/commands/ring', {
+    const result = await this.bridgeRequest('POST', '/ring', {
       parentCallSid: callSid,
       callerNumber,
-      volunteers: volunteers.map((v) => ({ callToken: v.callToken, phone: v.phone })),
+      volunteers: volunteers.map((v) => ({ pubkey: v.callToken, phone: v.phone })),
       callbackUrl,
       hubId,
     })
-    return (result as { callSids?: string[] })?.callSids ?? []
+    return (result as { channelIds?: string[] })?.channelIds ?? []
   }
 
   async cancelRinging(callSids: string[], exceptSid?: string): Promise<void> {
-    await this.bridgeRequest('POST', '/commands/cancel-ringing', {
-      callSids,
-      exceptSid,
+    await this.bridgeRequest('POST', '/cancel-ringing', {
+      channelIds: callSids,
+      exceptId: exceptSid,
     })
   }
 
@@ -124,14 +124,15 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
 
     const body = await request.clone().text()
     const timestamp = request.headers.get('X-Bridge-Timestamp') || ''
+    const url = request.url
 
     // Reject webhooks with timestamps older than 5 minutes (replay protection)
-    const tsSeconds = parseInt(timestamp, 10)
-    if (isNaN(tsSeconds) || Math.abs(Date.now() / 1000 - tsSeconds) > 300) {
+    const tsMs = parseInt(timestamp, 10)
+    if (isNaN(tsMs) || Math.abs(Date.now() - tsMs) > 300_000) {
       return false
     }
 
-    const payload = `${timestamp}.${body}`
+    const payload = `${timestamp}.${url}.${body}`
 
     const key = await crypto.subtle.importKey(
       'raw',
@@ -141,9 +142,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
       ['sign'],
     )
     const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
-    const expectedSig = Array.from(new Uint8Array(sig))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
+    const expectedSig = btoa(String.fromCharCode(...new Uint8Array(sig)))
 
     // Constant-time comparison to prevent timing attacks
     if (signature.length !== expectedSig.length) return false
@@ -254,9 +253,9 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
 
   protected async bridgeRequest(method: string, path: string, body?: unknown): Promise<unknown> {
     const url = `${this.bridgeCallbackUrl}${path}`
-    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const timestamp = Date.now().toString()
     const bodyStr = body ? JSON.stringify(body) : ''
-    const payload = `${timestamp}.${bodyStr}`
+    const payload = `${timestamp}.${url}.${bodyStr}`
 
     const key = await crypto.subtle.importKey(
       'raw',
@@ -266,9 +265,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
       ['sign'],
     )
     const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
-    const signature = Array.from(new Uint8Array(sig))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
+    const signature = btoa(String.fromCharCode(...new Uint8Array(sig)))
 
     const response = await fetch(url, {
       method,
