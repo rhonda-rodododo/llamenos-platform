@@ -32,12 +32,11 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 // Constants
 // ---------------------------------------------------------------------------
 
-const SESSION_DURATION_MS = 8 * 60 * 60 * 1000 // 8 hours
-const RENEWAL_THRESHOLD_MS = 7 * 60 * 60 * 1000 // renew when < 1h remaining
+import { SESSION_DURATION_MS, RENEWAL_THRESHOLD_MS } from '../lib/session-renewal'
+import { decideDeviceRegistration, MAX_DEVICES_PER_VOLUNTEER } from '../lib/device-eviction'
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const CHALLENGE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const PROVISION_ROOM_TTL_MS = 5 * 60 * 1000 // 5 minutes
-const MAX_DEVICES_PER_VOLUNTEER = 5
 
 /** Fields a non-admin volunteer may self-update */
 const VOLUNTEER_SAFE_FIELDS = new Set([
@@ -799,20 +798,15 @@ export class IdentityService {
   }): Promise<void> {
     const now = new Date()
 
-    // Check for existing device with same pushToken
-    const existing = await this.db
-      .select()
+    // Fetch all devices for this user to make the eviction decision
+    const allDevices = await this.db
+      .select({ id: devices.id, lastSeenAt: devices.lastSeenAt, pushToken: devices.pushToken })
       .from(devices)
-      .where(
-        and(
-          eq(devices.pubkey, pubkey),
-          eq(devices.pushToken, data.pushToken),
-        ),
-      )
-      .limit(1)
+      .where(eq(devices.pubkey, pubkey))
 
-    if (existing.length > 0) {
-      // Update existing device
+    const decision = decideDeviceRegistration(allDevices, data.pushToken)
+
+    if (decision.action === 'update_existing') {
       await this.db
         .update(devices)
         .set({
@@ -821,24 +815,12 @@ export class IdentityService {
           ...(data.x25519Pubkey !== undefined && { x25519Pubkey: data.x25519Pubkey }),
           lastSeenAt: now,
         })
-        .where(eq(devices.id, existing[0].id))
+        .where(eq(devices.id, decision.deviceId))
       return
     }
 
-    // Check device count
-    const allDevices = await this.db
-      .select({ id: devices.id, lastSeenAt: devices.lastSeenAt })
-      .from(devices)
-      .where(eq(devices.pubkey, pubkey))
-
-    if (allDevices.length >= MAX_DEVICES_PER_VOLUNTEER) {
-      // Remove oldest device
-      const sorted = allDevices.sort((a, b) => {
-        const aTime = a.lastSeenAt?.getTime() ?? 0
-        const bTime = b.lastSeenAt?.getTime() ?? 0
-        return aTime - bTime
-      })
-      await this.db.delete(devices).where(eq(devices.id, sorted[0].id))
+    if (decision.evictDeviceId) {
+      await this.db.delete(devices).where(eq(devices.id, decision.evictDeviceId))
     }
 
     // Insert new device
