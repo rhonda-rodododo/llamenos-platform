@@ -153,12 +153,19 @@ export async function createHubViaApi(
   request: APIRequestContext,
   name: string,
 ): Promise<string> {
-  const slug = name.toLowerCase().replace(/\s+/g, '-')
-  const { status, data } = await apiPost<{ hub: { id: string } }>(request, '/hubs', { name, slug })
-  if (status !== 200 && status !== 201) {
-    throw new Error(`Failed to create hub: ${status}`)
+  // Use the test-create-hub endpoint (dev.ts) which bypasses permission checks
+  // and only requires the X-Test-Secret header. The authenticated /api/hubs POST
+  // requires system:manage-hubs which the bootstrap admin may not have.
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  const res = await request.post('/api/test-create-hub', {
+    headers: { 'X-Test-Secret': testSecret },
+    data: { name },
+  })
+  if (!res.ok()) {
+    throw new Error(`Failed to create hub: ${res.status()}`)
   }
-  return data.hub.id
+  const data = await res.json() as { id: string }
+  return data.id
 }
 
 export async function deleteHubViaApi(

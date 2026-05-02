@@ -14,7 +14,7 @@ import {
   type User,
 } from '@/lib/api'
 import { useToast } from '@/lib/toast'
-import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy } from 'lucide-react'
+import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, Coffee } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +30,7 @@ const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 
 function ShiftsPage() {
   const { t } = useTranslation()
-  const { isAdmin } = useAuth()
+  const { isAdmin, onBreak, toggleBreak } = useAuth()
   const { toast } = useToast()
   const [shifts, setShifts] = useState<Shift[]>([])
   const [users, setUsers] = useState<User[]>([])
@@ -68,10 +68,28 @@ function ShiftsPage() {
           <Clock className="h-6 w-6 text-primary" />
           <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('shifts.title')}</h1>
         </div>
-        <Button data-testid="shift-create-btn" onClick={() => { setShowForm(true); setEditingShift(null) }}>
-          <CalendarPlus className="h-4 w-4" />
-          {t('shifts.createShift')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={onBreak ? 'default' : 'outline'}
+            size="sm"
+            data-testid="break-toggle-btn"
+            onClick={async () => {
+              try {
+                await toggleBreak()
+              } catch {
+                toast(t('common.error'), 'error')
+              }
+            }}
+            className={onBreak ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+          >
+            <Coffee className="h-3.5 w-3.5" />
+            {onBreak ? t('dashboard.endBreak') : t('dashboard.goOnBreak')}
+          </Button>
+          <Button data-testid="shift-create-btn" onClick={() => { setShowForm(true); setEditingShift(null) }}>
+            <CalendarPlus className="h-4 w-4" />
+            {t('shifts.createShift')}
+          </Button>
+        </div>
       </div>
 
       {(showForm || editingShift) && (
