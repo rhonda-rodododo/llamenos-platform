@@ -25,10 +25,13 @@ class BaseUITest: XCTestCase {
 
     // MARK: - Hub URL
 
-    /// The test hub URL, read from environment or defaulting to localhost (Docker Compose).
+    /// The test hub URL, read from environment or defaulting to 127.0.0.1 (Docker Compose).
+    /// Uses 127.0.0.1 instead of localhost to force IPv4 — Bun's HTTP server binds to
+    /// 0.0.0.0 (IPv4 only), and the iOS Simulator's URLSession may try IPv6 [::1] first,
+    /// causing connection timeouts on macOS CI runners.
     var testHubURL: String {
         ProcessInfo.processInfo.environment["TEST_HUB_URL"]
-            ?? "http://localhost:3000"
+            ?? "http://127.0.0.1:3000"
     }
 
     // MARK: - Test Secret
