@@ -6,7 +6,7 @@
  *   - PUK envelopes: HPKE-encrypted PUK seed distribution
  *   - MLS messages: pending handshake message delivery
  */
-import { and, asc, eq, max } from 'drizzle-orm'
+import { and, asc, desc, eq, max } from 'drizzle-orm'
 import type { Database } from '../db'
 import { sigchainLinks, pukEnvelopes, mlsPendingMessages } from '../db/schema'
 
@@ -98,27 +98,16 @@ export class CryptoKeysService {
     prevHash: string
     hash: string
   }): Promise<SigchainLinkRecord> {
-    // Fetch current chain head
-    const [head] = await this.db
+    // Fetch the chain tail (highest seqNo) in one query
+    const [currentHead] = await this.db
       .select({
         seqNo: sigchainLinks.seqNo,
         hash: sigchainLinks.hash,
       })
       .from(sigchainLinks)
       .where(eq(sigchainLinks.userPubkey, userPubkey))
-      .orderBy(asc(sigchainLinks.seqNo))
-      .limit(1000) // read all then take last (chain is short)
-      // Note: we actually want the LAST row — re-query with desc
-    const tail = await this.db
-      .select({
-        seqNo: sigchainLinks.seqNo,
-        hash: sigchainLinks.hash,
-      })
-      .from(sigchainLinks)
-      .where(eq(sigchainLinks.userPubkey, userPubkey))
-      .orderBy(asc(sigchainLinks.seqNo))
-
-    const currentHead = tail.at(-1)
+      .orderBy(desc(sigchainLinks.seqNo))
+      .limit(1)
     const expectedSeqNo = currentHead === undefined ? 0 : currentHead.seqNo + 1
     const expectedPrevHash = currentHead?.hash ?? ''
 
