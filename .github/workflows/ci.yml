@@ -390,7 +390,7 @@ jobs:
     needs: [changes, android-build-test]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     strategy:
       fail-fast: false
@@ -701,6 +701,9 @@ jobs:
               echo "S3-compatible storage is ready"
               break
             fi
+            if [ "$i" -eq 15 ]; then
+              echo "::warning::S3-compatible storage did not start (storage operations will fail)"
+            fi
             sleep 1
           done
 
@@ -709,6 +712,11 @@ jobs:
         with:
           name: app-build
           path: dist/
+
+      - name: Run database migrations
+        run: bun scripts/run-migrations.ts
+        env:
+          DATABASE_URL: postgresql://llamenos@localhost:5432/llamenos
 
       - name: Start Bun backend
         run: |
@@ -720,6 +728,11 @@ jobs:
             if curl -sf http://localhost:3000/api/health/live; then
               echo "Backend is ready"
               break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::Backend did not become healthy after 60s"
+              cat /tmp/backend.log || true
+              exit 1
             fi
             sleep 2
           done
