@@ -25,7 +25,8 @@ import type {
   SubscriberChannel,
 } from '@shared/types'
 import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
-import { BLAST_MAX_RETRIES, BLAST_RETRY_BACKOFF_BASE_MS } from '../types'
+import { BLAST_MAX_RETRIES } from '../types'
+import { computeRetryDecision } from '../lib/blast-delivery'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
@@ -847,10 +848,9 @@ export class BlastsService {
    * If max retries exceeded, marks as permanently failed.
    */
   async markDeliveryFailed(deliveryId: string, error: string, currentAttempts: number): Promise<void> {
-    const newAttempts = currentAttempts + 1
+    const decision = computeRetryDecision(currentAttempts)
 
-    if (newAttempts >= BLAST_MAX_RETRIES) {
-      // Permanently failed
+    if (decision.permanentlyFailed) {
       await this.db
         .update(blastDeliveries)
         .set({
@@ -858,22 +858,18 @@ export class BlastsService {
           error,
           failedAt: new Date(),
           lastAttemptAt: new Date(),
-          attempts: newAttempts,
+          attempts: decision.newAttempts,
         })
         .where(eq(blastDeliveries.id, deliveryId))
     } else {
-      // Schedule retry with exponential backoff
-      const backoffMs = BLAST_RETRY_BACKOFF_BASE_MS * Math.pow(2, newAttempts - 1)
-      const nextRetry = new Date(Date.now() + backoffMs)
-
       await this.db
         .update(blastDeliveries)
         .set({
           status: 'pending',
           error,
           lastAttemptAt: new Date(),
-          nextRetryAt: nextRetry,
-          attempts: newAttempts,
+          nextRetryAt: decision.nextRetryAt,
+          attempts: decision.newAttempts,
         })
         .where(eq(blastDeliveries.id, deliveryId))
     }
