@@ -80,15 +80,24 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         if (config.demoMode) setDemoMode(config.demoMode)
         if (config.demoResetSchedule !== undefined) setDemoResetSchedule(config.demoResetSchedule ?? null)
         setNeedsBootstrap(!!config.needsBootstrap)
+        // In test builds, the Before hook injects __TEST_WORKER_HUB via addInitScript
+        // so each Playwright worker uses its isolated hub instead of the server default.
+        // Check outside the hubs block to handle race conditions where the hub exists
+        // but hasn't appeared in the config response yet.
+        const testHub = (window as unknown as Record<string, unknown>).__TEST_WORKER_HUB as string | undefined
+        if (testHub) {
+          setActiveHub(testHub)
+          setDefaultHubId(testHub)
+          setCurrentHubIdState(testHub)
+        }
         if (config.hubs?.length) {
           setHubs(config.hubs)
-          // In test builds, the Before hook injects __TEST_WORKER_HUB via addInitScript
-          // so each Playwright worker uses its isolated hub instead of the server default.
-          const testHub = (window as unknown as Record<string, unknown>).__TEST_WORKER_HUB as string | undefined
-          const hubId = testHub || config.defaultHubId || config.hubs[0].id
-          setDefaultHubId(hubId)
-          setCurrentHubIdState(hubId)
-          setActiveHub(hubId)
+          if (!testHub) {
+            const hubId = config.defaultHubId || config.hubs[0].id
+            setDefaultHubId(hubId)
+            setCurrentHubIdState(hubId)
+            setActiveHub(hubId)
+          }
         }
         if (config.serverNostrPubkey) setServerNostrPubkey(config.serverNostrPubkey)
         if (config.nostrRelayUrl) setNostrRelayUrl(config.nostrRelayUrl)
