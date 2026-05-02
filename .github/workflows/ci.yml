@@ -308,17 +308,6 @@ jobs:
           # backend-bdd tests query PostgreSQL directly via db-helpers.ts
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
 
-      - name: Run backend BDD tests
-        run: bun run test:backend:bdd --no-codegen
-        timeout-minutes: 15
-        env:
-          TEST_HUB_URL: http://localhost:3000
-          TEST_RELAY_URL: ws://127.0.0.1:7777
-          SIGNAL_NOTIFIER_URL: http://localhost:3100
-          SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
-          PBX_TYPE: ari
-          DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
-
       - name: Smoke check sidecar health endpoints
         if: ${{ !cancelled() }}
         run: |
@@ -344,6 +333,122 @@ jobs:
             -f deploy/docker/docker-compose.test.yml \
             down -v
 
+
+  # ─── Backend BDD Tests ─────────────────────────────────────
+  backend-bdd:
+    needs: [changes, build]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create .env for Docker Compose
+        run: |
+          printf '%s\n' \
+            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
+            "DOMAIN=localhost" \
+            "PG_PASSWORD=ci-test-password" \
+            "HMAC_SECRET=$(openssl rand -hex 32)" \
+            "STORAGE_ACCESS_KEY=testaccess" \
+            "STORAGE_SECRET_KEY=testsecret123456" \
+            "HOTLINE_NAME=Llámenos" \
+            "BRIDGE_SECRET=ci-test-bridge-secret" \
+            "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "NOTIFIER_API_KEY=ci-test-notifier-key" \
+            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+            "PBX_TYPE=asterisk" \
+            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            > .env
+
+      - name: Build and start Docker Compose (core services)
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --wait app
+        timeout-minutes: 10
+
+      - name: Start sidecar profiles (signal + telephony)
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --no-recreate
+        timeout-minutes: 5
+
+      - name: Wait for signal-notifier health
+        run: |
+          echo "Waiting for signal-notifier..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100/health; then
+              echo "signal-notifier is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
+            fi
+            sleep 3
+          done
+
+      - name: Show container status
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            ps || true
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs --tail=50 || true
+
+      - name: Generate BDD test files
+        run: bunx bddgen
+
+      - name: Run backend BDD tests
+        run: bun run test:backend:bdd --no-codegen
+        timeout-minutes: 15
+        env:
+          TEST_HUB_URL: http://localhost:3000
+          TEST_RELAY_URL: ws://127.0.0.1:7777
+          SIGNAL_NOTIFIER_URL: http://localhost:3100
+          SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
+          PBX_TYPE: ari
+          DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: backend-bdd-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v
 
   # ─── Android Build & Test ───────────────────────────────────
   android-build-test:
@@ -868,7 +973,7 @@ jobs:
 
   # ─── CI Status Gate ─────────────────────────────────────────
   ci-status:
-    needs: [build, audit, crypto-tests, wasm-build, e2e, android-build-test, android-e2e, ios-build-test, crypto-guardrails]
+    needs: [build, audit, crypto-tests, wasm-build, e2e, backend-bdd, android-build-test, android-e2e, ios-build-test, crypto-guardrails]
     if: always()
     runs-on: ubuntu-latest
 
@@ -886,6 +991,7 @@ jobs:
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
           check_job "wasm-build" "${{ needs.wasm-build.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
+          check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
           check_job "android-build-test" "${{ needs.android-build-test.result }}"
           check_job "android-e2e" "${{ needs.android-e2e.result }}"
           check_job "ios-build-test" "${{ needs.ios-build-test.result }}"
