@@ -1,0 +1,8 @@
+package_name("org.llamenos.hotline")
+
+# Path to Google Play service account JSON key file.
+# Generate at: Google Play Console → Setup → API access → Service accounts
+# Grant the service account "Release manager" permissions in Play Console.
+# Store the key file outside the repo and set this env var:
+#   export GOOGLE_PLAY_JSON_KEY=/path/to/google-play-key.json
+json_key_file(ENV["GOOGLE_PLAY_JSON_KEY"] || "google-play-key.json")

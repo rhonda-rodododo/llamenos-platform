@@ -1,0 +1,9 @@
+Première version de Llamenos pour Android.
+
+• Notes et rapports d'appels chiffrés de bout en bout
+• Gestion des permanences et routage des appels en parallèle
+• Gestion des cas basée sur des modèles
+• Transcription sur l'appareil (l'audio ne quitte jamais votre appareil)
+• Prise en charge de 13 langues
+• Clés de chiffrement sauvegardées par Android Keystore
+• Auto-hébergé — vos données restent sur votre infrastructure

@@ -1,0 +1,55 @@
+Llamenos est un logiciel open source pour opérer des lignes d'assistance en crise de manière sécurisée — conçu pour les organisations qui doivent protéger l'identité des appelants et des bénévoles contre des adversaires sérieux.
+
+CHIFFREMENT DE BOUT EN BOUT PAR CONCEPTION
+
+Chaque note, transcription, rapport et message est chiffré de bout en bout. Le serveur ne stocke que du texte chiffré — votre hébergeur, l'administrateur de votre hub et Llamenos lui-même ne peuvent pas lire le contenu de vos appels. Le chiffrement se fait sur votre appareil. Le déchiffrement se fait uniquement sur les appareils des bénévoles authentifiés.
+
+Chaque note utilise une clé aléatoire unique avec confidentialité persistante : compromettre une note ne compromet pas les autres. Les clés sont enveloppées séparément pour le bénévole et chaque administrateur via HPKE (RFC 9180).
+
+COMMENT ÇA FONCTIONNE
+
+Lorsque quelqu'un appelle le numéro de votre organisation, tous les bénévoles en service reçoivent des notifications simultanées. Le premier bénévole à répondre prend l'appel. Les autres notifications sont effacées automatiquement.
+
+Pendant l'appel, les bénévoles écrivent des notes chiffrées en temps réel. La transcription optionnelle sur l'appareil utilise une IA qui s'exécute entièrement sur votre téléphone — l'audio ne quitte jamais votre appareil.
+
+POUR LES ÉQUIPES DE BÉNÉVOLES
+
+• Planification des permanences — les administrateurs définissent des permanences récurrentes et des groupes d'appel
+• Appels en parallèle — tous les bénévoles en service sonnent simultanément
+• Notes chiffrées — chiffrement des notes avec confidentialité persistante par appel
+• Gestion des cas — rapports basés sur des modèles avec champs personnalisés
+• Répertoire des contacts — répertoire des appelants chiffré
+• Support multi-hub — les bénévoles peuvent appartenir à plusieurs hubs et recevoir des appels de tous simultanément
+
+POUR LES ADMINISTRATEURS
+
+• Gestion des bénévoles — inviter, attribuer des rôles, gérer les permanences
+• Listes de blocage en temps réel — bloquer les appelants abusifs instantanément
+• Mitigation du spam — limitation de débit, détection de bots vocaux
+• Journaux d'audit — journal d'activité chaîné par hachage infalsifiable
+• Téléphonie configurable — compatible avec Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk ou FreeSWITCH
+
+LA CONFIDENTIALITÉ EN PREMIER
+
+• Le serveur ne peut pas lire le contenu chiffré (conception zéro connaissance)
+• Transcription sur l'appareil — l'audio n'est jamais transmis à aucun serveur
+• Aucune publicité, aucun suivi, aucun profilage comportemental
+• Conforme au RGPD — organisation européenne, accords de traitement des données disponibles
+• Builds reproductibles — vérifiez que l'application publiée correspond au code source public
+• Clés de chiffrement sauvegardées par Android Keystore — les clés privées de l'appareil ne quittent jamais le matériel sécurisé
+
+INFRASTRUCTURE AUTO-HÉBERGÉE
+
+Votre organisation gère son propre hub. Il n'existe pas de cloud Llamenos central. Vos données restent sur l'infrastructure que vous contrôlez, dans la juridiction de votre choix. Déployez via Docker Compose sur n'importe quel VPS Linux.
+
+13 LANGUES
+
+L'application est disponible en anglais, espagnol, chinois, tagalog, vietnamien, arabe, français, créole haïtien, coréen, russe, hindi, portugais et allemand.
+
+LOGICIEL LIBRE
+
+Llamenos est entièrement open source sous la licence AGPL-3.0. Auditez le code, exécutez votre propre instance ou contribuez sur github.com/rhonda-rodododo/llamenos-platform.
+
+---
+
+Llamenos est un logiciel destiné aux organisations qui opèrent des services de réponse aux crises. L'application nécessite une invitation d'un administrateur d'un hub auto-hébergé. Ce n'est pas un service de crise grand public.
