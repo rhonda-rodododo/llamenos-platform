@@ -1,0 +1,34 @@
+default_platform(:android)
+
+platform :android do
+  desc "Upload metadata and screenshots to Google Play (no binary)"
+  lane :metadata do
+    upload_to_play_store(
+      track: "internal",
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: false,
+      skip_upload_changelogs: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false
+    )
+  end
+
+  desc "Upload AAB to internal test track"
+  lane :internal do
+    upload_to_play_store(
+      track: "internal",
+      aab: "../app/build/outputs/bundle/release/app-release.aab"
+    )
+  end
+
+  desc "Promote internal build to production"
+  lane :promote_to_production do
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to: "production",
+      skip_upload_apk: true,
+      skip_upload_aab: true
+    )
+  end
+end

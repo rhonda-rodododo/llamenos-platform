@@ -1,0 +1,55 @@
+Llamenos es software de código abierto para operar líneas de ayuda en crisis de forma segura — diseñado para organizaciones que necesitan proteger la identidad de las personas que llaman y de los voluntarios contra adversarios serios.
+
+CIFRADO DE EXTREMO A EXTREMO POR DISEÑO
+
+Cada nota, transcripción, informe y mensaje está cifrado de extremo a extremo. El servidor almacena solo texto cifrado — su proveedor de alojamiento, el administrador de su hub y Llamenos en sí no pueden leer el contenido de sus llamadas. El cifrado ocurre en su dispositivo. El descifrado ocurre solo en dispositivos de voluntarios autenticados.
+
+Cada nota utiliza una clave aleatoria única con secreto hacia adelante: comprometer una nota no compromete a las demás. Las claves se envuelven por separado para el voluntario y cada administrador mediante HPKE (RFC 9180).
+
+CÓMO FUNCIONA
+
+Cuando alguien llama al número de su organización, todos los voluntarios de turno reciben notificaciones simultáneas. El primer voluntario en responder toma la llamada. Las demás notificaciones se eliminan automáticamente.
+
+Durante la llamada, los voluntarios escriben notas cifradas en tiempo real. La transcripción opcional en el dispositivo usa IA que se ejecuta completamente en su teléfono — el audio nunca abandona su dispositivo.
+
+PARA EQUIPOS DE VOLUNTARIOS
+
+• Programación de turnos — los administradores definen turnos recurrentes y grupos de llamadas
+• Llamadas en paralelo — todos los voluntarios de turno suenan simultáneamente
+• Notas cifradas — cifrado de notas con secreto hacia adelante por llamada
+• Gestión de casos — informes basados en plantillas con campos personalizados
+• Registros de contactos — directorio de contactos de llamadas cifrado
+• Soporte multi-hub — los voluntarios pueden pertenecer a múltiples hubs y recibir llamadas de todos simultáneamente
+
+PARA ADMINISTRADORES
+
+• Gestión de voluntarios — invitar, asignar roles, gestionar turnos
+• Listas de bloqueo en tiempo real — bloquear llamadas abusivas al instante
+• Mitigación de spam — limitación de velocidad, detección de bots de voz
+• Registros de auditoría — registro de actividad en cadena de hash a prueba de manipulaciones
+• Telefonía configurable — compatible con Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk o FreeSWITCH
+
+PRIVACIDAD PRIMERO
+
+• El servidor no puede leer contenido cifrado (diseño de conocimiento cero)
+• Transcripción en el dispositivo — el audio nunca se transmite a ningún servidor
+• Sin publicidad, sin rastreo, sin perfiles de comportamiento
+• Compatible con GDPR — organización de la UE, acuerdos de procesamiento de datos disponibles
+• Compilaciones reproducibles — verifique que la aplicación publicada coincida con el código fuente público
+• Claves de cifrado respaldadas por Android Keystore — las claves privadas del dispositivo nunca salen del hardware seguro
+
+INFRAESTRUCTURA AUTOALOJADA
+
+Su organización gestiona su propio hub. No existe una nube central de Llamenos. Sus datos permanecen en la infraestructura que usted controla, en la jurisdicción que elija. Despliegue mediante Docker Compose en cualquier VPS Linux.
+
+13 IDIOMAS
+
+La aplicación está disponible en inglés, español, chino, tagalo, vietnamita, árabe, francés, criollo haitiano, coreano, ruso, hindi, portugués y alemán.
+
+CÓDIGO ABIERTO
+
+Llamenos es totalmente de código abierto bajo la licencia AGPL-3.0. Audite el código, ejecute su propia instancia o contribuya en github.com/rhonda-rodododo/llamenos-platform.
+
+---
+
+Llamenos es software para organizaciones que operan servicios de respuesta a crisis. La aplicación requiere una invitación de un administrador de un hub autoalojado. No es un servicio de crisis para consumidores.
