@@ -13,6 +13,7 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
+      "@worker/*": ["./*"],
       "@shared/*": ["../../packages/shared/*"],
       "@protocol/*": ["../../packages/protocol/*"]
     }

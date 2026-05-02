@@ -362,11 +362,11 @@ export class NodeNostrPublisher implements NostrPublisher {
     ws.addEventListener('close', () => {
       this.authenticated = false
       this.ws = null
-      for (const pending of this.pendingPublishes.values()) {
-        pending.reject(new Error('WebSocket closed'))
-      }
-      this.pendingPublishes.clear()
       if (!this.closed) {
+        for (const pending of this.pendingPublishes.values()) {
+          pending.reject(new Error('WebSocket closed'))
+        }
+        this.pendingPublishes.clear()
         this.scheduleReconnect()
       }
     })

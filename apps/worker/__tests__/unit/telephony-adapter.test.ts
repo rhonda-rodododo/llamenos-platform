@@ -136,6 +136,7 @@ describe('TelephonyAdapter configuration', () => {
         ariUrl: 'https://asterisk.local:8089/ari',
         ariUsername: 'admin',
         ariPassword: 'secret',
+        bridgeSecret: 'bridge-secret-value',
       }
       expect(validateConfig(config)).toEqual([])
     })
