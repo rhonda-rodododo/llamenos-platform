@@ -198,7 +198,7 @@ jobs:
 
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
   e2e:
-    needs: changes
+    needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -336,7 +336,7 @@ jobs:
 
   # ─── Backend BDD Tests ─────────────────────────────────────
   backend-bdd:
-    needs: changes
+    needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
