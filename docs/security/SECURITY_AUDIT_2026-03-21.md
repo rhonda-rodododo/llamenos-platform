@@ -1,3 +1,5 @@
+> **HISTORICAL DOCUMENT**: This is a point-in-time snapshot from 2026-03-21. Findings reflect the codebase state at that date. Many issues have been remediated since. The crypto architecture has continued to evolve — see [Crypto Architecture](CRYPTO_ARCHITECTURE.md) for current primitives and protocols.
+
 # Llamenos Platform Security Audit Report
 
 **Audit Date**: 2026-03-21
