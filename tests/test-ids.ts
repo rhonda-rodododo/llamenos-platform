@@ -134,6 +134,8 @@ export const TestIds = {
   CONV_CLOSE_BTN: 'conv-close-btn',
   CONV_REOPEN_BTN: 'conv-reopen-btn',
   CONV_SEND_BTN: 'conv-send-btn',
+  CONV_REASSIGN_BTN: 'conv-reassign-btn',
+  CONV_SEARCH: 'conv-search',
 
   // ============ Contacts ============
   CONTACT_ROW: 'contact-row',

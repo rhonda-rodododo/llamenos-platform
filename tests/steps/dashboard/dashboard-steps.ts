@@ -137,14 +137,7 @@ Given('I am on shift', async () => {
 Then('the dashboard clock button should say {string}', async ({ page }, text: string) => {
   const clockBtn = page.getByTestId(TestIds.BREAK_TOGGLE_BTN)
   await expect(clockBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Feature files use "Clock In"/"Clock Out" but UI shows "Take a Break"/"End Break"
-  // Map the concept to the actual UI text
-  const textMap: Record<string, string> = {
-    'Clock In': 'Take a Break',
-    'Clock Out': 'End Break',
-  }
-  const actualText = textMap[text] || text
-  await expect(clockBtn).toContainText(actualText)
+  await expect(clockBtn).toContainText(text)
 })
 
 When('I tap the dashboard clock button', async ({ page }) => {

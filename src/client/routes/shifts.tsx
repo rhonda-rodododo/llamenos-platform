@@ -14,7 +14,7 @@ import {
   type User,
 } from '@/lib/api'
 import { useToast } from '@/lib/toast'
-import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, Coffee } from 'lucide-react'
+import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, LogIn, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -80,10 +80,9 @@ function ShiftsPage() {
                 toast(t('common.error'), 'error')
               }
             }}
-            className={onBreak ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
           >
-            <Coffee className="h-3.5 w-3.5" />
-            {onBreak ? t('dashboard.endBreak') : t('dashboard.goOnBreak')}
+            {onBreak ? <LogIn className="h-3.5 w-3.5" /> : <LogOut className="h-3.5 w-3.5" />}
+            {onBreak ? t('dashboard.clockIn', { defaultValue: 'Clock In' }) : t('dashboard.clockOut', { defaultValue: 'Clock Out' })}
           </Button>
           <Button data-testid="shift-create-btn" onClick={() => { setShowForm(true); setEditingShift(null) }}>
             <CalendarPlus className="h-4 w-4" />
