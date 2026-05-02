@@ -1,0 +1,9 @@
+Initial release of Llamenos for iOS.
+
+• End-to-end encrypted call notes and reports
+• Shift management and parallel call routing
+• Template-driven case management
+• On-device transcription (audio never leaves your device)
+• Support for 13 languages
+• iOS Keychain-backed encryption keys
+• Self-hosted — your data stays on your infrastructure

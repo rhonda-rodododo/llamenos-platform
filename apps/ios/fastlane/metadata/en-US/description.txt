@@ -1,0 +1,55 @@
+Llamenos is open-source software for operating secure crisis response hotlines — built for organizations that need to protect caller and volunteer identities against serious adversaries.
+
+END-TO-END ENCRYPTED BY DESIGN
+
+Every note, transcript, report, and message is end-to-end encrypted. The server stores only ciphertext — your hosting provider, your hub administrator, and Llamenos itself cannot read the content of your calls. Encryption happens on your device. Decryption happens only on authenticated volunteer devices.
+
+Each note uses a unique random key with forward secrecy: compromising one note does not compromise others. Keys are wrapped separately for the volunteer and each admin using HPKE (RFC 9180), a modern standard used in TLS 1.3.
+
+HOW IT WORKS
+
+When someone calls your organization's hotline number, all on-shift volunteers receive simultaneous push notifications. The first volunteer to answer takes the call. Other notifications are cleared automatically.
+
+During the call, volunteers write encrypted notes in real-time. Optional on-device transcription uses AI running entirely within the app — audio never leaves your device. After the call, notes are sealed and stored as ciphertext on your self-hosted server.
+
+FOR VOLUNTEER TEAMS
+
+• Shift scheduling — admins define recurring shifts and ring groups
+• Parallel ringing — all on-shift volunteers ring simultaneously
+• Encrypted notes — per-call forward-secret note encryption
+• Case management — template-driven reports with custom fields
+• Contact records — encrypted caller contact directory
+• Multi-hub support — volunteers can be members of multiple hubs, receiving calls from all simultaneously
+
+FOR ADMINISTRATORS
+
+• Volunteer management — invite, assign roles, manage shifts
+• Real-time ban lists — block abusive callers instantly
+• Spam mitigation — rate limiting, voice bot detection
+• Audit logs — tamper-evident hash-chained activity log
+• Configurable telephony — works with Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk, or FreeSWITCH
+
+PRIVACY FIRST
+
+• Server cannot read encrypted content (zero-knowledge design)
+• On-device transcription — audio never transmitted to any server
+• No advertising, no tracking, no behavioral profiling
+• GDPR-compliant — EU organization, data processing agreements available
+• Reproducible builds — verify the published app matches the public source code
+• iOS Keychain-backed encryption keys — device private keys never leave secure hardware
+
+SELF-HOSTED INFRASTRUCTURE
+
+Your organization runs its own hub. There is no central Llamenos cloud. Your data stays on infrastructure you control, in the jurisdiction you choose. Deploy via Docker Compose on any Linux VPS.
+
+13 LANGUAGES
+
+The app is available in English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, French, Haitian Creole, Korean, Russian, Hindi, Portuguese, and German — designed for multilingual volunteer teams serving diverse communities.
+
+OPEN SOURCE
+
+Llamenos is fully open source under the AGPL-3.0 license. Audit the code, run your own instance, or contribute at github.com/rhonda-rodododo/llamenos-platform.
+
+---
+
+Llamenos is software for organizations that operate crisis response services. The app requires an invitation from an administrator of a self-hosted hub to use. It is not a consumer crisis service — if you are in crisis, please contact your local emergency services or a crisis helpline in your region.
