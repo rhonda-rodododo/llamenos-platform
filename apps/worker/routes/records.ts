@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv, User } from '../types'
+import { scoreVolunteers } from '../lib/volunteer-scoring'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import {
@@ -659,63 +660,22 @@ records.get('/:id/suggest-assignees',
     // 3. Get all user profiles
     const { users: allUsers } = await services.identity.getUsers()
 
-    const onShiftSet = new Set(onShiftPubkeys)
-    const alreadyAssigned = new Set(record.assignedTo)
-
-    // 4. Score each eligible volunteer
-    const suggestions: Array<{
-      pubkey: string
-      score: number
-      reasons: string[]
-      activeCaseCount: number
-      maxCases: number
-    }> = []
-
+    // 4. Gather workload counts for on-shift volunteers
+    const activeCaseCounts = new Map<string, number>()
     for (const vol of allUsers) {
-      if (!vol.active) continue
-      if (vol.onBreak) continue
-      if (!onShiftSet.has(vol.pubkey)) continue
-      if (alreadyAssigned.has(vol.pubkey)) continue
-
-      // Get workload
-      const { count: activeCaseCount } = await services.cases.countByAssignment(vol.pubkey)
-
-      const maxCases = vol.maxCaseAssignments ?? 0
-      if (maxCases > 0 && activeCaseCount >= maxCases) continue
-
-      let score = 50 // Base score
-      const reasons: string[] = ['On shift']
-
-      // Workload score: lower workload = higher score (0-30 points)
-      const effectiveMax = maxCases > 0 ? maxCases : 20
-      const utilization = activeCaseCount / effectiveMax
-      score += Math.round((1 - utilization) * 30)
-      reasons.push(`${activeCaseCount}/${effectiveMax} cases`)
-
-      // Language match (0-15 points)
-      const languageNeed = c.req.query('language')
-      if (languageNeed && vol.spokenLanguages?.includes(languageNeed)) {
-        score += 15
-        reasons.push(`Speaks ${languageNeed}`)
-      }
-
-      // Specialization match (0-10 points)
-      if (vol.specializations?.length) {
-        score += 5
-        reasons.push('Has specializations')
-      }
-
-      suggestions.push({
-        pubkey: vol.pubkey,
-        score,
-        reasons,
-        activeCaseCount,
-        maxCases: effectiveMax,
-      })
+      if (!vol.active || vol.onBreak) continue
+      const { count } = await services.cases.countByAssignment(vol.pubkey)
+      activeCaseCounts.set(vol.pubkey, count)
     }
 
-    // Sort by score descending
-    suggestions.sort((a, b) => b.score - a.score)
+    // 5. Score eligible volunteers via extracted pure function
+    const suggestions = scoreVolunteers({
+      allUsers,
+      onShiftPubkeys,
+      alreadyAssigned: record.assignedTo,
+      activeCaseCounts,
+      languageNeed: c.req.query('language'),
+    })
 
     return c.json({ suggestions })
   },
