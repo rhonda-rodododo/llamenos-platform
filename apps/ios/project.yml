@@ -11,13 +11,9 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    # DEVELOPMENT_TEAM is intentionally empty: the Apple Developer account
-    # must be logged in via Xcode > Settings > Accounts on the build Mac
-    # before this can be populated. Fill in the 10-character Team ID once
-    # available (e.g. "AB12CD34EF") and set the same value in
-    # ExportOptions.plist's `teamID` key. Both files use automatic signing,
-    # so no provisioning profile names need to be hardcoded — Xcode will
-    # request them via `xcodebuild -allowProvisioningUpdates`.
+    # DEVELOPMENT_TEAM is intentionally empty: the Apple Developer account is
+    # pending activation. Fill in the 10-character Team ID once available
+    # (e.g. "AB12CD34EF") and update ExportOptions.plist accordingly.
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     # The Rust XCFramework is only built for arm64 simulator slices.
