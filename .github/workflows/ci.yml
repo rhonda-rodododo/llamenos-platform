@@ -242,7 +242,7 @@ jobs:
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
-            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
             "PBX_TYPE=asterisk" \
@@ -276,6 +276,20 @@ jobs:
             fi
             if [ "$i" -eq 30 ]; then
               echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
+            fi
+            sleep 3
+          done
+
+      - name: Wait for sip-bridge health
+        run: |
+          echo "Waiting for sip-bridge..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3001/health; then
+              echo "sip-bridge is ready"
+              break
+            fi
+            if [ "$i" -eq 20 ]; then
+              echo "::warning::sip-bridge did not become healthy — SIP health check test will fail"
             fi
             sleep 3
           done
@@ -318,6 +332,11 @@ jobs:
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
+          # Must match SERVER_NOSTR_SECRET in .env (fixed value = relay.steps DEV fallback)
+          # so backend-bdd tests can decrypt Nostr relay events produced by the docker app
+          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
+          # sip-bridge exposed on host port 3001 via docker-compose.test.yml
+          SIP_BRIDGE_URL: http://localhost:3001
 
       - name: Smoke check sidecar health endpoints
         if: ${{ !cancelled() }}
@@ -440,7 +459,7 @@ jobs:
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
-            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
             "PBX_TYPE=asterisk" \
