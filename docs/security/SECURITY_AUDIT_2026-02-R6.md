@@ -1,3 +1,5 @@
+> **HISTORICAL DOCUMENT**: This is a point-in-time snapshot from 2026-02-23. The codebase has evolved significantly since this audit — notably, ECIES has been replaced by HPKE (RFC 9180), per-device Ed25519/X25519 keys replace nsec, and the backend moved from Cloudflare Workers to Bun + PostgreSQL. See the current [Crypto Architecture](CRYPTO_ARCHITECTURE.md) and [Threat Model](THREAT_MODEL.md) for the up-to-date security posture.
+
 # Security Audit Report — Round 6 (2026-02-23)
 
 ## Scope
