@@ -857,22 +857,52 @@ jobs:
           STORAGE_BUCKET: llamenos-files
           SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
 
-      - name: Show backend logs
+      - name: Show backend startup logs
         if: ${{ !cancelled() }}
         run: cat /tmp/backend.log || true
+
+      # Disable macOS Application Firewall — prevents it from blocking
+      # incoming connections to the Bun server from the iOS Simulator.
+      - name: Disable macOS firewall for tests
+        run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
+
+      # Verify backend serves API requests (not just liveness).
+      # BaseUITest uses 127.0.0.1 to force IPv4 — verify the same path.
+      - name: Verify backend API connectivity
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST http://127.0.0.1:3000/api/test-create-hub \
+            -H "Content-Type: application/json" \
+            -H "X-Test-Secret: test-reset-secret" \
+            -d '{"name":"ci-connectivity-check"}')
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | sed '$d')
+          echo "HTTP $http_code: $body"
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Backend API check failed (HTTP $http_code). Backend logs:"
+            cat /tmp/backend.log || true
+            exit 1
+          fi
+          echo "Backend API connectivity verified"
 
       - name: Run UI tests
         working-directory: apps/ios
         run: |
-          # TEST_HUB_URL defaults to http://localhost:3000 in BaseUITest.swift,
-          # which matches the backend started above. No -testenv flag needed
-          # (-testenv is not a valid xcodebuild option).
+          # BaseUITest defaults to http://127.0.0.1:3000 (IPv4 explicit).
+          # Bun binds to 0.0.0.0 — using 127.0.0.1 avoids IPv6 [::1] timeouts
+          # from the iOS Simulator's URLSession on macOS CI runners.
           xcodebuild test \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build
+
+      - name: Show backend runtime logs
+        if: ${{ !cancelled() }}
+        run: |
+          echo "=== Backend logs (full) ==="
+          cat /tmp/backend.log || true
 
       - name: Stop backend services
         if: always()
