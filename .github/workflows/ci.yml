@@ -437,7 +437,7 @@ jobs:
         with:
           name: backend-bdd-results
           path: |
-            backend-bdd-report/
+            playwright-report/
             test-results/
           retention-days: 7
 
