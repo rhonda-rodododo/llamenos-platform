@@ -82,14 +82,16 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             }
             onNodeWithTag("create-identity").performClick()
             // v3 device key model: Login → PINSet directly (no Onboarding/confirm-backup step)
-            waitForNode("pin-pad")
+            waitForNode("pin-pad", timeoutMillis = 10_000)
             enterPin("123456")
             enterPin("123456")
         } else {
             // Returning user — enter PIN to unlock
             enterPin("123456")
         }
-        waitForNode("dashboard-title")
+        // Key generation (PBKDF2) + navigation can be slow on CI emulators with
+        // software rendering — allow up to 15s for the dashboard to appear.
+        waitForNode("dashboard-title", timeoutMillis = 15_000)
         onNodeWithTag("dashboard-title").assertIsDisplayed()
     }
 

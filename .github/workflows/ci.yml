@@ -322,22 +322,6 @@ jobs:
           # backend-bdd tests query PostgreSQL directly via db-helpers.ts
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
 
-      - name: Run backend BDD tests
-        run: bun run test:backend:bdd --no-codegen
-        timeout-minutes: 15
-        env:
-          TEST_HUB_URL: http://localhost:3000
-          TEST_RELAY_URL: ws://127.0.0.1:7777
-          SIGNAL_NOTIFIER_URL: http://localhost:3100
-          SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
-          PBX_TYPE: ari
-          DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
-          # Must match SERVER_NOSTR_SECRET in .env (fixed value = relay.steps DEV fallback)
-          # so backend-bdd tests can decrypt Nostr relay events produced by the docker app
-          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
-          # sip-bridge exposed on host port 3001 via docker-compose.test.yml
-          SIP_BRIDGE_URL: http://localhost:3001
-
       - name: Smoke check sidecar health endpoints
         if: ${{ !cancelled() }}
         run: |
@@ -363,6 +347,157 @@ jobs:
             -f deploy/docker/docker-compose.test.yml \
             down -v
 
+
+  # ─── Backend BDD Tests ─────────────────────────────────────
+  backend-bdd:
+    needs: [changes, build]
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create .env for Docker Compose
+        run: |
+          printf '%s\n' \
+            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
+            "DOMAIN=localhost" \
+            "PG_PASSWORD=ci-test-password" \
+            "HMAC_SECRET=$(openssl rand -hex 32)" \
+            "STORAGE_ACCESS_KEY=testaccess" \
+            "STORAGE_SECRET_KEY=testsecret123456" \
+            "HOTLINE_NAME=Llámenos" \
+            "BRIDGE_SECRET=ci-test-bridge-secret" \
+            "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_NOSTR_SECRET=$(openssl rand -hex 32)" \
+            "NOTIFIER_API_KEY=ci-test-notifier-key" \
+            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+            "PBX_TYPE=asterisk" \
+            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            > .env
+
+      - name: Build and start Docker Compose (core services)
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --wait app
+        timeout-minutes: 10
+
+      - name: Start sidecar profiles (signal + telephony)
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --no-recreate
+        timeout-minutes: 5
+
+      - name: Wait for signal-notifier health
+        run: |
+          echo "Waiting for signal-notifier..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100/health; then
+              echo "signal-notifier is ready"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
+            fi
+            sleep 3
+          done
+
+      - name: Show container status
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            ps || true
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs --tail=50 || true
+
+      - name: Generate BDD test files
+        run: bunx bddgen
+
+      - name: Run backend BDD tests
+        run: bun run test:backend:bdd --no-codegen
+        timeout-minutes: 15
+        env:
+          TEST_HUB_URL: http://localhost:3000
+          TEST_RELAY_URL: ws://127.0.0.1:7777
+          SIGNAL_NOTIFIER_URL: http://localhost:3100
+          SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
+          PBX_TYPE: ari
+          DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
+          # Must match SERVER_NOSTR_SECRET in .env (fixed value = relay.steps DEV fallback)
+          # so backend-bdd tests can decrypt Nostr relay events produced by the docker app
+          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
+          # sip-bridge exposed on host port 3001 via docker-compose.test.yml
+          SIP_BRIDGE_URL: http://localhost:3001
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: backend-bdd-results
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v
+
+  # ─── Backend Unit Tests ────────────────────────────────────
+  backend-unit:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run backend unit tests
+        run: cd apps/worker && bun test 2>&1 | tee /tmp/backend-unit-results.txt; exit ${PIPESTATUS[0]}
+
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: backend-unit-results
+          path: /tmp/backend-unit-results.txt
+          retention-days: 7
 
   # ─── Android Build & Test ───────────────────────────────────
   android-build-test:
@@ -442,6 +577,50 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ac638b010cf58a27ee6c972d7336334ccaf61c96 # v4.4.1
+
+      # ── Build native crypto library for emulator (x86_64) ───────
+      # The Android app requires the Rust crypto .so to function —
+      # without it, CryptoService.nativeLibLoaded=false and identity
+      # creation fails (no key generation possible).
+      - name: Cache native crypto .so
+        id: crypto-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
+          key: android-crypto-x86_64-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
+
+      - name: Install Rust stable (for crypto build)
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        with:
+          toolchain: stable
+          targets: x86_64-linux-android
+
+      - name: Rust cache
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+        with:
+          workspaces: packages/crypto
+
+      - name: Install cargo-ndk
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-ndk --locked
+
+      - name: Build crypto .so for x86_64 emulator
+        if: steps.crypto-cache.outputs.cache-hit != 'true'
+        run: |
+          cd packages/crypto
+          export ANDROID_NDK_HOME="$(ls -1d $ANDROID_HOME/ndk/*/ 2>/dev/null | sort -V | tail -1)"
+          echo "Using NDK: $ANDROID_NDK_HOME"
+          mkdir -p ../../apps/android/app/src/main/jniLibs
+          cargo ndk -t x86_64 --platform 24 \
+            -o ../../apps/android/app/src/main/jniLibs \
+            build --release --features mobile
+
+      - name: Verify crypto .so exists
+        run: |
+          ls -la apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
+          file apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
 
       # ── Start backend services ──────────────────────────────────
       # Android E2E tests need a running backend for hub creation,
@@ -556,7 +735,15 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           emulator-boot-timeout: 600
-          script: cd apps/android && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
+          script: |
+            # Forward host port 3000 into emulator so localhost:3000 works inside the app
+            adb reverse tcp:3000 tcp:3000
+            # Verify backend is reachable from host before running tests
+            curl -sf http://localhost:3000/api/health/ready || { echo "::error::Backend not reachable"; exit 1; }
+            cd apps/android && ./gradlew connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" \
+              -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" \
+              -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -590,7 +777,7 @@ jobs:
 
   # ─── iOS Build & Test ──────────────────────────────────────
   ios-build-test:
-    needs: [changes, build]
+    needs: changes
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: macos-latest
     timeout-minutes: 90
@@ -771,22 +958,52 @@ jobs:
           STORAGE_BUCKET: llamenos-files
           SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
 
-      - name: Show backend logs
+      - name: Show backend startup logs
         if: ${{ !cancelled() }}
         run: cat /tmp/backend.log || true
+
+      # Disable macOS Application Firewall — prevents it from blocking
+      # incoming connections to the Bun server from the iOS Simulator.
+      - name: Disable macOS firewall for tests
+        run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
+
+      # Verify backend serves API requests (not just liveness).
+      # BaseUITest uses 127.0.0.1 to force IPv4 — verify the same path.
+      - name: Verify backend API connectivity
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST http://127.0.0.1:3000/api/test-create-hub \
+            -H "Content-Type: application/json" \
+            -H "X-Test-Secret: test-reset-secret" \
+            -d '{"name":"ci-connectivity-check"}')
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | sed '$d')
+          echo "HTTP $http_code: $body"
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Backend API check failed (HTTP $http_code). Backend logs:"
+            cat /tmp/backend.log || true
+            exit 1
+          fi
+          echo "Backend API connectivity verified"
 
       - name: Run UI tests
         working-directory: apps/ios
         run: |
-          # TEST_HUB_URL defaults to http://localhost:3000 in BaseUITest.swift,
-          # which matches the backend started above. No -testenv flag needed
-          # (-testenv is not a valid xcodebuild option).
+          # BaseUITest defaults to http://127.0.0.1:3000 (IPv4 explicit).
+          # Bun binds to 0.0.0.0 — using 127.0.0.1 avoids IPv6 [::1] timeouts
+          # from the iOS Simulator's URLSession on macOS CI runners.
           xcodebuild test \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build
+
+      - name: Show backend runtime logs
+        if: ${{ !cancelled() }}
+        run: |
+          echo "=== Backend logs (full) ==="
+          cat /tmp/backend.log || true
 
       - name: Stop backend services
         if: always()
@@ -887,7 +1104,7 @@ jobs:
 
   # ─── CI Status Gate ─────────────────────────────────────────
   ci-status:
-    needs: [build, audit, crypto-tests, wasm-build, e2e, android-build-test, android-e2e, ios-build-test, crypto-guardrails]
+    needs: [build, audit, crypto-tests, wasm-build, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails]
     if: always()
     runs-on: ubuntu-latest
 
@@ -905,6 +1122,8 @@ jobs:
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
           check_job "wasm-build" "${{ needs.wasm-build.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
+          check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
+          check_job "backend-unit" "${{ needs.backend-unit.result }}"
           check_job "android-build-test" "${{ needs.android-build-test.result }}"
           check_job "android-e2e" "${{ needs.android-e2e.result }}"
           check_job "ios-build-test" "${{ needs.ios-build-test.result }}"
