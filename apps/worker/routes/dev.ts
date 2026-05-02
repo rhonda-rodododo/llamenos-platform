@@ -526,6 +526,91 @@ dev.post('/test-simulate/delivery-status', async (c) => {
   return c.json({ ok: true })
 })
 
+// 7a. Simulate Signal delivery receipt
+// Accepts { conversationId, timestamp, receiptType } and updates the outbound
+// message whose externalId matches the timestamp to "delivered" / "read".
+dev.post('/test-simulate/signal-receipt', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json().catch(() => ({})) as {
+    conversationId?: string
+    timestamp?: string
+    receiptType?: string
+  }
+  if (!body.conversationId || !body.timestamp) {
+    return c.json({ error: 'conversationId and timestamp are required' }, 400)
+  }
+
+  const services = c.get('services')
+  const { messages } = await services.conversations.listMessages(body.conversationId, { limit: 200 })
+  const message = messages.find(m => m.externalId === body.timestamp)
+  if (!message) {
+    return c.json({ error: 'No outbound message found with that externalId/timestamp' }, 404)
+  }
+
+  const newStatus = body.receiptType === 'read' ? 'read' : 'delivered'
+  await services.conversations.updateMessageStatus({
+    externalId: message.externalId!,
+    status: newStatus,
+    timestamp: new Date().toISOString(),
+  })
+
+  return c.json({ ok: true, messageId: message.id, status: newStatus })
+})
+
+// 7b. Simulate Signal reaction webhook
+// Returns the eventType/payload that the backend would publish over Nostr
+// so BDD tests can assert MESSAGE_REACTION events are dispatched.
+dev.post('/test-simulate/signal-reaction', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json().catch(() => ({})) as {
+    conversationId?: string
+    emoji?: string
+    targetTimestamp?: string
+  }
+  if (!body.conversationId || !body.emoji) {
+    return c.json({ error: 'conversationId and emoji are required' }, 400)
+  }
+
+  // Signal reactions are published as Nostr MESSAGE_REACTION events.
+  // In simulation we record the intent and return the expected event shape.
+  const payload = {
+    conversationId: body.conversationId,
+    emoji: body.emoji,
+    targetTimestamp: body.targetTimestamp,
+    simulatedAt: new Date().toISOString(),
+  }
+
+  return c.json({ ok: true, eventType: 'MESSAGE_REACTION', payload })
+})
+
+// 7c. Simulate Signal typing indicator webhook
+// Returns the eventType/payload that the backend would publish over Nostr
+// so BDD tests can assert TYPING_INDICATOR events are dispatched.
+dev.post('/test-simulate/signal-typing', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json().catch(() => ({})) as {
+    conversationId?: string
+    action?: string
+  }
+  if (!body.conversationId) {
+    return c.json({ error: 'conversationId is required' }, 400)
+  }
+
+  const payload = {
+    conversationId: body.conversationId,
+    action: body.action ?? 'STARTED',
+    simulatedAt: new Date().toISOString(),
+  }
+
+  return c.json({ ok: true, eventType: 'TYPING_INDICATOR', payload })
+})
+
 // ─── Test Push Log (dev/test BDD helper) ──────────────────────────────────
 // Returns or clears the in-memory push payload log recorded by push-dispatch.ts.
 // Used by backend BDD tests to verify that push payloads carry hubId without

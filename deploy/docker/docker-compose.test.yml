@@ -35,6 +35,11 @@ services:
         hard: 65536
     volumes:
       - ./strfry-test.conf:/etc/strfry.conf:ro
+    # Base compose puts strfry on `internal` only (internal: true blocks host
+    # port exposure). Add `web` so the port mapping actually works in CI.
+    networks:
+      - internal
+      - web
 
   app:
     ports:
@@ -90,7 +95,14 @@ services:
   # ── Asterisk sidecar: test mode ────────────────────────────────────
   # sip-bridge points to the mock ARI endpoint; BRIDGE_SECRET and
   # ARI_PASSWORD come from .env (set to ci-test-* values in CI).
+  # Expose port 3001 → 3000 so backend-bdd health check tests can reach the
+  # bridge from the host. Base compose puts sip-bridge on `internal` only.
   sip-bridge:
+    ports:
+      - "3001:3000"
+    networks:
+      - internal
+      - web
     environment:
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_USERNAME=llamenos
