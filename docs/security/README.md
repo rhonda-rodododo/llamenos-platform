@@ -1,6 +1,6 @@
 # Llamenos Security Documentation
 
-**Last Updated:** 2026-05-02
+**Last Updated:** 2026-05-03
 **Crypto Architecture:** HPKE (RFC 9180) + Ed25519/X25519 + AES-256-GCM
 **Audit Status:** Two historical audits (2026-02, 2026-03); docs updated for current architecture
 
@@ -37,8 +37,9 @@ All cryptographic operations are implemented once in `packages/crypto/` (Rust), 
 | HPKE (RFC 9180, X25519-HKDF-SHA256-AES256-GCM) | All key wrapping (notes, messages, files, hub key, PUK) |
 | Ed25519 | Device signing keys, auth tokens, sigchain entries |
 | X25519 | Device encryption keys, HPKE decapsulation |
-| AES-256-GCM | Symmetric encryption |
-| PBKDF2-SHA256 (600K iterations) | PIN-to-KEK derivation for device key storage |
+| AES-256-GCM | Symmetric encryption (notes, messages, HPKE AEAD) |
+| XChaCha20-Poly1305 | Hub event encryption (Nostr relay events) |
+| Argon2id (64MB, 3 iterations, 4 parallelism) | PIN/passphrase-to-KEK derivation for device key storage |
 | HMAC-SHA256 | Phone/IP hashing, blind index generation |
 | 57 domain separation labels | Albrecht defense — label enforced at decrypt |
 
@@ -63,7 +64,8 @@ The server **cannot read** these, even under legal compulsion:
 - **Sigchain** — append-only, hash-chained, Ed25519-signed device authorization log
 - **PUK (Per-User Key)** — user-level key hierarchy with Cascading Lazy Key Rotation (CLKR)
 - **Hub key** — random 32 bytes, HPKE-wrapped per member, rotated on departure
-- **MLS** (RFC 9420, feature-gated) — group state management
+- **MLS** (RFC 9420) — group state management (always compiled; no feature flag)
+- **Hub event epoch rotation** — server event key rotates every 24 hours for forward secrecy
 - **SFrame** — voice E2EE key derivation
 
 ### Server-Accessible Under Subpoena
@@ -80,11 +82,11 @@ The server **cannot read** these, even under legal compulsion:
 
 ## What We Do NOT Claim
 
-- **Traffic analysis resistance**: No padding, no dummy traffic
-- **Metadata confidentiality**: Server needs timestamps and routing data
-- **SMS/WhatsApp transport E2EE**: Provider sees plaintext during transit (messages are E2EE at rest)
-- **Nostr relay metadata privacy**: Relay observes event metadata (pubkeys, timing, sizes) — only content is encrypted
-- **PIN brute-force resistance (offline)**: 6–8 digits is ~20–27 bits of entropy
+- **Traffic analysis resistance (full)**: Hub events are padded to power-of-2 buckets (min 512B), but no dummy traffic or cover traffic — patterns from connection timing remain visible
+- **Metadata confidentiality**: Server needs timestamps, routing data, and event counts; caller numbers are HMAC-hashed and User-Agent SHA-256 hashed, country is not stored — but connection metadata remains
+- **SMS/WhatsApp transport E2EE**: Provider sees plaintext during transit; Signal-first routing (when the recipient has Signal) avoids this, and SMS notification-only mode omits message content from SMS bodies — but provider-visible delivery still occurs
+- **Nostr relay metadata privacy**: Relay observes event metadata (pseudonymous pubkeys, timing, sizes); content is per-hub encrypted with epoch-rotating keys; write-policy plugin limits events to the whitelisted server pubkey only — relay cannot fake events but can observe metadata
+- **PIN brute-force resistance (offline) — now significantly improved**: Minimum 8 digits or alphanumeric passphrase (8+ chars); Argon2id (64MB, 3 iterations, 4 parallelism) replaces PBKDF2 for strong GPU/ASIC resistance. Seizure of encrypted blob requires defeating Argon2id in addition to guessing credential.
 - **Deletion verification**: Cannot cryptographically prove hosting provider deleted data
 
 ## Reporting Security Issues

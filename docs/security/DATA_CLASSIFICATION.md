@@ -1,7 +1,7 @@
 # Data Classification Reference
 
-**Version:** 2.0
-**Date:** 2026-05-02
+**Version:** 2.1
+**Date:** 2026-05-03
 
 Complete inventory of all data stored and processed by Llamenos, with classification levels for security audits, legal review, and GDPR compliance.
 
@@ -157,9 +157,12 @@ Hash-chained for tamper detection.
 | `action` | Plaintext | Configurable | What happened |
 | `actorPubkey` | Plaintext | Configurable | Who did it |
 | `ipHash` | Hashed (truncated) | Configurable | 96-bit truncated IP hash (HMAC-SHA256) |
+| `ua` | Hashed (SHA-256) | Configurable | User-Agent string hashed with `sha256(rawUA)` — fingerprint preserved for correlation without storing UA string |
 | `details` | Plaintext | Configurable | Action-specific metadata |
 | `entryHash` | Plaintext | Configurable | SHA-256 of this entry's content |
 | `previousEntryHash` | Plaintext | Configurable | Hash chain link to previous entry |
+
+**Note**: Country/region is explicitly **not collected** — the audit service omits it entirely ("privacy cost outweighs operational value"). Prior deployments that stored country should remove it on next migration.
 
 ---
 
@@ -229,8 +232,9 @@ Hash-chained for tamper detection.
 | Data | Classification | Retention | Notes |
 |------|---------------|-----------|-------|
 | Ephemeral events (kind 20001) | Never persisted | Forwarded only | Call signals, presence — never stored to disk |
-| Persistent events (kind 1000+) | **E2EE** | Configurable | Content encrypted with hub event key |
+| Persistent events (kind 1000+) | **E2EE** | Configurable | Content encrypted with epoch-rotating per-hub XChaCha20-Poly1305 key; padded to power-of-2 bucket |
 | Connection metadata | Plaintext | Log-dependent | IP, timing — operator controls logging |
+| Event publisher | Plaintext (pubkey) | Stored with event | Only server pubkey is accepted — write-policy enforces this |
 
 ---
 
@@ -342,6 +346,7 @@ Note: Llamenos does not currently enforce automated retention policies. Operator
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-03 | 2.1 | Post-hardening: added `ua` (SHA-256 hashed) field to audit logs; noted country is not collected; updated Nostr relay events (epoch-rotating per-hub key, power-of-2 padding, write-policy publisher constraint) |
 | 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR entries, added CMS data, added hub key distribution, added blind indexes, updated client storage to Tauri Store/Keychain/Keystore (not localStorage), updated Nostr relay data, added signal-notifier sidecar, removed Durable Objects/Cloudflare references |
 | 2026-02-25 | 1.1 | ZK Architecture Overhaul: Updated ConversationDO to E2EE, ShiftManagerDO encrypted details, AuditDO hash chain, client-side transcription |
 | 2026-02-25 | 1.0 | Initial data classification document |

@@ -1,7 +1,7 @@
 # Deployment Hardening Guide
 
-**Version:** 2.0
-**Date:** 2026-05-02
+**Version:** 2.1
+**Date:** 2026-05-03
 
 Security-focused deployment recommendations for Llamenos operators. Since Llamenos is self-hosted open-source software, the operator is responsible for infrastructure security. This document covers two deployment architectures.
 
@@ -314,18 +314,52 @@ The Nostr relay handles all real-time event delivery (call notifications, presen
 
 Production config at `deploy/docker/strfry-prod.conf`:
 - Max event size: 64KB
-- Reject events older than 24 hours or newer than 60 seconds
+- Reject events older than 300 seconds (5 minutes) or newer than 30 seconds
 - Ephemeral event TTL: 300 seconds (5 minutes)
 - Max 10 subscriptions per connection
 - Negentropy enabled for efficient sync
 - Compression enabled
 
+### Write-Policy Plugin
+
+`deploy/docker/write-policy.sh` runs as a strfry write-policy subprocess:
+
+```bash
+writePolicy {
+    plugin = "/app/write-policy.sh"
+}
+```
+
+The plugin enforces:
+- **Server pubkey whitelist**: Only the server's derived Nostr pubkey (`ALLOWED_PUBKEY` env var) may publish events
+- **NIP-42 passthrough**: Auth events (kind 22242) are always accepted from any pubkey — required for client authentication
+- **All other publishers rejected**: Returns `"action": "reject"` with reason `"unauthorized publisher"`
+
+Set `ALLOWED_PUBKEY` to the server's Nostr pubkey (derived from `SERVER_NOSTR_SECRET` via HKDF at startup). The docker-compose.yml mounts the plugin read-only:
+
+```yaml
+volumes:
+  - ./write-policy.sh:/app/write-policy.sh:ro
+```
+
 ### Security Properties
 
 - **Ephemeral events** (kind 20001): Never stored to disk — forwarded to active subscribers only
 - **Generic tags**: All events use `["t", "llamenos:event"]` — relay cannot distinguish event types
-- **Content encryption**: All event content encrypted with hub event key (AES-256-GCM + HKDF)
-- **NIP-42 auth**: Clients authenticate before subscribing
+- **Content encryption**: All event content encrypted with epoch-rotating server event key (XChaCha20-Poly1305 + HKDF, 24h epoch rotation) with per-hub key scoping
+- **NIP-42 auth**: Server authenticates to relay on connect; clients authenticate before subscribing
+- **Publisher verification**: Write-policy rejects all non-server publishers
+
+### Signal-First Delivery Configuration
+
+The messaging delivery router (`apps/worker/messaging/delivery-router.ts`) supports two configuration keys in hub messaging config:
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `preferSignalDelivery` | `true` | Route to Signal when recipient is registered; fallback to SMS/other on failure |
+| `smsContentMode` | `'notification-only'` | When `'notification-only'`, SMS body is replaced with a generic "new message" notification; full content sent only via Signal or WhatsApp |
+
+`smsContentMode: 'notification-only'` is the default. This means SMS recipients see "You have a new message" instead of the message body, preventing message content from appearing in SMS provider logs. Set to `'full'` only if you accept provider-side plaintext exposure.
 
 ### Internal TLS
 
@@ -405,6 +439,7 @@ Trust anchor is the **GitHub Release** (not the running application). CI generat
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-03 | 2.1 | Post-hardening: strfry write-policy plugin configuration + ALLOWED_PUBKEY setup; corrected event age limits (300s, not 24h); Signal-first delivery and SMS notification-only mode config; updated hub event encryption cipher (XChaCha20-Poly1305 + epoch rotation) |
 | 2026-05-02 | 2.0 | Complete rewrite: removed Cloudflare Workers section (backend is Bun+PostgreSQL, not CF Workers), updated to match actual deploy/ configs (Ansible roles, Docker Compose overlays, Helm templates, Caddyfile.production), HPKE replaces ECIES, device keys replace nsec, added sigchain/PUK references, added split-origin production Caddyfile, added internal TLS, added security scanning role |
 | 2026-02-25 | 1.2 | Added Caddy section, Nostr relay operations, reproducible builds |
 | 2026-02-23 | 1.0 | Initial deployment hardening guide |

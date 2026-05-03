@@ -1,7 +1,7 @@
 # Key Revocation Runbook
 
-**Version:** 2.0
-**Date:** 2026-05-02
+**Version:** 2.1
+**Date:** 2026-05-03
 
 Operational procedures for emergency key revocation, rotation, and compromise response in Llamenos deployments.
 
@@ -23,8 +23,9 @@ Operational procedures for emergency key revocation, rotation, and compromise re
 2. [User Departure and Device Revocation](#2-user-departure-and-device-revocation)
 3. [Device Seizure Response](#3-device-seizure-response)
 4. [Hub Key Rotation Ceremony](#4-hub-key-rotation-ceremony)
-5. [PUK Rotation on Departure](#5-puk-rotation-on-departure)
-6. [Response Timeframe Summary](#6-response-timeframe-summary)
+5. [Hub Event Key Epoch Rotation](#5-hub-event-key-epoch-rotation)
+6. [PUK Rotation on Departure](#6-puk-rotation-on-departure)
+7. [Response Timeframe Summary](#7-response-timeframe-summary)
 
 ---
 
@@ -114,7 +115,7 @@ When a user leaves the organization, their devices must be deauthorized via sigc
 
 3. **Rotate the hub key** (see [Section 4](#4-hub-key-rotation-ceremony)). The departed user does NOT receive the new key.
 
-4. **Rotate PUK for affected data** (see [Section 5](#5-puk-rotation-on-departure)) — exclude the departed user from future PUK seed distributions.
+4. **Rotate PUK for affected data** (see [Section 6](#6-puk-rotation-on-departure)) — exclude the departed user from future PUK seed distributions.
 
 5. **Verify post-departure access boundaries**:
    - Departed user CAN decrypt notes they authored (they have the author envelope keys)
@@ -150,7 +151,7 @@ The user is leaving on bad terms, has been terminated, or is suspected of acting
 
 3. **Rotate the hub key immediately** (Section 4).
 
-4. **Rotate PUK** (Section 5).
+4. **Rotate PUK** (Section 6).
 
 5. **Revoke all WebAuthn credentials** for the user's devices.
 
@@ -200,16 +201,17 @@ Whether or not the panic action was taken, assume worst case:
 
 7. **Revoke WebAuthn credentials** for the seized device.
 
-### 3.3 PIN Protection Assessment
+### 3.3 PIN/Passphrase Protection Assessment
 
-Device private keys are encrypted under a PIN-derived key (PBKDF2-SHA256, 600K iterations).
+Device private keys are encrypted under a credential-derived key using Argon2id (64MB memory, 3 iterations, 4 parallelism). Minimum credential is 8 decimal digits; alphanumeric passphrases (8+ chars with at least one letter) are also accepted.
 
-| PIN Length | Brute-force time (offline, GPU) | Assessment |
-|------------|----------------------------------------------|------------|
-| 6 digits | Hours to days | Marginal |
-| 8 digits | Days to weeks | Provides meaningful time buffer |
+| Credential Type | Argon2id brute-force cost (GPU) | Assessment |
+|-----------------|--------------------------------|------------|
+| 8-digit PIN | High (memory-bound) | Provides meaningful delay; begin hub rotation within 1 hour |
+| 10-digit PIN | Very high | Provides days to weeks even on GPU clusters |
+| Alphanumeric passphrase (8+ chars) | Extremely high | Strong protection; rotate hub key within 24 hours |
 
-PIN protection is a delay mechanism, not a permanent barrier. Hub key rotation must complete before a well-funded adversary cracks the PIN. For 6–8 digit PINs, begin hub key rotation within 1 hour of confirmed device seizure.
+Argon2id's 64MB memory cost makes GPU/ASIC parallelization expensive compared to PBKDF2. However, PIN protection is still a delay mechanism, not a permanent barrier for well-funded adversaries. Hub key rotation must complete before expiration of the delay budget.
 
 ### 3.4 Post-Seizure Re-Onboarding
 
@@ -278,7 +280,64 @@ If rotation fails mid-ceremony:
 
 ---
 
-## 5. PUK Rotation on Departure
+## 5. Hub Event Key Epoch Rotation
+
+The server event key (used for XChaCha20-Poly1305 encryption of Nostr relay events) rotates automatically every 24 hours. This is **automatic** — no operator action is required for routine epoch rotation.
+
+### 5.1 How Epoch Rotation Works
+
+The server event key is derived as:
+```
+event_key = HKDF-SHA256(SERVER_NOSTR_SECRET, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY[:hubId], info=LABEL_HUB_EVENT_EPOCH:[epoch])
+```
+
+Where `epoch = floor(unix_timestamp / 86400)` — a new key every 24 hours.
+
+Clients receive the **current epoch key** and the **previous epoch key** from `GET /api/auth/me`. This ensures clients can decrypt events published just before an epoch boundary.
+
+### 5.2 When Manual Action is Needed
+
+| Scenario | Action |
+|----------|--------|
+| `SERVER_NOSTR_SECRET` compromised | Rotate `SERVER_NOSTR_SECRET` immediately (redeploy required). All past epoch keys are invalidated. Redistribute new epoch keys to clients via `/api/auth/me`. |
+| Client stuck on old epoch | Client should receive previous epoch key from `/api/auth/me`. If persistent, check that client is syncing auth/me on reconnect. |
+| Hub key rotation (member departure) | Hub key rotation is separate from epoch rotation. Both may be needed simultaneously — see [Section 4](#4-hub-key-rotation-ceremony). |
+
+### 5.3 Emergency: Rotate SERVER_NOSTR_SECRET
+
+If the server's Nostr secret is compromised, an attacker can decrypt all stored relay events (retroactively) and forge new events until the key is rotated.
+
+1. Generate a new secret:
+   ```bash
+   openssl rand -hex 32   # Must be exactly 64 hex chars
+   ```
+
+2. Update `.env`:
+   ```bash
+   sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=<new_secret>|" .env
+   ```
+
+3. Redeploy:
+   ```bash
+   docker compose restart app
+   ```
+
+4. Update `ALLOWED_PUBKEY` in strfry config if the new secret produces a different server Nostr pubkey:
+   ```bash
+   # Derive new pubkey from new secret
+   bun run bootstrap-admin  # or use the /api/config endpoint after restart
+   ```
+
+5. Restart strfry with the new `ALLOWED_PUBKEY`:
+   ```bash
+   docker compose restart strfry
+   ```
+
+All clients will receive the new epoch key on next `GET /api/auth/me`. Old epoch keys derived from the compromised secret are permanently invalidated.
+
+---
+
+## 6. PUK Rotation on Departure
 
 When a user departs or a device is compromised, the PUK must be rotated so the departed user/device cannot derive future items keys or note epoch keys.
 
@@ -298,7 +357,7 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 
 ---
 
-## 6. Response Timeframe Summary
+## 7. Response Timeframe Summary
 
 | Scenario | Action | Maximum Timeframe |
 |----------|--------|-------------------|
@@ -311,6 +370,8 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 | Device seizure (no panic wipe) | Deactivation + sigchain deauthorize + hub key rotation | 1 hour |
 | Device seizure (panic wipe confirmed) | Hub key rotation (precautionary) | 24 hours |
 | Routine hub key rotation | Scheduled | Per organizational policy (quarterly recommended) |
+| Hub event key epoch rotation | Automatic | Every 24 hours — no operator action required |
+| SERVER_NOSTR_SECRET compromise | Emergency rotation | Immediately — rotate secret, redeploy, update ALLOWED_PUBKEY in strfry |
 
 ---
 
@@ -318,5 +379,6 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-03 | 2.1 | Post-hardening: added Section 5 (hub event key epoch rotation + SERVER_NOSTR_SECRET emergency rotation); updated Section 3.3 to reflect Argon2id + min 8-digit/alphanumeric credential; updated response timeframes table |
 | 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, sigchain-based device deauthorization replaces nsec revocation, added PUK rotation section, added CLKR chain references, updated device storage (Tauri Store/Keychain/Keystore not localStorage), removed Cloudflare Workers references, updated panic wipe to platform-native lock |
 | 2026-02-25 | 1.0 | Initial version |
