@@ -184,6 +184,44 @@ calls.get('/identify/:identifierHash',
   },
 )
 
+// --- Get single call by ID ---
+
+calls.get('/:callId',
+  describeRoute({
+    tags: ['Calls'],
+    summary: 'Get a single call by ID (active or historical)',
+    responses: {
+      200: {
+        description: 'Call record',
+        content: {
+          'application/json': {
+            schema: resolver(callActionResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('calls:read-active'),
+  async (c) => {
+    const callId = c.req.param('callId')
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+
+    // Try active calls first (hub-scoped if available, then global), fall back to history
+    const activeCall = hubId
+      ? await services.calls.getActiveCallById(hubId, callId)
+      : await services.calls.getActiveCallByCallId(callId)
+    if (activeCall) return c.json(activeCall)
+
+    const historyRecord = await services.calls.getCallRecord(callId)
+    if (historyRecord) return c.json(historyRecord)
+
+    return c.json({ error: 'Call not found' }, 404)
+  },
+)
+
 // --- Call Actions (REST endpoints for WS→Nostr migration) ---
 
 // Answer a ringing call (volunteer)

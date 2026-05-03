@@ -57,8 +57,8 @@ export interface AddMessageInput {
   conversationId: string
   direction: 'inbound' | 'outbound'
   authorPubkey: string
-  encryptedContent: string
-  readerEnvelopes: RecipientEnvelope[]
+  encryptedContent?: string
+  readerEnvelopes?: RecipientEnvelope[]
   hasAttachments?: boolean
   attachmentIds?: string[]
   externalId?: string
@@ -294,7 +294,7 @@ export class ConversationsService {
         conversationId: input.conversationId,
         direction: input.direction,
         authorPubkey: input.authorPubkey,
-        encryptedContent: input.encryptedContent,
+        encryptedContent: input.encryptedContent ?? '',
         readerEnvelopes: input.readerEnvelopes,
         hasAttachments: input.hasAttachments ?? false,
         attachmentIds: input.attachmentIds,

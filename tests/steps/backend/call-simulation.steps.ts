@@ -290,7 +290,7 @@ When('a call needs to be routed', async ({ request, world }) => {
   const caller = uniqueCallerNumber()
   const hubId = getScenarioState(world).hubId
   try {
-    const result = await simulateIncomingCall(request, { callerNumber: caller, hubId })
+    const result = await simulateIncomingCall(request, { callerNumber: caller, hubId, checkVolunteers: true })
     getCallSimState(world).callId = result.callId
     getCallSimState(world).callStatus = result.status
     getScenarioState(world).callId = result.callId

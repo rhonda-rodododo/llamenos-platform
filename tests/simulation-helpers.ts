@@ -31,7 +31,7 @@ function simulationHeaders(): Record<string, string> {
 export interface SimulateIncomingCallResult {
   ok: boolean
   callId: string
-  status: 'ringing'
+  status: 'ringing' | 'no-volunteers'
 }
 
 export interface SimulateAnswerCallResult {
@@ -71,6 +71,8 @@ export interface SimulateIncomingCallOptions {
   language?: string
   /** Hub ID override. Optional. */
   hubId?: string
+  /** When true, returns error if no volunteers are on shift. Optional. */
+  checkVolunteers?: boolean
 }
 
 export interface SimulateIncomingMessageOptions {
@@ -145,6 +147,7 @@ export async function simulateIncomingCall(
       callerNumber: options.callerNumber,
       ...(options.language ? { language: options.language } : {}),
       ...(options.hubId ? { hubId: options.hubId } : {}),
+      ...(options.checkVolunteers ? { checkVolunteers: true } : {}),
     },
   )
 }

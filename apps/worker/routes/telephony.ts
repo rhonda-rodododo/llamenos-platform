@@ -13,6 +13,7 @@ import { maybeTranscribe, transcribeVoicemail } from '../services/transcription'
 import { publishNostrEvent } from '../lib/nostr-events'
 import { KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
 import { createLogger } from '../lib/logger'
+import { backgroundTask } from '../lib/hono-compat'
 
 const logger = createLogger('telephony')
 
@@ -155,7 +156,7 @@ telephony.post('/language-selected', async (c) => {
   if (!rateLimited && !spamSettings.voiceCaptchaEnabled) {
     const origin = new URL(c.req.url).origin
     logger.info('Starting parallel ringing', { callSid, origin, hubId: hubId || 'global' })
-    c.executionCtx.waitUntil(startParallelRinging(callSid, callerNumber, origin, c.env, services, hubId ?? ''))
+    backgroundTask(c,startParallelRinging(callSid, callerNumber, origin, c.env, services, hubId ?? ''))
   }
 
   return telephonyResponse(response)
@@ -178,7 +179,7 @@ telephony.post('/captcha', async (c) => {
 
   if (match) {
     const origin = new URL(c.req.url).origin
-    c.executionCtx.waitUntil(startParallelRinging(callSid, callerNumber, origin, c.env, services, hubId ?? ''))
+    backgroundTask(c,startParallelRinging(callSid, callerNumber, origin, c.env, services, hubId ?? ''))
   }
 
   return telephonyResponse(response)
@@ -374,7 +375,7 @@ telephony.post('/call-recording', async (c) => {
     }
 
     if (recordingSid) {
-      c.executionCtx.waitUntil(
+      backgroundTask(c,
         maybeTranscribe(parentCallSid, recordingSid, pubkey, c.env, services)
       )
     }
@@ -403,7 +404,7 @@ telephony.post('/voicemail-recording', async (c) => {
 
     await audit(services.audit, 'voicemailReceived', 'system', { callSid }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
 
-    c.executionCtx.waitUntil(transcribeVoicemail(callSid, c.env, services))
+    backgroundTask(c,transcribeVoicemail(callSid, c.env, services))
   }
 
   return telephonyResponse(adapter.emptyResponse())

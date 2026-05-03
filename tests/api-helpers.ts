@@ -87,7 +87,7 @@ export async function apiGet<T = unknown>(
   const res = await request.get(fullPath, {
     headers: authHeaders(nsec, 'GET', fullPath),
   })
-  const data = res.ok() ? await safeJson(res) : null
+  const data = await safeJson(res)
   return { status: res.status(), data: data as T }
 }
 
@@ -102,7 +102,7 @@ export async function apiPost<T = unknown>(
     headers: authHeaders(nsec, 'POST', fullPath),
     data: body,
   })
-  const data = res.ok() ? await safeJson(res) : null
+  const data = await safeJson(res)
   return { status: res.status(), data: data as T }
 }
 
@@ -117,7 +117,7 @@ export async function apiPatch<T = unknown>(
     headers: authHeaders(nsec, 'PATCH', fullPath),
     data: body,
   })
-  const data = res.ok() ? await safeJson(res) : null
+  const data = await safeJson(res)
   return { status: res.status(), data: data as T }
 }
 
@@ -132,7 +132,7 @@ export async function apiPut<T = unknown>(
     headers: authHeaders(nsec, 'PUT', fullPath),
     data: body,
   })
-  const data = res.ok() ? await safeJson(res) : null
+  const data = await safeJson(res)
   return { status: res.status(), data: data as T }
 }
 
@@ -145,7 +145,7 @@ export async function apiDelete<T = unknown>(
   const res = await request.delete(fullPath, {
     headers: authHeaders(nsec, 'DELETE', fullPath),
   })
-  const data = res.ok() ? await safeJson(res) : null
+  const data = await safeJson(res)
   return { status: res.status(), data: data as T }
 }
 
