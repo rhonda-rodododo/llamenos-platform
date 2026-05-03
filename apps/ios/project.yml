@@ -73,7 +73,8 @@ targets:
     scheme:
       testTargets:
         - LlamenosTests
-        - LlamenosUITests
+        - name: LlamenosUITests
+          parallelizable: true
       gatherCoverageData: true
       coverageTargets:
         - Llamenos

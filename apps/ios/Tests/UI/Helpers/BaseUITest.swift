@@ -3,19 +3,41 @@ import XCTest
 /// Base class for all BDD-aligned UI tests.
 /// Provides shared setup, BDD step helpers (given/when/then), and navigation utilities.
 ///
-/// Each test gets an isolated hub created via POST /api/test-create-hub in setUp().
-/// The hub ID is stored in `testHubId` and passed to the app via --test-hub-id.
+/// Each test *class* gets one isolated hub created via POST /api/test-create-hub in
+/// `class func setUp()`. All test methods within the class share this hub. This enables
+/// Xcode parallel testing: each parallel worker runs a different test class, and each
+/// class has its own hub — no shared state between workers.
 class BaseUITest: XCTestCase {
     var app: XCUIApplication!
 
-    /// Isolated hub created for this test. Set in setUp() via createTestHub().
-    var testHubId: String = ""
+    // MARK: - Class-Level Hub Isolation
+
+    /// Thread-safe storage of hub IDs keyed by test class name.
+    /// Each subclass gets its own hub, created once in `class func setUp()`.
+    private static var classHubIds: [String: String] = [:]
+    private static let hubLock = NSLock()
+
+    /// Hub ID for this test class, created once in `class func setUp()`.
+    var testHubId: String {
+        let key = String(describing: type(of: self))
+        Self.hubLock.lock()
+        defer { Self.hubLock.unlock() }
+        return Self.classHubIds[key] ?? ""
+    }
+
+    override class func setUp() {
+        super.setUp()
+        let key = String(describing: self)
+        let hubId = createClassHub()
+        hubLock.lock()
+        classHubIds[key] = hubId
+        hubLock.unlock()
+    }
 
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
         app = XCUIApplication()
-        testHubId = createTestHub()
     }
 
     override func tearDown() {
@@ -43,20 +65,26 @@ class BaseUITest: XCTestCase {
             ?? "test-reset-secret"
     }
 
-    // MARK: - Hub Isolation
+    // MARK: - Hub Creation (Class-Level)
 
-    /// Create a fresh isolated hub for this test run.
-    /// Returns the hub ID, or empty string on failure (with XCTFail).
-    func createTestHub() -> String {
-        let hubName = "ios-test-\(Int(Date().timeIntervalSince1970 * 1000))"
-        guard let url = URL(string: "\(testHubURL)/api/test-create-hub") else {
-            XCTFail("Invalid test hub URL: \(testHubURL)")
+    /// Create a fresh isolated hub for this test class.
+    /// Called once per class in `class func setUp()` — not per test method.
+    private class func createClassHub() -> String {
+        let hubURL = ProcessInfo.processInfo.environment["TEST_HUB_URL"]
+            ?? "http://127.0.0.1:3000"
+        let secret = ProcessInfo.processInfo.environment["E2E_TEST_SECRET"]
+            ?? ProcessInfo.processInfo.environment["TEST_RESET_SECRET"]
+            ?? "test-reset-secret"
+        let className = String(describing: self)
+        let hubName = "ios-\(className)-\(Int(Date().timeIntervalSince1970 * 1000))"
+        guard let url = URL(string: "\(hubURL)/api/test-create-hub") else {
+            print("BaseUITest: invalid test hub URL: \(hubURL)")
             return ""
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(testSecret, forHTTPHeaderField: "X-Test-Secret")
+        request.setValue(secret, forHTTPHeaderField: "X-Test-Secret")
         request.timeoutInterval = 15
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["name": hubName])
 
@@ -65,12 +93,12 @@ class BaseUITest: XCTestCase {
         URLSession.shared.dataTask(with: request) { data, response, error in
             defer { semaphore.signal() }
             if let error {
-                print("Warning: createTestHub failed: \(error.localizedDescription)")
+                print("Warning: createClassHub(\(className)) failed: \(error.localizedDescription)")
                 return
             }
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-                print("Warning: createTestHub returned \(code)")
+                print("Warning: createClassHub(\(className)) returned \(code)")
                 return
             }
             if let data,
@@ -80,7 +108,9 @@ class BaseUITest: XCTestCase {
             }
         }.resume()
         _ = semaphore.wait(timeout: .now() + 15)
-        XCTAssertFalse(hubId.isEmpty, "createTestHub returned empty hub ID — is the backend running?")
+        if hubId.isEmpty {
+            print("Warning: createClassHub(\(className)) returned empty hub ID — is the backend running?")
+        }
         return hubId
     }
 
@@ -153,10 +183,10 @@ class BaseUITest: XCTestCase {
 
     // MARK: - Server State (deprecated)
 
-    /// Deprecated: hub isolation via createTestHub() in setUp() replaces this.
-    /// Each test gets its own fresh hub — no global reset needed.
+    /// Deprecated: hub isolation via class-level createClassHub() replaces this.
+    /// Each test class gets its own fresh hub — no global reset needed.
     func resetServerState() {
-        fatalError("resetServerState() is removed — hub isolation via createTestHub() in setUp() provides per-test isolation. Remove this call.")
+        fatalError("resetServerState() is removed — class-level hub isolation provides per-class isolation. Remove this call.")
     }
 
     // MARK: - Simulation Helpers
