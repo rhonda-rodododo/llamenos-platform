@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 
-const mockGetTelephonyFromService = vi.fn()
+const { mockGetTelephonyFromService } = vi.hoisted(() => ({
+  mockGetTelephonyFromService: vi.fn(),
+}))
 vi.mock('@worker/lib/service-factories', () => ({
   getTelephonyFromService: mockGetTelephonyFromService,
 }))
