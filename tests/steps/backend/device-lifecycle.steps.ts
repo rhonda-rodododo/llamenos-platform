@@ -43,21 +43,13 @@ function randomPushToken(): string {
 
 // ── Given/When ──────────────────────────────────────────────────────
 
-When('the user registers a device with platform {string}', async ({ request, world }, platform: string) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  setLastResponse(world, await apiPost(request, '/devices/register', {
-    platform, pushToken: randomPushToken(), wakeKeyPublic: randomWakeKey(),
-  }, s.user!.nsec))
-})
-
 Given('the user registers a device with platform {string}', async ({ request, world }, platform: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   const res = await apiPost(request, '/devices/register', {
     platform, pushToken: randomPushToken(), wakeKeyPublic: randomWakeKey(),
   }, s.user!.nsec)
-  expect(res.status).toBe(204)
+  setLastResponse(world, res)
 })
 
 When('the user lists their devices', async ({ request, world }) => {

@@ -136,8 +136,10 @@ When('the admin lists invites', async ({ request, world }) => {
 
 When('the admin revokes the invite', async ({ request, world }) => {
   const s = getS(world)
-  expect(s.inviteCode).toBeDefined()
-  setLastResponse(world, await apiDelete(request, `/invites/${s.inviteCode}`, ADMIN_NSEC))
+  const crudState = getState<{ inviteCode?: string }>(world, 'crud')
+  const inviteCode = s.inviteCode ?? crudState?.inviteCode
+  expect(inviteCode).toBeDefined()
+  setLastResponse(world, await apiDelete(request, `/invites/${inviteCode}`))
 })
 
 When('a client floods invite validation {int} times', async ({ request, world }, count: number) => {

@@ -352,10 +352,6 @@ Then('the invite list should contain {string}', async ({request, world}, name: s
   expect(invites.some(i => i.name === name)).toBeTruthy()
 })
 
-When('the admin revokes the invite', async ({ request, world }) => {
-  await apiDelete(request, `/invites/${getCrudState(world).inviteCode}`)
-})
-
 Then('the invite list should not contain the revoked code', async ({ request, world }) => {
   const { data } = await apiGet<{ invites: Array<{ code: string }> }>(request, '/invites')
   const invites = (data as { invites?: Array<{ code: string }> })?.invites ?? []
