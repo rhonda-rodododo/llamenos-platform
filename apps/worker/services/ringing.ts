@@ -8,6 +8,7 @@ import { createLogger } from '../lib/logger'
 import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from '../routes/metrics'
+import { hashPhone } from '../lib/crypto'
 
 const logger = createLogger('ringing')
 
@@ -64,10 +65,11 @@ export async function startParallelRinging(
 
     logger.info('Ringing volunteers', { callSid, total: available.length, phone: toRingPhone.length, browserVoip: browserVoip.length })
 
-    // Register the incoming call
+    // Register the incoming call — store HMAC hash, not the raw number
+    const callerNumberHash = hashPhone(callerNumber, env.HMAC_SECRET)
     await services.calls.addCall(hubId, {
       callId: callSid,
-      callerNumber,
+      callerNumber: callerNumberHash,
       callerLast4: callerNumber.slice(-4),
       status: 'ringing',
     })

@@ -353,8 +353,9 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   const services = c.get('services')
   const hubId = body.hubId ?? ''
 
-  // Check if the caller is banned (mirrors real telephony flow — uses raw phone, not hashed)
-  const banned = await services.records.checkBan(body.callerNumber, hubId || undefined)
+  // Check if the caller is banned (hash before lookup — mirrors real telephony flow)
+  const callerNumberHash = hashPhone(body.callerNumber, c.env.HMAC_SECRET)
+  const banned = await services.records.checkBan(callerNumberHash, hubId || undefined)
   if (banned) {
     return c.json({ error: 'Caller is banned', banned: true }, 403)
   }
@@ -374,7 +375,7 @@ dev.post('/test-simulate/incoming-call', async (c) => {
 
   await services.calls.addCall(hubId, {
     callId,
-    callerNumber: body.callerNumber,
+    callerNumber: callerNumberHash,
     callerLast4: body.callerNumber?.slice(-4),
   })
 
