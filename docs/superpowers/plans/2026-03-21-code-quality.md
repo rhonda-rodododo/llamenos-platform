@@ -116,7 +116,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 - Modify: `apps/worker/middleware/cors.ts`
 - Modify: `apps/worker/types/infra.ts`
 
-**Context:** The `ALLOWED_ORIGINS` set in `cors.ts` hardcodes `https://app.llamenos.org` and `https://demo.llamenos-hotline.com`. Self-hosters cannot override without editing source. The fix adds a `CORS_ALLOWED_ORIGINS` env var (comma-separated). When set, it replaces the hardcoded production defaults. The development localhost fallback (`http://localhost:5173`, `http://localhost:1420`) is only active when `ENVIRONMENT=development` AND `CORS_ALLOWED_ORIGINS` is unset.
+**Context:** The `ALLOWED_ORIGINS` set in `cors.ts` hardcodes `https://app.llamenos.org` and `https://demo.llamenos-platform.com`. Self-hosters cannot override without editing source. The fix adds a `CORS_ALLOWED_ORIGINS` env var (comma-separated). When set, it replaces the hardcoded production defaults. The development localhost fallback (`http://localhost:5173`, `http://localhost:1420`) is only active when `ENVIRONMENT=development` AND `CORS_ALLOWED_ORIGINS` is unset.
 
 The BDD test suite runs with `ENVIRONMENT=development` and does not set `CORS_ALLOWED_ORIGINS`, so the localhost fallback will continue to work for tests without any change.
 
@@ -161,7 +161,7 @@ function buildAllowedOrigins(env: { CORS_ALLOWED_ORIGINS?: string }): Set<string
   } else {
     // Default production origins when env var not set
     base.add('https://app.llamenos.org')
-    base.add('https://demo.llamenos-hotline.com')
+    base.add('https://demo.llamenos-platform.com')
   }
   return base
 }

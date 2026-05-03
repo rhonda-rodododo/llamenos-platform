@@ -19,8 +19,8 @@ Despliega tu propia linea de Llamenos en menos de una hora. Necesitaras una cuen
 ## 1. Clonar e instalar
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
-cd llamenos-hotline
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
+cd llamenos-platform
 bun install
 ```
 

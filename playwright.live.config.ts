@@ -4,7 +4,7 @@ import { config } from 'dotenv'
 // Load .env.live for Twilio credentials and staging config
 config({ path: '.env.live' })
 
-const baseURL = process.env.LIVE_BASE_URL || 'https://demo-next.llamenos-hotline.com'
+const baseURL = process.env.LIVE_BASE_URL || 'https://demo-next.llamenos-platform.com'
 
 export default defineConfig({
   testDir: './tests/live',

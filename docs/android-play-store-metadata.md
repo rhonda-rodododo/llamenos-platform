@@ -80,7 +80,7 @@ The app is available in English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, 
 
 OPEN SOURCE
 
-Llamenos is fully open source under the AGPL-3.0 license. Audit the code, run your own instance, or contribute at github.com/rhonda-rodododo/llamenos-hotline.
+Llamenos is fully open source under the AGPL-3.0 license. Audit the code, run your own instance, or contribute at github.com/rhonda-rodododo/llamenos-platform.
 
 ---
 
@@ -255,9 +255,9 @@ Screenshot overlay text suggestions:
 
 ## Store Listing Contact Details
 
-**Email:** `support@llamenos-hotline.com`
-**Website:** `https://llamenos-hotline.com`
-**Privacy policy URL:** `https://llamenos-hotline.com/privacy`
+**Email:** `support@llamenos-platform.com`
+**Website:** `https://llamenos-platform.com`
+**Privacy policy URL:** `https://llamenos-platform.com/privacy`
 
 ---
 
@@ -279,8 +279,8 @@ Initial release of Llamenos for Android.
 
 ## Notes for Legal Review Before Submission
 
-- [ ] Confirm privacy policy URL is live and accessible: `https://llamenos-hotline.com/privacy`
-- [ ] Confirm support URL is live: `https://llamenos-hotline.com/support`
+- [ ] Confirm privacy policy URL is live and accessible: `https://llamenos-platform.com/privacy`
+- [ ] Confirm support URL is live: `https://llamenos-platform.com/support`
 - [ ] Confirm "Llamenos" is acceptable as app name (no trademark conflicts)
 - [ ] Confirm contact email addresses (`support@`, `privacy@`, `legal@`) are active
 - [ ] Confirm test hub URL and credentials are ready for Google review

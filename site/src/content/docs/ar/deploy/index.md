@@ -15,8 +15,8 @@ description: انشر خط الطوارئ الخاص بك باستخدام Llame
 ## 1. استنساخ المشروع والتثبيت
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
-cd llamenos-hotline
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
+cd llamenos-platform
 bun install
 ```
 

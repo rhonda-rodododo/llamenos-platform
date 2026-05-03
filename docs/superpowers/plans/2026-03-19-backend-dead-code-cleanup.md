@@ -326,11 +326,11 @@ Then in each mutation handler after the service call succeeds:
 **Files:**
 - Modify: `apps/worker/wrangler.jsonc`
 
-**Context:** The DO bindings and `migrations` block exist for the `demo.llamenos-hotline.com` CF deployment. The real production backend (Bun+PostgreSQL, Docker/Helm) does not use them. A reader unfamiliar with the history cannot tell this from the file. The spec says: documentation only, do not remove the bindings.
+**Context:** The DO bindings and `migrations` block exist for the `demo.llamenos-platform.com` CF deployment. The real production backend (Bun+PostgreSQL, Docker/Helm) does not use them. A reader unfamiliar with the history cannot tell this from the file. The spec says: documentation only, do not remove the bindings.
 
 - [ ] Add a comment block before the `// Durable Object bindings` comment on line 16 of `wrangler.jsonc`:
   ```jsonc
-  // NOTE: The DO bindings and migrations below are for the demo.llamenos-hotline.com
+  // NOTE: The DO bindings and migrations below are for the demo.llamenos-platform.com
   // Cloudflare Workers deployment ONLY. The production backend runs as Bun+PostgreSQL
   // (self-hosted via Docker/Helm) and does NOT use Durable Objects — they were removed
   // in Epic 358. Do not add DO patterns to the main codebase.

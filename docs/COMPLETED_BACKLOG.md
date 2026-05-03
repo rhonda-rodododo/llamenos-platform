@@ -1948,7 +1948,7 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 
 ## 2026-02-11: Marketing Site + Docs (Cloudflare Pages)
 
-### Marketing Site at llamenos-hotline.com
+### Marketing Site at llamenos-platform.com
 - [x] Scaffolded Astro static site in `site/` with Tailwind v4 (via `@tailwindcss/vite`)
 - [x] Dark theme design derived from app's oklch palette — bg, card, accent, green/amber/red semantic colors
 - [x] **Home page**: Hero with tagline, 6 feature highlight cards, security callout, CTA section

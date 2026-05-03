@@ -77,7 +77,7 @@ The app is available in English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, 
 
 OPEN SOURCE
 
-Llamenos is fully open source under the AGPL-3.0 license. Audit the code, run your own instance, or contribute at github.com/rhonda-rodododo/llamenos-hotline.
+Llamenos is fully open source under the AGPL-3.0 license. Audit the code, run your own instance, or contribute at github.com/rhonda-rodododo/llamenos-platform.
 
 ---
 
@@ -301,7 +301,7 @@ The app qualifies for License Exception ENC as:
 - Uses only standard, publicly-available cryptographic algorithms (AES, HKDF, HPKE, Ed25519, X25519)
 - Intended for mass-market distribution (App Store)
 - Not for military or government restricted use
-- Full source code is publicly available (AGPL-3.0 at github.com/rhonda-rodododo/llamenos-hotline)
+- Full source code is publicly available (AGPL-3.0 at github.com/rhonda-rodododo/llamenos-platform)
 - Encryption is for protecting user data, not for circumventing government access
 
 **Self-classification report recipients:**
@@ -413,7 +413,7 @@ configures. It does not make requests to any Llamenos-operated servers.
 
 OPEN SOURCE
 
-Full source code: https://github.com/rhonda-rodododo/llamenos-hotline
+Full source code: https://github.com/rhonda-rodododo/llamenos-platform
 
 Contact during review: support@llamenos.org
 ```

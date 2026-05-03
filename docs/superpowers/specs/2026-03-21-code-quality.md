@@ -129,7 +129,7 @@ if (env.ENVIRONMENT === 'development') {
 
 **Problem:**
 
-The localhost ports are hardcoded. If a developer changes the Vite port (e.g. to avoid a conflict), or if an E2E test harness runs on a non-standard port, CORS blocks the frontend. More critically: the production `ALLOWED_ORIGINS` set hardcodes `https://app.llamenos.org` and `https://demo.llamenos-hotline.com`. Deployers who run the app under a different hostname (self-hosting is explicitly supported) cannot override these without editing source code.
+The localhost ports are hardcoded. If a developer changes the Vite port (e.g. to avoid a conflict), or if an E2E test harness runs on a non-standard port, CORS blocks the frontend. More critically: the production `ALLOWED_ORIGINS` set hardcodes `https://app.llamenos.org` and `https://demo.llamenos-platform.com`. Deployers who run the app under a different hostname (self-hosting is explicitly supported) cannot override these without editing source code.
 
 **Fix:**
 
@@ -149,7 +149,7 @@ function buildAllowedOrigins(env: { ENVIRONMENT: string; CORS_ALLOWED_ORIGINS?: 
   } else {
     // Default production origins when env var not set
     base.add('https://app.llamenos.org')
-    base.add('https://demo.llamenos-hotline.com')
+    base.add('https://demo.llamenos-platform.com')
   }
   return base
 }

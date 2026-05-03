@@ -10,7 +10,7 @@
 
 Port and evolve the v1 firehose inference agent into the v2 monorepo architecture. The firehose observes messaging channels (Signal groups, SMS threads, WhatsApp groups), buffers incoming messages, runs LLM-powered extraction to produce structured CMS reports, and publishes results via E2EE envelope encryption and Nostr real-time events.
 
-The v1 implementation (`llamenos-hotline/src/server/services/firehose.ts` + `firehose-agent.ts` + `firehose-inference.ts`) provides a solid foundation: connection CRUD, buffer management, heuristic clustering, OpenAI-compatible inference, and E2EE report submission. This spec defines the v2 evolution with tiered inference, forward-secrecy buffers, backpressure, circuit breakers, progressive extraction, and CMS schema integration.
+The v1 implementation (`llamenos-platform/src/server/services/firehose.ts` + `firehose-agent.ts` + `firehose-inference.ts`) provides a solid foundation: connection CRUD, buffer management, heuristic clustering, OpenAI-compatible inference, and E2EE report submission. This spec defines the v2 evolution with tiered inference, forward-secrecy buffers, backpressure, circuit breakers, progressive extraction, and CMS schema integration.
 
 ---
 

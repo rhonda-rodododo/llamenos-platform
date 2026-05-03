@@ -15,8 +15,8 @@ I-deploy ang sarili mong Llamenos hotline sa loob ng isang oras. Kakailanganin m
 ## 1. I-clone at i-install
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
-cd llamenos-hotline
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
+cd llamenos-platform
 bun install
 ```
 

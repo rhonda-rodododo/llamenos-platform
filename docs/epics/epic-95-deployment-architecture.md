@@ -97,7 +97,7 @@ Create `deploy/docker/download-page/index.html` — a minimal page shown when so
     <a class="btn" href="/api/download/macos">macOS</a>
     <a class="btn" href="/api/download/linux">Linux</a>
   </div>
-  <p><small>Or visit <a href="https://llamenos-hotline.com">llamenos-hotline.com</a> for documentation.</small></p>
+  <p><small>Or visit <a href="https://llamenos-platform.com">llamenos-platform.com</a> for documentation.</small></p>
 </body>
 </html>
 ```

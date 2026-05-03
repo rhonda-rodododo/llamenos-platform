@@ -519,7 +519,7 @@ describe('R8 Epic 262: Worker medium security fixes', () => {
   it('M14: CORS explicit allowlist', () => {
     const ALLOWED_ORIGINS = new Set([
       'https://app.llamenos.org',
-      'https://demo.llamenos-hotline.com',
+      'https://demo.llamenos-platform.com',
       'tauri://localhost',
     ])
 

@@ -22,8 +22,8 @@ The same routing applies to SMS, WhatsApp, Signal, and other messaging channels 
 ## Quick start
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
-cd llamenos-hotline
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
+cd llamenos-platform
 ./scripts/docker-setup.sh
 ```
 

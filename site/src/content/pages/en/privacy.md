@@ -106,7 +106,7 @@ Llámenos is developed by an EU-based organization. If you are in the European E
 - **Right to restrict processing** — request that processing be limited
 - **Right to withdraw consent** — where processing is based on consent, withdraw it at any time
 
-To exercise these rights, contact your hub administrator (the data controller for your hub), or reach us at [privacy@llamenos-hotline.com](mailto:privacy@llamenos-hotline.com).
+To exercise these rights, contact your hub administrator (the data controller for your hub), or reach us at [privacy@llamenos-platform.com](mailto:privacy@llamenos-platform.com).
 
 You also have the right to lodge a complaint with your national data protection authority.
 
@@ -126,8 +126,8 @@ We will post any changes to this policy on this page and update the effective da
 
 ## Contact
 
-**Privacy inquiries:** [privacy@llamenos-hotline.com](mailto:privacy@llamenos-hotline.com)
+**Privacy inquiries:** [privacy@llamenos-platform.com](mailto:privacy@llamenos-platform.com)
 
-**Bug reports and security disclosures:** [github.com/rhonda-rodododo/llamenos-hotline/issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues)
+**Bug reports and security disclosures:** [github.com/rhonda-rodododo/llamenos-platform/issues](https://github.com/rhonda-rodododo/llamenos-platform/issues)
 
-Llámenos is open source. You can audit what the app does: [github.com/rhonda-rodododo/llamenos-hotline](https://github.com/rhonda-rodododo/llamenos-hotline)
+Llámenos is open source. You can audit what the app does: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)

@@ -9,7 +9,7 @@ description: Cài đặt và thiết lập ứng dụng Llamenos trên iOS và A
 
 Ứng dụng di động là ứng dụng đồng hành với ứng dụng desktop. Nó kết nối đến cùng backend Llamenos (Cloudflare Workers hoặc tự lưu trữ) và sử dụng cùng giao thức.
 
-Ứng dụng nằm trong kho riêng (`llamenos-hotline`) nhưng chia sẻ:
+Ứng dụng nằm trong kho riêng (`llamenos-platform`) nhưng chia sẻ:
 
 - **llamenos-core** — Cùng Rust crate cho tất cả phép toán mật mã, biên dịch qua UniFFI cho iOS và Android
 - **Giao thức** — Cùng định dạng wire, API endpoints và lược đồ mã hóa
@@ -21,7 +21,7 @@ description: Cài đặt và thiết lập ứng dụng Llamenos trên iOS và A
 
 Ứng dụng hiện được phân phối dưới dạng APK:
 
-1. Tải file `.apk` mới nhất từ trang [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest)
+1. Tải file `.apk` mới nhất từ trang [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-platform/releases/latest)
 2. Trên thiết bị Android, vào **Cài đặt > Bảo mật** và bật **Cài đặt từ nguồn không xác định**
 3. Mở APK đã tải và nhấn **Cài đặt**
 4. Mở Llamenos từ danh sách ứng dụng

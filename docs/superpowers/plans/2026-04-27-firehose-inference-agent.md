@@ -235,7 +235,7 @@
 
 **Files:** `apps/worker/services/firehose.ts`
 
-Port from v1 (`llamenos-hotline/src/server/services/firehose.ts`) with the following changes:
+Port from v1 (`llamenos-platform/src/server/services/firehose.ts`) with the following changes:
 - [ ] Update imports to v2 paths (`../db`, `../bun-jsonb`, protocol schemas)
 - [ ] Replace `encryptedAgentNsec: string` with structured `inference_config` JSONB
 - [ ] Add `getWindowKeys()`, `createWindowKey()`, `deactivateWindowKey()` methods
@@ -268,7 +268,7 @@ Port from v1 (`llamenos-hotline/src/server/services/firehose.ts`) with the follo
 
 **Files:** `apps/worker/services/firehose-inference.ts`
 
-Port from v1 (`llamenos-hotline/src/server/services/firehose-inference.ts`) with enhancements:
+Port from v1 (`llamenos-platform/src/server/services/firehose-inference.ts`) with enhancements:
 
 - [ ] Carry forward: `FirehoseInferenceClient` class, `buildJsonSchemaFromFields()`, `extractReport()`, `detectIncidentBoundaries()`, `healthCheck()`
 - [ ] Add `DataMinimizer` class:
@@ -297,7 +297,7 @@ Port from v1 (`llamenos-hotline/src/server/services/firehose-inference.ts`) with
 
 **Files:** `apps/worker/services/firehose-agent.ts`
 
-Port from v1 (`llamenos-hotline/src/server/services/firehose-agent.ts`) with enhancements:
+Port from v1 (`llamenos-platform/src/server/services/firehose-agent.ts`) with enhancements:
 
 - [ ] Carry forward: `AgentInstance` type, `init()`, `startAgent()`, `stopAgent()`, `shutdown()`, `runExtractionLoop()`, `heuristicCluster()`, `submitExtractedReport()`
 - [ ] Add half-open circuit breaker state:

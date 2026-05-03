@@ -10,7 +10,7 @@ Esta pagina explica como o Llamenos esta estruturado, como os dados fluem pelo s
 O Llamenos e dividido em tres repositorios que compartilham um protocolo comum e um nucleo criptografico:
 
 ```
-llamenos              llamenos-core           llamenos-hotline
+llamenos              llamenos-core           llamenos-platform
 (Desktop + API)       (Shared Crypto)         (Mobile App)
 +--------------+      +--------------+        +--------------+
 | Tauri v2     |      | Rust crate   |        | React Native |
@@ -25,7 +25,7 @@ llamenos              llamenos-core           llamenos-hotline
 
 - **llamenos** -- O aplicativo desktop (Tauri v2 com webview Vite + React), o backend Cloudflare Worker e o backend Node.js auto-hospedado. Este e o repositorio principal.
 - **llamenos-core** -- Um crate Rust compartilhado que implementa todas as operacoes criptograficas: criptografia de envelope ECIES, assinaturas Schnorr, derivacao de chaves PBKDF2, HKDF e XChaCha20-Poly1305. Compilado para codigo nativo (Tauri), WASM (navegador) e bindings UniFFI (mobile).
-- **llamenos-hotline** -- O aplicativo movel React Native para iOS e Android. Usa bindings UniFFI para chamar o mesmo codigo Rust de criptografia.
+- **llamenos-platform** -- O aplicativo movel React Native para iOS e Android. Usa bindings UniFFI para chamar o mesmo codigo Rust de criptografia.
 
 Todas as tres plataformas implementam o mesmo protocolo de fio definido em `docs/protocol/PROTOCOL.md`.
 

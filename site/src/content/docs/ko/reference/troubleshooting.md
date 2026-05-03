@@ -120,7 +120,7 @@ bun run deploy:site     # 마케팅 사이트만 배포
 데스크톱 앱은 Tauri updater를 사용하여 새 버전을 확인합니다. 업데이트가 감지되지 않는 경우:
 
 - 인터넷 연결을 확인하세요
-- 업데이트 엔드포인트에 접근 가능한지 확인하세요: `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
+- 업데이트 엔드포인트에 접근 가능한지 확인하세요: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
 - Linux에서 AppImage 자동 업데이트는 파일이 해당 디렉토리에서 쓰기 권한을 가져야 합니다
 - macOS에서 앱은 `/Applications`에 있어야 합니다 (DMG에서 직접 실행하면 안 됨)
 
@@ -262,6 +262,6 @@ Llamenos는 단일 인스턴스 모드를 적용합니다. 앱이 이미 실행 
 
 여기에서 문제를 찾을 수 없는 경우:
 
-- [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues)에서 알려진 버그와 해결 방법을 확인하세요
+- [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues)에서 알려진 버그와 해결 방법을 확인하세요
 - 새 이슈를 만들기 전에 기존 이슈를 검색하세요
 - 버그를 신고할 때 다음을 포함하세요: 배포 모드 (Cloudflare/Docker/Kubernetes), 플랫폼 (데스크톱/모바일), 브라우저 콘솔 또는 터미널의 오류 메시지

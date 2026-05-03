@@ -10,7 +10,7 @@
 
 The current `packages/crypto` crate is built on secp256k1 (k256) with a Nostr-derived identity model (nsec/npub, BIP-340 Schnorr). This creates friction:
 
-1. **Curve mismatch**: The v1 prototype (llamenos-hotline) already migrated to Ed25519/X25519 with HPKE. The production crate still uses k256.
+1. **Curve mismatch**: The v1 prototype (llamenos-platform) already migrated to Ed25519/X25519 with HPKE. The production crate still uses k256.
 2. **No forward secrecy for group operations**: Hub key distribution uses static ECIES wrapping — no ratcheting, no PCS (post-compromise security).
 3. **No MLS**: Real-time voice E2EE and group messaging require a scalable group key agreement protocol. Hand-rolling is unacceptable.
 4. **Identity coupling**: The nsec/npub model ties identity to a single key. The v1 prototype already implements device-based identity with sigchains. The production crate must match.

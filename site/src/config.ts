@@ -1,19 +1,19 @@
 export const siteConfig = {
   name: 'Llámenos',
-  url: 'https://llamenos-hotline.com',
+  url: 'https://llamenos-platform.com',
   description: 'Secure open-source crisis response hotline software with end-to-end encryption.',
 
   github: {
     org: 'rhonda-rodododo',
-    repo: 'llamenos-hotline',
-    url: 'https://github.com/rhonda-rodododo/llamenos-hotline',
-    releasesUrl: 'https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest',
-    issuesUrl: 'https://github.com/rhonda-rodododo/llamenos-hotline/issues',
-    mobileReleasesUrl: 'https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest',
+    repo: 'llamenos-platform',
+    url: 'https://github.com/rhonda-rodododo/llamenos-platform',
+    releasesUrl: 'https://github.com/rhonda-rodododo/llamenos-platform/releases/latest',
+    issuesUrl: 'https://github.com/rhonda-rodododo/llamenos-platform/issues',
+    mobileReleasesUrl: 'https://github.com/rhonda-rodododo/llamenos-platform/releases/latest',
   },
 
   registry: {
-    app: 'ghcr.io/rhonda-rodododo/llamenos-hotline',
+    app: 'ghcr.io/rhonda-rodododo/llamenos-platform',
     signalNotifier: 'ghcr.io/rhonda-rodododo/llamenos-signal-notifier',
   },
 

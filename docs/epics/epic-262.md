@@ -56,7 +56,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
 ```typescript
 const ALLOWED_ORIGINS = new Set([
   'https://app.llamenos.org',
-  'https://demo.llamenos-hotline.com',
+  'https://demo.llamenos-platform.com',
   'tauri://localhost',
   'https://tauri.localhost',
 ])

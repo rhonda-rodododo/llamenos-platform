@@ -183,7 +183,7 @@ Change the mobile card from "Coming soon" (opacity-60, disabled) to an active ca
       <p class="text-xs text-fg-muted">{t.platforms.mobile.description}</p>
     </div>
   </div>
-  <a href="https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest"
+  <a href="https://github.com/rhonda-rodododo/llamenos-platform/releases/latest"
      class="mt-auto inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
      target="_blank" rel="noopener">
     Download APK

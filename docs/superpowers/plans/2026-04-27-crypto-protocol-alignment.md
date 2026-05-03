@@ -96,7 +96,7 @@ Replace BIP-340 Schnorr with Ed25519:
 
 ### 1.6 Update `labels.rs`
 
-Port all labels from `llamenos-hotline/src/shared/crypto-labels.ts` into Rust. Use v1 naming convention with colon-separated paths and `:v1` suffix (e.g., `"llamenos:puk:sign:v1"`). Add the `LABEL_REGISTRY` array with stable indices matching v1 hotline ordering. Add `label_to_id()` and `id_to_label()` functions. Retire indices 42-46 per v1 convention.
+Port all labels from `llamenos-platform/src/shared/crypto-labels.ts` into Rust. Use v1 naming convention with colon-separated paths and `:v1` suffix (e.g., `"llamenos:puk:sign:v1"`). Add the `LABEL_REGISTRY` array with stable indices matching v1 hotline ordering. Add `label_to_id()` and `id_to_label()` functions. Retire indices 42-46 per v1 convention.
 
 ### 1.7 Update `packages/protocol/crypto-labels.json`
 

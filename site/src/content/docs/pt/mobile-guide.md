@@ -9,7 +9,7 @@ O aplicativo movel Llamenos permite que voluntarios atendam chamadas, respondam 
 
 O aplicativo movel e um complemento ao aplicativo desktop. Ele se conecta ao mesmo backend Llamenos (Cloudflare Workers ou auto-hospedado) e usa o mesmo protocolo, para que os voluntarios possam alternar entre desktop e mobile sem interrupcoes.
 
-O aplicativo movel esta em um repositorio separado (`llamenos-hotline`), mas compartilha:
+O aplicativo movel esta em um repositorio separado (`llamenos-platform`), mas compartilha:
 
 - **llamenos-core** -- O mesmo crate Rust para todas as operacoes criptograficas, compilado via UniFFI para iOS e Android
 - **Protocolo** -- O mesmo formato de fio, endpoints de API e esquema de criptografia
@@ -21,7 +21,7 @@ O aplicativo movel esta em um repositorio separado (`llamenos-hotline`), mas com
 
 O aplicativo movel e distribuido atualmente como APK para instalacao manual:
 
-1. Baixe o arquivo `.apk` mais recente na pagina de [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest)
+1. Baixe o arquivo `.apk` mais recente na pagina de [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-platform/releases/latest)
 2. No seu dispositivo Android, va para **Configuracoes > Seguranca** e ative **Instalar de fontes desconhecidas** (ou ative por aplicativo quando solicitado)
 3. Abra o APK baixado e toque em **Instalar**
 4. Depois de instalado, abra o Llamenos na gaveta de aplicativos

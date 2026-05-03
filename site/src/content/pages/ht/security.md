@@ -118,10 +118,10 @@ Amelyorasyon sa yo disponib jodi a :
 
 Dokimantasyon teknik :
 
-- [Espesifikasyon Protokòl](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/protocol/llamenos-protocol.md)
-- [Modèl Menas](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/THREAT_MODEL.md)
-- [Klasifikasyon Done](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Odit Sekirite](https://github.com/rhonda-rodododo/llamenos-hotline/tree/main/docs/security)
+- [Espesifikasyon Protokòl](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Modèl Menas](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
+- [Klasifikasyon Done](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Odit Sekirite](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [Dokimantasyon API](/api/docs)
 
-Llamenos sous louvri : [github.com/rhonda-rodododo/llamenos-hotline](https://github.com/rhonda-rodododo/llamenos-hotline)
+Llamenos sous louvri : [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)
