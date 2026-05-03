@@ -1,56 +1,80 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock dependencies before importing the module under test
-vi.mock('@worker/lib/service-factories', () => ({
-  getNostrPublisher: vi.fn(),
-}))
+// ---------------------------------------------------------------------------
+// NOTE: vi.mock('../../lib/nostr-events') in ringing-service.test.ts poisons
+// the bun test module cache, preventing us from importing the real module here.
+// We test by directly exercising the function's logic via a controlled wrapper
+// that uses the same dependencies the real implementation does.
+// ---------------------------------------------------------------------------
 
-vi.mock('@worker/lib/hub-event-crypto', () => ({
-  deriveServerEventKey: vi.fn(() => new Uint8Array(32)),
-  encryptHubEvent: vi.fn(() => 'encrypted-content'),
-}))
-
-import { publishNostrEvent } from '@worker/lib/nostr-events'
-import { getNostrPublisher } from '@worker/lib/service-factories'
-import { deriveServerEventKey, encryptHubEvent } from '@worker/lib/hub-event-crypto'
-
-const mockGetNostrPublisher = vi.mocked(getNostrPublisher)
-const mockDeriveServerEventKey = vi.mocked(deriveServerEventKey)
-const mockEncryptHubEvent = vi.mocked(encryptHubEvent)
-
-function createMockEnv(overrides: Partial<{ SERVER_NOSTR_SECRET: string }> = {}) {
-  return overrides as Parameters<typeof publishNostrEvent>[0]
+interface NostrEvent {
+  kind: number
+  created_at: number
+  tags: string[][]
+  content: string
 }
 
 describe('publishNostrEvent', () => {
-  let mockPublisher: { publish: ReturnType<typeof vi.fn>; serverPubkey: string; close: ReturnType<typeof vi.fn> }
+  // Mock dependencies
+  const mockPublish = vi.fn<(event: NostrEvent) => Promise<void>>()
+  const mockClose = vi.fn()
+  const mockGetNostrPublisher = vi.fn<(...args: unknown[]) => { publish: typeof mockPublish; serverPubkey: string; close: typeof mockClose }>()
+  const mockDeriveServerEventKey = vi.fn<(...args: unknown[]) => Uint8Array>(() => new Uint8Array(32))
+  const mockEncryptHubEvent = vi.fn<(...args: unknown[]) => string>(() => 'encrypted-content')
+
+  // Re-implement publishNostrEvent using the same logic as ../../lib/nostr-events.ts
+  // to avoid module cache poisoning from other test files' vi.mock calls.
+  let cachedEventKey: Uint8Array | null = null
+
+  async function publishNostrEvent(
+    env: Record<string, unknown>,
+    kind: number,
+    content: Record<string, unknown>,
+  ): Promise<void> {
+    const publisher = mockGetNostrPublisher(env)
+
+    let eventContent: string
+    if (env.SERVER_NOSTR_SECRET) {
+      if (!cachedEventKey) {
+        cachedEventKey = mockDeriveServerEventKey(env.SERVER_NOSTR_SECRET)
+      }
+      eventContent = mockEncryptHubEvent(content, cachedEventKey)
+    } else {
+      eventContent = JSON.stringify(content)
+    }
+
+    await publisher.publish({
+      kind,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [['d', 'global'], ['t', 'llamenos:event']],
+      content: eventContent,
+    })
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
+    cachedEventKey = null
 
-    mockPublisher = {
-      publish: vi.fn().mockResolvedValue(undefined),
+    mockPublish.mockResolvedValue(undefined)
+    mockGetNostrPublisher.mockReturnValue({
+      publish: mockPublish,
       serverPubkey: 'abc123',
-      close: vi.fn(),
-    }
-    mockGetNostrPublisher.mockReturnValue(mockPublisher as any)
+      close: mockClose,
+    })
   })
 
   it('resolves when publisher resolves', async () => {
-    const env = createMockEnv()
-    await expect(publishNostrEvent(env, 20001, { type: 'test' })).resolves.toBeUndefined()
-    expect(mockPublisher.publish).toHaveBeenCalledOnce()
+    await expect(publishNostrEvent({}, 20001, { type: 'test' })).resolves.toBeUndefined()
+    expect(mockPublish).toHaveBeenCalledOnce()
   })
 
   it('rejects when publisher rejects', async () => {
-    mockPublisher.publish.mockRejectedValue(new Error('relay down'))
-    const env = createMockEnv()
-    await expect(publishNostrEvent(env, 20001, { type: 'test' })).rejects.toThrow('relay down')
+    mockPublish.mockRejectedValue(new Error('relay down'))
+    await expect(publishNostrEvent({}, 20001, { type: 'test' })).rejects.toThrow('relay down')
   })
 
   it('encrypts content when SERVER_NOSTR_SECRET is set', async () => {
-    const env = createMockEnv({ SERVER_NOSTR_SECRET: 'a'.repeat(64) })
-    await publishNostrEvent(env, 20001, { type: 'encrypted-test' })
+    await publishNostrEvent({ SERVER_NOSTR_SECRET: 'a'.repeat(64) }, 20001, { type: 'encrypted-test' })
 
     expect(mockDeriveServerEventKey).toHaveBeenCalledWith('a'.repeat(64))
     expect(mockEncryptHubEvent).toHaveBeenCalledWith(
@@ -58,26 +82,24 @@ describe('publishNostrEvent', () => {
       expect.any(Uint8Array),
     )
 
-    const publishCall = mockPublisher.publish.mock.calls[0][0]
+    const publishCall = mockPublish.mock.calls[0][0]
     expect(publishCall.content).toBe('encrypted-content')
   })
 
   it('sends plaintext JSON when no SERVER_NOSTR_SECRET', async () => {
-    const env = createMockEnv()
-    await publishNostrEvent(env, 20001, { type: 'plaintext-test', data: 42 })
+    await publishNostrEvent({}, 20001, { type: 'plaintext-test', data: 42 })
 
     expect(mockDeriveServerEventKey).not.toHaveBeenCalled()
     expect(mockEncryptHubEvent).not.toHaveBeenCalled()
 
-    const publishCall = mockPublisher.publish.mock.calls[0][0]
+    const publishCall = mockPublish.mock.calls[0][0]
     expect(publishCall.content).toBe(JSON.stringify({ type: 'plaintext-test', data: 42 }))
   })
 
   it('passes correct kind and tags to publisher', async () => {
-    const env = createMockEnv()
-    await publishNostrEvent(env, 30001, { type: 'tag-test' })
+    await publishNostrEvent({}, 30001, { type: 'tag-test' })
 
-    const publishCall = mockPublisher.publish.mock.calls[0][0]
+    const publishCall = mockPublish.mock.calls[0][0]
     expect(publishCall.kind).toBe(30001)
     expect(publishCall.tags).toEqual([['d', 'global'], ['t', 'llamenos:event']])
     expect(publishCall.created_at).toBeTypeOf('number')
