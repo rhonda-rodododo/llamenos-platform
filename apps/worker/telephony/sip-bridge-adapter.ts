@@ -160,7 +160,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
   // --- Webhook parsing (shared — JSON payloads from bridge) ---
 
   async parseIncomingWebhook(request: Request): Promise<WebhookCallInfo> {
-    const data = (await request.json()) as BridgeWebhookPayload
+    const data = (await request.clone().json()) as BridgeWebhookPayload
     return {
       callSid: data.channelId || data.callSid || '',
       callerNumber: data.callerNumber || data.from || '',
@@ -169,7 +169,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
   }
 
   async parseLanguageWebhook(request: Request): Promise<WebhookCallInfo & WebhookDigits> {
-    const data = (await request.json()) as BridgeWebhookPayload
+    const data = (await request.clone().json()) as BridgeWebhookPayload
     return {
       callSid: data.channelId || data.callSid || '',
       callerNumber: data.callerNumber || data.from || '',
@@ -178,7 +178,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
   }
 
   async parseCaptchaWebhook(request: Request): Promise<WebhookDigits & { callerNumber: string }> {
-    const data = (await request.json()) as BridgeWebhookPayload
+    const data = (await request.clone().json()) as BridgeWebhookPayload
     return {
       digits: data.digits || '',
       callerNumber: data.callerNumber || data.from || '',
@@ -186,22 +186,22 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
   }
 
   async parseCallStatusWebhook(request: Request): Promise<WebhookCallStatus> {
-    const data = (await request.json()) as BridgeWebhookPayload
+    const data = (await request.clone().json()) as BridgeWebhookPayload
     return { status: mapBridgeStatus(data.state || data.status || '') }
   }
 
   async parseQueueWaitWebhook(request: Request): Promise<WebhookQueueWait> {
-    const data = (await request.json()) as BridgeWebhookPayload
+    const data = (await request.clone().json()) as BridgeWebhookPayload
     return { queueTime: data.queueTime || 0 }
   }
 
   async parseQueueExitWebhook(request: Request): Promise<WebhookQueueResult> {
-    const data = (await request.json()) as BridgeWebhookPayload
+    const data = (await request.clone().json()) as BridgeWebhookPayload
     return { result: mapQueueResult(data.result || data.reason || '') }
   }
 
   async parseRecordingWebhook(request: Request): Promise<WebhookRecordingStatus> {
-    const data = (await request.json()) as BridgeWebhookPayload
+    const data = (await request.clone().json()) as BridgeWebhookPayload
     return {
       status: data.recordingStatus === 'done' ? 'completed' : 'failed',
       recordingSid: data.recordingName || data.recordingSid,
