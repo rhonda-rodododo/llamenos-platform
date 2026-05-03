@@ -5,12 +5,12 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
-# Copy source code
+# Copy source code (exclude test files via .dockerignore)
 COPY src/ src/
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 
-# Type check
-RUN bun run typecheck
+# Type check (build config excludes test files)
+RUN tsc --noEmit --project tsconfig.build.json
 
 # Build
 RUN bun build src/index.ts --outdir dist --target bun
