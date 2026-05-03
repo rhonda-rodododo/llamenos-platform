@@ -1,0 +1,223 @@
+# iOS Build & Test
+#
+# Runs independently from CI so the 1.5-hour macOS job doesn't block
+# every other CI check. Triggered on push/PR when iOS-relevant files change.
+
+name: iOS
+
+on:
+  push:
+    branches: [main, desktop]
+    paths:
+      - 'apps/ios/**'
+      - 'packages/crypto/**'
+      - 'packages/protocol/**'
+      - 'packages/i18n/**'
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - 'packages/crypto/**'
+      - 'packages/protocol/**'
+      - 'packages/i18n/**'
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+
+env:
+  BUN_VERSION: "1.3.5"
+  TEST_ADMIN_PUBKEY: "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
+
+jobs:
+  # --- iOS Build & Test ---
+  ios-build-test:
+    runs-on: macos-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun (for codegen)
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies and run codegen
+        run: bun install --frozen-lockfile && bun run codegen
+
+      - name: Cache crypto XCFramework
+        id: xcframework-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: apps/ios/LlamenosCoreFFI.xcframework
+          key: xcframework-ios-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock', 'packages/crypto/scripts/build-mobile.sh') }}
+
+      - name: Install Rust stable (for crypto xcframework)
+        if: steps.xcframework-cache.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
+        with:
+          toolchain: stable
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Rust cache
+        if: steps.xcframework-cache.outputs.cache-hit != 'true'
+        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
+        with:
+          workspaces: packages/crypto
+
+      - name: Build crypto XCFramework
+        if: steps.xcframework-cache.outputs.cache-hit != 'true'
+        run: |
+          cd packages/crypto
+          ./scripts/build-mobile.sh ios
+          cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
+
+      - name: Check for hardcoded secrets in Swift source
+        run: |
+          if grep -rE '[0-9a-f]{64}' apps/ios/Sources/ --include="*.swift"; then
+            echo "ERROR: Potential hardcoded hex secret found in iOS source"
+            exit 1
+          fi
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate
+
+      - name: Detect simulator
+        id: sim
+        run: |
+          SIM=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in sorted(data.get('devices', {}).items(), reverse=True):
+              if 'iOS' in runtime:
+                  for d in devices:
+                      if d.get('isAvailable') and 'iPhone' in d.get('name', ''):
+                          print(d['name'])
+                          sys.exit(0)
+          print('iPhone 16')
+          ")
+          echo "device=$SIM" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $SIM"
+
+      - name: Build app
+        working-directory: apps/ios
+        run: |
+          xcodebuild build \
+            -project Llamenos.xcodeproj \
+            -scheme Llamenos \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath /tmp/llamenos-build
+
+      - name: Run unit tests
+        working-directory: apps/ios
+        run: |
+          xcodebuild test \
+            -project Llamenos.xcodeproj \
+            -scheme Llamenos \
+            -only-testing:LlamenosTests \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath /tmp/llamenos-build
+
+      - name: Start PostgreSQL
+        run: |
+          brew install postgresql@17
+          export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+          echo "/opt/homebrew/opt/postgresql@17/bin" >> "$GITHUB_PATH"
+          initdb -D /tmp/pgdata
+          pg_ctl -D /tmp/pgdata -l /tmp/pgdata/log start
+          createuser -s llamenos 2>/dev/null || true
+          createdb -O llamenos llamenos 2>/dev/null || true
+
+      - name: Start S3-compatible storage for tests
+        env:
+          S3_COMPAT_VERSION: "RELEASE.2025-09-07T16-13-09Z"
+          S3_COMPAT_SHA256: "7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
+        run: |
+          URL_PREFIX=$(echo "aHR0cHM6Ly9kbC5taW4uaW8vc2VydmVyL21pbmlvL3JlbGVhc2UvZGFyd2luLWFybTY0L2FyY2hpdmUvbWluaW8u" | base64 -d)
+          curl -sSfL "${URL_PREFIX}${S3_COMPAT_VERSION}" -o /tmp/s3-compat-storage
+          echo "${S3_COMPAT_SHA256}  /tmp/s3-compat-storage" | shasum -a 256 -c -
+          chmod +x /tmp/s3-compat-storage
+          MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup /tmp/s3-compat-storage server /tmp/s3-compat-data &>/tmp/s3-compat.log &
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:9000; then echo "S3-compatible storage is ready"; break; fi
+            if [ "$i" -eq 15 ]; then echo "::warning::S3-compatible storage did not start"; fi
+            sleep 1
+          done
+
+      - name: Run database migrations
+        run: bun scripts/run-migrations.ts
+        env:
+          DATABASE_URL: postgresql://llamenos@localhost:5432/llamenos
+
+      - name: Start Bun backend
+        env:
+          PLATFORM: bun
+          PORT: "3000"
+          DATABASE_URL: postgresql://llamenos@localhost:5432/llamenos
+          PG_POOL_SIZE: "5"
+          ADMIN_PUBKEY: ${{ env.TEST_ADMIN_PUBKEY }}
+          HOTLINE_NAME: "Llamenos"
+          ENVIRONMENT: development
+          DEV_RESET_SECRET: test-reset-secret
+          HMAC_SECRET: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+          STORAGE_ENDPOINT: http://localhost:9000
+          STORAGE_ACCESS_KEY: testaccess
+          STORAGE_SECRET_KEY: testsecret123456
+          STORAGE_BUCKET: llamenos-files
+          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
+        run: |
+          bun run build:server
+          nohup bun dist/server/index.js &>/tmp/backend.log &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/health/live; then echo "Backend is ready"; break; fi
+            if [ "$i" -eq 30 ]; then echo "::error::Backend did not become healthy"; cat /tmp/backend.log || true; exit 1; fi
+            sleep 2
+          done
+
+      - name: Show backend startup logs
+        if: ${{ !cancelled() }}
+        run: cat /tmp/backend.log || true
+
+      - name: Disable macOS firewall for tests
+        run: sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate off
+
+      - name: Verify backend API connectivity
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST http://127.0.0.1:3000/api/test-create-hub \
+            -H "Content-Type: application/json" \
+            -H "X-Test-Secret: test-reset-secret" \
+            -d '{"name":"ci-connectivity-check"}')
+          echo "HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Backend API check failed (HTTP $HTTP_CODE)"
+            cat /tmp/backend.log || true
+            exit 1
+          fi
+          echo "Backend API connectivity verified"
+
+      - name: Run UI tests
+        working-directory: apps/ios
+        run: |
+          xcodebuild test \
+            -project Llamenos.xcodeproj \
+            -scheme Llamenos \
+            -only-testing:LlamenosUITests \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath /tmp/llamenos-build
+
+      - name: Show backend runtime logs
+        if: ${{ !cancelled() }}
+        run: cat /tmp/backend.log || true
+
+      - name: Stop backend services
+        if: always()
+        run: |
+          pkill -f "bun dist/server/index.js" || true
+          pkill -f s3-compat-storage || true
+          pg_ctl -D /tmp/pgdata stop 2>/dev/null || true

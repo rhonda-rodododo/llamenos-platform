@@ -2619,6 +2619,14 @@ public func randomBytesHex() -> String  {
 })
 }
 /**
+ * Clear all hub keys from Rust memory. Called on lock/logout.
+ */
+public func mobileClearHubKeys()  {try! rustCall() {
+    uniffi_llamenos_core_fn_func_mobile_clear_hub_keys($0
+    )
+}
+}
+/**
  * Create an Ed25519 auth token using the device signing key in mobile state.
  */
 public func mobileCreateAuthToken(timestamp: UInt64, method: String, path: String)throws  -> AuthToken  {
@@ -2644,6 +2652,44 @@ public func mobileCreateAuthTokenFromSigningKey(signingKeyHex: String, timestamp
         FfiConverterUInt64.lower(timestamp),
         FfiConverterString.lower(method),
         FfiConverterString.lower(path),$0
+    )
+})
+}
+/**
+ * Try to decrypt a relay event against ALL stored hub keys.
+ * Returns (hub_id, decrypted_json) for the first key that succeeds, or error if none match.
+ * This is used for multi-hub event attribution without exposing keys to Swift.
+ */
+public func mobileDecryptEventWithAttribution(ciphertextHex: String)throws  -> [String]  {
+    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_decrypt_event_with_attribution(
+        FfiConverterString.lower(ciphertextHex),$0
+    )
+})
+}
+/**
+ * Decrypt a hub event payload (XChaCha20-Poly1305) using the hub key stored in Rust.
+ * Input: hex(nonce_24 + ciphertext), hub ID to look up the key.
+ * Output: decrypted UTF-8 string (JSON).
+ */
+public func mobileDecryptHubEvent(ciphertextHex: String, hubId: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event(
+        FfiConverterString.lower(ciphertextHex),
+        FfiConverterString.lower(hubId),$0
+    )
+})
+}
+/**
+ * Decrypt a server-published event using stored server event keys.
+ * Tries current key first, falls back to previous key (epoch rotation).
+ * Input: hex(nonce_24 + ciphertext).
+ * Output: decrypted UTF-8 string (JSON).
+ */
+public func mobileDecryptServerEvent(encryptedHex: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_decrypt_server_event(
+        FfiConverterString.lower(encryptedHex),$0
     )
 })
 }
@@ -2677,6 +2723,16 @@ public func mobileGenerateAndLoad(deviceId: String, pin: String)throws  -> Encry
 public func mobileGetDeviceState()throws  -> DeviceKeyState  {
     return try  FfiConverterTypeDeviceKeyState_lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
     uniffi_llamenos_core_fn_func_mobile_get_device_state($0
+    )
+})
+}
+/**
+ * Check if a hub key is stored.
+ */
+public func mobileHasHubKey(hubId: String) -> Bool  {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_llamenos_core_fn_func_mobile_has_hub_key(
+        FfiConverterString.lower(hubId),$0
     )
 })
 }
@@ -2750,7 +2806,7 @@ public func mobileIsValidPin(pin: String) -> Bool  {
 })
 }
 /**
- * Lock the mobile crypto state — zeroize device secrets.
+ * Lock the mobile crypto state — zeroize device secrets, hub keys, and server event keys.
  */
 public func mobileLock()  {try! rustCall() {
     uniffi_llamenos_core_fn_func_mobile_lock($0
@@ -2810,6 +2866,26 @@ public func mobileRandomBytesHex() -> String  {
     uniffi_llamenos_core_fn_func_mobile_random_bytes_hex($0
     )
 })
+}
+/**
+ * Store a hub symmetric key in Rust memory (never exposed to Swift/Kotlin).
+ */
+public func mobileSetHubKey(hubId: String, keyHex: String)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_set_hub_key(
+        FfiConverterString.lower(hubId),
+        FfiConverterString.lower(keyHex),$0
+    )
+}
+}
+/**
+ * Store server event keys (current + optional previous for epoch rotation).
+ */
+public func mobileSetServerEventKeys(currentHex: String, previousHex: String?)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_set_server_event_keys(
+        FfiConverterString.lower(currentHex),
+        FfiConverterOptionString.lower(previousHex),$0
+    )
+}
 }
 /**
  * Create a new sigchain link using the device's Ed25519 key from mobile state.
@@ -3020,10 +3096,22 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_random_bytes_hex() != 29596) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_llamenos_core_checksum_func_mobile_clear_hub_keys() != 24613) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_llamenos_core_checksum_func_mobile_create_auth_token() != 23090) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_create_auth_token_from_signing_key() != 63368) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_event_with_attribution() != 61537) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event() != 22831) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event() != 7592) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_ed25519_verify() != 35261) {
@@ -3033,6 +3121,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_get_device_state() != 13863) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_has_hub_key() != 39831) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_hpke_open() != 47930) {
@@ -3053,7 +3144,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_mobile_is_valid_pin() != 14552) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_mobile_lock() != 24331) {
+    if (uniffi_llamenos_core_checksum_func_mobile_lock() != 62527) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_puk_create() != 309) {
@@ -3069,6 +3160,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex() != 24092) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_set_hub_key() != 25956) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_set_server_event_keys() != 35873) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_sigchain_create_link() != 21640) {

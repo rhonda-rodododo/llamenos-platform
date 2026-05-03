@@ -359,32 +359,30 @@ final class WebSocketService: @unchecked Sendable {
 
     #if DEBUG
     /// Overridable decryption closure for unit testing.
-    /// Defaults to the real `CryptoService.decryptServerEvent`.
-    /// Tests may inject a mock that returns predetermined plaintext for a known key.
-    var decryptionHandler: (String, String) -> String? = { encryptedHex, keyHex in
-        CryptoService.decryptServerEvent(encryptedHex: encryptedHex, keyHex: keyHex)
+    /// Defaults to the real Rust-side multi-hub key-trial attribution.
+    /// Tests may inject a mock that returns predetermined (hubId, json) for a known ciphertext.
+    var decryptionHandler: (String) -> (hubId: String, json: String)? = { encryptedHex in
+        // In DEBUG builds, this default still routes to Rust for real decryption
+        return nil  // Falls through to the #else path in decryptEvent
     }
     #endif
 
-    /// Tries all loaded hub keys and returns an `AttributedHubEvent` for the first key
+    /// Tries all loaded hub keys in Rust and returns an `AttributedHubEvent` for the first key
     /// that successfully decrypts the event content. Returns `nil` if no key matches.
     ///
     /// This is the core of multi-hub support: the hub whose key decrypts the event
     /// is identified as the source hub, without requiring a separate per-hub connection.
+    /// Hub keys never leave Rust memory during this operation.
     internal func decryptEvent(_ encryptedContent: String) -> AttributedHubEvent? {
-        let hubKeys = cryptoService.allHubKeys()
-        for (hubId, keyHex) in hubKeys {
-            let json: String?
-            #if DEBUG
-            json = decryptionHandler(encryptedContent, keyHex)
-            #else
-            json = CryptoService.decryptServerEvent(encryptedHex: encryptedContent, keyHex: keyHex)
-            #endif
-            if let json, let eventType = parseHubEvent(json) {
-                return AttributedHubEvent(hubId: hubId, event: eventType)
-            }
-        }
-        return nil
+        let result: (hubId: String, json: String)?
+        #if DEBUG
+        result = decryptionHandler(encryptedContent)
+            ?? cryptoService.decryptEventWithAttribution(ciphertextHex: encryptedContent)
+        #else
+        result = cryptoService.decryptEventWithAttribution(ciphertextHex: encryptedContent)
+        #endif
+        guard let result, let eventType = parseHubEvent(result.json) else { return nil }
+        return AttributedHubEvent(hubId: result.hubId, event: eventType)
     }
 
     /// Parse decrypted JSON content into a `HubEventType` using the `type` field.
