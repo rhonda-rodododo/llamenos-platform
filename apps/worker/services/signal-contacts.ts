@@ -3,7 +3,7 @@
  *
  * Zero-knowledge design:
  *   - App server stores only the HMAC hash of the Signal identifier.
- *   - The plaintext identifier is registered in the signal-notifier sidecar's SQLite DB.
+ *   - The plaintext identifier is registered in the signal-notifier sidecar's PostgreSQL store.
  *   - The sidecar resolves hash → plaintext for delivery, keeping plaintext off the main DB.
  *   - ECIES ciphertext + per-user envelopes let the volunteer recover their identifier.
  *

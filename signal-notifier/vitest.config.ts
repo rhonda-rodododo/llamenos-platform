@@ -5,5 +5,7 @@ export default defineConfig({
     name: "signal-notifier",
     include: ["src/**/*.test.ts"],
     environment: "node",
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
   },
 });

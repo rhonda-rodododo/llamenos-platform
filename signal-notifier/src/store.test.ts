@@ -1,85 +1,68 @@
-import { describe, expect, test } from 'vitest'
-import { unlinkSync } from 'node:fs'
+import { describe, expect, test, beforeAll, afterAll, beforeEach } from 'vitest'
 import { IdentifierStore } from './store'
+import { createTestDb } from './test-helpers'
 
 const TEST_SECRET = 'test-encryption-secret-for-signal-notifier-store'
 
-function withStore(suffix: string, fn: (store: IdentifierStore) => void): void {
-  const path = `./test-notifier-${suffix}.db`
-  const store = new IdentifierStore(path, TEST_SECRET)
-  try {
-    fn(store)
-  } finally {
-    store.close()
-    try { unlinkSync(path) } catch {}
-  }
-}
+describe('IdentifierStore (PostgreSQL)', () => {
+  let ctx: Awaited<ReturnType<typeof createTestDb>>
+  let store: IdentifierStore
 
-describe('IdentifierStore', () => {
-  test('register + lookup roundtrips with encryption', () => {
-    withStore('roundtrip', (store) => {
-      store.register('hash1', '+15551234567', 'phone')
-      const result = store.lookup('hash1')
-      expect(result?.plaintext).toBe('+15551234567')
-      expect(result?.type).toBe('phone')
-    })
+  beforeAll(async () => {
+    ctx = await createTestDb('store')
+    store = new IdentifierStore(ctx.db, TEST_SECRET)
   })
 
-  test('lookup returns null for unknown hash', () => {
-    withStore('unknown', (store) => {
-      expect(store.lookup('missing')).toBeNull()
-    })
+  beforeEach(async () => {
+    await ctx.truncateAll()
   })
 
-  test('register replaces existing entry', () => {
-    withStore('replace', (store) => {
-      store.register('hash1', '+15551111111', 'phone')
-      store.register('hash1', '+15552222222', 'phone')
-      expect(store.lookup('hash1')?.plaintext).toBe('+15552222222')
-    })
+  afterAll(async () => {
+    await ctx.cleanup()
   })
 
-  test('remove deletes entry', () => {
-    withStore('remove', (store) => {
-      store.register('hash1', '+15551111111', 'phone')
-      store.remove('hash1')
-      expect(store.lookup('hash1')).toBeNull()
-    })
+  test('register + lookup roundtrips with encryption', async () => {
+    await store.register('hash1', '+15551234567', 'phone')
+    const result = await store.lookup('hash1')
+    expect(result?.plaintext).toBe('+15551234567')
+    expect(result?.type).toBe('phone')
   })
 
-  test('count returns registered entry total', () => {
-    withStore('count', (store) => {
-      expect(store.count()).toBe(0)
-      store.register('hash1', '+15551111111', 'phone')
-      store.register('hash2', '@signal.user', 'username')
-      expect(store.count()).toBe(2)
-      store.remove('hash1')
-      expect(store.count()).toBe(1)
-    })
+  test('lookup returns null for unknown hash', async () => {
+    expect(await store.lookup('missing')).toBeNull()
   })
 
-  test('isRegistered returns true for existing hash without decrypting', () => {
-    withStore('isRegistered', (store) => {
-      store.register('hash1', '+15551111111', 'phone')
-      expect(store.isRegistered('hash1')).toBe(true)
-      expect(store.isRegistered('hash2')).toBe(false)
-    })
+  test('register replaces existing entry', async () => {
+    await store.register('hash1', '+15551111111', 'phone')
+    await store.register('hash1', '+15552222222', 'phone')
+    expect((await store.lookup('hash1'))?.plaintext).toBe('+15552222222')
   })
 
-  test('plaintext is encrypted at rest', () => {
-    withStore('encrypted', (store) => {
-      store.register('hash1', '+15551234567', 'phone')
-      const raw = store.lookup('hash1')
-      expect(raw?.plaintext).toBe('+15551234567')
+  test('remove deletes entry', async () => {
+    await store.register('hash1', '+15551111111', 'phone')
+    await store.remove('hash1')
+    expect(await store.lookup('hash1')).toBeNull()
+  })
 
-      const store2 = new IdentifierStore('./test-notifier-encrypted.db', 'wrong-secret')
-      try {
-        const result = store2.lookup('hash1')
-        expect(result).toBeNull()
-      } finally {
-        store2.close()
-        try { unlinkSync('./test-notifier-encrypted.db') } catch {}
-      }
-    })
+  test('count returns registered entry total', async () => {
+    expect(await store.count()).toBe(0)
+    await store.register('hash1', '+15551111111', 'phone')
+    await store.register('hash2', '@signal.user', 'username')
+    expect(await store.count()).toBe(2)
+    await store.remove('hash1')
+    expect(await store.count()).toBe(1)
+  })
+
+  test('isRegistered returns true for existing hash', async () => {
+    await store.register('hash1', '+15551111111', 'phone')
+    expect(await store.isRegistered('hash1')).toBe(true)
+    expect(await store.isRegistered('hash2')).toBe(false)
+  })
+
+  test('plaintext is encrypted at rest — wrong key cannot decrypt', async () => {
+    await store.register('hash1', '+15551234567', 'phone')
+    const wrongStore = new IdentifierStore(ctx.db, 'wrong-secret')
+    const result = await wrongStore.lookup('hash1')
+    expect(result).toBeNull()
   })
 })

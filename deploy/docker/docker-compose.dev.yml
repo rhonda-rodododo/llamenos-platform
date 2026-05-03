@@ -97,14 +97,15 @@ services:
       - "3100:3100"
     environment:
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-dev-notifier-key}
+      - NOTIFIER_API_KEY_PREVIOUS=${NOTIFIER_API_KEY_PREVIOUS:-}
       - NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-dev-token-secret}
+      - DATABASE_URL=postgres://postgres:${PG_PASSWORD:-postgres}@postgres:5432/llamenos?sslmode=disable
       - SIGNAL_BRIDGE_URL=http://signal-cli:8080
       - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
       - SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-}
-      - NOTIFIER_DB_PATH=/app/data/notifier.db
-    volumes:
-      - signal-notifier-data:/app/data
     depends_on:
+      postgres:
+        condition: service_healthy
       signal-cli:
         condition: service_healthy
     healthcheck:
@@ -179,6 +180,5 @@ volumes:
   rustfsdata:
   strfrydata:
   signal-data:
-  signal-notifier-data:
   ollama-data:
   asterisk-config:
