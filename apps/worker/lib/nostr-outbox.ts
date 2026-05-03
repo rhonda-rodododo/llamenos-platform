@@ -82,7 +82,7 @@ export class EventOutbox {
         hasId: 'id' in eventJson,
         hasSig: 'sig' in eventJson,
       })
-      return
+      throw new Error(`Invalid Nostr event: ${error}`)
     }
 
     await this.db.insert(nostrEventOutbox).values({
@@ -118,14 +118,22 @@ export class EventOutbox {
       const parsed = parseJsonbValue(rawRow.event_json)
       if (!parsed) {
         logger.error(`Skipping event ${rawRow.id}: event_json is not a valid object`)
-        await this.markPermanentlyFailed(rawRow.id as number)
+        try {
+          await this.markPermanentlyFailed(rawRow.id as number)
+        } catch (err) {
+          logger.error(`Failed to mark event ${rawRow.id} as dead`, err)
+        }
         continue
       }
 
       const error = validateNostrEvent(parsed)
       if (error) {
         logger.error(`Skipping event ${rawRow.id}: ${error}`)
-        await this.markPermanentlyFailed(rawRow.id as number)
+        try {
+          await this.markPermanentlyFailed(rawRow.id as number)
+        } catch (err) {
+          logger.error(`Failed to mark event ${rawRow.id} as dead`, err)
+        }
         continue
       }
 

@@ -27,7 +27,12 @@ export class FcmClient {
 
   private getClient(): FCM {
     if (!this.fcm) {
-      const serviceAccount = JSON.parse(this.serviceAccountKey) as FcmServiceAccount
+      let serviceAccount: FcmServiceAccount
+      try {
+        serviceAccount = JSON.parse(this.serviceAccountKey) as FcmServiceAccount
+      } catch {
+        throw new Error('Invalid FCM service account key: not valid JSON')
+      }
       this.fcm = new FCM(new FcmOptions({ serviceAccount }))
     }
     return this.fcm
@@ -63,8 +68,7 @@ export class FcmClient {
       // Token-related errors — device should be unregistered
       if (
         errMsg.includes('NOT_FOUND') ||
-        errMsg.includes('UNREGISTERED') ||
-        errMsg.includes('INVALID_ARGUMENT')
+        errMsg.includes('UNREGISTERED')
       ) {
         return false
       }

@@ -2,16 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { startParallelRinging } from '../../services/ringing'
 import type { Env } from '../../types'
 import type { Services } from '../../services'
+import * as serviceFactories from '../../lib/service-factories'
 
-// Mock adapter declared at top level (bun test hoists vi.mock automatically)
-const mockAdapter = {
-  ringVolunteers: vi.fn().mockResolvedValue(undefined),
-}
+const mockAdapter = (serviceFactories as unknown as { __mockAdapter: { ringVolunteers: ReturnType<typeof vi.fn> } }).__mockAdapter
 
-vi.mock('../../lib/service-factories', () => ({
-  getTelephonyFromService: vi.fn().mockResolvedValue(mockAdapter),
-  getHubTelephonyFromService: vi.fn().mockResolvedValue(mockAdapter),
-}))
+vi.mock('../../lib/service-factories', () => {
+  const mockAdapter = {
+    ringVolunteers: vi.fn().mockResolvedValue(undefined),
+  }
+  return {
+    getTelephonyFromService: vi.fn().mockResolvedValue(mockAdapter),
+    getHubTelephonyFromService: vi.fn().mockResolvedValue(mockAdapter),
+    __mockAdapter: mockAdapter,
+  }
+})
 
 vi.mock('../../lib/voip-push', () => ({
   dispatchVoipPushFromService: vi.fn().mockResolvedValue(undefined),

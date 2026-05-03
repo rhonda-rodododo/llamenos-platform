@@ -112,6 +112,10 @@ export async function getMessagingAdapterFromService(
 
 let cachedPublisher: NostrPublisher | null = null
 
+export function _resetNostrPublisherCache(): void {
+  cachedPublisher = null
+}
+
 /**
  * Get the Nostr event publisher for the current platform.
  * Lazily creates and caches the publisher instance.

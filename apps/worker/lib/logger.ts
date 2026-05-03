@@ -445,8 +445,10 @@ export function createLogger(namespace: string): Logger {
 // Background overflow drain
 // ---------------------------------------------------------------------------
 
+let overflowInterval: ReturnType<typeof setInterval> | undefined
+
 if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
-  const overflowInterval = setInterval(() => {
+  overflowInterval = setInterval(() => {
     const summaries = rateLimiter.drainOverflows()
     for (const s of summaries) {
       emit(
@@ -461,4 +463,11 @@ if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
     }
   }, 10_000)
   overflowInterval.unref?.()
+}
+
+export function _clearLoggerOverflowInterval(): void {
+  if (overflowInterval) {
+    clearInterval(overflowInterval)
+    overflowInterval = undefined
+  }
 }

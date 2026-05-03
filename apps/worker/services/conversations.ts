@@ -63,6 +63,7 @@ export interface AddMessageInput {
   attachmentIds?: string[]
   externalId?: string
   status?: MessageDeliveryStatus
+  failureReason?: string
 }
 
 export interface MessagePagination {
@@ -300,6 +301,7 @@ export class ConversationsService {
         attachmentIds: input.attachmentIds,
         externalId: input.externalId,
         status: input.direction === 'outbound' ? (input.status ?? 'pending') : (input.status ?? 'sent'),
+        failureReason: input.failureReason,
       })
       .returning()
 

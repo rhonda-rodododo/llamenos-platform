@@ -36,8 +36,8 @@ function dispatchPushToUser(
     dispatcher.sendToVolunteer(userPubkey, wake, full).catch((e) => {
       logger.error('Push dispatch to user failed', e)
     })
-  } catch {
-    // Push not configured
+  } catch (e) {
+    logger.error('Push dispatch setup failed', e)
   }
 }
 
@@ -411,6 +411,7 @@ conversations.post('/:id/messages',
       readerEnvelopes,
       externalId,
       status,
+      failureReason,
     })
 
     // Publish new message event to Nostr relay
@@ -511,7 +512,7 @@ conversations.post('/:id/claim',
     const user = c.get('user')
     const hubId = c.get('hubId')
     if (!hubId) {
-      return c.json({ error: 'missing hub context' }, 500)
+      return c.json({ error: 'missing hub context' }, 400)
     }
 
     // Fetch conversation to check channel type

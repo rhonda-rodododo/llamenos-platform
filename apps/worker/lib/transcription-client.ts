@@ -38,7 +38,7 @@ export function createTranscriptionService(opts?: {
   validateWhisperUrl(whisperUrl)
 
   return {
-    async run(_model: string, input: { audio: number[] }): Promise<{ text: string }> {
+    async run(model: string, input: { audio: number[] }): Promise<{ text: string }> {
       // Convert number array back to Uint8Array
       const audioBytes = new Uint8Array(input.audio)
 
@@ -46,7 +46,7 @@ export function createTranscriptionService(opts?: {
       const formData = new FormData()
       const blob = new Blob([audioBytes], { type: 'audio/wav' })
       formData.append('file', blob, 'audio.wav')
-      formData.append('model', 'Systran/faster-whisper-base')
+      formData.append('model', model || 'Systran/faster-whisper-base')
       formData.append('response_format', 'json')
 
       const response = await fetch(whisperUrl, {
