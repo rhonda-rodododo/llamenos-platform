@@ -430,7 +430,7 @@ describe('conversations route', () => {
           readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
         }),
       })
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(201)
       const body = await res.json()
       expect(body.id).toBe('msg-new')
       expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({
@@ -460,7 +460,7 @@ describe('conversations route', () => {
           readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
         }),
       })
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(201)
     })
 
     it('returns 403 for non-admin messaging unassigned conversation', async () => {
@@ -538,7 +538,7 @@ describe('conversations route', () => {
         }),
       })
 
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(201)
       expect(sendSpy).toHaveBeenCalled()
       expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ status: 'sent', externalId: 'ext-123' }))
     })
@@ -571,7 +571,7 @@ describe('conversations route', () => {
         }),
       })
 
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(201)
       expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({
         status: 'failed',
       }))
