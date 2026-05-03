@@ -84,7 +84,7 @@ export const bans = pgTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     hubId: text('hub_id'),
-    phone: text('phone').notNull(),
+    phone: text('phone_hash').notNull(),  // HMAC-SHA256 of raw phone number
     reason: text('reason'),
     bannedBy: text('banned_by'),
     bannedAt: timestamp('banned_at', { withTimezone: true })
@@ -92,7 +92,7 @@ export const bans = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex('bans_hub_id_phone_idx').on(table.hubId, table.phone),
+    uniqueIndex('bans_hub_id_phone_hash_idx').on(table.hubId, table.phone),
   ],
 )
 

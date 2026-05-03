@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { startParallelRinging } from '../../services/ringing'
+import { hashPhone } from '../../lib/crypto'
 import type { Env } from '../../types'
 import type { Services } from '../../services'
 import * as serviceFactories from '../../lib/service-factories'
+
+const TEST_HMAC_SECRET = 'a'.repeat(64)
 
 const mockAdapter = (serviceFactories as unknown as { __mockAdapter: { ringVolunteers: ReturnType<typeof vi.fn> } }).__mockAdapter
 
@@ -45,6 +48,7 @@ function makeEnv(overrides?: Partial<Env>): Env {
   return {
     SERVER_NOSTR_SECRET: 'a'.repeat(64),
     NOSTR_RELAY_URL: 'ws://localhost:7777',
+    HMAC_SECRET: TEST_HMAC_SECRET,
     ...overrides,
   } as Env
 }
@@ -187,20 +191,24 @@ describe('startParallelRinging', () => {
     expect(ringArgs.volunteers).toHaveLength(2)
   })
 
-  it('registers the incoming call with correct data', async () => {
+  it('registers the incoming call with hashed callerNumber (not plaintext)', async () => {
     const services = makeServices({
       onShiftPubkeys: ['pk-1'],
       allUsers: [makeUser({ pubkey: 'pk-1' })],
     })
 
-    await startParallelRinging('CA-6', '+15559876543', 'http://localhost', makeEnv(), services, 'hub-1')
+    const rawPhone = '+15559876543'
+    await startParallelRinging('CA-6', rawPhone, 'http://localhost', makeEnv(), services, 'hub-1')
 
+    const expectedHash = hashPhone(rawPhone, TEST_HMAC_SECRET)
     expect(services.calls.addCall).toHaveBeenCalledWith('hub-1', {
       callId: 'CA-6',
-      callerNumber: '+15559876543',
+      callerNumber: expectedHash,
       callerLast4: '6543',
       status: 'ringing',
     })
+    // Verify the hash does not leak the raw number
+    expect(expectedHash).not.toContain(rawPhone)
   })
 
   it('extracts last 4 digits of caller number', async () => {

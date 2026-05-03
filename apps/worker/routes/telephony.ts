@@ -83,7 +83,7 @@ telephony.post('/incoming', async (c) => {
   // Use hub-scoped adapter for all subsequent operations
   const adapter = hubId ? ((await getHubTelephonyFromService(c.env, services.settings, hubId)) ?? globalAdapter) : globalAdapter
 
-  const banned = await services.records.checkBan(callerNumber, hubId)
+  const banned = await services.records.checkBan(hashPhone(callerNumber, c.env.HMAC_SECRET), hubId)
   if (banned) {
     return telephonyResponse(adapter.rejectCall())
   }

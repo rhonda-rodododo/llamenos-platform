@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import banRoutes from '@worker/routes/bans'
+import { hashPhone } from '@worker/lib/crypto'
+
+const TEST_HMAC_SECRET = 'a'.repeat(64)
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -133,7 +136,7 @@ describe('bans routes', () => {
       expect(json.ban.phone).toBe('+12125551234')
       expect(addBanSpy).toHaveBeenCalledWith({
         hubId: 'hub-1',
-        phone: '+12125551234',
+        phone: hashPhone('+12125551234', TEST_HMAC_SECRET),
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
       })
@@ -188,7 +191,10 @@ describe('bans routes', () => {
       expect(res.status).toBe(200)
       const json = await res.json()
       expect(json.count).toBe(2)
-      expect(bulkAddBansSpy).toHaveBeenCalledWith(['+12125551234', '+12125555678'], 'Spam', 'a'.repeat(64), 'hub-1')
+      expect(bulkAddBansSpy).toHaveBeenCalledWith(
+        [hashPhone('+12125551234', TEST_HMAC_SECRET), hashPhone('+12125555678', TEST_HMAC_SECRET)],
+        'Spam', 'a'.repeat(64), 'hub-1',
+      )
       expect(auditLogSpy).toHaveBeenCalledOnce()
     })
 
@@ -233,7 +239,7 @@ describe('bans routes', () => {
 
       const res = await app.request('/bans/%2B12125551234', { method: 'DELETE' })
       expect(res.status).toBe(200)
-      expect(removeBanSpy).toHaveBeenCalledWith('+12125551234', 'hub-1')
+      expect(removeBanSpy).toHaveBeenCalledWith(hashPhone('+12125551234', TEST_HMAC_SECRET), 'hub-1')
       expect(auditLogSpy).toHaveBeenCalledOnce()
     })
 
@@ -250,7 +256,7 @@ describe('bans routes', () => {
       expect(res.status).toBe(200)
       // The phone passed to removeBan should be "%2B12125551234" (single decoded),
       // NOT "+12125551234" (double decoded)
-      expect(removeBanSpy).toHaveBeenCalledWith('%2B12125551234', 'hub-1')
+      expect(removeBanSpy).toHaveBeenCalledWith(hashPhone('%2B12125551234', TEST_HMAC_SECRET), 'hub-1')
     })
 
     it('returns 403 without bans:delete permission', async () => {

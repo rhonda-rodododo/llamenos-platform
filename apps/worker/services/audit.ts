@@ -286,8 +286,10 @@ export async function audit(
     const rawIp = ctx.request.headers.get('CF-Connecting-IP')
       ?? ctx.request.headers.get('x-forwarded-for')
     meta.ip = rawIp ? hashIP(rawIp, ctx.hmacSecret) : null
-    meta.country = ctx.request.headers.get('CF-IPCountry')
-    meta.ua = ctx.request.headers.get('User-Agent')
+    // Hash UA: preserves same-browser pattern detection without storing fingerprint
+    const rawUa = ctx.request.headers.get('User-Agent')
+    meta.ua = rawUa ? bytesToHex(sha256(utf8ToBytes(rawUa))) : null
+    // country is omitted entirely — privacy cost outweighs operational value
   }
   await auditService.log(event, actorPubkey, { ...details, ...meta }, hubId)
 }

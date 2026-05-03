@@ -21,7 +21,7 @@ export const activeCalls = pgTable(
   {
     callId: text('call_id').primaryKey(),
     hubId: text('hub_id'),
-    callerNumber: text('caller_number').notNull(),
+    callerNumber: text('caller_number_hash').notNull(),  // HMAC-SHA256 of raw number
     callerLast4: text('caller_last4'),
     answeredBy: text('answered_by'),
     status: text('status').notNull().default('ringing'),
