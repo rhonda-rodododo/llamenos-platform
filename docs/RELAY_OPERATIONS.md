@@ -100,10 +100,12 @@ The StatefulSet uses a PersistentVolumeClaim for the LMDB data directory.
 
 ### Cloudflare (Service Binding)
 
-Nosflare is configured in `wrangler.jsonc` as a service binding:
+> **Note**: The Llamenos backend (`apps/worker/`) is a Bun HTTP server on a self-hosted VPS — it is **not** a Cloudflare Worker. The only Cloudflare deployment is the marketing site (`site/`). Nosflare is an alternative relay option for organizations that want to run *only* the relay on Cloudflare's edge network (e.g., as a relay-only Cloudflare Worker separate from the main backend). The self-hosted strfry relay (Docker Compose) is the default and recommended approach.
+
+If deploying Nosflare as a standalone Cloudflare Worker, configure a separate `wrangler.jsonc` for the Nosflare Worker (not `site/wrangler.jsonc`, which is for the marketing site):
 
 ```bash
-# Set the server Nostr secret
+# Set the server Nostr secret in the Nosflare Worker
 wrangler secret put SERVER_NOSTR_SECRET
 ```
 

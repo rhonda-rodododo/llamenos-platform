@@ -155,9 +155,9 @@ After rotation:
 - All connected clients will automatically reconnect and accept the new server identity
 - Historical events signed by the old server key will fail verification (acceptable — ephemeral events are not persisted)
 
-### 1.5 Asterisk / Bridge Secrets Rotation
+### 1.5 Asterisk / SIP Bridge Secrets Rotation
 
-Only applicable if using the Asterisk profile.
+Only applicable if using the `asterisk` profile (`sip-bridge` + Asterisk PBX).
 
 ```bash
 cd /opt/llamenos/deploy/docker
@@ -175,7 +175,7 @@ docker compose exec asterisk sed -i \
   "s|^password=.*|password=${NEW_ARI_PASSWORD}|" /etc/asterisk/ari.conf
 
 # Restart all affected services
-docker compose restart asterisk asterisk-bridge app
+docker compose restart asterisk sip-bridge app
 ```
 
 ---
@@ -559,7 +559,7 @@ The VPS itself has been compromised (SSH breach, container escape, provider-leve
    - HMAC secret
    - RustFS credentials
    - Twilio/telephony credentials
-   - Asterisk credentials (if applicable)
+   - Asterisk / SIP bridge credentials (`ARI_PASSWORD`, `BRIDGE_SECRET`) if using the asterisk profile
    - SSH keys (generate new key pairs for the new server)
 
 4. **Update DNS** to point to the new server.

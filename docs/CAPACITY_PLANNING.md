@@ -69,7 +69,7 @@
 
 | Concern | Indicator | Mitigation |
 |---------|-----------|------------|
-| Node.js heap growth | RSS > 80% of container limit | Tune `--max-old-space-size`, profile leaks |
+| Bun process heap growth | RSS > 80% of container limit | Profile with `bun --inspect`, check for listener/timer leaks |
 | WebSocket connections | Memory per connection ~50-100 KB | Set max connections limit |
 | Crypto operations | ECIES envelope creation is CPU+memory bound | Pool crypto workers |
 
@@ -91,19 +91,12 @@
 
 ### Horizontal Scaling
 
-1. **Application tier:** Stateless Node.js — add instances behind a load balancer.
+1. **Application tier:** Stateless Bun HTTP server — add instances behind a load balancer.
    - WebSocket connections require sticky sessions or a shared pub/sub layer (Redis, NATS).
    - Nostr relay handles real-time event distribution, reducing direct WS fanout needs.
 2. **Database tier:** Read replicas for volunteer list, shift schedule, audit log reads.
    - Write operations (notes, audit entries) stay on primary.
 3. **Telephony:** Twilio handles scaling on their side. Monitor concurrent call limits in your Twilio account.
-
-### Cloudflare Workers (Cloud Deployment)
-
-For the CF Workers deployment, scaling is handled by the platform:
-- Durable Objects provide strong consistency with automatic placement.
-- No connection pooling needed (DOs use SQLite internally).
-- Monitor DO alarm/storage limits and request duration.
 
 ## Load Test Results
 

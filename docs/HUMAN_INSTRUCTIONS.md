@@ -602,49 +602,15 @@ Complete inventory of every secret the CI/CD pipelines require. Set these at
 
 ### CI/CD Secrets (`ci.yml`)
 
-| Secret | Used By | How to Get | Required |
-|--------|---------|------------|----------|
-| `CLOUDFLARE_API_TOKEN` | Worker deploy, E2E tests | Cloudflare dashboard > API Tokens | Yes -- should already be set |
-| `CLOUDFLARE_ACCOUNT_ID` | Worker deploy, E2E tests | Cloudflare dashboard > Account Home | Yes -- should already be set |
-
-### Cross-Repo CI Secrets (`llamenos-core` repo only)
+The backend is a Bun + PostgreSQL server deployed to a self-hosted VPS via Ansible/Docker
+Compose. `ci.yml` does not use Cloudflare credentials for backend deployment. Cloudflare
+credentials are only required for the marketing site (`site/`) deployment via
+`bun run deploy:site`.
 
 | Secret | Used By | How to Get | Required |
 |--------|---------|------------|----------|
-| `CROSS_REPO_TOKEN` | `notify-downstream` job | GitHub PAT (see below) | Yes -- for cross-repo CI triggers |
-
-#### Creating the `CROSS_REPO_TOKEN` GitHub PAT
-
-When `llamenos-core` CI passes on `main`, it dispatches `repository_dispatch`
-events to `llamenos` and `llamenos-mobile` so they automatically test against
-the latest crypto crate. This requires a GitHub Personal Access Token with
-permission to dispatch workflows in the downstream repos.
-
-1. Go to https://github.com/settings/tokens?type=beta (Fine-grained tokens)
-2. Click **Generate new token**
-3. **Token name**: `llamenos-cross-repo-ci`
-4. **Expiration**: 1 year (set a calendar reminder to rotate)
-5. **Repository access**: Select **Only select repositories**, then choose:
-   - `rhonda-rodododo/llamenos`
-   - `rhonda-rodododo/llamenos-mobile`
-6. **Permissions**: Under **Repository permissions**, set:
-   - **Contents**: Read (required for `repository_dispatch`)
-7. Click **Generate token** and copy the value
-8. In the `llamenos-core` repo, go to **Settings > Secrets and variables > Actions**
-9. Add a new secret named `CROSS_REPO_TOKEN` with the token value
-
-**Important**: This secret only needs to be set in `llamenos-core` -- the
-downstream repos respond to `repository_dispatch` events without needing any
-additional secrets. The downstream workflows (`ci.yml` in `llamenos`,
-`mobile-e2e.yml` in `llamenos-mobile`) already include `repository_dispatch`
-in their `on:` triggers with `types: [core-updated]`.
-
-**Verification**: After setup, push a commit to `llamenos-core` `main` and
-check that workflow runs appear in both downstream repos:
-```bash
-gh run list --repo rhonda-rodododo/llamenos --event repository_dispatch --limit 3
-gh run list --repo rhonda-rodododo/llamenos-mobile --event repository_dispatch --limit 3
-```
+| `CLOUDFLARE_API_TOKEN` | Marketing site deploy (`site/`) only | Cloudflare dashboard > API Tokens | Only for `bun run deploy:site` |
+| `CLOUDFLARE_ACCOUNT_ID` | Marketing site deploy (`site/`) only | Cloudflare dashboard > Account Home | Only for `bun run deploy:site` |
 
 ### Docker Secrets (`docker.yml`)
 
@@ -684,6 +650,10 @@ APPLE_TEAM_ID                      Updated 2025-XX-XX
 AZURE_TENANT_ID                    Updated 2025-XX-XX
 AZURE_CLIENT_ID                    Updated 2025-XX-XX
 AZURE_CLIENT_SECRET                Updated 2025-XX-XX
+```
+
+For marketing site deployment only (optional):
+```
 CLOUDFLARE_API_TOKEN               Updated 2025-XX-XX
 CLOUDFLARE_ACCOUNT_ID              Updated 2025-XX-XX
 ```
@@ -721,10 +691,9 @@ identifiers, and configuration values are consistent across the project.
       (currently correct -- ensures `.sig` files are generated)
 - [ ] **GitHub Actions workflows are enabled** on the repository (check
       Settings > Actions > General)
-- [ ] **`llamenos-core` is accessible to CI**: The `tauri-release.yml` workflow
-      checks out `rhonda-rodododo/llamenos-core` as a sibling directory. Verify
-      that the repository exists and the `GITHUB_TOKEN` has read access (or use
-      a deploy key / PAT if the repo is private).
+- [ ] **`packages/crypto` is in-repo**: The shared Rust crypto crate lives at
+      `packages/crypto/` in this monorepo. No external `llamenos-core` checkout
+      is needed. `tauri-release.yml` builds from the monorepo directly.
 - [ ] **All GitHub Secrets from Section 7** are set and populated
 - [ ] **CSP `connect-src`** in `src-tauri/tauri.conf.json` includes the
       production API domain (currently: `https://app.llamenos.org`)
@@ -756,7 +725,8 @@ script to keep all four version files in sync.
 ### Release flow summary
 
 1. **API releases** (automatic): Push to `main` with conventional commits.
-   `ci.yml` runs E2E tests, bumps version, deploys Worker, creates GitHub
+   `ci.yml` runs E2E tests, bumps version, deploys the Bun + PostgreSQL backend
+   to the self-hosted VPS via Ansible/Docker Compose, and creates a GitHub
    Release with CHECKSUMS.txt and SLSA provenance.
 
 2. **Desktop releases** (tag-triggered): Push a `release/desktop-v*` tag or
@@ -854,8 +824,10 @@ F-Droid requires reproducible builds from source. Steps:
 3. Submit to [F-Droid Data](https://gitlab.com/fdroid/fdroiddata) via merge request
 4. F-Droid builders compile from source on each release
 
-Note: Since llamenos-core is Rust compiled to native libraries, F-Droid builds
-need Rust toolchain and Android NDK in their build environment.
+Note: Since `packages/crypto` is a Rust crate compiled to native JNI libraries
+for Android, F-Droid builds need the Rust toolchain and Android NDK in their
+build environment. The crypto crate is in-repo at `packages/crypto/` -- no
+external repository checkout is required.
 
 ---
 

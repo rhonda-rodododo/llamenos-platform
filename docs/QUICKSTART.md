@@ -517,7 +517,7 @@ Llamenos supports five telephony providers. Configure them through the admin UI 
 - **SignalWire** -- Twilio-compatible API with better pricing
 - **Vonage** -- NCCO-based call control
 - **Plivo** -- XML-based call control
-- **Asterisk** -- Self-hosted PBX (requires the asterisk Docker profile)
+- **Asterisk / FreeSWITCH** -- Self-hosted PBX via `sip-bridge/` (requires the telephony Docker profile; `PBX_TYPE` env var selects ARI/ESL/Kamailio backend)
 
 For detailed setup instructions for each provider, see the documentation site or the `site/src/content/docs/` directory.
 
@@ -644,9 +644,9 @@ docker compose --profile transcription up -d
 
 For GPU acceleration (NVIDIA), set `WHISPER_DEVICE=cuda` in `.env`.
 
-### Asterisk PBX
+### Self-Hosted SIP PBX (Asterisk / FreeSWITCH)
 
-Self-hosted telephony without a cloud provider. Requires SIP trunk configuration.
+Self-hosted telephony without a cloud provider. Uses the `sip-bridge/` service, which translates ARI/ESL/Kamailio events to the Llamenos webhook format. Requires SIP trunk configuration.
 
 ```bash
 # Generate required secrets
@@ -656,8 +656,9 @@ BRIDGE_SECRET=$(openssl rand -base64 24)
 # Add to .env
 echo "ARI_PASSWORD=$ARI_PASSWORD" >> .env
 echo "BRIDGE_SECRET=$BRIDGE_SECRET" >> .env
+echo "PBX_TYPE=ari" >> .env   # Options: ari (Asterisk), esl (FreeSWITCH), kamailio
 
-docker compose --profile asterisk up -d
+docker compose --profile telephony up -d
 ```
 
 ### Signal Messaging

@@ -43,8 +43,7 @@ The build process eliminates all sources of non-determinism:
 | Client CSS bundles (`dist/client/assets/*.css`) | Yes | Content-hashed filenames |
 | `index.html` | Yes | References content-hashed assets |
 | `CHECKSUMS.txt` | Yes | SHA-256 of all output files |
-| Worker bundle (Node.js) | Yes | Same deterministic config |
-| Worker bundle (Cloudflare) | **No** | Cloudflare modifies the bundle during deployment |
+| Server bundle (Bun) | Yes | Same deterministic config (`dist/server/`) |
 
 ---
 
@@ -56,12 +55,20 @@ The build process eliminates all sources of non-determinism:
 # Verify a specific release version
 scripts/verify-build.sh v1.0.0
 
+# Verify latest release
+scripts/verify-build.sh
+
+# Skip Docker build — verify signatures only (faster)
+SKIP_DOCKER_BUILD=1 scripts/verify-build.sh v1.0.0
+
 # The script:
-# 1. Checks out the tagged version
-# 2. Builds inside a Docker container (Dockerfile.build)
-# 3. Generates CHECKSUMS.txt from the build output
-# 4. Downloads CHECKSUMS.txt from the GitHub Release
-# 5. Compares them — any mismatch is flagged
+# 1. Downloads CHECKSUMS.txt + cosign signatures from the llamenos-releases repo
+# 2. Verifies cosign keyless signatures (if cosign is installed)
+# 3. Verifies SBOM attestation and SLSA provenance (if cosign is installed)
+# 4. Clones the source at the tagged version
+# 5. Builds inside a Docker container (Dockerfile.build)
+# 6. Computes checksums of the local build output
+# 7. Compares them — any mismatch is flagged
 ```
 
 ### Manual Verification
@@ -75,13 +82,18 @@ git checkout v1.0.0
 # 2. Build in the deterministic Docker environment
 docker build -f Dockerfile.build -t llamenos-verify .
 
-# 3. Extract checksums from the build
-docker run --rm llamenos-verify cat /app/CHECKSUMS.txt > local-checksums.txt
+# 3. Extract build output from the container
+docker create --name llamenos-verify-extract llamenos-verify
+docker cp llamenos-verify-extract:/build/dist ./local-dist
+docker rm llamenos-verify-extract
 
-# 4. Download the release checksums from GitHub
-curl -sL https://github.com/llamenos/llamenos/releases/download/v1.0.0/CHECKSUMS.txt > release-checksums.txt
+# 4. Compute local checksums
+(cd local-dist && find . -type f -exec sha256sum {} \; | sort) > local-checksums.txt
 
-# 5. Compare
+# 5. Download the published checksums from the llamenos-releases repo
+curl -sL https://raw.githubusercontent.com/rhonda-rodododo/llamenos-releases/main/desktop/v1.0.0/CHECKSUMS.txt > release-checksums.txt
+
+# 6. Compare
 diff local-checksums.txt release-checksums.txt
 # No output = match. Any output = mismatch (investigate).
 ```
@@ -90,7 +102,7 @@ diff local-checksums.txt release-checksums.txt
 
 ## 4. Trust Anchor
 
-The trust anchor is the **GitHub Release** — specifically the `CHECKSUMS.txt` file attached to the release.
+The trust anchor is the **`llamenos-releases` repository** — specifically the `CHECKSUMS.txt` committed to `desktop/v<version>/CHECKSUMS.txt`. Binary artifacts are hosted on the self-hosted RustFS instance at `releases.llamenos.org`. The GitHub Release contains the metadata (CHECKSUMS.txt, SBOM, provenance) but not the binaries themselves.
 
 ### What This Proves
 
@@ -106,7 +118,6 @@ If verification passes, you know:
 | The running server serves these exact files | A compromised server could serve different files |
 | The source code is free of vulnerabilities | Reproducible builds verify build integrity, not code quality |
 | GitHub Actions was not compromised | CI/CD supply chain is a separate trust boundary |
-| Cloudflare serves unmodified files | CF controls TLS termination and can serve arbitrary content |
 
 ### Why Not Serve Checksums from the App
 
@@ -125,9 +136,9 @@ Client JavaScript and CSS bundles are fully verified:
 
 These are the security-critical artifacts — they contain the cryptographic code that handles key management, encryption, and decryption.
 
-### Not Verified (Server/Worker)
+### Server Bundle
 
-The Worker/server bundle is **not verified** for Cloudflare deployments because Cloudflare modifies the bundle during deployment (minification, source maps, etc.). For Node.js self-hosted deployments, the server bundle IS deterministic and can be verified using the same Docker build process.
+The Bun server bundle (`dist/server/`) is deterministic and can be verified using the same Docker build process (`Dockerfile.build`). The server is self-hosted (Bun + PostgreSQL on VPS) — there is no Cloudflare Worker deployment for the backend. The Cloudflare deployment (`site/`) is the marketing site only and is not subject to this verification process.
 
 ---
 
