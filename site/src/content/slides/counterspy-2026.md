@@ -15,17 +15,17 @@ CounterSpy 2026 — Atlanta, Sunday May 3
 
 ---
 
-## It Started Like This
+## What we want to prevent
 
 > *A detective in Atlanta called an organizer at 9:37am on a Tuesday. He knew her name. He knew she'd answered calls at 11pm, 1am, and 2am during the protest. He cited specific call durations.*
 >
-> *She'd been running her org's crisis line through Google Voice. The detective had served an administrative subpoena on Google three days earlier. Google had complied within 48 hours. She didn't know.*
+> *She'd been running the jail support hotline through Google Voice. The detective had served an administrative subpoena on Google three days earlier. Google had complied within 48 hours. She didn't know.*
 
 :::fragment
 *He didn't need a warrant. He needed a form and 48 hours.*
 :::
 
-<!-- notes: Pause here. Let this land. This is not a hypothetical. Administrative subpoenas to US-based cloud providers require no judicial review. The provider doesn't have to tell you they complied. You might find out months later in a transparency report, or you might find out when a detective calls you. This is the threat we're designing against. Not nation-state zero-days. Not sophisticated cryptographic attacks. Paperwork. -->
+<!-- notes: Pause here. Let this land. This is not a hypothetical. Administrative subpoenas to US-based cloud providers require no judicial review. The provider doesn't have to tell you they complied. You might find out months later in a transparency report, or you might find out when a detective calls you. This is the low end of the threat we're designing against — paperwork. But we're also designing against the high end: nation-state adversaries with NSLs, runtime instrumentation budgets, and physical access to infrastructure. The architecture has to hold against both. -->
 
 ---
 
@@ -87,7 +87,7 @@ CounterSpy 2026 — Atlanta, Sunday May 3
 *None of these adversaries need to break encryption. They go to your provider with a form.*
 :::
 
-<!-- notes: Name the adversaries directly. "Law enforcement" is too abstract. We're talking about cops. We're talking about ICE. We're talking about the private investigators that right-wing groups hire after getting org member lists from leak sites. The threat model matters because it determines what you protect against. We're not defending against nation-state zero-days aimed at individual people. We're defending against a detective with 48 hours and a form. That's achievable. Let's talk about how. -->
+<!-- notes: Name the adversaries directly. "Law enforcement" is too abstract. We're talking about cops. We're talking about ICE. We're talking about FBI with national security letters. We're talking about the private investigators that right-wing groups hire after getting org member lists from leak sites. We're also talking about nation-state actors who can compel hosting providers and instrument runtimes. The threat model matters because it determines what you protect against. We defend against all of these — from the detective with 48 hours and a form, up to a sophisticated adversary with physical access to infrastructure. That's the bar we set. -->
 
 ---
 
@@ -190,11 +190,11 @@ Notes in Google Docs
 - PSTN number → SIP trunk → **your server**
 - You control what gets logged (including: nothing)
 - Telnyx/SignalWire offer CDR-free options
-- Self-hosted Asterisk/FreeSWITCH: no cloud provider at all
-- More setup, **you own the metadata**
+- Self-hosted Asterisk/FreeSWITCH: no cloud provider at all — **this is the default deployment**
+- Ansible playbook handles setup, **you own the metadata**
 :::
 
-<!-- notes: The SIP trunk is the key architectural move. Instead of "Twilio routes calls for you," you're saying "a PSTN number terminates at MY server, then I route." The call detail record lives on your infrastructure, not Twilio's. If you go all the way to self-hosted Asterisk with no cloud SIP provider, there's no external party with records at all — just your database, which you control. -->
+<!-- notes: The SIP trunk is the key architectural move. Instead of "Twilio routes calls for you," you're saying "a PSTN number terminates at MY server, then I route." The call detail record lives on your infrastructure, not Twilio's. Self-hosted Asterisk/FreeSWITCH is the default deployment — the Ansible playbook sets it up. With no cloud SIP provider, there's no external party with records at all — just your database on your FDE-encrypted server, which you control. Cloud SIP providers like Telnyx exist as an option for orgs that aren't ready to run their own PBX yet. -->
 
 ---
 
@@ -202,7 +202,7 @@ Notes in Google Docs
 
 ![PSTN SIP Call Flow](/diagrams/pstn-sip-flow.svg)
 
-<!-- notes: Walk through this slowly. The SIP bridge is the key piece — it's running on your server, behind a Cloudflare Tunnel for ingress, no public IP needed. The PSTN number is just a DID (Direct Inward Dial) from whatever SIP provider you chose. The caller's phone rings YOUR server. Not Twilio's server. Not Google's server. Yours. -->
+<!-- notes: Walk through this slowly. The SIP bridge is the key piece — it's running on your server, behind a WireGuard tunnel for ingress, no public IP needed. The PSTN number is just a DID (Direct Inward Dial) from whatever SIP provider you chose. The caller's phone rings YOUR server. Not Twilio's server. Not Google's server. Yours. -->
 
 ---
 
@@ -242,25 +242,28 @@ One inbound call. Outbound legs all start at the same timestamp. First pickup wi
 *Every adapter implements the same interface. Switching providers is a config change, not a code rewrite.*
 :::
 
-<!-- notes: The adapter architecture means you can start with Twilio while you're building your self-hosting capability, migrate to Telnyx when you're ready, then to self-hosted Asterisk when you want full control. No code changes — just update PBX_TYPE in your .env. The SIP bridge is provider-agnostic. This is important because your threat model might evolve. You don't want to rewrite your hotline infrastructure every time you move up the privacy ladder. -->
+<!-- notes: The default Ansible deployment gives you self-hosted Asterisk or FreeSWITCH — that's the recommended setup. But the adapter architecture means if an org needs to start with Twilio while building out infrastructure, they can, and migrate later with zero code changes — just update PBX_TYPE in your .env. The SIP bridge is provider-agnostic. You don't want to rewrite your hotline infrastructure every time your threat model evolves. -->
 
 ---
 
 ## Self-Hosting: The Full Stack
 
 ```bash
-# What you run
+# What you run (production — Ansible is the default)
+ansible-playbook -i inventory deploy.yml
+
+# For demos and local development only:
 docker compose up -d
 ```
 
 ![Docker Services](/diagrams/docker-services.svg)
 
-- **Cloudflare Tunnels** for ingress — no public IP exposed, ever
-- **EU hosting** compatible — Hetzner in Germany or Finland, GDPR by design
+- **WireGuard tunnels** for ingress — no public IP exposed, ever
+- **1984 Hosting** (Iceland) — not subject to the US CLOUD Act, custom Debian FDE ISO with dropbear for remote unlock
 - **No telemetry** to any external party
 - Reproducible builds with **SLSA provenance** and **cosign** verification
 
-<!-- notes: The Cloudflare Tunnel means your server doesn't need a public IP. It phones home to Cloudflare, which handles ingress. No port scanning. No DDoS directly at your IP. IP address not exposed to clients. Yes, Cloudflare is still a third party — I'll talk about the trust model there in the limitations section. But it's substantially better than "here's my server's IP, please subpoena it." -->
+<!-- notes: The WireGuard tunnel means your server doesn't need a public IP. No port scanning. No DDoS directly at your IP. IP address not exposed to clients. No third-party TLS termination — the tunnel is point-to-point encrypted between your server and your entry node. -->
 
 ---
 
@@ -333,7 +336,7 @@ This one is a big deal.
 :::columns
 :::left
 ### How most transcription works
-- Call audio → sent to API (Cloudflare, Google, OpenAI)
+- Call audio → sent to API (Google, OpenAI, AWS)
 - Transcription service processes your call content
 - You get text back
 - **The transcription provider heard everything**
@@ -362,7 +365,7 @@ This one is a big deal.
 ### v1: secp256k1 ECIES
 - Non-standard curve for key agreement (Nostr-specific)
 - Custom construction — no formal proof for this exact combination
-- Single nsec per user = single point of compromise
+- Single secret key per user = single point of compromise
 - No domain separation = cross-protocol attack surface
 - **Identified in review:** non-standard, not formally verified
 :::right
@@ -408,8 +411,8 @@ Every cryptographic operation has a **unique context string**.
 
 ```
 Old model (v1):
-  User has ONE nsec (secret key)
-  nsec lives on every device
+  User has ONE secret key
+  Same key on every device
   Device compromise = full account compromise
 
 New model (v2):
@@ -447,7 +450,7 @@ Same zero-knowledge pattern as notes — for inbound Signal, SMS, WhatsApp messa
 
 ---
 
-## Hosting Provider Subpoena (Cloudflare, VPS)
+## Hosting Provider Subpoena (1984 Hosting, VPS)
 
 **What they CAN hand over:**
 
@@ -463,7 +466,7 @@ Same zero-knowledge pattern as notes — for inbound Signal, SMS, WhatsApp messa
 
 Note content, message content, transcription text, per-note encryption keys (ephemeral, never stored), volunteer private keys (device-side only), your HMAC secret.
 
-<!-- notes: This is the key scenario. Law enforcement goes to your hosting provider — Cloudflare, Hetzner, DigitalOcean, whoever. Gets a court order. The provider hands over everything they have. What does that get them? Encrypted blobs, timestamps, and hashed phone numbers. They can prove a call happened. They cannot read what was said in the notes. They cannot identify the caller. Metadata: yes. Content: no. That's a meaningful line. -->
+<!-- notes: This is the key scenario. Law enforcement goes to your hosting provider. With 1984 Hosting in Iceland, they're outside US CLOUD Act jurisdiction — a US subpoena doesn't work, they'd need an MLAT request through Icelandic courts, which takes months and has a higher bar. Even if they succeed, what does the provider hand over? Encrypted blobs, timestamps, and hashed phone numbers. The disk is FDE with your custom ISO — 1984 can't read it at rest. They can prove a call happened. They cannot read what was said in the notes. They cannot identify the caller. Metadata: yes. Content: no. That's a meaningful line. -->
 
 ---
 
@@ -502,7 +505,7 @@ Call notes (never sent to telephony provider), volunteer identities beyond routi
 - Per-note forward secrecy: compromising identity key doesn't reveal notes without also getting per-note envelopes
 
 **Admin device seized:**
-- If admin nsec obtained: attacker can decrypt ALL notes (admin envelope on every note)
+- If admin device key obtained: attacker can decrypt ALL notes (admin envelope on every note)
 - Admin key separation: identity key vs. decryption key are separate keypairs — compromising auth doesn't auto-expose notes
 
 <!-- notes: The device seizure scenario is worth walking through carefully. If a volunteer's phone is seized unlocked — bad day. Admin can revoke the session. The volunteer's notes are accessible but only their notes. If the phone is locked, the attacker needs to brute-force a 6-8 digit PIN against 600k PBKDF2 iterations. That's not impossible but it's not fast either. The admin device is the most sensitive — store it somewhere that isn't your pocket at a protest. -->
@@ -515,13 +518,13 @@ Call notes (never sent to telephony provider), volunteer identities beyond routi
 - **SMS/WhatsApp transport E2EE**: These channels require provider-side plaintext in transit. We E2EE at rest; the provider sees it in transit.
 - **PIN brute-force resistance (offline)**: 6-8 digits is ~27 bits of entropy. A seized encrypted blob + a GPU = brute-forceable in days to weeks.
 - **Metadata confidentiality**: The server needs timestamps and routing data to function.
-- **Cloudflare as adversary**: If Cloudflare is willing and legally compelled to instrument the Workers runtime — they could. We recommend self-hosted deployment for high-threat orgs.
+- **Hosting provider coercion**: If your hosting provider is physically compelled to image your disk — Debian FDE with dropbear remote unlock means they get ciphertext. 1984 Hosting (Iceland) is outside CLOUD Act jurisdiction.
 
 :::fragment
-*We're solving for the realistic adversary: lazy cops with administrative subpoenas. Not nation-states with runtime instrumentation budgets.*
+*We're solving for the full adversary spectrum: from administrative subpoenas to nation-states with NSLs and physical access to infrastructure.*
 :::
 
-<!-- notes: I want to say this clearly: we built this for the threat model that most US activist orgs actually face. An FBI agent with a national security letter and unlimited resources is a different problem than a county sheriff with a form and 48 hours. We're solving the second problem really well. The first problem — nation-state adversary targeting you specifically — you have bigger issues than your hotline software. Operational security, device hygiene, physical security. Llámenos is one layer, not the whole stack. -->
+<!-- notes: I want to say this clearly: we built this for the full threat spectrum. A county sheriff with a form and 48 hours is the easy case — we handle that trivially. But we also handle the hard case: an FBI agent with a national security letter, a fusion center correlating metadata across providers, a nation-state actor with physical access to your hosting infrastructure. FDE with a custom ISO on 1984 Hosting means even physical seizure of the disk doesn't help. CLOUD Act non-applicability means US legal process doesn't reach your provider. E2EE with per-device keys means server compromise reveals nothing. This is the full stack — not one layer, but defense in depth from the hosting jurisdiction to the key material on each device. -->
 
 ---
 
@@ -664,7 +667,7 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 :::
 
 :::fragment
-2. **Single nsec per user** — one private key per person, on multiple devices. Device compromise = all notes compromised.
+2. **Single secret key per user** — one private key per person, on multiple devices. Device compromise = all notes compromised.
 :::
 
 :::fragment
@@ -734,7 +737,7 @@ A Signal protocol cryptographer reviewed v1. Key findings:
 :::left
 ### v1
 - secp256k1 ECIES (custom construction)
-- Single nsec per user, on every device
+- Single secret key per user, on every device
 - No domain separation
 - No per-note forward secrecy
 - No device authorization chain
@@ -822,11 +825,11 @@ services:
   monitoring:   Prometheus + Grafana
 ```
 
-- **Cloudflare Tunnels** for ingress — no exposed public IP
-- **EU hosting**: Hetzner Germany/Finland for GDPR compliance
+- **WireGuard tunnels** for ingress — no exposed public IP
+- **1984 Hosting** (Iceland) — outside US CLOUD Act jurisdiction, custom FDE ISO, GDPR-compliant
 - **Kubernetes** option: Helm chart with health probes and network policies
 
-<!-- notes: The strfry Nostr relay is not optional — it's the real-time event bus between server and clients. Your Nostr relay, running on your infrastructure, not one of the public ones. This is important: hub events, call routing, presence — all go through the relay. That relay is yours. Cost for a small org: 2 CPU, 4GB RAM VPS on Hetzner is about €8/month. SIP DID from Telnyx is $1-5/month. That's the infrastructure cost for a secure hotline. -->
+<!-- notes: The strfry Nostr relay is not optional — it's the real-time event bus between server and clients. Your Nostr relay, running on your infrastructure, not one of the public ones. This is important: hub events, call routing, presence — all go through the relay. That relay is yours. We host on 1984 Hosting in Iceland — they're not subject to the US CLOUD Act, which means a US subpoena doesn't compel them to hand over data. They support custom FDE ISOs, so you control the full-disk encryption key — even 1984 staff can't read your disk at rest. Cost for a small org: 2 CPU, 4GB RAM VPS on 1984 is about €10/month. SIP DID from Telnyx is $1-5/month. That's the infrastructure cost for a nation-state-resistant hotline. -->
 
 ---
 
@@ -901,7 +904,7 @@ Active hub in the UI doesn't affect which calls they receive.
 - **Traffic analysis**: Sophisticated adversary can see call timing patterns
 - **Device seizure with PIN**: Seized + unlocked = notes accessible
 - **Admin coercion**: A coerced admin can decrypt all notes
-- **Nation-state runtime instrumentation**: If Cloudflare is your adversary, use self-hosted
+- **Hosting provider coercion**: FDE + Iceland jurisdiction, but physical seizure is always a risk
 - **Operational security failures**: Bad passwords, phishing, shoulder surfing
 - **SMS/WhatsApp in transit**: Provider sees plaintext during delivery
 :::
@@ -912,7 +915,7 @@ Active hub in the UI doesn't affect which calls they receive.
 
 ## Know Your Threat Model Before You Deploy
 
-> *Llámenos is designed for the realistic threat faced by a US-based activist organization: law enforcement administrative subpoenas, OSINT-level adversaries, and insider threats. It is not designed to withstand a dedicated nation-state adversary with physical access to your infrastructure.*
+> *Llámenos is designed to withstand the full adversary spectrum: from law enforcement administrative subpoenas and OSINT-level adversaries, through FBI national security letters, to nation-state actors with physical access to infrastructure. FDE hosting outside CLOUD Act jurisdiction, E2EE with per-device keys, and self-hosted SIP are the default — not optional hardening.*
 
 **Before deploying, answer:**
 - Who is your adversary? Be specific.
@@ -948,8 +951,8 @@ Active hub in the UI doesn't affect which calls they receive.
 <!-- notes: The project is pre-production. No production users yet. We need orgs with real security needs who are willing to give us real-world feedback. If you've been subpoenaed — I want to talk to you specifically. Your experience stress-tests our assumptions in ways that theoretical analysis cannot. Come find me after this. I'll be the one by the coffee trying to convince people that self-hosting a Nostr relay is worth it.
 
 Likely questions:
-1. "What does it cost?" — €8-15/month VPS on Hetzner. $1-5/month SIP DID. That's it.
-2. "What about GDPR?" — HMAC-hashed caller numbers, E2EE content, EU hosting available. Caller data question for your DPA.
+1. "What does it cost?" — €10-20/month VPS on 1984 Hosting (Iceland). $1-5/month SIP DID. That's it.
+2. "What about GDPR?" — HMAC-hashed caller numbers, E2EE content, Icelandic hosting outside CLOUD Act. Caller data question for your DPA.
 3. "Can we port our Google Voice number?" — Yes. Port to a SIP-capable provider, point at your trunk.
 4. "What's the status of MLS?" — Behind a feature flag. Functional, not battle-tested. Wait for the RFC to stabilize.
 5. "What if a volunteer leaves badly?" — Hub key rotation. Future notes inaccessible. Historical notes they took: they still have their device key. That's the forward secrecy trade-off. Same as any E2EE system.
