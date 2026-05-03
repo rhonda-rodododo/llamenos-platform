@@ -9,7 +9,7 @@ Llamenos 모바일 앱을 사용하면 자원봉사자가 휴대폰에서 전화
 
 모바일 앱은 데스크톱 애플리케이션의 동반 앱입니다. 동일한 Llamenos 백엔드(Cloudflare Workers 또는 자체 호스팅)에 연결하고 동일한 프로토콜을 사용하므로, 자원봉사자는 데스크톱과 모바일 사이를 원활하게 전환할 수 있습니다.
 
-모바일 앱은 별도의 저장소(`llamenos-mobile`)에 있지만 다음을 공유합니다:
+모바일 앱은 별도의 저장소(`llamenos-hotline`)에 있지만 다음을 공유합니다:
 
 - **llamenos-core** — 모든 암호화 작업을 위한 동일한 Rust 크레이트, iOS 및 Android용 UniFFI로 컴파일
 - **프로토콜** — 동일한 와이어 포맷, API 엔드포인트 및 암호화 방식
@@ -21,7 +21,7 @@ Llamenos 모바일 앱을 사용하면 자원봉사자가 휴대폰에서 전화
 
 모바일 앱은 현재 사이드로딩용 APK로 배포됩니다:
 
-1. [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-mobile/releases/latest) 페이지에서 최신 `.apk` 파일을 다운로드하세요
+1. [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest) 페이지에서 최신 `.apk` 파일을 다운로드하세요
 2. Android 기기에서 **설정 > 보안**으로 이동하여 **알 수 없는 소스에서 설치**를 활성화하세요 (또는 요청 시 앱별로 활성화)
 3. 다운로드한 APK를 열고 **설치**를 탭하세요
 4. 설치가 완료되면 앱 서랍에서 Llamenos를 여세요

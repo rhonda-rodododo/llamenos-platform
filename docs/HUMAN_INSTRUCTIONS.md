@@ -458,8 +458,8 @@ AuthorName: Llamenos
 AuthorEmail: dev@llamenos.org
 AuthorWebSite: https://llamenos-hotline.com
 WebSite: https://llamenos-hotline.com
-SourceCode: https://github.com/rhonda-rodododo/llamenos-mobile
-IssueTracker: https://github.com/rhonda-rodododo/llamenos-mobile/issues
+SourceCode: https://github.com/rhonda-rodododo/llamenos-hotline
+IssueTracker: https://github.com/rhonda-rodododo/llamenos-hotline/issues
 
 AutoName: Hotline
 Description: |
@@ -468,7 +468,7 @@ Description: |
   lines where volunteer and caller identity protection is critical.
 
 RepoType: git
-Repo: https://github.com/rhonda-rodododo/llamenos-mobile.git
+Repo: https://github.com/rhonda-rodododo/llamenos-hotline.git
 
 Builds:
   - versionName: 1.0.0

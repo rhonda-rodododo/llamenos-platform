@@ -15,8 +15,8 @@ description: एक घंटे से भी कम समय में अप
 ## 1. क्लोन और इंस्टॉल करें
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
+cd llamenos-hotline
 bun install
 ```
 

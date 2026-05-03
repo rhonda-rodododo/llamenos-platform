@@ -172,7 +172,7 @@ Add workflow status badges to the top of each repo's README.md:
 
 **llamenos-mobile:**
 ```markdown
-[![Mobile E2E](https://github.com/user/llamenos-mobile/actions/workflows/mobile-e2e.yml/badge.svg)](https://github.com/user/llamenos-mobile/actions/workflows/mobile-e2e.yml)
+[![Mobile E2E](https://github.com/rhonda-rodododo/llamenos-hotline/actions/workflows/mobile-e2e.yml/badge.svg)](https://github.com/rhonda-rodododo/llamenos-hotline/actions/workflows/mobile-e2e.yml)
 ```
 
 ## Files to Modify

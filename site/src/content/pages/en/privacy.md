@@ -128,6 +128,6 @@ We will post any changes to this policy on this page and update the effective da
 
 **Privacy inquiries:** [privacy@llamenos-hotline.com](mailto:privacy@llamenos-hotline.com)
 
-**Bug reports and security disclosures:** [github.com/rhonda-rodododo/llamenos-platform/issues](https://github.com/rhonda-rodododo/llamenos-platform/issues)
+**Bug reports and security disclosures:** [github.com/rhonda-rodododo/llamenos-hotline/issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues)
 
-Llámenos is open source. You can audit what the app does: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)
+Llámenos is open source. You can audit what the app does: [github.com/rhonda-rodododo/llamenos-hotline](https://github.com/rhonda-rodododo/llamenos-hotline)

@@ -80,7 +80,7 @@ The app is available in English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, 
 
 OPEN SOURCE
 
-Llamenos is fully open source under the AGPL-3.0 license. Audit the code, run your own instance, or contribute at github.com/rhonda-rodododo/llamenos-platform.
+Llamenos is fully open source under the AGPL-3.0 license. Audit the code, run your own instance, or contribute at github.com/rhonda-rodododo/llamenos-hotline.
 
 ---
 

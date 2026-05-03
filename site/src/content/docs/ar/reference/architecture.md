@@ -10,7 +10,7 @@ description: نظرة عامة على بنية النظام — المستودع
 ينقسم Llamenos عبر ثلاثة مستودعات تشترك في بروتوكول مشترك ونواة تشفيرية:
 
 ```
-llamenos              llamenos-core           llamenos-mobile
+llamenos              llamenos-core           llamenos-hotline
 (Desktop + API)       (Shared Crypto)         (Mobile App)
 +--------------+      +--------------+        +--------------+
 | Tauri v2     |      | Rust crate   |        | React Native |
@@ -25,7 +25,7 @@ llamenos              llamenos-core           llamenos-mobile
 
 - **llamenos** — تطبيق سطح المكتب (Tauri v2 مع واجهة Vite + React)، خلفية Cloudflare Worker، وخلفية Node.js المستضافة ذاتياً. هذا هو المستودع الرئيسي.
 - **llamenos-core** — حزمة Rust مشتركة تنفذ جميع العمليات التشفيرية: تشفير ظرف ECIES، توقيعات Schnorr، اشتقاق مفاتيح PBKDF2، HKDF، و XChaCha20-Poly1305. تُجمع لكود أصلي (لـ Tauri)، WASM (للمتصفح)، وروابط UniFFI (للموبايل).
-- **llamenos-mobile** — تطبيق React Native للموبايل لنظامي iOS و Android. يستخدم روابط UniFFI لاستدعاء نفس كود Rust التشفيري.
+- **llamenos-hotline** — تطبيق React Native للموبايل لنظامي iOS و Android. يستخدم روابط UniFFI لاستدعاء نفس كود Rust التشفيري.
 
 تنفذ جميع المنصات الثلاث نفس بروتوكول السلك المحدد في `docs/protocol/PROTOCOL.md`.
 

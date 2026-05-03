@@ -15,8 +15,8 @@ description: 1시간 이내에 나만의 Llamenos 핫라인을 배포하세요.
 ## 1. 클론 및 설치
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
+cd llamenos-hotline
 bun install
 ```
 

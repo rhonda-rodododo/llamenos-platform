@@ -15,8 +15,8 @@ description: 在一小时内部署您自己的 Llamenos 热线。
 ## 1. 克隆并安装
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
+cd llamenos-hotline
 bun install
 ```
 

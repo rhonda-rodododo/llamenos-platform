@@ -15,8 +15,8 @@ Deplwaye pwòp liy dirèk Llamenos ou nan mwens ke yon èdtan. W ap bezwen yon k
 ## 1. Klone epi enstale
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
-cd llamenos-platform
+git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
+cd llamenos-hotline
 bun install
 ```
 

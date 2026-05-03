@@ -108,7 +108,7 @@ docker compose version  # 2.x
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/rhonda-rodododo/llamenos-platform.git
+git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
 cd llamenos
 
 # 2. Copy and edit environment config
@@ -662,7 +662,7 @@ docker compose --profile monitoring up -d
 ## Getting Help
 
 - **Self-hosting docs**: `llamenos-hotline.com/docs`
-- **GitHub Issues**: `github.com/rhonda-rodododo/llamenos-platform/issues`
+- **GitHub Issues**: `github.com/rhonda-rodododo/llamenos-hotline/issues`
 - **Signal group**: Ask during a training session for the group link
 - **CLAUDE.md**: In the repo root — full technical reference for deep dives
 

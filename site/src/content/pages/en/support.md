@@ -9,7 +9,7 @@ subtitle: Get help with Llámenos — setup, configuration, and troubleshooting.
 
 We aim to respond within 2 business days. For urgent issues affecting an active crisis line, include "URGENT" in the subject line.
 
-**Bug reports and feature requests:** [github.com/rhonda-rodododo/llamenos-platform/issues](https://github.com/rhonda-rodododo/llamenos-platform/issues)
+**Bug reports and feature requests:** [github.com/rhonda-rodododo/llamenos-hotline/issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues)
 
 **Security disclosures:** For vulnerabilities, please use GitHub's private security advisory feature rather than opening a public issue.
 
@@ -95,7 +95,7 @@ Recording is disabled by default. If your administrator has enabled recording, t
 
 **How do I report a bug?**
 
-Open an issue at [github.com/rhonda-rodododo/llamenos-platform/issues](https://github.com/rhonda-rodododo/llamenos-platform/issues). Include:
+Open an issue at [github.com/rhonda-rodododo/llamenos-hotline/issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues). Include:
 - iOS version and device model
 - App version (found in Settings → About)
 - Steps to reproduce the issue
@@ -104,7 +104,7 @@ Open an issue at [github.com/rhonda-rodododo/llamenos-platform/issues](https://g
 
 **I found a security vulnerability. How do I report it?**
 
-Use GitHub's private security advisory: [github.com/rhonda-rodododo/llamenos-platform/security/advisories/new](https://github.com/rhonda-rodododo/llamenos-platform/security/advisories/new). Do not open a public issue for security vulnerabilities.
+Use GitHub's private security advisory: [github.com/rhonda-rodododo/llamenos-hotline/security/advisories/new](https://github.com/rhonda-rodododo/llamenos-hotline/security/advisories/new). Do not open a public issue for security vulnerabilities.
 
 ---
 
