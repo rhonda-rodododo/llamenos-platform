@@ -168,6 +168,11 @@ pub fn run() {
             crypto::sigchain_verify_link,
             // SFrame key derivation
             crypto::sframe_derive_key,
+            // Hub event decryption (H2 — symmetric key stays in Rust)
+            crypto::set_hub_key,
+            crypto::set_server_event_keys,
+            crypto::decrypt_hub_event,
+            crypto::decrypt_server_event,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

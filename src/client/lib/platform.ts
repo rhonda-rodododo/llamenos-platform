@@ -415,6 +415,62 @@ export async function sigchainVerifyLink(
   return false
 }
 
+// ── Hub event decryption (H2 hardening) ────────────────────────────
+
+/**
+ * Store a hub symmetric key in Rust CryptoState.
+ * After this call, the key is held ONLY in Rust memory — JS cannot access it.
+ */
+export async function setHubKey(hubKeyHex: string): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('set_hub_key', { hubKeyHex })
+    return
+  }
+  throw new Error('WASM set_hub_key not yet implemented')
+}
+
+/**
+ * Store server event keys (epoch-scoped) in Rust CryptoState.
+ * Called after receiving keys from /api/auth/me.
+ */
+export async function setServerEventKeys(keys: Array<[number, string]>): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('set_server_event_keys', { keys })
+    return
+  }
+  throw new Error('WASM set_server_event_keys not yet implemented')
+}
+
+/**
+ * Decrypt hub event content using the hub key stored in Rust CryptoState.
+ * The hub key NEVER enters JavaScript — decryption happens entirely in Rust.
+ */
+export async function decryptHubEvent(ciphertextHex: string): Promise<string | null> {
+  if (useTauri) {
+    try {
+      return await tauriInvoke<string>('decrypt_hub_event', { ciphertextHex })
+    } catch {
+      return null
+    }
+  }
+  throw new Error('WASM decrypt_hub_event not yet implemented')
+}
+
+/**
+ * Decrypt a server-published relay event using the epoch-keyed server event key
+ * stored in Rust CryptoState.
+ */
+export async function decryptServerEvent(ciphertextHex: string, epoch: number): Promise<string | null> {
+  if (useTauri) {
+    try {
+      return await tauriInvoke<string>('decrypt_server_event', { ciphertextHex, epoch })
+    } catch {
+      return null
+    }
+  }
+  throw new Error('WASM decrypt_server_event not yet implemented')
+}
+
 // ── SFrame key derivation ───────────────────────────────────────────
 
 /** Derive an SFrame key for a call participant (stateless). */

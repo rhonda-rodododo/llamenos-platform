@@ -1,74 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { deriveHubEventKey, deriveServerEventKey, deriveHubEventKeys, encryptHubEvent } from '@worker/lib/hub-event-crypto'
+import {
+  deriveServerEventKey,
+  encryptHubEvent,
+  getCurrentEpoch,
+  EVENT_KEY_EPOCH_DURATION,
+} from '@worker/lib/hub-event-crypto'
+import { deriveServerKeypair, deriveServerKeypairLegacy } from '@worker/lib/nostr-publisher'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
-import { hexToBytes } from '@noble/hashes/utils.js'
-import { LABEL_HUB_EVENT, LABEL_HUB_EVENT_KEY } from '@shared/crypto-labels'
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 
 // A 64-hex-char (32-byte) test secret, as SERVER_NOSTR_SECRET is defined.
 const TEST_SECRET = 'c0ffee00'.repeat(8)
 
-describe('deriveHubEventKey (per-hub)', () => {
-  it('returns a 32-byte key', () => {
-    const key = deriveHubEventKey(TEST_SECRET, 'hub-1')
-    expect(key).toBeInstanceOf(Uint8Array)
-    expect(key.length).toBe(32)
-  })
-
-  it('is deterministic — same (secret, hubId) produces same key', () => {
-    const key1 = deriveHubEventKey(TEST_SECRET, 'hub-1')
-    const key2 = deriveHubEventKey(TEST_SECRET, 'hub-1')
-    expect(key1).toEqual(key2)
-  })
-
-  it('different hub IDs produce different keys', () => {
-    const key1 = deriveHubEventKey(TEST_SECRET, 'hub-1')
-    const key2 = deriveHubEventKey(TEST_SECRET, 'hub-2')
-    expect(key1).not.toEqual(key2)
-  })
-
-  it('different secrets produce different keys for the same hub', () => {
-    const key1 = deriveHubEventKey(TEST_SECRET, 'hub-1')
-    const key2 = deriveHubEventKey('deadbeef'.repeat(8), 'hub-1')
-    expect(key1).not.toEqual(key2)
-  })
-
-  it('per-hub key differs from legacy global key', () => {
-    const perHub = deriveHubEventKey(TEST_SECRET, 'hub-1')
-    const legacy = deriveServerEventKey(TEST_SECRET)
-    expect(perHub).not.toEqual(legacy)
-  })
-
-  it('empty-string hubId produces a valid key (for cross-hub events)', () => {
-    const key = deriveHubEventKey(TEST_SECRET, '')
-    expect(key).toBeInstanceOf(Uint8Array)
-    expect(key.length).toBe(32)
-  })
-
-  it('uses LABEL_HUB_EVENT_KEY domain separation', () => {
-    expect(LABEL_HUB_EVENT_KEY).toBe('llamenos:hub-event-key:v1')
-    // The key is derived with LABEL_HUB_EVENT_KEY info, not LABEL_HUB_EVENT
-    expect(LABEL_HUB_EVENT_KEY).not.toBe(LABEL_HUB_EVENT)
-  })
-})
-
-describe('deriveHubEventKeys', () => {
-  it('returns a map of hubId to hex key', () => {
-    const keys = deriveHubEventKeys(TEST_SECRET, ['hub-1', 'hub-2'])
-    expect(Object.keys(keys)).toEqual(['hub-1', 'hub-2'])
-    expect(keys['hub-1']).toMatch(/^[0-9a-f]{64}$/)
-    expect(keys['hub-2']).toMatch(/^[0-9a-f]{64}$/)
-    expect(keys['hub-1']).not.toBe(keys['hub-2'])
-  })
-
-  it('includes empty-string key when requested', () => {
-    const keys = deriveHubEventKeys(TEST_SECRET, ['', 'hub-1'])
-    expect(keys['']).toMatch(/^[0-9a-f]{64}$/)
-    expect(keys['hub-1']).toMatch(/^[0-9a-f]{64}$/)
-    expect(keys['']).not.toBe(keys['hub-1'])
-  })
-})
-
-describe('deriveServerEventKey (legacy)', () => {
+describe('deriveServerEventKey', () => {
   it('returns a 32-byte key', () => {
     const key = deriveServerEventKey(TEST_SECRET)
     expect(key).toBeInstanceOf(Uint8Array)
@@ -80,10 +24,104 @@ describe('deriveServerEventKey (legacy)', () => {
     const key2 = deriveServerEventKey(TEST_SECRET)
     expect(key1).toEqual(key2)
   })
+
+  it('different secrets produce different keys', () => {
+    const key1 = deriveServerEventKey(TEST_SECRET)
+    const key2 = deriveServerEventKey('deadbeef00'.repeat(6) + 'deadbeef')
+    expect(key1).not.toEqual(key2)
+  })
+})
+
+describe('H1: Signing / encryption key separation', () => {
+  it('signing key and encryption key are derived independently', () => {
+    const signingKeypair = deriveServerKeypair(TEST_SECRET)
+    const encryptionKey = deriveServerEventKey(TEST_SECRET)
+
+    // The signing secret key (32 bytes) must differ from the encryption key (32 bytes)
+    expect(bytesToHex(signingKeypair.secretKey)).not.toBe(bytesToHex(encryptionKey))
+  })
+
+  it('new signing key differs from legacy signing key', () => {
+    const newKeypair = deriveServerKeypair(TEST_SECRET)
+    const legacyKeypair = deriveServerKeypairLegacy(TEST_SECRET)
+
+    expect(newKeypair.pubkey).not.toBe(legacyKeypair.pubkey)
+    expect(bytesToHex(newKeypair.secretKey)).not.toBe(bytesToHex(legacyKeypair.secretKey))
+  })
+
+  it('encryption key is deterministic for same inputs', () => {
+    const key1 = deriveServerEventKey(TEST_SECRET)
+    const key2 = deriveServerEventKey(TEST_SECRET)
+    expect(bytesToHex(key1)).toBe(bytesToHex(key2))
+  })
+
+  it('different secrets produce different encryption keys', () => {
+    const key1 = deriveServerEventKey(TEST_SECRET)
+    const key2 = deriveServerEventKey('b'.repeat(64))
+    expect(bytesToHex(key1)).not.toBe(bytesToHex(key2))
+  })
+})
+
+describe('H5: Epoch-based key rotation', () => {
+  it('getCurrentEpoch returns a positive integer', () => {
+    const epoch = getCurrentEpoch()
+    expect(epoch).toBeGreaterThan(0)
+    expect(Number.isInteger(epoch)).toBe(true)
+  })
+
+  it('getCurrentEpoch is deterministic for same timestamp', () => {
+    const ts = 1700000000
+    expect(getCurrentEpoch(ts)).toBe(getCurrentEpoch(ts))
+  })
+
+  it('timestamps within same epoch produce same epoch number', () => {
+    // Use a timestamp aligned to an epoch boundary to avoid off-by-one
+    const epochNum = 19675 // arbitrary epoch
+    const baseTs = epochNum * EVENT_KEY_EPOCH_DURATION
+    const epoch1 = getCurrentEpoch(baseTs)
+    const epoch2 = getCurrentEpoch(baseTs + EVENT_KEY_EPOCH_DURATION - 1)
+    expect(epoch1).toBe(epoch2)
+    expect(epoch1).toBe(epochNum)
+  })
+
+  it('timestamps in adjacent epochs produce different epoch numbers', () => {
+    const baseTs = 1700000000
+    const epoch1 = getCurrentEpoch(baseTs)
+    const epoch2 = getCurrentEpoch(baseTs + EVENT_KEY_EPOCH_DURATION)
+    expect(epoch2).toBe(epoch1 + 1)
+  })
+
+  it('different epochs produce different encryption keys', () => {
+    const key1 = deriveServerEventKey(TEST_SECRET, undefined, 100)
+    const key2 = deriveServerEventKey(TEST_SECRET, undefined, 101)
+    expect(bytesToHex(key1)).not.toBe(bytesToHex(key2))
+  })
+
+  it('same epoch produces same encryption key', () => {
+    const key1 = deriveServerEventKey(TEST_SECRET, undefined, 100)
+    const key2 = deriveServerEventKey(TEST_SECRET, undefined, 100)
+    expect(bytesToHex(key1)).toBe(bytesToHex(key2))
+  })
+
+  it('per-hub keys are different from global keys', () => {
+    const globalKey = deriveServerEventKey(TEST_SECRET, undefined, 100)
+    const hubKey = deriveServerEventKey(TEST_SECRET, 'hub-123', 100)
+    expect(bytesToHex(globalKey)).not.toBe(bytesToHex(hubKey))
+  })
+
+  it('different hubs produce different keys at same epoch', () => {
+    const hubKey1 = deriveServerEventKey(TEST_SECRET, 'hub-1', 100)
+    const hubKey2 = deriveServerEventKey(TEST_SECRET, 'hub-2', 100)
+    expect(bytesToHex(hubKey1)).not.toBe(bytesToHex(hubKey2))
+  })
+
+  it('EVENT_KEY_EPOCH_DURATION is 24 hours', () => {
+    expect(EVENT_KEY_EPOCH_DURATION).toBe(86400)
+  })
 })
 
 describe('encryptHubEvent', () => {
-  const eventKey = deriveHubEventKey(TEST_SECRET, 'hub-1')
+  const eventKey = deriveServerEventKey(TEST_SECRET)
 
   it('returns a hex string', () => {
     const hex = encryptHubEvent({ type: 'test' }, eventKey)
@@ -123,22 +161,31 @@ describe('encryptHubEvent', () => {
     const nonce = packed.slice(0, 24)
     const ciphertext = packed.slice(24)
 
-    const wrongKey = deriveHubEventKey(TEST_SECRET, 'hub-2')
+    const wrongKey = deriveServerEventKey('deadbeef'.repeat(8))
     const cipher = xchacha20poly1305(wrongKey, nonce)
 
     expect(() => cipher.decrypt(ciphertext)).toThrow()
   })
 
-  it('hub-1 key cannot decrypt hub-2 encrypted content', () => {
-    const hub1Key = deriveHubEventKey(TEST_SECRET, 'hub-1')
-    const hub2Key = deriveHubEventKey(TEST_SECRET, 'hub-2')
+  it('epoch-derived key can round-trip decrypt', () => {
+    const epoch = getCurrentEpoch()
+    const epochKey = deriveServerEventKey(TEST_SECRET, undefined, epoch)
+    const content = { type: 'epoch-test', epoch }
+    const hex = encryptHubEvent(content, epochKey)
 
-    const hex = encryptHubEvent({ secret: 'for-hub-2' }, hub2Key)
+    // Decrypt with same epoch key
     const packed = hexToBytes(hex)
     const nonce = packed.slice(0, 24)
     const ciphertext = packed.slice(24)
+    const cipher = xchacha20poly1305(epochKey, nonce)
+    const plaintext = cipher.decrypt(ciphertext)
+    const decoded = JSON.parse(new TextDecoder().decode(plaintext))
 
-    const cipher = xchacha20poly1305(hub1Key, nonce)
-    expect(() => cipher.decrypt(ciphertext)).toThrow()
+    expect(decoded).toEqual(content)
+
+    // Decrypt with different epoch key fails
+    const wrongEpochKey = deriveServerEventKey(TEST_SECRET, undefined, epoch + 1)
+    const wrongCipher = xchacha20poly1305(wrongEpochKey, nonce)
+    expect(() => wrongCipher.decrypt(ciphertext)).toThrow()
   })
 })

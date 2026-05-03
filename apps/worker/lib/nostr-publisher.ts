@@ -15,7 +15,12 @@ import { hexToBytes } from '@noble/hashes/utils.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { LABEL_SERVER_NOSTR_KEY, LABEL_SERVER_NOSTR_KEY_INFO } from '@shared/crypto-labels'
+import {
+  LABEL_SERVER_NOSTR_KEY,
+  LABEL_SERVER_NOSTR_KEY_INFO,
+  LABEL_SERVER_NOSTR_SIGNING_KEY,
+  LABEL_SERVER_NOSTR_SIGNING_KEY_INFO,
+} from '@shared/crypto-labels'
 import { KIND_NIP42_AUTH } from '@shared/nostr-events'
 import { withRetry, isRetryableError, RetryableError } from './retry'
 import { getCircuitBreaker } from './circuit-breaker'
@@ -48,15 +53,33 @@ export interface NostrPublisher {
 }
 
 /**
- * Derive the server Nostr keypair from SERVER_NOSTR_SECRET using HKDF.
+ * Derive the server Nostr signing keypair from SERVER_NOSTR_SECRET using HKDF.
  *
- * This is deterministic — same secret always produces the same keypair.
- * The secret should be a 32-byte hex string generated once per deployment
- * (e.g., `openssl rand -hex 32`).
+ * Uses signing-specific domain separation labels so that the signing key
+ * is cryptographically independent from the encryption key (H1 fix).
+ *
+ * Falls back to legacy labels for backwards compatibility if the deployment
+ * hasn't rotated secrets yet.
  *
  * Returns { secretKey, pubkey } where pubkey is hex x-only (32 bytes).
  */
 export function deriveServerKeypair(serverSecret: string): { secretKey: Uint8Array; pubkey: string } {
+  const secretBytes = hexToBytes(serverSecret)
+  const secretKey = hkdf(
+    sha256,
+    secretBytes,
+    utf8ToBytes(LABEL_SERVER_NOSTR_SIGNING_KEY),
+    utf8ToBytes(LABEL_SERVER_NOSTR_SIGNING_KEY_INFO),
+    32,
+  )
+  const pubkey = getPublicKey(secretKey)
+  return { secretKey, pubkey }
+}
+
+/**
+ * @deprecated Use deriveServerKeypair (signing-separated). Kept for migration tooling.
+ */
+export function deriveServerKeypairLegacy(serverSecret: string): { secretKey: Uint8Array; pubkey: string } {
   const secretBytes = hexToBytes(serverSecret)
   const secretKey = hkdf(
     sha256,
@@ -152,11 +175,14 @@ export class CFNostrPublisher implements NostrPublisher {
  * - NIP-42 authentication on connect
  * - Graceful shutdown
  */
+/** NIP-42 authentication state */
+export type AuthState = 'unauthenticated' | 'authenticating' | 'authenticated'
+
 export class NodeNostrPublisher implements NostrPublisher {
   readonly serverPubkey: string
   private readonly secretKey: Uint8Array
   private ws: WebSocket | null = null
-  private authenticated = false
+  private authState: AuthState = 'unauthenticated'
   private connecting = false
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -165,6 +191,8 @@ export class NodeNostrPublisher implements NostrPublisher {
   private publishTimeout = 10_000
   private closed = false
   private outbox: NostrEventOutbox | null = null
+  /** The event ID of the most recent NIP-42 auth event, used to match relay OK */
+  private pendingAuthEventId: string | null = null
 
   constructor(
     private readonly relayUrl: string,
@@ -234,7 +262,7 @@ export class NodeNostrPublisher implements NostrPublisher {
       await this.outbox.enqueue(eventRecord)
 
       // Attempt immediate delivery if connected
-      if (this.ws?.readyState === WebSocket.OPEN && this.authenticated) {
+      if (this.ws?.readyState === WebSocket.OPEN && this.authState === 'authenticated') {
         // Fire-and-forget — outbox poller will retry on failure
         this.sendAndAwaitOk(event).catch(() => {
           // Event is safe in the outbox — poller will retry
@@ -248,7 +276,7 @@ export class NodeNostrPublisher implements NostrPublisher {
     }
 
     // Without outbox: original behavior (in-memory queue)
-    if (this.ws?.readyState === WebSocket.OPEN && this.authenticated) {
+    if (this.ws?.readyState === WebSocket.OPEN && this.authState === 'authenticated') {
       return this.sendAndAwaitOk(event)
     }
 
@@ -267,7 +295,7 @@ export class NodeNostrPublisher implements NostrPublisher {
    * Throws if not connected or delivery fails.
    */
   async deliverSignedEvent(eventJson: Record<string, unknown>): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.authenticated) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.authState !== 'authenticated') {
       // Trigger reconnect if needed
       if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
         this.connect().catch(() => {})
@@ -336,20 +364,7 @@ export class NodeNostrPublisher implements NostrPublisher {
           if (data[0] === 'AUTH') {
             this.handleNIP42Auth(data[1] as string)
           } else if (data[0] === 'OK') {
-            const eventId = data[1] as string
-            const accepted = data[2] as boolean
-            const message = data[3] as string
-            const pending = this.pendingPublishes.get(eventId)
-            if (pending) {
-              this.pendingPublishes.delete(eventId)
-              if (accepted) {
-                pending.resolve()
-              } else {
-                pending.reject(new Error(`Relay rejected event ${eventId}: ${message}`))
-              }
-            } else if (!accepted) {
-              logger.warn(`Event ${eventId} rejected: ${message}`)
-            }
+            this.handleOK(data[1] as string, data[2] as boolean, data[3] as string)
           } else if (data[0] === 'NOTICE') {
             logger.warn(`Relay notice: ${data[1]}`)
           }
@@ -360,7 +375,8 @@ export class NodeNostrPublisher implements NostrPublisher {
     })
 
     ws.addEventListener('close', () => {
-      this.authenticated = false
+      this.authState = 'unauthenticated'
+      this.pendingAuthEventId = null
       this.ws = null
       if (!this.closed) {
         for (const pending of this.pendingPublishes.values()) {
@@ -377,8 +393,8 @@ export class NodeNostrPublisher implements NostrPublisher {
 
     // If no AUTH challenge arrives within 2s, assume open relay
     setTimeout(() => {
-      if (!this.authenticated && this.ws === ws) {
-        this.authenticated = true
+      if (this.authState === 'unauthenticated' && this.ws === ws) {
+        this.authState = 'authenticated'
         this.flushPendingEvents()
       }
     }, 2000)
@@ -397,9 +413,38 @@ export class NodeNostrPublisher implements NostrPublisher {
       content: '',
     }, this.secretKey)
 
+    this.pendingAuthEventId = authEvent.id
+    this.authState = 'authenticating'
     this.ws.send(JSON.stringify(['AUTH', authEvent]))
-    this.authenticated = true
-    this.flushPendingEvents()
+    // Events are buffered until relay confirms auth via OK
+  }
+
+  private handleOK(eventId: string, accepted: boolean, message: string): void {
+    // Check if this OK is for our pending NIP-42 auth event
+    if (this.pendingAuthEventId && eventId === this.pendingAuthEventId) {
+      this.pendingAuthEventId = null
+      if (accepted) {
+        this.authState = 'authenticated'
+        this.flushPendingEvents()
+      } else {
+        this.authState = 'unauthenticated'
+        logger.error(`Relay rejected NIP-42 auth: ${message}`)
+        this.scheduleReconnect()
+      }
+      return
+    }
+
+    const pending = this.pendingPublishes.get(eventId)
+    if (pending) {
+      this.pendingPublishes.delete(eventId)
+      if (accepted) {
+        pending.resolve()
+      } else {
+        pending.reject(new Error(`Relay rejected event ${eventId}: ${message}`))
+      }
+    } else if (!accepted) {
+      logger.warn(`Event ${eventId} rejected: ${message}`)
+    }
   }
 
   private flushPendingEvents(): void {

@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useConfig, useHasMessaging } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
-import { useEffect, useState, useCallback, type ReactNode } from 'react'
-import { hexToBytes } from '@noble/hashes/utils.js'
+import { useEffect, useState, type ReactNode } from 'react'
+import { setServerEventKeys } from '@/lib/platform'
 import { NostrProvider } from '@/lib/nostr/context'
 import { useCalls, useShiftStatus } from '@/lib/hooks'
 import { CommandPalette, triggerCommandPalette } from '@/components/command-palette'
@@ -163,23 +163,27 @@ const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frid
 function NostrWrappedLayout() {
   const { serverNostrPubkey, nostrRelayUrl } = useConfig()
 
-  const { hubEventKeys } = useAuth()
+  const { serverEventKeyHex, serverEventKeyPrevHex, eventKeyEpoch } = useAuth()
 
-  // Per-hub event keys for decrypting relay events (XChaCha20-Poly1305).
-  // Keys come from GET /api/auth/me — HKDF-derived per hub from SERVER_NOSTR_SECRET.
-  const getHubEventKey = useCallback((hubId: string): Uint8Array | null => {
-    if (!hubEventKeys) return null
-    const keyHex = hubEventKeys[hubId]
-    if (!keyHex) return null
-    return hexToBytes(keyHex)
-  }, [hubEventKeys])
+  // Push epoch-scoped server event keys to Rust CryptoState (H2 hardening —
+  // keys never stay in JS memory longer than needed for the IPC call)
+  useEffect(() => {
+    if (serverEventKeyHex && eventKeyEpoch !== undefined) {
+      const keys: Array<[number, string]> = [[eventKeyEpoch, serverEventKeyHex]]
+      if (serverEventKeyPrevHex) {
+        keys.push([eventKeyEpoch - 1, serverEventKeyPrevHex])
+      }
+      setServerEventKeys(keys).catch((err: unknown) => {
+        console.error('[nostr] Failed to push event keys to Rust:', err)
+      })
+    }
+  }, [serverEventKeyHex, serverEventKeyPrevHex, eventKeyEpoch])
 
   return (
     <NostrProvider
       relayUrl={nostrRelayUrl}
       serverPubkey={serverNostrPubkey}
       isAuthenticated={true}
-      getHubEventKey={getHubEventKey}
     >
       <AuthenticatedLayout />
     </NostrProvider>

@@ -1,20 +1,19 @@
 /**
  * Hub-event encryption for Nostr relay events.
  *
- * Each hub gets its own symmetric event encryption key, derived from
- * SERVER_NOSTR_SECRET with the hubId as HKDF salt. This ensures a user
- * with access to one hub cannot decrypt events for other hubs.
+ * The hub key is client-side only (ECIES-wrapped per member); the server never
+ * holds the raw hub key. For server-published events, we derive a symmetric
+ * event encryption key from SERVER_NOSTR_SECRET so that relay content is
+ * encrypted at rest. Clients receive this key via the hub key distribution
+ * envelope (the admin wraps it alongside the hub key).
  *
- * Derivation (per-hub):
- *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=hubId, info=LABEL_HUB_EVENT_KEY, 32)
+ * Derivation:
+ *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=empty, info="llamenos:hub-event", 32)
  *   nonce = random(24)
  *   ciphertext = XChaCha20-Poly1305(event_key, nonce).encrypt(UTF-8(json))
  *   output = hex(nonce || ciphertext)
  *
- * Legacy (global, deprecated — kept for backward compatibility during migration):
- *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=empty, info=LABEL_HUB_EVENT, 32)
- *
- * Clients receive per-hub event keys via GET /api/auth/me (hubEventKeys map).
+ * Clients receive the server's event key via GET /api/auth/me (serverEventKeyHex).
  */
 
 import { hkdf } from '@noble/hashes/hkdf.js'
@@ -22,35 +21,45 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { LABEL_HUB_EVENT, LABEL_HUB_EVENT_KEY } from '@shared/crypto-labels'
+import {
+  LABEL_SERVER_EVENT_ENCRYPTION_KEY,
+  LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO,
+  LABEL_HUB_EVENT_EPOCH,
+} from '@shared/crypto-labels'
 
 /**
- * Derive a per-hub event encryption key from SERVER_NOSTR_SECRET.
- * Uses hubId as HKDF salt for domain separation between hubs.
- * Deterministic — same (secret, hubId) always produces the same key.
+ * Derive the server event encryption key from SERVER_NOSTR_SECRET.
+ *
+ * Uses encryption-specific domain separation labels (H1 fix) — cryptographically
+ * independent from the signing key derived in nostr-publisher.ts.
+ *
+ * Optionally accepts a hubId for per-hub key scoping and an epoch for
+ * forward secrecy (H5 fix). When epoch is provided, the key changes
+ * each epoch window, providing forward secrecy.
  */
-export function deriveHubEventKey(serverSecret: string, hubId: string): Uint8Array {
-  return hkdf(sha256, hexToBytes(serverSecret), utf8ToBytes(hubId), utf8ToBytes(LABEL_HUB_EVENT_KEY), 32)
+export function deriveServerEventKey(
+  serverSecret: string,
+  hubId?: string,
+  epoch?: number,
+): Uint8Array {
+  const salt = hubId
+    ? utf8ToBytes(`${LABEL_SERVER_EVENT_ENCRYPTION_KEY}:${hubId}`)
+    : utf8ToBytes(LABEL_SERVER_EVENT_ENCRYPTION_KEY)
+
+  const info = epoch !== undefined
+    ? utf8ToBytes(`${LABEL_HUB_EVENT_EPOCH}:${epoch}`)
+    : utf8ToBytes(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO)
+
+  return hkdf(sha256, hexToBytes(serverSecret), salt, info, 32)
 }
 
-/**
- * @deprecated Use deriveHubEventKey() with a hubId instead.
- * Kept for backward compatibility during migration — derives the old global key.
- */
-export function deriveServerEventKey(serverSecret: string): Uint8Array {
-  return hkdf(sha256, hexToBytes(serverSecret), new Uint8Array(0), utf8ToBytes(LABEL_HUB_EVENT), 32)
-}
+/** Default epoch duration in seconds (24 hours) */
+export const EVENT_KEY_EPOCH_DURATION = 86400
 
-/**
- * Derive event keys for multiple hubs at once.
- * Returns a map of hubId → hex-encoded key.
- */
-export function deriveHubEventKeys(serverSecret: string, hubIds: string[]): Record<string, string> {
-  const keys: Record<string, string> = {}
-  for (const hubId of hubIds) {
-    keys[hubId] = bytesToHex(deriveHubEventKey(serverSecret, hubId))
-  }
-  return keys
+/** Get the current epoch number based on timestamp */
+export function getCurrentEpoch(timestampSec?: number): number {
+  const ts = timestampSec ?? Math.floor(Date.now() / 1000)
+  return Math.floor(ts / EVENT_KEY_EPOCH_DURATION)
 }
 
 /**

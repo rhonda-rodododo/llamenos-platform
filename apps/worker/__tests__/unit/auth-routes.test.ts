@@ -36,11 +36,9 @@ vi.mock('@worker/services/audit', () => ({
 }))
 
 vi.mock('@worker/lib/hub-event-crypto', () => ({
-  deriveHubEventKeys: (_secret: string, hubIds: string[]) => {
-    const keys: Record<string, string> = {}
-    for (const id of hubIds) keys[id] = 'aa'.repeat(32)
-    return keys
-  },
+  deriveServerEventKey: (_secret: string, _hubId?: string, _epoch?: number) => new Uint8Array(32),
+  getCurrentEpoch: (_ts?: number) => 19999,
+  EVENT_KEY_EPOCH_DURATION: 86400,
 }))
 
 vi.mock('@worker/middleware/auth', () => ({

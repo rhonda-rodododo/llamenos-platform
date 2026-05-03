@@ -12,6 +12,11 @@ use std::sync::Mutex;
 use llamenos_core::{auth, device_keys, hpke_envelope, puk, sigchain};
 use tauri_plugin_store::StoreExt;
 
+use chacha20poly1305::{
+    aead::{Aead, KeyInit},
+    XChaCha20Poly1305, XNonce,
+};
+
 fn err_str(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
@@ -28,6 +33,12 @@ pub struct CryptoState {
     pin_failed_attempts: Mutex<u32>,
     /// PIN lockout expiry — epoch millis. Zero means no lockout.
     pin_lockout_until: Mutex<u64>,
+    /// Hub symmetric key — 32 bytes for XChaCha20-Poly1305 hub event decryption.
+    /// Stored in Rust to prevent webview JS from accessing it (H2 hardening).
+    hub_key: Mutex<Option<Vec<u8>>>,
+    /// Server event key(s) — epoch-scoped symmetric keys for relay event decryption.
+    /// Current + previous epoch for rolling window (H5 hardening).
+    server_event_keys: Mutex<Vec<(u64, Vec<u8>)>>,
 }
 
 impl CryptoState {
@@ -37,6 +48,8 @@ impl CryptoState {
             device_state: Mutex::new(None),
             pin_failed_attempts: Mutex::new(0),
             pin_lockout_until: Mutex::new(0),
+            hub_key: Mutex::new(None),
+            server_event_keys: Mutex::new(Vec::new()),
         }
     }
 
@@ -45,6 +58,8 @@ impl CryptoState {
         // DeviceSecrets implements Zeroize on drop
         *self.secrets.lock().unwrap() = None;
         *self.device_state.lock().unwrap() = None;
+        *self.hub_key.lock().unwrap() = None;
+        self.server_event_keys.lock().unwrap().clear();
     }
 
     fn with_secrets<T>(
@@ -403,4 +418,91 @@ pub fn sframe_derive_key(
     let key = llamenos_core::sframe::derive_sframe_key(&exporter_secret, &call_id, participant_index)
         .map_err(err_str)?;
     Ok(hex::encode(key))
+}
+
+// ── Hub event decryption (H2 hardening — symmetric key stays in Rust) ──
+
+/// Store a hub symmetric key in CryptoState. Called after unwrapping from HPKE envelope.
+/// The key NEVER enters JavaScript — it goes directly from HPKE open to this state.
+#[tauri::command]
+pub fn set_hub_key(state: tauri::State<'_, CryptoState>, hub_key_hex: String) -> Result<(), String> {
+    let key_bytes = hex::decode(&hub_key_hex).map_err(err_str)?;
+    if key_bytes.len() != 32 {
+        return Err(format!("Hub key must be 32 bytes, got {}", key_bytes.len()));
+    }
+    *state.hub_key.lock().unwrap() = Some(key_bytes);
+    Ok(())
+}
+
+/// Store server event keys (current + previous epoch) in CryptoState.
+/// Called from JS after receiving keys from /api/auth/me.
+#[tauri::command]
+pub fn set_server_event_keys(
+    state: tauri::State<'_, CryptoState>,
+    keys: Vec<(u64, String)>,
+) -> Result<(), String> {
+    let mut decoded = Vec::with_capacity(keys.len());
+    for (epoch, hex_key) in keys {
+        let key_bytes = hex::decode(&hex_key).map_err(err_str)?;
+        if key_bytes.len() != 32 {
+            return Err(format!("Event key must be 32 bytes, got {}", key_bytes.len()));
+        }
+        decoded.push((epoch, key_bytes));
+    }
+    *state.server_event_keys.lock().unwrap() = decoded;
+    Ok(())
+}
+
+/// Decrypt hub event content using the hub key stored in CryptoState.
+/// Input: hex-encoded nonce(24) + ciphertext (XChaCha20-Poly1305).
+/// Returns the decrypted plaintext string.
+#[tauri::command]
+pub fn decrypt_hub_event(
+    state: tauri::State<'_, CryptoState>,
+    ciphertext_hex: String,
+) -> Result<String, String> {
+    let hub_key = state.hub_key.lock().unwrap();
+    let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
+
+    let data = hex::decode(&ciphertext_hex).map_err(err_str)?;
+    if data.len() < 24 {
+        return Err("Ciphertext too short (need at least 24-byte nonce)".into());
+    }
+
+    let nonce = XNonce::from_slice(&data[..24]);
+    let cipher = XChaCha20Poly1305::new_from_slice(key)
+        .map_err(|e| format!("Invalid hub key: {e}"))?;
+    let plaintext = cipher.decrypt(nonce, &data[24..])
+        .map_err(|_| "Hub event decryption failed (wrong key or corrupted data)".to_string())?;
+
+    String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
+}
+
+/// Decrypt a server-published relay event using the epoch-keyed server event key.
+/// Input: hex-encoded nonce(24) + ciphertext + epoch number.
+/// Returns the decrypted plaintext string.
+#[tauri::command]
+pub fn decrypt_server_event(
+    state: tauri::State<'_, CryptoState>,
+    ciphertext_hex: String,
+    epoch: u64,
+) -> Result<String, String> {
+    let keys = state.server_event_keys.lock().unwrap();
+    let key = keys.iter()
+        .find(|(e, _)| *e == epoch)
+        .map(|(_, k)| k)
+        .ok_or_else(|| format!("No server event key for epoch {epoch}"))?;
+
+    let data = hex::decode(&ciphertext_hex).map_err(err_str)?;
+    if data.len() < 24 {
+        return Err("Ciphertext too short (need at least 24-byte nonce)".into());
+    }
+
+    let nonce = XNonce::from_slice(&data[..24]);
+    let cipher = XChaCha20Poly1305::new_from_slice(key)
+        .map_err(|e| format!("Invalid server event key: {e}"))?;
+    let plaintext = cipher.decrypt(nonce, &data[24..])
+        .map_err(|_| "Server event decryption failed (wrong key or corrupted data)".to_string())?;
+
+    String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
 }

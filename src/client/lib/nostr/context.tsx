@@ -30,8 +30,11 @@ interface NostrProviderProps {
   serverPubkey: string | undefined
   /** Whether the user is authenticated */
   isAuthenticated: boolean
-  /** Look up the per-hub event decryption key by hub ID. Returns null if unavailable. */
-  getHubEventKey: (hubId: string) => Uint8Array | null
+  /**
+   * @deprecated Hub key now lives in Rust CryptoState — use platform.setHubKey().
+   * Kept for backwards compat; ignored by RelayManager.
+   */
+  getHubKey?: () => Uint8Array | null
 }
 
 export function NostrProvider({
@@ -39,14 +42,9 @@ export function NostrProvider({
   relayUrl,
   serverPubkey,
   isAuthenticated,
-  getHubEventKey,
 }: NostrProviderProps) {
   const [state, setState] = useState<RelayState>('disconnected')
   const relayRef = useRef<RelayManager | null>(null)
-
-  // Stable ref for hub key callback to avoid recreating RelayManager on every render
-  const getHubEventKeyRef = useRef(getHubEventKey)
-  getHubEventKeyRef.current = getHubEventKey
 
   useEffect(() => {
     if (!isAuthenticated || !relayUrl || !serverPubkey) {
@@ -72,7 +70,6 @@ export function NostrProvider({
     const manager = new RelayManager({
       relayUrl: wsUrl,
       serverPubkey,
-      getHubEventKey: (hubId: string) => getHubEventKeyRef.current(hubId),
       onStateChange: setState,
     })
 
