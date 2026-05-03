@@ -85,34 +85,12 @@ devicesRoutes.post('/register',
   })
 
 /**
- * DELETE /api/devices/:id
- * Deregister a specific device. Device must belong to the authenticated user.
- * Callers should trigger PUK rotation after deregistering a device.
- */
-devicesRoutes.delete('/:id',
-  describeRoute({
-    tags: ['Devices'],
-    summary: 'Deregister a specific device',
-    responses: {
-      204: { description: 'Device deregistered' },
-      404: { description: 'Device not found or not owned by caller' },
-      ...authErrors,
-    },
-  }),
-  async (c) => {
-    const pubkey = c.get('pubkey')
-    const deviceId = c.req.param('id')
-    const services = c.get('services')
-
-    const deleted = await services.identity.deleteDeviceById(pubkey, deviceId)
-    if (!deleted) return c.json({ error: 'Device not found' }, 404)
-    return c.body(null, 204)
-  })
-
-/**
  * POST /api/devices/voip-token
  * Register a VoIP-specific push token (PushKit on iOS, FCM on Android).
  * Stored separately from regular push tokens — used for high-priority call dispatch.
+ *
+ * NOTE: voip-token routes MUST be registered BEFORE /:id to prevent
+ * the parameterized route from intercepting literal /voip-token requests.
  */
 devicesRoutes.post('/voip-token',
   describeRoute({
@@ -157,6 +135,34 @@ devicesRoutes.delete('/voip-token',
 
     await services.identity.deleteVoipToken(pubkey)
 
+    return c.body(null, 204)
+  })
+
+/**
+ * DELETE /api/devices/:id
+ * Deregister a specific device. Device must belong to the authenticated user.
+ * Callers should trigger PUK rotation after deregistering a device.
+ *
+ * NOTE: This parameterized route MUST come after literal routes
+ * (like /voip-token) to prevent it from capturing their paths.
+ */
+devicesRoutes.delete('/:id',
+  describeRoute({
+    tags: ['Devices'],
+    summary: 'Deregister a specific device',
+    responses: {
+      204: { description: 'Device deregistered' },
+      404: { description: 'Device not found or not owned by caller' },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const pubkey = c.get('pubkey')
+    const deviceId = c.req.param('id')
+    const services = c.get('services')
+
+    const deleted = await services.identity.deleteDeviceById(pubkey, deviceId)
+    if (!deleted) return c.json({ error: 'Device not found' }, 404)
     return c.body(null, 204)
   })
 
