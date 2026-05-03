@@ -54,11 +54,30 @@ function createMockAdapter(): MessagingAdapter {
   } as unknown as MessagingAdapter
 }
 
+function createSettingsService(overrides: Partial<SettingsService> = {}): SettingsService {
+  return {
+    getMessagingConfig: vi.fn().mockResolvedValue({
+      enabledChannels: ['sms', 'whatsapp', 'signal'],
+      sms: { enabled: true },
+      whatsapp: { integrationMode: 'twilio' as const },
+      signal: { bridgeUrl: 'http://signal-bridge', bridgeApiKey: 'key', webhookSecret: 'secret', registeredNumber: '+15550000000' },
+      rcs: null,
+      telegram: null,
+      autoAssign: true,
+      inactivityTimeout: 60,
+      maxConcurrentPerUser: 3,
+      preferSignalDelivery: true,
+      smsContentMode: 'notification-only',
+    }),
+    ...overrides,
+  } as unknown as SettingsService
+}
+
 function createDeps(overrides: Record<string, unknown> = {}) {
   const mockAdapter = createMockAdapter()
   return {
     blastsService: createMockBlastsService(),
-    settingsService: {} as SettingsService,
+    settingsService: createSettingsService(),
     resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
     resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
     onProgress: vi.fn(),
@@ -101,7 +120,19 @@ describe('blast-delivery-worker', () => {
 
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService({ getMessagingConfig: vi.fn().mockResolvedValue({
+          enabledChannels: ['sms', 'whatsapp', 'signal'],
+          sms: { enabled: true },
+          whatsapp: { integrationMode: 'twilio' as const },
+          signal: { bridgeUrl: 'http://signal-bridge', bridgeApiKey: 'key', webhookSecret: 'secret', registeredNumber: '+15550000000' },
+          rcs: null,
+          telegram: null,
+          autoAssign: true,
+          inactivityTimeout: 60,
+          maxConcurrentPerUser: 3,
+          preferSignalDelivery: true,
+          smsContentMode: 'full' as const,
+        }) }),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
       }
@@ -136,7 +167,19 @@ describe('blast-delivery-worker', () => {
 
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService({ getMessagingConfig: vi.fn().mockResolvedValue({
+          enabledChannels: ['sms', 'whatsapp', 'signal'],
+          sms: { enabled: true },
+          whatsapp: { integrationMode: 'twilio' as const },
+          signal: { bridgeUrl: 'http://signal-bridge', bridgeApiKey: 'key', webhookSecret: 'secret', registeredNumber: '+15550000000' },
+          rcs: null,
+          telegram: null,
+          autoAssign: true,
+          inactivityTimeout: 60,
+          maxConcurrentPerUser: 3,
+          preferSignalDelivery: true,
+          smsContentMode: 'full' as const,
+        }) }),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
       }
@@ -169,7 +212,19 @@ describe('blast-delivery-worker', () => {
 
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService({ getMessagingConfig: vi.fn().mockResolvedValue({
+          enabledChannels: ['sms', 'whatsapp', 'signal'],
+          sms: { enabled: true },
+          whatsapp: { integrationMode: 'twilio' as const },
+          signal: { bridgeUrl: 'http://signal-bridge', bridgeApiKey: 'key', webhookSecret: 'secret', registeredNumber: '+15550000000' },
+          rcs: null,
+          telegram: null,
+          autoAssign: true,
+          inactivityTimeout: 60,
+          maxConcurrentPerUser: 3,
+          preferSignalDelivery: true,
+          smsContentMode: 'full' as const,
+        }) }),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
       }
@@ -228,7 +283,7 @@ describe('blast-delivery-worker', () => {
       const onStatusChange = vi.fn()
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService(),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
         onStatusChange,
@@ -347,7 +402,7 @@ describe('blast-delivery-worker', () => {
 
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService(),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
       }
@@ -371,7 +426,7 @@ describe('blast-delivery-worker', () => {
 
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService(),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
       }
@@ -399,7 +454,7 @@ describe('blast-delivery-worker', () => {
 
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService(),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
       }
@@ -439,7 +494,19 @@ describe('blast-delivery-worker', () => {
 
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService({ getMessagingConfig: vi.fn().mockResolvedValue({
+          enabledChannels: ['sms', 'whatsapp', 'signal'],
+          sms: { enabled: true },
+          whatsapp: { integrationMode: 'twilio' as const },
+          signal: { bridgeUrl: 'http://signal-bridge', bridgeApiKey: 'key', webhookSecret: 'secret', registeredNumber: '+15550000000' },
+          rcs: null,
+          telegram: null,
+          autoAssign: true,
+          inactivityTimeout: 60,
+          maxConcurrentPerUser: 3,
+          preferSignalDelivery: true,
+          smsContentMode: 'full' as const,
+        }) }),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
       }
@@ -472,7 +539,7 @@ describe('blast-delivery-worker', () => {
       const onProgress = vi.fn()
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService(),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
         onProgress,
@@ -500,7 +567,7 @@ describe('blast-delivery-worker', () => {
       const onStatusChange = vi.fn()
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService(),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
         onStatusChange,
@@ -543,7 +610,7 @@ describe('blast-delivery-worker', () => {
       const onStatusChange = vi.fn()
       const deps = {
         blastsService,
-        settingsService: {} as SettingsService,
+        settingsService: createSettingsService(),
         resolveAdapter: vi.fn().mockResolvedValue(mockAdapter),
         resolveIdentifier: vi.fn().mockResolvedValue('+1234567890'),
         onStatusChange,

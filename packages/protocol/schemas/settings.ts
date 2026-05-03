@@ -150,6 +150,8 @@ export const messagingConfigSchema = z.looseObject({
   inactivityTimeout: z.number().int().min(5).max(1440).optional(),
   welcomeMessage: z.string().max(500).optional(),
   awayMessage: z.string().max(500).optional(),
+  preferSignalDelivery: z.boolean().optional().default(true),
+  smsContentMode: z.enum(['full', 'notification-only']).optional().default('notification-only'),
 })
 
 export const telephonyProviderSchema = z.looseObject({

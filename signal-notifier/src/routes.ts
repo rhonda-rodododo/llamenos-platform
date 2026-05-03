@@ -40,7 +40,7 @@ function verifyRegistrationToken(tokenSecret: string, token: string): string | n
 
 /**
  * Build the notifier router.
- * - Bearer token routes: app-server-only (notify, unregister)
+ * - Bearer token routes: app-server-only (notify, unregister, check)
  * - Token-based route: client-direct registration (/register-client)
  */
 export function buildRoutes(
@@ -51,8 +51,6 @@ export function buildRoutes(
 ): Hono {
   const app = new Hono()
 
-  // Client-direct registration — validated by short-lived token, not the bearer API key.
-  // The client calls this directly so the app server never sees the plaintext identifier.
   app.post('/register-client', async (c) => {
     let body: RegisterClientBody
     try {
@@ -77,7 +75,6 @@ export function buildRoutes(
     return c.json({ ok: true })
   })
 
-  // Bearer token auth middleware for all remaining endpoints
   app.use('*', async (c, next) => {
     const header = c.req.header('authorization')
     if (!apiKey || header !== `Bearer ${apiKey}`) {
@@ -86,14 +83,18 @@ export function buildRoutes(
     await next()
   })
 
-  // Delete a hash → plaintext mapping
+  app.get('/check/:hash', (c) => {
+    const hash = c.req.param('hash')
+    const registered = store.isRegistered(hash)
+    return c.json({ registered })
+  })
+
   app.delete('/unregister/:hash', (c) => {
     const hash = c.req.param('hash')
     store.remove(hash)
     return c.json({ ok: true })
   })
 
-  // Send a notification to a registered hash
   app.post('/notify', async (c) => {
     let body: NotifyBody
     try {
@@ -123,6 +124,5 @@ export function buildRoutes(
     return c.json({ ok: true })
   })
 
-  // Health check (no auth required — override middleware for this path)
   return app
 }
