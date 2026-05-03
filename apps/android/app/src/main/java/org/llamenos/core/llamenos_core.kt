@@ -796,13 +796,29 @@ external fun uniffi_llamenos_core_fn_func_mobile_hpke_seal(`plaintextHex`: RustB
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_mobile_hpke_seal_key(`keyHex`: RustBuffer.ByValue,`recipientPubkeyHex`: RustBuffer.ByValue,`label`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-external fun uniffi_llamenos_core_fn_func_mobile_is_unlocked(uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_is_unlocked(uniffi_out_err: UniffiRustCallStatus,
 ): Byte
-external fun uniffi_llamenos_core_fn_func_mobile_is_valid_pin(`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_is_valid_pin(`pin`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Byte
-external fun uniffi_llamenos_core_fn_func_mobile_lock(uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_lock(uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-external fun uniffi_llamenos_core_fn_func_mobile_puk_create(uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_set_hub_key(`hubId`: RustBuffer.ByValue,`keyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): Unit
+external fun uniffi_llamenos_core_fn_func_mobile_has_hub_key(`hubId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_clear_hub_keys(uniffi_out_err: UniffiRustCallStatus,
+): Unit
+external fun uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event(`encryptedHex`: RustBuffer.ByValue,`hubId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event_trial(`encryptedHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_set_server_event_keys(`currentHex`: RustBuffer.ByValue,`previousHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): Unit
+external fun uniffi_llamenos_core_fn_func_mobile_decrypt_server_event(`encryptedHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_clear_server_event_keys(uniffi_out_err: UniffiRustCallStatus,
+): Unit
+external fun uniffi_llamenos_core_fn_func_mobile_puk_create(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_mobile_puk_derive_state(`seedHex`: RustBuffer.ByValue,`generation`: Int,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -3078,16 +3094,105 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     
 
         /**
-         * Lock the mobile crypto state — zeroize device secrets.
+         * Lock the mobile crypto state — zeroize device secrets and clear all cached keys.
          */ fun `mobileLock`()
-        = 
+        =
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_llamenos_core_fn_func_mobile_lock(
-    
+
         _status)
 }
-    
-    
+
+
+        /**
+         * Store a hub key in Rust memory. The key never leaves this process.
+         */
+    @Throws(CryptoException::class) fun `mobileSetHubKey`(`hubId`: kotlin.String, `keyHex`: kotlin.String) {
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_set_hub_key(
+        FfiConverterString.lower(`hubId`),FfiConverterString.lower(`keyHex`),_status)
+}
+    }
+
+        /**
+         * Check if a hub key is cached in Rust state.
+         */
+    fun `mobileHasHubKey`(`hubId`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_has_hub_key(
+        FfiConverterString.lower(`hubId`),_status)
+}
+    )
+    }
+
+        /**
+         * Clear all hub keys from Rust memory.
+         */
+    fun `mobileClearHubKeys`()
+        =
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_clear_hub_keys(
+        _status)
+}
+
+        /**
+         * Decrypt a hub event using the cached hub key for the given hub ID.
+         */
+    @Throws(CryptoException::class) fun `mobileDecryptHubEvent`(`encryptedHex`: kotlin.String, `hubId`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event(
+        FfiConverterString.lower(`encryptedHex`),FfiConverterString.lower(`hubId`),_status)
+}
+    )
+    }
+
+        /**
+         * Try to decrypt an event by trial-decrypting with all cached hub keys.
+         * Returns [hub_id, plaintext_json].
+         */
+    @Throws(CryptoException::class) fun `mobileDecryptHubEventTrial`(`encryptedHex`: kotlin.String): kotlin.collections.List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event_trial(
+        FfiConverterString.lower(`encryptedHex`),_status)
+}
+    )
+    }
+
+        /**
+         * Store server event keys in Rust memory for epoch-based rotation.
+         */
+    @Throws(CryptoException::class) fun `mobileSetServerEventKeys`(`currentHex`: kotlin.String, `previousHex`: kotlin.String) {
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_set_server_event_keys(
+        FfiConverterString.lower(`currentHex`),FfiConverterString.lower(`previousHex`),_status)
+}
+    }
+
+        /**
+         * Decrypt a server event using the stored server event keys.
+         */
+    @Throws(CryptoException::class) fun `mobileDecryptServerEvent`(`encryptedHex`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_decrypt_server_event(
+        FfiConverterString.lower(`encryptedHex`),_status)
+}
+    )
+    }
+
+        /**
+         * Clear server event keys from Rust memory.
+         */
+    fun `mobileClearServerEventKeys`()
+        =
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_clear_server_event_keys(
+        _status)
+}
+
 
         /**
          * Create the initial PUK (generation 1), wrapped to the device's X25519 pubkey.

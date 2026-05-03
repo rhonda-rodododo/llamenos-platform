@@ -15,6 +15,7 @@
 //! Stateless functions (HPKE seal, sigchain verify, ed25519 verify) do NOT
 //! access the static state and can be called without unlocking.
 
+use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
 use crate::auth;
@@ -30,6 +31,12 @@ use zeroize::Zeroize;
 struct MobileState {
     secrets: Option<DeviceSecrets>,
     device_state: Option<DeviceKeyState>,
+    /// Hub keys: hubId → 32-byte key as hex. Held in Rust memory only.
+    hub_keys: HashMap<String, String>,
+    /// Server event key (current epoch). XChaCha20-Poly1305 key hex.
+    server_event_key_current: Option<String>,
+    /// Server event key (previous epoch) for rotation grace period.
+    server_event_key_previous: Option<String>,
 }
 
 impl MobileState {
@@ -37,6 +44,9 @@ impl MobileState {
         Self {
             secrets: None,
             device_state: None,
+            hub_keys: HashMap::new(),
+            server_event_key_current: None,
+            server_event_key_previous: None,
         }
     }
 }
@@ -100,13 +110,26 @@ pub fn mobile_unlock(
     Ok(ds)
 }
 
-/// Lock the mobile crypto state — zeroize device secrets.
+/// Lock the mobile crypto state — zeroize device secrets and clear all cached keys.
 #[uniffi::export]
 pub fn mobile_lock() {
     let mut guard = state().lock().unwrap();
     // DeviceSecrets implements Zeroize on drop
     guard.secrets = None;
     guard.device_state = None;
+    // Clear hub keys and server event keys from Rust memory
+    for v in guard.hub_keys.values_mut() {
+        v.zeroize();
+    }
+    guard.hub_keys.clear();
+    if let Some(ref mut k) = guard.server_event_key_current {
+        k.zeroize();
+    }
+    guard.server_event_key_current = None;
+    if let Some(ref mut k) = guard.server_event_key_previous {
+        k.zeroize();
+    }
+    guard.server_event_key_previous = None;
 }
 
 /// Check if the mobile crypto state is unlocked.
@@ -439,6 +462,153 @@ pub fn mobile_random_bytes_hex() -> String {
     hex::encode(bytes)
 }
 
+// ── Hub key management (keys held in Rust, never exposed to host) ─
+
+/// Store a hub key in Rust memory. The key never leaves this process.
+#[uniffi::export]
+pub fn mobile_set_hub_key(hub_id: String, key_hex: String) -> Result<(), CryptoError> {
+    let key_bytes = hex::decode(&key_hex).map_err(CryptoError::HexError)?;
+    if key_bytes.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+    let mut guard = state().lock().unwrap();
+    guard.hub_keys.insert(hub_id, key_hex);
+    Ok(())
+}
+
+/// Check if a hub key is cached in Rust state.
+#[uniffi::export]
+pub fn mobile_has_hub_key(hub_id: String) -> bool {
+    state().lock().unwrap().hub_keys.contains_key(&hub_id)
+}
+
+/// Clear all hub keys from Rust memory.
+#[uniffi::export]
+pub fn mobile_clear_hub_keys() {
+    let mut guard = state().lock().unwrap();
+    for v in guard.hub_keys.values_mut() {
+        v.zeroize();
+    }
+    guard.hub_keys.clear();
+}
+
+/// Decrypt a hub event using the cached hub key for the given hub ID.
+///
+/// Uses XChaCha20-Poly1305. Input: hex(nonce_24 + ciphertext), hub ID.
+/// Returns decrypted UTF-8 JSON, or error if no key cached or decryption fails.
+#[uniffi::export]
+pub fn mobile_decrypt_hub_event(
+    encrypted_hex: String,
+    hub_id: String,
+) -> Result<String, CryptoError> {
+    let key_hex = {
+        let guard = state().lock().unwrap();
+        guard
+            .hub_keys
+            .get(&hub_id)
+            .cloned()
+            .ok_or_else(|| CryptoError::InvalidInput(format!("No hub key for {hub_id}")))?
+    };
+    crate::ffi::decrypt_server_event_hex(&encrypted_hex, &key_hex)
+}
+
+/// Try to decrypt an event by trial-decrypting with all cached hub keys.
+///
+/// Returns `(hub_id, plaintext_json)` for the first key that succeeds,
+/// or an error if no key works. This avoids exposing hub keys to the host.
+#[uniffi::export]
+pub fn mobile_decrypt_hub_event_trial(encrypted_hex: String) -> Result<Vec<String>, CryptoError> {
+    let hub_keys: Vec<(String, String)> = {
+        let guard = state().lock().unwrap();
+        guard.hub_keys.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    };
+    for (hub_id, key_hex) in &hub_keys {
+        if let Ok(plaintext) = crate::ffi::decrypt_server_event_hex(&encrypted_hex, key_hex) {
+            return Ok(vec![hub_id.clone(), plaintext]);
+        }
+    }
+    Err(CryptoError::DecryptionFailed)
+}
+
+// ── Server event key management ───────────────────────────────────
+
+/// Store server event keys in Rust memory for epoch-based rotation.
+///
+/// `current_hex`: current epoch key (required, 32 bytes hex).
+/// `previous_hex`: previous epoch key (optional, empty string = none).
+#[uniffi::export]
+pub fn mobile_set_server_event_keys(
+    current_hex: String,
+    previous_hex: String,
+) -> Result<(), CryptoError> {
+    let current_bytes = hex::decode(&current_hex).map_err(CryptoError::HexError)?;
+    if current_bytes.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+    let prev = if previous_hex.is_empty() {
+        None
+    } else {
+        let prev_bytes = hex::decode(&previous_hex).map_err(CryptoError::HexError)?;
+        if prev_bytes.len() != 32 {
+            return Err(CryptoError::InvalidSecretKey);
+        }
+        Some(previous_hex)
+    };
+
+    let mut guard = state().lock().unwrap();
+    if let Some(ref mut k) = guard.server_event_key_current {
+        k.zeroize();
+    }
+    guard.server_event_key_current = Some(current_hex);
+    if let Some(ref mut k) = guard.server_event_key_previous {
+        k.zeroize();
+    }
+    guard.server_event_key_previous = prev;
+    Ok(())
+}
+
+/// Decrypt a server event using the stored server event keys.
+///
+/// Tries current key first, then previous key (epoch rotation grace period).
+/// Returns decrypted UTF-8 JSON.
+#[uniffi::export]
+pub fn mobile_decrypt_server_event(encrypted_hex: String) -> Result<String, CryptoError> {
+    let (current, previous) = {
+        let guard = state().lock().unwrap();
+        (
+            guard.server_event_key_current.clone(),
+            guard.server_event_key_previous.clone(),
+        )
+    };
+
+    if let Some(ref key) = current {
+        if let Ok(plaintext) = crate::ffi::decrypt_server_event_hex(&encrypted_hex, key) {
+            return Ok(plaintext);
+        }
+    }
+    if let Some(ref key) = previous {
+        if let Ok(plaintext) = crate::ffi::decrypt_server_event_hex(&encrypted_hex, key) {
+            return Ok(plaintext);
+        }
+    }
+
+    Err(CryptoError::DecryptionFailed)
+}
+
+/// Clear server event keys from Rust memory.
+#[uniffi::export]
+pub fn mobile_clear_server_event_keys() {
+    let mut guard = state().lock().unwrap();
+    if let Some(ref mut k) = guard.server_event_key_current {
+        k.zeroize();
+    }
+    guard.server_event_key_current = None;
+    if let Some(ref mut k) = guard.server_event_key_previous {
+        k.zeroize();
+    }
+    guard.server_event_key_previous = None;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -531,6 +701,112 @@ mod tests {
         assert_eq!(seed_hex.len(), 64);
 
         mobile_lock();
+    }
+
+    #[test]
+    fn hub_key_set_and_decrypt() {
+        use chacha20poly1305::{
+            aead::{Aead, KeyInit},
+            XChaCha20Poly1305, XNonce,
+        };
+
+        let key = crate::ecies::random_bytes_32();
+        let key_hex = hex::encode(&key);
+        let hub_id = "test-hub-1";
+
+        mobile_set_hub_key(hub_id.into(), key_hex.clone()).unwrap();
+        assert!(mobile_has_hub_key(hub_id.into()));
+        assert!(!mobile_has_hub_key("other-hub".into()));
+
+        // Encrypt a test payload
+        let plaintext = r#"{"type":"call:ring","callId":"test123"}"#;
+        let mut nonce_bytes = [0u8; 24];
+        getrandom::getrandom(&mut nonce_bytes).unwrap();
+        let nonce = XNonce::from_slice(&nonce_bytes);
+        let cipher = XChaCha20Poly1305::new_from_slice(&key).unwrap();
+        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).unwrap();
+        let mut packed = Vec::with_capacity(24 + ciphertext.len());
+        packed.extend_from_slice(&nonce_bytes);
+        packed.extend_from_slice(&ciphertext);
+        let encrypted_hex = hex::encode(&packed);
+
+        // Decrypt via hub key
+        let decrypted = mobile_decrypt_hub_event(encrypted_hex.clone(), hub_id.into()).unwrap();
+        assert_eq!(decrypted, plaintext);
+
+        // Wrong hub fails
+        assert!(mobile_decrypt_hub_event(encrypted_hex.clone(), "wrong-hub".into()).is_err());
+
+        // Trial decrypt finds the right hub
+        let result = mobile_decrypt_hub_event_trial(encrypted_hex).unwrap();
+        assert_eq!(result[0], hub_id);
+        assert_eq!(result[1], plaintext);
+
+        // Clear and verify gone
+        mobile_clear_hub_keys();
+        assert!(!mobile_has_hub_key(hub_id.into()));
+    }
+
+    #[test]
+    fn server_event_key_set_and_decrypt() {
+        use chacha20poly1305::{
+            aead::{Aead, KeyInit},
+            XChaCha20Poly1305, XNonce,
+        };
+
+        let key1 = crate::ecies::random_bytes_32();
+        let key1_hex = hex::encode(&key1);
+        let key2 = crate::ecies::random_bytes_32();
+        let key2_hex = hex::encode(&key2);
+
+        // Helper to encrypt with a specific key
+        let encrypt = |key: &[u8; 32], msg: &str| -> String {
+            let mut nonce_bytes = [0u8; 24];
+            getrandom::getrandom(&mut nonce_bytes).unwrap();
+            let nonce = XNonce::from_slice(&nonce_bytes);
+            let cipher = XChaCha20Poly1305::new_from_slice(key).unwrap();
+            let ct = cipher.encrypt(nonce, msg.as_bytes()).unwrap();
+            let mut packed = Vec::with_capacity(24 + ct.len());
+            packed.extend_from_slice(&nonce_bytes);
+            packed.extend_from_slice(&ct);
+            hex::encode(&packed)
+        };
+
+        let msg = r#"{"type":"presence:summary"}"#;
+        let ct_key1 = encrypt(&key1, msg);
+        let ct_key2 = encrypt(&key2, msg);
+
+        // Set current only
+        mobile_set_server_event_keys(key1_hex.clone(), "".into()).unwrap();
+        assert_eq!(mobile_decrypt_server_event(ct_key1.clone()).unwrap(), msg);
+        assert!(mobile_decrypt_server_event(ct_key2.clone()).is_err());
+
+        // Set with epoch rotation (key2 is current, key1 is previous)
+        mobile_set_server_event_keys(key2_hex.clone(), key1_hex.clone()).unwrap();
+        assert_eq!(mobile_decrypt_server_event(ct_key2.clone()).unwrap(), msg);
+        assert_eq!(mobile_decrypt_server_event(ct_key1.clone()).unwrap(), msg); // previous epoch still works
+
+        // Wrong key fails
+        let key3 = crate::ecies::random_bytes_32();
+        let ct_key3 = encrypt(&key3, msg);
+        assert!(mobile_decrypt_server_event(ct_key3).is_err());
+
+        // Clear
+        mobile_clear_server_event_keys();
+        assert!(mobile_decrypt_server_event(ct_key1).is_err());
+    }
+
+    #[test]
+    fn lock_clears_hub_and_server_keys() {
+        let key = hex::encode(crate::ecies::random_bytes_32());
+        mobile_set_hub_key("hub-lock-test".into(), key.clone()).unwrap();
+        mobile_set_server_event_keys(key, "".into()).unwrap();
+        assert!(mobile_has_hub_key("hub-lock-test".into()));
+
+        mobile_lock();
+
+        assert!(!mobile_has_hub_key("hub-lock-test".into()));
+        // Server event decrypt should fail after lock
     }
 
     #[test]
