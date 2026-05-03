@@ -35,7 +35,6 @@ pub mod labels;
 pub mod puk;
 pub mod sigchain;
 
-#[cfg(feature = "mls")]
 pub mod mls;
 pub mod sframe;
 
