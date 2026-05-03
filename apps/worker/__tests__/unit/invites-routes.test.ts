@@ -4,7 +4,7 @@
  * Tests invite creation, redemption, validation, revocation,
  * privilege escalation prevention.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 
@@ -12,37 +12,37 @@ import type { AppEnv } from '@worker/types/infra'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockVerifyAuthToken = vi.fn()
-const mockCheckRateLimit = vi.fn().mockResolvedValue(false)
-const mockHashIP = vi.fn().mockReturnValue('hashed')
-const mockAudit = vi.fn().mockResolvedValue(undefined)
+const mockVerifyAuthToken = jest.fn()
+const mockCheckRateLimit = jest.fn().mockResolvedValue(false)
+const mockHashIP = jest.fn().mockReturnValue('hashed')
+const mockAudit = jest.fn().mockResolvedValue(undefined)
 
-vi.mock('@worker/lib/auth', () => ({
+mock.module('@worker/lib/auth', () => ({
   verifyAuthToken: (...args: unknown[]) => mockVerifyAuthToken(...args),
 }))
 
-vi.mock('@worker/lib/helpers', () => ({
+mock.module('@worker/lib/helpers', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }))
 
-vi.mock('@worker/lib/crypto', () => ({
+mock.module('@worker/lib/crypto', () => ({
   hashIP: (...args: unknown[]) => mockHashIP(...args),
 }))
 
-vi.mock('@worker/services/audit', () => ({
+mock.module('@worker/services/audit', () => ({
   audit: (...args: unknown[]) => mockAudit(...args),
 }))
 
-vi.mock('@worker/middleware/auth', () => ({
-  auth: vi.fn().mockImplementation(async (_c: unknown, next: () => Promise<void>) => next()),
+mock.module('@worker/middleware/auth', () => ({
+  auth: jest.fn().mockImplementation(async (_c: unknown, next: () => Promise<void>) => next()),
 }))
 
-vi.mock('@worker/middleware/permission-guard', () => ({
+mock.module('@worker/middleware/permission-guard', () => ({
   requirePermission: (..._perms: string[]) =>
     async (_c: unknown, next: () => Promise<void>) => next(),
 }))
 
-vi.mock('hono-openapi', () => ({
+mock.module('hono-openapi', () => ({
   describeRoute: () => async (_c: unknown, next: () => Promise<void>) => next(),
   resolver: (s: unknown) => s,
   validator: (_type: string, _schema: unknown) => {
@@ -53,7 +53,7 @@ vi.mock('hono-openapi', () => ({
   },
 }))
 
-vi.mock('@worker/lib/entity-router', () => ({
+mock.module('@worker/lib/entity-router', () => ({
   createEntityRouter: () => new Hono(),
 }))
 
@@ -73,14 +73,14 @@ function createApp(permissions: string[] = ['invites:read', 'invites:create', 'i
   const app = new Hono<AppEnv>()
   const services = {
     identity: {
-      validateInvite: vi.fn().mockResolvedValue({ valid: true, name: 'Test Invite' }),
-      redeemInvite: vi.fn().mockResolvedValue({ ok: true }),
-      createInvite: vi.fn().mockResolvedValue({ code: 'INV-123', name: 'New Invite' }),
-      revokeInvite: vi.fn().mockResolvedValue(undefined),
-      getInvites: vi.fn().mockResolvedValue({ invites: [] }),
+      validateInvite: jest.fn().mockResolvedValue({ valid: true, name: 'Test Invite' }),
+      redeemInvite: jest.fn().mockResolvedValue({ ok: true }),
+      createInvite: jest.fn().mockResolvedValue({ code: 'INV-123', name: 'New Invite' }),
+      revokeInvite: jest.fn().mockResolvedValue(undefined),
+      getInvites: jest.fn().mockResolvedValue({ invites: [] }),
     },
     settings: {
-      checkRateLimit: vi.fn().mockResolvedValue({ limited: false }),
+      checkRateLimit: jest.fn().mockResolvedValue({ limited: false }),
     },
     audit: {},
   }
@@ -107,7 +107,7 @@ const defaultEnv = { HMAC_SECRET: 'test' } as never
 
 describe('invites routes', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
     mockVerifyAuthToken.mockResolvedValue(true)
     mockCheckRateLimit.mockResolvedValue(false)
   })

@@ -5,8 +5,8 @@
  * with middleware stubs so we can test the validator() middleware in isolation
  * without needing a real database or services layer.
  */
+import { jest } from 'bun:test'
 import { Hono } from 'hono'
-import { vi } from 'vitest'
 import type { AppEnv } from '../../types'
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ function createMockServices(): AppEnv['Variables']['services'] {
       return new Proxy({}, {
         get(_t, method) {
           if (typeof method === 'symbol') return undefined
-          return vi.fn().mockResolvedValue({})
+          return jest.fn().mockResolvedValue({})
         },
       })
     },

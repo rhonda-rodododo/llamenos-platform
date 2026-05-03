@@ -1,16 +1,16 @@
 // @ts-nocheck
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, mock, jest } from 'bun:test'
 import { EventOutbox } from '@worker/lib/nostr-outbox'
 
-vi.mock('@worker/lib/logger', () => ({
+mock.module('@worker/lib/logger', () => ({
   createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    trace: vi.fn(),
-    fatal: vi.fn(),
-    child: vi.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    trace: jest.fn(),
+    fatal: jest.fn(),
+    child: jest.fn(),
   }),
 }))
 

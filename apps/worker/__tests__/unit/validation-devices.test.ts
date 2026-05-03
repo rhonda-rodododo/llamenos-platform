@@ -4,7 +4,7 @@
  * Devices are security-critical — validates Ed25519/X25519 pubkeys,
  * compressed secp256k1 wake keys, and platform enums.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import devicesRoutes from '../../routes/devices'
 import {
   createTestApp,

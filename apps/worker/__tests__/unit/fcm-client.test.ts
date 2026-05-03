@@ -1,13 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
+const mockSendToToken = jest.fn()
 
-const mockSendToToken = vi.fn()
-
-vi.mock('fcm-cloudflare-workers', () => {
+mock.module('fcm-cloudflare-workers', () => {
   return {
-    FCM: vi.fn(function () {
+    FCM: jest.fn(function () {
       return { sendToToken: mockSendToToken }
     }),
-    FcmOptions: vi.fn(function (this: unknown, opts: unknown) {
+    FcmOptions: jest.fn(function (this: unknown, opts: unknown) {
       return opts
     }),
   }

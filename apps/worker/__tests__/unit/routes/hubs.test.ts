@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import hubRoutes from '@worker/routes/hubs'
@@ -13,7 +13,7 @@ function createTestApp(opts: {
   pubkey?: string
   userHubRoles?: { hubId: string; roleIds: string[] }[]
   serviceMock?: Record<string, unknown>
-  auditLogSpy?: ReturnType<typeof vi.fn>
+  auditLogSpy?: ReturnType<typeof jest.fn>
 } = {}) {
   const {
     permissions = ['*'],
@@ -21,7 +21,7 @@ function createTestApp(opts: {
     pubkey = 'a'.repeat(64),
     userHubRoles = [],
     serviceMock = {},
-    auditLogSpy = vi.fn().mockResolvedValue(undefined),
+    auditLogSpy = jest.fn().mockResolvedValue(undefined),
   } = opts
 
   const mockAuditService = { log: auditLogSpy }
@@ -77,7 +77,7 @@ function createTestApp(opts: {
 
 describe('hubs routes', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   // -------------------------------------------------------------------------
@@ -86,7 +86,7 @@ describe('hubs routes', () => {
 
   describe('GET /hubs', () => {
     it('lists all active hubs for super admin', async () => {
-      const getHubsSpy = vi.fn().mockResolvedValue({
+      const getHubsSpy = jest.fn().mockResolvedValue({
         hubs: [
           { id: 'hub-1', name: 'Hub 1', status: 'active' },
           { id: 'hub-2', name: 'Hub 2', status: 'suspended' },
@@ -107,7 +107,7 @@ describe('hubs routes', () => {
     })
 
     it('lists only member hubs for non-super-admin', async () => {
-      const getHubsSpy = vi.fn().mockResolvedValue({
+      const getHubsSpy = jest.fn().mockResolvedValue({
         hubs: [
           { id: 'hub-1', name: 'Hub 1', status: 'active' },
           { id: 'hub-2', name: 'Hub 2', status: 'active' },
@@ -129,7 +129,7 @@ describe('hubs routes', () => {
     })
 
     it('returns empty list when user has no hub memberships', async () => {
-      const getHubsSpy = vi.fn().mockResolvedValue({
+      const getHubsSpy = jest.fn().mockResolvedValue({
         hubs: [{ id: 'hub-1', name: 'Hub 1', status: 'active' }],
       })
 
@@ -148,7 +148,7 @@ describe('hubs routes', () => {
     it('returns 403 without hubs:read permission', async () => {
       const { app } = createTestApp({
         permissions: ['other:read'],
-        serviceMock: { settings: { getHubs: vi.fn() } },
+        serviceMock: { settings: { getHubs: jest.fn() } },
       })
 
       const res = await app.request('/hubs')
@@ -162,7 +162,7 @@ describe('hubs routes', () => {
 
   describe('POST /hubs', () => {
     it('creates a hub with explicit slug', async () => {
-      const createHubSpy = vi.fn().mockResolvedValue(undefined)
+      const createHubSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         permissions: ['system:manage-hubs'],
         serviceMock: { settings: { createHub: createHubSpy } },
@@ -178,11 +178,11 @@ describe('hubs routes', () => {
       const json = await res.json()
       expect(json.hub.name).toBe('New Hub')
       expect(json.hub.slug).toBe('new-hub')
-      expect(createHubSpy).toHaveBeenCalledOnce()
+      expect(createHubSpy).toHaveBeenCalledTimes(1)
     })
 
     it('generates slug from name when not provided', async () => {
-      const createHubSpy = vi.fn().mockResolvedValue(undefined)
+      const createHubSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         permissions: ['system:manage-hubs'],
         serviceMock: { settings: { createHub: createHubSpy } },
@@ -200,7 +200,7 @@ describe('hubs routes', () => {
     })
 
     it('rejects empty name-derived slug with 400', async () => {
-      const createHubSpy = vi.fn().mockResolvedValue(undefined)
+      const createHubSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         permissions: ['system:manage-hubs'],
         serviceMock: { settings: { createHub: createHubSpy } },
@@ -233,7 +233,7 @@ describe('hubs routes', () => {
     })
 
     it('handles ServiceError from createHub', async () => {
-      const createHubSpy = vi.fn().mockRejectedValue(
+      const createHubSpy = jest.fn().mockRejectedValue(
         Object.assign(new Error('Hub already exists'), { status: 409 }),
       )
       const { app } = createTestApp({
@@ -257,7 +257,7 @@ describe('hubs routes', () => {
 
   describe('GET /hubs/:hubId', () => {
     it('returns hub details for super admin', async () => {
-      const getHubSpy = vi.fn().mockResolvedValue({
+      const getHubSpy = jest.fn().mockResolvedValue({
         hub: { id: 'hub-1', name: 'Hub 1', status: 'active' },
       })
       const { app } = createTestApp({
@@ -272,7 +272,7 @@ describe('hubs routes', () => {
     })
 
     it('returns hub details for hub member', async () => {
-      const getHubSpy = vi.fn().mockResolvedValue({
+      const getHubSpy = jest.fn().mockResolvedValue({
         hub: { id: 'hub-1', name: 'Hub 1', status: 'active' },
       })
       const { app } = createTestApp({
@@ -286,7 +286,7 @@ describe('hubs routes', () => {
     })
 
     it('returns 403 for non-member non-super-admin', async () => {
-      const getHubSpy = vi.fn().mockResolvedValue({
+      const getHubSpy = jest.fn().mockResolvedValue({
         hub: { id: 'hub-1', name: 'Hub 1', status: 'active' },
       })
       const { app } = createTestApp({
@@ -300,7 +300,7 @@ describe('hubs routes', () => {
     })
 
     it('returns 404 when hub not found', async () => {
-      const getHubSpy = vi.fn().mockRejectedValue(new Error('Not found'))
+      const getHubSpy = jest.fn().mockRejectedValue(new Error('Not found'))
       const { app } = createTestApp({
         permissions: ['*'],
         serviceMock: { settings: { getHub: getHubSpy } },
@@ -323,7 +323,7 @@ describe('hubs routes', () => {
 
   describe('PATCH /hubs/:hubId', () => {
     it('updates a hub', async () => {
-      const updateHubSpy = vi.fn().mockResolvedValue({ hub: { id: 'hub-1', name: 'Updated' } })
+      const updateHubSpy = jest.fn().mockResolvedValue({ hub: { id: 'hub-1', name: 'Updated' } })
       const { app } = createTestApp({
         permissions: ['system:manage-hubs'],
         serviceMock: { settings: { updateHub: updateHubSpy } },
@@ -356,7 +356,7 @@ describe('hubs routes', () => {
 
   describe('POST /hubs/:hubId/members', () => {
     it('adds a member to hub', async () => {
-      const setHubRoleSpy = vi.fn().mockResolvedValue({ ok: true })
+      const setHubRoleSpy = jest.fn().mockResolvedValue({ ok: true })
       const { app, auditLogSpy } = createTestApp({
         permissions: ['hubs:manage-members'],
         hubId: 'hub-1',
@@ -378,7 +378,7 @@ describe('hubs routes', () => {
         hubId: 'hub-1',
         roleIds: ['role-volunteer'],
       })
-      expect(auditLogSpy).toHaveBeenCalledOnce()
+      expect(auditLogSpy).toHaveBeenCalledTimes(1)
     })
 
     it('returns 403 without hubs:manage-members permission', async () => {
@@ -398,7 +398,7 @@ describe('hubs routes', () => {
 
   describe('DELETE /hubs/:hubId/members/:pubkey', () => {
     it('removes a member from hub', async () => {
-      const removeHubRoleSpy = vi.fn().mockResolvedValue(undefined)
+      const removeHubRoleSpy = jest.fn().mockResolvedValue(undefined)
       const { app, auditLogSpy } = createTestApp({
         permissions: ['hubs:manage-members'],
         serviceMock: {
@@ -413,7 +413,7 @@ describe('hubs routes', () => {
 
       expect(res.status).toBe(200)
       expect(removeHubRoleSpy).toHaveBeenCalledWith({ pubkey: 'member-pubkey', hubId: 'hub-1' })
-      expect(auditLogSpy).toHaveBeenCalledOnce()
+      expect(auditLogSpy).toHaveBeenCalledTimes(1)
     })
 
     it('returns 403 without hubs:manage-members permission', async () => {
@@ -431,8 +431,8 @@ describe('hubs routes', () => {
 
   describe('DELETE /hubs/:hubId', () => {
     it('deletes a hub', async () => {
-      const deleteHubSpy = vi.fn().mockResolvedValue(undefined)
-      const getHubStorageCredentialsSpy = vi.fn().mockResolvedValue(undefined)
+      const deleteHubSpy = jest.fn().mockResolvedValue(undefined)
+      const getHubStorageCredentialsSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         permissions: ['system:manage-hubs'],
         serviceMock: {
@@ -461,7 +461,7 @@ describe('hubs routes', () => {
 
   describe('GET /hubs/:hubId/key', () => {
     it('returns envelope for current user', async () => {
-      const getHubKeyEnvelopesSpy = vi.fn().mockResolvedValue({
+      const getHubKeyEnvelopesSpy = jest.fn().mockResolvedValue({
         envelopes: [
           { pubkey: 'a'.repeat(64), wrappedKey: 'wrapped', ephemeralPubkey: 'd'.repeat(64) },
           { pubkey: 'c'.repeat(64), wrappedKey: 'wrapped2', ephemeralPubkey: 'e'.repeat(64) },
@@ -480,7 +480,7 @@ describe('hubs routes', () => {
     })
 
     it('returns 404 when no envelope for user', async () => {
-      const getHubKeyEnvelopesSpy = vi.fn().mockResolvedValue({
+      const getHubKeyEnvelopesSpy = jest.fn().mockResolvedValue({
         envelopes: [{ pubkey: 'c'.repeat(64), wrappedKey: 'wrapped', ephemeralPubkey: 'd'.repeat(64) }],
       })
       const { app } = createTestApp({
@@ -494,7 +494,7 @@ describe('hubs routes', () => {
     })
 
     it('returns 403 for non-member non-super-admin', async () => {
-      const getHubKeyEnvelopesSpy = vi.fn().mockResolvedValue({ envelopes: [] })
+      const getHubKeyEnvelopesSpy = jest.fn().mockResolvedValue({ envelopes: [] })
       const { app } = createTestApp({
         permissions: ['hubs:read'],
         userHubRoles: [{ hubId: 'hub-2', roleIds: ['role-volunteer'] }],
@@ -506,7 +506,7 @@ describe('hubs routes', () => {
     })
 
     it('returns 404 when hub not found', async () => {
-      const getHubKeyEnvelopesSpy = vi.fn().mockRejectedValue(new Error('Not found'))
+      const getHubKeyEnvelopesSpy = jest.fn().mockRejectedValue(new Error('Not found'))
       const { app } = createTestApp({
         permissions: ['hubs:read'],
         userHubRoles: [{ hubId: 'hub-1', roleIds: ['role-volunteer'] }],
@@ -524,7 +524,7 @@ describe('hubs routes', () => {
 
   describe('PUT /hubs/:hubId/key', () => {
     it('sets hub key envelopes', async () => {
-      const setHubKeyEnvelopesSpy = vi.fn().mockResolvedValue(undefined)
+      const setHubKeyEnvelopesSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         permissions: ['hubs:manage-keys'],
         serviceMock: { settings: { setHubKeyEnvelopes: setHubKeyEnvelopesSpy } },

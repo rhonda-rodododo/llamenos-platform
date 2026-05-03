@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { CircuitBreaker, CircuitOpenError } from '@worker/lib/circuit-breaker'
 
 describe('CircuitBreaker', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    jest.useFakeTimers()
   })
 
   afterEach(() => {
-    vi.useRealTimers()
+    jest.useRealTimers()
   })
 
   function makeBreaker(overrides?: { failureThreshold?: number; resetTimeoutMs?: number; failureWindowMs?: number }) {
@@ -46,7 +46,7 @@ describe('CircuitBreaker', () => {
     expect(breaker.getState()).toBe('open')
 
     // Advance time past reset timeout
-    vi.advanceTimersByTime(5000)
+    jest.advanceTimersByTime(5000)
     expect(breaker.getState()).toBe('half_open')
   })
 
@@ -58,7 +58,7 @@ describe('CircuitBreaker', () => {
     await expect(breaker.execute(fail)).rejects.toThrow()
 
     // Advance to half_open
-    vi.advanceTimersByTime(5000)
+    jest.advanceTimersByTime(5000)
 
     // Probe succeeds
     const result = await breaker.execute(succeed)
@@ -75,7 +75,7 @@ describe('CircuitBreaker', () => {
     await expect(breaker.execute(fail)).rejects.toThrow()
 
     // Advance to half_open
-    vi.advanceTimersByTime(5000)
+    jest.advanceTimersByTime(5000)
 
     // Probe fails
     await expect(breaker.execute(fail)).rejects.toThrow('service down')
@@ -92,7 +92,7 @@ describe('CircuitBreaker', () => {
     expect(breaker.getState()).toBe('closed')
 
     // Advance past window so previous failures expire
-    vi.advanceTimersByTime(11000)
+    jest.advanceTimersByTime(11000)
 
     // One more failure — should NOT trip (old ones pruned)
     await expect(breaker.execute(fail)).rejects.toThrow()

@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { TokenBucketRateLimiter } from '@worker/lib/rate-limiter'
 
 describe('TokenBucketRateLimiter', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
+    jest.useFakeTimers()
   })
 
   afterEach(() => {
-    vi.useRealTimers()
+    jest.useRealTimers()
   })
 
   it('starts with full burst capacity', () => {
@@ -35,7 +35,7 @@ describe('TokenBucketRateLimiter', () => {
     expect(limiter.tryConsume()).toBe(false)
 
     // Advance 1 second — should add 10 tokens
-    vi.advanceTimersByTime(1000)
+    jest.advanceTimersByTime(1000)
     expect(limiter.availableTokens).toBe(10)
     expect(limiter.tryConsume()).toBe(true)
   })
@@ -51,7 +51,7 @@ describe('TokenBucketRateLimiter', () => {
     const waitPromise = limiter.waitForToken()
 
     // Advance time to allow refill
-    vi.advanceTimersByTime(200)
+    jest.advanceTimersByTime(200)
 
     const waited = await waitPromise
     expect(waited).toBeGreaterThan(0)

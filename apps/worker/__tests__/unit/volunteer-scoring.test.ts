@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { scoreVolunteers, type ScoringInput } from '../../lib/volunteer-scoring'
 
 type ScoringUser = ScoringInput['allUsers'][number]

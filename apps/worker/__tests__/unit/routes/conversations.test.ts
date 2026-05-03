@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import conversationsRoute from '@worker/routes/conversations'
@@ -6,8 +6,8 @@ import * as nostrEvents from '@worker/lib/nostr-events'
 import * as pushDispatch from '@worker/lib/push-dispatch'
 import * as serviceFactories from '@worker/lib/service-factories'
 
-vi.mock('@worker/lib/nostr-events', () => ({
-  publishNostrEvent: vi.fn().mockResolvedValue(undefined),
+mock.module('@worker/lib/nostr-events', () => ({
+  publishNostrEvent: jest.fn().mockResolvedValue(undefined),
 }))
 
 function createTestApp(opts: {
@@ -41,12 +41,12 @@ function createTestApp(opts: {
     },
   } = opts
 
-  const mockAuditService = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAuditService = { log: jest.fn().mockResolvedValue(undefined) }
 
   const defaultServices = {
     conversations: {
-      list: vi.fn().mockResolvedValue({ conversations: [], total: 0 }),
-      getById: vi.fn().mockResolvedValue({
+      list: jest.fn().mockResolvedValue({ conversations: [], total: 0 }),
+      getById: jest.fn().mockResolvedValue({
         id: 'conv-1',
         channelType: 'sms',
         contactIdentifierHash: 'hash123',
@@ -57,26 +57,26 @@ function createTestApp(opts: {
         lastMessageAt: new Date().toISOString(),
         messageCount: 0,
       }),
-      getStats: vi.fn().mockResolvedValue({ total: 5, waiting: 2 }),
-      getAllVolunteerLoads: vi.fn().mockResolvedValue({ [pubkey]: 3 }),
-      listMessages: vi.fn().mockResolvedValue({ messages: [], total: 0 }),
-      addMessage: vi.fn().mockResolvedValue({ id: 'msg-1' }),
-      update: vi.fn().mockResolvedValue({ id: 'conv-1', status: 'closed' }),
-      claim: vi.fn().mockResolvedValue({ id: 'conv-1', assignedTo: pubkey, status: 'active' }),
-      getContactIdentifier: vi.fn().mockResolvedValue('+15551234567'),
+      getStats: jest.fn().mockResolvedValue({ total: 5, waiting: 2 }),
+      getAllVolunteerLoads: jest.fn().mockResolvedValue({ [pubkey]: 3 }),
+      listMessages: jest.fn().mockResolvedValue({ messages: [], total: 0 }),
+      addMessage: jest.fn().mockResolvedValue({ id: 'msg-1' }),
+      update: jest.fn().mockResolvedValue({ id: 'conv-1', status: 'closed' }),
+      claim: jest.fn().mockResolvedValue({ id: 'conv-1', assignedTo: pubkey, status: 'active' }),
+      getContactIdentifier: jest.fn().mockResolvedValue('+15551234567'),
     },
     identity: {
-      hasAdmin: vi.fn().mockResolvedValue({ hasAdmin: true }),
-      getDevices: vi.fn().mockResolvedValue({ devices: [] }),
-      cleanupDevices: vi.fn().mockResolvedValue(undefined),
+      hasAdmin: jest.fn().mockResolvedValue({ hasAdmin: true }),
+      getDevices: jest.fn().mockResolvedValue({ devices: [] }),
+      cleanupDevices: jest.fn().mockResolvedValue(undefined),
     },
     shifts: {
-      getCurrentVolunteers: vi.fn().mockResolvedValue([pubkey]),
+      getCurrentVolunteers: jest.fn().mockResolvedValue([pubkey]),
     },
     audit: mockAuditService,
     settings: {
-      getTelephonyProvider: vi.fn().mockResolvedValue({ phoneNumber: '+1555000000' }),
-      getMessagingConfig: vi.fn().mockResolvedValue({ enabledChannels: ['sms', 'whatsapp', 'signal'], sms: { enabled: true } }),
+      getTelephonyProvider: jest.fn().mockResolvedValue({ phoneNumber: '+1555000000' }),
+      getMessagingConfig: jest.fn().mockResolvedValue({ enabledChannels: ['sms', 'whatsapp', 'signal'], sms: { enabled: true } }),
     },
   }
 
@@ -102,7 +102,7 @@ function createTestApp(opts: {
       c.set('hubId', hubId)
     }
     Object.defineProperty(c, 'executionCtx', {
-      value: { waitUntil: vi.fn() },
+      value: { waitUntil: jest.fn() },
       writable: true,
       configurable: true,
     })
@@ -122,12 +122,12 @@ function createTestApp(opts: {
 
 describe('conversations route', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('GET /', () => {
     it('lists all conversations for admin with read-all permission', async () => {
-      const listSpy = vi.fn().mockResolvedValue({
+      const listSpy = jest.fn().mockResolvedValue({
         conversations: [{ id: 'conv-1', channelType: 'sms', status: 'active' }],
         total: 1,
       })
@@ -144,11 +144,11 @@ describe('conversations route', () => {
     })
 
     it('returns assigned + waiting conversations for volunteer without read-all', async () => {
-      const assignedSpy = vi.fn().mockResolvedValue({
+      const assignedSpy = jest.fn().mockResolvedValue({
         conversations: [{ id: 'conv-1', channelType: 'sms', status: 'active' }],
         total: 1,
       })
-      const waitingSpy = vi.fn().mockResolvedValue({
+      const waitingSpy = jest.fn().mockResolvedValue({
         conversations: [
           { id: 'conv-2', channelType: 'sms', status: 'waiting' },
           { id: 'conv-3', channelType: 'whatsapp', status: 'waiting' },
@@ -159,7 +159,7 @@ describe('conversations route', () => {
         permissions: ['conversations:read-assigned'],
         services: {
           conversations: {
-            list: vi.fn().mockImplementation((args) => {
+            list: jest.fn().mockImplementation((args) => {
               if (args.assignedTo) return assignedSpy(args)
               return waitingSpy(args)
             }),
@@ -176,7 +176,7 @@ describe('conversations route', () => {
     })
 
     it('filters waiting conversations by claimable channels', async () => {
-      const waitingSpy = vi.fn().mockResolvedValue({
+      const waitingSpy = jest.fn().mockResolvedValue({
         conversations: [
           { id: 'conv-2', channelType: 'sms', status: 'waiting' },
           { id: 'conv-3', channelType: 'signal', status: 'waiting' },
@@ -187,7 +187,7 @@ describe('conversations route', () => {
         permissions: ['conversations:claim-sms'],
         services: {
           conversations: {
-            list: vi.fn().mockImplementation((args) => {
+            list: jest.fn().mockImplementation((args) => {
               if (args.status === 'waiting') return waitingSpy(args)
               return { conversations: [], total: 0 }
             }),
@@ -203,7 +203,7 @@ describe('conversations route', () => {
     })
 
     it('filters waiting by user supportedMessagingChannels', async () => {
-      const waitingSpy = vi.fn().mockResolvedValue({
+      const waitingSpy = jest.fn().mockResolvedValue({
         conversations: [
           { id: 'conv-2', channelType: 'sms', status: 'waiting' },
           { id: 'conv-3', channelType: 'whatsapp', status: 'waiting' },
@@ -219,7 +219,7 @@ describe('conversations route', () => {
         },
         services: {
           conversations: {
-            list: vi.fn().mockImplementation((args) => {
+            list: jest.fn().mockImplementation((args) => {
               if (args.status === 'waiting') return waitingSpy(args)
               return { conversations: [], total: 0 }
             }),
@@ -235,7 +235,7 @@ describe('conversations route', () => {
     })
 
     it('hides all waiting conversations when messagingEnabled is false', async () => {
-      const waitingSpy = vi.fn().mockResolvedValue({
+      const waitingSpy = jest.fn().mockResolvedValue({
         conversations: [{ id: 'conv-2', channelType: 'sms', status: 'waiting' }],
         total: 1,
       })
@@ -244,7 +244,7 @@ describe('conversations route', () => {
         user: { messagingEnabled: false },
         services: {
           conversations: {
-            list: vi.fn().mockImplementation((args) => {
+            list: jest.fn().mockImplementation((args) => {
               if (args.status === 'waiting') return waitingSpy(args)
               return { conversations: [], total: 0 }
             }),
@@ -260,7 +260,7 @@ describe('conversations route', () => {
     })
 
     it('passes pagination params to service', async () => {
-      const listSpy = vi.fn().mockResolvedValue({ conversations: [], total: 0 })
+      const listSpy = jest.fn().mockResolvedValue({ conversations: [], total: 0 })
       const app = createTestApp({
         permissions: ['conversations:read-all'],
         services: { conversations: { list: listSpy } },
@@ -335,7 +335,7 @@ describe('conversations route', () => {
     })
 
     it('returns 403 for non-admin viewing another volunteers conversation', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'other-pubkey',
         status: 'active',
@@ -350,7 +350,7 @@ describe('conversations route', () => {
     })
 
     it('allows viewing waiting conversations without assignment', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: null,
         status: 'waiting',
@@ -365,7 +365,7 @@ describe('conversations route', () => {
     })
 
     it('allows admin to view any conversation', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'other-pubkey',
         status: 'active',
@@ -382,7 +382,7 @@ describe('conversations route', () => {
 
   describe('GET /:id/messages', () => {
     it('returns paginated messages', async () => {
-      const listSpy = vi.fn().mockResolvedValue({
+      const listSpy = jest.fn().mockResolvedValue({
         messages: [{ id: 'msg-1' }],
         total: 1,
       })
@@ -399,7 +399,7 @@ describe('conversations route', () => {
     })
 
     it('returns 403 for unauthorized conversation', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'other-pubkey',
         status: 'active',
@@ -416,7 +416,7 @@ describe('conversations route', () => {
 
   describe('POST /:id/messages', () => {
     it('sends outbound message for assigned volunteer', async () => {
-      const addSpy = vi.fn().mockResolvedValue({ id: 'msg-new' })
+      const addSpy = jest.fn().mockResolvedValue({ id: 'msg-new' })
       const app = createTestApp({
         permissions: ['conversations:read-assigned'],
         services: { conversations: { addMessage: addSpy } },
@@ -440,13 +440,13 @@ describe('conversations route', () => {
     })
 
     it('allows admin with send-any to message any conversation', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'other-pubkey',
         status: 'active',
         channelType: 'web',
       })
-      const addSpy = vi.fn().mockResolvedValue({ id: 'msg-new' })
+      const addSpy = jest.fn().mockResolvedValue({ id: 'msg-new' })
       const app = createTestApp({
         permissions: ['conversations:send-any'],
         services: { conversations: { getById: getSpy, addMessage: addSpy } },
@@ -464,7 +464,7 @@ describe('conversations route', () => {
     })
 
     it('returns 403 for non-admin messaging unassigned conversation', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'other-pubkey',
         status: 'active',
@@ -486,13 +486,13 @@ describe('conversations route', () => {
     })
 
     it('marks web channel messages as delivered without external send', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'test-pubkey-' + '0'.repeat(50),
         status: 'active',
         channelType: 'web',
       })
-      const addSpy = vi.fn().mockResolvedValue({ id: 'msg-new' })
+      const addSpy = jest.fn().mockResolvedValue({ id: 'msg-new' })
       const app = createTestApp({
         permissions: ['conversations:read-assigned'],
         services: { conversations: { getById: getSpy, addMessage: addSpy } },
@@ -511,21 +511,21 @@ describe('conversations route', () => {
     })
 
     it('sends via messaging adapter when plaintext provided for external channel', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'test-pubkey-' + '0'.repeat(50),
         status: 'active',
         channelType: 'sms',
       })
-      const addSpy = vi.fn().mockResolvedValue({ id: 'msg-new' })
-      const sendSpy = vi.fn().mockResolvedValue({ success: true, externalId: 'ext-123' })
-      const adapterSpy = vi.fn().mockResolvedValue({ sendMessage: sendSpy })
+      const addSpy = jest.fn().mockResolvedValue({ id: 'msg-new' })
+      const sendSpy = jest.fn().mockResolvedValue({ success: true, externalId: 'ext-123' })
+      const adapterSpy = jest.fn().mockResolvedValue({ sendMessage: sendSpy })
 
-      vi.spyOn(serviceFactories, 'getMessagingAdapterFromService').mockImplementation(adapterSpy)
+      jest.spyOn(serviceFactories, 'getMessagingAdapterFromService').mockImplementation(adapterSpy)
 
       const app = createTestApp({
         permissions: ['conversations:read-assigned'],
-        services: { conversations: { getById: getSpy, addMessage: addSpy, getContactIdentifier: vi.fn().mockResolvedValue('+15551234567') } },
+        services: { conversations: { getById: getSpy, addMessage: addSpy, getContactIdentifier: jest.fn().mockResolvedValue('+15551234567') } },
       })
 
       const res = await app.request('/conv-1/messages', {
@@ -544,21 +544,21 @@ describe('conversations route', () => {
     })
 
     it('marks failed when messaging adapter returns failure', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'test-pubkey-' + '0'.repeat(50),
         status: 'active',
         channelType: 'sms',
       })
-      const addSpy = vi.fn().mockResolvedValue({ id: 'msg-new' })
-      const sendSpy = vi.fn().mockResolvedValue({ success: false, error: 'Provider error' })
-      const adapterSpy = vi.fn().mockResolvedValue({ sendMessage: sendSpy })
+      const addSpy = jest.fn().mockResolvedValue({ id: 'msg-new' })
+      const sendSpy = jest.fn().mockResolvedValue({ success: false, error: 'Provider error' })
+      const adapterSpy = jest.fn().mockResolvedValue({ sendMessage: sendSpy })
 
-      vi.spyOn(serviceFactories, 'getMessagingAdapterFromService').mockImplementation(adapterSpy)
+      jest.spyOn(serviceFactories, 'getMessagingAdapterFromService').mockImplementation(adapterSpy)
 
       const app = createTestApp({
         permissions: ['conversations:read-assigned'],
-        services: { conversations: { getById: getSpy, addMessage: addSpy, getContactIdentifier: vi.fn().mockResolvedValue('+15551234567') } },
+        services: { conversations: { getById: getSpy, addMessage: addSpy, getContactIdentifier: jest.fn().mockResolvedValue('+15551234567') } },
       })
 
       const res = await app.request('/conv-1/messages', {
@@ -580,7 +580,7 @@ describe('conversations route', () => {
 
   describe('PATCH /:id', () => {
     it('updates conversation for assigned volunteer', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ id: 'conv-1', status: 'closed' })
+      const updateSpy = jest.fn().mockResolvedValue({ id: 'conv-1', status: 'closed' })
       const app = createTestApp({
         permissions: ['conversations:read-assigned'],
         services: { conversations: { update: updateSpy } },
@@ -596,12 +596,12 @@ describe('conversations route', () => {
     })
 
     it('allows admin with update permission', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'other-pubkey',
         status: 'active',
       })
-      const updateSpy = vi.fn().mockResolvedValue({ id: 'conv-1', status: 'closed' })
+      const updateSpy = jest.fn().mockResolvedValue({ id: 'conv-1', status: 'closed' })
       const app = createTestApp({
         permissions: ['conversations:update'],
         services: { conversations: { getById: getSpy, update: updateSpy } },
@@ -616,7 +616,7 @@ describe('conversations route', () => {
     })
 
     it('returns 403 for non-admin without update permission', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         assignedTo: 'other-pubkey',
         status: 'active',
@@ -637,12 +637,12 @@ describe('conversations route', () => {
 
   describe('POST /:id/claim', () => {
     it('claims waiting conversation for volunteer with channel permission', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         channelType: 'sms',
         status: 'waiting',
       })
-      const claimSpy = vi.fn().mockResolvedValue({ id: 'conv-1', assignedTo: 'test-pubkey-' + '0'.repeat(50), status: 'active' })
+      const claimSpy = jest.fn().mockResolvedValue({ id: 'conv-1', assignedTo: 'test-pubkey-' + '0'.repeat(50), status: 'active' })
       const app = createTestApp({
         permissions: ['conversations:claim-sms'],
         services: { conversations: { getById: getSpy, claim: claimSpy } },
@@ -656,7 +656,7 @@ describe('conversations route', () => {
     })
 
     it('returns 400 when hubId is missing', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         channelType: 'sms',
         status: 'waiting',
@@ -674,7 +674,7 @@ describe('conversations route', () => {
     })
 
     it('returns 403 when volunteer lacks channel claim permission', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         channelType: 'signal',
         status: 'waiting',
@@ -692,7 +692,7 @@ describe('conversations route', () => {
     })
 
     it('returns 403 when user not configured for channel', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         channelType: 'signal',
         status: 'waiting',
@@ -713,7 +713,7 @@ describe('conversations route', () => {
     })
 
     it('returns 403 when messaging is disabled for user', async () => {
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         channelType: 'sms',
         status: 'waiting',
@@ -734,12 +734,12 @@ describe('conversations route', () => {
       const { clearTestPushLog, getTestPushLog } = await import('@worker/lib/push-dispatch')
       clearTestPushLog()
 
-      const getSpy = vi.fn().mockResolvedValue({
+      const getSpy = jest.fn().mockResolvedValue({
         id: 'conv-1',
         channelType: 'sms',
         status: 'waiting',
       })
-      const claimSpy = vi.fn().mockResolvedValue({ id: 'conv-1', assignedTo: 'test-pubkey-' + '0'.repeat(50), status: 'active' })
+      const claimSpy = jest.fn().mockResolvedValue({ id: 'conv-1', assignedTo: 'test-pubkey-' + '0'.repeat(50), status: 'active' })
       const app = createTestApp({
         permissions: ['conversations:claim-sms'],
         services: { conversations: { getById: getSpy, claim: claimSpy } },

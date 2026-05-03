@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { PlivoAdapter } from '@worker/telephony/plivo'
 import { getVoicemailThanks } from '@shared/voice-prompts'
 
 describe('PlivoAdapter', () => {
   let adapter: PlivoAdapter
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof jest.fn>
 
   beforeEach(() => {
     adapter = new PlivoAdapter('auth-id-123', 'auth-token-456', '+15551234567')
-    fetchMock = vi.fn()
+    fetchMock = jest.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   describe('handleLanguageMenu', () => {
@@ -500,14 +500,14 @@ describe('PlivoAdapter', () => {
   describe('parseCallStatusWebhook', () => {
     it('maps Plivo statuses correctly', async () => {
       const tests = [
-        { raw: 'ringing', expected: 'ringing' },
-        { raw: 'in-progress', expected: 'answered' },
-        { raw: 'completed', expected: 'completed' },
-        { raw: 'busy', expected: 'busy' },
-        { raw: 'no-answer', expected: 'no-answer' },
-        { raw: 'failed', expected: 'failed' },
-        { raw: 'cancel', expected: 'failed' },
-        { raw: 'hangup', expected: 'completed' },
+        { raw: 'ringing', expected: 'ringing' as const },
+        { raw: 'in-progress', expected: 'answered' as const },
+        { raw: 'completed', expected: 'completed' as const },
+        { raw: 'busy', expected: 'busy' as const },
+        { raw: 'no-answer', expected: 'no-answer' as const },
+        { raw: 'failed', expected: 'failed' as const },
+        { raw: 'cancel', expected: 'failed' as const },
+        { raw: 'hangup', expected: 'completed' as const },
       ]
 
       for (const t of tests) {
@@ -549,9 +549,9 @@ describe('PlivoAdapter', () => {
   describe('parseQueueExitWebhook', () => {
     it('maps conference actions correctly', async () => {
       const tests = [
-        { raw: 'enter', expected: 'bridged' },
-        { raw: 'exit', expected: 'hangup' },
-        { raw: 'other', expected: 'error' },
+        { raw: 'enter', expected: 'bridged' as const },
+        { raw: 'exit', expected: 'hangup' as const },
+        { raw: 'other', expected: 'error' as const },
       ]
 
       for (const t of tests) {

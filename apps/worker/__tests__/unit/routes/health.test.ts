@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import healthRoute from '@worker/routes/health'
 
-vi.mock('@worker/db', () => ({
-  getDb: vi.fn().mockReturnValue({
-    execute: vi.fn().mockResolvedValue(undefined),
+mock.module('@worker/db', () => ({
+  getDb: jest.fn().mockReturnValue({
+    execute: jest.fn().mockResolvedValue(undefined),
   }),
 }))
 
@@ -30,11 +30,11 @@ function createTestApp(opts: {
 }
 
 describe('health route', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>
+  let fetchSpy: ReturnType<typeof jest.spyOn>
 
   beforeEach(() => {
-    vi.clearAllMocks()
-    fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
+    jest.clearAllMocks()
+    const fetchImpl = async (url: URL | RequestInfo): Promise<Response> => {
       const urlStr = String(url)
       if (urlStr.includes('storage:9000')) {
         return new Response(null, { status: 403 })
@@ -46,7 +46,9 @@ describe('health route', () => {
         return new Response('ok', { status: 200 })
       }
       return new Response(null, { status: 500 })
-    })
+    }
+    const fetchMock = Object.assign(fetchImpl, { preconnect: fetch.preconnect }) as typeof fetch
+    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(fetchMock)
   })
 
   afterEach(() => {
@@ -70,10 +72,10 @@ describe('health route', () => {
     })
 
     it('returns 503 when postgres fails', async () => {
-      const { getDb } = await import('@worker/db')
-      vi.mocked(getDb).mockReturnValueOnce({
-        execute: vi.fn().mockRejectedValue(new Error('Connection refused')),
-      } as unknown as ReturnType<typeof getDb>)
+      const dbModule = await import('@worker/db')
+      ;(dbModule.getDb as unknown as jest.Mock).mockReturnValueOnce({
+        execute: jest.fn().mockRejectedValue(new Error('Connection refused')),
+      } as unknown as ReturnType<typeof dbModule.getDb>)
 
       const app = createTestApp()
       const res = await app.request('/')
@@ -220,10 +222,10 @@ describe('health route', () => {
     })
 
     it('returns 503 when dependencies are degraded', async () => {
-      const { getDb } = await import('@worker/db')
-      vi.mocked(getDb).mockReturnValueOnce({
-        execute: vi.fn().mockRejectedValue(new Error('DB down')),
-      } as unknown as ReturnType<typeof getDb>)
+      const dbModule = await import('@worker/db')
+      ;(dbModule.getDb as unknown as jest.Mock).mockReturnValueOnce({
+        execute: jest.fn().mockRejectedValue(new Error('DB down')),
+      } as unknown as ReturnType<typeof dbModule.getDb>)
 
       const app = createTestApp()
       const res = await app.request('/ready')

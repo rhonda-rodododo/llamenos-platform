@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { RecordsService } from '@worker/services/records'
 import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
@@ -6,7 +6,7 @@ import { createMockDb } from './mock-db'
 describe('RecordsService', () => {
   function setup() {
     const { db } = createMockDb(['notes', 'noteReplies', 'bans', 'contactMetadata'])
-    const audit = { log: vi.fn().mockResolvedValue(undefined) } as any
+    const audit = { log: jest.fn().mockResolvedValue(undefined) } as any
     const service = new RecordsService(db as any, audit)
     return { db, service, audit }
   }

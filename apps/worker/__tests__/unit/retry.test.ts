@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { withRetry, isRetryableError, assertOkOrRetryable, RetryableError } from '@worker/lib/retry'
 
 // Use baseDelayMs: 0 / maxDelayMs: 0 throughout so tests don't sleep.

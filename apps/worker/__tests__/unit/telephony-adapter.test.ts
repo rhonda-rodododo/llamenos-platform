@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import type { TelephonyProviderConfig, TelephonyProviderType } from '@shared/types'
 import { PROVIDER_REQUIRED_FIELDS, TELEPHONY_PROVIDER_LABELS } from '@shared/types'
 

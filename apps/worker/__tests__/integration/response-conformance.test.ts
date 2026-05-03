@@ -12,48 +12,46 @@
  * @Serializable generated types.
  */
 
-// Module-level mocks must be at top level (Vitest hoists vi.mock)
-vi.mock('../../db', () => ({
+// Module-level mocks must be at top level
+import { describe, it, expect, mock, jest } from 'bun:test'
+mock.module('../../db', () => ({
   getDb: () => ({
-    execute: vi.fn().mockResolvedValue([{ '?column?': 1 }]),
-    select: vi.fn().mockReturnThis(),
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue([]),
+    execute: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockResolvedValue([]),
   }),
 }))
 
-// Mock auth lib: importOriginal to keep all exports, override auth-critical functions
-vi.mock('../../lib/auth', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../lib/auth')>()
-  const FIXED_PUBKEY = 'a'.repeat(64)
-  return {
-    ...actual,
-    verifyAuthToken: vi.fn().mockResolvedValue(true),
-    authenticateRequest: vi.fn().mockResolvedValue({
+// Mock auth lib: import original, override auth-critical functions
+import * as actualAuth from '../../lib/auth'
+const FIXED_PUBKEY = 'a'.repeat(64)
+mock.module('../../lib/auth', () => ({
+  ...actualAuth,
+  verifyAuthToken: jest.fn().mockResolvedValue(true),
+  authenticateRequest: jest.fn().mockResolvedValue({
+    pubkey: FIXED_PUBKEY,
+    user: {
       pubkey: FIXED_PUBKEY,
-      user: {
-        pubkey: FIXED_PUBKEY,
-        name: 'Test User',
-        phone: '+15551234567',
-        roles: ['role-super-admin'],
-        hubRoles: [],
-        active: true,
-        createdAt: new Date().toISOString(),
-        encryptedSecretKey: '',
-        transcriptionEnabled: false,
-        spokenLanguages: ['en'],
-        uiLanguage: 'en',
-        profileCompleted: true,
-        onBreak: false,
-        callPreference: 'phone',
-        specializations: [],
-      },
-    }),
-  }
-})
+      name: 'Test User',
+      phone: '+15551234567',
+      roles: ['role-super-admin'],
+      hubRoles: [],
+      active: true,
+      createdAt: new Date().toISOString(),
+      encryptedSecretKey: '',
+      transcriptionEnabled: false,
+      spokenLanguages: ['en'],
+      uiLanguage: 'en',
+      profileCompleted: true,
+      onBreak: false,
+      callPreference: 'phone',
+      specializations: [],
+    },
+  }),
+}))
 
-import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import { assertConformsToSchema } from '../helpers/response-conformance'
@@ -121,11 +119,11 @@ function buildApp(
     extraEnv = {},
   } = opts
 
-  const mockAudit = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAudit = { log: jest.fn().mockResolvedValue(undefined) }
   // Auth middleware calls services.settings.getRoles() to resolve permissions.
   // Return a super-admin role with wildcard permission so all routes pass permission checks.
   const mockSettingsBase = {
-    getRoles: vi.fn().mockResolvedValue({
+    getRoles: jest.fn().mockResolvedValue({
       roles: [{ id: 'role-super-admin', name: 'Super Admin', slug: 'super-admin', permissions: ['*'], hubPermissions: [] }],
     }),
   }
@@ -183,7 +181,8 @@ describe('Health Routes — response conformance', () => {
   })
 
   it('GET /health — response body conforms to healthResponseSchema (may return 503 when deps unavailable)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }))
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 }) as unknown as typeof fetch
     const { app, env } = buildApp('/', healthRoutes, {
       extraEnv: {
         STORAGE_ENDPOINT: 'http://fake-storage:9000',
@@ -200,11 +199,12 @@ describe('Health Routes — response conformance', () => {
     // checks values must be objects with status field (not raw strings)
     const firstCheck = Object.values(result.parsed.checks)[0]
     expect(firstCheck).toHaveProperty('status')
-    vi.unstubAllGlobals()
+    globalThis.fetch = originalFetch
   })
 
   it('GET /ready — response body conforms to readinessResponseSchema (may return 503 when deps unavailable)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }))
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 }) as unknown as typeof fetch
     const { app, env } = buildApp('/', healthRoutes, {
       extraEnv: {
         STORAGE_ENDPOINT: 'http://fake-storage:9000',
@@ -217,7 +217,7 @@ describe('Health Routes — response conformance', () => {
       env,
     })
     expect(result.parsed.status).toBe('ok')
-    vi.unstubAllGlobals()
+    globalThis.fetch = originalFetch
   })
 })
 
@@ -228,7 +228,7 @@ describe('Health Routes — response conformance', () => {
 describe('Auth Routes — response conformance', () => {
   it('POST /login — conforms to loginResponseSchema', async () => {
     const mockIdentity = {
-      getUser: vi.fn().mockResolvedValue({
+      getUser: jest.fn().mockResolvedValue({
         pubkey: MOCK_PUBKEY,
         roles: ['role-super-admin'],
       }),
@@ -248,8 +248,8 @@ describe('Auth Routes — response conformance', () => {
 
   it('GET /me — conforms to meResponseSchema', async () => {
     const mockIdentity = {
-      getWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
-      getWebAuthnSettings: vi.fn().mockResolvedValue({ requireForAdmins: false, requireForUsers: false }),
+      getWebAuthnCredentials: jest.fn().mockResolvedValue({ credentials: [] }),
+      getWebAuthnSettings: jest.fn().mockResolvedValue({ requireForAdmins: false, requireForUsers: false }),
     }
 
     const { app, env } = buildApp('/auth', authRoutes, {
@@ -272,13 +272,13 @@ describe('Auth Routes — response conformance', () => {
 describe('Config Routes — response conformance', () => {
   it('GET /config — conforms to configResponseSchema', async () => {
     const mockSettings = {
-      getEnabledChannels: vi.fn().mockResolvedValue({ voice: true, sms: false, whatsapp: false, signal: false, rcs: false, telegram: false, reports: false }),
-      getTelephonyProvider: vi.fn().mockResolvedValue(null),
-      getSetupState: vi.fn().mockResolvedValue({ setupCompleted: true }),
-      getHubs: vi.fn().mockResolvedValue({ hubs: [] }),
+      getEnabledChannels: jest.fn().mockResolvedValue({ voice: true, sms: false, whatsapp: false, signal: false, rcs: false, telegram: false, reports: false }),
+      getTelephonyProvider: jest.fn().mockResolvedValue(null),
+      getSetupState: jest.fn().mockResolvedValue({ setupCompleted: true }),
+      getHubs: jest.fn().mockResolvedValue({ hubs: [] }),
     }
     const mockIdentity = {
-      hasAdmin: vi.fn().mockResolvedValue({ hasAdmin: true }),
+      hasAdmin: jest.fn().mockResolvedValue({ hasAdmin: true }),
     }
 
     const { app, env } = buildApp('/config', configRoutes, {
@@ -310,7 +310,7 @@ describe('Calls Routes — response conformance', () => {
 
   it('GET /calls/active — conforms to activeCallsResponseSchema', async () => {
     const mockCalls = {
-      getActiveCalls: vi.fn().mockResolvedValue(mockActiveCalls),
+      getActiveCalls: jest.fn().mockResolvedValue(mockActiveCalls),
     }
 
     const { app, env } = buildApp('/calls', callsRoutes, {
@@ -323,7 +323,7 @@ describe('Calls Routes — response conformance', () => {
 
   it('GET /calls/today-count — conforms to todayCountResponseSchema', async () => {
     const mockCalls = {
-      getTodayCount: vi.fn().mockResolvedValue(7),
+      getTodayCount: jest.fn().mockResolvedValue(7),
     }
 
     const { app, env } = buildApp('/calls', callsRoutes, {
@@ -337,7 +337,7 @@ describe('Calls Routes — response conformance', () => {
 
   it('GET /calls/presence — conforms to callPresenceResponseSchema', async () => {
     const mockCalls = {
-      getPresence: vi.fn().mockResolvedValue({
+      getPresence: jest.fn().mockResolvedValue({
         users: [{ pubkey: MOCK_PUBKEY, status: 'available' }],
       }),
     }
@@ -369,7 +369,7 @@ describe('Hub Routes — response conformance', () => {
 
   it('GET /hubs — conforms to hubListResponseSchema', async () => {
     const mockSettings = {
-      getHubs: vi.fn().mockResolvedValue({ hubs: [mockHub] }),
+      getHubs: jest.fn().mockResolvedValue({ hubs: [mockHub] }),
     }
 
     const { app, env } = buildApp('/hubs', hubRoutes, {
@@ -385,7 +385,7 @@ describe('Hub Routes — response conformance', () => {
   it('GET /hubs/:hubId — conforms to hubDetailResponseSchema', async () => {
     const mockSettings = {
       // Service returns { hub: ... } wrapper
-      getHub: vi.fn().mockResolvedValue({ hub: mockHub }),
+      getHub: jest.fn().mockResolvedValue({ hub: mockHub }),
     }
 
     const { app, env } = buildApp('/hubs', hubRoutes, {
@@ -414,7 +414,7 @@ describe('Notes Routes — response conformance', () => {
 
   it('GET /notes — conforms to noteListResponseSchema', async () => {
     const mockRecords = {
-      listNotes: vi.fn().mockResolvedValue({ notes: [mockNote], total: 1 }),
+      listNotes: jest.fn().mockResolvedValue({ notes: [mockNote], total: 1 }),
     }
 
     const { app, env } = buildApp('/notes', notesRoutes, {
@@ -430,10 +430,10 @@ describe('Notes Routes — response conformance', () => {
 
   it('POST /notes — conforms to noteResponseSchema (flat, no wrapper)', async () => {
     const mockRecords = {
-      createNote: vi.fn().mockResolvedValue(mockNote),
+      createNote: jest.fn().mockResolvedValue(mockNote),
     }
     const mockCasesService = {
-      createInteraction: vi.fn().mockResolvedValue(undefined),
+      createInteraction: jest.fn().mockResolvedValue(undefined),
     }
 
     const { app, env } = buildApp('/notes', notesRoutes, {
@@ -469,7 +469,7 @@ describe('Bans Routes — response conformance', () => {
       },
     ]
     const mockRecords = {
-      listBans: vi.fn().mockResolvedValue({ bans: mockBans }),
+      listBans: jest.fn().mockResolvedValue({ bans: mockBans }),
     }
 
     const { app, env } = buildApp('/bans', bansRoutes, {
@@ -490,7 +490,7 @@ describe('Bans Routes — response conformance', () => {
 describe('Invites Routes — response conformance', () => {
   it('GET /invites/validate/:code — conforms to inviteValidationResponseSchema', async () => {
     const mockIdentity = {
-      validateInvite: vi.fn().mockResolvedValue({
+      validateInvite: jest.fn().mockResolvedValue({
         valid: true,
         name: 'John Doe',
         roleIds: ['role-volunteer'],
@@ -499,7 +499,7 @@ describe('Invites Routes — response conformance', () => {
     const mockSettings = {
       // checkRateLimit is called as settings.checkRateLimit({ key, maxPerMinute })
       // must return { limited: boolean }
-      checkRateLimit: vi.fn().mockResolvedValue({ limited: false }),
+      checkRateLimit: jest.fn().mockResolvedValue({ limited: false }),
     }
 
     const { app, env } = buildApp('/invites', invitesRoutes, {
@@ -528,7 +528,7 @@ describe('Invites Routes — response conformance', () => {
     }
     const mockIdentity = {
       // Entity router uses 'getInvites' as the list method
-      getInvites: vi.fn().mockResolvedValue({ invites: [mockInvite] }),
+      getInvites: jest.fn().mockResolvedValue({ invites: [mockInvite] }),
     }
 
     const { app, env } = buildApp('/invites', invitesRoutes, {
@@ -562,7 +562,7 @@ describe('Users Routes — response conformance', () => {
 
   it('GET /users — conforms to userListResponseSchema', async () => {
     const mockIdentity = {
-      getUsers: vi.fn().mockResolvedValue({ users: [mockUser] }),
+      getUsers: jest.fn().mockResolvedValue({ users: [mockUser] }),
     }
 
     const { app, env } = buildApp('/users', usersRoutes, {
@@ -577,7 +577,7 @@ describe('Users Routes — response conformance', () => {
 
   it('GET /users/:pubkey — conforms to userResponseSchema', async () => {
     const mockIdentity = {
-      getUser: vi.fn().mockResolvedValue(mockUser),
+      getUser: jest.fn().mockResolvedValue(mockUser),
     }
 
     const { app, env } = buildApp('/users', usersRoutes, {
@@ -598,7 +598,7 @@ describe('Users Routes — response conformance', () => {
 describe('Shifts Routes — response conformance', () => {
   it('GET /shifts/my-status — conforms to myStatusResponseSchema', async () => {
     const mockShifts = {
-      getMyStatus: vi.fn().mockResolvedValue({
+      getMyStatus: jest.fn().mockResolvedValue({
         onShift: false,
         currentShift: null,
         nextShift: null,  // Required field — nullable but must be present

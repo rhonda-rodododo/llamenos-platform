@@ -4,7 +4,7 @@
  * Tests the auth middleware: token validation, expired tokens,
  * missing auth header, role resolution, dev-mode bypass.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 
@@ -12,29 +12,29 @@ import type { AppEnv } from '@worker/types/infra'
 // Mocks — must be set up before importing the middleware
 // ---------------------------------------------------------------------------
 
-const mockAuthenticateRequest = vi.fn()
-const mockParseAuthHeader = vi.fn()
-const mockParseSessionHeader = vi.fn()
-const mockValidateToken = vi.fn()
+const mockAuthenticateRequest = jest.fn()
+const mockParseAuthHeader = jest.fn()
+const mockParseSessionHeader = jest.fn()
+const mockValidateToken = jest.fn()
 
-vi.mock('@worker/lib/auth', () => ({
+mock.module('@worker/lib/auth', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
   parseAuthHeader: (...args: unknown[]) => mockParseAuthHeader(...args),
   parseSessionHeader: (...args: unknown[]) => mockParseSessionHeader(...args),
   validateToken: (...args: unknown[]) => mockValidateToken(...args),
 }))
 
-vi.mock('@worker/lib/logger', () => ({
+mock.module('@worker/lib/logger', () => ({
   createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    child: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }),
   }),
 }))
 
-vi.mock('@worker/lib/error-counter', () => ({
-  incError: vi.fn(),
+mock.module('@worker/lib/error-counter', () => ({
+  incError: jest.fn(),
 }))
 
 // Import after mocks
@@ -62,11 +62,11 @@ const defaultRoles = [
 function makeServices(overrides: Record<string, unknown> = {}) {
   return {
     identity: {
-      getUserInternal: vi.fn(),
+      getUserInternal: jest.fn(),
       ...overrides,
     },
     settings: {
-      getRoles: vi.fn().mockResolvedValue({ roles: defaultRoles }),
+      getRoles: jest.fn().mockResolvedValue({ roles: defaultRoles }),
     },
   }
 }
@@ -103,7 +103,7 @@ function req(app: Hono<AppEnv>, path: string, headers?: Record<string, string>, 
 
 describe('auth middleware', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
     mockParseAuthHeader.mockReturnValue(null)
     mockParseSessionHeader.mockReturnValue(null)
   })
@@ -168,7 +168,7 @@ describe('auth middleware', () => {
       mockValidateToken.mockReturnValue(true)
 
       const { app, services } = createApp()
-      ;(services.identity.getUserInternal as ReturnType<typeof vi.fn>).mockResolvedValue(user)
+      ;(services.identity.getUserInternal as ReturnType<typeof jest.fn>).mockResolvedValue(user)
 
       const res = await req(app, '/test',
         { Authorization: 'Bearer {"pubkey":"aabbccdd11223344","timestamp":1234,"token":"abc"}' },
@@ -197,7 +197,7 @@ describe('auth middleware', () => {
       mockValidateToken.mockReturnValue(true)
 
       const { app, services } = createApp()
-      ;(services.identity.getUserInternal as ReturnType<typeof vi.fn>).mockResolvedValue(user)
+      ;(services.identity.getUserInternal as ReturnType<typeof jest.fn>).mockResolvedValue(user)
 
       const res = await req(app, '/test',
         { Authorization: 'Bearer {"pubkey":"aabbccdd11223344","timestamp":1234,"token":"abc"}' },
@@ -212,7 +212,7 @@ describe('auth middleware', () => {
       mockValidateToken.mockReturnValue(true)
 
       const { app, services } = createApp()
-      ;(services.identity.getUserInternal as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+      ;(services.identity.getUserInternal as ReturnType<typeof jest.fn>).mockResolvedValue(null)
 
       const res = await req(app, '/test',
         { Authorization: 'Bearer {"pubkey":"unknown","timestamp":1234,"token":"abc"}' },

@@ -6,7 +6,7 @@
  * Bug found: chunk upload uses `files:download-all` to gate admin overrides,
  * semantically wrong for an upload operation.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import uploadsRouter from '../../routes/uploads'
@@ -27,9 +27,9 @@ type FileRecordLike = {
 }
 
 const R2_STUB = {
-  put: vi.fn().mockResolvedValue(undefined),
-  get: vi.fn(),
-  delete: vi.fn().mockResolvedValue(undefined),
+  put: jest.fn().mockResolvedValue(undefined),
+  get: jest.fn(),
+  delete: jest.fn().mockResolvedValue(undefined),
 }
 
 // Hono bindings — passed as 3rd arg to app.request() so that c.env.R2_BUCKET resolves
@@ -55,12 +55,12 @@ function makeApp(opts: {
     },
   } = opts
 
-  const mockAudit = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAudit = { log: jest.fn().mockResolvedValue(undefined) }
   const mockConversations = {
-    createFile: vi.fn().mockResolvedValue(undefined),
-    getFile: vi.fn().mockResolvedValue(fileRecord),
-    markChunkComplete: vi.fn().mockResolvedValue({ completedChunks: 1, totalChunks: fileRecord.totalChunks }),
-    markFileComplete: vi.fn().mockResolvedValue(undefined),
+    createFile: jest.fn().mockResolvedValue(undefined),
+    getFile: jest.fn().mockResolvedValue(fileRecord),
+    markChunkComplete: jest.fn().mockResolvedValue({ completedChunks: 1, totalChunks: fileRecord.totalChunks }),
+    markFileComplete: jest.fn().mockResolvedValue(undefined),
   }
 
   const app = new Hono<AppEnv>()

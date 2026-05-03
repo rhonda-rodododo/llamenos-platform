@@ -7,7 +7,7 @@
  * 3. Version byte is correctly handled in ECIES wrapping
  * 4. Label consistency between encrypt and decrypt sides
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { hkdf } from '@noble/hashes/hkdf.js'

@@ -4,7 +4,7 @@
  * Notes are E2EE — validates encrypted content, key envelopes, and the
  * callId/conversationId refinement (at least one must be present).
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import notesRoutes from '../../routes/notes'
 import {
   createTestApp,

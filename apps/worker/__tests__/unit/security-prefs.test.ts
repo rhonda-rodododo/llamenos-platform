@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { SecurityPrefsService } from '../../services/security-prefs'
 
 // ---------------------------------------------------------------------------
@@ -33,9 +33,9 @@ function makeMockDb() {
 
   // Simplified mock that tracks calls and returns controlled data
   const db = {
-    select: vi.fn(),
-    insert: vi.fn(),
-    update: vi.fn(),
+    select: jest.fn(),
+    insert: jest.fn(),
+    update: jest.fn(),
     _store: store,
   }
 
@@ -65,16 +65,16 @@ describe('SecurityPrefsService', () => {
 
       // Mock db where select returns empty, insert returns defaults
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([defaultRow]),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([defaultRow]),
           }),
         }),
       }
@@ -103,10 +103,10 @@ describe('SecurityPrefsService', () => {
       }
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([existingRow]),
             }),
           }),
         }),
@@ -124,16 +124,16 @@ describe('SecurityPrefsService', () => {
 
     it('throws if insert returns no rows', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([]),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
           }),
         }),
       }
@@ -163,17 +163,17 @@ describe('SecurityPrefsService', () => {
       }
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([existingRow]),
             }),
           }),
         }),
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([updatedRow]),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([updatedRow]),
             }),
           }),
         }),
@@ -204,17 +204,17 @@ describe('SecurityPrefsService', () => {
       }
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([existingRow]),
             }),
           }),
         }),
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([]),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -230,16 +230,16 @@ describe('SecurityPrefsService', () => {
       // If get() fails because row doesn't exist AND insert fails,
       // update should not proceed
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([]),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
           }),
         }),
       }

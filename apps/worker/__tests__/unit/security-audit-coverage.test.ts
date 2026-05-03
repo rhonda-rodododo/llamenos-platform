@@ -12,9 +12,8 @@
  * - R8: serverEventKeyHex behind auth, DEMO_MODE production gate, webhook hostname bypass,
  *        NotePayload maxLength, hub slug validation, blast mediaUrl HTTPS enforcement
  */
-import { describe, it, expect, vi } from 'vitest'
-
 // ─── Round 4: Mass assignment field allowlist ─────────────────────────────────
+import { describe, it, expect } from 'bun:test'
 
 describe('R4: Mass assignment — volunteer self-update safe fields', () => {
   // The volunteer PATCH endpoint restricts which fields a non-admin can update.

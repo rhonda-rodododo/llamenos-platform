@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'bun:test'
 import { parseAuthHeader, parseSessionHeader, validateToken, verifyAuthToken } from '@worker/lib/auth'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { sha256 } from '@noble/hashes/sha2.js'

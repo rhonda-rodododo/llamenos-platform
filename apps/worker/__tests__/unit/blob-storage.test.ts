@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, mock, jest } from 'bun:test'
 import { createBlobStorage } from '@worker/lib/blob-storage'
 
 // ---------------------------------------------------------------------------
 // Mock @aws-sdk/client-s3
 // ---------------------------------------------------------------------------
 
-const mockSend = vi.fn()
+const mockSend = jest.fn()
 
-vi.mock('@aws-sdk/client-s3', () => {
+mock.module('@aws-sdk/client-s3', () => {
   class S3Client {
     send = mockSend
   }
@@ -37,7 +37,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  // vi.unstubAllEnvs is not available in bun vitest compat — restore manually
+  // Restore env vars manually
   delete process.env.STORAGE_ACCESS_KEY
   delete process.env.STORAGE_SECRET_KEY
 })
@@ -77,7 +77,7 @@ describe('createBlobStorage — credentials', () => {
 
   // Bug fix test: MINIO_* legacy vars trigger deprecation warning, STORAGE_* do not
   it('does NOT warn when using STORAGE_* env vars (bug fix: was warning on correct vars)', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       createBlobStorage({
         endpoint: 'http://test:9000',
@@ -91,7 +91,7 @@ describe('createBlobStorage — credentials', () => {
   })
 
   it('warns when using legacy MINIO_* env vars', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
     const savedKey = process.env.MINIO_ACCESS_KEY
     process.env.MINIO_ACCESS_KEY = 'legacy-key'
     try {
@@ -118,7 +118,7 @@ describe('BlobStorage.put', () => {
     mockSend.mockResolvedValueOnce({})
     const storage = makeStorageWithCreds()
     await storage.put('my/key', 'hello world')
-    expect(mockSend).toHaveBeenCalledOnce()
+    expect(mockSend).toHaveBeenCalledTimes(1)
     const cmd = mockSend.mock.calls[0][0]
     expect(cmd.input).toMatchObject({ Bucket: 'test-bucket', Key: 'my/key', Body: 'hello world' })
   })
@@ -128,7 +128,7 @@ describe('BlobStorage.put', () => {
     const storage = makeStorageWithCreds()
     const bytes = new Uint8Array([1, 2, 3])
     await storage.put('my/key', bytes)
-    expect(mockSend).toHaveBeenCalledOnce()
+    expect(mockSend).toHaveBeenCalledTimes(1)
     const cmd = mockSend.mock.calls[0][0]
     expect(cmd.input.Body).toEqual(bytes)
   })
@@ -232,7 +232,7 @@ describe('BlobStorage.delete', () => {
     mockSend.mockResolvedValueOnce({})
     const storage = makeStorageWithCreds()
     await storage.delete('del/key')
-    expect(mockSend).toHaveBeenCalledOnce()
+    expect(mockSend).toHaveBeenCalledTimes(1)
     const cmd = mockSend.mock.calls[0][0]
     expect(cmd.input).toMatchObject({ Bucket: 'test-bucket', Key: 'del/key' })
   })

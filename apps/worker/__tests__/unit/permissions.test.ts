@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import {
   permissionGranted,
   resolvePermissions,
@@ -14,6 +14,7 @@ import {
   DEFAULT_ROLES,
   CHANNEL_CLAIM_PERMISSIONS,
   type Role,
+  type Permission,
 } from '@shared/permissions'
 
 // Helper to create a full Role from a partial definition
@@ -210,7 +211,7 @@ describe('getPermissionsByDomain', () => {
   it('all PERMISSION_CATALOG entries are present', () => {
     const grouped = getPermissionsByDomain()
     const allKeys = Object.values(grouped).flatMap(entries => entries.map(e => e.key))
-    for (const key of Object.keys(PERMISSION_CATALOG)) {
+    for (const key of Object.keys(PERMISSION_CATALOG) as Permission[]) {
       expect(allKeys).toContain(key)
     }
   })

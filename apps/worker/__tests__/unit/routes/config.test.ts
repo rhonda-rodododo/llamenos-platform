@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 
-vi.stubGlobal('__BUILD_VERSION__', '1.0.0-test')
-vi.stubGlobal('__BUILD_COMMIT__', 'abc123')
-vi.stubGlobal('__BUILD_TIME__', '2024-01-01T00:00:00Z')
+;(globalThis as any).__BUILD_VERSION__ = '1.0.0-test'
+;(globalThis as any).__BUILD_COMMIT__ = 'abc123'
+;(globalThis as any).__BUILD_TIME__ = '2024-01-01T00:00:00Z'
 
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
@@ -40,12 +40,12 @@ function createTestApp(opts: {
 function createMockServices(overrides: { settings?: Record<string, unknown>; identity?: Record<string, unknown> } = {}) {
   return {
     settings: {
-      getEnabledChannels: vi.fn().mockResolvedValue({
+      getEnabledChannels: jest.fn().mockResolvedValue({
         voice: true, sms: true, whatsapp: true, signal: true, rcs: true, telegram: true, reports: true,
       }),
-      getTelephonyProvider: vi.fn().mockResolvedValue({ phoneNumber: '+15559876543' }),
-      getSetupState: vi.fn().mockResolvedValue({ setupCompleted: true }),
-      getHubs: vi.fn().mockResolvedValue({
+      getTelephonyProvider: jest.fn().mockResolvedValue({ phoneNumber: '+15559876543' }),
+      getSetupState: jest.fn().mockResolvedValue({ setupCompleted: true }),
+      getHubs: jest.fn().mockResolvedValue({
         hubs: [
           { id: 'hub-1', name: 'Main Hub', status: 'active' as const },
           { id: 'hub-2', name: 'Inactive Hub', status: 'inactive' as const },
@@ -54,7 +54,7 @@ function createMockServices(overrides: { settings?: Record<string, unknown>; ide
       ...(overrides.settings || {}),
     },
     identity: {
-      hasAdmin: vi.fn().mockResolvedValue({ hasAdmin: true }),
+      hasAdmin: jest.fn().mockResolvedValue({ hasAdmin: true }),
       ...(overrides.identity || {}),
     },
   }
@@ -62,7 +62,7 @@ function createMockServices(overrides: { settings?: Record<string, unknown>; ide
 
 describe('config route', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   describe('GET /', () => {
@@ -94,7 +94,7 @@ describe('config route', () => {
     it('falls back to env phone number when telephony provider fails', async () => {
       const services = createMockServices({
         settings: {
-          getTelephonyProvider: vi.fn().mockRejectedValue(new Error('DB error')),
+          getTelephonyProvider: jest.fn().mockRejectedValue(new Error('DB error')),
         },
       })
       const app = createTestApp({ services })
@@ -108,7 +108,7 @@ describe('config route', () => {
     it('defaults channels to all-disabled when getEnabledChannels fails', async () => {
       const services = createMockServices({
         settings: {
-          getEnabledChannels: vi.fn().mockRejectedValue(new Error('DB error')),
+          getEnabledChannels: jest.fn().mockRejectedValue(new Error('DB error')),
         },
       })
       const app = createTestApp({ services })
@@ -124,7 +124,7 @@ describe('config route', () => {
     it('defaults setupCompleted to true and demoMode from env when getSetupState fails', async () => {
       const services = createMockServices({
         settings: {
-          getSetupState: vi.fn().mockRejectedValue(new Error('DB error')),
+          getSetupState: jest.fn().mockRejectedValue(new Error('DB error')),
         },
       })
       const app = createTestApp({
@@ -143,7 +143,7 @@ describe('config route', () => {
     it('defaults needsBootstrap to false when hasAdmin fails', async () => {
       const services = createMockServices({
         identity: {
-          hasAdmin: vi.fn().mockRejectedValue(new Error('DB error')),
+          hasAdmin: jest.fn().mockRejectedValue(new Error('DB error')),
         },
       })
       const app = createTestApp({ services })
@@ -157,7 +157,7 @@ describe('config route', () => {
     it('returns empty hubs when getHubs fails', async () => {
       const services = createMockServices({
         settings: {
-          getHubs: vi.fn().mockRejectedValue(new Error('DB error')),
+          getHubs: jest.fn().mockRejectedValue(new Error('DB error')),
         },
       })
       const app = createTestApp({ services })
@@ -172,7 +172,7 @@ describe('config route', () => {
     it('does not set defaultHubId when multiple active hubs exist', async () => {
       const services = createMockServices({
         settings: {
-          getHubs: vi.fn().mockResolvedValue({
+          getHubs: jest.fn().mockResolvedValue({
             hubs: [
               { id: 'hub-1', name: 'Hub 1', status: 'active' as const },
               { id: 'hub-2', name: 'Hub 2', status: 'active' as const },
@@ -266,7 +266,7 @@ describe('config route', () => {
     })
 
     it('derives serverNostrPubkey from valid SERVER_NOSTR_SECRET', async () => {
-      const deriveSpy = vi.spyOn(nostrPublisher, 'deriveServerKeypair').mockReturnValue({
+      const deriveSpy = jest.spyOn(nostrPublisher, 'deriveServerKeypair').mockReturnValue({
         secretKey: new Uint8Array(32),
         pubkey: 'testpubkeyhex123',
       })
@@ -286,7 +286,7 @@ describe('config route', () => {
     it('uses demoMode from setupState when env does not force it', async () => {
       const services = createMockServices({
         settings: {
-          getSetupState: vi.fn().mockResolvedValue({ setupCompleted: true, demoMode: true }),
+          getSetupState: jest.fn().mockResolvedValue({ setupCompleted: true, demoMode: true }),
         },
       })
       const app = createTestApp({

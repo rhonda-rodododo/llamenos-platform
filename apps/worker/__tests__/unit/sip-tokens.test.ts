@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { isSipConfigured, generateSipParams } from '@worker/telephony/sip-tokens'
 import type { TelephonyProviderConfig } from '@shared/types'
 

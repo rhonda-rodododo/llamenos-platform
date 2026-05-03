@@ -4,7 +4,7 @@
  * Tests the newly added validator() middleware for firehose connection
  * create and update routes.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import firehoseRoutes from '../../routes/firehose'
 import {
   createTestApp,

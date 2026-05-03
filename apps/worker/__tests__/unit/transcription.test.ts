@@ -1,14 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
-
-const { mockGetTelephonyFromService } = vi.hoisted(() => ({
-  mockGetTelephonyFromService: vi.fn(),
-}))
-vi.mock('@worker/lib/service-factories', () => ({
+import { describe, it, expect, mock, jest } from 'bun:test'
+const mockGetTelephonyFromService = jest.fn()
+mock.module('@worker/lib/service-factories', () => ({
   getTelephonyFromService: mockGetTelephonyFromService,
 }))
 
-vi.mock('@worker/lib/crypto', () => ({
-  encryptMessageForStorage: vi.fn().mockReturnValue({
+mock.module('@worker/lib/crypto', () => ({
+  encryptMessageForStorage: jest.fn().mockReturnValue({
     encryptedContent: 'enc',
     readerEnvelopes: [],
   }),
@@ -19,23 +16,23 @@ import { maybeTranscribe, transcribeVoicemail } from '@worker/services/transcrip
 describe('transcription', () => {
   function setup() {
     const env = {
-      AI: { run: vi.fn() },
+      AI: { run: jest.fn() },
       ADMIN_DECRYPTION_PUBKEY: 'a'.repeat(64),
       ADMIN_PUBKEY: 'a'.repeat(64),
     } as any
 
     const services = {
       settings: {
-        getTranscriptionSettings: vi.fn().mockResolvedValue({ globalEnabled: true }),
+        getTranscriptionSettings: jest.fn().mockResolvedValue({ globalEnabled: true }),
       },
       identity: {
-        getUser: vi.fn().mockResolvedValue({ transcriptionEnabled: true }),
+        getUser: jest.fn().mockResolvedValue({ transcriptionEnabled: true }),
       },
       records: {
-        createNote: vi.fn().mockResolvedValue({}),
+        createNote: jest.fn().mockResolvedValue({}),
       },
       calls: {
-        updateMetadata: vi.fn().mockResolvedValue({}),
+        updateMetadata: jest.fn().mockResolvedValue({}),
       },
     } as any
 
@@ -49,7 +46,7 @@ describe('transcription', () => {
       const { env, services } = setup()
       env.AI.run.mockResolvedValue({ text: 'Hello world' })
       mockGetTelephonyFromService.mockResolvedValue({
-        getRecordingAudio: vi.fn().mockResolvedValue(new ArrayBuffer(100)),
+        getRecordingAudio: jest.fn().mockResolvedValue(new ArrayBuffer(100)),
       })
 
       await maybeTranscribe('call-1', 'rec-1', 'b'.repeat(64), env, services)
@@ -83,7 +80,7 @@ describe('transcription', () => {
     it('returns early when no audio', async () => {
       const { env, services } = setup()
       mockGetTelephonyFromService.mockResolvedValue({
-        getRecordingAudio: vi.fn().mockResolvedValue(null),
+        getRecordingAudio: jest.fn().mockResolvedValue(null),
       })
 
       await maybeTranscribe('call-1', 'rec-1', 'b'.repeat(64), env, services)
@@ -96,7 +93,7 @@ describe('transcription', () => {
       const { env, services } = setup()
       env.AI.run.mockResolvedValue({ text: 'Voicemail message' })
       mockGetTelephonyFromService.mockResolvedValue({
-        getCallRecording: vi.fn().mockResolvedValue(new ArrayBuffer(100)),
+        getCallRecording: jest.fn().mockResolvedValue(new ArrayBuffer(100)),
       })
 
       await transcribeVoicemail('call-1', env, services)

@@ -4,7 +4,7 @@
  * Hubs are the multi-tenant boundary — validates creation, updates,
  * member management, and hub key envelope distribution.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import hubRoutes from '../../routes/hubs'
 import {
   createTestApp,

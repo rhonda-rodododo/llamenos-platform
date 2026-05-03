@@ -4,7 +4,7 @@
  * Validates encrypted contact creation with 3-tier E2EE envelopes,
  * identifier hashes, and blind indexes.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import contactsV2Routes from '../../routes/contacts-v2'
 import {
   createTestApp,

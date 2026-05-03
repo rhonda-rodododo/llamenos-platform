@@ -3,13 +3,13 @@
  *
  * Tests sigchain routes: fetch, append, chain integrity, auth enforcement.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 import { CryptoKeyError } from '@worker/services/crypto-keys'
 
 // Mock openapi decorators to passthrough
-vi.mock('hono-openapi', () => ({
+mock.module('hono-openapi', () => ({
   describeRoute: () => async (_c: unknown, next: () => Promise<void>) => next(),
   resolver: (s: unknown) => s,
   validator: (_type: string, _schema: unknown) => {
@@ -20,7 +20,7 @@ vi.mock('hono-openapi', () => ({
   },
 }))
 
-vi.mock('@worker/middleware/permission-guard', () => ({
+mock.module('@worker/middleware/permission-guard', () => ({
   requirePermission: (..._perms: string[]) =>
     async (_c: unknown, next: () => Promise<void>) => next(),
   checkPermission: (perms: string[], required: string) => {
@@ -41,8 +41,8 @@ function createApp(callerPubkey: string, permissions: string[] = ['users:read'])
   const app = new Hono<AppEnv>()
   const services = {
     cryptoKeys: {
-      getSigchain: vi.fn().mockResolvedValue([]),
-      appendSigchainLink: vi.fn(),
+      getSigchain: jest.fn().mockResolvedValue([]),
+      appendSigchainLink: jest.fn(),
     },
   }
 
@@ -66,7 +66,7 @@ const defaultEnv = {} as never
 // ---------------------------------------------------------------------------
 
 describe('sigchain routes', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => jest.clearAllMocks())
 
   describe('GET /users/:targetPubkey/sigchain', () => {
     it('returns own sigchain', async () => {

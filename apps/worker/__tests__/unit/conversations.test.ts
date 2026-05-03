@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { ConversationsService } from '@worker/services/conversations'
 import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'

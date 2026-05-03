@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import banRoutes from '@worker/routes/bans'
@@ -12,14 +12,14 @@ function createTestApp(opts: {
   hubId?: string
   pubkey?: string
   serviceMock?: Record<string, unknown>
-  auditLogSpy?: ReturnType<typeof vi.fn>
+  auditLogSpy?: ReturnType<typeof jest.fn>
 } = {}) {
   const {
     permissions = ['*'],
     hubId,
     pubkey = 'a'.repeat(64),
     serviceMock = {},
-    auditLogSpy = vi.fn().mockResolvedValue(undefined),
+    auditLogSpy = jest.fn().mockResolvedValue(undefined),
   } = opts
 
   const mockAuditService = { log: auditLogSpy }
@@ -72,7 +72,7 @@ function createTestApp(opts: {
 
 describe('bans routes', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   // -------------------------------------------------------------------------
@@ -81,7 +81,7 @@ describe('bans routes', () => {
 
   describe('GET /bans', () => {
     it('lists bans', async () => {
-      const listBansSpy = vi.fn().mockResolvedValue({
+      const listBansSpy = jest.fn().mockResolvedValue({
         bans: [{ phone: '+12125551234', reason: 'Spam', bannedBy: 'admin', bannedAt: new Date().toISOString() }],
       })
       const { app } = createTestApp({
@@ -110,7 +110,7 @@ describe('bans routes', () => {
 
   describe('POST /bans', () => {
     it('bans a valid phone number', async () => {
-      const addBanSpy = vi.fn().mockResolvedValue({
+      const addBanSpy = jest.fn().mockResolvedValue({
         phone: '+12125551234',
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
@@ -137,7 +137,7 @@ describe('bans routes', () => {
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
       })
-      expect(auditLogSpy).toHaveBeenCalledOnce()
+      expect(auditLogSpy).toHaveBeenCalledTimes(1)
     })
 
     it('rejects invalid phone number', async () => {
@@ -172,7 +172,7 @@ describe('bans routes', () => {
 
   describe('POST /bans/bulk', () => {
     it('bulk bans valid phone numbers', async () => {
-      const bulkAddBansSpy = vi.fn().mockResolvedValue(2)
+      const bulkAddBansSpy = jest.fn().mockResolvedValue(2)
       const { app, auditLogSpy } = createTestApp({
         permissions: ['bans:bulk-create'],
         hubId: 'hub-1',
@@ -189,7 +189,7 @@ describe('bans routes', () => {
       const json = await res.json()
       expect(json.count).toBe(2)
       expect(bulkAddBansSpy).toHaveBeenCalledWith(['+12125551234', '+12125555678'], 'Spam', 'a'.repeat(64), 'hub-1')
-      expect(auditLogSpy).toHaveBeenCalledOnce()
+      expect(auditLogSpy).toHaveBeenCalledTimes(1)
     })
 
     it('rejects when any phone is invalid', async () => {
@@ -224,7 +224,7 @@ describe('bans routes', () => {
 
   describe('DELETE /bans/:phone', () => {
     it('unbans a phone number', async () => {
-      const removeBanSpy = vi.fn().mockResolvedValue(undefined)
+      const removeBanSpy = jest.fn().mockResolvedValue(undefined)
       const { app, auditLogSpy } = createTestApp({
         permissions: ['bans:delete'],
         hubId: 'hub-1',
@@ -234,11 +234,11 @@ describe('bans routes', () => {
       const res = await app.request('/bans/%2B12125551234', { method: 'DELETE' })
       expect(res.status).toBe(200)
       expect(removeBanSpy).toHaveBeenCalledWith('+12125551234', 'hub-1')
-      expect(auditLogSpy).toHaveBeenCalledOnce()
+      expect(auditLogSpy).toHaveBeenCalledTimes(1)
     })
 
     it('unbans a phone number with percent-encoded characters correctly', async () => {
-      const removeBanSpy = vi.fn().mockResolvedValue(undefined)
+      const removeBanSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         permissions: ['bans:delete'],
         hubId: 'hub-1',

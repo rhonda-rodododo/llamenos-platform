@@ -7,7 +7,7 @@
  * core logic lives in unexported private functions (isShiftActive) or requires
  * a live database connection (updateMessageStatus).
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { isSipConfigured, generateSipParams } from '@worker/telephony/sip-tokens'
 import type { TelephonyProviderConfig } from '@shared/types'
 

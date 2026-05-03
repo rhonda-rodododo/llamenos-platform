@@ -4,7 +4,7 @@
  * Tests agent keypair generation, sealing, and unsealing.
  * Bug-hunting focus: key isolation, domain separation, zeroization.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { generateAgentKeypair, unsealAgentNsec } from '@worker/lib/agent-identity'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'

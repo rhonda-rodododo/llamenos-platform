@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { FirehoseInferenceClient } from '@worker/services/firehose-inference'
 
 describe('FirehoseInferenceClient', () => {
   function setup() {
     const client = new FirehoseInferenceClient('http://localhost:8000/v1', 'test-model')
-    const mockCreate = vi.fn()
+    const mockCreate = jest.fn()
     ;(client as any).client = { chat: { completions: { create: mockCreate } } }
     return { client, mockCreate }
   }
@@ -157,7 +157,7 @@ describe('FirehoseInferenceClient', () => {
   describe('healthCheck', () => {
     it('returns ok when models list succeeds', async () => {
       const { client } = setup()
-      ;(client as any).client = { models: { list: vi.fn().mockResolvedValue({}) } }
+      ;(client as any).client = { models: { list: jest.fn().mockResolvedValue({}) } }
 
       const result = await client.healthCheck()
       expect(result.ok).toBe(true)
@@ -166,7 +166,7 @@ describe('FirehoseInferenceClient', () => {
 
     it('returns error when models list fails', async () => {
       const { client } = setup()
-      ;(client as any).client = { models: { list: vi.fn().mockRejectedValue(new Error('timeout')) } }
+      ;(client as any).client = { models: { list: jest.fn().mockRejectedValue(new Error('timeout')) } }
 
       const result = await client.healthCheck()
       expect(result.ok).toBe(false)

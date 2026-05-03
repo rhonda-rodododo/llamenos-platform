@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import shiftRoutes from '@worker/routes/shifts'
@@ -23,7 +23,7 @@ function createTestApp(opts: {
   const services: Record<string, unknown> = {
     shifts: serviceMock.shifts || {},
     settings: serviceMock.settings || {},
-    audit: serviceMock.audit || { log: vi.fn().mockResolvedValue(undefined) },
+    audit: serviceMock.audit || { log: jest.fn().mockResolvedValue(undefined) },
   }
 
   const app = new Hono<AppEnv>()
@@ -66,7 +66,7 @@ function createTestApp(opts: {
 
 describe('shifts routes', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   // -------------------------------------------------------------------------
@@ -75,7 +75,7 @@ describe('shifts routes', () => {
 
   describe('GET /shifts/my-status', () => {
     it('returns shift status for current user', async () => {
-      const getMyStatusSpy = vi.fn().mockResolvedValue({
+      const getMyStatusSpy = jest.fn().mockResolvedValue({
         onShift: true,
         currentShift: { name: 'Morning', startTime: '09:00', endTime: '12:00' },
         nextShift: null,
@@ -94,7 +94,7 @@ describe('shifts routes', () => {
     })
 
     it('uses empty string hubId when not set', async () => {
-      const getMyStatusSpy = vi.fn().mockResolvedValue({
+      const getMyStatusSpy = jest.fn().mockResolvedValue({
         onShift: false,
         currentShift: null,
         nextShift: null,
@@ -116,7 +116,7 @@ describe('shifts routes', () => {
 
   describe('GET /shifts/fallback', () => {
     it('returns fallback group config', async () => {
-      const getFallbackGroupSpy = vi.fn().mockResolvedValue({
+      const getFallbackGroupSpy = jest.fn().mockResolvedValue({
         userPubkeys: ['b'.repeat(64), 'c'.repeat(64)],
       })
       const { app } = createTestApp({
@@ -145,7 +145,7 @@ describe('shifts routes', () => {
 
   describe('PUT /shifts/fallback', () => {
     it('updates fallback group config', async () => {
-      const setFallbackGroupSpy = vi.fn().mockResolvedValue({
+      const setFallbackGroupSpy = jest.fn().mockResolvedValue({
         userPubkeys: ['d'.repeat(64), 'e'.repeat(64)],
       })
       const { app } = createTestApp({
@@ -183,7 +183,7 @@ describe('shifts routes', () => {
 
   describe('GET /shifts', () => {
     it('lists shifts', async () => {
-      const listSpy = vi.fn().mockResolvedValue({
+      const listSpy = jest.fn().mockResolvedValue({
         shifts: [{ id: 's1', name: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)] }],
       })
       const { app } = createTestApp({
@@ -212,7 +212,7 @@ describe('shifts routes', () => {
 
   describe('POST /shifts', () => {
     it('creates a shift', async () => {
-      const createSpy = vi.fn().mockResolvedValue({
+      const createSpy = jest.fn().mockResolvedValue({
         id: 's1',
         name: 'Morning',
         startTime: '09:00',
@@ -223,7 +223,7 @@ describe('shifts routes', () => {
       const { app } = createTestApp({
         permissions: ['shifts:create'],
         hubId: 'hub-1',
-        serviceMock: { shifts: { list: vi.fn(), create: createSpy } },
+        serviceMock: { shifts: { list: jest.fn(), create: createSpy } },
       })
 
       const res = await app.request('/shifts', {
@@ -253,7 +253,7 @@ describe('shifts routes', () => {
 
   describe('PATCH /shifts/:id', () => {
     it('updates a shift', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({
+      const updateSpy = jest.fn().mockResolvedValue({
         id: 's1',
         name: 'Evening',
         startTime: '18:00',
@@ -264,7 +264,7 @@ describe('shifts routes', () => {
       const { app } = createTestApp({
         permissions: ['shifts:update'],
         hubId: 'hub-1',
-        serviceMock: { shifts: { list: vi.fn(), update: updateSpy } },
+        serviceMock: { shifts: { list: jest.fn(), update: updateSpy } },
       })
 
       const res = await app.request('/shifts/s1', {
@@ -294,11 +294,11 @@ describe('shifts routes', () => {
 
   describe('DELETE /shifts/:id', () => {
     it('deletes a shift', async () => {
-      const deleteSpy = vi.fn().mockResolvedValue({ ok: true })
+      const deleteSpy = jest.fn().mockResolvedValue({ ok: true })
       const { app } = createTestApp({
         permissions: ['shifts:delete'],
         hubId: 'hub-1',
-        serviceMock: { shifts: { list: vi.fn(), delete: deleteSpy } },
+        serviceMock: { shifts: { list: jest.fn(), delete: deleteSpy } },
       })
 
       const res = await app.request('/shifts/s1', { method: 'DELETE' })

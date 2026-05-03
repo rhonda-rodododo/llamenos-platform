@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { CasesService } from '../../services/cases'
 import { ServiceError } from '../../services/settings'
 
@@ -74,11 +74,11 @@ describe('CasesService — CRUD', () => {
     it('creates a case and returns the row', async () => {
       const row = makeCaseRow({ id: 'case-new' })
 
-      const insertValues = vi.fn()
+      const insertValues = jest.fn()
       const db = {
-        insert: vi.fn().mockReturnValue({
+        insert: jest.fn().mockReturnValue({
           values: insertValues.mockReturnValue({
-            returning: vi.fn().mockResolvedValue([row]),
+            returning: jest.fn().mockResolvedValue([row]),
           }),
         }),
       }
@@ -100,22 +100,22 @@ describe('CasesService — CRUD', () => {
 
     it('creates contact links atomically when provided', async () => {
       const row = makeCaseRow({ id: 'case-linked' })
-      const insertContactValues = vi.fn().mockResolvedValue(undefined)
-      const updateSet = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const insertContactValues = jest.fn().mockResolvedValue(undefined)
+      const updateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        insert: vi.fn()
+        insert: jest.fn()
           .mockReturnValueOnce({
-            values: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([row]),
+            values: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([row]),
             }),
           })
           .mockReturnValueOnce({
             values: insertContactValues,
           }),
-        update: vi.fn().mockReturnValue({ set: updateSet }),
+        update: jest.fn().mockReturnValue({ set: updateSet }),
       }
 
       const svc = new CasesService(db as never)
@@ -141,9 +141,9 @@ describe('CasesService — CRUD', () => {
     it('returns case record', async () => {
       const row = makeCaseRow({ id: 'case-1' })
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([row]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([row]),
           }),
         }),
       }
@@ -155,9 +155,9 @@ describe('CasesService — CRUD', () => {
 
     it('throws 404 for nonexistent case', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
           }),
         }),
       }
@@ -180,21 +180,21 @@ describe('CasesService — CRUD', () => {
         interactionCount: 1,
       })
 
-      const insertInteraction = vi.fn().mockReturnValue({
-        values: vi.fn().mockResolvedValue(undefined),
+      const insertInteraction = jest.fn().mockReturnValue({
+        values: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([existingRow]),
           }),
         }),
         insert: insertInteraction,
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([updatedRow]),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([updatedRow]),
             }),
           }),
         }),
@@ -220,18 +220,18 @@ describe('CasesService — CRUD', () => {
         statusHash: 'hash-open',
       })
 
-      const insertInteraction = vi.fn()
+      const insertInteraction = jest.fn()
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([existingRow]),
           }),
         }),
         insert: insertInteraction,
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([updatedRow]),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([updatedRow]),
             }),
           }),
         }),
@@ -261,15 +261,15 @@ describe('CasesService — Assignment', () => {
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([existingRow]),
           }),
         }),
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([{
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([{
                 assignedTo: ['pk-1', 'pk-2'],
               }]),
             }),
@@ -293,15 +293,15 @@ describe('CasesService — Assignment', () => {
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([existingRow]),
           }),
         }),
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([{
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([{
                 assignedTo: ['pk-1', 'pk-3'],
               }]),
             }),
@@ -318,9 +318,9 @@ describe('CasesService — Assignment', () => {
 
     it('throws 404 for nonexistent case', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
           }),
         }),
       }
@@ -338,9 +338,9 @@ describe('CasesService — Assignment', () => {
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([existingRow]),
           }),
         }),
       }
@@ -358,18 +358,18 @@ describe('CasesService — Assignment', () => {
 describe('CasesService — list pagination', () => {
   it('caps limit at 100', async () => {
     const db = {
-      select: vi.fn()
+      select: jest.fn()
         .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([{ count: 0 }]),
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
           }),
         })
         .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  offset: vi.fn().mockResolvedValue([]),
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
                 }),
               }),
             }),
@@ -388,18 +388,18 @@ describe('CasesService — list pagination', () => {
 
   it('defaults to page 1, limit 20', async () => {
     const db = {
-      select: vi.fn()
+      select: jest.fn()
         .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([{ count: 5 }]),
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 5 }]),
           }),
         })
         .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  offset: vi.fn().mockResolvedValue([]),
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
                 }),
               }),
             }),
@@ -416,18 +416,18 @@ describe('CasesService — list pagination', () => {
 
   it('computes hasMore correctly', async () => {
     const db = {
-      select: vi.fn()
+      select: jest.fn()
         .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([{ count: 50 }]),
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 50 }]),
           }),
         })
         .mockReturnValueOnce({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  offset: vi.fn().mockResolvedValue([]),
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  offset: jest.fn().mockResolvedValue([]),
                 }),
               }),
             }),
@@ -457,19 +457,19 @@ describe('CasesService — Evidence verification', () => {
       integrityHash: 'sha256-abc123',
     }
 
-    const insertEntry = vi.fn().mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
+    const insertEntry = jest.fn().mockReturnValue({
+      values: jest.fn().mockResolvedValue(undefined),
     })
-    const updateEvidence = vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+    const updateEvidence = jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       }),
     })
 
     const db = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([evidenceRow]),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([evidenceRow]),
         }),
       }),
       insert: insertEntry,
@@ -491,17 +491,17 @@ describe('CasesService — Evidence verification', () => {
     }
 
     const db = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([evidenceRow]),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([evidenceRow]),
         }),
       }),
-      insert: vi.fn().mockReturnValue({
-        values: vi.fn().mockResolvedValue(undefined),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockResolvedValue(undefined),
       }),
-      update: vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
         }),
       }),
     }
@@ -516,9 +516,9 @@ describe('CasesService — Evidence verification', () => {
 
   it('throws 404 for nonexistent evidence', async () => {
     const db = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
         }),
       }),
     }
@@ -543,8 +543,8 @@ describe('CasesService — Reset safety', () => {
   })
 
   it('allows reset in demo mode', async () => {
-    const deleteFn = vi.fn().mockResolvedValue(undefined)
-    const db = { delete: vi.fn().mockReturnValue(deleteFn()) }
+    const deleteFn = jest.fn().mockResolvedValue(undefined)
+    const db = { delete: jest.fn().mockReturnValue(deleteFn()) }
     const svc = new CasesService(db as never)
 
     await svc.reset({ DEMO_MODE: 'true', ENVIRONMENT: 'production' })
@@ -552,8 +552,8 @@ describe('CasesService — Reset safety', () => {
   })
 
   it('allows reset in development environment', async () => {
-    const deleteFn = vi.fn().mockResolvedValue(undefined)
-    const db = { delete: vi.fn().mockReturnValue(deleteFn()) }
+    const deleteFn = jest.fn().mockResolvedValue(undefined)
+    const db = { delete: jest.fn().mockReturnValue(deleteFn()) }
     const svc = new CasesService(db as never)
 
     await svc.reset({ DEMO_MODE: 'false', ENVIRONMENT: 'development' })

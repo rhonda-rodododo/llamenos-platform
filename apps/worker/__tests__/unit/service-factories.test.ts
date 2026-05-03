@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, mock, jest } from 'bun:test'
 import {
   getTelephonyFromService,
   getHubTelephonyFromService,
@@ -9,78 +9,78 @@ import {
 import { NodeNostrPublisher } from '@worker/lib/nostr-publisher'
 import type { TelephonyProviderConfig, MessagingConfig, MessagingChannelType } from '@shared/types'
 
-vi.mock('@worker/telephony/twilio', () => ({
-  TwilioAdapter: vi.fn(function (sid: string, token: string, phone: string) {
+mock.module('@worker/telephony/twilio', () => ({
+  TwilioAdapter: jest.fn(function (sid: string, token: string, phone: string) {
     return { type: 'twilio', sid, token, phone }
   }),
 }))
 
-vi.mock('@worker/telephony/signalwire', () => ({
-  SignalWireAdapter: vi.fn(function (sid: string, token: string, phone: string, space: string) {
+mock.module('@worker/telephony/signalwire', () => ({
+  SignalWireAdapter: jest.fn(function (sid: string, token: string, phone: string, space: string) {
     return { type: 'signalwire', sid, token, phone, space }
   }),
 }))
 
-vi.mock('@worker/telephony/vonage', () => ({
-  VonageAdapter: vi.fn(function (...args: unknown[]) {
+mock.module('@worker/telephony/vonage', () => ({
+  VonageAdapter: jest.fn(function (...args: unknown[]) {
     return { type: 'vonage', args }
   }),
 }))
 
-vi.mock('@worker/telephony/plivo', () => ({
-  PlivoAdapter: vi.fn(function (...args: unknown[]) {
+mock.module('@worker/telephony/plivo', () => ({
+  PlivoAdapter: jest.fn(function (...args: unknown[]) {
     return { type: 'plivo', args }
   }),
 }))
 
-vi.mock('@worker/telephony/asterisk', () => ({
-  AsteriskAdapter: vi.fn(function (...args: unknown[]) {
+mock.module('@worker/telephony/asterisk', () => ({
+  AsteriskAdapter: jest.fn(function (...args: unknown[]) {
     return { type: 'asterisk', args }
   }),
 }))
 
-vi.mock('@worker/telephony/telnyx', () => ({
-  TelnyxAdapter: vi.fn(function (...args: unknown[]) {
+mock.module('@worker/telephony/telnyx', () => ({
+  TelnyxAdapter: jest.fn(function (...args: unknown[]) {
     return { type: 'telnyx', args }
   }),
 }))
 
-vi.mock('@worker/telephony/bandwidth', () => ({
-  BandwidthAdapter: vi.fn(function (...args: unknown[]) {
+mock.module('@worker/telephony/bandwidth', () => ({
+  BandwidthAdapter: jest.fn(function (...args: unknown[]) {
     return { type: 'bandwidth', args }
   }),
 }))
 
-vi.mock('@worker/telephony/freeswitch', () => ({
-  FreeSwitchAdapter: vi.fn(function (...args: unknown[]) {
+mock.module('@worker/telephony/freeswitch', () => ({
+  FreeSwitchAdapter: jest.fn(function (...args: unknown[]) {
     return { type: 'freeswitch', args }
   }),
 }))
 
-vi.mock('@worker/messaging/sms/factory', () => ({
-  createSMSAdapter: vi.fn().mockImplementation(() => ({ channel: 'sms' })),
+mock.module('@worker/messaging/sms/factory', () => ({
+  createSMSAdapter: jest.fn().mockImplementation(() => ({ channel: 'sms' })),
 }))
 
-vi.mock('@worker/messaging/whatsapp/factory', () => ({
-  createWhatsAppAdapter: vi.fn().mockImplementation(() => ({ channel: 'whatsapp' })),
+mock.module('@worker/messaging/whatsapp/factory', () => ({
+  createWhatsAppAdapter: jest.fn().mockImplementation(() => ({ channel: 'whatsapp' })),
 }))
 
-vi.mock('@worker/messaging/signal/factory', () => ({
-  createSignalAdapter: vi.fn().mockImplementation(() => ({ channel: 'signal' })),
+mock.module('@worker/messaging/signal/factory', () => ({
+  createSignalAdapter: jest.fn().mockImplementation(() => ({ channel: 'signal' })),
 }))
 
-vi.mock('@worker/messaging/rcs/factory', () => ({
-  createRCSAdapter: vi.fn().mockImplementation(() => ({ channel: 'rcs' })),
+mock.module('@worker/messaging/rcs/factory', () => ({
+  createRCSAdapter: jest.fn().mockImplementation(() => ({ channel: 'rcs' })),
 }))
 
-vi.mock('@worker/messaging/telegram/factory', () => ({
-  createTelegramAdapter: vi.fn().mockImplementation(() => ({ channel: 'telegram' })),
+mock.module('@worker/messaging/telegram/factory', () => ({
+  createTelegramAdapter: jest.fn().mockImplementation(() => ({ channel: 'telegram' })),
 }))
 
-const mockCreateNostrPublisher = vi.fn()
-const mockConnect = vi.fn().mockResolvedValue(undefined)
+const mockCreateNostrPublisher = jest.fn()
+const mockConnect = jest.fn().mockResolvedValue(undefined)
 
-vi.mock('@worker/lib/nostr-publisher', () => ({
+mock.module('@worker/lib/nostr-publisher', () => ({
   createNostrPublisher: (...args: unknown[]) => mockCreateNostrPublisher(...args),
   NodeNostrPublisher: class MockNodeNostrPublisher {
     connect = mockConnect
@@ -107,7 +107,7 @@ describe('service-factories', () => {
         phoneNumber: '+1234',
       }
       const settingsService = {
-        getTelephonyProvider: vi.fn().mockResolvedValue(config),
+        getTelephonyProvider: jest.fn().mockResolvedValue(config),
       }
       const env = {} as unknown as Parameters<typeof getTelephonyFromService>[0]
       const adapter = await getTelephonyFromService(env, settingsService)
@@ -117,7 +117,7 @@ describe('service-factories', () => {
 
     it('falls back to env vars when settings fail', async () => {
       const settingsService = {
-        getTelephonyProvider: vi.fn().mockRejectedValue(new Error('db down')),
+        getTelephonyProvider: jest.fn().mockRejectedValue(new Error('db down')),
       }
       const env = {
         TWILIO_ACCOUNT_SID: 'AC_fallback',
@@ -125,7 +125,7 @@ describe('service-factories', () => {
         TWILIO_PHONE_NUMBER: '+1999',
       } as unknown as Parameters<typeof getTelephonyFromService>[0]
       const adapter = await getTelephonyFromService(env, settingsService)
-      expect(adapter).toEqual({
+      expect(adapter as unknown).toEqual({
         type: 'twilio',
         sid: 'AC_fallback',
         token: 'fallback_token',
@@ -135,7 +135,7 @@ describe('service-factories', () => {
 
     it('falls back to env vars when settings returns null', async () => {
       const settingsService = {
-        getTelephonyProvider: vi.fn().mockResolvedValue(null),
+        getTelephonyProvider: jest.fn().mockResolvedValue(null),
       }
       const env = {
         TWILIO_ACCOUNT_SID: 'AC_fb',
@@ -143,7 +143,7 @@ describe('service-factories', () => {
         TWILIO_PHONE_NUMBER: '+1888',
       } as unknown as Parameters<typeof getTelephonyFromService>[0]
       const adapter = await getTelephonyFromService(env, settingsService)
-      expect(adapter).toEqual({
+      expect(adapter as unknown).toEqual({
         type: 'twilio',
         sid: 'AC_fb',
         token: 'tk',
@@ -153,7 +153,7 @@ describe('service-factories', () => {
 
     it('returns null when no config available', async () => {
       const settingsService = {
-        getTelephonyProvider: vi.fn().mockResolvedValue(null),
+        getTelephonyProvider: jest.fn().mockResolvedValue(null),
       }
       const env = {} as unknown as Parameters<typeof getTelephonyFromService>[0]
       const adapter = await getTelephonyFromService(env, settingsService)
@@ -171,12 +171,12 @@ describe('service-factories', () => {
         signalwireSpace: 'space',
       }
       const settingsService = {
-        getHubTelephonyProvider: vi.fn().mockResolvedValue(hubConfig),
-        getTelephonyProvider: vi.fn().mockResolvedValue(null),
+        getHubTelephonyProvider: jest.fn().mockResolvedValue(hubConfig),
+        getTelephonyProvider: jest.fn().mockResolvedValue(null),
       }
       const env = {} as unknown as Parameters<typeof getHubTelephonyFromService>[0]
       const adapter = await getHubTelephonyFromService(env, settingsService, 'hub-1')
-      expect(adapter).toEqual({
+      expect(adapter as unknown).toEqual({
         type: 'signalwire',
         sid: 'AC_hub',
         token: 'hub_token',
@@ -193,12 +193,12 @@ describe('service-factories', () => {
         phoneNumber: '+2222',
       }
       const settingsService = {
-        getHubTelephonyProvider: vi.fn().mockResolvedValue(null),
-        getTelephonyProvider: vi.fn().mockResolvedValue(globalConfig),
+        getHubTelephonyProvider: jest.fn().mockResolvedValue(null),
+        getTelephonyProvider: jest.fn().mockResolvedValue(globalConfig),
       }
       const env = {} as unknown as Parameters<typeof getHubTelephonyFromService>[0]
       const adapter = await getHubTelephonyFromService(env, settingsService, 'hub-1')
-      expect(adapter).toEqual({
+      expect(adapter as unknown).toEqual({
         type: 'twilio',
         sid: 'AC_global',
         token: 'global_token',
@@ -208,8 +208,8 @@ describe('service-factories', () => {
 
     it('falls back to env vars when both hub and global fail', async () => {
       const settingsService = {
-        getHubTelephonyProvider: vi.fn().mockRejectedValue(new Error('fail')),
-        getTelephonyProvider: vi.fn().mockRejectedValue(new Error('fail')),
+        getHubTelephonyProvider: jest.fn().mockRejectedValue(new Error('fail')),
+        getTelephonyProvider: jest.fn().mockRejectedValue(new Error('fail')),
       }
       const env = {
         TWILIO_ACCOUNT_SID: 'AC_env',
@@ -217,7 +217,7 @@ describe('service-factories', () => {
         TWILIO_PHONE_NUMBER: '+3333',
       } as unknown as Parameters<typeof getHubTelephonyFromService>[0]
       const adapter = await getHubTelephonyFromService(env, settingsService, 'hub-1')
-      expect(adapter).toEqual({
+      expect(adapter as unknown).toEqual({
         type: 'twilio',
         sid: 'AC_env',
         token: 'env_token',
@@ -238,47 +238,47 @@ describe('service-factories', () => {
 
     it('returns SMS adapter', async () => {
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(baseMessagingConfig),
-        getTelephonyProvider: vi.fn().mockResolvedValue({ type: 'twilio', accountSid: 'AC', authToken: 't', phoneNumber: '+1' } as TelephonyProviderConfig),
+        getMessagingConfig: jest.fn().mockResolvedValue(baseMessagingConfig),
+        getTelephonyProvider: jest.fn().mockResolvedValue({ type: 'twilio', accountSid: 'AC', authToken: 't', phoneNumber: '+1' } as TelephonyProviderConfig),
       }
       const adapter = await getMessagingAdapterFromService('sms', settingsService, 'secret')
-      expect(adapter).toEqual({ channel: 'sms' })
+      expect(adapter as unknown).toEqual({ channel: 'sms' })
     })
 
     it('returns WhatsApp adapter', async () => {
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(baseMessagingConfig),
-        getTelephonyProvider: vi.fn(),
+        getMessagingConfig: jest.fn().mockResolvedValue(baseMessagingConfig),
+        getTelephonyProvider: jest.fn(),
       }
       const adapter = await getMessagingAdapterFromService('whatsapp', settingsService, 'secret')
-      expect(adapter).toEqual({ channel: 'whatsapp' })
+      expect(adapter as unknown).toEqual({ channel: 'whatsapp' })
     })
 
     it('returns Signal adapter', async () => {
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(baseMessagingConfig),
-        getTelephonyProvider: vi.fn(),
+        getMessagingConfig: jest.fn().mockResolvedValue(baseMessagingConfig),
+        getTelephonyProvider: jest.fn(),
       }
       const adapter = await getMessagingAdapterFromService('signal', settingsService, 'secret')
-      expect(adapter).toEqual({ channel: 'signal' })
+      expect(adapter as unknown).toEqual({ channel: 'signal' })
     })
 
     it('returns RCS adapter', async () => {
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(baseMessagingConfig),
-        getTelephonyProvider: vi.fn(),
+        getMessagingConfig: jest.fn().mockResolvedValue(baseMessagingConfig),
+        getTelephonyProvider: jest.fn(),
       }
       const adapter = await getMessagingAdapterFromService('rcs', settingsService, 'secret')
-      expect(adapter).toEqual({ channel: 'rcs' })
+      expect(adapter as unknown).toEqual({ channel: 'rcs' })
     })
 
     it('returns Telegram adapter', async () => {
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(baseMessagingConfig),
-        getTelephonyProvider: vi.fn(),
+        getMessagingConfig: jest.fn().mockResolvedValue(baseMessagingConfig),
+        getTelephonyProvider: jest.fn(),
       }
       const adapter = await getMessagingAdapterFromService('telegram', settingsService, 'secret')
-      expect(adapter).toEqual({ channel: 'telegram' })
+      expect(adapter as unknown).toEqual({ channel: 'telegram' })
     })
 
     it('throws when channel is not enabled', async () => {
@@ -287,8 +287,8 @@ describe('service-factories', () => {
         enabledChannels: ['sms'],
       }
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(config),
-        getTelephonyProvider: vi.fn(),
+        getMessagingConfig: jest.fn().mockResolvedValue(config),
+        getTelephonyProvider: jest.fn(),
       }
       await expect(getMessagingAdapterFromService('whatsapp', settingsService, 'secret')).rejects.toThrow(
         'whatsapp channel is not enabled'
@@ -302,8 +302,8 @@ describe('service-factories', () => {
         sms: undefined,
       } as unknown as MessagingConfig
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(config),
-        getTelephonyProvider: vi.fn(),
+        getMessagingConfig: jest.fn().mockResolvedValue(config),
+        getTelephonyProvider: jest.fn(),
       }
       await expect(getMessagingAdapterFromService('sms', settingsService, 'secret')).rejects.toThrow(
         'SMS is not enabled'
@@ -316,8 +316,8 @@ describe('service-factories', () => {
         enabledChannels: ['sms'],
       }
       const settingsService = {
-        getMessagingConfig: vi.fn().mockResolvedValue(config),
-        getTelephonyProvider: vi.fn().mockResolvedValue(null),
+        getMessagingConfig: jest.fn().mockResolvedValue(config),
+        getTelephonyProvider: jest.fn().mockResolvedValue(null),
       }
       await expect(getMessagingAdapterFromService('sms', settingsService, 'secret')).rejects.toThrow(
         'SMS requires a configured telephony provider'
@@ -327,7 +327,7 @@ describe('service-factories', () => {
 
   describe('getNostrPublisher', () => {
     it('creates publisher from env when not cached', () => {
-      const fakePublisher = { publish: vi.fn(), serverPubkey: 'pub', close: vi.fn() }
+      const fakePublisher = { publish: jest.fn(), serverPubkey: 'pub', close: jest.fn() }
       mockCreateNostrPublisher.mockReturnValue(fakePublisher)
       const env = { SERVER_NOSTR_SECRET: 'secret' } as Parameters<typeof getNostrPublisher>[0]
       const result = getNostrPublisher(env)
@@ -336,7 +336,7 @@ describe('service-factories', () => {
     })
 
     it('returns cached publisher on subsequent calls', () => {
-      const fakePublisher = { publish: vi.fn(), serverPubkey: 'pub', close: vi.fn() }
+      const fakePublisher = { publish: jest.fn(), serverPubkey: 'pub', close: jest.fn() }
       mockCreateNostrPublisher.mockReturnValue(fakePublisher)
       const env = { SERVER_NOSTR_SECRET: 'secret' } as Parameters<typeof getNostrPublisher>[0]
       const first = getNostrPublisher(env)
@@ -346,7 +346,7 @@ describe('service-factories', () => {
     })
 
     it('uses env.NOSTR_PUBLISHER if pre-configured', () => {
-      const preConfigured = { publish: vi.fn(), serverPubkey: 'pre', close: vi.fn() }
+      const preConfigured = { publish: jest.fn(), serverPubkey: 'pre', close: jest.fn() }
       const env = { NOSTR_PUBLISHER: preConfigured } as unknown as Parameters<typeof getNostrPublisher>[0]
       const result = getNostrPublisher(env)
       expect(result).toBe(preConfigured)
@@ -362,12 +362,12 @@ describe('service-factories', () => {
     })
 
     it('allows cache reset for tests', () => {
-      const fakePublisher = { publish: vi.fn(), serverPubkey: 'pub', close: vi.fn() }
+      const fakePublisher = { publish: jest.fn(), serverPubkey: 'pub', close: jest.fn() }
       mockCreateNostrPublisher.mockReturnValue(fakePublisher)
       const env = { SERVER_NOSTR_SECRET: 'secret' } as Parameters<typeof getNostrPublisher>[0]
       getNostrPublisher(env)
       _resetNostrPublisherCache()
-      const newFake = { publish: vi.fn(), serverPubkey: 'pub2', close: vi.fn() }
+      const newFake = { publish: jest.fn(), serverPubkey: 'pub2', close: jest.fn() }
       mockCreateNostrPublisher.mockReturnValue(newFake)
       const result = getNostrPublisher(env)
       expect(result).toBe(newFake)

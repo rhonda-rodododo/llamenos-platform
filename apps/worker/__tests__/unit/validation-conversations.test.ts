@@ -4,7 +4,7 @@
  * Validates E2EE message envelopes, conversation status transitions,
  * and channel type enums.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import conversationsRoutes from '../../routes/conversations'
 import type { AppEnv } from '../../types'
 import {
@@ -27,14 +27,14 @@ function createWebChannelServices(): AppEnv['Variables']['services'] {
       if (typeof prop === 'symbol') return undefined
       if (prop === 'conversations') {
         return {
-          getById: vi.fn().mockResolvedValue(webConv),
-          addMessage: vi.fn().mockResolvedValue({ id: 'msg-new' }),
+          getById: jest.fn().mockResolvedValue(webConv),
+          addMessage: jest.fn().mockResolvedValue({ id: 'msg-new' }),
         }
       }
       return new Proxy({}, {
         get(_t, method) {
           if (typeof method === 'symbol') return undefined
-          return vi.fn().mockResolvedValue({})
+          return jest.fn().mockResolvedValue({})
         },
       })
     },

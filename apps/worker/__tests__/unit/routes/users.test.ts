@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import userRoutes from '@worker/routes/users'
@@ -12,14 +12,14 @@ function createTestApp(opts: {
   hubId?: string
   pubkey?: string
   serviceMock?: Record<string, unknown>
-  auditLogSpy?: ReturnType<typeof vi.fn>
+  auditLogSpy?: ReturnType<typeof jest.fn>
 } = {}) {
   const {
     permissions = ['*'],
     hubId,
     pubkey = 'a'.repeat(64),
     serviceMock = {},
-    auditLogSpy = vi.fn().mockResolvedValue(undefined),
+    auditLogSpy = jest.fn().mockResolvedValue(undefined),
   } = opts
 
   const mockAuditService = { log: auditLogSpy }
@@ -70,7 +70,7 @@ function createTestApp(opts: {
 
 describe('users routes', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   // -------------------------------------------------------------------------
@@ -79,12 +79,12 @@ describe('users routes', () => {
 
   describe('GET /users', () => {
     it('lists users', async () => {
-      const getUsersSpy = vi.fn().mockResolvedValue({
+      const getUsersSpy = jest.fn().mockResolvedValue({
         users: [{ pubkey: 'u1', name: 'User 1', active: true, createdAt: new Date().toISOString(), roles: ['role-volunteer'] }],
       })
       const { app } = createTestApp({
         permissions: ['users:read'],
-        serviceMock: { identity: { getUsers: getUsersSpy, getUser: vi.fn() } },
+        serviceMock: { identity: { getUsers: getUsersSpy, getUser: jest.fn() } },
       })
 
       const res = await app.request('/users')
@@ -106,12 +106,12 @@ describe('users routes', () => {
 
   describe('GET /users/:targetPubkey', () => {
     it('returns a user', async () => {
-      const getUserSpy = vi.fn().mockResolvedValue({
+      const getUserSpy = jest.fn().mockResolvedValue({
         volunteer: { pubkey: 'u1', name: 'User 1', active: true, createdAt: new Date().toISOString(), roles: ['role-volunteer'] },
       })
       const { app } = createTestApp({
         permissions: ['users:read'],
-        serviceMock: { identity: { getUsers: vi.fn(), getUser: getUserSpy } },
+        serviceMock: { identity: { getUsers: jest.fn(), getUser: getUserSpy } },
       })
 
       const res = await app.request('/users/u1')
@@ -126,12 +126,12 @@ describe('users routes', () => {
 
   describe('POST /users', () => {
     it('creates a user with default volunteer role when roleIds omitted', async () => {
-      const createUserSpy = vi.fn().mockResolvedValue({
+      const createUserSpy = jest.fn().mockResolvedValue({
         volunteer: { pubkey: 'b'.repeat(64), name: 'New User', active: true, createdAt: new Date().toISOString(), roles: ['role-volunteer'] },
       })
       const { app, auditLogSpy } = createTestApp({
         permissions: ['users:create'],
-        serviceMock: { identity: { createUser: createUserSpy, getUsers: vi.fn(), getUser: vi.fn() } },
+        serviceMock: { identity: { createUser: createUserSpy, getUsers: jest.fn(), getUser: jest.fn() } },
       })
 
       const res = await app.request('/users', {
@@ -144,16 +144,16 @@ describe('users routes', () => {
       expect(createUserSpy).toHaveBeenCalledWith(
         expect.objectContaining({ roleIds: ['role-volunteer'] }),
       )
-      expect(auditLogSpy).toHaveBeenCalledOnce()
+      expect(auditLogSpy).toHaveBeenCalledTimes(1)
     })
 
     it('creates a user with provided roleIds', async () => {
-      const createUserSpy = vi.fn().mockResolvedValue({
+      const createUserSpy = jest.fn().mockResolvedValue({
         volunteer: { pubkey: 'b'.repeat(64), name: 'New User', active: true, createdAt: new Date().toISOString(), roles: ['role-hub-admin'] },
       })
       const { app } = createTestApp({
         permissions: ['users:create'],
-        serviceMock: { identity: { createUser: createUserSpy, getUsers: vi.fn(), getUser: vi.fn() } },
+        serviceMock: { identity: { createUser: createUserSpy, getUsers: jest.fn(), getUser: jest.fn() } },
       })
 
       const res = await app.request('/users', {
@@ -169,12 +169,12 @@ describe('users routes', () => {
     })
 
     it('defaults to volunteer when roleIds is empty array', async () => {
-      const createUserSpy = vi.fn().mockResolvedValue({
+      const createUserSpy = jest.fn().mockResolvedValue({
         volunteer: { pubkey: 'b'.repeat(64), name: 'New User', active: true, createdAt: new Date().toISOString(), roles: ['role-volunteer'] },
       })
       const { app } = createTestApp({
         permissions: ['users:create'],
-        serviceMock: { identity: { createUser: createUserSpy, getUsers: vi.fn(), getUser: vi.fn() } },
+        serviceMock: { identity: { createUser: createUserSpy, getUsers: jest.fn(), getUser: jest.fn() } },
       })
 
       const res = await app.request('/users', {
@@ -206,12 +206,12 @@ describe('users routes', () => {
 
   describe('PATCH /users/:targetPubkey', () => {
     it('updates a user', async () => {
-      const updateUserSpy = vi.fn().mockResolvedValue({
+      const updateUserSpy = jest.fn().mockResolvedValue({
         volunteer: { pubkey: 'u1', name: 'Updated', active: true, createdAt: new Date().toISOString(), roles: ['role-volunteer'] },
       })
       const { app } = createTestApp({
         permissions: ['users:update'],
-        serviceMock: { identity: { updateUser: updateUserSpy, getUsers: vi.fn(), getUser: vi.fn(), revokeAllSessions: vi.fn() } },
+        serviceMock: { identity: { updateUser: updateUserSpy, getUsers: jest.fn(), getUser: jest.fn(), revokeAllSessions: jest.fn() } },
       })
 
       const res = await app.request('/users/u1', {
@@ -225,18 +225,18 @@ describe('users routes', () => {
     })
 
     it('revokes sessions when deactivating user', async () => {
-      const updateUserSpy = vi.fn().mockResolvedValue({
+      const updateUserSpy = jest.fn().mockResolvedValue({
         volunteer: { pubkey: 'u1', name: 'User', active: false, createdAt: new Date().toISOString(), roles: ['role-volunteer'] },
       })
-      const revokeAllSessionsSpy = vi.fn().mockResolvedValue(undefined)
+      const revokeAllSessionsSpy = jest.fn().mockResolvedValue(undefined)
       const { app, auditLogSpy } = createTestApp({
         permissions: ['users:update'],
         serviceMock: {
           identity: {
             updateUser: updateUserSpy,
             revokeAllSessions: revokeAllSessionsSpy,
-            getUsers: vi.fn(),
-            getUser: vi.fn(),
+            getUsers: jest.fn(),
+            getUser: jest.fn(),
           },
         },
       })
@@ -253,18 +253,18 @@ describe('users routes', () => {
     })
 
     it('revokes sessions when changing roles', async () => {
-      const updateUserSpy = vi.fn().mockResolvedValue({
+      const updateUserSpy = jest.fn().mockResolvedValue({
         volunteer: { pubkey: 'u1', name: 'User', active: true, createdAt: new Date().toISOString(), roles: ['role-hub-admin'] },
       })
-      const revokeAllSessionsSpy = vi.fn().mockResolvedValue(undefined)
+      const revokeAllSessionsSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         permissions: ['users:update'],
         serviceMock: {
           identity: {
             updateUser: updateUserSpy,
             revokeAllSessions: revokeAllSessionsSpy,
-            getUsers: vi.fn(),
-            getUser: vi.fn(),
+            getUsers: jest.fn(),
+            getUser: jest.fn(),
           },
         },
       })
@@ -296,16 +296,16 @@ describe('users routes', () => {
 
   describe('DELETE /users/:targetPubkey', () => {
     it('deletes a user and revokes sessions', async () => {
-      const deleteUserSpy = vi.fn().mockResolvedValue(undefined)
-      const revokeAllSessionsSpy = vi.fn().mockResolvedValue(undefined)
+      const deleteUserSpy = jest.fn().mockResolvedValue(undefined)
+      const revokeAllSessionsSpy = jest.fn().mockResolvedValue(undefined)
       const { app, auditLogSpy } = createTestApp({
         permissions: ['users:delete'],
         serviceMock: {
           identity: {
             deleteUser: deleteUserSpy,
             revokeAllSessions: revokeAllSessionsSpy,
-            getUsers: vi.fn(),
-            getUser: vi.fn(),
+            getUsers: jest.fn(),
+            getUser: jest.fn(),
           },
         },
       })
@@ -314,20 +314,20 @@ describe('users routes', () => {
       expect(res.status).toBe(200)
       expect(revokeAllSessionsSpy).toHaveBeenCalledWith('u1')
       expect(deleteUserSpy).toHaveBeenCalledWith('u1')
-      expect(auditLogSpy).toHaveBeenCalledOnce()
+      expect(auditLogSpy).toHaveBeenCalledTimes(1)
     })
 
     it('proceeds with deletion even if session revocation fails', async () => {
-      const deleteUserSpy = vi.fn().mockResolvedValue(undefined)
-      const revokeAllSessionsSpy = vi.fn().mockRejectedValue(new Error('Session error'))
+      const deleteUserSpy = jest.fn().mockResolvedValue(undefined)
+      const revokeAllSessionsSpy = jest.fn().mockRejectedValue(new Error('Session error'))
       const { app } = createTestApp({
         permissions: ['users:delete'],
         serviceMock: {
           identity: {
             deleteUser: deleteUserSpy,
             revokeAllSessions: revokeAllSessionsSpy,
-            getUsers: vi.fn(),
-            getUser: vi.fn(),
+            getUsers: jest.fn(),
+            getUser: jest.fn(),
           },
         },
       })
@@ -350,16 +350,16 @@ describe('users routes', () => {
 
   describe('GET /users/:targetPubkey/cases', () => {
     it('lists case records for a user', async () => {
-      const listSpy = vi.fn().mockResolvedValue({
+      const listSpy = jest.fn().mockResolvedValue({
         records: [{ id: 'c1', title: 'Case 1' }],
         total: 1,
       })
-      const getUserSpy = vi.fn().mockResolvedValue({ volunteer: { pubkey: 'u1', name: 'User 1' } })
+      const getUserSpy = jest.fn().mockResolvedValue({ volunteer: { pubkey: 'u1', name: 'User 1' } })
       const { app } = createTestApp({
         permissions: ['users:read-cases'],
         hubId: 'hub-1',
         serviceMock: {
-          identity: { getUser: getUserSpy, getUsers: vi.fn() },
+          identity: { getUser: getUserSpy, getUsers: jest.fn() },
           cases: { list: listSpy },
         },
       })
@@ -372,12 +372,12 @@ describe('users routes', () => {
     })
 
     it('returns 404 when user not found', async () => {
-      const getUserSpy = vi.fn().mockRejectedValue(new Error('User not found'))
+      const getUserSpy = jest.fn().mockRejectedValue(new Error('User not found'))
       const { app } = createTestApp({
         permissions: ['users:read-cases'],
         serviceMock: {
-          identity: { getUser: getUserSpy, getUsers: vi.fn() },
-          cases: { list: vi.fn() },
+          identity: { getUser: getUserSpy, getUsers: jest.fn() },
+          cases: { list: jest.fn() },
         },
       })
 
@@ -398,8 +398,8 @@ describe('users routes', () => {
 
   describe('GET /users/:targetPubkey/metrics', () => {
     it('returns metrics for a user with closed records', async () => {
-      const getUserSpy = vi.fn().mockResolvedValue({ volunteer: { pubkey: 'u1', name: 'User 1' } })
-      const listSpy = vi.fn().mockResolvedValue({
+      const getUserSpy = jest.fn().mockResolvedValue({ volunteer: { pubkey: 'u1', name: 'User 1' } })
+      const listSpy = jest.fn().mockResolvedValue({
         records: [
           { id: 'c1', createdAt: '2024-01-01T00:00:00Z', closedAt: '2024-01-03T00:00:00Z' },
           { id: 'c2', createdAt: '2024-01-01T00:00:00Z', closedAt: '2024-01-05T00:00:00Z' },
@@ -410,7 +410,7 @@ describe('users routes', () => {
         permissions: ['users:read-metrics'],
         hubId: 'hub-1',
         serviceMock: {
-          identity: { getUser: getUserSpy, getUsers: vi.fn() },
+          identity: { getUser: getUserSpy, getUsers: jest.fn() },
           cases: { list: listSpy },
         },
       })
@@ -425,8 +425,8 @@ describe('users routes', () => {
     })
 
     it('returns null averageResolutionDays when no closed records', async () => {
-      const getUserSpy = vi.fn().mockResolvedValue({ volunteer: { pubkey: 'u1', name: 'User 1' } })
-      const listSpy = vi.fn().mockResolvedValue({
+      const getUserSpy = jest.fn().mockResolvedValue({ volunteer: { pubkey: 'u1', name: 'User 1' } })
+      const listSpy = jest.fn().mockResolvedValue({
         records: [
           { id: 'c1', createdAt: '2024-01-01T00:00:00Z' },
         ],
@@ -435,7 +435,7 @@ describe('users routes', () => {
         permissions: ['users:read-metrics'],
         hubId: 'hub-1',
         serviceMock: {
-          identity: { getUser: getUserSpy, getUsers: vi.fn() },
+          identity: { getUser: getUserSpy, getUsers: jest.fn() },
           cases: { list: listSpy },
         },
       })
@@ -447,12 +447,12 @@ describe('users routes', () => {
     })
 
     it('returns 404 when user not found', async () => {
-      const getUserSpy = vi.fn().mockRejectedValue(new Error('User not found'))
+      const getUserSpy = jest.fn().mockRejectedValue(new Error('User not found'))
       const { app } = createTestApp({
         permissions: ['users:read-metrics'],
         serviceMock: {
-          identity: { getUser: getUserSpy, getUsers: vi.fn() },
-          cases: { list: vi.fn() },
+          identity: { getUser: getUserSpy, getUsers: jest.fn() },
+          cases: { list: jest.fn() },
         },
       })
 

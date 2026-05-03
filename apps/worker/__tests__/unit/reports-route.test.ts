@@ -4,7 +4,7 @@
  * Tests: report access control, isReport guard, conversionEnabled auth,
  * message sending permissions, report type visibility.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import reportsRouter from '../../routes/reports'
@@ -52,25 +52,25 @@ function makeApp(opts: {
     hubId = 'hub-1',
   } = opts
 
-  const mockAudit = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAudit = { log: jest.fn().mockResolvedValue(undefined) }
   const mockConversations = {
-    list: vi.fn().mockResolvedValue({ conversations, total: conversations.length }),
-    getById: vi.fn().mockResolvedValue(conversation),
-    create: vi.fn().mockResolvedValue(conversation),
-    addMessage: vi.fn().mockResolvedValue({ id: 'msg-1' }),
-    update: vi.fn().mockResolvedValue(conversation),
-    listMessages: vi.fn().mockResolvedValue({ messages: [], total: 0 }),
-    listFiles: vi.fn().mockResolvedValue([]),
+    list: jest.fn().mockResolvedValue({ conversations, total: conversations.length }),
+    getById: jest.fn().mockResolvedValue(conversation),
+    create: jest.fn().mockResolvedValue(conversation),
+    addMessage: jest.fn().mockResolvedValue({ id: 'msg-1' }),
+    update: jest.fn().mockResolvedValue(conversation),
+    listMessages: jest.fn().mockResolvedValue({ messages: [], total: 0 }),
+    listFiles: jest.fn().mockResolvedValue([]),
   }
   const mockCases = {
-    listReportCases: vi.fn().mockResolvedValue({ links: [] }),
-    linkReportCase: vi.fn().mockResolvedValue({ id: 'link-1' }),
-    unlinkReportCase: vi.fn().mockResolvedValue(undefined),
+    listReportCases: jest.fn().mockResolvedValue({ links: [] }),
+    linkReportCase: jest.fn().mockResolvedValue({ id: 'link-1' }),
+    unlinkReportCase: jest.fn().mockResolvedValue(undefined),
   }
   const mockSettings = {
-    getReportCategories: vi.fn().mockResolvedValue({ categories: [] }),
-    getReportTypes: vi.fn().mockResolvedValue({ reportTypes: [] }),
-    getCmsReportTypes: vi.fn().mockResolvedValue({ reportTypes: [] }),
+    getReportCategories: jest.fn().mockResolvedValue({ categories: [] }),
+    getReportTypes: jest.fn().mockResolvedValue({ reportTypes: [] }),
+    getCmsReportTypes: jest.fn().mockResolvedValue({ reportTypes: [] }),
   }
 
   const app = new Hono<AppEnv>()

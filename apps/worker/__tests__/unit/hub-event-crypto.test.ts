@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { deriveServerEventKey, encryptHubEvent } from '@worker/lib/hub-event-crypto'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { hexToBytes } from '@noble/hashes/utils.js'

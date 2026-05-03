@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import {
   createLogger,
   _setLoggerConfigForTests,
@@ -10,15 +10,15 @@ import {
 } from '@worker/lib/logger'
 
 describe('logger', () => {
-  let stdoutSpy: ReturnType<typeof vi.spyOn>
-  let stderrSpy: ReturnType<typeof vi.spyOn>
+  let stdoutSpy: ReturnType<typeof jest.spyOn>
+  let stderrSpy: ReturnType<typeof jest.spyOn>
   let originalNodeEnv: string | undefined
 
   beforeEach(() => {
     originalNodeEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'test'
-    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    stdoutSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true)
     _setLoggerConfigForTests({
       minLevel: 'trace',
       namespaces: ['*'],
@@ -96,7 +96,7 @@ describe('logger', () => {
       log.info('timestamp check')
       const entry = lastStdout()
       expect(typeof entry?.timestamp).toBe('string')
-      expect(new Date(entry!.timestamp as string).toISOString()).toBe(entry!.timestamp)
+      expect(new Date(entry!.timestamp as string).toISOString()).toBe(entry!.timestamp as string)
     })
   })
 
@@ -336,11 +336,11 @@ describe('logger', () => {
 
   describe('rate limiting', () => {
     beforeEach(() => {
-      vi.useFakeTimers()
+      jest.useFakeTimers()
     })
 
     afterEach(() => {
-      vi.useRealTimers()
+      jest.useRealTimers()
     })
 
     it('drops logs after token bucket is exhausted', () => {
@@ -381,7 +381,7 @@ describe('logger', () => {
       const log = createLogger('test')
       log.debug('first')
       log.debug('second')
-      vi.advanceTimersByTime(1001)
+      jest.advanceTimersByTime(1001)
       log.debug('third')
       expect(stdoutSpy).toHaveBeenCalledTimes(2)
     })

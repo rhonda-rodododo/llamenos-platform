@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { CallsService } from '../../services/calls'
 import { ServiceError } from '../../services/settings'
 
@@ -137,16 +137,16 @@ function createServiceWithData(opts?: {
 
   // Build a mock DB that supports the essential operations used by CallsService
   const db = {
-    select: vi.fn().mockImplementation(() => ({
-      from: vi.fn().mockImplementation((table: unknown) => ({
-        where: vi.fn().mockImplementation(() => {
+    select: jest.fn().mockImplementation(() => ({
+      from: jest.fn().mockImplementation((table: unknown) => ({
+        where: jest.fn().mockImplementation(() => {
           // Return matching rows
           const source = _activeCalls
           return {
-            limit: vi.fn().mockResolvedValue([...source.values()]),
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                offset: vi.fn().mockResolvedValue([...source.values()]),
+            limit: jest.fn().mockResolvedValue([...source.values()]),
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                offset: jest.fn().mockResolvedValue([...source.values()]),
               }),
             }),
             then: (resolve: (v: unknown) => void) => resolve([...source.values()]),
@@ -155,22 +155,22 @@ function createServiceWithData(opts?: {
       })),
     })),
 
-    insert: vi.fn().mockImplementation(() => ({
-      values: vi.fn().mockImplementation((vals: Record<string, unknown>) => ({
-        returning: vi.fn().mockImplementation(() => {
+    insert: jest.fn().mockImplementation(() => ({
+      values: jest.fn().mockImplementation((vals: Record<string, unknown>) => ({
+        returning: jest.fn().mockImplementation(() => {
           const row = { ...vals, id: vals.callId ?? vals.token ?? crypto.randomUUID() }
           return [row]
         }),
-        onConflictDoNothing: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([vals]),
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([vals]),
         }),
       })),
     })),
 
-    update: vi.fn().mockImplementation(() => ({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockImplementation(() => {
+    update: jest.fn().mockImplementation(() => ({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockImplementation(() => {
             // Return the first active call as "updated"
             const first = [..._activeCalls.values()][0]
             return first ? [{ ...first, status: 'in-progress', answeredBy: 'pk1', answeredAt: new Date() }] : []
@@ -179,9 +179,9 @@ function createServiceWithData(opts?: {
       }),
     })),
 
-    delete: vi.fn().mockImplementation(() => ({
-      where: vi.fn().mockReturnValue({
-        returning: vi.fn().mockImplementation(() => {
+    delete: jest.fn().mockImplementation(() => ({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockImplementation(() => {
           const first = [..._activeCalls.values()][0]
           if (first) {
             _activeCalls.delete(first.callId as string)
@@ -192,20 +192,20 @@ function createServiceWithData(opts?: {
       }),
     })),
 
-    transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+    transaction: jest.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       // Create a tx mock that operates on the same data
       const tx = {
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockImplementation((vals: Record<string, unknown>) => ({
-            returning: vi.fn().mockResolvedValue([{ ...vals, id: vals.callId ?? crypto.randomUUID() }]),
-            onConflictDoNothing: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([vals]),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((vals: Record<string, unknown>) => ({
+            returning: jest.fn().mockResolvedValue([{ ...vals, id: vals.callId ?? crypto.randomUUID() }]),
+            onConflictDoNothing: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([vals]),
             }),
           })),
         }),
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockImplementation(() => {
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockImplementation(() => {
               const first = [..._activeCalls.values()][0]
               if (first) {
                 _activeCalls.delete(first.callId as string)
@@ -215,10 +215,10 @@ function createServiceWithData(opts?: {
             }),
           }),
         }),
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([]),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -292,10 +292,10 @@ describe('CallsService', () => {
       const { svc } = createServiceWithData()
       // Mock update to return empty array
       const db = {
-        update: vi.fn().mockReturnValue({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([]),
+        update: jest.fn().mockReturnValue({
+          set: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -404,22 +404,22 @@ describe('CallsService', () => {
         },
       ]
 
-      const txInsert = vi.fn().mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+      const txInsert = jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
         }),
       })
-      const txDelete = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const txDelete = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(selectResults),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(selectResults),
           }),
         }),
-        transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
+        transaction: jest.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
           return fn({ insert: txInsert, delete: txDelete })
         }),
       }
@@ -456,20 +456,20 @@ describe('CallsService', () => {
       ]
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(selectResults),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(selectResults),
           }),
         }),
-        transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
+        transaction: jest.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
           return fn({
-            insert: vi.fn().mockReturnValue({
-              values: vi.fn().mockReturnValue({
-                onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+            insert: jest.fn().mockReturnValue({
+              values: jest.fn().mockReturnValue({
+                onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
               }),
             }),
-            delete: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue(undefined),
+            delete: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(undefined),
             }),
           })
         }),
@@ -498,12 +498,12 @@ describe('CallsService', () => {
       ]
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(selectResults),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(selectResults),
           }),
         }),
-        transaction: vi.fn(),
+        transaction: jest.fn(),
       }
 
       const svc = new CallsService(db as never)
@@ -519,9 +519,9 @@ describe('CallsService', () => {
   describe('getPresence', () => {
     it('marks volunteers as on-call when they have an active in-progress call', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([
               {
                 callId: 'call-1',
                 hubId: 'hub-1',
@@ -533,11 +533,11 @@ describe('CallsService', () => {
             ]),
           }),
         }),
-        transaction: vi.fn(),
+        transaction: jest.fn(),
       }
 
       const shiftsService = {
-        getCurrentVolunteers: vi.fn().mockResolvedValue(['pk-busy', 'pk-free']),
+        getCurrentVolunteers: jest.fn().mockResolvedValue(['pk-busy', 'pk-free']),
       }
 
       const svc = new CallsService(db as never, shiftsService as never)
@@ -555,16 +555,16 @@ describe('CallsService', () => {
 
     it('returns all available when no active calls', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
           }),
         }),
-        transaction: vi.fn(),
+        transaction: jest.fn(),
       }
 
       const shiftsService = {
-        getCurrentVolunteers: vi.fn().mockResolvedValue(['pk1', 'pk2']),
+        getCurrentVolunteers: jest.fn().mockResolvedValue(['pk1', 'pk2']),
       }
 
       const svc = new CallsService(db as never, shiftsService as never)
@@ -577,12 +577,12 @@ describe('CallsService', () => {
 
     it('works without shifts service', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
           }),
         }),
-        transaction: vi.fn(),
+        transaction: jest.fn(),
       }
 
       // No shifts service provided
@@ -600,17 +600,17 @@ describe('CallsService', () => {
       let storedToken: Record<string, unknown> | undefined
 
       const db = {
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockImplementation((vals: Record<string, unknown>) => {
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockImplementation((vals: Record<string, unknown>) => {
             storedToken = vals
             return {
-              returning: vi.fn().mockResolvedValue([vals]),
+              returning: jest.fn().mockResolvedValue([vals]),
             }
           }),
         }),
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockImplementation(() => {
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockImplementation(() => {
               if (storedToken) return [storedToken]
               return []
             }),
@@ -640,9 +640,9 @@ describe('CallsService', () => {
 
     it('returns null for unknown token', async () => {
       const db = {
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([]),
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([]),
           }),
         }),
       }
@@ -659,12 +659,12 @@ describe('CallsService', () => {
       // but the current implementation only sets status='spam'
       // without recording WHO reported it. This is a data gap
       // that may be needed for audit logging.
-      const updateSet = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const updateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        update: vi.fn().mockReturnValue({ set: updateSet }),
+        update: jest.fn().mockReturnValue({ set: updateSet }),
       }
 
       const svc = new CallsService(db as never)
@@ -687,10 +687,10 @@ describe('CallsService', () => {
 
     it('returns hubId for existing call', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([{ hubId: 'hub-42' }]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ hubId: 'hub-42' }]),
             }),
           }),
         }),
@@ -702,10 +702,10 @@ describe('CallsService', () => {
 
     it('returns null when call not found', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -718,7 +718,7 @@ describe('CallsService', () => {
 
   describe('listCallHistory', () => {
     it('uses default pagination (page 1, limit 50)', async () => {
-      const selectFn = vi.fn()
+      const selectFn = jest.fn()
       const countResult = [{ total: 2 }]
       const callRows = [
         { callId: 'c1', startedAt: new Date() },
@@ -726,18 +726,18 @@ describe('CallsService', () => {
       ]
 
       const db = {
-        select: vi.fn()
+        select: jest.fn()
           .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue(countResult),
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(countResult),
             }),
           })
           .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                orderBy: vi.fn().mockReturnValue({
-                  limit: vi.fn().mockReturnValue({
-                    offset: vi.fn().mockResolvedValue(callRows),
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                orderBy: jest.fn().mockReturnValue({
+                  limit: jest.fn().mockReturnValue({
+                    offset: jest.fn().mockResolvedValue(callRows),
                   }),
                 }),
               }),
@@ -755,18 +755,18 @@ describe('CallsService', () => {
 
     it('hasMore is true when more pages exist', async () => {
       const db = {
-        select: vi.fn()
+        select: jest.fn()
           .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue([{ total: 100 }]),
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([{ total: 100 }]),
             }),
           })
           .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                orderBy: vi.fn().mockReturnValue({
-                  limit: vi.fn().mockReturnValue({
-                    offset: vi.fn().mockResolvedValue([]),
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                orderBy: jest.fn().mockReturnValue({
+                  limit: jest.fn().mockReturnValue({
+                    offset: jest.fn().mockResolvedValue([]),
                   }),
                 }),
               }),

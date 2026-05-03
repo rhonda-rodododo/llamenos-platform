@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { createTranscriptionService } from '@worker/lib/transcription-client'
 import type { TranscriptionService } from '@worker/types'
 
 describe('transcription-client', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>
+  let fetchSpy: ReturnType<typeof jest.spyOn>
   let originalWhisperUrl: string | undefined
 
   beforeEach(() => {
     originalWhisperUrl = process.env.WHISPER_URL
     delete process.env.WHISPER_URL
-    fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ text: 'hello world' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )
   })

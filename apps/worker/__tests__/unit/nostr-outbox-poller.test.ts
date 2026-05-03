@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import {
   startOutboxPoller,
   stopOutboxPoller,
@@ -9,16 +9,16 @@ import type { NodeNostrPublisher } from '@worker/lib/nostr-publisher'
 
 function createMockOutbox() {
   return {
-    drainBatch: vi.fn().mockResolvedValue([]),
-    markDelivered: vi.fn().mockResolvedValue(undefined),
-    markFailed: vi.fn().mockResolvedValue(undefined),
-    cleanup: vi.fn().mockResolvedValue(undefined),
+    drainBatch: jest.fn().mockResolvedValue([]),
+    markDelivered: jest.fn().mockResolvedValue(undefined),
+    markFailed: jest.fn().mockResolvedValue(undefined),
+    cleanup: jest.fn().mockResolvedValue(undefined),
   } as unknown as EventOutbox
 }
 
 function createMockPublisher() {
   return {
-    deliverSignedEvent: vi.fn().mockResolvedValue(undefined),
+    deliverSignedEvent: jest.fn().mockResolvedValue(undefined),
   } as unknown as NodeNostrPublisher
 }
 
@@ -27,21 +27,21 @@ describe('nostr-outbox-poller', () => {
   let publisher: ReturnType<typeof createMockPublisher>
 
   beforeEach(() => {
-    vi.useFakeTimers()
+    jest.useFakeTimers()
     outbox = createMockOutbox()
     publisher = createMockPublisher()
   })
 
   afterEach(() => {
     stopOutboxPoller()
-    vi.useRealTimers()
+    jest.useRealTimers()
   })
 
   it('is a no-op if startOutboxPoller is called twice', async () => {
     startOutboxPoller(outbox, publisher)
     startOutboxPoller(outbox, publisher)
 
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
     expect(outbox.drainBatch).toHaveBeenCalledTimes(1)
   })
 
@@ -50,7 +50,7 @@ describe('nostr-outbox-poller', () => {
 
     expect(outbox.drainBatch).not.toHaveBeenCalled()
 
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(outbox.drainBatch).toHaveBeenCalledTimes(1)
     expect(outbox.drainBatch).toHaveBeenCalledWith(50)
@@ -59,10 +59,10 @@ describe('nostr-outbox-poller', () => {
   it('drains on interval after initial delay', async () => {
     startOutboxPoller(outbox, publisher)
 
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
     expect(outbox.drainBatch).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(30_000)
+    await jest.advanceTimersByTime(30_000)
     expect(outbox.drainBatch).toHaveBeenCalledTimes(2)
   })
 
@@ -73,7 +73,7 @@ describe('nostr-outbox-poller', () => {
     ])
 
     startOutboxPoller(outbox, publisher)
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(publisher.deliverSignedEvent).toHaveBeenCalledTimes(2)
     expect(publisher.deliverSignedEvent).toHaveBeenNthCalledWith(1, { kind: 1, content: 'hello' })
@@ -91,7 +91,7 @@ describe('nostr-outbox-poller', () => {
     ])
 
     startOutboxPoller(outbox, publisher)
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(publisher.deliverSignedEvent).toHaveBeenCalledTimes(1)
     expect(outbox.markDelivered).not.toHaveBeenCalled()
@@ -103,12 +103,12 @@ describe('nostr-outbox-poller', () => {
     outbox.drainBatch.mockRejectedValue(new Error('db locked'))
 
     startOutboxPoller(outbox, publisher)
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(publisher.deliverSignedEvent).not.toHaveBeenCalled()
     expect(outbox.markFailed).not.toHaveBeenCalled()
 
-    await vi.advanceTimersByTimeAsync(30_000)
+    await jest.advanceTimersByTime(30_000)
     expect(outbox.drainBatch).toHaveBeenCalledTimes(2)
   })
 
@@ -116,7 +116,7 @@ describe('nostr-outbox-poller', () => {
     outbox.drainBatch.mockResolvedValue([])
 
     startOutboxPoller(outbox, publisher)
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(publisher.deliverSignedEvent).not.toHaveBeenCalled()
     expect(outbox.markDelivered).not.toHaveBeenCalled()
@@ -126,7 +126,7 @@ describe('nostr-outbox-poller', () => {
   it('runs cleanup on interval', async () => {
     startOutboxPoller(outbox, publisher)
 
-    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    await jest.advanceTimersByTime(5 * 60_000)
 
     expect(outbox.cleanup).toHaveBeenCalledTimes(1)
   })
@@ -135,7 +135,7 @@ describe('nostr-outbox-poller', () => {
     startOutboxPoller(outbox, publisher)
     stopOutboxPoller()
 
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(outbox.drainBatch).not.toHaveBeenCalled()
   })
@@ -148,7 +148,7 @@ describe('nostr-outbox-poller', () => {
       { id: 5, event_json: { kind: 1, content: 'late' }, attempts: 0 },
     ])
 
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(publisher.deliverSignedEvent).not.toHaveBeenCalled()
   })
@@ -164,7 +164,7 @@ describe('nostr-outbox-poller', () => {
     ])
 
     startOutboxPoller(outbox, publisher)
-    await vi.advanceTimersByTimeAsync(10_000)
+    await jest.advanceTimersByTime(10_000)
 
     expect(outbox.markDelivered).toHaveBeenCalledTimes(1)
     expect(outbox.markDelivered).toHaveBeenCalledWith(10)

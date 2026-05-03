@@ -4,7 +4,7 @@
  * Tests: permission enforcement, note creation, note listing (scoped vs admin),
  * update ownership, reply access control.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import notesRouter from '../../routes/notes'
@@ -26,16 +26,16 @@ function makeApp(opts: {
     hubId = 'hub-1',
   } = opts
 
-  const mockAudit = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAudit = { log: jest.fn().mockResolvedValue(undefined) }
   const mockRecords = {
-    listNotes: vi.fn().mockResolvedValue({ notes: [], total: 0 }),
-    createNote: vi.fn().mockResolvedValue({ id: 'note-1', authorPubkey: pubkey }),
-    updateNote: vi.fn().mockResolvedValue({ id: 'note-1', authorPubkey: pubkey }),
-    listReplies: vi.fn().mockResolvedValue([]),
-    createReply: vi.fn().mockResolvedValue({ id: 'reply-1', authorPubkey: pubkey }),
+    listNotes: jest.fn().mockResolvedValue({ notes: [], total: 0 }),
+    createNote: jest.fn().mockResolvedValue({ id: 'note-1', authorPubkey: pubkey }),
+    updateNote: jest.fn().mockResolvedValue({ id: 'note-1', authorPubkey: pubkey }),
+    listReplies: jest.fn().mockResolvedValue([]),
+    createReply: jest.fn().mockResolvedValue({ id: 'reply-1', authorPubkey: pubkey }),
   }
   const mockCases = {
-    createInteraction: vi.fn().mockResolvedValue(undefined),
+    createInteraction: jest.fn().mockResolvedValue(undefined),
   }
 
   const app = new Hono<AppEnv>()

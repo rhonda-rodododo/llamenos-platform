@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import * as labels from '@shared/crypto-labels'
 
 describe('Crypto domain separation labels', () => {

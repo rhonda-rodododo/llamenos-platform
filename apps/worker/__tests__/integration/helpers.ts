@@ -3,8 +3,7 @@
  *
  * Provides an in-memory DurableObjectState mock and a mock Env,
  * allowing direct instantiation and testing of DO classes without
- * the Cloudflare runtime (@cloudflare/vitest-pool-workers requires
- * vitest 2/3 and is not compatible with vitest 4).
+ * the Cloudflare runtime.
  *
  * The storage mock implements the full DurableObjectStorage interface
  * subset that our DOs actually use (get, put, delete, list, deleteAll,

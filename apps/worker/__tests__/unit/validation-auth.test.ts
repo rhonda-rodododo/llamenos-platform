@@ -7,7 +7,7 @@
  * /me/* routes apply their own internal auth middleware, so we test those
  * schemas directly via Zod parse to verify validation rules.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import authRoutes from '../../routes/auth'
 import {
   createTestApp,

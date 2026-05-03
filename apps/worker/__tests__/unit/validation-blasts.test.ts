@@ -4,7 +4,7 @@
  * Validates blast creation, scheduling, subscriber imports, and
  * blast settings updates.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import blastsRoutes from '../../routes/blasts'
 import {
   createTestApp,

@@ -1,40 +1,40 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { startParallelRinging } from '../../services/ringing'
 import type { Env } from '../../types'
 import type { Services } from '../../services'
 import * as serviceFactories from '../../lib/service-factories'
 
-const mockAdapter = (serviceFactories as unknown as { __mockAdapter: { ringVolunteers: ReturnType<typeof vi.fn> } }).__mockAdapter
+const mockAdapter = (serviceFactories as unknown as { __mockAdapter: { ringVolunteers: ReturnType<typeof jest.fn> } }).__mockAdapter
 
-vi.mock('../../lib/service-factories', () => {
+mock.module('../../lib/service-factories', () => {
   const mockAdapter = {
-    ringVolunteers: vi.fn().mockResolvedValue(undefined),
+    ringVolunteers: jest.fn().mockResolvedValue(undefined),
   }
   return {
-    getTelephonyFromService: vi.fn().mockResolvedValue(mockAdapter),
-    getHubTelephonyFromService: vi.fn().mockResolvedValue(mockAdapter),
+    getTelephonyFromService: jest.fn().mockResolvedValue(mockAdapter),
+    getHubTelephonyFromService: jest.fn().mockResolvedValue(mockAdapter),
     __mockAdapter: mockAdapter,
   }
 })
 
-vi.mock('../../lib/voip-push', () => ({
-  dispatchVoipPushFromService: vi.fn().mockResolvedValue(undefined),
+mock.module('../../lib/voip-push', () => ({
+  dispatchVoipPushFromService: jest.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../../lib/nostr-events', () => ({
-  publishNostrEvent: vi.fn().mockResolvedValue(undefined),
+mock.module('../../lib/nostr-events', () => ({
+  publishNostrEvent: jest.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../../lib/logger', () => ({
+mock.module('../../lib/logger', () => ({
   createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
   }),
 }))
 
-vi.mock('../../routes/metrics', () => ({
-  incCounter: vi.fn(),
+mock.module('../../routes/metrics', () => ({
+  incCounter: jest.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -80,17 +80,17 @@ function makeServices(overrides: {
 
   return {
     shifts: {
-      getCurrentVolunteers: vi.fn().mockResolvedValue(onShiftPubkeys),
+      getCurrentVolunteers: jest.fn().mockResolvedValue(onShiftPubkeys),
     },
     settings: {
-      getFallbackGroup: vi.fn().mockResolvedValue({ userPubkeys: fallbackPubkeys }),
+      getFallbackGroup: jest.fn().mockResolvedValue({ userPubkeys: fallbackPubkeys }),
     },
     identity: {
-      getUsers: vi.fn().mockResolvedValue({ users: allUsers }),
+      getUsers: jest.fn().mockResolvedValue({ users: allUsers }),
     },
     calls: {
-      addCall: vi.fn().mockResolvedValue({ callId: 'CA-test' }),
-      createCallToken: vi.fn().mockResolvedValue('token-abc'),
+      addCall: jest.fn().mockResolvedValue({ callId: 'CA-test' }),
+      createCallToken: jest.fn().mockResolvedValue('token-abc'),
     },
   } as unknown as Services
 }
@@ -101,7 +101,7 @@ function makeServices(overrides: {
 
 describe('startParallelRinging', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   it('skips when no volunteers on shift and no fallback', async () => {
@@ -211,7 +211,7 @@ describe('startParallelRinging', () => {
 
     await startParallelRinging('CA-7', '+13035551234', 'http://localhost', makeEnv(), services, 'hub-1')
 
-    const addCallArgs = (services.calls.addCall as ReturnType<typeof vi.fn>).mock.calls[0][1]
+    const addCallArgs = (services.calls.addCall as ReturnType<typeof jest.fn>).mock.calls[0][1]
     expect(addCallArgs.callerLast4).toBe('1234')
   })
 
@@ -234,7 +234,7 @@ describe('startParallelRinging', () => {
       onShiftPubkeys: ['pk-1'],
     })
     // Make identity.getUsers throw
-    ;(services.identity.getUsers as ReturnType<typeof vi.fn>).mockRejectedValue(
+    ;(services.identity.getUsers as ReturnType<typeof jest.fn>).mockRejectedValue(
       new Error('DB connection failed'),
     )
 
@@ -255,8 +255,8 @@ describe('startParallelRinging', () => {
     await startParallelRinging('CA-10', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-1')
 
     // Token should be created with empty pubkey — documents the gap
-    if ((services.calls.createCallToken as ReturnType<typeof vi.fn>).mock.calls.length > 0) {
-      const tokenArgs = (services.calls.createCallToken as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    if ((services.calls.createCallToken as ReturnType<typeof jest.fn>).mock.calls.length > 0) {
+      const tokenArgs = (services.calls.createCallToken as ReturnType<typeof jest.fn>).mock.calls[0][0]
       expect(tokenArgs.volunteerPubkey).toBe('')
     }
   })

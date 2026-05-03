@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import type { CaseManagementTemplate } from '../../../../packages/protocol/template-types'
 
 function makeTemplate(id: string): CaseManagementTemplate {
@@ -19,9 +19,7 @@ function makeTemplate(id: string): CaseManagementTemplate {
 }
 
 describe('template-loader', () => {
-  beforeEach(() => {
-    vi.resetModules()
-  })
+  // bun:test doesn't need explicit module reset — dynamic imports are fresh per test
 
   async function loadTemplates(importFn: (path: string) => Promise<unknown>) {
     const { loadBundledTemplates } = await import('@worker/lib/template-loader')
@@ -30,7 +28,7 @@ describe('template-loader', () => {
 
   it('loads templates from dynamic imports', async () => {
     const template = makeTemplate('general-hotline')
-    const importFn = vi.fn().mockImplementation((path: string) => {
+    const importFn = jest.fn().mockImplementation((path: string) => {
       if (path.includes('general-hotline')) return Promise.resolve({ default: template })
       return Promise.reject(new Error('Module not found'))
     })
@@ -42,7 +40,7 @@ describe('template-loader', () => {
 
   it('caches templates on second call', async () => {
     const template = makeTemplate('general-hotline')
-    const importFn = vi.fn().mockResolvedValue({ default: template })
+    const importFn = jest.fn().mockResolvedValue({ default: template })
     const { loadBundledTemplates } = await import('@worker/lib/template-loader')
     const first = await loadBundledTemplates(importFn)
     const second = await loadBundledTemplates(importFn)
@@ -52,7 +50,7 @@ describe('template-loader', () => {
 
   it('silently skips missing template files', async () => {
     const template = makeTemplate('general-hotline')
-    const importFn = vi.fn().mockImplementation((path: string) => {
+    const importFn = jest.fn().mockImplementation((path: string) => {
       if (path.includes('general-hotline')) return Promise.resolve({ default: template })
       return Promise.reject(new Error('Module not found'))
     })
@@ -63,7 +61,7 @@ describe('template-loader', () => {
 
   it('handles modules without a default export (uses mod directly)', async () => {
     const template = makeTemplate('jail-support')
-    const importFn = vi.fn().mockImplementation((path: string) => {
+    const importFn = jest.fn().mockImplementation((path: string) => {
       if (path.includes('jail-support')) return Promise.resolve(template)
       return Promise.reject(new Error('Module not found'))
     })
@@ -74,7 +72,7 @@ describe('template-loader', () => {
   it('returns multiple templates when multiple files exist', async () => {
     const t1 = makeTemplate('general-hotline')
     const t2 = makeTemplate('jail-support')
-    const importFn = vi.fn().mockImplementation((path: string) => {
+    const importFn = jest.fn().mockImplementation((path: string) => {
       if (path.includes('general-hotline')) return Promise.resolve({ default: t1 })
       if (path.includes('jail-support')) return Promise.resolve({ default: t2 })
       return Promise.reject(new Error('Module not found'))
@@ -85,7 +83,7 @@ describe('template-loader', () => {
   })
 
   it('returns empty array when all template files are missing', async () => {
-    const importFn = vi.fn().mockRejectedValue(new Error('Module not found'))
+    const importFn = jest.fn().mockRejectedValue(new Error('Module not found'))
     const templates = await loadTemplates(importFn)
     expect(templates).toEqual([])
   })

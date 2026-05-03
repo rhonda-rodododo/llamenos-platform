@@ -3,7 +3,7 @@
  *
  * Validates E.164 phone format enforcement and bulk ban limits.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import bansRoutes from '../../routes/bans'
 import {
   createTestApp,

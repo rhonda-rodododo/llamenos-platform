@@ -1,5 +1,4 @@
-import { vi } from 'vitest'
-
+import { jest } from 'bun:test'
 function makeChainable<T>(result: T, methods: Record<string, any>) {
   const p = Promise.resolve(result) as Promise<T> & Record<string, any>
   for (const [key, val] of Object.entries(methods)) {
@@ -36,26 +35,26 @@ export function createMockDb(tables: string[] = []) {
   }
 
   function buildSelectChain(result: any[]) {
-    const limitFn = vi.fn((n?: number) =>
+    const limitFn = jest.fn((n?: number) =>
       makeChainable(result.slice(0, n ?? result.length), {
-        offset: vi.fn(() => Promise.resolve(result)),
+        offset: jest.fn(() => Promise.resolve(result)),
       })
     )
 
-    const orderByFn = vi.fn(() =>
+    const orderByFn = jest.fn(() =>
       makeChainable(result, {
         limit: limitFn,
-        offset: vi.fn(() => Promise.resolve(result)),
+        offset: jest.fn(() => Promise.resolve(result)),
       })
     )
 
-    const groupByFn = vi.fn(() =>
+    const groupByFn = jest.fn(() =>
       makeChainable(result, {
-        orderBy: vi.fn(() => Promise.resolve(result)),
+        orderBy: jest.fn(() => Promise.resolve(result)),
       })
     )
 
-    const offsetFn = vi.fn(() => Promise.resolve(result))
+    const offsetFn = jest.fn(() => Promise.resolve(result))
 
     return makeChainable(result, {
       limit: limitFn,
@@ -75,25 +74,25 @@ export function createMockDb(tables: string[] = []) {
     $setExecuteResult: (result: any) => { _executeResult = result },
     $reset: reset,
 
-    select: vi.fn(() => {
+    select: jest.fn(() => {
       const result = nextSelect()
       return {
-        from: vi.fn(() => {
-          const whereFn = vi.fn(() => buildSelectChain(result))
-          const limitFn = vi.fn((n?: number) =>
+        from: jest.fn(() => {
+          const whereFn = jest.fn(() => buildSelectChain(result))
+          const limitFn = jest.fn((n?: number) =>
             makeChainable(result.slice(0, n ?? result.length), {
-              offset: vi.fn(() => Promise.resolve(result)),
+              offset: jest.fn(() => Promise.resolve(result)),
             })
           )
-          const orderByFn = vi.fn(() =>
+          const orderByFn = jest.fn(() =>
             makeChainable(result, {
               limit: limitFn,
-              offset: vi.fn(() => Promise.resolve(result)),
+              offset: jest.fn(() => Promise.resolve(result)),
             })
           )
-          const groupByFn = vi.fn(() =>
+          const groupByFn = jest.fn(() =>
             makeChainable(result, {
-              orderBy: vi.fn(() => Promise.resolve(result)),
+              orderBy: jest.fn(() => Promise.resolve(result)),
             })
           )
 
@@ -107,15 +106,15 @@ export function createMockDb(tables: string[] = []) {
       }
     }),
 
-    insert: vi.fn(() => ({
-      values: vi.fn(() => {
-        const returningFn = vi.fn(() => Promise.resolve(_insertResult))
-        const onConflictDoUpdateFn = vi.fn(() =>
+    insert: jest.fn(() => ({
+      values: jest.fn(() => {
+        const returningFn = jest.fn(() => Promise.resolve(_insertResult))
+        const onConflictDoUpdateFn = jest.fn(() =>
           makeChainable(_insertResult, {
             returning: returningFn,
           })
         )
-        const onConflictDoNothingFn = vi.fn(() => Promise.resolve())
+        const onConflictDoNothingFn = jest.fn(() => Promise.resolve())
 
         return makeChainable(_insertResult, {
           returning: returningFn,
@@ -125,26 +124,26 @@ export function createMockDb(tables: string[] = []) {
       }),
     })),
 
-    update: vi.fn(() => ({
-      set: vi.fn(() => {
-        const whereFn = vi.fn(() =>
+    update: jest.fn(() => ({
+      set: jest.fn(() => {
+        const whereFn = jest.fn(() =>
           makeChainable(_updateResult, {
-            returning: vi.fn(() => Promise.resolve(_updateResult)),
+            returning: jest.fn(() => Promise.resolve(_updateResult)),
           })
         )
         return { where: whereFn }
       }),
     })),
 
-    delete: vi.fn(() => ({
-      where: vi.fn(() =>
+    delete: jest.fn(() => ({
+      where: jest.fn(() =>
         makeChainable(_deleteResult, {
-          returning: vi.fn(() => Promise.resolve(_deleteResult)),
+          returning: jest.fn(() => Promise.resolve(_deleteResult)),
         })
       ),
     })),
 
-    execute: vi.fn(() => Promise.resolve(_executeResult)),
+    execute: jest.fn(() => Promise.resolve(_executeResult)),
   }
 
   return { db, store, reset }

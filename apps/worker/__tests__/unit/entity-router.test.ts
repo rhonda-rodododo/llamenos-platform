@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { createEntityRouter } from '../../lib/entity-router'
@@ -15,7 +15,7 @@ function createTestApp(
     hubId?: string
     pubkey?: string
     serviceMock?: Record<string, unknown>
-    auditLogSpy?: ReturnType<typeof vi.fn>
+    auditLogSpy?: ReturnType<typeof jest.fn>
   } = {},
 ) {
   const {
@@ -23,7 +23,7 @@ function createTestApp(
     hubId,
     pubkey = 'test-pubkey-' + '0'.repeat(50),
     serviceMock = {},
-    auditLogSpy = vi.fn().mockResolvedValue(undefined),
+    auditLogSpy = jest.fn().mockResolvedValue(undefined),
   } = opts
 
   const mockAuditService = { log: auditLogSpy }
@@ -90,7 +90,7 @@ describe('createEntityRouter', () => {
 
   describe('GET / (list)', () => {
     it('calls service[listMethod] and returns result', async () => {
-      const listSpy = vi.fn().mockResolvedValue({ items: [] })
+      const listSpy = jest.fn().mockResolvedValue({ items: [] })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -104,11 +104,11 @@ describe('createEntityRouter', () => {
 
       const res = await app.request('/test')
       expect(res.status).toBe(200)
-      expect(listSpy).toHaveBeenCalledOnce()
+      expect(listSpy).toHaveBeenCalledTimes(1)
     })
 
     it('passes hubId as first arg when hubScoped is true', async () => {
-      const listSpy = vi.fn().mockResolvedValue({ items: [] })
+      const listSpy = jest.fn().mockResolvedValue({ items: [] })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -126,7 +126,7 @@ describe('createEntityRouter', () => {
     })
 
     it('does not pass hubId when hubScoped is false', async () => {
-      const listSpy = vi.fn().mockResolvedValue({ items: [] })
+      const listSpy = jest.fn().mockResolvedValue({ items: [] })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -153,7 +153,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
         },
         {
-          serviceMock: { list: vi.fn().mockResolvedValue({ items: [] }) },
+          serviceMock: { list: jest.fn().mockResolvedValue({ items: [] }) },
           permissions: ['other:read'],
         },
       )
@@ -163,7 +163,7 @@ describe('createEntityRouter', () => {
     })
 
     it('uses permissionOverrides.list when set', async () => {
-      const listSpy = vi.fn().mockResolvedValue({ items: [] })
+      const listSpy = jest.fn().mockResolvedValue({ items: [] })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -181,11 +181,11 @@ describe('createEntityRouter', () => {
 
       const res = await app.request('/test')
       expect(res.status).toBe(200)
-      expect(listSpy).toHaveBeenCalledOnce()
+      expect(listSpy).toHaveBeenCalledTimes(1)
     })
 
     it('passes validated query params when listQuerySchema is provided', async () => {
-      const listSpy = vi.fn().mockResolvedValue({ items: [] })
+      const listSpy = jest.fn().mockResolvedValue({ items: [] })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -203,7 +203,7 @@ describe('createEntityRouter', () => {
     })
 
     it('uses custom method name when methods.list is set', async () => {
-      const findAllSpy = vi.fn().mockResolvedValue({ items: [] })
+      const findAllSpy = jest.fn().mockResolvedValue({ items: [] })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -217,7 +217,7 @@ describe('createEntityRouter', () => {
       )
 
       await app.request('/test')
-      expect(findAllSpy).toHaveBeenCalledOnce()
+      expect(findAllSpy).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -227,7 +227,7 @@ describe('createEntityRouter', () => {
 
   describe('GET /:id (get)', () => {
     it('calls service[getMethod] with id', async () => {
-      const getSpy = vi.fn().mockResolvedValue({ id: 'abc', name: 'Thing' })
+      const getSpy = jest.fn().mockResolvedValue({ id: 'abc', name: 'Thing' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -236,7 +236,7 @@ describe('createEntityRouter', () => {
           listResponseSchema: listSchema,
           itemResponseSchema: itemSchema,
         },
-        { serviceMock: { list: vi.fn(), get: getSpy } },
+        { serviceMock: { list: jest.fn(), get: getSpy } },
       )
 
       const res = await app.request('/test/abc')
@@ -245,7 +245,7 @@ describe('createEntityRouter', () => {
     })
 
     it('passes hubId first when hubScoped is true', async () => {
-      const getSpy = vi.fn().mockResolvedValue({ id: 'abc', name: 'Thing' })
+      const getSpy = jest.fn().mockResolvedValue({ id: 'abc', name: 'Thing' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -255,7 +255,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           hubScoped: true,
         },
-        { serviceMock: { list: vi.fn(), get: getSpy }, hubId: 'hub-999' },
+        { serviceMock: { list: jest.fn(), get: getSpy }, hubId: 'hub-999' },
       )
 
       await app.request('/test/abc')
@@ -272,7 +272,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           disableGet: true,
         },
-        { serviceMock: { list: vi.fn().mockResolvedValue({ items: [] }) } },
+        { serviceMock: { list: jest.fn().mockResolvedValue({ items: [] }) } },
       )
 
       const res = await app.request('/test/abc')
@@ -280,7 +280,7 @@ describe('createEntityRouter', () => {
     })
 
     it('uses custom idParam', async () => {
-      const getSpy = vi.fn().mockResolvedValue({ id: 'pk1', name: 'Thing' })
+      const getSpy = jest.fn().mockResolvedValue({ id: 'pk1', name: 'Thing' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -290,7 +290,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           idParam: 'pubkey',
         },
-        { serviceMock: { list: vi.fn(), get: getSpy } },
+        { serviceMock: { list: jest.fn(), get: getSpy } },
       )
 
       await app.request('/test/pk1')
@@ -312,7 +312,7 @@ describe('createEntityRouter', () => {
           listResponseSchema: listSchema,
           itemResponseSchema: itemSchema,
         },
-        { serviceMock: { list: vi.fn().mockResolvedValue({ items: [] }) } },
+        { serviceMock: { list: jest.fn().mockResolvedValue({ items: [] }) } },
       )
 
       const res = await app.request('/test', {
@@ -324,7 +324,7 @@ describe('createEntityRouter', () => {
     })
 
     it('calls service[createMethod] with body and returns 201', async () => {
-      const createSpy = vi.fn().mockResolvedValue({ id: 'new-1', name: 'New Thing' })
+      const createSpy = jest.fn().mockResolvedValue({ id: 'new-1', name: 'New Thing' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -334,7 +334,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           createBodySchema: createSchema,
         },
-        { serviceMock: { list: vi.fn(), create: createSpy } },
+        { serviceMock: { list: jest.fn(), create: createSpy } },
       )
 
       const res = await app.request('/test', {
@@ -347,7 +347,7 @@ describe('createEntityRouter', () => {
     })
 
     it('passes hubId first when hubScoped is true', async () => {
-      const createSpy = vi.fn().mockResolvedValue({ id: 'new-1', name: 'New Thing' })
+      const createSpy = jest.fn().mockResolvedValue({ id: 'new-1', name: 'New Thing' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -358,7 +358,7 @@ describe('createEntityRouter', () => {
           createBodySchema: createSchema,
           hubScoped: true,
         },
-        { serviceMock: { list: vi.fn(), create: createSpy }, hubId: 'hub-42' },
+        { serviceMock: { list: jest.fn(), create: createSpy }, hubId: 'hub-42' },
       )
 
       await app.request('/test', {
@@ -380,7 +380,7 @@ describe('createEntityRouter', () => {
           createBodySchema: createSchema,
         },
         {
-          serviceMock: { list: vi.fn(), create: vi.fn() },
+          serviceMock: { list: jest.fn(), create: jest.fn() },
           permissions: ['things:read'],
         },
       )
@@ -394,7 +394,7 @@ describe('createEntityRouter', () => {
     })
 
     it('uses permissionOverrides.create when set', async () => {
-      const createSpy = vi.fn().mockResolvedValue({ id: 'x', name: 'X' })
+      const createSpy = jest.fn().mockResolvedValue({ id: 'x', name: 'X' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -406,7 +406,7 @@ describe('createEntityRouter', () => {
           permissionOverrides: { create: 'things:add-new' },
         },
         {
-          serviceMock: { list: vi.fn(), create: createSpy },
+          serviceMock: { list: jest.fn(), create: createSpy },
           permissions: ['things:add-new'],
         },
       )
@@ -434,7 +434,7 @@ describe('createEntityRouter', () => {
           listResponseSchema: listSchema,
           itemResponseSchema: itemSchema,
         },
-        { serviceMock: { list: vi.fn().mockResolvedValue({ items: [] }) } },
+        { serviceMock: { list: jest.fn().mockResolvedValue({ items: [] }) } },
       )
 
       const res = await app.request('/test/abc', {
@@ -446,7 +446,7 @@ describe('createEntityRouter', () => {
     })
 
     it('calls service[updateMethod] with id and body', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ id: 'abc', name: 'Updated' })
+      const updateSpy = jest.fn().mockResolvedValue({ id: 'abc', name: 'Updated' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -456,7 +456,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           updateBodySchema: updateSchema,
         },
-        { serviceMock: { list: vi.fn(), update: updateSpy } },
+        { serviceMock: { list: jest.fn(), update: updateSpy } },
       )
 
       const res = await app.request('/test/abc', {
@@ -469,7 +469,7 @@ describe('createEntityRouter', () => {
     })
 
     it('passes hubId first when hubScoped is true', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ id: 'abc', name: 'Updated' })
+      const updateSpy = jest.fn().mockResolvedValue({ id: 'abc', name: 'Updated' })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -480,7 +480,7 @@ describe('createEntityRouter', () => {
           updateBodySchema: updateSchema,
           hubScoped: true,
         },
-        { serviceMock: { list: vi.fn(), update: updateSpy }, hubId: 'hub-7' },
+        { serviceMock: { list: jest.fn(), update: updateSpy }, hubId: 'hub-7' },
       )
 
       await app.request('/test/abc', {
@@ -498,7 +498,7 @@ describe('createEntityRouter', () => {
 
   describe('DELETE /:id (delete)', () => {
     it('calls service[deleteMethod] with id', async () => {
-      const deleteSpy = vi.fn().mockResolvedValue({ ok: true })
+      const deleteSpy = jest.fn().mockResolvedValue({ ok: true })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -507,7 +507,7 @@ describe('createEntityRouter', () => {
           listResponseSchema: listSchema,
           itemResponseSchema: itemSchema,
         },
-        { serviceMock: { list: vi.fn(), delete: deleteSpy } },
+        { serviceMock: { list: jest.fn(), delete: deleteSpy } },
       )
 
       const res = await app.request('/test/abc', { method: 'DELETE' })
@@ -525,7 +525,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           disableDelete: true,
         },
-        { serviceMock: { list: vi.fn().mockResolvedValue({ items: [] }) } },
+        { serviceMock: { list: jest.fn().mockResolvedValue({ items: [] }) } },
       )
 
       const res = await app.request('/test/abc', { method: 'DELETE' })
@@ -533,7 +533,7 @@ describe('createEntityRouter', () => {
     })
 
     it('passes hubId first when hubScoped is true', async () => {
-      const deleteSpy = vi.fn().mockResolvedValue({ ok: true })
+      const deleteSpy = jest.fn().mockResolvedValue({ ok: true })
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -543,7 +543,7 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           hubScoped: true,
         },
-        { serviceMock: { list: vi.fn(), delete: deleteSpy }, hubId: 'hub-del' },
+        { serviceMock: { list: jest.fn(), delete: deleteSpy }, hubId: 'hub-del' },
       )
 
       await app.request('/test/abc', { method: 'DELETE' })
@@ -557,8 +557,8 @@ describe('createEntityRouter', () => {
 
   describe('audit events', () => {
     it('emits audit when auditEvents.created is set', async () => {
-      const createSpy = vi.fn().mockResolvedValue({ id: 'x', name: 'X' })
-      const auditSpy = vi.fn().mockResolvedValue(undefined)
+      const createSpy = jest.fn().mockResolvedValue({ id: 'x', name: 'X' })
+      const auditSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -569,7 +569,7 @@ describe('createEntityRouter', () => {
           createBodySchema: createSchema,
           auditEvents: { created: 'thingCreated' },
         },
-        { serviceMock: { list: vi.fn(), create: createSpy }, auditLogSpy: auditSpy },
+        { serviceMock: { list: jest.fn(), create: createSpy }, auditLogSpy: auditSpy },
       )
 
       await app.request('/test', {
@@ -578,14 +578,14 @@ describe('createEntityRouter', () => {
         body: JSON.stringify({ name: 'Audited' }),
       })
 
-      expect(auditSpy).toHaveBeenCalledOnce()
+      expect(auditSpy).toHaveBeenCalledTimes(1)
       // audit() calls auditService.log(event, actorPubkey, details, hubId)
       expect(auditSpy.mock.calls[0][0]).toBe('thingCreated')
     })
 
     it('does NOT emit audit when auditEvents.created is omitted', async () => {
-      const createSpy = vi.fn().mockResolvedValue({ id: 'x', name: 'X' })
-      const auditSpy = vi.fn().mockResolvedValue(undefined)
+      const createSpy = jest.fn().mockResolvedValue({ id: 'x', name: 'X' })
+      const auditSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -596,7 +596,7 @@ describe('createEntityRouter', () => {
           createBodySchema: createSchema,
           // No auditEvents
         },
-        { serviceMock: { list: vi.fn(), create: createSpy }, auditLogSpy: auditSpy },
+        { serviceMock: { list: jest.fn(), create: createSpy }, auditLogSpy: auditSpy },
       )
 
       await app.request('/test', {
@@ -609,8 +609,8 @@ describe('createEntityRouter', () => {
     })
 
     it('emits audit with resource id for update', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ id: 'res-1', name: 'U' })
-      const auditSpy = vi.fn().mockResolvedValue(undefined)
+      const updateSpy = jest.fn().mockResolvedValue({ id: 'res-1', name: 'U' })
+      const auditSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -621,7 +621,7 @@ describe('createEntityRouter', () => {
           updateBodySchema: updateSchema,
           auditEvents: { updated: 'thingUpdated' },
         },
-        { serviceMock: { list: vi.fn(), update: updateSpy }, auditLogSpy: auditSpy },
+        { serviceMock: { list: jest.fn(), update: updateSpy }, auditLogSpy: auditSpy },
       )
 
       await app.request('/test/res-1', {
@@ -630,13 +630,13 @@ describe('createEntityRouter', () => {
         body: JSON.stringify({ name: 'Updated' }),
       })
 
-      expect(auditSpy).toHaveBeenCalledOnce()
+      expect(auditSpy).toHaveBeenCalledTimes(1)
       expect(auditSpy.mock.calls[0][0]).toBe('thingUpdated')
     })
 
     it('emits audit with resource id for delete', async () => {
-      const deleteSpy = vi.fn().mockResolvedValue({ ok: true })
-      const auditSpy = vi.fn().mockResolvedValue(undefined)
+      const deleteSpy = jest.fn().mockResolvedValue({ ok: true })
+      const auditSpy = jest.fn().mockResolvedValue(undefined)
       const { app } = createTestApp(
         {
           tag: 'Things',
@@ -646,12 +646,12 @@ describe('createEntityRouter', () => {
           itemResponseSchema: itemSchema,
           auditEvents: { deleted: 'thingDeleted' },
         },
-        { serviceMock: { list: vi.fn(), delete: deleteSpy }, auditLogSpy: auditSpy },
+        { serviceMock: { list: jest.fn(), delete: deleteSpy }, auditLogSpy: auditSpy },
       )
 
       await app.request('/test/res-1', { method: 'DELETE' })
 
-      expect(auditSpy).toHaveBeenCalledOnce()
+      expect(auditSpy).toHaveBeenCalledTimes(1)
       expect(auditSpy.mock.calls[0][0]).toBe('thingDeleted')
     })
   })

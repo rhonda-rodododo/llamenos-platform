@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { TaskScheduler } from '@worker/services/scheduler'
 import { createMockDb } from './mock-db'
 
-vi.mock('@worker/lib/blast-delivery-worker', () => ({
-  startBlastWorker: vi.fn(),
-  stopBlastWorker: vi.fn(),
+mock.module('@worker/lib/blast-delivery-worker', () => ({
+  startBlastWorker: jest.fn(),
+  stopBlastWorker: jest.fn(),
 }))
 
-vi.mock('@worker/lib/blast-scheduled-poller', () => ({
-  startScheduledBlastPoller: vi.fn(),
-  stopScheduledBlastPoller: vi.fn(),
+mock.module('@worker/lib/blast-scheduled-poller', () => ({
+  startScheduledBlastPoller: jest.fn(),
+  stopScheduledBlastPoller: jest.fn(),
 }))
 
 import { startBlastWorker, stopBlastWorker } from '@worker/lib/blast-delivery-worker'
@@ -23,7 +23,7 @@ describe('TaskScheduler', () => {
   }
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('start', () => {

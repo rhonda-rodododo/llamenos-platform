@@ -4,7 +4,7 @@
  * Tests: getAccessLevel helper, IDOR prevention on get/:id and by-number/:number,
  * PATCH update ownership, permission gates, interaction access control.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import recordsRouter from '../../routes/records'
@@ -52,40 +52,40 @@ function makeApp(opts: {
     hubId = 'hub-1',
   } = opts
 
-  const mockAudit = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAudit = { log: jest.fn().mockResolvedValue(undefined) }
   const mockCases = {
-    list: vi.fn().mockResolvedValue({ records: [], total: 0 }),
-    get: vi.fn().mockResolvedValue(record),
-    getByNumber: vi.fn().mockResolvedValue(record),
-    create: vi.fn().mockResolvedValue(record),
-    update: vi.fn().mockResolvedValue(record),
-    delete: vi.fn().mockResolvedValue(undefined),
-    assign: vi.fn().mockResolvedValue(record),
-    unassign: vi.fn().mockResolvedValue(record),
-    linkContact: vi.fn().mockResolvedValue({ id: 'link-1' }),
-    unlinkContact: vi.fn().mockResolvedValue(undefined),
-    listContacts: vi.fn().mockResolvedValue([]),
-    listByContact: vi.fn().mockResolvedValue({ records: [] }),
-    getBySource: vi.fn().mockResolvedValue({ linked: false }),
-    listInteractions: vi.fn().mockResolvedValue({ interactions: [], total: 0 }),
-    createInteraction: vi.fn().mockResolvedValue({ id: 'int-1' }),
-    deleteInteraction: vi.fn().mockResolvedValue(undefined),
-    linkReportCase: vi.fn().mockResolvedValue({ id: 'link-1' }),
-    unlinkReportCase: vi.fn().mockResolvedValue(undefined),
-    listCaseReports: vi.fn().mockResolvedValue({ links: [] }),
-    listReportCases: vi.fn().mockResolvedValue({ links: [] }),
-    countByAssignment: vi.fn().mockResolvedValue({ count: 0 }),
+    list: jest.fn().mockResolvedValue({ records: [], total: 0 }),
+    get: jest.fn().mockResolvedValue(record),
+    getByNumber: jest.fn().mockResolvedValue(record),
+    create: jest.fn().mockResolvedValue(record),
+    update: jest.fn().mockResolvedValue(record),
+    delete: jest.fn().mockResolvedValue(undefined),
+    assign: jest.fn().mockResolvedValue(record),
+    unassign: jest.fn().mockResolvedValue(record),
+    linkContact: jest.fn().mockResolvedValue({ id: 'link-1' }),
+    unlinkContact: jest.fn().mockResolvedValue(undefined),
+    listContacts: jest.fn().mockResolvedValue([]),
+    listByContact: jest.fn().mockResolvedValue({ records: [] }),
+    getBySource: jest.fn().mockResolvedValue({ linked: false }),
+    listInteractions: jest.fn().mockResolvedValue({ interactions: [], total: 0 }),
+    createInteraction: jest.fn().mockResolvedValue({ id: 'int-1' }),
+    deleteInteraction: jest.fn().mockResolvedValue(undefined),
+    linkReportCase: jest.fn().mockResolvedValue({ id: 'link-1' }),
+    unlinkReportCase: jest.fn().mockResolvedValue(undefined),
+    listCaseReports: jest.fn().mockResolvedValue({ links: [] }),
+    listReportCases: jest.fn().mockResolvedValue({ links: [] }),
+    countByAssignment: jest.fn().mockResolvedValue({ count: 0 }),
   }
   const mockSettings = {
-    getEntityTypeById: vi.fn().mockResolvedValue({ id: 'et-1', numberingEnabled: false }),
-    generateCaseNumber: vi.fn().mockResolvedValue({ number: 'CASE-001' }),
-    getRoles: vi.fn().mockResolvedValue({ roles: [] }),
+    getEntityTypeById: jest.fn().mockResolvedValue({ id: 'et-1', numberingEnabled: false }),
+    generateCaseNumber: jest.fn().mockResolvedValue({ number: 'CASE-001' }),
+    getRoles: jest.fn().mockResolvedValue({ roles: [] }),
   }
   const mockIdentity = {
-    getUsers: vi.fn().mockResolvedValue({ users: [] }),
+    getUsers: jest.fn().mockResolvedValue({ users: [] }),
   }
   const mockShifts = {
-    getCurrentVolunteers: vi.fn().mockResolvedValue([]),
+    getCurrentVolunteers: jest.fn().mockResolvedValue([]),
   }
 
   const app = new Hono<AppEnv>()

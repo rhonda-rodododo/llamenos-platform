@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { DigestCronService } from '@worker/services/digest-cron'
 import { createMockDb } from './mock-db'
 
@@ -6,7 +6,7 @@ describe('DigestCronService', () => {
   function setup() {
     const { db } = createMockDb(['userSecurityPrefs', 'auditLog'])
     const notifications = {
-      sendAlert: vi.fn().mockResolvedValue({ delivered: true }),
+      sendAlert: jest.fn().mockResolvedValue({ delivered: true }),
     } as any
     const prefs = {} as any
     const service = new DigestCronService(db as any, notifications, prefs)

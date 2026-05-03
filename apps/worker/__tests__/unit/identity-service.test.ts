@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { IdentityService } from '../../services/identity'
 import { ServiceError } from '../../services/settings'
 
@@ -103,10 +103,10 @@ describe('IdentityService — Admin Bootstrap', () => {
   describe('hasAdmin', () => {
     it('returns false when no super-admin exists', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -118,10 +118,10 @@ describe('IdentityService — Admin Bootstrap', () => {
 
     it('returns true when active super-admin exists', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([{ pubkey: 'admin-pk' }]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ pubkey: 'admin-pk' }]),
             }),
           }),
         }),
@@ -134,19 +134,19 @@ describe('IdentityService — Admin Bootstrap', () => {
 
   describe('bootstrapAdmin', () => {
     it('creates admin when none exists', async () => {
-      const insertValues = vi.fn().mockReturnValue({
-        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+      const insertValues = jest.fn().mockReturnValue({
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
-        insert: vi.fn().mockReturnValue({
+        insert: jest.fn().mockReturnValue({
           values: insertValues,
         }),
       }
@@ -163,10 +163,10 @@ describe('IdentityService — Admin Bootstrap', () => {
 
     it('throws 403 when admin already exists', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([{ pubkey: 'existing-admin' }]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([{ pubkey: 'existing-admin' }]),
             }),
           }),
         }),
@@ -187,8 +187,8 @@ describe('IdentityService — User CRUD', () => {
     it('strips encryptedSecretKey from returned users', async () => {
       const row = makeUserRow({ pubkey: 'pk-1', encryptedSecretKey: 'SENSITIVE' })
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockResolvedValue([row]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockResolvedValue([row]),
         }),
       }
 
@@ -205,10 +205,10 @@ describe('IdentityService — User CRUD', () => {
     it('returns sanitized user', async () => {
       const row = makeUserRow({ pubkey: 'pk-1' })
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([row]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([row]),
             }),
           }),
         }),
@@ -222,10 +222,10 @@ describe('IdentityService — User CRUD', () => {
 
     it('throws 404 for unknown pubkey', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -240,10 +240,10 @@ describe('IdentityService — User CRUD', () => {
     it('returns full user with encryptedSecretKey', async () => {
       const row = makeUserRow({ pubkey: 'pk-1', encryptedSecretKey: 'SENSITIVE' })
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([row]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([row]),
             }),
           }),
         }),
@@ -257,10 +257,10 @@ describe('IdentityService — User CRUD', () => {
 
     it('returns null for unknown pubkey', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -274,13 +274,13 @@ describe('IdentityService — User CRUD', () => {
 
   describe('createUser', () => {
     it('creates user with default role-volunteer', async () => {
-      const insertValues = vi.fn()
+      const insertValues = jest.fn()
       const returnedRow = makeUserRow({ pubkey: 'new-pk' })
 
       const db = {
-        insert: vi.fn().mockReturnValue({
+        insert: jest.fn().mockReturnValue({
           values: insertValues.mockReturnValue({
-            returning: vi.fn().mockResolvedValue([returnedRow]),
+            returning: jest.fn().mockResolvedValue([returnedRow]),
           }),
         }),
       }
@@ -299,13 +299,13 @@ describe('IdentityService — User CRUD', () => {
     })
 
     it('uses provided roleIds', async () => {
-      const insertValues = vi.fn()
+      const insertValues = jest.fn()
       const returnedRow = makeUserRow({ pubkey: 'new-pk', roles: ['role-admin'] })
 
       const db = {
-        insert: vi.fn().mockReturnValue({
+        insert: jest.fn().mockReturnValue({
           values: insertValues.mockReturnValue({
-            returning: vi.fn().mockResolvedValue([returnedRow]),
+            returning: jest.fn().mockResolvedValue([returnedRow]),
           }),
         }),
       }
@@ -333,19 +333,19 @@ describe('IdentityService — User CRUD', () => {
         onBreak: true,
       })
 
-      const updateSet = vi.fn()
+      const updateSet = jest.fn()
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([existingRow]),
             }),
           }),
         }),
-        update: vi.fn().mockReturnValue({
+        update: jest.fn().mockReturnValue({
           set: updateSet.mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([updatedRow]),
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([updatedRow]),
             }),
           }),
         }),
@@ -369,19 +369,19 @@ describe('IdentityService — User CRUD', () => {
       const existingRow = makeUserRow({ pubkey: 'pk-1' })
       const updatedRow = makeUserRow({ pubkey: 'pk-1', roles: ['role-admin'] })
 
-      const updateSet = vi.fn()
+      const updateSet = jest.fn()
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([existingRow]),
             }),
           }),
         }),
-        update: vi.fn().mockReturnValue({
+        update: jest.fn().mockReturnValue({
           set: updateSet.mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([updatedRow]),
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([updatedRow]),
             }),
           }),
         }),
@@ -400,19 +400,19 @@ describe('IdentityService — User CRUD', () => {
 
     it('never allows overwriting pubkey', async () => {
       const existingRow = makeUserRow({ pubkey: 'pk-1' })
-      const updateSet = vi.fn()
+      const updateSet = jest.fn()
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([existingRow]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([existingRow]),
             }),
           }),
         }),
-        update: vi.fn().mockReturnValue({
+        update: jest.fn().mockReturnValue({
           set: updateSet.mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([existingRow]),
+            where: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([existingRow]),
             }),
           }),
         }),
@@ -433,10 +433,10 @@ describe('IdentityService — User CRUD', () => {
 
     it('throws 404 when user does not exist', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -459,10 +459,10 @@ describe('IdentityService — Invites', () => {
     it('returns valid for unused, unexpired invite', async () => {
       const invite = makeInviteRow()
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([invite]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([invite]),
             }),
           }),
         }),
@@ -477,10 +477,10 @@ describe('IdentityService — Invites', () => {
 
     it('returns not_found for unknown code', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -495,10 +495,10 @@ describe('IdentityService — Invites', () => {
     it('returns already_used for redeemed invite', async () => {
       const invite = makeInviteRow({ usedAt: new Date() })
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([invite]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([invite]),
             }),
           }),
         }),
@@ -515,10 +515,10 @@ describe('IdentityService — Invites', () => {
         expiresAt: new Date('2020-01-01'), // in the past
       })
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([invite]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([invite]),
             }),
           }),
         }),
@@ -541,10 +541,10 @@ describe('IdentityService — Sessions', () => {
     it('returns session for valid, fresh token', async () => {
       const session = makeSessionRow()
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([session]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([session]),
             }),
           }),
         }),
@@ -558,10 +558,10 @@ describe('IdentityService — Sessions', () => {
 
     it('throws 401 for unknown token', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -575,15 +575,15 @@ describe('IdentityService — Sessions', () => {
       const expired = makeSessionRow({
         expiresAt: new Date('2020-01-01'),
       })
-      const deleteFn = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const deleteFn = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([expired]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([expired]),
             }),
           }),
         }),
@@ -599,19 +599,19 @@ describe('IdentityService — Sessions', () => {
       const nearExpiry = makeSessionRow({
         expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min from now
       })
-      const updateSet = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const updateSet = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([nearExpiry]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([nearExpiry]),
             }),
           }),
         }),
-        update: vi.fn().mockReturnValue({ set: updateSet }),
+        update: jest.fn().mockReturnValue({ set: updateSet }),
       }
 
       const svc = new IdentityService(db as never)
@@ -638,15 +638,15 @@ describe('IdentityService — WebAuthn Challenges', () => {
         challenge: 'random-challenge-data',
         createdAt: new Date(), // just created
       }
-      const deleteFn = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const deleteFn = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([challenge]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([challenge]),
             }),
           }),
         }),
@@ -662,10 +662,10 @@ describe('IdentityService — WebAuthn Challenges', () => {
 
     it('throws 404 for unknown challenge', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -682,15 +682,15 @@ describe('IdentityService — WebAuthn Challenges', () => {
         createdAt: new Date(Date.now() - 10 * 60 * 1000), // 10 min ago
       }
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([expired]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([expired]),
             }),
           }),
         }),
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
         }),
       }
 
@@ -723,10 +723,10 @@ describe('IdentityService — Provisioning Rooms', () => {
         primaryPubkey: null,
       }
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([room]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([room]),
             }),
           }),
         }),
@@ -748,15 +748,15 @@ describe('IdentityService — Provisioning Rooms', () => {
         primaryPubkey: null,
       }
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([room]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([room]),
             }),
           }),
         }),
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
+        delete: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
         }),
       }
 
@@ -774,14 +774,14 @@ describe('IdentityService — Provisioning Rooms', () => {
         encryptedNsec: 'enc-nsec-data',
         primaryPubkey: 'primary-pk',
       }
-      const deleteFn = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const deleteFn = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([room]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([room]),
             }),
           }),
         }),
@@ -807,10 +807,10 @@ describe('IdentityService — Provisioning Rooms', () => {
         primaryPubkey: null,
       }
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([room]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([room]),
             }),
           }),
         }),
@@ -837,9 +837,9 @@ describe('IdentityService — Reset', () => {
   })
 
   it('allows reset in development mode', async () => {
-    const txFn = vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
+    const txFn = jest.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
       const tx = {
-        delete: vi.fn().mockReturnValue(Promise.resolve()),
+        delete: jest.fn().mockReturnValue(Promise.resolve()),
       }
       return fn(tx)
     })
@@ -851,9 +851,9 @@ describe('IdentityService — Reset', () => {
   })
 
   it('allows reset in demo mode regardless of environment', async () => {
-    const txFn = vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
+    const txFn = jest.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
       const tx = {
-        delete: vi.fn().mockReturnValue(Promise.resolve()),
+        delete: jest.fn().mockReturnValue(Promise.resolve()),
       }
       return fn(tx)
     })

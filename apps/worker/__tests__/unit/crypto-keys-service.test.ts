@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { CryptoKeysService, CryptoKeyError } from '../../services/crypto-keys'
 
 // ---------------------------------------------------------------------------
@@ -56,10 +56,10 @@ describe('CryptoKeysService — Sigchain', () => {
   describe('getSigchain', () => {
     it('returns empty array for user with no sigchain', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -77,10 +77,10 @@ describe('CryptoKeysService — Sigchain', () => {
       ]
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(links),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockResolvedValue(links),
             }),
           }),
         }),
@@ -107,18 +107,18 @@ describe('CryptoKeysService — Sigchain', () => {
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue([]),
               }), // empty chain
             }),
           }),
         }),
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([insertedRow]),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([insertedRow]),
           }),
         }),
       }
@@ -152,18 +152,18 @@ describe('CryptoKeysService — Sigchain', () => {
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue(chainTail),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue(chainTail),
               }),
             }),
           }),
         }),
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([insertedRow]),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([insertedRow]),
           }),
         }),
       }
@@ -188,11 +188,11 @@ describe('CryptoKeysService — Sigchain', () => {
       ]
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue(existingLinks),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue(existingLinks),
               }),
             }),
           }),
@@ -223,11 +223,11 @@ describe('CryptoKeysService — Sigchain', () => {
       ]
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue(existingLinks),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue(existingLinks),
               }),
             }),
           }),
@@ -258,11 +258,11 @@ describe('CryptoKeysService — Sigchain', () => {
       ]
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue(existingLinks),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              orderBy: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue(existingLinks),
               }),
             }),
           }),
@@ -294,11 +294,11 @@ describe('CryptoKeysService — Sigchain', () => {
       //   2. orderBy(asc) — then used .at(-1)
       //
       // Fixed to: orderBy(desc).limit(1) — single efficient query
-      const selectSpy = vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([]),
+      const selectSpy = jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            orderBy: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -306,9 +306,9 @@ describe('CryptoKeysService — Sigchain', () => {
 
       const db = {
         select: selectSpy,
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([
               makeLink({ seqNo: 0, hash: 'h0', prevHash: '' }),
             ]),
           }),
@@ -339,7 +339,7 @@ describe('CryptoKeysService — PUK Envelopes', () => {
   describe('distributePukEnvelopes', () => {
     it('returns empty array when no envelopes provided', async () => {
       const db = {
-        insert: vi.fn(),
+        insert: jest.fn(),
       }
       const svc = new CryptoKeysService(db as never)
       const result = await svc.distributePukEnvelopes('user-pk1', [])
@@ -369,9 +369,9 @@ describe('CryptoKeysService — PUK Envelopes', () => {
       ]
 
       const db = {
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue(insertedRows),
+        insert: jest.fn().mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue(insertedRows),
           }),
         }),
       }
@@ -392,9 +392,9 @@ describe('CryptoKeysService — PUK Envelopes', () => {
   describe('getPukEnvelopeForDevice', () => {
     it('returns null when no envelope exists', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([{ maxGen: null }]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ maxGen: null }]),
           }),
         }),
       }
@@ -415,16 +415,16 @@ describe('CryptoKeysService — PUK Envelopes', () => {
       }
 
       const db = {
-        select: vi.fn()
+        select: jest.fn()
           .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue([{ maxGen: 3 }]),
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([{ maxGen: 3 }]),
             }),
           })
           .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([envRow]),
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue({
+                limit: jest.fn().mockResolvedValue([envRow]),
               }),
             }),
           }),
@@ -447,16 +447,16 @@ describe('CryptoKeysService — PUK Envelopes', () => {
 describe('CryptoKeysService — MLS Messages', () => {
   describe('enqueueMlsMessages', () => {
     it('does nothing for empty message array', async () => {
-      const db = { insert: vi.fn() }
+      const db = { insert: jest.fn() }
       const svc = new CryptoKeysService(db as never)
       await svc.enqueueMlsMessages('hub-1', [])
       expect(db.insert).not.toHaveBeenCalled()
     })
 
     it('inserts messages for multiple recipients', async () => {
-      const insertValues = vi.fn().mockReturnValue({})
+      const insertValues = jest.fn().mockReturnValue({})
       const db = {
-        insert: vi.fn().mockReturnValue({
+        insert: jest.fn().mockReturnValue({
           values: insertValues,
         }),
       }
@@ -477,9 +477,9 @@ describe('CryptoKeysService — MLS Messages', () => {
   describe('fetchAndClearMlsMessages', () => {
     it('returns empty array when no messages pending', async () => {
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
           }),
         }),
       }
@@ -501,14 +501,14 @@ describe('CryptoKeysService — MLS Messages', () => {
         },
       ]
 
-      const deleteMock = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+      const deleteMock = jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue(undefined),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(messages),
+        select: jest.fn().mockReturnValue({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue(messages),
           }),
         }),
         delete: deleteMock,
@@ -527,9 +527,9 @@ describe('CryptoKeysService — MLS Messages', () => {
 
   describe('uploadKeyPackage', () => {
     it('stores key package as a pending message', async () => {
-      const insertValues = vi.fn().mockReturnValue({})
+      const insertValues = jest.fn().mockReturnValue({})
       const db = {
-        insert: vi.fn().mockReturnValue({ values: insertValues }),
+        insert: jest.fn().mockReturnValue({ values: insertValues }),
       }
 
       const svc = new CryptoKeysService(db as never)

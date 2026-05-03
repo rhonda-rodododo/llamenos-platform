@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { createHmac } from 'node:crypto'
 import {
   renderAlertMessage,
@@ -112,9 +112,9 @@ describe('issueRegistrationToken', () => {
   }
 
   function makeService() {
-    const mockSignalContacts = { findByUser: vi.fn() }
-    const mockPrefs = { get: vi.fn() }
-    const mockAudit = { log: vi.fn() }
+    const mockSignalContacts = { findByUser: jest.fn() }
+    const mockPrefs = { get: jest.fn() }
+    const mockAudit = { log: jest.fn() }
     return new UserNotificationsService(
       mockSignalContacts as never,
       mockPrefs as never,
@@ -220,7 +220,7 @@ describe('sendAlert', () => {
     }
 
     const prefs = {
-      get: vi.fn().mockResolvedValue({
+      get: jest.fn().mockResolvedValue({
         notificationChannel: opts.notificationChannel,
         digestCadence: opts.digestCadence,
         alertOnNewDevice: opts.alertOnNewDevice,
@@ -231,17 +231,17 @@ describe('sendAlert', () => {
     }
 
     const signalContacts = {
-      findByUser: vi.fn().mockResolvedValue(
+      findByUser: jest.fn().mockResolvedValue(
         opts.contactExists
           ? { identifierHash: 'contact-hash-abc' }
           : null,
       ),
     }
 
-    const audit = { log: vi.fn().mockResolvedValue(undefined) }
+    const audit = { log: jest.fn().mockResolvedValue(undefined) }
 
     // Mock global fetch
-    const fetchMock = vi.fn().mockResolvedValue({
+    const fetchMock = jest.fn().mockResolvedValue({
       ok: opts.notifierOk,
       status: opts.notifierOk ? 200 : 500,
     })
@@ -264,7 +264,7 @@ describe('sendAlert', () => {
   }
 
   beforeEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   it('skips delivery when notification channel is not signal', async () => {
@@ -407,11 +407,11 @@ describe('sendAlert', () => {
 
 describe('unregisterFromSidecar', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   it('sends DELETE request to sidecar with correct URL', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true })
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const svc = new UserNotificationsService(
@@ -427,7 +427,7 @@ describe('unregisterFromSidecar', () => {
 
     await svc.unregisterFromSidecar('hash-abc')
 
-    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, opts] = fetchMock.mock.calls[0]
     expect(url).toBe('http://localhost:3100/api/unregister/hash-abc')
     expect(opts.method).toBe('DELETE')
@@ -435,7 +435,7 @@ describe('unregisterFromSidecar', () => {
   })
 
   it('does not throw on network error (best-effort)', async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('connection refused')) as unknown as typeof fetch
+    globalThis.fetch = jest.fn().mockRejectedValue(new Error('connection refused')) as unknown as typeof fetch
 
     const svc = new UserNotificationsService(
       {} as never,

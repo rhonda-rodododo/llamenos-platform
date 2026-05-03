@@ -7,7 +7,7 @@
  * POST /invites (create) uses internal auth middleware, so we test
  * that schema directly via Zod parse.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import invitesRoutes from '../../routes/invites'
 import {
   createTestApp,

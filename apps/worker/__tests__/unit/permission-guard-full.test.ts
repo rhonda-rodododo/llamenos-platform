@@ -4,7 +4,7 @@
  * Tests requirePermission, requireAnyPermission, checkPermission,
  * and requireEntityTypeAccess middleware.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 import {
@@ -32,7 +32,7 @@ function createApp(permissions: string[], userRoles: string[] = ['role-volunteer
     c.set('allRoles', allRoles as never)
     c.set('services', {
       settings: {
-        getEntityTypeById: vi.fn(),
+        getEntityTypeById: jest.fn(),
       },
     } as never)
     await next()
@@ -171,7 +171,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('returns 404 when entity type is not found', async () => {
     const app = createApp(['cases:read-own'], ['role-volunteer'])
-    const mockGetEntityType = vi.fn().mockRejectedValue(new Error('not found'))
+    const mockGetEntityType = jest.fn().mockRejectedValue(new Error('not found'))
     app.use('*', async (c, next) => {
       const svc = c.get('services')
       ;(svc.settings as unknown as Record<string, unknown>).getEntityTypeById = mockGetEntityType
@@ -186,7 +186,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('bypasses entity type check for cases:* admin', async () => {
     const app = createApp(['cases:*'], ['role-super-admin'])
-    const mockGetEntityType = vi.fn().mockResolvedValue({
+    const mockGetEntityType = jest.fn().mockResolvedValue({
       accessRoles: ['legal-observer'],
       editRoles: ['legal-observer'],
     })
@@ -204,7 +204,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('bypasses entity type check for global wildcard', async () => {
     const app = createApp(['*'], ['role-super-admin'])
-    const mockGetEntityType = vi.fn().mockResolvedValue({
+    const mockGetEntityType = jest.fn().mockResolvedValue({
       accessRoles: ['legal-observer'],
     })
     app.use('*', async (c, next) => {
@@ -221,7 +221,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('denies read when user role not in accessRoles', async () => {
     const app = createApp(['cases:read-own'], ['role-volunteer'])
-    const mockGetEntityType = vi.fn().mockResolvedValue({
+    const mockGetEntityType = jest.fn().mockResolvedValue({
       accessRoles: ['legal-observer'],
       editRoles: [],
     })
@@ -241,7 +241,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('grants read when user role is in accessRoles', async () => {
     const app = createApp(['cases:read-own'], ['role-legal-observer'])
-    const mockGetEntityType = vi.fn().mockResolvedValue({
+    const mockGetEntityType = jest.fn().mockResolvedValue({
       accessRoles: ['legal-observer'],
       editRoles: [],
     })
@@ -259,7 +259,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('denies write when user role not in editRoles', async () => {
     const app = createApp(['cases:read-own'], ['role-volunteer'])
-    const mockGetEntityType = vi.fn().mockResolvedValue({
+    const mockGetEntityType = jest.fn().mockResolvedValue({
       accessRoles: [],
       editRoles: ['legal-observer'],
     })
@@ -279,7 +279,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('grants access when accessRoles is empty (fallback to generic perms)', async () => {
     const app = createApp(['cases:read-own'], ['role-volunteer'])
-    const mockGetEntityType = vi.fn().mockResolvedValue({
+    const mockGetEntityType = jest.fn().mockResolvedValue({
       accessRoles: [],
       editRoles: [],
     })
@@ -297,7 +297,7 @@ describe('requireEntityTypeAccess', () => {
 
   it('reads entityTypeId from query string', async () => {
     const app = createApp(['cases:*'], ['role-super-admin'])
-    const mockGetEntityType = vi.fn().mockResolvedValue({ accessRoles: ['admin'] })
+    const mockGetEntityType = jest.fn().mockResolvedValue({ accessRoles: ['admin'] })
     app.use('*', async (c, next) => {
       const svc = c.get('services')
       ;(svc.settings as unknown as Record<string, unknown>).getEntityTypeById = mockGetEntityType

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { SipBridgeAdapter } from '@worker/telephony/sip-bridge-adapter'
 import { AsteriskAdapter } from '@worker/telephony/asterisk'
 import { FreeSwitchAdapter } from '@worker/telephony/freeswitch'
@@ -75,18 +75,18 @@ function makeJsonRequest(body: object, headers?: Record<string, string>): Reques
 
 describe('SipBridgeAdapter', () => {
   let adapter: TestSipBridgeAdapter
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof jest.fn>
   const bridgeSecret = 'bridge-secret-123'
   const bridgeCallbackUrl = 'https://bridge.example.com'
 
   beforeEach(() => {
     adapter = new TestSipBridgeAdapter('+15551234567', bridgeCallbackUrl, bridgeSecret)
-    fetchMock = vi.fn()
+    fetchMock = jest.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   describe('validateWebhook', () => {
@@ -225,20 +225,20 @@ describe('SipBridgeAdapter', () => {
 
   describe('parseCallStatusWebhook', () => {
     it('maps bridge statuses correctly', async () => {
-      const tests: Array<{ raw: string; expected: string }> = [
-        { raw: 'ring', expected: 'ringing' },
-        { raw: 'ringing', expected: 'ringing' },
-        { raw: 'up', expected: 'answered' },
-        { raw: 'answered', expected: 'answered' },
-        { raw: 'down', expected: 'completed' },
-        { raw: 'hangup', expected: 'completed' },
-        { raw: 'completed', expected: 'completed' },
-        { raw: 'busy', expected: 'busy' },
-        { raw: 'noanswer', expected: 'no-answer' },
-        { raw: 'no-answer', expected: 'no-answer' },
-        { raw: 'congestion', expected: 'failed' },
-        { raw: 'failed', expected: 'failed' },
-        { raw: 'unknown', expected: 'initiated' },
+      const tests = [
+        { raw: 'ring', expected: 'ringing' as const },
+        { raw: 'ringing', expected: 'ringing' as const },
+        { raw: 'up', expected: 'answered' as const },
+        { raw: 'answered', expected: 'answered' as const },
+        { raw: 'down', expected: 'completed' as const },
+        { raw: 'hangup', expected: 'completed' as const },
+        { raw: 'completed', expected: 'completed' as const },
+        { raw: 'busy', expected: 'busy' as const },
+        { raw: 'noanswer', expected: 'no-answer' as const },
+        { raw: 'no-answer', expected: 'no-answer' as const },
+        { raw: 'congestion', expected: 'failed' as const },
+        { raw: 'failed', expected: 'failed' as const },
+        { raw: 'unknown', expected: 'initiated' as const },
       ]
 
       for (const t of tests) {
@@ -271,16 +271,16 @@ describe('SipBridgeAdapter', () => {
 
   describe('parseQueueExitWebhook', () => {
     it('maps queue results correctly', async () => {
-      const tests: Array<{ raw: string; expected: string }> = [
-        { raw: 'bridged', expected: 'bridged' },
-        { raw: 'answered', expected: 'bridged' },
-        { raw: 'leave', expected: 'leave' },
-        { raw: 'timeout', expected: 'leave' },
-        { raw: 'full', expected: 'queue-full' },
-        { raw: 'queue-full', expected: 'queue-full' },
-        { raw: 'hangup', expected: 'hangup' },
-        { raw: 'caller-hangup', expected: 'hangup' },
-        { raw: 'unknown', expected: 'error' },
+      const tests = [
+        { raw: 'bridged', expected: 'bridged' as const },
+        { raw: 'answered', expected: 'bridged' as const },
+        { raw: 'leave', expected: 'leave' as const },
+        { raw: 'timeout', expected: 'leave' as const },
+        { raw: 'full', expected: 'queue-full' as const },
+        { raw: 'queue-full', expected: 'queue-full' as const },
+        { raw: 'hangup', expected: 'hangup' as const },
+        { raw: 'caller-hangup', expected: 'hangup' as const },
+        { raw: 'unknown', expected: 'error' as const },
       ]
 
       for (const t of tests) {
@@ -474,7 +474,7 @@ describe('SipBridgeAdapter', () => {
 
 describe('AsteriskAdapter', () => {
   let adapter: AsteriskAdapter
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof jest.fn>
 
   beforeEach(() => {
     adapter = new AsteriskAdapter(
@@ -485,12 +485,12 @@ describe('AsteriskAdapter', () => {
       'https://bridge.example.com',
       'bridge-secret',
     )
-    fetchMock = vi.fn()
+    fetchMock = jest.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   describe('getEndpointFormat', () => {
@@ -753,7 +753,7 @@ describe('AsteriskAdapter', () => {
 
 describe('FreeSwitchAdapter', () => {
   let adapter: FreeSwitchAdapter
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof jest.fn>
 
   beforeEach(() => {
     adapter = new FreeSwitchAdapter(
@@ -762,12 +762,12 @@ describe('FreeSwitchAdapter', () => {
       'bridge-secret',
       'https://api.example.com',
     )
-    fetchMock = vi.fn()
+    fetchMock = jest.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   describe('getEndpointFormat', () => {

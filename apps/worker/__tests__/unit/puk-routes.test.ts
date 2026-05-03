@@ -3,11 +3,11 @@
  *
  * Tests PUK envelope distribution and retrieval.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 
-vi.mock('hono-openapi', () => ({
+mock.module('hono-openapi', () => ({
   describeRoute: () => async (_c: unknown, next: () => Promise<void>) => next(),
   resolver: (s: unknown) => s,
   validator: (_type: string, _schema: unknown) => {
@@ -28,8 +28,8 @@ function createApp(pubkey = 'user-pk-1') {
   const app = new Hono<AppEnv>()
   const services = {
     cryptoKeys: {
-      distributePukEnvelopes: vi.fn(),
-      getPukEnvelopeForDevice: vi.fn(),
+      distributePukEnvelopes: jest.fn(),
+      getPukEnvelopeForDevice: jest.fn(),
     },
   }
 
@@ -49,7 +49,7 @@ function createApp(pubkey = 'user-pk-1') {
 // ---------------------------------------------------------------------------
 
 describe('PUK routes', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => jest.clearAllMocks())
 
   describe('POST /puk/envelopes', () => {
     it('distributes PUK envelopes', async () => {

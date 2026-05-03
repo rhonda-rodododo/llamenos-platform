@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { buildBucketPolicy, createStorageAdmin } from '@worker/lib/storage-admin'
 
 // ---------------------------------------------------------------------------
@@ -68,11 +68,11 @@ describe('buildBucketPolicy', () => {
 
 describe('createStorageAdmin — auth headers', () => {
   // We test the behavior of available() by intercepting fetch
-  let fetchSpy: ReturnType<typeof vi.fn>
+  let fetchSpy: ReturnType<typeof jest.fn>
   let originalFetch: typeof globalThis.fetch
 
   beforeEach(() => {
-    fetchSpy = vi.fn()
+    fetchSpy = jest.fn()
     originalFetch = globalThis.fetch
     globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch
   })

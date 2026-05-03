@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { hashPhone, hashIP, hashAuditEntry, encryptMessageForStorage, encryptCallRecordForStorage } from '@worker/lib/crypto'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'

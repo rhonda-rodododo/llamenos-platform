@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { FirehoseAgentService } from '@worker/services/firehose-agent'
 import { createMockDb } from './mock-db'
 
@@ -6,19 +6,19 @@ describe('FirehoseAgentService', () => {
   function setup() {
     const { db } = createMockDb()
     const firehose = {
-      listActiveConnections: vi.fn().mockResolvedValue([]),
-      getConnection: vi.fn().mockResolvedValue(null),
-      updateConnection: vi.fn().mockResolvedValue(undefined),
-      getUnextractedMessages: vi.fn().mockResolvedValue([]),
-      markMessagesExtracted: vi.fn().mockResolvedValue(undefined),
-      getWindowKey: vi.fn().mockResolvedValue(null),
+      listActiveConnections: jest.fn().mockResolvedValue([]),
+      getConnection: jest.fn().mockResolvedValue(null),
+      updateConnection: jest.fn().mockResolvedValue(undefined),
+      getUnextractedMessages: jest.fn().mockResolvedValue([]),
+      markMessagesExtracted: jest.fn().mockResolvedValue(undefined),
+      getWindowKey: jest.fn().mockResolvedValue(null),
     } as any
     const conversations = {
-      create: vi.fn().mockResolvedValue({ id: 'conv-1' }),
-      addMessage: vi.fn().mockResolvedValue({ id: 'msg-1' }),
+      create: jest.fn().mockResolvedValue({ id: 'conv-1' }),
+      addMessage: jest.fn().mockResolvedValue({ id: 'msg-1' }),
     } as any
-    const auditService = { log: vi.fn().mockResolvedValue(undefined) } as any
-    const settings = { getCustomFields: vi.fn().mockResolvedValue({ fields: [] }) } as any
+    const auditService = { log: jest.fn().mockResolvedValue(undefined) } as any
+    const settings = { getCustomFields: jest.fn().mockResolvedValue({ fields: [] }) } as any
 
     const service = new FirehoseAgentService(
       db as any,

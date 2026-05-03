@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { applyTemplate, detectTemplateUpdates } from '../../lib/template-engine'
 import type { CaseManagementTemplate } from '../../../../packages/protocol/template-types'
 import type { EntityTypeDefinition } from '@protocol/schemas/entity-schema'

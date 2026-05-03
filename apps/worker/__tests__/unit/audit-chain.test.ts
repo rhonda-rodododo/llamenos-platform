@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { hashAuditEntry, stableJsonStringify } from '../../lib/crypto'
 import type { AuditLogEntry } from '../../types'
 

@@ -4,7 +4,7 @@
  * Tests: envelope-based access control, uploader access, files:download-all bypass,
  * file sharing permission, metadata scoping.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '../../types'
 import filesRouter from '../../routes/files'
@@ -29,8 +29,8 @@ type FileRecordLike = {
 }
 
 const R2_STUB = {
-  get: vi.fn(),
-  put: vi.fn(),
+  get: jest.fn(),
+  put: jest.fn(),
 }
 
 // Hono bindings — passed as 3rd arg to app.request() so that c.env.R2_BUCKET resolves
@@ -53,10 +53,10 @@ function makeApp(opts: {
     },
   } = opts
 
-  const mockAudit = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAudit = { log: jest.fn().mockResolvedValue(undefined) }
   const mockConversations = {
-    getFile: vi.fn().mockResolvedValue(fileRecord),
-    addFileRecipient: vi.fn().mockResolvedValue(undefined),
+    getFile: jest.fn().mockResolvedValue(fileRecord),
+    addFileRecipient: jest.fn().mockResolvedValue(undefined),
   }
 
   const app = new Hono<AppEnv>()

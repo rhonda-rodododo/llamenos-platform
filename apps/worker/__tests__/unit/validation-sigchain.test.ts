@@ -4,7 +4,7 @@
  * Sigchain is security-critical — validates Ed25519 signatures, hash-chain
  * continuity, and link types. All schemas are inline in the route file.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import sigchainRoutes from '../../routes/sigchain'
 import {
   createTestApp,

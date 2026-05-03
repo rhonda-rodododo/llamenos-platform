@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import settingsRoute from '@worker/routes/settings'
@@ -14,47 +14,47 @@ function createTestApp(opts: {
     services = {},
   } = opts
 
-  const mockAuditService = { log: vi.fn().mockResolvedValue(undefined) }
+  const mockAuditService = { log: jest.fn().mockResolvedValue(undefined) }
 
   const defaultServices = {
     settings: {
-      getTranscriptionSettings: vi.fn().mockResolvedValue({ enabled: true, model: 'whisper' }),
-      updateTranscriptionSettings: vi.fn().mockResolvedValue({ enabled: true, model: 'whisper' }),
-      getCustomFields: vi.fn().mockResolvedValue([{ id: 'cf-1', name: 'Field 1' }]),
-      updateCustomFields: vi.fn().mockResolvedValue([{ id: 'cf-1', name: 'Field 1' }]),
-      getSpamSettings: vi.fn().mockResolvedValue({ voiceCaptchaEnabled: false }),
-      updateSpamSettings: vi.fn().mockResolvedValue({ voiceCaptchaEnabled: false }),
-      getCallSettings: vi.fn().mockResolvedValue({ queueTimeoutSeconds: 90 }),
-      updateCallSettings: vi.fn().mockResolvedValue({ queueTimeoutSeconds: 90 }),
-      getIvrLanguages: vi.fn().mockResolvedValue({ languages: ['en'] }),
-      updateIvrLanguages: vi.fn().mockResolvedValue({ languages: ['en'] }),
-      getTelephonyProvider: vi.fn().mockResolvedValue({ type: 'twilio', phoneNumber: '+1555000000' }),
-      updateTelephonyProvider: vi.fn().mockResolvedValue({ type: 'twilio', phoneNumber: '+1555000000' }),
-      getMessagingConfig: vi.fn().mockResolvedValue({ channels: ['sms'] }),
-      updateMessagingConfig: vi.fn().mockResolvedValue({ channels: ['sms'] }),
-      getSetupState: vi.fn().mockResolvedValue({ setupCompleted: true }),
-      updateSetupState: vi.fn().mockResolvedValue({ setupCompleted: true }),
-      getIvrAudioList: vi.fn().mockResolvedValue({ prompts: [] }),
-      uploadIvrAudio: vi.fn().mockResolvedValue({ ok: true }),
-      deleteIvrAudio: vi.fn().mockResolvedValue({ ok: true }),
-      getReportTypes: vi.fn().mockResolvedValue([{ id: 'rt-1', name: 'Type 1' }]),
-      createReportType: vi.fn().mockResolvedValue({ id: 'rt-1', name: 'Type 1' }),
-      updateReportType: vi.fn().mockResolvedValue({ id: 'rt-1', name: 'Updated' }),
-      archiveReportType: vi.fn().mockResolvedValue({ ok: true }),
-      getRoles: vi.fn().mockResolvedValue([{ id: 'role-1', name: 'Admin' }]),
-      createRole: vi.fn().mockResolvedValue({ id: 'role-1', name: 'Admin' }),
-      updateRole: vi.fn().mockResolvedValue({ id: 'role-1', name: 'Admin' }),
-      deleteRole: vi.fn().mockResolvedValue({ ok: true }),
-      getTTLOverrides: vi.fn().mockResolvedValue({}),
-      updateTTLOverrides: vi.fn().mockResolvedValue({}),
-      getCleanupMetrics: vi.fn().mockResolvedValue({}),
-      getGeocodingConfig: vi.fn().mockResolvedValue({ provider: 'google', countries: ['US'], enabled: true }),
-      updateGeocodingConfig: vi.fn().mockResolvedValue({ provider: 'google', countries: ['US'], enabled: true }),
-      getGeocodingConfigAdmin: vi.fn().mockResolvedValue({ provider: 'google', apiKey: 'secret', countries: ['US'], enabled: true }),
+      getTranscriptionSettings: jest.fn().mockResolvedValue({ enabled: true, model: 'whisper' }),
+      updateTranscriptionSettings: jest.fn().mockResolvedValue({ enabled: true, model: 'whisper' }),
+      getCustomFields: jest.fn().mockResolvedValue([{ id: 'cf-1', name: 'Field 1' }]),
+      updateCustomFields: jest.fn().mockResolvedValue([{ id: 'cf-1', name: 'Field 1' }]),
+      getSpamSettings: jest.fn().mockResolvedValue({ voiceCaptchaEnabled: false }),
+      updateSpamSettings: jest.fn().mockResolvedValue({ voiceCaptchaEnabled: false }),
+      getCallSettings: jest.fn().mockResolvedValue({ queueTimeoutSeconds: 90 }),
+      updateCallSettings: jest.fn().mockResolvedValue({ queueTimeoutSeconds: 90 }),
+      getIvrLanguages: jest.fn().mockResolvedValue({ languages: ['en'] }),
+      updateIvrLanguages: jest.fn().mockResolvedValue({ languages: ['en'] }),
+      getTelephonyProvider: jest.fn().mockResolvedValue({ type: 'twilio', phoneNumber: '+1555000000' }),
+      updateTelephonyProvider: jest.fn().mockResolvedValue({ type: 'twilio', phoneNumber: '+1555000000' }),
+      getMessagingConfig: jest.fn().mockResolvedValue({ channels: ['sms'] }),
+      updateMessagingConfig: jest.fn().mockResolvedValue({ channels: ['sms'] }),
+      getSetupState: jest.fn().mockResolvedValue({ setupCompleted: true }),
+      updateSetupState: jest.fn().mockResolvedValue({ setupCompleted: true }),
+      getIvrAudioList: jest.fn().mockResolvedValue({ prompts: [] }),
+      uploadIvrAudio: jest.fn().mockResolvedValue({ ok: true }),
+      deleteIvrAudio: jest.fn().mockResolvedValue({ ok: true }),
+      getReportTypes: jest.fn().mockResolvedValue([{ id: 'rt-1', name: 'Type 1' }]),
+      createReportType: jest.fn().mockResolvedValue({ id: 'rt-1', name: 'Type 1' }),
+      updateReportType: jest.fn().mockResolvedValue({ id: 'rt-1', name: 'Updated' }),
+      archiveReportType: jest.fn().mockResolvedValue({ ok: true }),
+      getRoles: jest.fn().mockResolvedValue([{ id: 'role-1', name: 'Admin' }]),
+      createRole: jest.fn().mockResolvedValue({ id: 'role-1', name: 'Admin' }),
+      updateRole: jest.fn().mockResolvedValue({ id: 'role-1', name: 'Admin' }),
+      deleteRole: jest.fn().mockResolvedValue({ ok: true }),
+      getTTLOverrides: jest.fn().mockResolvedValue({}),
+      updateTTLOverrides: jest.fn().mockResolvedValue({}),
+      getCleanupMetrics: jest.fn().mockResolvedValue({}),
+      getGeocodingConfig: jest.fn().mockResolvedValue({ provider: 'google', countries: ['US'], enabled: true }),
+      updateGeocodingConfig: jest.fn().mockResolvedValue({ provider: 'google', countries: ['US'], enabled: true }),
+      getGeocodingConfigAdmin: jest.fn().mockResolvedValue({ provider: 'google', apiKey: 'secret', countries: ['US'], enabled: true }),
     },
     identity: {
-      getWebAuthnSettings: vi.fn().mockResolvedValue({ enabled: true }),
-      updateWebAuthnSettings: vi.fn().mockResolvedValue({ enabled: true }),
+      getWebAuthnSettings: jest.fn().mockResolvedValue({ enabled: true }),
+      updateWebAuthnSettings: jest.fn().mockResolvedValue({ enabled: true }),
     },
     audit: mockAuditService,
   }
@@ -77,7 +77,7 @@ function createTestApp(opts: {
     c.set('allRoles', [])
     c.set('requestId', 'test-req-1')
     Object.defineProperty(c, 'executionCtx', {
-      value: { waitUntil: vi.fn() },
+      value: { waitUntil: jest.fn() },
       writable: true,
       configurable: true,
     })
@@ -90,7 +90,7 @@ function createTestApp(opts: {
 
 describe('settings route', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('transcription', () => {
@@ -113,7 +113,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /transcription updates settings with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ enabled: false })
+      const updateSpy = jest.fn().mockResolvedValue({ enabled: false })
       const app = createTestApp({
         permissions: ['settings:manage-transcription'],
         services: { settings: { updateTranscriptionSettings: updateSpy } },
@@ -130,7 +130,7 @@ describe('settings route', () => {
 
   describe('custom-fields', () => {
     it('GET /custom-fields returns fields filtered by role', async () => {
-      const getSpy = vi.fn().mockResolvedValue([{ id: 'cf-1' }])
+      const getSpy = jest.fn().mockResolvedValue([{ id: 'cf-1' }])
       const app = createTestApp({
         permissions: ['settings:manage-fields'],
         services: { settings: { getCustomFields: getSpy } },
@@ -141,7 +141,7 @@ describe('settings route', () => {
     })
 
     it('GET /custom-fields passes volunteer filter without manage-fields', async () => {
-      const getSpy = vi.fn().mockResolvedValue([{ id: 'cf-1' }])
+      const getSpy = jest.fn().mockResolvedValue([{ id: 'cf-1' }])
       const app = createTestApp({
         permissions: ['settings:read'],
         services: { settings: { getCustomFields: getSpy } },
@@ -169,7 +169,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /spam updates settings with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ voiceCaptchaEnabled: true })
+      const updateSpy = jest.fn().mockResolvedValue({ voiceCaptchaEnabled: true })
       const app = createTestApp({
         permissions: ['settings:manage-spam'],
         services: { settings: { updateSpamSettings: updateSpy } },
@@ -192,7 +192,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /call updates settings with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ queueTimeoutSeconds: 120 })
+      const updateSpy = jest.fn().mockResolvedValue({ queueTimeoutSeconds: 120 })
       const app = createTestApp({
         permissions: ['settings:manage-calls'],
         services: { settings: { updateCallSettings: updateSpy } },
@@ -215,7 +215,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /ivr-languages updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ languages: ['en', 'es'] })
+      const updateSpy = jest.fn().mockResolvedValue({ languages: ['en', 'es'] })
       const app = createTestApp({
         permissions: ['settings:manage-ivr'],
         services: { settings: { updateIvrLanguages: updateSpy } },
@@ -237,7 +237,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /webauthn updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ enabled: false })
+      const updateSpy = jest.fn().mockResolvedValue({ enabled: false })
       const app = createTestApp({
         permissions: ['settings:manage-webauthn'],
         services: { identity: { updateWebAuthnSettings: updateSpy } },
@@ -260,7 +260,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /telephony-provider updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ type: 'twilio' })
+      const updateSpy = jest.fn().mockResolvedValue({ type: 'twilio' })
       const app = createTestApp({
         permissions: ['settings:manage-telephony'],
         services: { settings: { updateTelephonyProvider: updateSpy } },
@@ -292,7 +292,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /messaging updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ channels: ['sms', 'whatsapp'] })
+      const updateSpy = jest.fn().mockResolvedValue({ channels: ['sms', 'whatsapp'] })
       const app = createTestApp({
         permissions: ['settings:manage-messaging'],
         services: { settings: { updateMessagingConfig: updateSpy } },
@@ -315,7 +315,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /setup updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ setupCompleted: true })
+      const updateSpy = jest.fn().mockResolvedValue({ setupCompleted: true })
       const app = createTestApp({
         permissions: ['settings:manage-setup'],
         services: { settings: { updateSetupState: updateSpy } },
@@ -337,7 +337,7 @@ describe('settings route', () => {
     })
 
     it('PUT /ivr-audio/:promptType/:language uploads audio with permission', async () => {
-      const uploadSpy = vi.fn().mockResolvedValue({ ok: true })
+      const uploadSpy = jest.fn().mockResolvedValue({ ok: true })
       const app = createTestApp({
         permissions: ['settings:manage-ivr'],
         services: { settings: { uploadIvrAudio: uploadSpy } },
@@ -352,7 +352,7 @@ describe('settings route', () => {
     })
 
     it('DELETE /ivr-audio/:promptType/:language removes audio with permission', async () => {
-      const deleteSpy = vi.fn().mockResolvedValue({ ok: true })
+      const deleteSpy = jest.fn().mockResolvedValue({ ok: true })
       const app = createTestApp({
         permissions: ['settings:manage-ivr'],
         services: { settings: { deleteIvrAudio: deleteSpy } },
@@ -381,7 +381,7 @@ describe('settings route', () => {
     })
 
     it('POST /report-types creates with permission', async () => {
-      const createSpy = vi.fn().mockResolvedValue({ id: 'rt-new', name: 'New Type' })
+      const createSpy = jest.fn().mockResolvedValue({ id: 'rt-new', name: 'New Type' })
       const app = createTestApp({
         permissions: ['settings:manage-fields'],
         services: { settings: { createReportType: createSpy } },
@@ -396,7 +396,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /report-types/:id updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ id: 'rt-1', name: 'Updated' })
+      const updateSpy = jest.fn().mockResolvedValue({ id: 'rt-1', name: 'Updated' })
       const app = createTestApp({
         permissions: ['settings:manage-fields'],
         services: { settings: { updateReportType: updateSpy } },
@@ -411,7 +411,7 @@ describe('settings route', () => {
     })
 
     it('DELETE /report-types/:id archives with permission', async () => {
-      const archiveSpy = vi.fn().mockResolvedValue({ ok: true })
+      const archiveSpy = jest.fn().mockResolvedValue({ ok: true })
       const app = createTestApp({
         permissions: ['settings:manage-fields'],
         services: { settings: { archiveReportType: archiveSpy } },
@@ -440,7 +440,7 @@ describe('settings route', () => {
     })
 
     it('POST /roles creates with permission', async () => {
-      const createSpy = vi.fn().mockResolvedValue({ id: 'role-new', name: 'New Role' })
+      const createSpy = jest.fn().mockResolvedValue({ id: 'role-new', name: 'New Role' })
       const app = createTestApp({
         permissions: ['system:manage-roles'],
         services: { settings: { createRole: createSpy } },
@@ -455,7 +455,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /roles/:id updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ id: 'role-1', name: 'Updated' })
+      const updateSpy = jest.fn().mockResolvedValue({ id: 'role-1', name: 'Updated' })
       const app = createTestApp({
         permissions: ['system:manage-roles'],
         services: { settings: { updateRole: updateSpy } },
@@ -470,7 +470,7 @@ describe('settings route', () => {
     })
 
     it('DELETE /roles/:id removes with permission', async () => {
-      const deleteSpy = vi.fn().mockResolvedValue({ ok: true })
+      const deleteSpy = jest.fn().mockResolvedValue({ ok: true })
       const app = createTestApp({
         permissions: ['system:manage-roles'],
         services: { settings: { deleteRole: deleteSpy } },
@@ -523,7 +523,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /ttl updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ conversationTTL: 86400 })
+      const updateSpy = jest.fn().mockResolvedValue({ conversationTTL: 86400 })
       const app = createTestApp({
         permissions: ['settings:manage-ttl'],
         services: { settings: { updateTTLOverrides: updateSpy } },
@@ -548,7 +548,7 @@ describe('settings route', () => {
     it('GET /cleanup-metrics returns aggregated metrics', async () => {
       const app = createTestApp({
         permissions: ['settings:manage'],
-        services: { settings: { getCleanupMetrics: vi.fn().mockResolvedValue({ deleted: 5 }) } },
+        services: { settings: { getCleanupMetrics: jest.fn().mockResolvedValue({ deleted: 5 }) } },
       })
       const res = await app.request('/cleanup-metrics')
       expect(res.status).toBe(200)

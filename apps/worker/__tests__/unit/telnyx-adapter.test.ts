@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { TelnyxAdapter } from '@worker/telephony/telnyx'
 
 describe('TelnyxAdapter', () => {
   let adapter: TelnyxAdapter
-  let fetchSpy: ReturnType<typeof vi.spyOn>
-  let subtleVerifySpy: ReturnType<typeof vi.spyOn>
-  let subtleImportKeySpy: ReturnType<typeof vi.spyOn>
+  let fetchSpy: ReturnType<typeof jest.spyOn>
+  let subtleVerifySpy: ReturnType<typeof jest.spyOn>
+  let subtleImportKeySpy: ReturnType<typeof jest.spyOn>
 
   const API_KEY = 'test-api-key'
   const CONNECTION_ID = 'conn-123'
@@ -13,15 +13,15 @@ describe('TelnyxAdapter', () => {
 
   beforeEach(() => {
     adapter = new TelnyxAdapter(API_KEY, CONNECTION_ID, PHONE_NUMBER)
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('{}', { status: 200 }),
     )
-    subtleVerifySpy = vi.spyOn(crypto.subtle, 'verify').mockResolvedValue(true)
-    subtleImportKeySpy = vi.spyOn(crypto.subtle, 'importKey').mockResolvedValue({} as CryptoKey)
+    subtleVerifySpy = jest.spyOn(crypto.subtle, 'verify').mockResolvedValue(true)
+    subtleImportKeySpy = jest.spyOn(crypto.subtle, 'importKey').mockResolvedValue({} as CryptoKey)
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   function assertCommandFetch(
@@ -655,22 +655,22 @@ describe('TelnyxAdapter', () => {
     })
 
     it('maps hangup causes correctly', async () => {
-      const causes: Array<{ cause: string; expected: string }> = [
-        { cause: 'normal_clearing', expected: 'completed' },
-        { cause: 'originator_cancel', expected: 'failed' },
-        { cause: 'timeout', expected: 'no-answer' },
-        { cause: 'busy', expected: 'busy' },
-        { cause: 'user_busy', expected: 'busy' },
-        { cause: 'call_rejected', expected: 'failed' },
-        { cause: 'no_user_response', expected: 'no-answer' },
-        { cause: 'no_answer', expected: 'no-answer' },
-        { cause: 'subscriber_absent', expected: 'no-answer' },
-        { cause: 'normal_unspecified', expected: 'completed' },
-        { cause: 'unallocated_number', expected: 'failed' },
-        { cause: 'network_out_of_order', expected: 'failed' },
-        { cause: 'recovery_on_timer_expire', expected: 'no-answer' },
-        { cause: 'interworking', expected: 'failed' },
-        { cause: 'unknown_cause', expected: 'failed' },
+      const causes = [
+        { cause: 'normal_clearing', expected: 'completed' as const },
+        { cause: 'originator_cancel', expected: 'failed' as const },
+        { cause: 'timeout', expected: 'no-answer' as const },
+        { cause: 'busy', expected: 'busy' as const },
+        { cause: 'user_busy', expected: 'busy' as const },
+        { cause: 'call_rejected', expected: 'failed' as const },
+        { cause: 'no_user_response', expected: 'no-answer' as const },
+        { cause: 'no_answer', expected: 'no-answer' as const },
+        { cause: 'subscriber_absent', expected: 'no-answer' as const },
+        { cause: 'normal_unspecified', expected: 'completed' as const },
+        { cause: 'unallocated_number', expected: 'failed' as const },
+        { cause: 'network_out_of_order', expected: 'failed' as const },
+        { cause: 'recovery_on_timer_expire', expected: 'no-answer' as const },
+        { cause: 'interworking', expected: 'failed' as const },
+        { cause: 'unknown_cause', expected: 'failed' as const },
       ]
 
       for (const { cause, expected } of causes) {

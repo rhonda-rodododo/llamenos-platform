@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, mock, jest } from 'bun:test'
 import {
   observeFirehoseMessage,
   clearWindowKeyCache,
@@ -6,24 +6,24 @@ import {
 } from '@worker/messaging/firehose-observer'
 import type { FirehoseService } from '@worker/services/firehose'
 
-vi.mock('@worker/lib/crypto', () => ({
-  eciesWrapKeyForRecipient: vi.fn((_key: Uint8Array, _pubkey: string, _label: string) => ({
+mock.module('@worker/lib/crypto', () => ({
+  eciesWrapKeyForRecipient: jest.fn((_key: Uint8Array, _pubkey: string, _label: string) => ({
     wrappedKey: 'mock-wrapped-key-hex',
     ephemeralPubkey: 'mock-ephemeral-pubkey-hex',
   })),
 }))
 
-vi.mock('@shared/crypto-labels', () => ({
+mock.module('@shared/crypto-labels', () => ({
   LABEL_FIREHOSE_BUFFER_ENCRYPT: 'llamenos:firehose:buffer-encrypt',
 }))
 
 function createMockFirehoseService(overrides: Partial<FirehoseService> = {}): FirehoseService {
   return {
-    findConnectionBySignalGroup: vi.fn(),
-    getCurrentWindowKey: vi.fn(),
-    createWindowKey: vi.fn(),
-    addBufferMessage: vi.fn(),
-    incrementWindowKeyMessageCount: vi.fn(),
+    findConnectionBySignalGroup: jest.fn(),
+    getCurrentWindowKey: jest.fn(),
+    createWindowKey: jest.fn(),
+    addBufferMessage: jest.fn(),
+    incrementWindowKeyMessageCount: jest.fn(),
     ...overrides,
   } as unknown as FirehoseService
 }
@@ -48,13 +48,13 @@ describe('firehose-observer', () => {
 
   afterEach(() => {
     clearWindowKeyCache()
-    vi.clearAllMocks()
+    jest.clearAllMocks()
   })
 
   describe('observeFirehoseMessage', () => {
     it('returns false when no connection found', async () => {
       const firehose = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue(null),
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue(null),
       })
       const msg = createMockMessage()
 
@@ -67,7 +67,7 @@ describe('firehose-observer', () => {
 
     it('returns false when connection status is not active', async () => {
       const firehose = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue({
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'pending',
           agentPubkey: 'pubkey-abc',
@@ -84,16 +84,16 @@ describe('firehose-observer', () => {
 
     it('returns true and encrypts message when connection is active', async () => {
       const firehose = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue({
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
           agentPubkey: 'pubkey-abc',
           bufferTtlDays: 7,
         }),
-        getCurrentWindowKey: vi.fn().mockResolvedValue(null),
-        createWindowKey: vi.fn().mockResolvedValue({ id: 'wk-1' }),
-        addBufferMessage: vi.fn().mockResolvedValue(undefined),
-        incrementWindowKeyMessageCount: vi.fn().mockResolvedValue(undefined),
+        getCurrentWindowKey: jest.fn().mockResolvedValue(null),
+        createWindowKey: jest.fn().mockResolvedValue({ id: 'wk-1' }),
+        addBufferMessage: jest.fn().mockResolvedValue(undefined),
+        incrementWindowKeyMessageCount: jest.fn().mockResolvedValue(undefined),
       })
       const msg = createMockMessage()
 
@@ -122,16 +122,16 @@ describe('firehose-observer', () => {
 
     it('reuses existing window key when valid and cached', async () => {
       const firehose = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue({
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
           agentPubkey: 'pubkey-abc',
           bufferTtlDays: 7,
         }),
-        getCurrentWindowKey: vi.fn().mockResolvedValue(null),
-        createWindowKey: vi.fn().mockResolvedValue({ id: 'wk-existing' }),
-        addBufferMessage: vi.fn().mockResolvedValue(undefined),
-        incrementWindowKeyMessageCount: vi.fn().mockResolvedValue(undefined),
+        getCurrentWindowKey: jest.fn().mockResolvedValue(null),
+        createWindowKey: jest.fn().mockResolvedValue({ id: 'wk-existing' }),
+        addBufferMessage: jest.fn().mockResolvedValue(undefined),
+        incrementWindowKeyMessageCount: jest.fn().mockResolvedValue(undefined),
       })
 
       const msg1 = createMockMessage({ content: 'First message' })
@@ -144,21 +144,21 @@ describe('firehose-observer', () => {
       )
 
       const msg2 = createMockMessage({ content: 'Second message' })
-      vi.clearAllMocks()
+      jest.clearAllMocks()
       const firehose2 = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue({
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
           agentPubkey: 'pubkey-abc',
           bufferTtlDays: 7,
         }),
-        getCurrentWindowKey: vi.fn().mockResolvedValue({
+        getCurrentWindowKey: jest.fn().mockResolvedValue({
           id: 'wk-existing',
           windowEnd: new Date('2099-01-01T00:00:00Z'),
           sealedKey: 'sealed-key-hex',
         }),
-        addBufferMessage: vi.fn().mockResolvedValue(undefined),
-        incrementWindowKeyMessageCount: vi.fn().mockResolvedValue(undefined),
+        addBufferMessage: jest.fn().mockResolvedValue(undefined),
+        incrementWindowKeyMessageCount: jest.fn().mockResolvedValue(undefined),
       })
 
       const result2 = await observeFirehoseMessage(firehose2, msg2)
@@ -172,13 +172,13 @@ describe('firehose-observer', () => {
 
     it('returns false when encryption throws', async () => {
       const firehose = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue({
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
           agentPubkey: 'pubkey-abc',
           bufferTtlDays: 7,
         }),
-        getCurrentWindowKey: vi.fn().mockRejectedValue(new Error('DB error')),
+        getCurrentWindowKey: jest.fn().mockRejectedValue(new Error('DB error')),
       })
       const msg = createMockMessage()
 
@@ -191,16 +191,16 @@ describe('firehose-observer', () => {
   describe('clearWindowKeyCache', () => {
     it('clears the in-memory window key cache', async () => {
       const firehose = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue({
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
           agentPubkey: 'pubkey-abc',
           bufferTtlDays: 7,
         }),
-        getCurrentWindowKey: vi.fn().mockResolvedValue(null),
-        createWindowKey: vi.fn().mockResolvedValue({ id: 'wk-1' }),
-        addBufferMessage: vi.fn().mockResolvedValue(undefined),
-        incrementWindowKeyMessageCount: vi.fn().mockResolvedValue(undefined),
+        getCurrentWindowKey: jest.fn().mockResolvedValue(null),
+        createWindowKey: jest.fn().mockResolvedValue({ id: 'wk-1' }),
+        addBufferMessage: jest.fn().mockResolvedValue(undefined),
+        incrementWindowKeyMessageCount: jest.fn().mockResolvedValue(undefined),
       })
       const msg = createMockMessage()
 
@@ -210,20 +210,20 @@ describe('firehose-observer', () => {
       clearWindowKeyCache()
 
       const firehose2 = createMockFirehoseService({
-        findConnectionBySignalGroup: vi.fn().mockResolvedValue({
+        findConnectionBySignalGroup: jest.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
           agentPubkey: 'pubkey-abc',
           bufferTtlDays: 7,
         }),
-        getCurrentWindowKey: vi.fn().mockResolvedValue({
+        getCurrentWindowKey: jest.fn().mockResolvedValue({
           id: 'wk-1',
           windowEnd: new Date('2099-01-01T00:00:00Z'),
           sealedKey: 'sealed-key-hex',
         }),
-        createWindowKey: vi.fn().mockResolvedValue({ id: 'wk-2' }),
-        addBufferMessage: vi.fn().mockResolvedValue(undefined),
-        incrementWindowKeyMessageCount: vi.fn().mockResolvedValue(undefined),
+        createWindowKey: jest.fn().mockResolvedValue({ id: 'wk-2' }),
+        addBufferMessage: jest.fn().mockResolvedValue(undefined),
+        incrementWindowKeyMessageCount: jest.fn().mockResolvedValue(undefined),
       })
 
       const msg2 = createMockMessage()

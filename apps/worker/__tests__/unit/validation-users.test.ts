@@ -4,7 +4,7 @@
  * Validates user creation (admin), user updates, and Epic 340 profile
  * extension fields (specializations, maxCaseAssignments, teamId, supervisorPubkey).
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import usersRoutes from '../../routes/users'
 import {
   createTestApp,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, jest } from 'bun:test'
 import { BandwidthAdapter } from '@worker/telephony/bandwidth'
 import { DEFAULT_LANGUAGE } from '@shared/languages'
 import { getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
@@ -13,7 +13,7 @@ describe('BandwidthAdapter', () => {
 
   beforeEach(() => {
     adapter = new BandwidthAdapter(accountId, apiToken, apiSecret, applicationId, phoneNumber)
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   // --- BXML / IVR Methods ---
@@ -299,7 +299,7 @@ describe('BandwidthAdapter', () => {
 
   describe('hangupCall', () => {
     it('POSTs state=completed to the call endpoint', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response('{}', { status: 200 }),
       )
 
@@ -315,7 +315,7 @@ describe('BandwidthAdapter', () => {
 
   describe('ringVolunteers', () => {
     it('POSTs outbound calls for each volunteer and returns callIds', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const fetchSpy = jest.spyOn(globalThis as any, 'fetch').mockImplementation((url: any) => {
         if (typeof url === 'string' && url.includes('/calls')) {
           return Promise.resolve(
             new Response(JSON.stringify({ callId: 'out-call-1' }), { status: 201 }),
@@ -339,7 +339,7 @@ describe('BandwidthAdapter', () => {
 
       const [firstUrl, firstInit] = fetchSpy.mock.calls[0]
       expect(firstUrl).toBe(`https://voice.bandwidth.com/api/v2/accounts/${accountId}/calls`)
-      const firstBody = JSON.parse(firstInit?.body as string)
+      const firstBody = JSON.parse((firstInit as RequestInit | undefined)?.body as string)
       expect(firstBody.from).toBe(phoneNumber)
       expect(firstBody.to).toBe('+15551111111')
       expect(firstBody.applicationId).toBe(applicationId)
@@ -349,7 +349,7 @@ describe('BandwidthAdapter', () => {
 
     it('skips failed calls and returns only successful callIds', async () => {
       let callCount = 0
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      const fetchSpy = jest.spyOn(globalThis as any, 'fetch').mockImplementation(() => {
         callCount++
         if (callCount === 1) {
           return Promise.resolve(new Response(JSON.stringify({ callId: 'ok-1' }), { status: 201 }))
@@ -371,7 +371,7 @@ describe('BandwidthAdapter', () => {
     })
 
     it('appends hub parameter when hubId is provided', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({ callId: 'out-1' }), { status: 201 }),
       )
 
@@ -393,7 +393,7 @@ describe('BandwidthAdapter', () => {
 
   describe('cancelRinging', () => {
     it('POSTs state=completed for each callSid', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response('{}', { status: 200 }),
       )
 
@@ -407,7 +407,7 @@ describe('BandwidthAdapter', () => {
     })
 
     it('skips the exceptSid', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response('{}', { status: 200 }),
       )
 
@@ -419,7 +419,7 @@ describe('BandwidthAdapter', () => {
     })
 
     it('handles empty array', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response('{}', { status: 200 }),
       )
 
@@ -433,7 +433,7 @@ describe('BandwidthAdapter', () => {
 
   describe('getCallRecording', () => {
     it('fetches recordings and returns audio buffer', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const fetchSpy = jest.spyOn(globalThis as any, 'fetch').mockImplementation((url: any) => {
         if (typeof url === 'string' && url.includes('/recordings/')) {
           return Promise.resolve(new Response(new ArrayBuffer(8), { status: 200 }))
         }
@@ -449,7 +449,7 @@ describe('BandwidthAdapter', () => {
     })
 
     it('returns null when recordings list is empty', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify([]), { status: 200 }),
       )
 
@@ -458,7 +458,7 @@ describe('BandwidthAdapter', () => {
     })
 
     it('returns null when API returns non-ok', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response('Not Found', { status: 404 }),
       )
 
@@ -469,7 +469,7 @@ describe('BandwidthAdapter', () => {
 
   describe('getRecordingAudio', () => {
     it('returns ArrayBuffer on success', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(new ArrayBuffer(4), { status: 200 }),
       )
 
@@ -478,7 +478,7 @@ describe('BandwidthAdapter', () => {
     })
 
     it('returns null on non-ok response', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jest.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response('Not Found', { status: 404 }),
       )
 
@@ -666,7 +666,7 @@ describe('BandwidthAdapter', () => {
     })
 
     it('maps disconnect causes correctly', async () => {
-      const causes: Array<[string, string]> = [
+      const causes = [
         ['hangup', 'completed'],
         ['busy', 'busy'],
         ['cancel', 'failed'],
@@ -675,7 +675,7 @@ describe('BandwidthAdapter', () => {
         ['timeout', 'no-answer'],
         ['normal_clearing', 'completed'],
         ['unknown', 'failed'],
-      ]
+      ] as const
 
       for (const [cause, expected] of causes) {
         const request = new Request('https://example.com/webhook', {

@@ -4,12 +4,12 @@
  * Tests API version negotiation: version header parsing,
  * exempt paths, upgrade required responses, response headers.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, mock } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 
 // Mock api-versions module to control version numbers
-vi.mock('@worker/lib/api-versions', () => ({
+mock.module('@worker/lib/api-versions', () => ({
   CURRENT_API_VERSION: 3,
   MIN_API_VERSION: 2,
   checkClientVersion: (v: number) => v < 2 ? { upgrade: true, minVersion: 2, currentVersion: 3 } : null,

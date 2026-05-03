@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { checkPermission } from '@worker/middleware/permission-guard'
 
 describe('checkPermission', () => {

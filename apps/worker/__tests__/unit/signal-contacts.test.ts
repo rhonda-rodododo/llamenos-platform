@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import {
   hashSignalIdentifier,
   derivePerUserHmacKey,
@@ -107,7 +107,7 @@ describe('SignalContactsService', () => {
       db.$setSelectResult([row])
 
       const result = await service.findByUser(TEST_PUBKEY)
-      expect(result).toEqual(row)
+      expect(result as unknown).toEqual(row)
     })
 
     it('returns null when not found', async () => {

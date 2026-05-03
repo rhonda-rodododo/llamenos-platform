@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { VonageAdapter } from '@worker/telephony/vonage'
+import type { WebhookCallStatus } from '@worker/telephony/adapter'
 import { getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
 
 describe('VonageAdapter', () => {
@@ -14,7 +15,7 @@ describe('VonageAdapter', () => {
       '+15551234567',
       'test-private-key',
     )
-    globalThis.fetch = vi.fn() as unknown as typeof fetch
+    globalThis.fetch = jest.fn() as unknown as typeof fetch
   })
 
   afterEach(() => {
@@ -372,7 +373,7 @@ describe('VonageAdapter', () => {
 
   describe('hangupCall', () => {
     it('sends PUT request with hangup action', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValueOnce(new Response('{}', { status: 200 }))
 
       await adapter.hangupCall('call-uuid-123')
@@ -388,7 +389,7 @@ describe('VonageAdapter', () => {
 
   describe('ringVolunteers', () => {
     it('calls each volunteer and returns UUIDs', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch
         .mockResolvedValueOnce(new Response(JSON.stringify({ uuid: 'uuid-1' }), { status: 201 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ uuid: 'uuid-2' }), { status: 201 }))
@@ -416,7 +417,7 @@ describe('VonageAdapter', () => {
     })
 
     it('strips + from phone numbers', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ uuid: 'uuid-1' }), { status: 201 }))
 
       await adapter.ringVolunteers({
@@ -433,7 +434,7 @@ describe('VonageAdapter', () => {
     })
 
     it('returns only successful call UUIDs, skipping failures', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch
         .mockResolvedValueOnce(new Response(JSON.stringify({ uuid: 'uuid-1' }), { status: 201 }))
         .mockResolvedValueOnce(new Response('Error', { status: 500 }))
@@ -452,7 +453,7 @@ describe('VonageAdapter', () => {
     })
 
     it('returns empty array when all calls fail', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch
         .mockResolvedValueOnce(new Response('Error', { status: 500 }))
         .mockResolvedValueOnce(new Response('Error', { status: 500 }))
@@ -473,7 +474,7 @@ describe('VonageAdapter', () => {
 
   describe('cancelRinging', () => {
     it('hangs up all provided call SIDs', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }))
 
       await adapter.cancelRinging(['uuid-1', 'uuid-2', 'uuid-3'])
@@ -485,7 +486,7 @@ describe('VonageAdapter', () => {
     })
 
     it('skips the exceptSid', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }))
 
       await adapter.cancelRinging(['uuid-1', 'uuid-2', 'uuid-3'], 'uuid-2')
@@ -498,7 +499,7 @@ describe('VonageAdapter', () => {
 
   describe('getCallRecording', () => {
     it('fetches recording and returns array buffer', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ recording_url: 'https://example.com/recording.mp3' }), { status: 200 }),
@@ -515,7 +516,7 @@ describe('VonageAdapter', () => {
     })
 
     it('returns null when call info has no recording_url', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }))
 
       const result = await adapter.getCallRecording('call-uuid-123')
@@ -525,7 +526,7 @@ describe('VonageAdapter', () => {
     })
 
     it('returns null when call info fetch fails', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValueOnce(new Response('Not found', { status: 404 }))
 
       const result = await adapter.getCallRecording('call-uuid-123')
@@ -534,7 +535,7 @@ describe('VonageAdapter', () => {
     })
 
     it('returns null when audio fetch fails', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch
         .mockResolvedValueOnce(
           new Response(JSON.stringify({ recording_url: 'https://example.com/recording.mp3' }), { status: 200 }),
@@ -549,7 +550,7 @@ describe('VonageAdapter', () => {
 
   describe('getRecordingAudio', () => {
     it('fetches audio from full URL and returns array buffer', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValueOnce(new Response(new ArrayBuffer(2048), { status: 200 }))
 
       const result = await adapter.getRecordingAudio('https://example.com/recording.mp3')
@@ -560,7 +561,7 @@ describe('VonageAdapter', () => {
     })
 
     it('returns null when fetch fails', async () => {
-      const mockFetch = vi.mocked(globalThis.fetch)
+      const mockFetch = (globalThis.fetch as unknown as jest.Mock)
       mockFetch.mockResolvedValueOnce(new Response('Error', { status: 500 }))
 
       const result = await adapter.getRecordingAudio('https://example.com/recording.mp3')
@@ -791,7 +792,7 @@ describe('VonageAdapter', () => {
       })
 
       const result = await adapter.parseCallStatusWebhook(request)
-      expect(result.status).toBe(expectedStatus)
+      expect(result.status).toBe(expectedStatus as WebhookCallStatus['status'])
     })
   })
 

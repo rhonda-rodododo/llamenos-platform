@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import { NullAdapter } from '../../geocoding/null'
 import { OpenCageAdapter } from '../../geocoding/opencage'
 import { GeoapifyAdapter } from '../../geocoding/geoapify'

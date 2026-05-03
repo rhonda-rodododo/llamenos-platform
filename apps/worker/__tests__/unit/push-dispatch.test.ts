@@ -4,7 +4,7 @@
  * Tests push dispatcher factory, NoopPushDispatcher, LoggingPushDispatcher,
  * and test push log management.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import {
   createPushDispatcherFromService,
   recordTestPushPayload,
@@ -14,13 +14,13 @@ import {
 import type { WakePayload, FullPushPayload, Env } from '@worker/types/infra'
 
 // Mock push-encryption (not needed for unit tests)
-vi.mock('@worker/lib/push-encryption', () => ({
+mock.module('@worker/lib/push-encryption', () => ({
   encryptWakePayload: () => 'encrypted-wake',
   encryptFullPayload: () => 'encrypted-full',
 }))
 
-vi.mock('@worker/lib/fcm-client', () => ({
-  FcmClient: vi.fn(),
+mock.module('@worker/lib/fcm-client', () => ({
+  FcmClient: jest.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -72,12 +72,12 @@ describe('test push log', () => {
 
 describe('createPushDispatcherFromService', () => {
   const mockIdentityService = {
-    getDevices: vi.fn().mockResolvedValue({ devices: [] }),
-    cleanupDevices: vi.fn(),
+    getDevices: jest.fn().mockResolvedValue({ devices: [] }),
+    cleanupDevices: jest.fn(),
   } as never
 
   const mockShiftsService = {
-    getCurrentVolunteers: vi.fn().mockResolvedValue([]),
+    getCurrentVolunteers: jest.fn().mockResolvedValue([]),
   } as never
 
   it('returns NoopPushDispatcher when no push credentials in production', () => {

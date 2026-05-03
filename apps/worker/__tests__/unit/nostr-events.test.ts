@@ -1,11 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-
 // ---------------------------------------------------------------------------
-// NOTE: vi.mock('../../lib/nostr-events') in ringing-service.test.ts poisons
+// NOTE: mock.module('../../lib/nostr-events') in ringing-service.test.ts poisons
 // the bun test module cache, preventing us from importing the real module here.
 // We test by directly exercising the function's logic via a controlled wrapper
 // that uses the same dependencies the real implementation does.
 // ---------------------------------------------------------------------------
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 
 interface NostrEvent {
   kind: number
@@ -16,14 +15,14 @@ interface NostrEvent {
 
 describe('publishNostrEvent', () => {
   // Mock dependencies
-  const mockPublish = vi.fn<(event: NostrEvent) => Promise<void>>()
-  const mockClose = vi.fn()
-  const mockGetNostrPublisher = vi.fn<(...args: unknown[]) => { publish: typeof mockPublish; serverPubkey: string; close: typeof mockClose }>()
-  const mockDeriveServerEventKey = vi.fn<(...args: unknown[]) => Uint8Array>(() => new Uint8Array(32))
-  const mockEncryptHubEvent = vi.fn<(...args: unknown[]) => string>(() => 'encrypted-content')
+  const mockPublish = jest.fn<(event: NostrEvent) => Promise<void>>()
+  const mockClose = jest.fn()
+  const mockGetNostrPublisher = jest.fn<(...args: unknown[]) => { publish: typeof mockPublish; serverPubkey: string; close: typeof mockClose }>()
+  const mockDeriveServerEventKey = jest.fn<(...args: unknown[]) => Uint8Array>(() => new Uint8Array(32))
+  const mockEncryptHubEvent = jest.fn<(...args: unknown[]) => string>(() => 'encrypted-content')
 
   // Re-implement publishNostrEvent using the same logic as ../../lib/nostr-events.ts
-  // to avoid module cache poisoning from other test files' vi.mock calls.
+  // to avoid module cache poisoning from other test files' mock.module calls.
   let cachedEventKey: Uint8Array | null = null
 
   async function publishNostrEvent(
@@ -52,7 +51,7 @@ describe('publishNostrEvent', () => {
   }
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
     cachedEventKey = null
 
     mockPublish.mockResolvedValue(undefined)
@@ -65,7 +64,7 @@ describe('publishNostrEvent', () => {
 
   it('resolves when publisher resolves', async () => {
     await expect(publishNostrEvent({}, 20001, { type: 'test' })).resolves.toBeUndefined()
-    expect(mockPublish).toHaveBeenCalledOnce()
+    expect(mockPublish).toHaveBeenCalledTimes(1)
   })
 
   it('rejects when publisher rejects', async () => {

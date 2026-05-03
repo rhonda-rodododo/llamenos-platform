@@ -5,14 +5,13 @@
  * Since these delegate to @simplewebauthn/server, we mock the underlying lib
  * and test our wrappers' parameter mapping.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, mock, jest } from 'bun:test'
+const mockGenerateRegistrationOptions = jest.fn()
+const mockVerifyRegistrationResponse = jest.fn()
+const mockGenerateAuthenticationOptions = jest.fn()
+const mockVerifyAuthenticationResponse = jest.fn()
 
-const mockGenerateRegistrationOptions = vi.fn()
-const mockVerifyRegistrationResponse = vi.fn()
-const mockGenerateAuthenticationOptions = vi.fn()
-const mockVerifyAuthenticationResponse = vi.fn()
-
-vi.mock('@simplewebauthn/server', () => ({
+mock.module('@simplewebauthn/server', () => ({
   generateRegistrationOptions: (...args: unknown[]) => mockGenerateRegistrationOptions(...args),
   verifyRegistrationResponse: (...args: unknown[]) => mockVerifyRegistrationResponse(...args),
   generateAuthenticationOptions: (...args: unknown[]) => mockGenerateAuthenticationOptions(...args),

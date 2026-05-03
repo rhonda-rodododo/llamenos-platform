@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, jest } from 'bun:test'
 import { Hono } from 'hono'
 import calls from '@worker/routes/calls'
 import type { AppEnv } from '@worker/types'
@@ -53,48 +53,48 @@ function createTestApp(opts: {
 
 function makeMockCallsService() {
   return {
-    getActiveCalls: vi.fn().mockResolvedValue([]),
-    getTodayCount: vi.fn().mockResolvedValue(5),
-    getPresence: vi.fn().mockResolvedValue({ activeCalls: 0, availableVolunteers: 2, users: [] }),
-    listCallHistory: vi.fn().mockResolvedValue({ calls: [], total: 0, hasMore: false }),
-    getActiveCallById: vi.fn().mockResolvedValue(null),
-    getActiveCallByCallId: vi.fn().mockResolvedValue(null),
-    getCallRecord: vi.fn().mockResolvedValue(null),
-    answerCall: vi.fn().mockResolvedValue({ callId: 'call-1', status: 'in-progress' }),
-    endCall: vi.fn().mockResolvedValue({ callId: 'call-1', status: 'completed' }),
-    reportSpam: vi.fn().mockResolvedValue({ ok: true }),
-    debug: vi.fn().mockResolvedValue({ activeCount: 0, activeCalls: [] }),
+    getActiveCalls: jest.fn().mockResolvedValue([]),
+    getTodayCount: jest.fn().mockResolvedValue(5),
+    getPresence: jest.fn().mockResolvedValue({ activeCalls: 0, availableVolunteers: 2, users: [] }),
+    listCallHistory: jest.fn().mockResolvedValue({ calls: [], total: 0, hasMore: false }),
+    getActiveCallById: jest.fn().mockResolvedValue(null),
+    getActiveCallByCallId: jest.fn().mockResolvedValue(null),
+    getCallRecord: jest.fn().mockResolvedValue(null),
+    answerCall: jest.fn().mockResolvedValue({ callId: 'call-1', status: 'in-progress' }),
+    endCall: jest.fn().mockResolvedValue({ callId: 'call-1', status: 'completed' }),
+    reportSpam: jest.fn().mockResolvedValue({ ok: true }),
+    debug: jest.fn().mockResolvedValue({ activeCount: 0, activeCalls: [] }),
   }
 }
 
 function makeMockContactsService() {
   return {
-    lookupByIdentifierHash: vi.fn().mockResolvedValue(null),
-    updateLastInteraction: vi.fn().mockResolvedValue(undefined),
+    lookupByIdentifierHash: jest.fn().mockResolvedValue(null),
+    updateLastInteraction: jest.fn().mockResolvedValue(undefined),
   }
 }
 
 function makeMockCasesService() {
   return {
-    listByContact: vi.fn().mockResolvedValue({ total: 0, records: [] }),
+    listByContact: jest.fn().mockResolvedValue({ total: 0, records: [] }),
   }
 }
 
 function makeMockRecordsService() {
   return {
-    addBan: vi.fn().mockResolvedValue(undefined),
+    addBan: jest.fn().mockResolvedValue(undefined),
   }
 }
 
 function makeMockAuditService() {
   return {
-    log: vi.fn().mockResolvedValue(undefined),
+    log: jest.fn().mockResolvedValue(undefined),
   }
 }
 
 function makeMockSettingsService() {
   return {
-    getTelephonyProvider: vi.fn().mockResolvedValue(null),
+    getTelephonyProvider: jest.fn().mockResolvedValue(null),
   }
 }
 

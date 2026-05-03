@@ -4,7 +4,7 @@
  * Records use 3-tier E2EE (summary, fields, PII). Validates envelope
  * minimums, UUID entity type references, and status change metadata.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import recordsRoutes from '../../routes/records'
 import {
   createTestApp,

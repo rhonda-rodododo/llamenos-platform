@@ -3,11 +3,11 @@
  *
  * Tests device registration, listing, deregistration, VoIP tokens.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 
-vi.mock('hono-openapi', () => ({
+mock.module('hono-openapi', () => ({
   describeRoute: () => async (_c: unknown, next: () => Promise<void>) => next(),
   resolver: (s: unknown) => s,
   validator: (_type: string, _schema: unknown) => {
@@ -28,12 +28,12 @@ function createApp(pubkey = 'user-pk-1') {
   const app = new Hono<AppEnv>()
   const services = {
     identity: {
-      listDevices: vi.fn().mockResolvedValue([]),
-      registerDevice: vi.fn().mockResolvedValue(undefined),
-      deleteDeviceById: vi.fn().mockResolvedValue(true),
-      deleteAllDevices: vi.fn().mockResolvedValue(undefined),
-      registerVoipToken: vi.fn().mockResolvedValue(undefined),
-      deleteVoipToken: vi.fn().mockResolvedValue(undefined),
+      listDevices: jest.fn().mockResolvedValue([]),
+      registerDevice: jest.fn().mockResolvedValue(undefined),
+      deleteDeviceById: jest.fn().mockResolvedValue(true),
+      deleteAllDevices: jest.fn().mockResolvedValue(undefined),
+      registerVoipToken: jest.fn().mockResolvedValue(undefined),
+      deleteVoipToken: jest.fn().mockResolvedValue(undefined),
     },
   }
 
@@ -53,7 +53,7 @@ function createApp(pubkey = 'user-pk-1') {
 // ---------------------------------------------------------------------------
 
 describe('devices routes', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => jest.clearAllMocks())
 
   describe('GET /devices', () => {
     it('returns empty list when no devices', async () => {

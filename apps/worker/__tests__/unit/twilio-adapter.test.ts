@@ -1,20 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test'
 import { TwilioAdapter } from '../../telephony/twilio'
 import { SignalWireAdapter } from '../../telephony/signalwire'
 import { DEFAULT_LANGUAGE } from '@shared/languages'
 
 describe('TwilioAdapter', () => {
   let adapter: TwilioAdapter
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof jest.fn>
 
   beforeEach(() => {
     adapter = new TwilioAdapter('AC1234567890', 'auth-token-123', '+15551234567')
-    fetchMock = vi.fn()
+    fetchMock = jest.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   // --- IVR Response Tests ---
@@ -472,14 +472,14 @@ describe('TwilioAdapter', () => {
   describe('parseCallStatusWebhook', () => {
     it('maps Twilio statuses correctly', async () => {
       const tests = [
-        { raw: 'initiated', expected: 'initiated' },
-        { raw: 'ringing', expected: 'ringing' },
-        { raw: 'in-progress', expected: 'answered' },
-        { raw: 'completed', expected: 'completed' },
-        { raw: 'busy', expected: 'busy' },
-        { raw: 'no-answer', expected: 'no-answer' },
-        { raw: 'failed', expected: 'failed' },
-        { raw: 'canceled', expected: 'failed' },
+        { raw: 'initiated', expected: 'initiated' as const },
+        { raw: 'ringing', expected: 'ringing' as const },
+        { raw: 'in-progress', expected: 'answered' as const },
+        { raw: 'completed', expected: 'completed' as const },
+        { raw: 'busy', expected: 'busy' as const },
+        { raw: 'no-answer', expected: 'no-answer' as const },
+        { raw: 'failed', expected: 'failed' as const },
+        { raw: 'canceled', expected: 'failed' as const },
       ]
 
       for (const t of tests) {
@@ -510,11 +510,11 @@ describe('TwilioAdapter', () => {
   describe('parseQueueExitWebhook', () => {
     it('maps queue results correctly', async () => {
       const tests = [
-        { raw: 'leave', expected: 'leave' },
-        { raw: 'queue-full', expected: 'queue-full' },
-        { raw: 'error', expected: 'error' },
-        { raw: 'bridged', expected: 'bridged' },
-        { raw: 'hangup', expected: 'hangup' },
+        { raw: 'leave', expected: 'leave' as const },
+        { raw: 'queue-full', expected: 'queue-full' as const },
+        { raw: 'error', expected: 'error' as const },
+        { raw: 'bridged', expected: 'bridged' as const },
+        { raw: 'hangup', expected: 'hangup' as const },
       ]
 
       for (const t of tests) {
@@ -623,16 +623,16 @@ describe('TwilioAdapter', () => {
 
 describe('SignalWireAdapter', () => {
   let adapter: SignalWireAdapter
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: ReturnType<typeof jest.fn>
 
   beforeEach(() => {
     adapter = new SignalWireAdapter('project-123', 'api-token-456', '+15551234567', 'myspace')
-    fetchMock = vi.fn()
+    fetchMock = jest.fn()
     globalThis.fetch = fetchMock as unknown as typeof fetch
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    jest.restoreAllMocks()
   })
 
   it('uses SignalWire base URLs', async () => {

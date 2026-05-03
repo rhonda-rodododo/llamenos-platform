@@ -3,31 +3,31 @@
  *
  * Tests VoIP push dispatch logic, early exits, and error handling.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import type { Env } from '@worker/types/infra'
 
 // Mock external modules
-vi.mock('@fivesheepco/cloudflare-apns2', () => ({
-  ApnsClient: vi.fn().mockImplementation(() => ({
-    send: vi.fn().mockResolvedValue(undefined),
+mock.module('@fivesheepco/cloudflare-apns2', () => ({
+  ApnsClient: jest.fn().mockImplementation(() => ({
+    send: jest.fn().mockResolvedValue(undefined),
   })),
-  Notification: vi.fn(),
+  Notification: jest.fn(),
   PushType: { voip: 'voip' },
   Priority: { immediate: 10 },
 }))
 
-vi.mock('@worker/lib/fcm-client', () => ({
-  FcmClient: vi.fn().mockImplementation(() => ({
-    send: vi.fn().mockResolvedValue(true),
+mock.module('@worker/lib/fcm-client', () => ({
+  FcmClient: jest.fn().mockImplementation(() => ({
+    send: jest.fn().mockResolvedValue(true),
   })),
 }))
 
-vi.mock('@worker/lib/logger', () => ({
+mock.module('@worker/lib/logger', () => ({
   createLogger: () => ({
-    debug: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
   }),
 }))
 
@@ -37,7 +37,7 @@ import { dispatchVoipPushFromService } from '@worker/lib/voip-push'
 // Helpers
 // ---------------------------------------------------------------------------
 
-const mockGetVoipTokens = vi.fn()
+const mockGetVoipTokens = jest.fn()
 
 function makeIdentityService(devices: Array<{ platform: string; voipToken: string }> = []) {
   mockGetVoipTokens.mockResolvedValue({ devices })
@@ -59,7 +59,7 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
 // ---------------------------------------------------------------------------
 
 describe('dispatchVoipPushFromService', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => jest.clearAllMocks())
 
   it('returns early for empty volunteer list', async () => {
     const identity = makeIdentityService()

@@ -4,7 +4,7 @@
  * Validates shift scheduling constraints: day range (0-6), time format,
  * and pubkey array validation.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'bun:test'
 import shiftsRoutes from '../../routes/shifts'
 import {
   createTestApp,

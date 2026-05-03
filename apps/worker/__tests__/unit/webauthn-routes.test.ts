@@ -3,7 +3,7 @@
  *
  * Tests WebAuthn registration, authentication, credential management.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, mock, jest } from 'bun:test'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 
@@ -11,39 +11,39 @@ import type { AppEnv } from '@worker/types/infra'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockGenerateAuthOptions = vi.fn()
-const mockVerifyAuthResponse = vi.fn()
-const mockGenerateRegOptions = vi.fn()
-const mockVerifyRegResponse = vi.fn()
-const mockCheckRateLimit = vi.fn().mockResolvedValue(false)
-const mockHashIP = vi.fn().mockReturnValue('hashed')
-const mockAudit = vi.fn().mockResolvedValue(undefined)
+const mockGenerateAuthOptions = jest.fn()
+const mockVerifyAuthResponse = jest.fn()
+const mockGenerateRegOptions = jest.fn()
+const mockVerifyRegResponse = jest.fn()
+const mockCheckRateLimit = jest.fn().mockResolvedValue(false)
+const mockHashIP = jest.fn().mockReturnValue('hashed')
+const mockAudit = jest.fn().mockResolvedValue(undefined)
 
-vi.mock('@worker/lib/webauthn', () => ({
+mock.module('@worker/lib/webauthn', () => ({
   generateRegOptions: (...args: unknown[]) => mockGenerateRegOptions(...args),
   verifyRegResponse: (...args: unknown[]) => mockVerifyRegResponse(...args),
   generateAuthOptions: (...args: unknown[]) => mockGenerateAuthOptions(...args),
   verifyAuthResponse: (...args: unknown[]) => mockVerifyAuthResponse(...args),
 }))
 
-vi.mock('@worker/lib/helpers', () => ({
+mock.module('@worker/lib/helpers', () => ({
   uint8ArrayToBase64URL: (bytes: Uint8Array) => Buffer.from(bytes).toString('base64url'),
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }))
 
-vi.mock('@worker/lib/crypto', () => ({
+mock.module('@worker/lib/crypto', () => ({
   hashIP: (...args: unknown[]) => mockHashIP(...args),
 }))
 
-vi.mock('@worker/services/audit', () => ({
+mock.module('@worker/services/audit', () => ({
   audit: (...args: unknown[]) => mockAudit(...args),
 }))
 
-vi.mock('@worker/middleware/auth', () => ({
-  auth: vi.fn().mockImplementation(async (_c: unknown, next: () => Promise<void>) => next()),
+mock.module('@worker/middleware/auth', () => ({
+  auth: jest.fn().mockImplementation(async (_c: unknown, next: () => Promise<void>) => next()),
 }))
 
-vi.mock('hono-openapi', () => ({
+mock.module('hono-openapi', () => ({
   describeRoute: () => async (_c: unknown, next: () => Promise<void>) => next(),
   resolver: (s: unknown) => s,
   validator: (_type: string, _schema: unknown) => {
@@ -64,17 +64,17 @@ function createApp(pubkey = 'user-pk-1') {
   const app = new Hono<AppEnv>()
   const services = {
     identity: {
-      getAllWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
-      getWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
-      storeWebAuthnChallenge: vi.fn().mockResolvedValue(undefined),
-      getWebAuthnChallenge: vi.fn().mockResolvedValue({ challenge: 'test-challenge' }),
-      updateWebAuthnCounter: vi.fn().mockResolvedValue(undefined),
-      createSession: vi.fn().mockResolvedValue({ token: 'session-token', pubkey }),
-      addWebAuthnCredential: vi.fn().mockResolvedValue(undefined),
-      deleteWebAuthnCredential: vi.fn().mockResolvedValue(undefined),
+      getAllWebAuthnCredentials: jest.fn().mockResolvedValue({ credentials: [] }),
+      getWebAuthnCredentials: jest.fn().mockResolvedValue({ credentials: [] }),
+      storeWebAuthnChallenge: jest.fn().mockResolvedValue(undefined),
+      getWebAuthnChallenge: jest.fn().mockResolvedValue({ challenge: 'test-challenge' }),
+      updateWebAuthnCounter: jest.fn().mockResolvedValue(undefined),
+      createSession: jest.fn().mockResolvedValue({ token: 'session-token', pubkey }),
+      addWebAuthnCredential: jest.fn().mockResolvedValue(undefined),
+      deleteWebAuthnCredential: jest.fn().mockResolvedValue(undefined),
     },
     settings: {
-      checkRateLimit: vi.fn().mockResolvedValue({ limited: false }),
+      checkRateLimit: jest.fn().mockResolvedValue({ limited: false }),
     },
   }
 
@@ -98,7 +98,7 @@ const defaultEnv = { HMAC_SECRET: 'test', HOTLINE_NAME: 'Test Hotline' } as neve
 
 describe('webauthn routes', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    jest.clearAllMocks()
     mockCheckRateLimit.mockResolvedValue(false)
   })
 
