@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from 'bun:test'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { WebhookSender } from './webhook-sender'
 import type { BridgeConfig, WebhookPayload } from './types'
 

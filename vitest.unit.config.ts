@@ -4,7 +4,10 @@ import path from "path";
 export default defineConfig({
   test: {
     name: "worker-unit",
-    include: ["apps/worker/__tests__/unit/**/*.test.ts"],
+    include: [
+      "apps/worker/__tests__/unit/**/*.test.ts",
+      "apps/worker/lib/**/*.test.ts",
+    ],
     environment: "node",
   },
   resolve: {
