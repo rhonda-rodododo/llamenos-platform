@@ -140,10 +140,10 @@ export class ShiftsService {
     const myShifts = allShifts.filter(s => s.userPubkeys.includes(pubkey))
 
     // Find current active shift
-    let currentShift: { name: string; startTime: string; endTime: string } | null = null
+    let currentShift: { id: string; name: string; startTime: string; endTime: string } | null = null
     for (const shift of myShifts) {
       if (isShiftActive(shift, currentDay, currentTime)) {
-        currentShift = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime }
+        currentShift = { id: shift.id, name: shift.name, startTime: shift.startTime, endTime: shift.endTime }
         break
       }
     }
@@ -166,7 +166,7 @@ export class ShiftsService {
           const minutesAway = daysAway * 24 * 60 + (shiftMinutes - currentMinutes)
           if (minutesAway > 0 && minutesAway < bestMinutesAway) {
             // Skip if this is the currently active shift
-            if (currentShift && shift.name === currentShift.name && daysAway === 0) continue
+            if (currentShift && shift.id === currentShift.id && daysAway === 0) continue
             bestMinutesAway = minutesAway
             nextShift = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime, day }
           }
