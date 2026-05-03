@@ -10,7 +10,7 @@ Paj sa a eksplike kijan Llamenos strukturé, kijan done yo sikile nan sistèm na
 Llamenos divize sou twa depo ki pataje yon protokòl komen ak yon nwayo kriptografik :
 
 ```
-llamenos              llamenos-core           llamenos-mobile
+llamenos              llamenos-core           llamenos-hotline
 (Desktop + API)       (Crypto pataje)         (Aplikasyon mobil)
 +--------------+      +--------------+        +--------------+
 | Tauri v2     |      | Rust crate   |        | React Native |
@@ -25,7 +25,7 @@ llamenos              llamenos-core           llamenos-mobile
 
 - **llamenos** — Aplikasyon biwo a (Tauri v2 ak yon webview Vite + React), backend Cloudflare Worker a, ak backend Node.js pwòp tèt ou a. Sa a se depo prensipal la.
 - **llamenos-core** — Yon crate Rust pataje ki aplike tout operasyon kriptografik yo : chifraj anvlòp ECIES, siyati Schnorr, derivasyon kle PBKDF2, HKDF, ak XChaCha20-Poly1305. Konpile nan kòd natif (pou Tauri), WASM (pou navigatè), ak liaisons UniFFI (pou mobil).
-- **llamenos-mobile** — Aplikasyon mobil React Native pou iOS ak Android. Itilize liaisons UniFFI pou rele menm kòd Rust kriptografik la.
+- **llamenos-hotline** — Aplikasyon mobil React Native pou iOS ak Android. Itilize liaisons UniFFI pou rele menm kòd Rust kriptografik la.
 
 Twa platfòm yo aplike menm protokòl fil ki defini nan `docs/protocol/PROTOCOL.md`.
 

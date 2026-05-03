@@ -118,10 +118,10 @@ Estas mejoras estan disponibles hoy:
 
 Documentacion tecnica:
 
-- [Especificacion del Protocolo](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
-- [Modelo de Amenazas](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
-- [Clasificacion de Datos](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Auditorias de Seguridad](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
+- [Especificacion del Protocolo](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/protocol/llamenos-protocol.md)
+- [Modelo de Amenazas](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/THREAT_MODEL.md)
+- [Clasificacion de Datos](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Auditorias de Seguridad](https://github.com/rhonda-rodododo/llamenos-hotline/tree/main/docs/security)
 - [Documentacion API](/api/docs)
 
-Llamenos es codigo abierto: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)
+Llamenos es codigo abierto: [github.com/rhonda-rodododo/llamenos-hotline](https://github.com/rhonda-rodododo/llamenos-hotline)

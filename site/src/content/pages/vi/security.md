@@ -118,10 +118,10 @@ Các cải tiến này đã hoạt động:
 
 Tài liệu kỹ thuật:
 
-- [Đặc tả giao thức](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
-- [Mô hình đe dọa](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
-- [Phân loại dữ liệu](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Kiểm toán bảo mật](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
+- [Đặc tả giao thức](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/protocol/llamenos-protocol.md)
+- [Mô hình đe dọa](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/THREAT_MODEL.md)
+- [Phân loại dữ liệu](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Kiểm toán bảo mật](https://github.com/rhonda-rodododo/llamenos-hotline/tree/main/docs/security)
 - [Tài liệu API](/api/docs)
 
-Llamenos là mã nguồn mở: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)
+Llamenos là mã nguồn mở: [github.com/rhonda-rodododo/llamenos-hotline](https://github.com/rhonda-rodododo/llamenos-hotline)

@@ -501,7 +501,7 @@ Hub-scoped: All shift endpoints are also available at `/api/hubs/:hubId/shifts/*
 
 ## Notes
 
-All note endpoints require `notes:read-own` as a baseline. Clients must encrypt notes before sending (see the [protocol specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md) for ECIES envelope format).
+All note endpoints require `notes:read-own` as a baseline. Clients must encrypt notes before sending (see the [protocol specification](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/protocol/PROTOCOL.md) for ECIES envelope format).
 
 ```
 GET /api/notes?callId=...&page=1&limit=50

@@ -10,7 +10,7 @@ Diese Seite erklaert, wie Llamenos aufgebaut ist, wie Daten durch das System fli
 Llamenos ist auf drei Repositories aufgeteilt, die ein gemeinsames Protokoll und einen kryptografischen Kern teilen:
 
 ```
-llamenos              llamenos-core           llamenos-mobile
+llamenos              llamenos-core           llamenos-hotline
 (Desktop + API)       (Shared Crypto)         (Mobile App)
 +--------------+      +--------------+        +--------------+
 | Tauri v2     |      | Rust crate   |        | React Native |
@@ -25,7 +25,7 @@ llamenos              llamenos-core           llamenos-mobile
 
 - **llamenos** -- Die Desktop-Anwendung (Tauri v2 mit Vite + React Webview), das Cloudflare Worker-Backend und das selbst gehostete Node.js-Backend. Dies ist das primaere Repository.
 - **llamenos-core** -- Ein gemeinsames Rust-Crate, das alle kryptografischen Operationen implementiert: ECIES-Envelope-Verschluesselung, Schnorr-Signaturen, PBKDF2-Schluesselableitung, HKDF und XChaCha20-Poly1305. Kompiliert zu nativem Code (Tauri), WASM (Browser) und UniFFI-Bindings (Mobile).
-- **llamenos-mobile** -- Die React Native Mobile-Anwendung fuer iOS und Android. Verwendet UniFFI-Bindings, um denselben Rust-Kryptocode aufzurufen.
+- **llamenos-hotline** -- Die React Native Mobile-Anwendung fuer iOS und Android. Verwendet UniFFI-Bindings, um denselben Rust-Kryptocode aufzurufen.
 
 Alle drei Plattformen implementieren dasselbe Wire-Protokoll, definiert in `docs/protocol/PROTOCOL.md`.
 

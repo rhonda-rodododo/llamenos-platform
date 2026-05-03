@@ -120,7 +120,7 @@ bun run deploy:site     # نشر موقع التسويق فقط
 يستخدم تطبيق سطح المكتب محدّث Tauri للتحقق من الإصدارات الجديدة. إذا لم تُكتشف التحديثات:
 
 - تحقق من اتصالك بالإنترنت
-- تحقق من إمكانية الوصول إلى نقطة نهاية التحديث: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- تحقق من إمكانية الوصول إلى نقطة نهاية التحديث: `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
 - على Linux، يتطلب التحديث التلقائي لـ AppImage أن يكون للملف صلاحيات كتابة في مجلده
 - على macOS، يجب أن يكون التطبيق في `/Applications` (وليس قيد التشغيل من DMG مباشرة)
 
@@ -262,6 +262,6 @@ bun run deploy:site     # نشر موقع التسويق فقط
 
 إذا لم تُغطَّ مشكلتك هنا:
 
-- تحقق من [مشاكل GitHub](https://github.com/rhonda-rodododo/llamenos-platform/issues) للأخطاء المعروفة والحلول البديلة
+- تحقق من [مشاكل GitHub](https://github.com/rhonda-rodododo/llamenos-hotline/issues) للأخطاء المعروفة والحلول البديلة
 - ابحث في المشاكل الموجودة قبل إنشاء واحدة جديدة
 - عند الإبلاغ عن خطأ، قم بتضمين: وضع النشر (Cloudflare/Docker/Kubernetes)، المنصة (سطح المكتب/موبايل)، وأي رسائل خطأ من وحدة تحكم المتصفح أو الطرفية

@@ -5,15 +5,15 @@ export const siteConfig = {
 
   github: {
     org: 'rhonda-rodododo',
-    repo: 'llamenos-platform',
-    url: 'https://github.com/rhonda-rodododo/llamenos-platform',
-    releasesUrl: 'https://github.com/rhonda-rodododo/llamenos-platform/releases/latest',
-    issuesUrl: 'https://github.com/rhonda-rodododo/llamenos-platform/issues',
-    mobileReleasesUrl: 'https://github.com/rhonda-rodododo/llamenos-mobile/releases/latest',
+    repo: 'llamenos-hotline',
+    url: 'https://github.com/rhonda-rodododo/llamenos-hotline',
+    releasesUrl: 'https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest',
+    issuesUrl: 'https://github.com/rhonda-rodododo/llamenos-hotline/issues',
+    mobileReleasesUrl: 'https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest',
   },
 
   registry: {
-    app: 'ghcr.io/rhonda-rodododo/llamenos-platform',
+    app: 'ghcr.io/rhonda-rodododo/llamenos-hotline',
     signalNotifier: 'ghcr.io/rhonda-rodododo/llamenos-signal-notifier',
   },
 

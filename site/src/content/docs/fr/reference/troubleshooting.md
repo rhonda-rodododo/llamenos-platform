@@ -120,7 +120,7 @@ Exécuter `wrangler pages deploy dist` depuis le mauvais répertoire déploie le
 L'application de bureau utilise le Tauri updater pour vérifier les nouvelles versions. Si les mises à jour ne sont pas détectées :
 
 - Vérifiez votre connexion Internet
-- Vérifiez que le endpoint de mise à jour est joignable : `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- Vérifiez que le endpoint de mise à jour est joignable : `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
 - Sur Linux, l'AppImage de mise à jour automatique nécessite des droits d'écriture dans son répertoire
 - Sur macOS, l'application doit être dans `/Applications` (ne pas l'exécuter directement depuis le DMG)
 
@@ -262,6 +262,6 @@ Si les événements hub échouent à la vérification de signature :
 
 Si votre problème n'est pas couvert ici :
 
-- Consultez les [Issues GitHub](https://github.com/rhonda-rodododo/llamenos-platform/issues) pour les bugs connus et les solutions de contournement
+- Consultez les [Issues GitHub](https://github.com/rhonda-rodododo/llamenos-hotline/issues) pour les bugs connus et les solutions de contournement
 - Recherchez les issues existantes avant d'en créer une nouvelle
 - Lors d'un rapport de bug, incluez : mode de déploiement (Cloudflare/Docker/Kubernetes), plateforme (Bureau/Mobile) et les messages d'erreur de la console du navigateur ou du terminal

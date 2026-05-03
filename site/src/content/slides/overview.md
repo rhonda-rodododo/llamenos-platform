@@ -244,7 +244,7 @@ Think about:
 ## Get Started
 
 - **Read the docs**: `llamenos-hotline.com/docs`
-- **Review the code**: `github.com/rhonda-rodododo/llamenos-platform`
+- **Review the code**: `github.com/rhonda-rodododo/llamenos-hotline`
 - **Full technical talk**: `llamenos-hotline.com/slides/counterspy-2026/` — 90-minute deep dive
 - **Talk to us**: Signal group (contact Rhonda)
 

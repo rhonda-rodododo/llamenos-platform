@@ -83,7 +83,7 @@ bun run deploy:site     # Chỉ trang marketing
 ### Cập nhật tự động không hoạt động
 
 - Kiểm tra kết nối internet
-- Xác minh endpoint cập nhật: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- Xác minh endpoint cập nhật: `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
 - Linux: AppImage cần quyền ghi trong thư mục
 - macOS: ứng dụng phải ở `/Applications`
 
@@ -179,6 +179,6 @@ Nguyên nhân phổ biến: mã QR hết hạn (5 phút), không có internet, p
 
 ## Nhận trợ giúp
 
-- Kiểm tra [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues)
+- Kiểm tra [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues)
 - Tìm kiếm issue hiện có trước khi tạo mới
 - Khi báo lỗi, bao gồm: chế độ triển khai, nền tảng và thông báo lỗi

@@ -10,7 +10,7 @@ Trang này giải thích cấu trúc của Llamenos, cách dữ liệu lưu chuy
 Llamenos được chia thành ba kho mã nguồn chia sẻ một giao thức và lõi mật mã chung:
 
 ```
-llamenos              llamenos-core           llamenos-mobile
+llamenos              llamenos-core           llamenos-hotline
 (Desktop + API)       (Shared Crypto)         (Mobile App)
 +--------------+      +--------------+        +--------------+
 | Tauri v2     |      | Rust crate   |        | React Native |
@@ -25,7 +25,7 @@ llamenos              llamenos-core           llamenos-mobile
 
 - **llamenos** — Ứng dụng desktop (Tauri v2 với Vite + React webview), backend Cloudflare Worker và backend Node.js tự lưu trữ. Đây là kho chính.
 - **llamenos-core** — Rust crate chia sẻ triển khai tất cả phép toán mật mã: mã hóa phong bì ECIES, chữ ký Schnorr, dẫn xuất khóa PBKDF2, HKDF và XChaCha20-Poly1305.
-- **llamenos-mobile** — Ứng dụng React Native cho iOS và Android. Sử dụng UniFFI bindings gọi cùng mã Rust.
+- **llamenos-hotline** — Ứng dụng React Native cho iOS và Android. Sử dụng UniFFI bindings gọi cùng mã Rust.
 
 Cả ba nền tảng triển khai cùng giao thức wire được định nghĩa trong `docs/protocol/PROTOCOL.md`.
 

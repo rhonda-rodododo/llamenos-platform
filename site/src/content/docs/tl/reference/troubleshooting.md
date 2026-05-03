@@ -106,7 +106,7 @@ bun run deploy:site
 ### Hindi gumagana ang auto-update
 
 - Suriin ang iyong internet connection
-- I-verify na maabot ang update endpoint: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- I-verify na maabot ang update endpoint: `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
 - Sa Linux, nangangailangan ang AppImage auto-update ng write permissions sa directory nito
 - Sa macOS, kailangang nasa `/Applications` ang app
 
@@ -198,6 +198,6 @@ Tingnan ang [Gabay sa Mobile](/docs/mobile-guide#troubleshooting-ng-mga-isyu-sa-
 
 ## Paghingi ng tulong
 
-- Suriin ang [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues)
+- Suriin ang [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues)
 - Maghanap sa mga umiiral na issue bago gumawa ng bago
 - Isama ang deployment mode, platform, at error messages kapag nag-uulat ng bug

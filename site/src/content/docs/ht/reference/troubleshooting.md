@@ -120,7 +120,7 @@ Kouri `wrangler pages deploy dist` soti nan move repertwa deplwaye build Vite ap
 Aplikasyon biwo a itilize Tauri updater pou verifye nouvèl vèsyon. Si mizajou pa detekte :
 
 - Verifye koneksyon entènèt ou
-- Verifye pwen finisman mizajou aksesib : `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- Verifye pwen finisman mizajou aksesib : `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
 - Sou Linux, mizajou otomatik AppImage mande fichye a gen pèmisyon ekri nan repertwa li
 - Sou macOS, aplikasyon an dwe nan `/Applications` (pa kouri soti nan DMG dirèkteman)
 
@@ -262,6 +262,6 @@ Si evènman hub echwe verifikasyon siyati :
 
 Si pwoblèm ou pa kouvri la a :
 
-- Verifye [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) pou bug ki konnen ak solisyon travay
+- Verifye [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues) pou bug ki konnen ak solisyon travay
 - Rechèche pwoblèm egzistan anvan ou kreye yon nouvo
 - Lè ou rapòte yon bug, enkli : mòd deplwaman ou (Cloudflare/Docker/Kubernetes), platfòm (Biwo/Mobil), ak nenpòt mesaj erè soti nan konsòl navigatè oswa tèminal

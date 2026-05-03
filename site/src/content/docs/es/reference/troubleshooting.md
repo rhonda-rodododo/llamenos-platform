@@ -120,7 +120,7 @@ Ejecutar `wrangler pages deploy dist` desde el directorio incorrecto despliega e
 La aplicacion de escritorio usa el Tauri updater para buscar nuevas versiones. Si las actualizaciones no se detectan:
 
 - Verifica tu conexion a internet
-- Verifica que el endpoint de actualizacion sea accesible: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- Verifica que el endpoint de actualizacion sea accesible: `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
 - En Linux, AppImage requiere permisos de escritura en su directorio para actualizacion automatica
 - En macOS, la aplicacion debe estar en `/Applications` (no ejecutandose directamente desde el DMG)
 
@@ -262,6 +262,6 @@ Si los eventos del hub fallan en la verificacion de firma:
 
 Si tu problema no esta cubierto aqui:
 
-- Revisa las [Issues de GitHub](https://github.com/rhonda-rodododo/llamenos-platform/issues) para bugs conocidos y soluciones alternativas
+- Revisa las [Issues de GitHub](https://github.com/rhonda-rodododo/llamenos-hotline/issues) para bugs conocidos y soluciones alternativas
 - Busca en issues existentes antes de crear uno nuevo
 - Al reportar un bug, incluye: tu modo de despliegue (Cloudflare/Docker/Kubernetes), plataforma (Escritorio/Movil) y cualquier mensaje de error de la consola del navegador o terminal

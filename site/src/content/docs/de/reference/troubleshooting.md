@@ -120,7 +120,7 @@ Das Ausfuehren von `wrangler pages deploy dist` aus dem falschen Verzeichnis ste
 Die Desktop-App verwendet den Tauri Updater, um nach neuen Versionen zu suchen. Wenn Updates nicht erkannt werden:
 
 - Ueberpruefen Sie Ihre Internetverbindung
-- Ueberpruefen Sie, ob der Update-Endpunkt erreichbar ist: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- Ueberpruefen Sie, ob der Update-Endpunkt erreichbar ist: `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
 - Unter Linux erfordert AppImage Schreibberechtigungen im Verzeichnis der Datei fuer Auto-Updates
 - Unter macOS muss die App in `/Applications` sein (nicht direkt vom DMG ausfuehren)
 
@@ -262,6 +262,6 @@ Wenn Hub-Events die Signaturverifikation nicht bestehen:
 
 Wenn Ihr Problem hier nicht behandelt wird:
 
-- Pruefen Sie die [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) auf bekannte Fehler und Workarounds
+- Pruefen Sie die [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues) auf bekannte Fehler und Workarounds
 - Suchen Sie in bestehenden Issues, bevor Sie ein neues erstellen
 - Wenn Sie einen Fehler melden, geben Sie an: Ihren Bereitstellungsmodus (Cloudflare/Docker/Kubernetes), Plattform (Desktop/Mobile) und alle Fehlermeldungen aus der Browserkonsole oder dem Terminal

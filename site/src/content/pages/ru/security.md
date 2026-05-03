@@ -118,10 +118,10 @@ subtitle: Что защищено, что видно и что может быт
 
 Техническая документация:
 
-- [Спецификация протокола](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
-- [Модель угроз](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
-- [Классификация данных](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Аудиты безопасности](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
+- [Спецификация протокола](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/protocol/llamenos-protocol.md)
+- [Модель угроз](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/THREAT_MODEL.md)
+- [Классификация данных](https://github.com/rhonda-rodododo/llamenos-hotline/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Аудиты безопасности](https://github.com/rhonda-rodododo/llamenos-hotline/tree/main/docs/security)
 - [Документация API](/api/docs)
 
-Llamenos с открытым исходным кодом: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)
+Llamenos с открытым исходным кодом: [github.com/rhonda-rodododo/llamenos-hotline](https://github.com/rhonda-rodododo/llamenos-hotline)
