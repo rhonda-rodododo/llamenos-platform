@@ -13,6 +13,11 @@ Then('the response status should be {int}', async ({ world }, expectedStatus: nu
   expect(getSharedState(world).lastResponse!.status).toBe(expectedStatus)
 })
 
+Then('the response status is {int}', async ({ world }, expectedStatus: number) => {
+  expect(getSharedState(world).lastResponse).toBeDefined()
+  expect(getSharedState(world).lastResponse!.status).toBe(expectedStatus)
+})
+
 Then('the response status should not be {int}', async ({ world }, unexpectedStatus: number) => {
   expect(getSharedState(world).lastResponse).toBeDefined()
   expect(getSharedState(world).lastResponse!.status).not.toBe(unexpectedStatus)
