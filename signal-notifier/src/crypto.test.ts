@@ -7,7 +7,7 @@ describe('store crypto', () => {
   const key = deriveKey(secret, salt)
 
   test('deriveKey produces a 32-byte key', () => {
-    const len = key instanceof ArrayBuffer ? key.byteLength : key.length
+    const len = key.length
     expect(len).toBe(32)
   })
 

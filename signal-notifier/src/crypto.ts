@@ -8,7 +8,7 @@ const AES_TAG_SIZE = 16
  * Derive an AES-256 key from a secret string using HKDF-SHA256.
  */
 export function deriveKey(secret: string, salt: string): Buffer {
-  return hkdfSync('sha256', secret, salt, 'llamenos-signal-notifier-store', AES_KEY_SIZE)
+  return Buffer.from(hkdfSync('sha256', secret, salt, 'llamenos-signal-notifier-store', AES_KEY_SIZE))
 }
 
 /**
