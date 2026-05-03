@@ -32,9 +32,9 @@ export class SignalWireAdapter extends TwilioAdapter {
     const params = new URLSearchParams(body)
 
     let dataString = url.toString()
-    const sortedKeys = Array.from(params.keys()).sort()
-    for (const key of sortedKeys) {
-      dataString += key + params.get(key)
+    const sortedEntries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))
+    for (const [key, value] of sortedEntries) {
+      dataString += key + value
     }
 
     const encoder = new TextEncoder()
