@@ -3096,7 +3096,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_random_bytes_hex() != 29596) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_mobile_clear_hub_keys() != 24613) {
+    if (uniffi_llamenos_core_checksum_func_mobile_clear_hub_keys() != 49932) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_create_auth_token() != 23090) {
@@ -3105,13 +3105,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_mobile_create_auth_token_from_signing_key() != 63368) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_event_with_attribution() != 61537) {
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_event_with_attribution() != 985) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event() != 22831) {
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event() != 23884) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event() != 7592) {
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event() != 16015) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_ed25519_verify() != 35261) {

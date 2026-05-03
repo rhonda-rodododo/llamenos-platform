@@ -359,12 +359,8 @@ final class WebSocketService: @unchecked Sendable {
 
     #if DEBUG
     /// Overridable decryption closure for unit testing.
-    /// Defaults to the real Rust-side multi-hub key-trial attribution.
     /// Tests may inject a mock that returns predetermined (hubId, json) for a known ciphertext.
-    var decryptionHandler: (String) -> (hubId: String, json: String)? = { encryptedHex in
-        // In DEBUG builds, this default still routes to Rust for real decryption
-        return nil  // Falls through to the #else path in decryptEvent
-    }
+    var decryptionHandler: (String) -> (hubId: String, json: String)? = { _ in nil }
     #endif
 
     /// Tries all loaded hub keys in Rust and returns an `AttributedHubEvent` for the first key

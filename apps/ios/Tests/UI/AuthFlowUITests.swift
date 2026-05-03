@@ -46,15 +46,16 @@ final class AuthFlowUITests: XCTestCase {
         let createButton = find("create-identity")
         XCTAssertTrue(createButton.waitForExistence(timeout: 3), "Create Identity button should exist")
 
-        // Import Key button
-        let importButton = find("import-key")
-        XCTAssertTrue(importButton.waitForExistence(timeout: 3), "Import Key button should exist")
+        // Link Device button (v3: device linking via QR/ECDH replaces nsec import)
+        let linkButton = find("link-device")
+        XCTAssertTrue(linkButton.waitForExistence(timeout: 3), "Link Device button should exist")
     }
 
     // MARK: - Onboarding Flow
 
     func testOnboardingFlowCreateIdentity() {
-        // Enter hub URL
+        // V3 device key model: tapping "Create New Identity" validates the hub URL
+        // and navigates directly to the PIN set screen — no nsec display or backup step.
         let hubURLInput = find("hub-url-input")
         XCTAssertTrue(hubURLInput.waitForExistence(timeout: 5))
         hubURLInput.tap()
@@ -69,36 +70,11 @@ final class AuthFlowUITests: XCTestCase {
         }
         createButton.tap()
 
-        // Nsec should be displayed on the onboarding screen
-        let nsecDisplay = find("nsec-display")
-        XCTAssertTrue(
-            nsecDisplay.waitForExistence(timeout: 5),
-            "Nsec display should appear on onboarding screen"
-        )
-
-        // Npub should also be displayed
-        let npubDisplay = find("npub-display")
-        XCTAssertTrue(npubDisplay.exists, "Npub display should exist")
-
-        // Confirm backup toggle/checkbox
-        let confirmBackup = find("confirm-backup")
-        XCTAssertTrue(confirmBackup.exists, "Confirm backup button should exist")
-
-        // The continue button should be disabled until backup is confirmed
-        // Tap confirm backup to enable it
-        confirmBackup.tap()
-
-        // Continue to PIN set should now be available
-        let continueButton = find("continue-to-pin")
-        if continueButton.exists {
-            continueButton.tap()
-        }
-
-        // PIN pad should appear
+        // PIN pad should appear directly (v3 flow: no onboarding/nsec step)
         let pinPad = find("pin-pad")
         XCTAssertTrue(
-            pinPad.waitForExistence(timeout: 5),
-            "PIN pad should appear after confirming backup"
+            pinPad.waitForExistence(timeout: 10),
+            "PIN pad should appear after tapping Create New Identity (v3 direct-to-PIN flow)"
         )
     }
 
@@ -150,35 +126,27 @@ final class AuthFlowUITests: XCTestCase {
 
     // MARK: - Import Flow
 
-    func testImportKeyFlow() {
-        // Enter hub URL first (required for import navigation)
+    func testDeviceLinkFlow() {
+        // V3: nsec import replaced by device linking (QR + ephemeral ECDH).
+        // Tap "Link from Another Device" and verify the device link screen appears.
         let hubInput = find("hub-url-input")
         XCTAssertTrue(hubInput.waitForExistence(timeout: 20), "Hub URL input should exist")
-        hubInput.tap()
-        hubInput.typeText("https://test.example.org")
-        dismissKeyboard()
 
-        // Tap "Import Key"
-        let importButton = find("import-key")
-        XCTAssertTrue(importButton.waitForExistence(timeout: 5))
-        importButton.tap()
+        let linkButton = find("link-device")
+        XCTAssertTrue(linkButton.waitForExistence(timeout: 5), "Link Device button should exist")
+        linkButton.tap()
 
-        // Nsec input should appear
-        let nsecInput = find("nsec-input")
+        // Device link view should appear
+        let deviceLinkView = find("device-link-view")
         XCTAssertTrue(
-            nsecInput.waitForExistence(timeout: 5),
-            "Nsec input field should appear"
+            deviceLinkView.waitForExistence(timeout: 5),
+            "Device link view should appear after tapping Link from Another Device"
         )
 
-        // Submit button should exist
-        let submitButton = find("submit-import")
-        XCTAssertTrue(submitButton.exists, "Submit import button should exist")
-
-        // Cancel should go back to login
-        let cancelButton = find("cancel-import")
-        if cancelButton.exists {
+        // Cancel should return to login
+        let cancelButton = find("cancel-device-link")
+        if cancelButton.waitForExistence(timeout: 3) {
             cancelButton.tap()
-            // Should return to login screen
             let createButton = find("create-identity")
             XCTAssertTrue(
                 createButton.waitForExistence(timeout: 5),
@@ -192,11 +160,11 @@ final class AuthFlowUITests: XCTestCase {
     func testDashboardShowsIdentityAndLockButton() {
         navigateToFullyAuthenticated()
 
-        // Dashboard should show npub
-        let npubDisplay = find("dashboard-npub")
+        // Dashboard should show identity (hex signing pubkey in v3)
+        let npubDisplay = find("dashboard-identity")
         XCTAssertTrue(
             npubDisplay.waitForExistence(timeout: 5),
-            "Dashboard should display the user's npub"
+            "Dashboard should display the user's identity"
         )
 
         // Lock button should exist
@@ -293,23 +261,11 @@ final class AuthFlowUITests: XCTestCase {
         createButton.tap()
     }
 
-    /// Navigate from onboarding to the PIN set screen.
+    /// Wait for the PIN set screen (v3: navigateToOnboarding already lands here).
     private func navigateToPINSet() {
-        // Confirm backup
-        let confirmBackup = find("confirm-backup")
-        if confirmBackup.waitForExistence(timeout: 5) {
-            confirmBackup.tap()
-        }
-
-        // Tap continue/proceed
-        let continueButton = find("continue-to-pin")
-        if continueButton.waitForExistence(timeout: 3) {
-            continueButton.tap()
-        }
-
-        // Wait for PIN pad
+        // V3: create-identity navigates directly to PINSetView — just wait for pin-pad.
         let pinPad = find("pin-pad")
-        _ = pinPad.waitForExistence(timeout: 5)
+        _ = pinPad.waitForExistence(timeout: 10)
     }
 
     /// Navigate all the way through to the dashboard (create identity, set PIN).
