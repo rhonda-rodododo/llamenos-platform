@@ -199,12 +199,16 @@ cmd_test() {
 }
 
 cmd_uitest() {
-  log "Running XCUITests on simulator..."
+  log "Running XCUITests on simulator (parallel, 4 workers)..."
   ensure_xcodeproj
 
   local sim_device
   sim_device=$(find_simulator)
   log "Using simulator: $sim_device"
+
+  # Worker count: default 4 (Mac M4 has 4 performance + 4 efficiency cores).
+  # Override with IOS_TEST_WORKERS env var.
+  local workers="${IOS_TEST_WORKERS:-4}"
 
   local docker_dir="$PROJECT_ROOT/deploy/docker"
   local started_docker=false
@@ -245,6 +249,8 @@ cmd_uitest() {
     -scheme "$XCODE_SCHEME" \
     -only-testing:LlamenosUITests \
     -destination "platform=iOS Simulator,name=$sim_device" \
+    -parallel-testing-enabled YES \
+    -parallel-testing-worker-count "$workers" \
     -resultBundlePath /tmp/llamenos-uitest.xcresult \
     2>&1 | filter_xcodebuild
   local exit_code=$?

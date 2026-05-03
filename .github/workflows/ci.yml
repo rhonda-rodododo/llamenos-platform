@@ -986,17 +986,22 @@ jobs:
           fi
           echo "Backend API connectivity verified"
 
-      - name: Run UI tests
+      - name: Run UI tests (parallel, 4 workers)
         working-directory: apps/ios
         run: |
           # BaseUITest defaults to http://127.0.0.1:3000 (IPv4 explicit).
           # Bun binds to 0.0.0.0 — using 127.0.0.1 avoids IPv6 [::1] timeouts
           # from the iOS Simulator's URLSession on macOS CI runners.
+          #
+          # Parallel testing: each test class gets its own hub via POST /api/test-create-hub
+          # in class setUp(). Xcode clones simulators per worker — no shared state.
           xcodebuild test \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -parallel-testing-enabled YES \
+            -parallel-testing-worker-count 4 \
             -derivedDataPath /tmp/llamenos-build
 
       - name: Show backend runtime logs
