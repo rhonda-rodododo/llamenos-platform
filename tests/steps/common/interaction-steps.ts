@@ -175,13 +175,30 @@ Then('the {string} button should be enabled', async ({ page }, name: string) => 
 })
 
 Then('the {string} button should be visible', async ({ page }, name: string) => {
-  const btn = page.getByRole('button', { name })
-  await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Map feature-file button names to actual UI text/testid
+  const testIdMap: Record<string, string> = {
+    'Clock In': TestIds.BREAK_TOGGLE_BTN,
+    'Clock Out': TestIds.BREAK_TOGGLE_BTN,
+  }
+  const testId = testIdMap[name]
+  if (testId) {
+    await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  } else {
+    await expect(page.getByRole('button', { name }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  }
 })
 
 Then('the {string} button should not be visible', async ({ page }, name: string) => {
-  const btn = page.getByRole('button', { name })
-  await expect(btn).not.toBeVisible({ timeout: 3000 })
+  const testIdMap: Record<string, string> = {
+    'Clock In': TestIds.BREAK_TOGGLE_BTN,
+    'Clock Out': TestIds.BREAK_TOGGLE_BTN,
+  }
+  const testId = testIdMap[name]
+  if (testId) {
+    await expect(page.getByTestId(testId)).not.toBeVisible({ timeout: 3000 })
+  } else {
+    await expect(page.getByRole('button', { name }).first()).not.toBeVisible({ timeout: 3000 })
+  }
 })
 
 // --- Text visibility patterns ---

@@ -132,12 +132,12 @@ export const test = base.extend<
   // Hub is NOT deleted after tests — stale hubs accumulate and are purged separately.
   workerHub: [async ({ playwright }, use, workerInfo) => {
     const backendUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
-    const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 30_000 })
+    const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000 })
     const name = `test-hub-${workerInfo.workerIndex}-${Date.now()}`
     const hubId = await createHubViaApi(ctx, name)
     await ctx.dispose()
     await use(hubId)
-  }, { scope: 'worker' }],
+  }, { scope: 'worker', timeout: 60_000 }],
 })
 
 export const { Given, When, Then, Before, After } = createBdd(test)

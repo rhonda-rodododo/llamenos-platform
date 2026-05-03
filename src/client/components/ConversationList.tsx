@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, User, MessageSquare } from 'lucide-react'
+import { Clock, User, MessageSquare, Search } from 'lucide-react'
 import type { Conversation } from '@/lib/api'
 import { ChannelBadge } from '@/components/ChannelBadge'
 
@@ -107,16 +107,30 @@ function ConversationCard({
 
 export function ConversationList({ conversations, onSelect, selectedId }: ConversationListProps) {
   const { t } = useTranslation()
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const { waiting, active } = useMemo(() => {
+  const { waiting, active, closed } = useMemo(() => {
     const waitingList: Conversation[] = []
     const activeList: Conversation[] = []
+    const closedList: Conversation[] = []
 
-    for (const conv of conversations) {
+    // Filter by search query if present
+    const query = searchQuery.trim().toLowerCase()
+    const filtered = query
+      ? conversations.filter(conv =>
+          (conv.contactLast4 && conv.contactLast4.includes(query)) ||
+          conv.channelType.toLowerCase().includes(query) ||
+          (conv.assignedTo && conv.assignedTo.toLowerCase().includes(query))
+        )
+      : conversations
+
+    for (const conv of filtered) {
       if (conv.status === 'waiting') {
         waitingList.push(conv)
       } else if (conv.status === 'active') {
         activeList.push(conv)
+      } else if (conv.status === 'closed') {
+        closedList.push(conv)
       }
     }
 
@@ -126,9 +140,10 @@ export function ConversationList({ conversations, onSelect, selectedId }: Conver
 
     waitingList.sort(byLastMessage)
     activeList.sort(byLastMessage)
+    closedList.sort(byLastMessage)
 
-    return { waiting: waitingList, active: activeList }
-  }, [conversations])
+    return { waiting: waitingList, active: activeList, closed: closedList }
+  }, [conversations, searchQuery])
 
   if (conversations.length === 0) {
     return (
@@ -141,8 +156,21 @@ export function ConversationList({ conversations, onSelect, selectedId }: Conver
 
   return (
     <div data-testid="conversation-list" className="space-y-4">
+      {/* Search input */}
+      <div className="relative px-3 pt-2">
+        <Search className="absolute left-5 top-4.5 h-3.5 w-3.5 text-muted-foreground" />
+        <input
+          type="search"
+          data-testid="conv-search"
+          placeholder={t('conversations.searchPlaceholder', 'Search conversations...')}
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full rounded-md border border-input bg-background py-1.5 pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+
       {waiting.length > 0 && (
-        <section>
+        <section className="px-3">
           <h3 data-testid="conv-section-header" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
             {t('conversations.waitingSection', 'Waiting')}
@@ -164,7 +192,7 @@ export function ConversationList({ conversations, onSelect, selectedId }: Conver
       )}
 
       {active.length > 0 && (
-        <section>
+        <section className="px-3">
           <h3 data-testid="conv-section-header" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
             {t('conversations.activeSection', 'Active')}
@@ -174,6 +202,28 @@ export function ConversationList({ conversations, onSelect, selectedId }: Conver
           </h3>
           <div className="space-y-1.5">
             {active.map(conv => (
+              <ConversationCard
+                key={conv.id}
+                conversation={conv}
+                isSelected={selectedId === conv.id}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {closed.length > 0 && (
+        <section className="px-3">
+          <h3 data-testid="conv-section-header" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="inline-block h-2 w-2 rounded-full bg-gray-400" />
+            {t('conversations.closedSection', 'Closed')}
+            <span className="rounded-full bg-gray-400/10 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">
+              {closed.length}
+            </span>
+          </h3>
+          <div className="space-y-1.5">
+            {closed.map(conv => (
               <ConversationCard
                 key={conv.id}
                 conversation={conv}

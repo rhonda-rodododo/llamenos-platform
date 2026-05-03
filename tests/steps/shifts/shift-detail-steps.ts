@@ -15,9 +15,16 @@ When('I tap a shift card', async ({ page, request }) => {
   const existingShifts = await listShiftsViaApi(request).catch(() => [])
   if (existingShifts.length === 0) {
     await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}` })
-    // Reload so the newly created shift appears in the list
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
+    // SPA-navigate away and back to refresh the shift list, avoiding a full
+    // page reload (which would trigger PIN re-entry)
+    await page.evaluate(() => {
+      const router = (window as any).__TEST_ROUTER
+      if (router) {
+        router.navigate({ to: '/' })
+        setTimeout(() => router.navigate({ to: '/shifts' }), 100)
+      }
+    })
+    await page.waitForURL(/\/shifts/, { timeout: Timeouts.ELEMENT })
   }
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })

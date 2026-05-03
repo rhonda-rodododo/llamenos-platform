@@ -834,7 +834,11 @@
     "whatsapp": "WhatsApp",
     "loadUsersError": "Failed to load volunteers",
     "noUsers": "No volunteers available",
-    "noUsersAvailable": "No volunteers available"
+    "noUsersAvailable": "No volunteers available",
+    "reopened": "Conversation reopened",
+    "reopenError": "Failed to reopen conversation",
+    "searchPlaceholder": "Search conversations...",
+    "closedSection": "Closed"
   },
   "copied": {
     "toClipboard": "Copied to clipboard"
@@ -947,7 +951,9 @@
     "viewCalls": "View Calls",
     "cases": "Dossiers",
     "noUsersOnline": "Aucun bénévole en ligne",
-    "userStatus": "Statut du bénévole"
+    "userStatus": "Statut du bénévole",
+    "clockIn": "Clock In",
+    "clockOut": "Clock Out"
   },
   "decryptingKeys": "Decrypting keys...",
   "delete": "Delete",

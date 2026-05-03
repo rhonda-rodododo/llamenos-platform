@@ -428,6 +428,11 @@ function NotesPage() {
                         <div className="flex items-center gap-2">
                           <p className="text-xs text-muted-foreground">
                             {new Date(note.createdAt).toLocaleString()}
+                            {note.authorPubkey && !note.authorPubkey.startsWith('system:') && (
+                              <span className="ml-1.5 font-mono opacity-60" title={note.authorPubkey}>
+                                {nameMap.get(note.authorPubkey) || note.authorPubkey.slice(0, 8)}
+                              </span>
+                            )}
                           </p>
                           {note.isTranscription && (
                             <Badge variant="secondary">
@@ -453,7 +458,7 @@ function NotesPage() {
                           />
                         ) : (
                           <>
-                            <p className="mt-2 text-sm whitespace-pre-wrap">{note.decrypted}</p>
+                            <p data-testid="note-detail-text" className="mt-2 text-sm whitespace-pre-wrap">{note.decrypted}</p>
                             {note.payload.fields && visibleFields.length > 0 && (
                               <CustomFieldBadges fields={visibleFields} values={note.payload.fields} />
                             )}

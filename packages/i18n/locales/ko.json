@@ -834,7 +834,11 @@
     "whatsapp": "WhatsApp",
     "loadUsersError": "Failed to load volunteers",
     "noUsers": "No volunteers available",
-    "noUsersAvailable": "No volunteers available"
+    "noUsersAvailable": "No volunteers available",
+    "reopened": "Conversation reopened",
+    "reopenError": "Failed to reopen conversation",
+    "searchPlaceholder": "Search conversations...",
+    "closedSection": "Closed"
   },
   "copied": {
     "toClipboard": "Copied to clipboard"
@@ -947,7 +951,9 @@
     "viewCalls": "View Calls",
     "cases": "사건",
     "noUsersOnline": "온라인 자원봉사자가 없습니다",
-    "userStatus": "자원봉사자 상태"
+    "userStatus": "자원봉사자 상태",
+    "clockIn": "Clock In",
+    "clockOut": "Clock Out"
   },
   "decryptingKeys": "Decrypting keys...",
   "delete": "Delete",

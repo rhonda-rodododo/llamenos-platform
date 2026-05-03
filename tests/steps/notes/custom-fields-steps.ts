@@ -238,8 +238,12 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
     await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
     await trigger.click()
     await page.getByTestId(TestIds.CUSTOM_FIELD_ADD_BTN).click()
-    await page.getByLabel(/label/i).fill(fieldLabel)
-    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+    const labelInput = page.getByLabel(/label/i)
+    await expect(labelInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await labelInput.fill(fieldLabel)
+    const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
+    await expect(saveBtn).toBeEnabled({ timeout: Timeouts.ELEMENT })
+    await saveBtn.click()
   }
 })
 

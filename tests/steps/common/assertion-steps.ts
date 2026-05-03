@@ -7,7 +7,9 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 Then('I should see the {string} button', async ({ page }, buttonText: string) => {
-  await expect(page.getByRole('button', { name: buttonText })).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Use .first() to avoid strict mode violations when the same button text
+  // appears in both the sidebar and the main content area (e.g. "Log Out")
+  await expect(page.getByRole('button', { name: buttonText }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the error {string}', async ({ page }, errorText: string) => {

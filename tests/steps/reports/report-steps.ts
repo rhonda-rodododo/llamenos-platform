@@ -90,9 +90,18 @@ When('I tap the first report card', async ({ page, request }) => {
   const existingReports = await listReportsViaApi(request).catch(() => ({ conversations: [], total: 0 }))
   if (existingReports.conversations.length === 0) {
     await createReportViaApi(request, { title: `Auto-seeded Report ${Date.now()}` })
-    // Refresh the page so the newly created report appears in the list
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
+    // SPA-navigate away and back to refresh without a full reload
+    // (reload triggers PIN re-entry which this step doesn't handle)
+    await page.evaluate(() => {
+      const router = (window as any).__TEST_ROUTER
+      if (router) router.navigate({ to: '/' })
+    })
+    await page.waitForURL(u => !u.toString().includes('/reports'), { timeout: 5000 }).catch(() => {})
+    await page.evaluate(() => {
+      const router = (window as any).__TEST_ROUTER
+      if (router) router.navigate({ to: '/reports' })
+    })
+    await page.waitForURL(/\/reports/, { timeout: 5000 }).catch(() => {})
   }
   const reportCard = page.getByTestId(TestIds.REPORT_CARD).first()
   await expect(reportCard).toBeVisible({ timeout: Timeouts.ELEMENT })
