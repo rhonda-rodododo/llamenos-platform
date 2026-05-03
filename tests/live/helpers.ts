@@ -8,7 +8,7 @@ import { getPublicKey, nip19 } from 'nostr-tools'
 // Re-export helpers that don't depend on ADMIN_NSEC
 export { enterPin } from '../helpers'
 
-const STAGING_PIN = '123456'
+const STAGING_PIN = '12345678'
 
 // Environment config — loaded from .env.live or process.env
 function requireEnv(key: string): string {

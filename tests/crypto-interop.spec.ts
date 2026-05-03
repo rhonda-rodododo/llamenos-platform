@@ -156,13 +156,12 @@ test.describe('Cross-platform crypto interop', () => {
   test('PIN encryption structure matches expected format', () => {
     const { encrypted, pin } = vectors.pinEncryption
 
-    // Validate structure (don't decrypt — PBKDF2 is too slow in Playwright)
+    // Validate structure (don't decrypt — Argon2id is too slow in Playwright)
     expect(encrypted.salt).toHaveLength(64) // 32 bytes hex
     expect(encrypted.nonce).toHaveLength(48) // 24 bytes hex
-    expect(encrypted.iterations).toBe(600_000)
     expect(encrypted.ciphertext).toBeTruthy()
     expect(encrypted.pubkey).toBeTruthy()
-    expect(pin).toBe('123456')
+    expect(pin).toBe('12345678')
   })
 
   // ─── v2 Tests ──────────────────────────────────────────────

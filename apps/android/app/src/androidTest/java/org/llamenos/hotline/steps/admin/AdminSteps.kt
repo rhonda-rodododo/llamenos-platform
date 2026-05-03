@@ -132,7 +132,7 @@ class AdminSteps : BaseSteps() {
 
     @Given("the crypto service is locked")
     fun theCryptoServiceIsLocked() {
-        runBlocking { cryptoService.generateDeviceKeys(java.util.UUID.randomUUID().toString(), "123456") }
+        runBlocking { cryptoService.generateDeviceKeys(java.util.UUID.randomUUID().toString(), "12345678") }
         cryptoService.lock()
     }
 

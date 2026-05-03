@@ -1206,7 +1206,7 @@
     <string name="error_hub_url_required">Hub URL is required</string>
     <string name="error_identity_exists">An identity already exists</string>
     <string name="error_invalid_nsec">The provided nsec key is invalid</string>
-    <string name="error_invalid_pin">PIN must be 6-8 digits</string>
+    <string name="error_invalid_pin">PIN or passphrase must be at least 8 characters</string>
     <string name="error_no_hub_url">No hub URL configured</string>
     <string name="error_no_key_loaded">No cryptographic key is loaded</string>
     <string name="error_no_stored_keys">No stored keys found</string>
@@ -1218,7 +1218,7 @@
     <string name="error_pin_mismatch">PINs do not match. Try again.</string>
     <string name="error_pin_not_numeric">PIN must contain only digits</string>
     <string name="error_pin_too_long">PIN must be at most 8 digits</string>
-    <string name="error_pin_too_short">PIN must be at least 6 digits</string>
+    <string name="error_pin_too_short">PIN or passphrase must be at least 8 characters</string>
     <string name="error_title">Error</string>
     <string name="error_wake_decrypt_failed">Wake decrypt failed: %@</string>
     <string name="error_wake_key_generation">Failed to generate wake key</string>
@@ -1733,7 +1733,7 @@
     <string name="onboarding_no_code">No invite code provided</string>
     <string name="onboarding_npub_label">Your Public Key</string>
     <string name="onboarding_nsec_label">Your Secret Key</string>
-    <string name="onboarding_pin_description">Choose a 6-digit PIN to protect your key on this device</string>
+    <string name="onboarding_pin_description">Choose a PIN (8+ digits) or passphrase (8+ characters) to protect your key</string>
     <string name="onboarding_pin_mismatch">PINs don\'t match. Try again.</string>
     <string name="onboarding_recovery_key">Your recovery key</string>
     <string name="onboarding_recovery_key_warning">Write this down and store it securely. If you lose your PIN and this key, your account cannot be recovered.</string>
@@ -1769,7 +1769,7 @@
     <string name="pin_confirm_description">Enter your PIN again to confirm</string>
     <string name="pin_confirm_subtitle">Enter the same PIN again to confirm</string>
     <string name="pin_confirm_title">Confirm your PIN</string>
-    <string name="pin_create_description">Choose a 6-digit PIN to protect your key on this device</string>
+    <string name="pin_create_description">Choose a PIN (8+ digits) or passphrase (8+ characters) to protect your key</string>
     <string name="pin_create_pin">Create a PIN</string>
     <string name="pin_create_title">Create a PIN</string>
     <string name="pin_dot_empty">Empty</string>
@@ -1781,9 +1781,9 @@
     <string name="pin_lockout_remaining">Locked out. Try again in %d seconds.</string>
     <string name="pin_mismatch">PINs don\'t match. Try again.</string>
     <string name="pin_set_encrypting">Encrypting your key...</string>
-    <string name="pin_set_subtitle">Choose a 6-8 digit PIN to protect your key</string>
+    <string name="pin_set_subtitle">Choose a PIN (8+ digits) or passphrase (8+ characters) to protect your key</string>
     <string name="pin_set_title">Create a PIN</string>
-    <string name="pin_too_short">PIN must be 6 digits</string>
+    <string name="pin_too_short">Must be at least 8 characters</string>
     <string name="pin_unlock_attempts">%d of %d attempts used</string>
     <string name="pin_unlock_subtitle">Enter your PIN to unlock</string>
     <string name="pin_unlock_title">Enter your PIN</string>

@@ -109,14 +109,14 @@ final class AuthFlowUITests: XCTestCase {
         navigateToPINSet()
 
         // Enter 6-digit PIN: 123456
-        enterPIN("123456")
+        enterPIN("12345678")
 
         // Should transition to confirm phase
         let pinPad = find("pin-pad")
         XCTAssertTrue(pinPad.exists, "PIN pad should still be visible for confirmation")
 
         // Confirm the same PIN: 123456
-        enterPIN("123456")
+        enterPIN("12345678")
 
         // Should reach dashboard after successful PIN set
         let dashboardTitle = find("dashboard-title")
@@ -131,7 +131,7 @@ final class AuthFlowUITests: XCTestCase {
         navigateToPINSet()
 
         // Enter first PIN: 123456
-        enterPIN("123456")
+        enterPIN("12345678")
 
         // Enter different PIN for confirmation: 567890
         enterPIN("567890")
@@ -318,10 +318,10 @@ final class AuthFlowUITests: XCTestCase {
         navigateToPINSet()
 
         // Enter PIN: 123456
-        enterPIN("123456")
+        enterPIN("12345678")
 
         // Confirm PIN: 123456
-        enterPIN("123456")
+        enterPIN("12345678")
 
         // Wait for dashboard
         let dashboardTitle = find("dashboard-title")

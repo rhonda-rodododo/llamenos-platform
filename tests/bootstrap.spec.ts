@@ -100,11 +100,11 @@ test.describe('In-Browser Admin Bootstrap', () => {
 
     // Step 2: PIN creation
     await expect(page.getByText('Create a PIN')).toBeVisible({ timeout: 5000 })
-    await enterPin(page, '123456')
+    await enterPin(page, '12345678')
 
     // PIN confirmation
     await expect(page.getByText('Confirm your PIN')).toBeVisible({ timeout: 5000 })
-    await enterPin(page, '123456')
+    await enterPin(page, '12345678')
 
     // Step 3: Generating + backup
     await expect(page.getByText('Save Your Recovery Key')).toBeVisible({ timeout: 15000 })
@@ -131,7 +131,7 @@ test.describe('In-Browser Admin Bootstrap', () => {
     const wizardPinEntry = page.getByRole('heading', { name: /enter your pin/i })
     const wizardPinVisible = await wizardPinEntry.isVisible({ timeout: 3000 }).catch(() => false)
     if (wizardPinVisible) {
-      await enterPin(page, '123456')
+      await enterPin(page, '12345678')
     }
 
     // Should now show the wizard's Identity step
@@ -149,7 +149,7 @@ test.describe('In-Browser Admin Bootstrap', () => {
     await expect(page.getByRole('heading', { name: 'Enter your PIN' })).toBeVisible({ timeout: 10000 })
 
     // Enter the correct PIN
-    await enterPin(page, '123456')
+    await enterPin(page, '12345678')
 
     // Should advance back to the wizard after PIN entry
     await expect(page.getByText('Setup Wizard')).toBeVisible({ timeout: 10000 })

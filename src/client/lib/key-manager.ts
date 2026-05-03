@@ -230,7 +230,11 @@ export class KeyLockedError extends Error {
   }
 }
 
-/** Validate a PIN format (6-8 digits, matching Rust crypto crate). */
-export function isValidPin(pin: string): boolean {
-  return /^\d{6,8}$/.test(pin)
+/** Validate credential format: numeric PIN (8+ digits) or alphanumeric passphrase (8+ chars with at least one letter). */
+export function isValidPin(credential: string): boolean {
+  if (credential.length < 8) return false
+  // All digits = numeric PIN (8+)
+  if (/^\d+$/.test(credential)) return true
+  // Alphanumeric passphrase: must have at least one letter
+  return /[a-zA-Z]/.test(credential)
 }
