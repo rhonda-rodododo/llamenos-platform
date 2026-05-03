@@ -199,7 +199,8 @@ jobs:
 
       - name: Generate CycloneDX SBOM
         run: |
-          npx --yes @cyclonedx/cdxgen -o sbom.cdx.json --spec-version 1.5
+          npx --yes @cyclonedx/cdxgen -o sbom.cdx.json --spec-version 1.5 \
+            --exclude ".mcp.json"
           echo "SBOM generated: $(jq '.components | length' sbom.cdx.json) components"
 
       - name: Install cosign
