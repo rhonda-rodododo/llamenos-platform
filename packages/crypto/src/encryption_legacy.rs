@@ -4,12 +4,12 @@
 //! All operations use the ECIES envelope pattern from `ecies.rs` with
 //! domain-separated labels from `labels.rs`.
 
+use argon2::Argon2;
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
     XChaCha20Poly1305, XNonce,
 };
 use hkdf::Hkdf;
-use pbkdf2::pbkdf2_hmac;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, Zeroizing};
@@ -20,7 +20,10 @@ use crate::ecies::{
 use crate::errors::CryptoError;
 use crate::labels::*;
 
-const PBKDF2_ITERATIONS: u32 = 600_000;
+/// Argon2id parameters (matching device_keys.rs).
+const ARGON2_M_COST_KIB: u32 = 65_536;
+const ARGON2_T_COST: u32 = 3;
+const ARGON2_P_COST: u32 = 4;
 
 // --- Per-Note Encryption (V2 — forward secrecy) ---
 
@@ -418,9 +421,9 @@ pub fn encrypt_export(json_string: &str, secret_key_hex: &str) -> Result<String,
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
 pub struct EncryptedKeyData {
-    /// hex, 16 or 32 bytes (new encryptions use 32)
+    /// hex, 32 bytes
     pub salt: String,
-    /// PBKDF2 iteration count (600,000)
+    /// Legacy field kept for serialization compat (ignored — Argon2id params are fixed)
     pub iterations: u32,
     /// hex, 24 bytes (XChaCha20 nonce)
     pub nonce: String,
@@ -430,14 +433,19 @@ pub struct EncryptedKeyData {
     pub pubkey: String,
 }
 
-/// Derive a 32-byte KEK from a PIN using PBKDF2-SHA256.
-pub fn derive_kek_from_pin(pin: &str, salt: &[u8]) -> [u8; 32] {
+/// Derive a 32-byte KEK from a credential using Argon2id.
+pub fn derive_kek_from_pin(credential: &str, salt: &[u8]) -> [u8; 32] {
     let mut kek = [0u8; 32];
-    pbkdf2_hmac::<Sha256>(pin.as_bytes(), salt, PBKDF2_ITERATIONS, &mut kek);
+    let params = argon2::Params::new(ARGON2_M_COST_KIB, ARGON2_T_COST, ARGON2_P_COST, Some(32))
+        .expect("valid argon2 params");
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+    argon2
+        .hash_password_into(credential.as_bytes(), salt, &mut kek)
+        .expect("argon2id hash failed");
     kek
 }
 
-/// Encrypt an nsec bech32 string with a PIN.
+/// Encrypt an nsec bech32 string with a credential (PIN or passphrase).
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn encrypt_with_pin(
     nsec: &str,
@@ -448,7 +456,7 @@ pub fn encrypt_with_pin(
         return Err(CryptoError::InvalidPin);
     }
 
-    let mut salt = [0u8; 32]; // M22: increased from 16 to 32 bytes
+    let mut salt = [0u8; 32];
     getrandom::getrandom(&mut salt).expect("getrandom failed");
 
     let mut kek = derive_kek_from_pin(pin, &salt);
@@ -479,7 +487,7 @@ pub fn encrypt_with_pin(
 
     Ok(EncryptedKeyData {
         salt: hex::encode(salt),
-        iterations: PBKDF2_ITERATIONS,
+        iterations: 0, // legacy field; Argon2id params are fixed
         nonce: hex::encode(nonce_bytes),
         ciphertext: hex::encode(ciphertext),
         pubkey: pubkey_hash,
@@ -513,11 +521,10 @@ pub fn decrypt_with_pin(data: &EncryptedKeyData, pin: &str) -> Result<String, Cr
     String::from_utf8(plaintext.to_vec()).map_err(|_| CryptoError::WrongPin)
 }
 
-/// Validate PIN format: 6-8 digits.
+/// Validate credential format: numeric PIN (8+ digits) or alphanumeric passphrase (8+ chars with at least one letter).
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn is_valid_pin(pin: &str) -> bool {
-    let len = pin.len();
-    (6..=8).contains(&len) && pin.chars().all(|c| c.is_ascii_digit())
+    crate::device_keys::is_valid_credential(pin)
 }
 
 #[cfg(test)]
@@ -593,7 +600,7 @@ mod tests {
     #[test]
     fn roundtrip_pin_encryption() {
         let nsec = "nsec1test1234567890abcdef";
-        let pin = "123456";
+        let pin = "12345678";
         let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
         let encrypted = encrypt_with_pin(nsec, pin, pubkey).unwrap();
@@ -602,68 +609,48 @@ mod tests {
     }
 
     #[test]
-    fn wrong_pin_fails() {
+    fn roundtrip_passphrase_encryption() {
+        let nsec = "nsec1testpassphrase";
+        let passphrase = "MyStr0ngPass!";
+        let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+
+        let encrypted = encrypt_with_pin(nsec, passphrase, pubkey).unwrap();
+        let decrypted = decrypt_with_pin(&encrypted, passphrase).unwrap();
+        assert_eq!(decrypted, nsec);
+    }
+
+    #[test]
+    fn wrong_credential_fails() {
         let nsec = "nsec1test1234567890abcdef";
-        let pin = "123456";
+        let pin = "12345678";
         let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
         let encrypted = encrypt_with_pin(nsec, pin, pubkey).unwrap();
-        let result = decrypt_with_pin(&encrypted, "999999");
+        let result = decrypt_with_pin(&encrypted, "99999999");
         assert!(result.is_err());
     }
 
     #[test]
-    fn pbkdf2_32_byte_salt_roundtrip() {
+    fn argon2id_32_byte_salt_roundtrip() {
         let nsec = "nsec1test32bytesalt";
-        let pin = "123456";
+        let pin = "12345678";
         let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
         let encrypted = encrypt_with_pin(nsec, pin, pubkey).unwrap();
-        // New encryptions should use 32-byte salt (64 hex chars)
+        // New encryptions use 32-byte salt (64 hex chars)
         assert_eq!(encrypted.salt.len(), 64);
         let decrypted = decrypt_with_pin(&encrypted, pin).unwrap();
         assert_eq!(decrypted, nsec);
     }
 
     #[test]
-    fn pbkdf2_16_byte_salt_backward_compat() {
-        // Simulate a legacy 16-byte salt encryption
-        let nsec = "nsec1legacy16byte";
-        let pin = "5678";
-        let mut salt = [0u8; 16];
-        getrandom::getrandom(&mut salt).expect("getrandom failed");
-        let mut kek = derive_kek_from_pin(pin, &salt);
-
-        let nonce_bytes = {
-            let mut n = [0u8; 24];
-            getrandom::getrandom(&mut n).expect("getrandom failed");
-            n
-        };
-        let nonce = XNonce::from_slice(&nonce_bytes);
-        let cipher = XChaCha20Poly1305::new_from_slice(&kek).unwrap();
-        let ciphertext = cipher.encrypt(nonce, nsec.as_bytes()).unwrap();
-        kek.zeroize();
-
-        let legacy_data = EncryptedKeyData {
-            salt: hex::encode(salt), // 32 hex chars = 16 bytes
-            iterations: 600_000,
-            nonce: hex::encode(nonce_bytes),
-            ciphertext: hex::encode(ciphertext),
-            pubkey: "deadbeef".to_string(),
-        };
-
-        // Should decrypt fine with 16-byte salt
-        let decrypted = decrypt_with_pin(&legacy_data, pin).unwrap();
-        assert_eq!(decrypted, nsec);
-    }
-
-    #[test]
-    fn invalid_pin_rejected() {
-        assert!(!is_valid_pin("12345")); // too short
-        assert!(!is_valid_pin("123456789")); // too long
-        assert!(!is_valid_pin("abcdef")); // not digits
-        assert!(is_valid_pin("123456")); // valid (6 digits)
+    fn credential_validation() {
+        assert!(!is_valid_pin("1234567")); // too short (7 digits)
+        assert!(!is_valid_pin("short")); // too short (5 chars)
+        assert!(!is_valid_pin("123456")); // old 6-digit PIN no longer valid
         assert!(is_valid_pin("12345678")); // valid (8 digits)
+        assert!(is_valid_pin("abcdefgh")); // valid (8 letters)
+        assert!(is_valid_pin("MyPass12")); // valid (mixed)
     }
 
     #[test]

@@ -108,13 +108,13 @@ pub fn decrypt_call_record_for_reader(
     )
 }
 
-/// Derive a 32-byte KEK from a PIN using PBKDF2-SHA256, returned as hex.
+/// Derive a 32-byte KEK from a credential using Argon2id, returned as hex.
 ///
-/// `salt_hex` is a hex-encoded salt (typically 16 bytes / 32 hex chars).
+/// `salt_hex` is a hex-encoded salt (32 bytes / 64 hex chars).
 #[allow(dead_code)]
-pub(crate) fn derive_kek_hex(pin: &str, salt_hex: &str) -> Result<String, CryptoError> {
+pub(crate) fn derive_kek_hex(credential: &str, salt_hex: &str) -> Result<String, CryptoError> {
     let salt = hex::decode(salt_hex).map_err(CryptoError::HexError)?;
-    let mut kek = derive_kek_from_pin(pin, &salt);
+    let mut kek = derive_kek_from_pin(credential, &salt);
     let hex = hex::encode(kek);
     kek.zeroize();
     Ok(hex)
