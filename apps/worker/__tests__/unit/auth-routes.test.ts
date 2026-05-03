@@ -36,7 +36,11 @@ vi.mock('@worker/services/audit', () => ({
 }))
 
 vi.mock('@worker/lib/hub-event-crypto', () => ({
-  deriveServerEventKey: () => new Uint8Array(32),
+  deriveHubEventKeys: (_secret: string, hubIds: string[]) => {
+    const keys: Record<string, string> = {}
+    for (const id of hubIds) keys[id] = 'aa'.repeat(32)
+    return keys
+  },
 }))
 
 vi.mock('@worker/middleware/auth', () => ({

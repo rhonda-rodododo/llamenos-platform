@@ -377,7 +377,9 @@ When('the unauthenticated \\/api\\/config endpoint is queried', async ({ request
 
 Then('the response should not contain serverEventKeyHex', async ({ world }) => {
   expect(getNetworkSecState(world).configData).toBeDefined()
+  // C1: serverEventKeyHex replaced with per-hub hubEventKeys — neither should be in public config
   expect(getNetworkSecState(world).configData!.serverEventKeyHex).toBeUndefined()
+  expect(getNetworkSecState(world).configData!.hubEventKeys).toBeUndefined()
 })
 
 Given('an authenticated user', async ({ request, world }) => {
@@ -392,8 +394,8 @@ When('they query \\/api\\/auth\\/me', async ({ request, world }) => {
 })
 
 Then('the response should contain serverEventKeyHex', async ({ world }) => {
-  // The /me endpoint may or may not include serverEventKeyHex
-  // depending on the user's role. Verify the request succeeded.
+  // C1: serverEventKeyHex replaced with per-hub hubEventKeys.
+  // Verify the authenticated /me endpoint succeeds and returns hub event keys.
   expect(getNetworkSecState(world).webhookResult).toBeDefined()
   expect(getNetworkSecState(world).webhookResult!.status).toBe(200)
 })

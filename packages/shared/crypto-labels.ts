@@ -143,3 +143,13 @@ export const LABEL_FIREHOSE_REPORT_WRAP = 'llamenos:firehose:report-wrap'
 
 /** HKDF context for per-hub storage IAM credential encryption at rest */
 export const LABEL_STORAGE_CREDENTIAL_WRAP = 'llamenos:storage-credential-wrap'
+
+// --- Nostr Event Tags ---
+
+/** Tag value for Llamenos events on the Nostr relay (`["t", NOSTR_EVENT_TAG]`) */
+export const NOSTR_EVENT_TAG = 'llamenos:event'
+
+// --- Per-Hub Event Encryption (Nostr hardening C1) ---
+
+/** HKDF info for deriving per-hub Nostr event encryption keys from SERVER_NOSTR_SECRET */
+export const LABEL_HUB_EVENT_KEY = 'llamenos:hub-event-key:v1'

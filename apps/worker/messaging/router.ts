@@ -111,7 +111,7 @@ messaging.post('/:channel/webhook', async (c) => {
               messageId: result.messageId,
               status: statusUpdate.status,
               timestamp: statusUpdate.timestamp,
-            }).catch((e) => {
+            }, '').catch((e) => {
               logger.error('Failed to publish status update', e)
             })
           }
@@ -145,7 +145,7 @@ messaging.post('/:channel/webhook', async (c) => {
           isTyping: typing.isTyping,
           channelType: 'signal',
           timestamp: typing.timestamp,
-        }).catch((e) => {
+        }, '').catch((e) => {
           logger.error('Failed to publish typing indicator', { error: e })
         })
         return c.json({ ok: true })
@@ -162,7 +162,7 @@ messaging.post('/:channel/webhook', async (c) => {
           isRemove: reaction.isRemove ?? false,
           sender: signalPayload.envelope.sourceUuid ?? signalPayload.envelope.source,
           channelType: 'signal',
-        }).catch((e) => {
+        }, '').catch((e) => {
           logger.error('Failed to publish reaction event', { error: e })
         })
         return c.json({ ok: true })
@@ -239,7 +239,7 @@ messaging.post('/:channel/webhook', async (c) => {
     type: 'message:new',
     conversationId: convResult.conversationId,
     channelType: channel,
-  }).catch((e) => { logger.error('Failed to publish inbound message event', e) })
+  }, hubId ?? '').catch((e) => { logger.error('Failed to publish inbound message event', e) })
 
   // Auto-assignment for new conversations
   if (convResult.isNew && convResult.status === 'waiting') {
@@ -356,7 +356,7 @@ async function tryAutoAssign(
       conversationId,
       assignedTo: bestCandidate,
       autoAssigned: true,
-    }).catch((e) => {
+    }, hubId ?? '').catch((e) => {
       logger.error('Failed to publish auto-assignment', e)
     })
 

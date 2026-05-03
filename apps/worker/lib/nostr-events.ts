@@ -1,21 +1,39 @@
 import type { AppEnv } from '../types'
 import { getNostrPublisher } from './service-factories'
-import { deriveServerEventKey, encryptHubEvent } from './hub-event-crypto'
+import { deriveHubEventKey, encryptHubEvent } from './hub-event-crypto'
+import { NOSTR_EVENT_TAG } from '@shared/crypto-labels'
 
-/** Cached event key — derived once per isolate lifetime */
-let cachedEventKey: Uint8Array | null = null
+/** Cached per-hub event keys — derived once per (secret, hubId) pair per isolate lifetime */
+const hubEventKeyCache = new Map<string, Uint8Array>()
 
-/** Publish an event to the Nostr relay for real-time sync. Content is encrypted if SERVER_NOSTR_SECRET is set. */
-export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>): Promise<void> {
+function getHubEventKey(serverSecret: string, hubId: string): Uint8Array {
+  const cacheKey = `${hubId}`
+  let key = hubEventKeyCache.get(cacheKey)
+  if (!key) {
+    key = deriveHubEventKey(serverSecret, hubId)
+    hubEventKeyCache.set(cacheKey, key)
+  }
+  return key
+}
+
+/**
+ * Publish an event to the Nostr relay for real-time sync.
+ * Content is encrypted with a per-hub key if SERVER_NOSTR_SECRET is set.
+ * The d-tag is set to hubId for proper per-hub event routing.
+ */
+export async function publishNostrEvent(
+  env: AppEnv['Bindings'],
+  kind: number,
+  content: Record<string, unknown>,
+  hubId: string,
+): Promise<void> {
   const publisher = getNostrPublisher(env)
 
-  // Encrypt event content if server secret is available
+  // Encrypt event content with per-hub key if server secret is available
   let eventContent: string
   if (env.SERVER_NOSTR_SECRET) {
-    if (!cachedEventKey) {
-      cachedEventKey = deriveServerEventKey(env.SERVER_NOSTR_SECRET)
-    }
-    eventContent = encryptHubEvent(content, cachedEventKey)
+    const eventKey = getHubEventKey(env.SERVER_NOSTR_SECRET, hubId)
+    eventContent = encryptHubEvent(content, eventKey)
   } else {
     eventContent = JSON.stringify(content)
   }
@@ -23,7 +41,7 @@ export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, c
   await publisher.publish({
     kind,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [['d', 'global'], ['t', 'llamenos:event']],
+    tags: [['d', hubId], ['t', NOSTR_EVENT_TAG]],
     content: eventContent,
   })
 }

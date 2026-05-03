@@ -145,7 +145,7 @@ events.post('/',
       eventId: event.id,
       entityTypeId: event.entityTypeId,
       caseNumber: event.caseNumber,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    }, c.get('hubId') ?? '').catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'eventCreated', pubkey, {
       eventId: event.id,
@@ -188,7 +188,7 @@ events.patch('/:id',
     publishNostrEvent(c.env, KIND_RECORD_UPDATED, {
       type: 'event:updated',
       eventId: id,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    }, c.get('hubId') ?? '').catch((e) => { logger.error('Failed to publish event', e) })
 
     await audit(services.audit, 'eventUpdated', pubkey, { eventId: id })
 

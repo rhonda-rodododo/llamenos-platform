@@ -19,7 +19,8 @@ import type { LlamenosEvent, RelayState, NostrEventHandler } from './types'
 export interface RelayManagerOptions {
   relayUrl: string
   serverPubkey: string
-  getHubKey: () => Uint8Array | null
+  /** Look up the per-hub event decryption key by hub ID. Returns null if unavailable. */
+  getHubEventKey: (hubId: string) => Uint8Array | null
   onStateChange?: (state: RelayState) => void
 }
 
@@ -39,7 +40,7 @@ export class RelayManager {
   private state: RelayState = 'disconnected'
   private serverPubkey: string
   private relayUrl: string
-  private getHubKey: () => Uint8Array | null
+  private getHubEventKey: (hubId: string) => Uint8Array | null
   private onStateChange?: (state: RelayState) => void
   private subscriptions = new Map<string, Subscription>()
   private pendingSubscriptions: Subscription[] = []
@@ -56,7 +57,7 @@ export class RelayManager {
   constructor(options: RelayManagerOptions) {
     this.relayUrl = options.relayUrl
     this.serverPubkey = options.serverPubkey
-    this.getHubKey = options.getHubKey
+    this.getHubEventKey = options.getHubEventKey
     this.onStateChange = options.onStateChange
   }
 
@@ -277,11 +278,22 @@ export class RelayManager {
     if (!verifyEvent(event)) return
     if (!validateLlamenosEvent(event)) return
 
+    // C2: Verify the event was published by the server — reject events from unknown pubkeys.
+    // This prevents a compromised relay or external attacker from injecting forged events.
+    if (event.pubkey !== this.serverPubkey) {
+      console.warn('[nostr] Rejected event from unknown publisher:', event.pubkey)
+      return
+    }
+
     // Deduplication
     if (!this.deduplicator.isNew(event)) return
 
-    // Try to decrypt content with hub key
-    const hubKey = this.getHubKey()
+    // Extract hubId from d-tag for per-hub key lookup and routing
+    const hubId = event.tags.find(t => t[0] === 'd')?.[1]
+    if (hubId === undefined) return
+
+    // C1: Decrypt content with per-hub event key (not a single global key)
+    const hubKey = this.getHubEventKey(hubId)
     let content: LlamenosEvent | null = null
 
     if (hubKey) {
@@ -290,10 +302,6 @@ export class RelayManager {
     }
 
     if (!content) return
-
-    // Route to all matching subscribers
-    const hubId = event.tags.find(t => t[0] === 'd')?.[1]
-    if (!hubId) return
 
     // Track the latest event timestamp per hub for replay on reconnect
     const prevTs = this.lastEventTimestamp.get(hubId) ?? 0

@@ -12,8 +12,7 @@ import { okResponseSchema } from '@protocol/schemas/common'
 import { publicErrors, authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { getPrimaryRole } from '@shared/permissions'
-import { deriveServerEventKey } from '../lib/hub-event-crypto'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { deriveHubEventKeys } from '../lib/hub-event-crypto'
 
 const auth = new Hono<AppEnv>()
 
@@ -148,10 +147,12 @@ auth.get('/me',
 
     const primaryRole = getPrimaryRole(user.roles, allRoles)
 
-    // Derive server event key for client-side decryption of encrypted relay events (Epic 252)
-    // Moved here from /api/config to keep it behind authentication (Epic 258 C2)
-    const serverEventKeyHex = c.env.SERVER_NOSTR_SECRET
-      ? bytesToHex(deriveServerEventKey(c.env.SERVER_NOSTR_SECRET))
+    // C1: Derive per-hub event keys — only for hubs this user is a member of.
+    // Each hub gets its own HKDF-derived key so a user in hub A cannot decrypt hub B's events.
+    // Also includes the empty-string hub key for cross-hub events (messaging webhooks, etc.)
+    const userHubIds = (user.hubRoles || []).map((hr: { hubId: string }) => hr.hubId)
+    const hubEventKeys = c.env.SERVER_NOSTR_SECRET
+      ? deriveHubEventKeys(c.env.SERVER_NOSTR_SECRET, ['', ...userHubIds])
       : undefined
 
     return c.json({
@@ -170,7 +171,7 @@ auth.get('/me',
       webauthnRegistered: webauthnCreds.length > 0,
       // H17: Removed adminPubkey (signing key identity) — only decryption pubkey needed
       adminDecryptionPubkey: c.env.ADMIN_DECRYPTION_PUBKEY || c.env.ADMIN_PUBKEY,
-      serverEventKeyHex,
+      hubEventKeys,
     })
   },
 )

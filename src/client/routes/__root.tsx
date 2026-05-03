@@ -163,21 +163,23 @@ const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frid
 function NostrWrappedLayout() {
   const { serverNostrPubkey, nostrRelayUrl } = useConfig()
 
-  const { serverEventKeyHex } = useAuth()
+  const { hubEventKeys } = useAuth()
 
-  // Server event key for decrypting relay events (XChaCha20-Poly1305).
-  // The key comes from GET /api/auth/me — same algorithm as decryptFromHub().
-  const getHubKey = useCallback((): Uint8Array | null => {
-    if (!serverEventKeyHex) return null
-    return hexToBytes(serverEventKeyHex)
-  }, [serverEventKeyHex])
+  // Per-hub event keys for decrypting relay events (XChaCha20-Poly1305).
+  // Keys come from GET /api/auth/me — HKDF-derived per hub from SERVER_NOSTR_SECRET.
+  const getHubEventKey = useCallback((hubId: string): Uint8Array | null => {
+    if (!hubEventKeys) return null
+    const keyHex = hubEventKeys[hubId]
+    if (!keyHex) return null
+    return hexToBytes(keyHex)
+  }, [hubEventKeys])
 
   return (
     <NostrProvider
       relayUrl={nostrRelayUrl}
       serverPubkey={serverNostrPubkey}
       isAuthenticated={true}
-      getHubKey={getHubKey}
+      getHubEventKey={getHubEventKey}
     >
       <AuthenticatedLayout />
     </NostrProvider>

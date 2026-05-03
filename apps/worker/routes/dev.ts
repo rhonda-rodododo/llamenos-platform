@@ -313,6 +313,7 @@ interface SimulateIncomingMessageBody {
   senderNumber: string
   body: string
   channel?: MessagingChannelType
+  hubId?: string
 }
 
 interface SimulateDeliveryStatusBody {
@@ -381,7 +382,7 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   publishNostrEvent(c.env, KIND_CALL_RING, {
     type: 'call:ring',
     callId,
-  }).catch(() => {})
+  }, hubId).catch(() => {})
 
   return c.json({ ok: true, callId, status: 'ringing' })
 })
@@ -406,13 +407,13 @@ dev.post('/test-simulate/answer-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'in-progress',
-  }).catch(() => {})
+  }, call.hubId ?? '').catch(() => {})
 
   // Publish presence update (mirrors real telephony flow)
   publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: body.callId,
-  }).catch(() => {})
+  }, call.hubId ?? '').catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'in-progress' })
 })
@@ -437,7 +438,7 @@ dev.post('/test-simulate/end-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'completed',
-  }).catch(() => {})
+  }, call.hubId ?? '').catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'completed' })
 })
@@ -462,7 +463,7 @@ dev.post('/test-simulate/voicemail', async (c) => {
   publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
     type: 'voicemail:new',
     callId: body.callId,
-  }).catch(() => {})
+  }, call.hubId ?? '').catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'unanswered' })
 })
@@ -492,12 +493,13 @@ dev.post('/test-simulate/incoming-message', async (c) => {
   }, adminDecryptionPubkey)
 
   // Publish Nostr event (mirrors real messaging webhook flow)
+  // Messaging events use empty hubId — conversations span all hubs
   publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: result.conversationId,
     messageId: result.messageId,
     channelType: channel,
-  }).catch(() => {})
+  }, body.hubId ?? '').catch(() => {})
 
   return c.json({ ok: true, conversationId: result.conversationId, messageId: result.messageId })
 })
