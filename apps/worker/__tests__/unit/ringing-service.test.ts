@@ -3,12 +3,10 @@ import { startParallelRinging } from '../../services/ringing'
 import type { Env } from '../../types'
 import type { Services } from '../../services'
 
-// Mock external modules — vi.hoisted is needed because vi.mock is hoisted above imports
-const { mockAdapter } = vi.hoisted(() => ({
-  mockAdapter: {
-    ringVolunteers: vi.fn().mockResolvedValue(undefined),
-  },
-}))
+// Mock adapter declared at top level (bun test hoists vi.mock automatically)
+const mockAdapter = {
+  ringVolunteers: vi.fn().mockResolvedValue(undefined),
+}
 
 vi.mock('../../lib/service-factories', () => ({
   getTelephonyFromService: vi.fn().mockResolvedValue(mockAdapter),

@@ -245,7 +245,7 @@ describe('sendAlert', () => {
       ok: opts.notifierOk,
       status: opts.notifierOk ? 200 : 500,
     })
-    vi.stubGlobal('fetch', fetchMock)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const config: UserNotificationsConfig = {
       notifierUrl: 'http://localhost:3100',
@@ -412,7 +412,7 @@ describe('unregisterFromSidecar', () => {
 
   it('sends DELETE request to sidecar with correct URL', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true })
-    vi.stubGlobal('fetch', fetchMock)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const svc = new UserNotificationsService(
       {} as never,
@@ -435,7 +435,7 @@ describe('unregisterFromSidecar', () => {
   })
 
   it('does not throw on network error (best-effort)', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection refused')))
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('connection refused')) as unknown as typeof fetch
 
     const svc = new UserNotificationsService(
       {} as never,
