@@ -41,6 +41,7 @@ pub mod sframe;
 // === Stable modules (curve-independent) ===
 pub mod blind_index;
 pub mod errors;
+pub mod padding;
 
 // === Legacy modules (secp256k1 — kept during transition, removed in Phase 6) ===
 pub mod auth_legacy;
