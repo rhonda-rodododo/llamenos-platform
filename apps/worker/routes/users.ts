@@ -53,7 +53,7 @@ users.post('/',
       pubkey: body.pubkey,
       name: body.name,
       phone: body.phone,
-      roleIds: body.roleIds || body.roles || ['role-volunteer'],
+      roleIds: (body.roleIds?.length ? body.roleIds : undefined) || (body.roles?.length ? body.roles : undefined) || ['role-volunteer'],
       encryptedSecretKey: body.encryptedSecretKey || '',
       // Epic 340: User profile extensions
       ...(body.specializations && { specializations: body.specializations }),
@@ -162,8 +162,12 @@ users.get('/:targetPubkey/cases',
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')
 
-    // Verify user exists (throws 404 if not found)
-    await services.identity.getUser(targetPubkey)
+    // Verify user exists
+    try {
+      await services.identity.getUser(targetPubkey)
+    } catch {
+      return c.json({ error: 'User not found' }, 404)
+    }
 
     const page = parseInt(c.req.query('page') ?? '1', 10)
     const limit = parseInt(c.req.query('limit') ?? '20', 10)
@@ -211,8 +215,12 @@ users.get('/:targetPubkey/metrics',
     const services = c.get('services')
     const targetPubkey = c.req.param('targetPubkey')
 
-    // Verify user exists (throws 404 if not found)
-    await services.identity.getUser(targetPubkey)
+    // Verify user exists
+    try {
+      await services.identity.getUser(targetPubkey)
+    } catch {
+      return c.json({ error: 'User not found' }, 404)
+    }
 
     const hubId = c.req.query('hubId') ?? c.get('hubId') ?? ''
 
@@ -235,7 +243,7 @@ users.get('/:targetPubkey/metrics',
       let totalDays = 0
       for (const record of closedRecords) {
         const created = new Date(record.createdAt).getTime()
-        const closed = new Date(record.closedAt!).getTime()
+        const closed = record.closedAt ? new Date(record.closedAt).getTime() : created
         totalDays += (closed - created) / (1000 * 60 * 60 * 24)
       }
       averageResolutionDays = Math.round((totalDays / closedRecords.length) * 10) / 10

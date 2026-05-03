@@ -76,9 +76,14 @@ config.get('/',
 
     // Derive server Nostr pubkey for client event verification (Epic 76.1)
     // NOTE: serverEventKeyHex moved to authenticated /api/auth/me endpoint (Epic 258 C2)
-    const serverNostrPubkey = c.env.SERVER_NOSTR_SECRET
-      ? deriveServerKeypair(c.env.SERVER_NOSTR_SECRET).pubkey
-      : undefined
+    let serverNostrPubkey: string | undefined
+    if (c.env.SERVER_NOSTR_SECRET) {
+      try {
+        serverNostrPubkey = deriveServerKeypair(c.env.SERVER_NOSTR_SECRET).pubkey
+      } catch {
+        serverNostrPubkey = undefined
+      }
+    }
 
     // Client-facing relay URL:
     // - Explicit env var takes priority (any deployment)

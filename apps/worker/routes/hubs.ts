@@ -82,10 +82,16 @@ routes.post('/',
     const services = c.get('services')
     const body = c.req.valid('json')
 
+    const name = body.name.trim()
+    const slug = body.slug?.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    if (!slug || slug === '-') {
+      return c.json({ error: 'Generated slug is empty. Provide a non-empty name or explicit slug.' }, 400)
+    }
+
     const hub: Hub = {
       id: crypto.randomUUID(),
-      name: body.name.trim(),
-      slug: body.slug?.trim() || body.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name,
+      slug,
       description: body.description?.trim(),
       status: 'active',
       phoneNumber: body.phoneNumber?.trim(),
@@ -124,7 +130,7 @@ routes.post('/',
       }
     }
 
-    return c.json({ hub })
+    return c.json({ hub }, 201)
   },
 )
 

@@ -121,7 +121,7 @@ bans.delete('/:phone',
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const hubId = c.get('hubId')
-    const phone = decodeURIComponent(c.req.param('phone'))
+    const phone = c.req.param('phone')
     await services.records.removeBan(phone, hubId)
     await audit(services.audit, 'numberUnbanned', pubkey, {}, undefined, hubId ?? undefined)
     return c.json({ ok: true })

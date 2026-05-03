@@ -64,6 +64,8 @@ let processing = false
 // Per-hub-per-channel rate limiters (keyed by hubId:channel)
 const rateLimiters = new Map<string, TokenBucketRateLimiter>()
 
+const MAX_RATE_LIMITERS = 1000
+
 function getRateLimiter(hubId: string, channel: MessagingChannelType, settings: BlastSettings): TokenBucketRateLimiter {
   const key = `${hubId || 'global'}:${channel}`
   let limiter = rateLimiters.get(key)
@@ -71,6 +73,11 @@ function getRateLimiter(hubId: string, channel: MessagingChannelType, settings: 
     const rate = settings.rateLimits?.[channel] ?? settings.rateLimitPerSecond
     limiter = TokenBucketRateLimiter.create(rate)
     rateLimiters.set(key, limiter)
+
+    if (rateLimiters.size > MAX_RATE_LIMITERS) {
+      const firstKey = rateLimiters.keys().next().value
+      if (firstKey) rateLimiters.delete(firstKey)
+    }
   }
   return limiter
 }
@@ -250,17 +257,15 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
  * Build the message body for a specific channel, with opt-out footer.
  */
 function buildMessageBody(content: BlastContent, channel: MessagingChannelType, optOutFooter: string): string {
-  // Use channel-specific override if available
   let body: string
   switch (channel) {
     case 'sms':
-      body = content.smsText ?? content.text
+      body = content.smsText ?? content.text ?? ''
       break
     default:
-      body = content.text
+      body = content.text ?? ''
       break
   }
 
-  // Append opt-out footer
   return body + optOutFooter
 }

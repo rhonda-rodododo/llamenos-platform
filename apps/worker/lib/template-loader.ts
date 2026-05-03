@@ -11,7 +11,9 @@ import type { CaseManagementTemplate } from '../../../packages/protocol/template
 // across different runtimes (Node.js vs Cloudflare Workers)
 let cachedTemplates: CaseManagementTemplate[] | null = null
 
-export async function loadBundledTemplates(): Promise<CaseManagementTemplate[]> {
+export async function loadBundledTemplates(
+  importFn: (path: string) => Promise<unknown> = (path) => import(path),
+): Promise<CaseManagementTemplate[]> {
   if (cachedTemplates) return cachedTemplates
 
   // Dynamic imports work in both Node.js and Cloudflare Workers bundled builds
@@ -34,9 +36,9 @@ export async function loadBundledTemplates(): Promise<CaseManagementTemplate[]> 
   const templates: CaseManagementTemplate[] = []
   for (const name of templateFiles) {
     try {
-      // Use dynamic import for cross-runtime compatibility
-      const mod = await import(`../../../packages/protocol/templates/${name}.json`)
-      templates.push(mod.default ?? mod)
+      const mod = await importFn(`../../../packages/protocol/templates/${name}.json`)
+      const template = (mod as Record<string, unknown>).default ?? mod
+      templates.push(template as CaseManagementTemplate)
     } catch {
       // Template file not found — skip silently
     }
