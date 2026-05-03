@@ -128,14 +128,14 @@ services.scheduler.start({
       type: 'blast:progress',
       blastId,
       ...stats,
-    }, '').catch(() => {})
+    }).catch(() => {})
   },
   onBlastStatusChange: (blastId, status) => {
     publishNostrEvent(env as unknown as Env, KIND_BLAST_STATUS, {
       type: 'blast:status',
       blastId,
       status,
-    }, '').catch(() => {})
+    }).catch(() => {})
   },
 })
 

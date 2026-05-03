@@ -419,7 +419,7 @@ conversations.post('/:id/messages',
       type: 'message:new',
       conversationId: id,
       channelType: 'outbound',
-    }, c.get('hubId') ?? '').catch((e) => { logger.error('Failed to publish event', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     audit(c.get('services').audit, 'messageSent', pubkey, {
       conversationId: id,
@@ -473,7 +473,7 @@ conversations.patch('/:id',
       type: convEventType,
       conversationId: id,
       assignedTo: body.assignedTo,
-    }, c.get('hubId') ?? '').catch((e) => { logger.error('Failed to publish event', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     audit(c.get('services').audit, body.status === 'closed' ? 'conversationClosed' : 'conversationUpdated', pubkey, {
       conversationId: id,
@@ -550,7 +550,7 @@ conversations.post('/:id/claim',
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: pubkey,
-    }, c.get('hubId') ?? '').catch((e) => { logger.error('Failed to publish event', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     // Push notification to assigned user (Epic 86)
     dispatchPushToUser(c.env, services, pubkey, {

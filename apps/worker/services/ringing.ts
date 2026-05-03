@@ -76,7 +76,7 @@ export async function startParallelRinging(
     publishNostrEvent(env, KIND_CALL_RING, {
       type: 'call:ring',
       callId: callSid,
-    }, hubId).catch((e) => { logger.error('Failed to publish event', e) })
+    }).catch((e) => { logger.error('Failed to publish event', e) })
 
     // Dispatch VoIP push notifications to mobile volunteers with registered VoIP tokens.
     // Skip VoIP push for global-scope (hubId='') calls — mobile clients require a real hub ID to route the call.
