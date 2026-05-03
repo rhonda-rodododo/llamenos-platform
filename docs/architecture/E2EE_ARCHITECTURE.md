@@ -1,5 +1,16 @@
 # Llamenos E2EE Architecture Overview
 
+> **Authoritative Reference:** For precise wire formats, cryptographic algorithms, domain separation constants, and API endpoint specifications, see [`docs/protocol/PROTOCOL.md`](../protocol/PROTOCOL.md). This document describes the architectural vision, implementation history, and security analysis. Where this document and PROTOCOL.md conflict, PROTOCOL.md is authoritative.
+>
+> **Key changes since this document was written:**
+> - ECIES (secp256k1 + XChaCha20-Poly1305) has been replaced by **HPKE (RFC 9180, X25519 + AES-256-GCM)** for all new envelope encryption
+> - Single nsec-per-user has been replaced by **per-device Ed25519/X25519 keypairs** (Phase 6)
+> - Auth uses **Ed25519 signatures** (with Schnorr fallback for legacy)
+> - Backend is **Bun + PostgreSQL** (not Cloudflare Workers / Durable Objects)
+> - Mobile clients are **native SwiftUI (iOS) and Kotlin/Compose (Android)**, not React Native
+> - Domain separation constants expanded from 25 to **57 labels** (source of truth: `packages/protocol/crypto-labels.json`)
+> - Crypto crate absorbed into monorepo as `packages/crypto/` (formerly external `llamenos-core` repo)
+
 ## Vision
 
 Transform Llamenos from a "server-side encrypted" model to a **true zero-knowledge architecture** where:
@@ -337,9 +348,9 @@ Server nsec (secp256k1) — SERVER IDENTITY ONLY
     └─→ CANNOT decrypt any user content
 ```
 
-## Domain Separation Labels (Authoritative Table)
+## Domain Separation Labels (Historical Subset)
 
-From Epic 76.0:
+> **Note:** This table shows 10 of the original Epic 76.0 labels. The full set of 57 labels is defined in `packages/protocol/crypto-labels.json` and documented in `docs/protocol/PROTOCOL.md` Section 2.1.
 
 | Label | Purpose | Used By |
 | ----- | ------- | ------- |

@@ -1,18 +1,22 @@
 # Architecture Overview
 
-> **Note:** This document reflects the original pre-monorepo architecture (three separate repos, React Native, Cloudflare Durable Objects).
-> The current architecture is a monorepo (`apps/`, `packages/`) with native iOS/Android, Bun+PostgreSQL backend, and a Rust crypto crate.
-> See `CLAUDE.md` for the authoritative current architecture description.
+> For full protocol details (wire formats, crypto algorithms, API endpoints), see `docs/protocol/PROTOCOL.md`.
 
-## Three-Repo Structure (Historical)
+## Monorepo Structure
 
 ```
-llamenos/           Desktop app (Tauri v2) + API + protocol spec
-llamenos-core/      Shared Rust crypto crate (native + WASM + UniFFI)
-llamenos-mobile/    React Native mobile app (Expo)
+apps/desktop/       Tauri v2 desktop shell (Rust backend + webview frontend)
+apps/worker/        Bun HTTP server (Hono + PostgreSQL)
+apps/ios/           Native SwiftUI iOS client
+apps/android/       Native Kotlin/Compose Android client
+apps/sip-bridge/    Protocol-agnostic SIP bridge (PBX_TYPE selects ARI/ESL/Kamailio)
+packages/crypto/    Shared Rust crypto crate (native + WASM + UniFFI)
+packages/protocol/  JSON Schema definitions + codegen (TS/Swift/Kotlin)
+packages/shared/    Cross-boundary TypeScript types and config
+packages/i18n/      Localization files + iOS/Android string codegen
 ```
 
-All three implement the same protocol: `docs/protocol/PROTOCOL.md`
+All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 
 ## Data Flow
 
@@ -20,21 +24,24 @@ All three implement the same protocol: `docs/protocol/PROTOCOL.md`
 Caller (GSM phone)
   │
   ▼
-Twilio / SIP Provider ──► TelephonyAdapter
+Twilio / SIP Provider ──► TelephonyAdapter (8 providers)
   │
   ▼
-Cloudflare Worker API ──► Durable Objects (6 singletons)
+Bun HTTP Server (Hono) ──► PostgreSQL
   │                           │
   ├─ REST responses ◄─────────┤
   │                           │
   ▼                           ▼
-Nostr Relay (strfry)     PostgreSQL (self-hosted alt)
+Nostr Relay (strfry)     RustFS (encrypted file storage)
   │
   ├──► Desktop App (Tauri v2 + webview)
-  │      └── Rust CryptoState (nsec never enters webview)
+  │      └── Rust CryptoState (device keys never enter webview)
   │
-  └──► Mobile App (React Native)
-         └── llamenos-core via UniFFI (nsec in native layer)
+  ├──► iOS App (Native SwiftUI)
+  │      └── packages/crypto via UniFFI XCFramework
+  │
+  └──► Android App (Native Kotlin/Compose)
+         └── packages/crypto via JNI .so
 ```
 
 ## Encryption Architecture
@@ -43,45 +50,49 @@ Nostr Relay (strfry)     PostgreSQL (self-hosted alt)
 
 | Data | Encrypted by | Decryptable by | Scheme |
 |------|-------------|----------------|--------|
-| Call notes | Author's client | Author + admins | ECIES per-note key |
-| Messages | Volunteer client | Assigned volunteer + admins | ECIES per-message key |
-| Call records | Server | Admins only | ECIES per-record key |
+| Call notes | Author's client | Author + admins | HPKE per-note key (legacy: ECIES) |
+| Messages | Volunteer client | Assigned volunteer + admins | HPKE per-message key (legacy: ECIES) |
+| Call records | Server | Admins only | HPKE per-record key (legacy: ECIES) |
 | Drafts | Client | Same client only | HKDF-derived key |
-| PIN-protected nsec | Client | Same device | PBKDF2 + XChaCha20 |
-| Hub events | Server | All members | Hub key (shared secret) |
+| PIN-protected device keys | Client | Same device | PBKDF2 + AES-256-GCM |
+| Hub events | Server | All members | Hub key (shared secret) via XChaCha20-Poly1305 |
 
 ### Key storage per platform
 
-| Platform | Where nsec lives | Access control |
-|----------|-----------------|----------------|
-| Desktop (Tauri) | Rust `CryptoState` | Never enters webview |
-| Mobile (RN) | expo-secure-store | Keychain (iOS) / EncryptedSharedPreferences (Android) |
+| Platform | Where device keys live | Access control |
+|----------|----------------------|----------------|
+| Desktop (Tauri) | Tauri Stronghold / Rust `CryptoState` | Never enters webview |
+| iOS | Keychain Services | `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` |
+| Android | EncryptedSharedPreferences | AndroidKeyStore-backed |
 | API server | Never stored | Server has own keypair; user keys never sent |
 
 ### Cryptographic primitives
 
-- **Curve**: secp256k1 (ECDH + BIP-340 Schnorr)
-- **AEAD**: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag)
-- **KDF**: HKDF-SHA-256 (legacy), PBKDF2-SHA-256 600K iterations (PINs)
-- **Domain separation**: 28 labeled contexts in `crypto-labels.ts` / `labels.rs`
+- **Envelope encryption**: HPKE RFC 9180 (X25519 + HKDF-SHA256 + AES-256-GCM) — current
+- **Legacy envelope**: secp256k1 ECIES (ECDH + XChaCha20-Poly1305) — for existing data
+- **Symmetric**: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag) for hub events
+- **KDF**: HKDF-SHA-256, PBKDF2-SHA-256 600K iterations (PINs)
+- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (Nostr identity)
+- **Domain separation**: 57 labeled contexts in `packages/protocol/crypto-labels.json`
 
-All crypto is implemented once in Rust (`llamenos-core`), compiled to:
-- Native library (Tauri desktop)
-- UniFFI Swift/Kotlin bindings (React Native mobile)
-- WASM (future browser support)
+All crypto is implemented once in Rust (`packages/crypto/`), compiled to:
+- Native library (Tauri desktop, path dep from `apps/desktop/Cargo.toml`)
+- UniFFI XCFramework (iOS) and JNI `.so` (Android)
+- WASM (browser test builds)
 
-## Durable Objects (Cloudflare)
+## Backend Services
 
-Six singletons accessed via `idFromName()`:
+The backend runs as a Bun HTTP server with Hono routing and PostgreSQL for persistence:
 
-| DO | Responsibility |
-|----|---------------|
-| IdentityDO | Volunteer identities, pubkeys, roles |
-| SettingsDO | Hub settings, telephony config, spam rules |
-| RecordsDO | Call records, notes, audit log |
-| ShiftManagerDO | Shift schedules, assignments |
-| CallRouterDO | Active call routing, parallel ringing |
-| ConversationDO | SMS/WhatsApp/Signal messaging threads |
+| Service Layer | Responsibility |
+|--------------|---------------|
+| Identity service | User identities, pubkeys, roles, device registry |
+| Settings service | Hub settings, telephony config, spam rules |
+| Records service | Call records, notes, audit log |
+| Shift service | Shift schedules, assignments |
+| Call router | Active call routing, parallel ringing |
+| Conversation service | SMS/WhatsApp/Signal messaging threads |
+| CMS services | Contacts, cases, reports, evidence |
 
 ## Real-Time Sync
 
@@ -92,10 +103,10 @@ Nostr relay (strfry) with encrypted ephemeral events:
 
 ## Security Layers
 
-| Layer | Desktop | Mobile |
-|-------|---------|--------|
-| Transport | HTTPS (CSP enforced) | HTTPS (enforced in API client) |
-| IPC isolation | Tauri isolation pattern + allowlist | N/A (native bridge) |
-| Key protection | CryptoState in Rust (zeroize on drop) | expo-secure-store + PBKDF2 |
-| Auth | BIP-340 Schnorr signatures | BIP-340 Schnorr signatures |
-| Forward secrecy | Ephemeral ECDH per encryption | Ephemeral ECDH per encryption |
+| Layer | Desktop | iOS | Android |
+|-------|---------|-----|---------|
+| Transport | HTTPS (CSP enforced) | HTTPS (App Transport Security) | HTTPS (network security config) |
+| IPC isolation | Tauri isolation pattern + capabilities | N/A (native) | N/A (native) |
+| Key protection | CryptoState in Rust (zeroize on drop) | Keychain + CryptoService singleton | EncryptedSharedPreferences + CryptoService |
+| Auth | Ed25519 device signatures (legacy: Schnorr) | Ed25519 device signatures | Ed25519 device signatures |
+| Forward secrecy | HPKE ephemeral encapsulation per envelope | HPKE ephemeral encapsulation | HPKE ephemeral encapsulation |
