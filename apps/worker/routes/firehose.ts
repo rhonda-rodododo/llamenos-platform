@@ -3,6 +3,7 @@
  * notification opt-outs, and agent lifecycle control.
  */
 import { Hono } from 'hono'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { LABEL_FIREHOSE_AGENT_SEAL } from '@shared/crypto-labels'
@@ -12,6 +13,7 @@ import {
   firehoseConnectionStatusSchema,
   type FirehoseConnectionStatus,
 } from '@protocol/schemas/firehose'
+import { authErrors } from '../openapi/helpers'
 import { generateAgentKeypair } from '../lib/agent-identity'
 import { backgroundTask } from '../lib/hono-compat'
 import { createLogger } from '../lib/logger'
@@ -96,24 +98,22 @@ firehose.get('/',
 // ---------------------------------------------------------------------------
 
 firehose.post('/',
+  describeRoute({
+    tags: ['Firehose'],
+    summary: 'Create a firehose connection',
+    responses: {
+      201: { description: 'Connection created' },
+      ...authErrors,
+    },
+  }),
   requirePermission('firehose:manage'),
+  validator('json', createFirehoseConnectionSchema),
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId') ?? 'global'
     const pubkey = c.get('pubkey')
 
-    let body: unknown
-    try {
-      body = await c.req.json()
-    } catch {
-      return c.json({ error: 'Invalid JSON body' }, 400)
-    }
-
-    const parsed = createFirehoseConnectionSchema.safeParse(body)
-    if (!parsed.success) {
-      return c.json({ error: 'Validation error', details: parsed.error.issues }, 400)
-    }
-    const data = parsed.data
+    const data = c.req.valid('json')
 
     // Seal key must be configured
     const sealKey = c.env.FIREHOSE_AGENT_SEAL_KEY
@@ -181,25 +181,24 @@ firehose.get('/:id',
 // ---------------------------------------------------------------------------
 
 firehose.patch('/:id',
+  describeRoute({
+    tags: ['Firehose'],
+    summary: 'Update a firehose connection',
+    responses: {
+      200: { description: 'Connection updated' },
+      404: { description: 'Connection not found' },
+      ...authErrors,
+    },
+  }),
   requirePermission('firehose:manage'),
+  validator('json', updateFirehoseConnectionSchema),
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId') ?? 'global'
     const pubkey = c.get('pubkey')
     const id = c.req.param('id')
 
-    let body: unknown
-    try {
-      body = await c.req.json()
-    } catch {
-      return c.json({ error: 'Invalid JSON body' }, 400)
-    }
-
-    const parsed = updateFirehoseConnectionSchema.safeParse(body)
-    if (!parsed.success) {
-      return c.json({ error: 'Validation error', details: parsed.error.issues }, 400)
-    }
-    const data = parsed.data
+    const data = c.req.valid('json')
 
     const existing = await services.firehose.getConnection(id)
     if (!existing) {
