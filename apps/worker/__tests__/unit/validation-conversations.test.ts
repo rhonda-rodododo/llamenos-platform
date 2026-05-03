@@ -4,8 +4,9 @@
  * Validates E2EE message envelopes, conversation status transitions,
  * and channel type enums.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import conversationsRoutes from '../../routes/conversations'
+import type { AppEnv } from '../../types'
 import {
   createTestApp,
   sendJSON,
@@ -13,11 +14,39 @@ import {
   VALID_ENVELOPE,
 } from '../helpers/openapi-validation'
 
+/** Creates a mock services object whose conversations.getById returns a web-channel conversation */
+function createWebChannelServices(): AppEnv['Variables']['services'] {
+  const webConv = {
+    id: 'conv-1',
+    channelType: 'web',
+    assignedTo: VALID_PUBKEY,
+    hubId: 'hub-1',
+  }
+  return new Proxy({} as AppEnv['Variables']['services'], {
+    get(_target, prop) {
+      if (typeof prop === 'symbol') return undefined
+      if (prop === 'conversations') {
+        return {
+          getById: vi.fn().mockResolvedValue(webConv),
+          addMessage: vi.fn().mockResolvedValue({ id: 'msg-new' }),
+        }
+      }
+      return new Proxy({}, {
+        get(_t, method) {
+          if (typeof method === 'symbol') return undefined
+          return vi.fn().mockResolvedValue({})
+        },
+      })
+    },
+  })
+}
+
 function createApp() {
   return createTestApp({
     prefix: '/conversations',
     routes: conversationsRoutes,
     authenticated: true,
+    services: createWebChannelServices(),
   })
 }
 
