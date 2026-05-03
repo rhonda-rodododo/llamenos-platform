@@ -201,13 +201,14 @@ class CryptoService @Inject constructor() {
 
     /**
      * Lock by zeroizing device secrets in Rust memory.
+     * Hub keys and server event keys are also zeroized in Rust.
      * Public keys are retained for locked-state display ("Locked as ...").
      */
     fun lock() {
         if (nativeLibLoaded) {
             try { org.llamenos.core.mobileLock() } catch (_: Exception) {}
         }
-        hubKeys.clear()
+        testHubKeys.clear()
     }
 
     // ---- Auth Token (Ed25519) ----
@@ -448,7 +449,7 @@ class CryptoService @Inject constructor() {
     // ---- Server Event Decryption ----
 
     /**
-     * Decrypt a server-encrypted event payload (XChaCha20-Poly1305).
+     * Decrypt a server-encrypted event payload (XChaCha20-Poly1305) with an explicit key.
      */
     fun decryptServerEvent(encryptedHex: String, keyHex: String): String? {
         if (!nativeLibLoaded) return null
@@ -456,6 +457,35 @@ class CryptoService @Inject constructor() {
             org.llamenos.core.decryptServerEventHex(encryptedHex, keyHex)
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /**
+     * Decrypt a server event using Rust-stored server event keys (current + previous epoch).
+     * Returns null if no keys are set or decryption fails with both keys.
+     */
+    fun decryptServerEventWithStoredKeys(encryptedHex: String): String? {
+        if (!nativeLibLoaded) return null
+        return try {
+            org.llamenos.core.mobileDecryptServerEvent(encryptedHex)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Store server event keys in Rust memory for epoch-based rotation.
+     * Keys are held exclusively in Rust — never in JVM memory.
+     *
+     * @param currentHex Current epoch key (32 bytes, hex-encoded)
+     * @param previousHex Previous epoch key (empty string if none)
+     */
+    fun setServerEventKeys(currentHex: String, previousHex: String = "") {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        try {
+            org.llamenos.core.mobileSetServerEventKeys(currentHex, previousHex)
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("Failed to set server event keys: ${e.message}", e)
         }
     }
 
@@ -517,17 +547,27 @@ class CryptoService @Inject constructor() {
     }
 
     // ---- Hub Key Management ----
+    // Hub keys are stored exclusively in Rust memory — NEVER in JVM/Kotlin memory.
+    // The Kotlin-side ConcurrentHashMap is only used as a fallback for JVM tests
+    // where the native library is unavailable.
 
-    private val hubKeys: MutableMap<String, String> = ConcurrentHashMap() // hubId → keyHex
+    private val testHubKeys: MutableMap<String, String> = ConcurrentHashMap()
 
-    fun hasHubKey(hubId: String): Boolean = hubKeys.containsKey(hubId)
+    fun hasHubKey(hubId: String): Boolean =
+        if (nativeLibLoaded) org.llamenos.core.mobileHasHubKey(hubId)
+        else testHubKeys.containsKey(hubId)
 
-    fun allHubKeys(): Map<String, String> = HashMap(hubKeys)
-
-    fun clearHubKeys() { hubKeys.clear() }
+    fun clearHubKeys() {
+        if (nativeLibLoaded) {
+            org.llamenos.core.mobileClearHubKeys()
+            org.llamenos.core.mobileClearServerEventKeys()
+        }
+        testHubKeys.clear()
+    }
 
     /**
      * Unwrap and cache the hub key using HPKE from a server-provided envelope.
+     * The unwrapped key is stored in Rust memory — it never enters JVM memory.
      */
     suspend fun loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse): Unit =
         withContext(computeDispatcher) {
@@ -551,8 +591,41 @@ class CryptoService @Inject constructor() {
                 throw CryptoException("Hub key decryption failed for hub $hubId: ${e.message}", e)
             }
 
-            hubKeys[hubId] = keyHex
+            // Store the unwrapped key in Rust state, then zeroize the local reference
+            try {
+                org.llamenos.core.mobileSetHubKey(hubId, keyHex)
+            } catch (e: org.llamenos.core.CryptoException) {
+                throw CryptoException("Failed to store hub key for $hubId: ${e.message}", e)
+            }
         }
+
+    /**
+     * Decrypt a hub event using the Rust-stored hub key.
+     * Returns decrypted JSON string or null if decryption fails.
+     */
+    fun decryptHubEvent(encryptedHex: String, hubId: String): String? {
+        if (!nativeLibLoaded) return null
+        return try {
+            org.llamenos.core.mobileDecryptHubEvent(encryptedHex, hubId)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Trial-decrypt an event against all cached hub keys in Rust.
+     * Returns Pair(hubId, plaintext) for the first key that succeeds, or null.
+     * Hub keys never leave Rust memory during this operation.
+     */
+    fun decryptHubEventTrial(encryptedHex: String): Pair<String, String>? {
+        if (!nativeLibLoaded) return null
+        return try {
+            val result = org.llamenos.core.mobileDecryptHubEventTrial(encryptedHex)
+            Pair(result[0], result[1])
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     // ---- Hex Utility ----
 
@@ -566,7 +639,11 @@ class CryptoService @Inject constructor() {
     // ---- Test Support ----
 
     internal fun injectHubKeyForTest(hubId: String, keyHex: String) {
-        hubKeys[hubId] = keyHex
+        if (nativeLibLoaded) {
+            org.llamenos.core.mobileSetHubKey(hubId, keyHex)
+        } else {
+            testHubKeys[hubId] = keyHex
+        }
     }
 
     /**

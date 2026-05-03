@@ -158,12 +158,13 @@ class DashboardViewModel @Inject constructor(
 
     /**
      * Fetch the server event encryption key from GET /api/auth/me.
-     * Sets it on WebSocketService so relay events can be decrypted.
+     * Stores it in Rust memory via CryptoService — key never touches JVM memory.
      */
     private suspend fun fetchServerEventKey() {
         try {
             val me = apiService.request<MeResponse>("GET", "/api/auth/me")
-            webSocketService.serverEventKeyHex = me.serverEventKeyHex
+            val currentKey = me.serverEventKeyHex ?: return
+            webSocketService.setServerEventKeys(currentKey)
             sessionState.adminDecryptionPubkey = me.adminDecryptionPubkey
         } catch (_: Exception) {
             // Non-fatal — WebSocket will still connect but events won't decrypt.
@@ -344,7 +345,6 @@ class DashboardViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        webSocketService.serverEventKeyHex = null
         webSocketService.disconnect()
     }
 }

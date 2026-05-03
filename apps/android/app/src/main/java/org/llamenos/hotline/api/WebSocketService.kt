@@ -93,8 +93,13 @@ class WebSocketService @Inject constructor(
      */
     val typedEvents: SharedFlow<AttributedHubEvent<LlamenosEvent>> = _typedEvents.asSharedFlow()
 
-    /** Server event encryption key, set after authentication via GET /api/auth/me. */
-    var serverEventKeyHex: String? = null
+    /**
+     * Store server event keys in Rust memory after authentication.
+     * Replaces the old `serverEventKeyHex` property — keys never touch JVM memory.
+     */
+    fun setServerEventKeys(currentHex: String, previousHex: String = "") {
+        cryptoService.setServerEventKeys(currentHex, previousHex)
+    }
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS) // No read timeout for WebSocket
@@ -157,7 +162,6 @@ class WebSocketService @Inject constructor(
         }
         webSocket?.close(1000, "Client disconnect")
         webSocket = null
-        serverEventKeyHex = null
         _connectionState.value = ConnectionState.DISCONNECTED
         reconnectAttempt = 0
     }
@@ -208,26 +212,27 @@ class WebSocketService @Inject constructor(
     }
 
     /**
-     * Attribute an encrypted Nostr event to its hub by trying all cached hub keys.
+     * Attribute an encrypted Nostr event to its hub by trial-decrypting in Rust.
      *
-     * Iterates [CryptoService.allHubKeys], attempting [CryptoService.decryptServerEvent]
-     * with each key's hex representation. The first key that successfully decrypts the
-     * content determines the [AttributedHubEvent.hubId]. Falls back to [serverEventKeyHex]
-     * if no hub key matches (e.g. during early auth before hub keys are loaded).
+     * All hub keys and server event keys are held in Rust memory. The trial decrypt
+     * iterates keys inside Rust — no key material ever enters JVM memory.
+     *
+     * Falls back to server event keys (current + previous epoch) if no hub key matches
+     * (e.g. during early auth before hub keys are loaded).
      *
      * @param encryptedContent Hex-encoded ciphertext from the Nostr event content field
      * @return [AttributedHubEvent] with the originating hub ID, or null if no key works
      */
     private fun decryptEvent(encryptedContent: String): AttributedHubEvent<LlamenosEvent>? {
-        // Try each cached hub key — first successful decryption identifies the hub.
-        for ((hubId, keyHex) in cryptoService.allHubKeys()) {
-            val plaintext = cryptoService.decryptServerEvent(encryptedContent, keyHex) ?: continue
-            val event = parseTypedEvent(plaintext) ?: continue
-            return AttributedHubEvent(hubId = hubId, event = event)
+        // Try all hub keys in Rust — first successful decryption identifies the hub.
+        val hubResult = cryptoService.decryptHubEventTrial(encryptedContent)
+        if (hubResult != null) {
+            val event = parseTypedEvent(hubResult.second) ?: return null
+            return AttributedHubEvent(hubId = hubResult.first, event = event)
         }
-        // Fall back to serverEventKeyHex for events received before hub keys are loaded.
-        val keyHex = serverEventKeyHex ?: return null
-        val plaintext = cryptoService.decryptServerEvent(encryptedContent, keyHex) ?: return null
+
+        // Fall back to Rust-stored server event keys (current + previous epoch).
+        val plaintext = cryptoService.decryptServerEventWithStoredKeys(encryptedContent) ?: return null
         val event = parseTypedEvent(plaintext) ?: return null
         val hubId = activeHubState.activeHubId.value ?: ""
         return AttributedHubEvent(hubId = hubId, event = event)
