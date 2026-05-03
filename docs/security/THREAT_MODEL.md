@@ -46,9 +46,9 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 - Sigchain device revocation — compromised devices can be deauthorized without affecting other devices
 
 **Residual risks**:
-- PIN entropy (6–8 digits, ~20–27 bits) is brute-forceable with seized encrypted blob + GPU resources
+- PIN entropy (minimum 8 digits; alphanumeric passphrase supported) with Argon2id (64MB/3/4) materially increases offline brute-force cost — but seized encrypted blob + sufficient GPU resources can still crack weak credentials
 - Caller phone numbers are transiently available to answering volunteers during active calls
-- Traffic analysis can reveal call timing, duration, and volunteer activity patterns
+- Traffic analysis can reveal call timing, duration, and volunteer activity patterns (hub event padding partially mitigates size analysis)
 - Legal compulsion of hosting provider yields encrypted blobs (but not decryption keys)
 
 ### Tier 2: Private Intelligence / Hacking Firm
@@ -182,12 +182,12 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 
 | Gap | Reason | Acceptable? |
 |-----|--------|------------|
-| Traffic analysis resistance | No padding, no dummy traffic | Yes — impractical for a native app + API architecture |
-| Metadata confidentiality | Server needs `callId`, `authorPubkey`, timestamps for routing | Yes — documented trade-off |
-| SMS/WhatsApp E2EE | Provider requires plaintext | Yes — documented per-channel |
-| PIN brute-force resistance (offline) | 6–8 digit PIN, ~1M–100M possibilities | Adequate with PBKDF2 rate-limiting |
+| Traffic analysis (full) | Hub events padded to power-of-2 buckets; API payloads not padded; no dummy traffic | Partial — hub event sizes hidden; call pattern timing still visible |
+| Metadata confidentiality | Server needs `callId`, `authorPubkey`, timestamps; caller number is HMAC-hashed; User-Agent is SHA-256 hashed; country not stored | Improved — less metadata retained than before; routing metadata unavoidable |
+| SMS/WhatsApp E2EE | Provider requires plaintext during send; Signal-first routing used when available; SMS notification-only mode omits body content | Partial — Signal routing eliminates provider visibility when applicable |
+| PIN brute-force resistance (offline) | Argon2id (64MB, 3 iter, 4 lanes) + minimum 8 digits or alphanumeric passphrase | Significantly improved — GPU/ASIC attack substantially more expensive than PBKDF2 |
 | Server-side key deletion verification | Cannot prove hosting provider deleted data | Yes — fundamental cloud trust limitation |
-| Nostr relay metadata privacy | Relay can observe event metadata (IPs, timing, sizes) | Yes — content encrypted; only metadata visible |
+| Nostr relay metadata privacy | Relay observes pseudonymous pubkeys, timing; write-policy limits publishers to server pubkey; content epoch-encrypted per hub | Improved — event injection blocked; content hidden; metadata still visible |
 
 ## Legal Compulsion and Subpoena Scenarios
 
@@ -227,8 +227,8 @@ This section documents what data can be obtained through legal process against v
 ### Device Seizure (Volunteer)
 
 **Without PIN:**
-- Encrypted key blob in platform secure storage requires PIN brute-force
-- 600,000 PBKDF2 iterations + 6–8 digit PIN = estimated hours to weeks on GPU hardware
+- Encrypted key blob in platform secure storage requires PIN/passphrase brute-force
+- Argon2id (64MB, 3 iterations, 4 parallelism) + minimum 8-digit or alphanumeric passphrase = substantially harder than PBKDF2 on GPU hardware; Argon2id's memory cost makes ASIC/GPU attacks significantly more expensive
 - Session tokens may still be valid if device was recently used (8-hour TTL)
 - Sigchain is public (device pubkeys are visible) but does not contain private keys
 
@@ -240,10 +240,11 @@ This section documents what data can be obtained through legal process against v
 
 **Mitigations:**
 - Enable device full-disk encryption
-- Use 8-digit PIN (not 6-digit)
+- Use alphanumeric passphrase (stronger than minimum 8-digit PIN)
 - Enable auto-lock on shorter timeout
 - Admin can remotely deauthorize device via sigchain + revoke sessions
 - Hub key rotation on departure excludes seized device
+- Argon2id (64MB/3/4) applied automatically — no user action required
 
 ### Device Seizure (Admin)
 
@@ -372,9 +373,9 @@ Outbound messages via SMS and WhatsApp are **not zero-knowledge**. The server se
 |---------|----------------------|--------------------------|---------------------|
 | In-app notes | No | N/A | Yes (current) |
 | In-app messaging (Nostr) | No | N/A | Yes (current) |
-| SMS outbound | Yes (momentarily) | Yes (stored by provider) | No |
+| SMS outbound | Yes (momentarily, only when Signal unavailable) | Yes (stored by provider) | No — but `smsContentMode: 'notification-only'` omits body content by default |
 | WhatsApp outbound (Business API) | Yes (momentarily) | Yes (Meta can read) | No |
-| Signal outbound (via signal-notifier sidecar) | No (sidecar handles) | No (Signal protocol E2EE) | Yes |
+| Signal outbound (via signal-notifier sidecar) | No (sidecar handles) | No (Signal protocol E2EE) | Yes — preferred when recipient is Signal-registered (`preferSignalDelivery: true` default) |
 
 The Signal notification sidecar (`signal-notifier/` on port 3100) provides true E2EE: it resolves contacts via HMAC-hashed identifiers (zero-knowledge) and re-encrypts via Signal protocol.
 
@@ -411,16 +412,26 @@ The Nostr relay (strfry, self-hosted) handles all real-time event delivery.
 |-----------|--------|----------|
 | Event metadata | Pubkeys (pseudonymous), timestamps, event kinds | Medium |
 | Connection metadata | IP addresses, connection timing, duration | Medium |
-| Event sizes | Ciphertext length reveals approximate content size | Low |
+| Event sizes (bucket only) | Ciphertext padded to power-of-2 buckets (min 512B) — exact size hidden | Low |
 | Generic tags | All events use `["t", "llamenos:event"]` — relay cannot distinguish event types | Low |
 
 ### What the Relay Cannot Observe
 
 | Protected | Mechanism |
 |-----------|-----------|
-| Event content | Encrypted with hub event key (AES-256-GCM + HKDF from hub key) |
+| Event content | Encrypted with epoch-rotating server event key (XChaCha20-Poly1305 + HKDF, 24h epoch rotation) |
 | Event type | Actual type (call:ring, presence, typing) is inside encrypted content |
 | User identity | Pubkeys are pseudonymous; relay has no mapping to real identities |
+| Fake event injection | Write-policy plugin (`write-policy.sh`) whitelists server pubkey only; rejects all other publishers |
+
+### Relay Write Policy
+
+The strfry relay runs a write-policy plugin (`deploy/docker/write-policy.sh`) that:
+- Accepts events only from `ALLOWED_PUBKEY` (the server's derived Nostr pubkey)
+- Always accepts NIP-42 auth events (kind 22242) from any pubkey — required for client authentication
+- Rejects all other publishers with `"action": "reject"` + reason
+
+This prevents any attacker who compromises a client (or intercepts credentials) from injecting fake events into the relay.
 
 ## Audit Log Tamper Detection
 
@@ -468,6 +479,7 @@ Audio from the volunteer's microphone is processed entirely in-browser/in-app:
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
+| 2026-05-03 | 2.1 | Post-hardening update | Argon2id + min-8 PIN; Nostr write-policy publisher verification; epoch-rotating event keys; power-of-2 payload padding; Signal-first routing; SMS notification-only mode; User-Agent hashed / country removed from audit; MLS always-on |
 | 2026-05-02 | 2.0 | Security docs overhaul | Complete rewrite: HPKE replaces ECIES, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR/MLS/SFrame, removed Cloudflare Workers/Durable Objects references (backend is Bun+PostgreSQL), updated trust boundary diagram, updated all crypto references to packages/crypto Rust crate |
 | 2026-02-25 | 1.3 | ZK Architecture Overhaul | Added Nostr relay trust boundary, audit log tamper detection, admin key separation, hub key compromise analysis, reproducible builds, client-side transcription |
 | 2026-02-25 | 1.2 | Epic 76.0 Phase 4 | Added APNs/FCM trust, Cloudflare trust boundary, admin pubkey fetch trust, departed volunteer key retirement, SMS/WhatsApp outbound limitation, npm supply chain risk |
