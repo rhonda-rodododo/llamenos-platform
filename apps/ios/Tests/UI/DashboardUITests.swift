@@ -35,15 +35,16 @@ final class DashboardUITests: BaseUITest {
         }
     }
 
-    func testDashboardShowsNpub() {
+    func testDashboardShowsIdentity() {
         given("I am authenticated and on the dashboard") {
             // Already on dashboard
         }
-        then("I should see my npub displayed") {
-            let npubDisplay = find("dashboard-npub")
+        then("I should see my identity displayed") {
+            // V3: signing pubkey (hex) shown as "Identity", not a Bech32 npub
+            let identityDisplay = find("dashboard-identity")
             XCTAssertTrue(
-                npubDisplay.waitForExistence(timeout: 5),
-                "Dashboard should display the user's npub"
+                identityDisplay.waitForExistence(timeout: 5),
+                "Dashboard should display the user's identity (signing pubkey)"
             )
         }
     }
@@ -182,9 +183,11 @@ final class DashboardUITests: BaseUITest {
             navigateToSettings()
         }
         then("I should see settings content") {
+            // settings-lock-app is always visible near the top; settings-signing-pubkey
+            // shows the hex pubkey in the identity card (v3 — no Bech32 npub).
             let found = anyElementExists([
-                "settings-npub", "settings-version",
-                "settings-lock-app", "settings-logout",
+                "settings-lock-app", "settings-signing-pubkey",
+                "settings-version", "settings-logout",
             ])
             XCTAssertTrue(found, "Settings view should show content")
         }

@@ -23,6 +23,11 @@ struct CryptoServiceHubKeyTests {
         #expect(crypto.hasHubKey(hubId: "hub-002") == false)
     }
 
+    @Test func hasHubKeyReturnsFalseForUnknownHub() {
+        let crypto = CryptoService()
+        #expect(crypto.hasHubKey(hubId: "hub-001") == false)
+    }
+
     @Test func lockClearsHubKeys() {
         let crypto = CryptoService()
         crypto.storeHubKeyForTesting(hubId: "hub-001", keyHex: String(repeating: "ab", count: 32))

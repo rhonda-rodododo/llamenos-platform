@@ -176,7 +176,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testHubKeyCacheStoreAndClear() {
         let service = CryptoService()
-        service.storeServerEventKey(hubId: "hub1", keyHex: String(repeating: "a", count: 64))
+        service.storeHubKeyForTesting(hubId: "hub1", keyHex: String(repeating: "a", count: 64))
         XCTAssertTrue(service.hasHubKey(hubId: "hub1"))
 
         service.clearHubKeys()

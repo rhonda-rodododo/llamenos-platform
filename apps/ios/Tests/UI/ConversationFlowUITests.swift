@@ -182,8 +182,8 @@ final class ConversationFlowUITests: XCTestCase {
 
         let tabBar = app.tabBars.firstMatch
         guard tabBar.waitForExistence(timeout: 5) else { return }
-        // Third tab = Conversations (0: Dashboard, 1: Notes, 2: Conversations)
-        let conversationsTabButton = tabBar.buttons.element(boundBy: 2)
+        // Tab order: 0=Dashboard, 1=Notes, 2=Cases, 3=Conversations, 4=Shifts, 5=Settings
+        let conversationsTabButton = tabBar.buttons.element(boundBy: 3)
         if conversationsTabButton.exists {
             conversationsTabButton.tap()
         }

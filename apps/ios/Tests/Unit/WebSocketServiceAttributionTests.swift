@@ -10,21 +10,32 @@ import Testing
 /// one in Rust and attributes the resulting `AttributedHubEvent.hubId` to whichever
 /// hub's key successfully decrypts the event content.
 ///
-/// Real XChaCha20-Poly1305 decryption happens in Rust. These tests use
-/// `WebSocketService.decryptionHandler` — a `#if DEBUG` closure that replaces
-/// the Rust CryptoService call, returning (hubId, json) directly.
+/// Real XChaCha20-Poly1305 decryption happens in Rust via `decryptEventWithAttribution`.
+/// These tests use `WebSocketService.decryptionHandler` — a `#if DEBUG` closure that
+/// replaces the CryptoService call — to return predetermined (hubId, json) pairs
+/// without requiring actual encrypted payloads.
 @MainActor
 struct WebSocketServiceAttributionTests {
 
-    // MARK: - Attribution Tests
+    // MARK: - Helpers
 
-    /// `decryptEvent` attributes the event to hub-2 when the mock returns hub-2.
-    @Test func testDecryptEventAttributesToCorrectHub() {
+    /// Create a `WebSocketService` with a fresh `CryptoService` and a mock decryption
+    /// closure that returns a fixed (hubId, json) for any ciphertext.
+    private func makeService(
+        hubId: String,
+        json: String = #"{"type":"call:ring","callSid":"CA123"}"#
+    ) -> WebSocketService {
         let crypto = CryptoService()
         let ws = WebSocketService(cryptoService: crypto)
-        ws.decryptionHandler = { _ in
-            return (hubId: "hub-2", json: #"{"type":"shift:update"}"#)
-        }
+        ws.decryptionHandler = { _ in (hubId: hubId, json: json) }
+        return ws
+    }
+
+    // MARK: - Attribution Tests
+
+    /// `decryptEvent` attributes the event to the hub whose key decrypted it.
+    @Test func testDecryptEventAttributesToCorrectHub() {
+        let ws = makeService(hubId: "hub-2", json: #"{"type":"shift:update"}"#)
 
         let result = ws.decryptEvent("opaque-ciphertext")
         #expect(result != nil)
@@ -36,30 +47,26 @@ struct WebSocketServiceAttributionTests {
     @Test func testDecryptEventReturnsNilWhenNoKeyMatches() {
         let crypto = CryptoService()
         let ws = WebSocketService(cryptoService: crypto)
+        // Mock: always fails — simulates wrong key or tampered ciphertext.
         ws.decryptionHandler = { _ in nil }
 
         let result = ws.decryptEvent("opaque-ciphertext")
         #expect(result == nil)
     }
 
-    /// `decryptEvent` returns `nil` when no hub keys are loaded at all.
+    /// `decryptEvent` returns `nil` when no hub keys are loaded and no mock is set.
     @Test func testDecryptEventReturnsNilWithNoHubKeys() {
         let crypto = CryptoService()
         let ws = WebSocketService(cryptoService: crypto)
-        // No mock set — default returns nil, Rust also has no keys
+        // decryptionHandler defaults to { _ in nil }, and no Rust hub keys loaded.
 
         let result = ws.decryptEvent("opaque-ciphertext")
         #expect(result == nil)
     }
 
-    /// When the mock identifies a specific hub, that attribution is preserved
-    /// through the full parse pipeline.
-    @Test func testDecryptEventAttributionPreservedThroughPipeline() {
-        let crypto = CryptoService()
-        let ws = WebSocketService(cryptoService: crypto)
-        ws.decryptionHandler = { _ in
-            return (hubId: "winner-hub", json: #"{"type":"voicemail:new"}"#)
-        }
+    /// `decryptEvent` parses a voicemail:new event type correctly via the attribution pipeline.
+    @Test func testDecryptEventParsesVoicemailNewType() {
+        let ws = makeService(hubId: "winner-hub", json: #"{"type":"voicemail:new"}"#)
 
         let result = ws.decryptEvent("opaque-ciphertext")
         #expect(result != nil)
