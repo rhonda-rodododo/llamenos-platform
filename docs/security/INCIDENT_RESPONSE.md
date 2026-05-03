@@ -1,7 +1,7 @@
 # Incident Response Runbook
 
-**Version:** 1.0
-**Date:** 2026-05-02
+**Version:** 1.1
+**Date:** 2026-05-03
 
 Procedures for responding to security incidents affecting a Llamenos deployment. For key-specific procedures (admin key compromise, device seizure, hub key rotation), see [Key Revocation Runbook](KEY_REVOCATION_RUNBOOK.md).
 
@@ -111,12 +111,56 @@ A user's device keys have been compromised (stolen credentials, phishing, malwar
    - The compromised user's notes are accessible to the attacker (author envelope)
    - Other users' notes are NOT accessible (per-note HPKE wrapping, different keys)
    - Hub events during the compromise window may be accessible if the user held the hub key
+   - If only the user's signing key is compromised (not encryption key): attacker can impersonate the user but cannot decrypt notes (key separation)
+   - If device was seized: Argon2id (64MB memory, 3 iterations, 4 parallelism) provides meaningful delay against GPU brute-force of the PIN — begin hub key rotation within 1 hour
 4. **Rotate hub key** (Section 4 of Key Revocation Runbook).
 5. **Generate a new invite** for the user to re-onboard with fresh device keys.
 
 ---
 
-## 4. Dependency Vulnerability
+## 4. Signal-Notifier Compromise
+
+The signal-notifier sidecar (port 3100) handles Signal message delivery and contact resolution.
+
+### Detection Signals
+- Unusual entries in `signal_audit_log` table (PostgreSQL)
+- Rate limiter triggering on unexpected IPs
+- Bearer token auth failures in logs
+- Unexpected `notify_failed` or `rate_limited` audit actions
+
+### Response
+
+1. **Rotate the bearer token** (`SIGNAL_NOTIFIER_BEARER_TOKEN`). The sidecar supports timing-safe comparison and token rotation (current + previous key):
+   ```bash
+   # Generate new token
+   openssl rand -hex 32
+   # Update in both app .env and signal-notifier .env
+   # Restart both services
+   docker compose restart app signal-notifier
+   ```
+
+2. **Review audit logs**: Query `signal_audit_log` for anomalous actions:
+   ```sql
+   SELECT action, identifier_hash, success, error_message, created_at
+   FROM signal_audit_log
+   WHERE created_at > NOW() - INTERVAL '24 hours'
+   ORDER BY created_at DESC;
+   ```
+
+3. **Assess exposure**: The signal-notifier uses zero-knowledge contact resolution (HMAC-hashed identifiers). An attacker with sidecar access could:
+   - Send Signal messages to hashed identifiers they enumerate
+   - Observe which identifiers have Signal registrations
+   - NOT reverse HMAC hashes without the HMAC secret (held by the app, not the sidecar)
+
+4. **If the HMAC secret is also compromised**: The attacker can reverse phone hashes. Rotate `HMAC_SECRET` in the app and re-hash all stored identifiers.
+
+### Key Separation Note
+
+The server's Nostr signing key and event encryption key are derived independently from `SERVER_NOSTR_SECRET` using separate HKDF labels. A signing key compromise (attacker can publish fake events) does NOT compromise event content confidentiality, and vice versa. When assessing server compromise scope, determine which derived key was exposed.
+
+---
+
+## 5. Dependency Vulnerability
 
 A critical vulnerability is discovered in a dependency (Rust crate, npm package, Docker base image).
 
@@ -143,7 +187,7 @@ A critical vulnerability is discovered in a dependency (Rust crate, npm package,
 
 ---
 
-## 5. Data Breach Notification (GDPR)
+## 6. Data Breach Notification (GDPR)
 
 If personal data of callers or users may have been exposed:
 
@@ -167,7 +211,7 @@ Record in the audit log:
 
 ---
 
-## 6. Communication Templates
+## 7. Communication Templates
 
 ### Internal (to users)
 
@@ -195,4 +239,5 @@ After every Critical or High severity incident:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-03 | 1.1 | Added signal-notifier compromise scenario (Section 4); added key separation note (signing vs encryption keys); added Argon2id timeline guidance for device seizure; renumbered sections |
 | 2026-05-02 | 1.0 | Initial incident response runbook |

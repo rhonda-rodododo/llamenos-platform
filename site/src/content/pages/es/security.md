@@ -8,6 +8,8 @@ subtitle: Que esta protegido, que es visible, y que puede obtenerse bajo citacio
 | Pueden proporcionar | NO pueden proporcionar |
 |---------------------|------------------------|
 | Metadatos de llamadas/mensajes (horarios, duraciones) | Contenido de notas, transcripciones, cuerpos de reportes |
+| Eventos en tiempo real | Si (por hub, claves rotativas) | No | Solo texto cifrado |
+| Cadenas User-Agent | SHA-256 hasheado | Solo hash | Hash (no reversible) |
 | Blobs de base de datos cifrados | Nombres de voluntarios (cifrado de extremo a extremo) |
 | Que cuentas de voluntarios estaban activas cuando | Registros del directorio de contactos (cifrado de extremo a extremo) |
 | | Contenido de mensajes (cifrado al llegar, almacenado como texto cifrado) |
@@ -41,11 +43,13 @@ Tu exposicion de privacidad depende de que canales habilites:
 |-------|---------------------|---------------------------|-------|
 | SMS | Tu proveedor de telefonia lee todos los mensajes | **Cifrado** | El proveedor retiene los mensajes originales |
 | WhatsApp | Meta lee todos los mensajes | **Cifrado** | El proveedor retiene los mensajes originales |
-| Signal | La red Signal es E2EE, pero el bridge descifra al llegar | **Cifrado** | Mejor que SMS, no es conocimiento cero |
+| Signal | La red Signal es E2EE; el bridge re-cifra al llegar | **Cifrado** | Ruta preferida cuando esta disponible |
+
+**Entrega priorizando Signal**: Cuando un destinatario tiene Signal, los mensajes se enrutan automaticamente por Signal — tu proveedor de telefonia nunca ve el contenido. Para SMS, solo se envia una notificacion generica "tienes un nuevo mensaje" por defecto (sin cuerpo del mensaje), asi que los registros de tu proveedor no contienen contenido sensible.
 
 **Los mensajes se cifran en el momento en que llegan a tu servidor.** El servidor almacena solo texto cifrado. Tu proveedor de telefonia o mensajeria puede aun tener el mensaje original — eso es una limitacion de esas plataformas, no algo que podamos cambiar.
 
-**Citacion al proveedor de mensajeria**: El proveedor de SMS tiene el contenido completo de mensajes. Meta tiene el contenido de WhatsApp. Los mensajes de Signal son E2EE hasta el bridge, pero el bridge (ejecutandose en tu servidor) descifra antes de re-cifrar para almacenamiento. En todos los casos, **tu servidor solo tiene texto cifrado** — el proveedor de hosting no puede leer el contenido de los mensajes.
+**Citacion al proveedor de mensajeria**: Los proveedores de SMS tienen el contenido completo de mensajes solo si habilitas explicitamente el modo SMS de contenido completo. Con el modo predeterminado de solo notificacion, los cuerpos SMS no contienen contenido de mensajes. Meta tiene el contenido de WhatsApp. Los mensajes de Signal son E2EE hasta el bridge, pero el bridge (ejecutandose en tu servidor) descifra antes de re-cifrar para almacenamiento. En todos los casos, **tu servidor solo tiene texto cifrado** — el proveedor de hosting no puede leer el contenido de los mensajes.
 
 ### Notas, transcripciones y reportes
 
@@ -54,10 +58,10 @@ Todo el contenido escrito por voluntarios esta cifrado de extremo a extremo:
 - Cada nota usa una **clave aleatoria unica** (secreto hacia adelante — comprometer una nota no compromete otras)
 - Las claves se envuelven separadamente para el voluntario y cada administrador
 - El servidor almacena solo texto cifrado
-- El descifrado ocurre en el navegador
+- El descifrado ocurre en tu dispositivo, en una capa segura que nunca expone claves a la interfaz de usuario
 - **Los campos personalizados, contenido de reportes y archivos adjuntos se cifran individualmente**
 
-**Incautacion de dispositivo**: Sin tu PIN **y** acceso a tu cuenta de proveedor de identidad, los atacantes obtienen un blob cifrado que es computacionalmente imposible de descifrar. Si tambien usas una llave de seguridad de hardware, **tres factores independientes** protegen tus datos.
+**Incautacion de dispositivo**: Sin tu PIN **y** acceso a tu cuenta de proveedor de identidad, los atacantes obtienen un blob cifrado protegido por Argon2id — una funcion de derivacion de claves resistente a la memoria que hace los ataques de fuerza bruta con hardware especializado (GPUs, ASICs) ordenes de magnitud mas costosos que los enfoques tradicionales. Si tambien usas una llave de seguridad de hardware, **tres factores independientes** protegen tus datos.
 
 ---
 
@@ -81,6 +85,14 @@ Estas mejoras estan disponibles hoy:
 
 | Funcion | Beneficio de privacidad |
 |---------|------------------------|
+| Proteccion de claves Argon2id | Las claves de tu dispositivo estan protegidas por una funcion resistente a la memoria que resiste ataques de fuerza bruta con GPUs y hardware especializado |
+| Enrutamiento priorizando Signal | Los mensajes se enrutan automaticamente por Signal cuando esta disponible, manteniendo el contenido fuera de los registros del proveedor SMS |
+| Modo SMS solo notificacion | Los destinatarios SMS solo ven "tienes un nuevo mensaje" — ningun contenido sensible en los registros del proveedor |
+| Resistencia al analisis de trafico | Los tamanos de eventos en tiempo real se rellenan para que los observadores no puedan distinguir mensajes cortos de largos |
+| Sin numeros de telefono en texto plano en la base de datos | Los numeros de llamantes se almacenan como hashes irreversibles — tu base de datos nunca contiene el numero real |
+| Cifrado por hub con secreto hacia adelante | Los eventos en tiempo real de cada hub se cifran con claves que rotan cada 24 horas — las claves antiguas no pueden descifrar nuevos eventos |
+| Criptografia en Rust en todas las plataformas | Escritorio, iOS y Android ejecutan la misma biblioteca criptografica auditada en Rust — las claves nunca entran en codigo JavaScript, Swift o Kotlin |
+| Acceso restringido al relay | Tu relay Nostr acepta eventos solo de tu servidor — ningun tercero puede inyectar notificaciones falsas |
 | Almacenamiento cifrado de mensajes | SMS, WhatsApp y Signal almacenados como texto cifrado en tu servidor |
 | Transcripcion en el dispositivo | El audio nunca sale de tu navegador — procesado completamente en tu dispositivo |
 | Proteccion de claves multifactor | Tus claves de cifrado estan protegidas por tu PIN, tu proveedor de identidad y opcionalmente una llave de seguridad de hardware |

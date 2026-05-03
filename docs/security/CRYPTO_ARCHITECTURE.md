@@ -78,9 +78,9 @@ Device private keys are stored encrypted at rest on each platform:
 
 | Platform | Storage | Encryption |
 |----------|---------|------------|
-| Desktop (Tauri) | Tauri Store (plugin-store) | PBKDF2-SHA256 (600K iterations) → AES-256-GCM |
-| iOS | Keychain (kSecAttrAccessibleWhenUnlockedThisDeviceOnly) | PBKDF2 → AES-256-GCM + Secure Enclave |
-| Android | EncryptedSharedPreferences (Keystore-backed) | PBKDF2 → AES-256-GCM + Android Keystore |
+| Desktop (Tauri) | Tauri Store (plugin-store) | Argon2id (64MB/3/4) → AES-256-GCM |
+| iOS | Keychain (kSecAttrAccessibleWhenUnlockedThisDeviceOnly) | Argon2id → AES-256-GCM + Secure Enclave |
+| Android | EncryptedSharedPreferences (Keystore-backed) | Argon2id → AES-256-GCM + Android Keystore |
 
 PIN/passphrase requirements: minimum 8 decimal digits (numeric PIN) or alphanumeric passphrase (8+ characters with at least one letter). Old 6-digit PINs are no longer accepted by `is_valid_credential()` in `packages/crypto/src/device_keys.rs`.
 

@@ -28,6 +28,8 @@ Ang iyong privacy exposure ay depende sa kung aling mga channel ang ine-enable m
 | Kung gumagamit ka ng... | Maa-access ng third party | Maa-access ng server | End-to-end encrypted na content |
 |-------------------------|---------------------------|----------------------|--------------------------------|
 | Twilio/SignalWire/Vonage/Plivo | Call audio (live), call records | Call metadata | Notes, transcripts |
+| Real-time events | Oo (per-hub, rotating keys) | Hindi | Ciphertext lang |
+| User-Agent strings | SHA-256 hashed | Hash lang | Hash (hindi mare-reverse) |
 | Self-hosted Asterisk | Wala (ikaw ang may kontrol) | Call metadata | Notes, transcripts |
 | Browser-to-browser (WebRTC) | Wala | Call metadata | Notes, transcripts |
 
@@ -41,11 +43,13 @@ Ang iyong privacy exposure ay depende sa kung aling mga channel ang ine-enable m
 |---------|--------------------|-------------------|-------|
 | SMS | Nababasa ng telephony provider mo ang lahat ng mensahe | **Encrypted** | Ang provider ay nag-iimbak ng orihinal na mensahe |
 | WhatsApp | Nababasa ng Meta ang lahat ng mensahe | **Encrypted** | Ang provider ay nag-iimbak ng orihinal na mensahe |
-| Signal | End-to-end encrypted ang Signal network, pero dine-decrypt ng bridge pagdating | **Encrypted** | Mas maganda kaysa SMS, hindi zero-knowledge |
+| Signal | End-to-end encrypted ang Signal network; nire-re-encrypt ng bridge pagdating | **Encrypted** | Preferred na ruta kapag available |
+
+**Signal-first na delivery**: Kapag may Signal ang recipient, awtomatikong niru-route ang mensahe sa Signal — hindi makikita ng telephony provider mo ang content. Para sa SMS, generic na "may bago kang mensahe" notification lang ang ipinapadala bilang default (walang message body), kaya walang sensitive na content sa logs ng provider mo.
 
 **Nae-encrypt ang mga mensahe pagdating sa iyong server.** Ciphertext lang ang ini-store ng server. Maaaring nasa provider pa rin ang orihinal na mensahe — limitasyon iyon ng mga platform na iyon, hindi natin mababago.
 
-**Subpoena sa messaging provider**: Meron ang SMS provider ng buong message content. Meron ang Meta ng WhatsApp content. Ang Signal messages ay end-to-end encrypted sa bridge, pero ang bridge (tumatakbo sa iyong server) ay nagde-decrypt bago mag-re-encrypt para sa storage. Sa lahat ng kaso, **ciphertext lang ang nasa iyong server** — hindi mababasa ng hosting provider ang message content.
+**Subpoena sa messaging provider**: Ang mga SMS provider ay may buong content ng mga mensahe lamang kung eksplisitong i-enable mo ang full-content SMS mode. Sa default na notification-only mode, ang mga SMS body ay walang message content. Meron ang Meta ng WhatsApp content. Ang Signal messages ay end-to-end encrypted sa bridge, pero ang bridge (tumatakbo sa iyong server) ay nagde-decrypt bago mag-re-encrypt para sa storage. Sa lahat ng kaso, **ciphertext lang ang nasa iyong server** — hindi mababasa ng hosting provider ang message content.
 
 ### Notes, transcripts, at reports
 
@@ -54,10 +58,10 @@ Lahat ng content na sinulat ng volunteer ay end-to-end encrypted:
 - Bawat note ay gumagamit ng **unique random key** (forward secrecy — ang pag-kompromiso ng isang note ay hindi nangangahulugang nakompromiso na rin ang iba)
 - Ang mga key ay hiwalay na naka-wrap para sa volunteer at bawat admin
 - Ciphertext lang ang ini-store ng server
-- Nangyayari ang decryption sa browser
+- Nangyayari ang decryption sa iyong device, sa isang secure na layer na hindi kailanman inilalantad ang mga key sa user interface
 - **Ang custom fields, report content, at file attachments ay lahat individually encrypted**
 
-**Pag-seize ng device**: Kung walang iyong PIN **at** access sa iyong identity provider account, ang makukuha ng attacker ay encrypted blob na computationally infeasible i-decrypt. Kung gumagamit ka rin ng hardware security key, **tatlong independent na factor** ang nagpoprotekta sa iyong data.
+**Pag-seize ng device**: Kung walang iyong PIN **at** access sa iyong identity provider account, ang makukuha ng attacker ay encrypted blob na protektado ng Argon2id — isang memory-hard key derivation function na ginagawang mas mahal nang maraming magnitude ang brute-force attacks gamit ang specialized hardware (GPU, ASIC) kumpara sa mga tradisyonal na paraan. Kung gumagamit ka rin ng hardware security key, **tatlong independent na factor** ang nagpoprotekta sa iyong data.
 
 ---
 
@@ -81,6 +85,14 @@ Ang mga pagpapabuti na ito ay live na ngayon:
 
 | Feature | Privacy benefit |
 |---------|-----------------|
+| Argon2id key protection | Ang mga device key mo ay protektado ng memory-hard function na lumalaban sa brute-force attacks gamit ang GPU at specialized hardware |
+| Signal-first message routing | Ang mga mensahe ay awtomatikong i-route sa Signal kapag available, pinapanatiling malayo ang content sa SMS provider logs |
+| SMS notification-only mode | Ang mga SMS recipient ay nakakakita lang ng "may bago kang mensahe" — walang sensitibong content sa provider logs |
+| Traffic analysis resistance | Ang mga real-time event size ay pine-pad para hindi makilala ng mga observer ang maikling mensahe mula sa mahaba |
+| Walang plaintext phone number sa database | Ang mga caller number ay naka-store bilang irreversible hash — hindi kailanman naglalaman ng tunay na numero ang database |
+| Per-hub encryption na may forward secrecy | Ang real-time events ng bawat hub ay naka-encrypt gamit ang mga key na nagro-rotate bawat 24 oras — hindi ma-decrypt ng lumang key ang bagong events |
+| Cryptography sa Rust sa lahat ng platform | Desktop, iOS, at Android ay gumagamit ng parehong audited Rust cryptography library — hindi kailanman pumapasok ang mga key sa JavaScript, Swift, o Kotlin code |
+| Restricted relay access | Ang Nostr relay mo ay tumatanggap ng events mula lamang sa server mo — walang outside party ang maka-inject ng pekeng notifications |
 | Encrypted message storage | Ang SMS, WhatsApp, at Signal messages ay naka-store bilang ciphertext sa iyong server |
 | On-device transcription | Hindi umaalis ang audio sa iyong browser — pinoproseso nang buo sa iyong device |
 | Multi-factor key protection | Ang iyong encryption keys ay protektado ng iyong PIN, identity provider, at opsyonal na hardware security key |

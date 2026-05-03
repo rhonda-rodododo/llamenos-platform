@@ -28,6 +28,8 @@ Ihre Datenschutzexposition haengt davon ab, welche Kanaele Sie aktivieren:
 | Wenn Sie verwenden... | Dritte koennen zugreifen | Server kann zugreifen | E2EE-Inhalte |
 |-----------------------|-------------------------|----------------------|--------------|
 | Twilio/SignalWire/Vonage/Plivo | Anrufaudio (live), Aufzeichnungen | Anrufmetadaten | Notizen, Transkripte |
+| Echtzeit-Ereignisse | Ja (pro Hub, rotierende Schluessel) | Nein | Nur Chiffretext |
+| User-Agent-Strings | SHA-256 gehasht | Nur Hash | Hash (nicht umkehrbar) |
 | Selbst gehosteter Asterisk | Nichts (Sie kontrollieren es) | Anrufmetadaten | Notizen, Transkripte |
 | Browser-zu-Browser (WebRTC) | Nichts | Anrufmetadaten | Notizen, Transkripte |
 
@@ -41,11 +43,13 @@ Ihre Datenschutzexposition haengt davon ab, welche Kanaele Sie aktivieren:
 |-------|-----------------|----------------|----------|
 | SMS | Ihr Telefonieanbieter liest alle Nachrichten | **Verschluesselt** | Anbieter behaelt Originalnachrichten |
 | WhatsApp | Meta liest alle Nachrichten | **Verschluesselt** | Anbieter behaelt Originalnachrichten |
-| Signal | Signal-Netzwerk ist E2EE, aber die Bridge entschluesselt bei Eingang | **Verschluesselt** | Besser als SMS, nicht Zero-Knowledge |
+| Signal | Signal-Netzwerk ist E2EE; die Bridge verschluesselt bei Eingang neu | **Verschluesselt** | Bevorzugte Route wenn verfuegbar |
+
+**Signal-priorisierte Zustellung**: Wenn ein Empfaenger Signal hat, werden Nachrichten automatisch ueber Signal geroutet — Ihr Telefonieanbieter sieht den Inhalt nie. Fuer SMS wird standardmaessig nur eine generische "Sie haben eine neue Nachricht"-Benachrichtigung gesendet (ohne Nachrichteninhalt), sodass die Protokolle Ihres Anbieters keinen sensiblen Inhalt enthalten.
 
 **Nachrichten werden in dem Moment verschluesselt, in dem sie auf Ihrem Server ankommen.** Der Server speichert nur Chiffretext. Ihr Telefonie- oder Messaging-Anbieter kann die Originalnachricht noch haben — das ist eine Einschraenkung dieser Plattformen, nicht etwas, das wir aendern koennen.
 
-**Vorladung an den Messaging-Anbieter**: Der SMS-Anbieter hat den vollstaendigen Nachrichteninhalt. Meta hat WhatsApp-Inhalte. Signal-Nachrichten sind E2EE bis zur Bridge, aber die Bridge (auf Ihrem Server) entschluesselt vor der Neuverschluesselung zur Speicherung. In allen Faellen hat **Ihr Server nur Chiffretext** — der Hosting-Anbieter kann den Nachrichteninhalt nicht lesen.
+**Vorladung an den Messaging-Anbieter**: SMS-Anbieter haben den vollstaendigen Nachrichteninhalt nur wenn Sie den Vollinhalts-SMS-Modus explizit aktivieren. Im Standard-Nur-Benachrichtigungsmodus enthalten SMS-Nachrichtenkoerper keinen Nachrichteninhalt. Meta hat WhatsApp-Inhalte. Signal-Nachrichten sind E2EE bis zur Bridge, aber die Bridge (auf Ihrem Server) entschluesselt vor der Neuverschluesselung zur Speicherung. In allen Faellen hat **Ihr Server nur Chiffretext** — der Hosting-Anbieter kann den Nachrichteninhalt nicht lesen.
 
 ### Notizen, Transkripte und Berichte
 
@@ -54,10 +58,10 @@ Alle von Freiwilligen verfassten Inhalte sind Ende-zu-Ende-verschluesselt:
 - Jede Notiz verwendet einen **einzigartigen Zufallsschluessel** (Forward Secrecy — die Kompromittierung einer Notiz kompromittiert nicht andere)
 - Schluessel werden separat fuer den Freiwilligen und jeden Administrator umhuellt
 - Der Server speichert nur Chiffretext
-- Entschluesselung erfolgt im Browser
+- Entschluesselung erfolgt auf Ihrem Geraet, in einer sicheren Schicht, die Schluessel nie der Benutzeroberflaeche aussetzt
 - **Benutzerdefinierte Felder, Berichtsinhalte und Dateianhang sind alle einzeln verschluesselt**
 
-**Geraetebeschlagnahmung**: Ohne Ihre PIN **und** Zugang zu Ihrem Identitaetsanbieter-Konto erhalten Angreifer einen verschluesselten Blob, der rechnerisch nicht entschluesselbar ist. Wenn Sie auch einen Hardware-Sicherheitsschluessel verwenden, schuetzen **drei unabhaengige Faktoren** Ihre Daten.
+**Geraetebeschlagnahmung**: Ohne Ihre PIN **und** Zugang zu Ihrem Identitaetsanbieter-Konto erhalten Angreifer einen durch Argon2id geschuetzten verschluesselten Blob — eine speicherintensive Schluesselableitungsfunktion, die Brute-Force-Angriffe mit spezialisierter Hardware (GPUs, ASICs) um Groessenordnungen teurer macht als herkoemmliche Ansaetze. Wenn Sie auch einen Hardware-Sicherheitsschluessel verwenden, schuetzen **drei unabhaengige Faktoren** Ihre Daten.
 
 ---
 
@@ -81,6 +85,14 @@ Diese Verbesserungen sind heute verfuegbar:
 
 | Funktion | Datenschutzvorteil |
 |----------|-------------------|
+| Argon2id-Schluesselschutz | Ihre Geraeteschluessel sind durch eine speicherintensive Funktion geschuetzt, die Brute-Force-Angriffe mit GPUs und spezialisierter Hardware widersteht |
+| Signal-priorisierte Nachrichtenweiterleitung | Nachrichten werden automatisch ueber Signal geleitet wenn verfuegbar — Inhalte bleiben aus SMS-Anbieter-Protokollen |
+| SMS-Nur-Benachrichtigungsmodus | SMS-Empfaenger sehen nur "Sie haben eine neue Nachricht" — kein sensibler Inhalt in Anbieter-Protokollen |
+| Verkehrsanalyse-Resistenz | Echtzeit-Ereignisgroessen werden aufgefuellt, damit Beobachter kurze nicht von langen Nachrichten unterscheiden koennen |
+| Keine Klartext-Telefonnummern in der Datenbank | Anrufernummern werden als irreversible Hashes gespeichert — Ihre Datenbank enthaelt nie die tatsaechliche Telefonnummer |
+| Hub-spezifische Verschluesselung mit Vorwaertsgeheimnis | Echtzeit-Ereignisse jedes Hubs werden mit Schluesseln verschluesselt die alle 24 Stunden rotieren — alte Schluessel koennen neue Ereignisse nicht entschluesseln |
+| Kryptographie in Rust auf allen Plattformen | Desktop, iOS und Android nutzen dieselbe gepruefte Rust-Kryptographiebibliothek — Schluessel gelangen nie in JavaScript-, Swift- oder Kotlin-Code |
+| Eingeschraenkter Relay-Zugang | Ihr Nostr-Relay akzeptiert nur Ereignisse von Ihrem Server — kein Dritter kann gefaelschte Benachrichtigungen einschleusen |
 | Verschluesselte Nachrichtenspeicherung | SMS-, WhatsApp- und Signal-Nachrichten werden als Chiffretext auf Ihrem Server gespeichert |
 | Geraeteinterne Transkription | Audio verlaesst nie Ihren Browser — wird vollstaendig auf Ihrem Geraet verarbeitet |
 | Mehrfaktor-Schluesselschutz | Ihre Verschluesselungsschluessel sind durch Ihre PIN, Ihren Identitaetsanbieter und optional einen Hardware-Sicherheitsschluessel geschuetzt |
