@@ -184,6 +184,32 @@ calls.get('/identify/:identifierHash',
   },
 )
 
+// Diagnostic endpoint (must be before /:callId to avoid param capture)
+calls.get('/debug',
+  describeRoute({
+    tags: ['Calls'],
+    summary: 'Debug call routing state',
+    responses: {
+      200: {
+        description: 'Debug information',
+        content: {
+          'application/json': {
+            schema: resolver(z.record(z.string(), z.unknown())),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('calls:debug'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const result = await services.calls.debug(hubId)
+    return c.json(result)
+  },
+)
+
 // --- Get single call by ID ---
 
 calls.get('/:callId',
@@ -452,32 +478,6 @@ calls.get('/:callId/recording',
         'Cache-Control': 'private, no-store',
       },
     })
-  },
-)
-
-// Diagnostic endpoint
-calls.get('/debug',
-  describeRoute({
-    tags: ['Calls'],
-    summary: 'Debug call routing state',
-    responses: {
-      200: {
-        description: 'Debug information',
-        content: {
-          'application/json': {
-            schema: resolver(z.record(z.string(), z.unknown())),
-          },
-        },
-      },
-      ...authErrors,
-    },
-  }),
-  requirePermission('calls:debug'),
-  async (c) => {
-    const services = c.get('services')
-    const hubId = c.get('hubId') ?? ''
-    const result = await services.calls.debug(hubId)
-    return c.json(result)
   },
 )
 
