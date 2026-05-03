@@ -9,6 +9,7 @@ import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED, KIND_MESSAGE_REACTION, KI
 import { publishNostrEvent } from '../lib/nostr-events'
 import { createPushDispatcherFromService } from '../lib/push-dispatch'
 import { createLogger } from '../lib/logger'
+import { backgroundTask } from '../lib/hono-compat'
 import type { Services } from '../services'
 import { SignalAdapter } from './signal/adapter'
 import type { SignalWebhookPayload } from './signal/types'
@@ -117,7 +118,7 @@ messaging.post('/:channel/webhook', async (c) => {
 
           // Also correlate with blast deliveries (non-blocking)
           if (statusUpdate.externalId) {
-            c.executionCtx.waitUntil(
+            backgroundTask(c,
               correlateBlastDeliveryStatus(services, statusUpdate.externalId, statusUpdate.status, statusUpdate.failureReason)
             )
           }
@@ -188,7 +189,7 @@ messaging.post('/:channel/webhook', async (c) => {
 
   // Firehose observer: buffer Signal group messages for inference agents
   if (channel === 'signal' && incoming.metadata?.groupId && incoming.body) {
-    c.executionCtx.waitUntil(
+    backgroundTask(c,
       observeFirehoseMessage(services.firehose, {
         signalGroupId: incoming.metadata.groupId,
         senderIdentifier: incoming.senderIdentifier,
@@ -242,7 +243,7 @@ messaging.post('/:channel/webhook', async (c) => {
 
   // Auto-assignment for new conversations
   if (convResult.isNew && convResult.status === 'waiting') {
-    c.executionCtx.waitUntil(
+    backgroundTask(c,
       tryAutoAssign(services, c.env, convResult.conversationId, channel, c.env.ADMIN_PUBKEY, hubId)
     )
   }
@@ -250,7 +251,7 @@ messaging.post('/:channel/webhook', async (c) => {
   // Push notification to assigned volunteer for new messages (Epic 86)
   // Only dispatch push if hubId is present — mobile clients require a real hub ID to route the notification.
   if (convResult.conversationId && hubId) {
-    c.executionCtx.waitUntil((async () => {
+    backgroundTask(c,(async () => {
       try {
         // Fetch the conversation to get the assigned volunteer
         const conv = await services.conversations.getById(convResult.conversationId)

@@ -13,6 +13,7 @@ import {
   type FirehoseConnectionStatus,
 } from '@protocol/schemas/firehose'
 import { generateAgentKeypair } from '../lib/agent-identity'
+import { backgroundTask } from '../lib/hono-compat'
 import { createLogger } from '../lib/logger'
 import { audit } from '../services/audit'
 
@@ -147,7 +148,7 @@ firehose.post('/',
 
     const updated = await services.firehose.setAgentKeypair(raw.id, agentPubkey, encryptedNsec)
 
-    c.executionCtx.waitUntil(
+    backgroundTask(c,
       audit(services.audit, 'firehoseConnectionCreated', pubkey, {
         connectionId: raw.id,
       }, undefined, hubId),
@@ -247,7 +248,7 @@ firehose.patch('/:id',
         }))
     }
 
-    c.executionCtx.waitUntil(
+    backgroundTask(c,
       audit(services.audit, 'firehoseConnectionUpdated', pubkey, {
         connectionId: id,
       }, undefined, hubId),
@@ -279,7 +280,7 @@ firehose.delete('/:id',
 
     await services.firehose.deleteConnection(id)
 
-    c.executionCtx.waitUntil(
+    backgroundTask(c,
       audit(services.audit, 'firehoseConnectionDeleted', pubkey, {
         connectionId: id,
       }, undefined, hubId),

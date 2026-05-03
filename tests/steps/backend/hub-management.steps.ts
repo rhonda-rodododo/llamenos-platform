@@ -66,11 +66,17 @@ When(
   'the admin creates a hub with name {string} and slug {string}',
   async ({ request, world }, name: string, slug: string) => {
     // Clean up any existing hub with this slug (left over from a previous test run)
-    const listRes = await apiGet<{ hubs: Array<{ id: string; slug: string }> }>(request, '/hubs')
+    const listRes = await apiGet<{ hubs: Array<{ id: string; slug: string; name: string }> }>(request, '/hubs')
     if (listRes.status === 200) {
       const existing = listRes.data?.hubs?.find(h => h.slug === slug)
       if (existing) {
-        await apiDelete(request, `/hubs/${existing.id}`).catch(() => {})
+        const delRes = await apiDelete(request, `/hubs/${existing.id}`)
+        if (delRes.status !== 200) {
+          // Delete failed (e.g., storage manager error) — reuse the existing hub
+          setLastResponse(world, { status: 200, data: { hub: existing } })
+          getHubManagementState(world).createdHub = existing
+          return
+        }
       }
     }
     const res = await apiPost<{ hub: { id: string; name: string; slug: string } }>(

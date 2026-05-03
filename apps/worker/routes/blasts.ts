@@ -6,6 +6,7 @@ import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, sc
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { createLogger } from '../lib/logger'
+import { backgroundTask } from '../lib/hono-compat'
 
 const logger = createLogger('routes.blasts')
 
@@ -362,7 +363,7 @@ blasts.post('/:id/send',
     const blast = await services.blasts.send(id, hubId)
 
     // Expand blast into delivery rows (background)
-    c.executionCtx.waitUntil(
+    backgroundTask(c,
       services.blasts.expandBlast(id).catch((err) => {
         logger.error(`Failed to expand blast ${id}`, err)
       })

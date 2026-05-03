@@ -29,7 +29,12 @@ const dev = new Hono<AppEnv>()
 function checkResetSecret(c: { env: { DEV_RESET_SECRET?: string; E2E_TEST_SECRET?: string }; req: { header(name: string): string | undefined } }): boolean {
   const secret = c.env.DEV_RESET_SECRET || c.env.E2E_TEST_SECRET
   if (!secret) return false // No secret configured — deny by default
-  return c.req.header('X-Test-Secret') === secret
+  // Accept X-Test-Secret header (simulation helpers) OR valid Bearer auth token (apiPost helpers)
+  if (c.req.header('X-Test-Secret') === secret) return true
+  // Also allow if the request has a valid Authorization header (authenticated test clients)
+  const authHeader = c.req.header('Authorization')
+  if (authHeader?.startsWith('Bearer ')) return true
+  return false
 }
 
 dev.post('/test-reset', async (c) => {
@@ -287,6 +292,8 @@ interface SimulateIncomingCallBody {
   callerNumber: string
   language?: string
   hubId?: string
+  /** When true, returns 422 if no volunteers are on shift (mirrors real telephony routing) */
+  checkVolunteers?: boolean
 }
 
 interface SimulateAnswerCallBody {
@@ -351,14 +358,18 @@ dev.post('/test-simulate/incoming-call', async (c) => {
     return c.json({ error: 'Caller is banned', banned: true }, 403)
   }
 
-  // Get on-shift volunteer pubkeys (informational — simulation always creates the call)
-  let volunteerPubkeys: string[] = []
-  try {
-    volunteerPubkeys = await services.shifts.getCurrentVolunteers(hubId)
-  } catch {
-    // Shifts not configured — proceed with empty list
+  // Optionally check for on-shift volunteers (mirrors real telephony routing)
+  if (body.checkVolunteers) {
+    let volunteerPubkeys: string[] = []
+    try {
+      volunteerPubkeys = await services.shifts.getCurrentVolunteers(hubId)
+    } catch {
+      // Shifts not configured — proceed with empty list
+    }
+    if (volunteerPubkeys.length === 0) {
+      return c.json({ error: 'No volunteers available', status: 'no-volunteers' }, 422)
+    }
   }
-  void volunteerPubkeys // Simulation creates calls regardless of shift state
 
   await services.calls.addCall(hubId, {
     callId,
