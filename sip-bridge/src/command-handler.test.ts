@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { CommandHandler } from './command-handler'
 import type { BridgeClient, BridgeEvent } from './bridge-client'
 import type { WebhookSender } from './webhook-sender'

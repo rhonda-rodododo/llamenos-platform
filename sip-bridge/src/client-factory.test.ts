@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test'
+import { describe, it, expect } from 'vitest'
 import { createBridgeClient } from './client-factory'
 import type { BridgeConfig } from './types'
 import { AriClient } from './clients/ari-client'

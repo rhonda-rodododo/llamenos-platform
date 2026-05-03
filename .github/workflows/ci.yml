@@ -489,7 +489,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run backend unit tests
-        run: cd apps/worker && bun test 2>&1 | tee /tmp/backend-unit-results.txt; exit ${PIPESTATUS[0]}
+        run: bunx vitest run --config vitest.unit.config.ts 2>&1 | tee /tmp/backend-unit-results.txt; exit ${PIPESTATUS[0]}
 
       - name: Upload test results on failure
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

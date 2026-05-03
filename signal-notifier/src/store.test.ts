@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { unlinkSync } from 'node:fs'
 import { IdentifierStore } from './store'
 
