@@ -76,6 +76,14 @@ function verifyRequest(
   const signature = request.headers.get('X-Bridge-Signature') ?? ''
   const timestamp = request.headers.get('X-Bridge-Timestamp') ?? ''
   if (!signature || !timestamp) return false
+
+  // Reject requests with timestamps older than 5 minutes (replay protection)
+  const tsMs = parseInt(timestamp, 10)
+  if (isNaN(tsMs) || Math.abs(Date.now() - tsMs) > 300_000) {
+    console.warn('[bridge] Rejected request with stale timestamp')
+    return false
+  }
+
   return webhook.verifySignature(url.toString(), body, timestamp, signature)
 }
 
@@ -130,8 +138,13 @@ async function main(): Promise<void> {
         }
       }
 
-      // ---- Status endpoint (detailed, unauthenticated) ----
+      // ---- Status endpoint (detailed, authenticated) ----
       if (path === '/status' && method === 'GET') {
+        const statusBody = ''
+        if (!verifyRequest(webhook, request, url, statusBody)) {
+          return new Response('Forbidden', { status: 403 })
+        }
+
         try {
           const health = await client.healthCheck()
           const channels = await client.listChannels()
@@ -263,11 +276,23 @@ async function main(): Promise<void> {
         if (!signature || !timestamp) {
           return new Response('Forbidden', { status: 403 })
         }
+
+        // Replay protection for recording requests
+        const tsMs = parseInt(timestamp, 10)
+        if (isNaN(tsMs) || Math.abs(Date.now() - tsMs) > 300_000) {
+          return new Response('Forbidden', { status: 403 })
+        }
+
         if (!webhook.verifySignature(urlForSigning.toString(), '', timestamp, signature)) {
           return new Response('Forbidden', { status: 403 })
         }
 
         const name = path.replace('/recordings/', '')
+
+        // Path traversal protection: reject names containing / or ..
+        if (name.includes('/') || name.includes('..')) {
+          return new Response('Bad Request: invalid recording name', { status: 400 })
+        }
         try {
           const audio = await client.getRecordingFile(name)
           if (!audio) {

@@ -499,9 +499,13 @@ export class CommandHandler {
   /** Play audio on a channel */
   private async execPlayback(cmd: PlaybackCommand): Promise<void> {
     if (cmd.text) {
-      // TTS — use PBX-specific TTS engine or pre-rendered audio
-      console.log(
-        `[handler] TTS playback: "${cmd.text.substring(0, 50)}..." lang=${cmd.language}`
+      // TODO: implement TTS engine integration
+      // Currently plays a beep as a placeholder when TTS text is received.
+      // A real implementation would route to a PBX-specific TTS engine
+      // (e.g. Asterisk Festival/Flite, FreeSWITCH mod_tts) or an external
+      // TTS service (Google Cloud TTS, AWS Polly) and play the resulting audio.
+      console.warn(
+        `[handler] TTS engine not configured — playing beep instead of: "${cmd.text.substring(0, 80)}..." lang=${cmd.language}`
       )
       try {
         await this.client.playMedia(cmd.channelId, `sound:beep`)

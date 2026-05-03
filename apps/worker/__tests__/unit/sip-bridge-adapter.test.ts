@@ -40,10 +40,15 @@ class TestSipBridgeAdapter extends SipBridgeAdapter {
   }
 }
 
-async function signBridgePayload(body: object, secret: string, timestamp?: number): Promise<{ signature: string; timestamp: string }> {
-  const ts = timestamp ?? Math.floor(Date.now() / 1000)
+async function signBridgePayload(
+  body: object,
+  secret: string,
+  timestamp?: number,
+  url = 'https://example.com/webhook',
+): Promise<{ signature: string; timestamp: string }> {
+  const ts = timestamp ?? Date.now()
   const bodyStr = JSON.stringify(body)
-  const payload = `${ts}.${bodyStr}`
+  const payload = `${ts}.${url}.${bodyStr}`
   const encoder = new TextEncoder()
   const key = await crypto.subtle.importKey(
     'raw',
@@ -53,9 +58,7 @@ async function signBridgePayload(body: object, secret: string, timestamp?: numbe
     ['sign'],
   )
   const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(payload))
-  const signature = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+  const signature = btoa(String.fromCharCode(...new Uint8Array(sig)))
   return { signature, timestamp: ts.toString() }
 }
 
@@ -102,7 +105,7 @@ describe('SipBridgeAdapter', () => {
       const body = { event: 'test' }
       const request = makeJsonRequest(body, {
         'X-Bridge-Signature': '0000000000000000000000000000000000000000000000000000000000000000',
-        'X-Bridge-Timestamp': Math.floor(Date.now() / 1000).toString(),
+        'X-Bridge-Timestamp': Date.now().toString(),
       })
       const result = await adapter.validateWebhook(request)
       expect(result).toBe(false)
@@ -110,7 +113,7 @@ describe('SipBridgeAdapter', () => {
 
     it('rejects missing signature header', async () => {
       const request = makeJsonRequest({ event: 'test' }, {
-        'X-Bridge-Timestamp': Math.floor(Date.now() / 1000).toString(),
+        'X-Bridge-Timestamp': Date.now().toString(),
       })
       const result = await adapter.validateWebhook(request)
       expect(result).toBe(false)
@@ -118,7 +121,7 @@ describe('SipBridgeAdapter', () => {
 
     it('rejects expired timestamp (>5 minutes old)', async () => {
       const body = { event: 'test' }
-      const oldTs = Math.floor(Date.now() / 1000) - 400
+      const oldTs = Date.now() - 400_000
       const { signature } = await signBridgePayload(body, bridgeSecret, oldTs)
       const request = makeJsonRequest(body, {
         'X-Bridge-Signature': signature,
@@ -130,7 +133,7 @@ describe('SipBridgeAdapter', () => {
 
     it('rejects timestamp too far in the future', async () => {
       const body = { event: 'test' }
-      const futureTs = Math.floor(Date.now() / 1000) + 400
+      const futureTs = Date.now() + 400_000
       const { signature } = await signBridgePayload(body, bridgeSecret, futureTs)
       const request = makeJsonRequest(body, {
         'X-Bridge-Signature': signature,
@@ -332,7 +335,7 @@ describe('SipBridgeAdapter', () => {
       await adapter.hangupCall('ch-1')
       expect(fetchMock).toHaveBeenCalledTimes(1)
       const [url, init] = fetchMock.mock.calls[0]
-      expect(url).toBe(`${bridgeCallbackUrl}/commands/hangup`)
+      expect(url).toBe(`${bridgeCallbackUrl}/hangup`)
       expect(init.method).toBe('POST')
       expect(JSON.parse(init.body)).toEqual({ channelId: 'ch-1' })
       expect(init.headers['X-Bridge-Signature']).toBeDefined()
@@ -345,7 +348,7 @@ describe('SipBridgeAdapter', () => {
       fetchMock.mockResolvedValue({
         ok: true,
         headers: { get: () => 'application/json' },
-        json: async () => ({ callSids: ['cs-v1', 'cs-v2'] }),
+        json: async () => ({ channelIds: ['cs-v1', 'cs-v2'] }),
       } as unknown as Response)
 
       const sids = await adapter.ringVolunteers({
@@ -362,7 +365,7 @@ describe('SipBridgeAdapter', () => {
       expect(sids).toEqual(['cs-v1', 'cs-v2'])
       expect(fetchMock).toHaveBeenCalledTimes(1)
       const [url, init] = fetchMock.mock.calls[0]
-      expect(url).toBe(`${bridgeCallbackUrl}/commands/ring`)
+      expect(url).toBe(`${bridgeCallbackUrl}/ring`)
       const body = JSON.parse(init.body)
       expect(body.parentCallSid).toBe('cs-parent')
       expect(body.callerNumber).toBe('+15551111111')
@@ -412,10 +415,10 @@ describe('SipBridgeAdapter', () => {
       await adapter.cancelRinging(['cs-1', 'cs-2'], 'cs-2')
       expect(fetchMock).toHaveBeenCalledTimes(1)
       const [url, init] = fetchMock.mock.calls[0]
-      expect(url).toBe(`${bridgeCallbackUrl}/commands/cancel-ringing`)
+      expect(url).toBe(`${bridgeCallbackUrl}/cancel-ringing`)
       const body = JSON.parse(init.body)
-      expect(body.callSids).toEqual(['cs-1', 'cs-2'])
-      expect(body.exceptSid).toBe('cs-2')
+      expect(body.channelIds).toEqual(['cs-1', 'cs-2'])
+      expect(body.exceptId).toBe('cs-2')
     })
   })
 
