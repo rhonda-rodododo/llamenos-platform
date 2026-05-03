@@ -69,10 +69,18 @@ pub struct EncryptedDeviceKeys {
     pub state: DeviceKeyState,
 }
 
-fn default_kdf_version() -> u8 { KDF_VERSION }
-fn default_argon2_m_cost() -> u32 { ARGON2_M_COST_KIB }
-fn default_argon2_t_cost() -> u32 { ARGON2_T_COST }
-fn default_argon2_p_cost() -> u32 { ARGON2_P_COST }
+fn default_kdf_version() -> u8 {
+    KDF_VERSION
+}
+fn default_argon2_m_cost() -> u32 {
+    ARGON2_M_COST_KIB
+}
+fn default_argon2_t_cost() -> u32 {
+    ARGON2_T_COST
+}
+fn default_argon2_p_cost() -> u32 {
+    ARGON2_P_COST
+}
 
 /// Internal: holds the raw secret key bytes (zeroized on drop).
 #[derive(Zeroize)]

@@ -159,11 +159,18 @@ class DashboardViewModel @Inject constructor(
     /**
      * Fetch the server event encryption key from GET /api/auth/me.
      * Stores it in Rust memory via CryptoService — key never touches JVM memory.
+     *
+     * The API returns hubEventKeys: Map<hubId, keyHex>. We select the key for the
+     * currently active hub, falling back to the first available key if the active
+     * hub is not yet set (e.g., during initial setup).
      */
     private suspend fun fetchServerEventKey() {
         try {
             val me = apiService.request<MeResponse>("GET", "/api/auth/me")
-            val currentKey = me.serverEventKeyHex ?: return
+            val hubKeys = me.hubEventKeys ?: return
+            val activeHubId = activeHubState.activeHubId.value
+            val currentKey = if (activeHubId != null) hubKeys[activeHubId] else hubKeys.values.firstOrNull()
+            currentKey ?: return
             webSocketService.setServerEventKeys(currentKey)
             sessionState.adminDecryptionPubkey = me.adminDecryptionPubkey
         } catch (_: Exception) {

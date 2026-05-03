@@ -526,16 +526,25 @@ pub fn mobile_decrypt_hub_event(
     ciphertext_hex: String,
     hub_id: String,
 ) -> Result<String, CryptoError> {
-    use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{
+        aead::{Aead, KeyInit},
+        XChaCha20Poly1305, XNonce,
+    };
     let guard = state().lock().unwrap();
-    let key = guard.hub_keys.get(&hub_id)
+    let key = guard
+        .hub_keys
+        .get(&hub_id)
         .ok_or_else(|| CryptoError::InvalidInput(format!("No hub key for hub: {hub_id}")))?;
     let data = hex::decode(&ciphertext_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 { return Err(CryptoError::InvalidCiphertext); }
+    if data.len() < 40 {
+        return Err(CryptoError::InvalidCiphertext);
+    }
     let nonce = XNonce::from_slice(&data[..24]);
     let cipher = XChaCha20Poly1305::new_from_slice(key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let plaintext = cipher.decrypt(nonce, &data[24..]).map_err(|_| CryptoError::DecryptionFailed)?;
+    let plaintext = cipher
+        .decrypt(nonce, &data[24..])
+        .map_err(|_| CryptoError::DecryptionFailed)?;
     String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)
 }
 
@@ -545,9 +554,14 @@ pub fn mobile_decrypt_hub_event(
 pub fn mobile_decrypt_event_with_attribution(
     ciphertext_hex: String,
 ) -> Result<Vec<String>, CryptoError> {
-    use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{
+        aead::{Aead, KeyInit},
+        XChaCha20Poly1305, XNonce,
+    };
     let data = hex::decode(&ciphertext_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 { return Err(CryptoError::InvalidCiphertext); }
+    if data.len() < 40 {
+        return Err(CryptoError::InvalidCiphertext);
+    }
     let nonce = XNonce::from_slice(&data[..24]);
     let ciphertext = &data[24..];
     let guard = state().lock().unwrap();
@@ -567,12 +581,19 @@ pub fn mobile_decrypt_event_with_attribution(
 /// Tries current key first, falls back to previous key (epoch rotation).
 #[uniffi::export]
 pub fn mobile_decrypt_server_event(encrypted_hex: String) -> Result<String, CryptoError> {
-    use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{
+        aead::{Aead, KeyInit},
+        XChaCha20Poly1305, XNonce,
+    };
     let guard = state().lock().unwrap();
-    let current = guard.server_event_current_key.as_ref()
+    let current = guard
+        .server_event_current_key
+        .as_ref()
         .ok_or_else(|| CryptoError::InvalidInput("No server event key set".into()))?;
     let data = hex::decode(&encrypted_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 { return Err(CryptoError::InvalidCiphertext); }
+    if data.len() < 40 {
+        return Err(CryptoError::InvalidCiphertext);
+    }
     let nonce = XNonce::from_slice(&data[..24]);
     let ciphertext = &data[24..];
     let cipher = XChaCha20Poly1305::new_from_slice(current)
@@ -583,7 +604,9 @@ pub fn mobile_decrypt_server_event(encrypted_hex: String) -> Result<String, Cryp
     if let Some(previous) = guard.server_event_previous_key.as_ref() {
         let cipher = XChaCha20Poly1305::new_from_slice(previous)
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-        let plaintext = cipher.decrypt(nonce, ciphertext).map_err(|_| CryptoError::DecryptionFailed)?;
+        let plaintext = cipher
+            .decrypt(nonce, ciphertext)
+            .map_err(|_| CryptoError::DecryptionFailed)?;
         return String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed);
     }
     Err(CryptoError::DecryptionFailed)
@@ -605,9 +628,14 @@ pub fn mobile_random_bytes_hex() -> String {
 /// or an error if no key works. Equivalent to `mobile_decrypt_event_with_attribution`.
 #[uniffi::export]
 pub fn mobile_decrypt_hub_event_trial(encrypted_hex: String) -> Result<Vec<String>, CryptoError> {
-    use chacha20poly1305::{aead::{Aead, KeyInit}, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{
+        aead::{Aead, KeyInit},
+        XChaCha20Poly1305, XNonce,
+    };
     let data = hex::decode(&encrypted_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 { return Err(CryptoError::InvalidCiphertext); }
+    if data.len() < 40 {
+        return Err(CryptoError::InvalidCiphertext);
+    }
     let nonce = XNonce::from_slice(&data[..24]);
     let ciphertext = &data[24..];
     let guard = state().lock().unwrap();

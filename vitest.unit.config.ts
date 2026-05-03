@@ -11,6 +11,7 @@ export default defineConfig({
       "deploy/docker/tests/**/*.test.ts",
     ],
     environment: "node",
+    setupFiles: ["./vitest.unit.setup.ts"],
   },
   resolve: {
     alias: [
