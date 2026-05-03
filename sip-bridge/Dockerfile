@@ -10,7 +10,7 @@ COPY src/ src/
 COPY tsconfig.json tsconfig.build.json ./
 
 # Type check (build config excludes test files)
-RUN tsc --noEmit --project tsconfig.build.json
+RUN bunx tsc --noEmit --project tsconfig.build.json
 
 # Build
 RUN bun build src/index.ts --outdir dist --target bun

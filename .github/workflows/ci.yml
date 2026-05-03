@@ -743,10 +743,7 @@ jobs:
             adb reverse tcp:3000 tcp:3000
             # Verify backend is reachable from host before running tests
             curl -sf http://localhost:3000/api/health/ready || { echo "::error::Backend not reachable"; exit 1; }
-            cd apps/android && ./gradlew connectedDebugAndroidTest \
-              -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" \
-              -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" \
-              -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
+            cd apps/android && ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -826,6 +823,11 @@ jobs:
           cd packages/crypto
           ./scripts/build-mobile.sh ios
           cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
+
+      - name: Copy fresh UniFFI bindings
+        if: steps.xcframework-cache.outputs.cache-hit != 'true'
+        run: |
+          cp packages/crypto/dist/ios/LlamenosCore.swift apps/ios/Sources/Generated/LlamenosCore.swift
 
       - name: Check for hardcoded secrets in Swift source
         run: |
