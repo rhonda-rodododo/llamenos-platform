@@ -31,7 +31,10 @@ interface AuthState {
   sessionExpired: boolean
   adminPubkey: string
   adminDecryptionPubkey: string
-  hubEventKeys: Record<string, string> | null
+  serverEventKeyHex: string | null
+  serverEventKeyPrevHex: string | null
+  eventKeyEpoch: number | undefined
+  eventKeyEpochDuration: number | undefined
 }
 
 interface AuthContextValue extends AuthState {
@@ -74,7 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionExpired: false,
     adminPubkey: '',
     adminDecryptionPubkey: '',
-    hubEventKeys: null,
+    serverEventKeyHex: null,
+    serverEventKeyPrevHex: null,
+    eventKeyEpoch: undefined,
+    eventKeyEpochDuration: undefined,
   })
 
   const lastApiActivity = useRef(Date.now())
@@ -161,7 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             callPreference: me.callPreference ?? 'phone',
             adminPubkey: me.adminDecryptionPubkey || '',
             adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-            hubEventKeys: me.hubEventKeys ?? null,
+            serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
             sessionExpiring: false,
             sessionExpired: false,
           })
@@ -197,7 +206,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             callPreference: me.callPreference ?? 'phone',
             adminPubkey: me.adminDecryptionPubkey || '',
             adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-            hubEventKeys: me.hubEventKeys ?? null,
+            serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
             sessionExpiring: false,
             sessionExpired: false,
           })
@@ -256,7 +268,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminDecryptionPubkey || '',
         adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-        hubEventKeys: me.hubEventKeys ?? null,
+        serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -298,7 +313,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminDecryptionPubkey || '',
         adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-        hubEventKeys: me.hubEventKeys ?? null,
+        serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -336,7 +354,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminDecryptionPubkey || '',
         adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-        hubEventKeys: me.hubEventKeys ?? null,
+        serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -376,7 +397,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminDecryptionPubkey || '',
         adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-        hubEventKeys: me.hubEventKeys ?? null,
+        serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -408,7 +432,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminDecryptionPubkey || '',
         adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-        hubEventKeys: me.hubEventKeys ?? null,
+        serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -436,7 +463,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         callPreference: me.callPreference ?? 'phone',
         adminPubkey: me.adminDecryptionPubkey || '',
         adminDecryptionPubkey: me.adminDecryptionPubkey || '',
-        hubEventKeys: me.hubEventKeys ?? null,
+        serverEventKeyHex: me.serverEventKeyHex ?? null,
+        serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
+        eventKeyEpoch: me.eventKeyEpoch,
+        eventKeyEpochDuration: me.eventKeyEpochDuration,
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -482,7 +512,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       callPreference: 'phone',
       adminPubkey: '',
       adminDecryptionPubkey: '',
-      hubEventKeys: null,
+      serverEventKeyHex: null,
+      serverEventKeyPrevHex: null,
+      eventKeyEpoch: undefined,
+      eventKeyEpochDuration: undefined,
       sessionExpiring: false,
       sessionExpired: false,
     })

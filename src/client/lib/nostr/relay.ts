@@ -11,16 +11,15 @@
 
 import { verifyEvent } from 'nostr-tools/pure'
 import type { Event as NostrEvent } from 'nostr-tools/core'
-import { signNostrEvent } from '../platform'
+import { signNostrEvent, decryptHubEvent, decryptServerEvent } from '../platform'
 import { EventDeduplicator, validateLlamenosEvent, parseLlamenosContent } from './events'
-import { decryptFromHub } from '../hub-key-manager'
 import type { LlamenosEvent, RelayState, NostrEventHandler } from './types'
 
 export interface RelayManagerOptions {
   relayUrl: string
   serverPubkey: string
-  /** Look up the per-hub event decryption key by hub ID. Returns null if unavailable. */
-  getHubEventKey: (hubId: string) => Uint8Array | null
+  /** @deprecated Hub key now lives in Rust CryptoState — use platform.setHubKey() */
+  getHubKey?: () => Uint8Array | null
   onStateChange?: (state: RelayState) => void
 }
 
@@ -35,12 +34,14 @@ const MAX_RECONNECT_DELAY = 30_000
 const BASE_RECONNECT_DELAY = 1_000
 const MAX_RECONNECT_ATTEMPTS = 20
 
+/** NIP-42 authentication state */
+export type AuthState = 'unauthenticated' | 'authenticating' | 'authenticated'
+
 export class RelayManager {
   private ws: WebSocket | null = null
   private state: RelayState = 'disconnected'
   private serverPubkey: string
   private relayUrl: string
-  private getHubEventKey: (hubId: string) => Uint8Array | null
   private onStateChange?: (state: RelayState) => void
   private subscriptions = new Map<string, Subscription>()
   private pendingSubscriptions: Subscription[] = []
@@ -48,7 +49,9 @@ export class RelayManager {
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private destroyed = false
-  private authenticated = false
+  private authState: AuthState = 'unauthenticated'
+  /** The event ID of the most recent NIP-42 auth event, used to match relay OK */
+  private pendingAuthEventId: string | null = null
   /** Tracks the timestamp of the last received event per hub for replay on reconnect */
   private lastEventTimestamp = new Map<string, number>()
   /** Timestamp when the connection was lost — used to request missed events */
@@ -57,7 +60,6 @@ export class RelayManager {
   constructor(options: RelayManagerOptions) {
     this.relayUrl = options.relayUrl
     this.serverPubkey = options.serverPubkey
-    this.getHubEventKey = options.getHubEventKey
     this.onStateChange = options.onStateChange
   }
 
@@ -124,7 +126,7 @@ export class RelayManager {
 
     this.subscriptions.set(sub.id, sub)
 
-    if (this.ws?.readyState === WebSocket.OPEN && this.authenticated) {
+    if (this.ws?.readyState === WebSocket.OPEN && this.authState === 'authenticated') {
       this.sendSubscription(sub)
     } else {
       this.pendingSubscriptions.push(sub)
@@ -194,12 +196,32 @@ export class RelayManager {
           case 'EVENT':
             this.handleEvent(data[1] as string, data[2] as NostrEvent)
             break
-          case 'OK':
-            // Event accepted/rejected: [OK, eventId, success, message]
-            if (!data[2]) {
-              console.warn(`[nostr] Event ${data[1]} rejected: ${data[3]}`)
+          case 'OK': {
+            const okEventId = data[1] as string
+            const okAccepted = data[2] as boolean
+            const okMessage = data[3] as string | undefined
+
+            // Check if this OK is for our pending NIP-42 auth event
+            if (this.pendingAuthEventId && okEventId === this.pendingAuthEventId) {
+              this.pendingAuthEventId = null
+              if (okAccepted) {
+                this.authState = 'authenticated'
+                this.setState('connected')
+                this.flushPendingSubscriptions()
+              } else {
+                this.authState = 'unauthenticated'
+                console.error(`[nostr] Relay rejected NIP-42 auth: ${okMessage}`)
+                this.scheduleReconnect()
+              }
+              break
+            }
+
+            // Regular event OK
+            if (!okAccepted) {
+              console.warn(`[nostr] Event ${okEventId} rejected: ${okMessage}`)
             }
             break
+          }
           case 'EOSE':
             // End of stored events for subscription
             break
@@ -207,7 +229,7 @@ export class RelayManager {
             // Subscription closed by relay: [CLOSED, subId, reason]
             if (typeof data[2] === 'string' && data[2].startsWith('auth-required:')) {
               // Re-authenticate
-              this.authenticated = false
+              this.authState = 'unauthenticated'
               this.setState('authenticating')
             }
             break
@@ -222,7 +244,8 @@ export class RelayManager {
 
     ws.addEventListener('close', () => {
       this.ws = null
-      this.authenticated = false
+      this.authState = 'unauthenticated'
+      this.pendingAuthEventId = null
       this.disconnectedAt = Date.now()
       this.setState('disconnected')
       if (!this.destroyed) {
@@ -236,8 +259,8 @@ export class RelayManager {
 
     // If no AUTH challenge arrives within 2s, assume open relay
     const authTimer = setTimeout(() => {
-      if (!this.authenticated && this.ws === ws && !this.destroyed) {
-        this.authenticated = true
+      if (this.authState === 'unauthenticated' && this.ws === ws && !this.destroyed) {
+        this.authState = 'authenticated'
         this.setState('connected')
         this.flushPendingSubscriptions()
       }
@@ -248,6 +271,7 @@ export class RelayManager {
   }
 
   private async handleAuth(challenge: string): Promise<void> {
+    this.authState = 'authenticating'
     this.setState('authenticating')
 
     try {
@@ -263,45 +287,50 @@ export class RelayManager {
       )
 
       if (this.ws?.readyState === WebSocket.OPEN) {
+        this.pendingAuthEventId = authEvent.id
         this.ws.send(JSON.stringify(['AUTH', authEvent]))
-        this.authenticated = true
-        this.setState('connected')
-        this.flushPendingSubscriptions()
+        // Events/subscriptions are buffered until relay confirms auth via OK
       }
     } catch {
+      this.authState = 'unauthenticated'
       console.error('[nostr] Cannot authenticate: key manager locked or IPC error')
     }
   }
 
-  private handleEvent(_subId: string, event: NostrEvent): void {
+  private async handleEvent(_subId: string, event: NostrEvent): Promise<void> {
     // Validate signature and structure
     if (!verifyEvent(event)) return
     if (!validateLlamenosEvent(event)) return
 
-    // C2: Verify the event was published by the server — reject events from unknown pubkeys.
-    // This prevents a compromised relay or external attacker from injecting forged events.
-    if (event.pubkey !== this.serverPubkey) {
-      console.warn('[nostr] Rejected event from unknown publisher:', event.pubkey)
-      return
-    }
-
     // Deduplication
     if (!this.deduplicator.isNew(event)) return
 
-    // Extract hubId from d-tag for per-hub key lookup and routing
-    const hubId = event.tags.find(t => t[0] === 'd')?.[1]
-    if (hubId === undefined) return
+    // Verify publisher identity — reject events not from the server
+    if (event.pubkey !== this.serverPubkey) return
 
-    // C1: Decrypt content with per-hub event key (not a single global key)
-    const hubKey = this.getHubEventKey(hubId)
-    let content: LlamenosEvent | null = null
+    // Decrypt content via Rust CryptoState (H2 — key never enters JS)
+    // Try epoch-keyed server event key first, then hub key
+    const epochTag = event.tags.find(t => t[0] === 'epoch')
+    let decrypted: string | null = null
 
-    if (hubKey) {
-      const decrypted = decryptFromHub(event.content, hubKey)
-      content = parseLlamenosContent(decrypted)
+    if (epochTag) {
+      const epoch = parseInt(epochTag[1], 10)
+      if (!isNaN(epoch)) {
+        decrypted = await decryptServerEvent(event.content, epoch)
+      }
     }
 
+    // Fall back to hub key decryption for events without epoch tag
+    if (!decrypted) {
+      decrypted = await decryptHubEvent(event.content)
+    }
+
+    const content = parseLlamenosContent(decrypted)
     if (!content) return
+
+    // Route to all matching subscribers
+    const hubId = event.tags.find(t => t[0] === 'd')?.[1]
+    if (!hubId) return
 
     // Track the latest event timestamp per hub for replay on reconnect
     const prevTs = this.lastEventTimestamp.get(hubId) ?? 0

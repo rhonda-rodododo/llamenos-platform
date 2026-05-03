@@ -12,7 +12,8 @@ import { okResponseSchema } from '@protocol/schemas/common'
 import { publicErrors, authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { getPrimaryRole } from '@shared/permissions'
-import { deriveHubEventKeys } from '../lib/hub-event-crypto'
+import { deriveServerEventKey, getCurrentEpoch, EVENT_KEY_EPOCH_DURATION } from '../lib/hub-event-crypto'
+import { bytesToHex } from '@noble/hashes/utils.js'
 
 const auth = new Hono<AppEnv>()
 
@@ -147,13 +148,20 @@ auth.get('/me',
 
     const primaryRole = getPrimaryRole(user.roles, allRoles)
 
-    // C1: Derive per-hub event keys — only for hubs this user is a member of.
-    // Each hub gets its own HKDF-derived key so a user in hub A cannot decrypt hub B's events.
-    // Also includes the empty-string hub key for cross-hub events (messaging webhooks, etc.)
-    const userHubIds = (user.hubRoles || []).map((hr: { hubId: string }) => hr.hubId)
-    const hubEventKeys = c.env.SERVER_NOSTR_SECRET
-      ? deriveHubEventKeys(c.env.SERVER_NOSTR_SECRET, ['', ...userHubIds])
-      : undefined
+    // Derive epoch-scoped server event key for client-side decryption (H1 + H5 fix)
+    // Key changes each epoch for forward secrecy. Client receives current + previous epoch keys.
+    const currentEpoch = getCurrentEpoch()
+    let serverEventKeyHex: string | undefined
+    let serverEventKeyPrevHex: string | undefined
+    let eventKeyEpoch: number | undefined
+    let eventKeyEpochDuration: number | undefined
+
+    if (c.env.SERVER_NOSTR_SECRET) {
+      serverEventKeyHex = bytesToHex(deriveServerEventKey(c.env.SERVER_NOSTR_SECRET, undefined, currentEpoch))
+      serverEventKeyPrevHex = bytesToHex(deriveServerEventKey(c.env.SERVER_NOSTR_SECRET, undefined, currentEpoch - 1))
+      eventKeyEpoch = currentEpoch
+      eventKeyEpochDuration = EVENT_KEY_EPOCH_DURATION
+    }
 
     return c.json({
       pubkey: user.pubkey,
@@ -171,7 +179,10 @@ auth.get('/me',
       webauthnRegistered: webauthnCreds.length > 0,
       // H17: Removed adminPubkey (signing key identity) — only decryption pubkey needed
       adminDecryptionPubkey: c.env.ADMIN_DECRYPTION_PUBKEY || c.env.ADMIN_PUBKEY,
-      hubEventKeys,
+      serverEventKeyHex,
+      serverEventKeyPrevHex,
+      eventKeyEpoch,
+      eventKeyEpochDuration,
     })
   },
 )

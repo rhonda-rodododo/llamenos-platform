@@ -382,7 +382,7 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   publishNostrEvent(c.env, KIND_CALL_RING, {
     type: 'call:ring',
     callId,
-  }, hubId).catch(() => {})
+  }).catch(() => {})
 
   return c.json({ ok: true, callId, status: 'ringing' })
 })
@@ -407,13 +407,13 @@ dev.post('/test-simulate/answer-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'in-progress',
-  }, call.hubId ?? '').catch(() => {})
+  }).catch(() => {})
 
   // Publish presence update (mirrors real telephony flow)
   publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: body.callId,
-  }, call.hubId ?? '').catch(() => {})
+  }).catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'in-progress' })
 })
@@ -438,7 +438,7 @@ dev.post('/test-simulate/end-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'completed',
-  }, call.hubId ?? '').catch(() => {})
+  }).catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'completed' })
 })
@@ -463,7 +463,7 @@ dev.post('/test-simulate/voicemail', async (c) => {
   publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
     type: 'voicemail:new',
     callId: body.callId,
-  }, call.hubId ?? '').catch(() => {})
+  }).catch(() => {})
 
   return c.json({ ok: true, callId: body.callId, status: 'unanswered' })
 })
@@ -499,7 +499,7 @@ dev.post('/test-simulate/incoming-message', async (c) => {
     conversationId: result.conversationId,
     messageId: result.messageId,
     channelType: channel,
-  }, body.hubId ?? '').catch(() => {})
+  }).catch(() => {})
 
   return c.json({ ok: true, conversationId: result.conversationId, messageId: result.messageId })
 })

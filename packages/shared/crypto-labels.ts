@@ -144,12 +144,19 @@ export const LABEL_FIREHOSE_REPORT_WRAP = 'llamenos:firehose:report-wrap'
 /** HKDF context for per-hub storage IAM credential encryption at rest */
 export const LABEL_STORAGE_CREDENTIAL_WRAP = 'llamenos:storage-credential-wrap'
 
-// --- Nostr Event Tags ---
+// --- Separated Signing / Encryption Derivation (Epic 258 H1) ---
 
-/** Tag value for Llamenos events on the Nostr relay (`["t", NOSTR_EVENT_TAG]`) */
-export const NOSTR_EVENT_TAG = 'llamenos:event'
+/** HKDF salt for server Nostr signing key derivation (separated from encryption) */
+export const LABEL_SERVER_NOSTR_SIGNING_KEY = 'llamenos:server-nostr-signing:v1'
 
-// --- Per-Hub Event Encryption (Nostr hardening C1) ---
+/** HKDF info for server Nostr signing key derivation */
+export const LABEL_SERVER_NOSTR_SIGNING_KEY_INFO = 'llamenos:server-nostr-signing-info:v1'
 
-/** HKDF info for deriving per-hub Nostr event encryption keys from SERVER_NOSTR_SECRET */
-export const LABEL_HUB_EVENT_KEY = 'llamenos:hub-event-key:v1'
+/** HKDF salt for server event encryption key derivation (separated from signing) */
+export const LABEL_SERVER_EVENT_ENCRYPTION_KEY = 'llamenos:server-event-encryption:v1'
+
+/** HKDF info for server event encryption key derivation */
+export const LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO = 'llamenos:server-event-encryption-info:v1'
+
+/** HKDF info for epoch-based hub event key derivation */
+export const LABEL_HUB_EVENT_EPOCH = 'llamenos:hub-event-epoch:v1'

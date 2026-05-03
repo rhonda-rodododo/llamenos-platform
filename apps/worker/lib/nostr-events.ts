@@ -1,38 +1,48 @@
 import type { AppEnv } from '../types'
 import { getNostrPublisher } from './service-factories'
-import { deriveHubEventKey, encryptHubEvent } from './hub-event-crypto'
-import { NOSTR_EVENT_TAG } from '@shared/crypto-labels'
+import { deriveServerEventKey, encryptHubEvent, getCurrentEpoch } from './hub-event-crypto'
 
-/** Cached per-hub event keys — derived once per (secret, hubId) pair per isolate lifetime */
-const hubEventKeyCache = new Map<string, Uint8Array>()
+/**
+ * Epoch-keyed event key cache. Keys are derived per-epoch for forward secrecy (H5 fix).
+ * Old epochs are evicted when a new epoch starts.
+ */
+const epochKeyCache = new Map<number, Uint8Array>()
+let lastCachedEpoch = -1
 
-function getHubEventKey(serverSecret: string, hubId: string): Uint8Array {
-  const cacheKey = `${hubId}`
-  let key = hubEventKeyCache.get(cacheKey)
-  if (!key) {
-    key = deriveHubEventKey(serverSecret, hubId)
-    hubEventKeyCache.set(cacheKey, key)
+function getOrDeriveEpochKey(serverSecret: string, epoch: number): Uint8Array {
+  const cached = epochKeyCache.get(epoch)
+  if (cached) return cached
+
+  const key = deriveServerEventKey(serverSecret, undefined, epoch)
+  epochKeyCache.set(epoch, key)
+
+  // Evict keys older than current - 1
+  if (epoch > lastCachedEpoch) {
+    lastCachedEpoch = epoch
+    for (const cachedEpoch of epochKeyCache.keys()) {
+      if (cachedEpoch < epoch - 1) {
+        epochKeyCache.delete(cachedEpoch)
+      }
+    }
   }
+
   return key
 }
 
 /**
  * Publish an event to the Nostr relay for real-time sync.
- * Content is encrypted with a per-hub key if SERVER_NOSTR_SECRET is set.
- * The d-tag is set to hubId for proper per-hub event routing.
+ * Content is encrypted with an epoch-scoped key for forward secrecy (H5 fix).
+ * The epoch tag is included so clients know which key window to use for decryption.
  */
-export async function publishNostrEvent(
-  env: AppEnv['Bindings'],
-  kind: number,
-  content: Record<string, unknown>,
-  hubId: string,
-): Promise<void> {
+export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>): Promise<void> {
   const publisher = getNostrPublisher(env)
+  const createdAt = Math.floor(Date.now() / 1000)
+  const epoch = getCurrentEpoch(createdAt)
 
-  // Encrypt event content with per-hub key if server secret is available
+  // Encrypt event content if server secret is available
   let eventContent: string
   if (env.SERVER_NOSTR_SECRET) {
-    const eventKey = getHubEventKey(env.SERVER_NOSTR_SECRET, hubId)
+    const eventKey = getOrDeriveEpochKey(env.SERVER_NOSTR_SECRET, epoch)
     eventContent = encryptHubEvent(content, eventKey)
   } else {
     eventContent = JSON.stringify(content)
@@ -40,8 +50,12 @@ export async function publishNostrEvent(
 
   await publisher.publish({
     kind,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [['d', hubId], ['t', NOSTR_EVENT_TAG]],
+    created_at: createdAt,
+    tags: [
+      ['d', 'global'],
+      ['t', 'llamenos:event'],
+      ['epoch', epoch.toString()],
+    ],
     content: eventContent,
   })
 }

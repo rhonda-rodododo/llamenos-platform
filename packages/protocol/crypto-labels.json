@@ -65,6 +65,10 @@
     "LABEL_PROVISION_PREFIX": "llamenos:provision-",
     "LABEL_STRONGHOLD": "llamenos:stronghold:v1",
     "LABEL_STORAGE_CREDENTIAL_WRAP": "llamenos:storage-credential-wrap",
-    "LABEL_HUB_EVENT_KEY": "llamenos:hub-event-key:v1"
+    "LABEL_SERVER_NOSTR_SIGNING_KEY": "llamenos:server-nostr-signing:v1",
+    "LABEL_SERVER_NOSTR_SIGNING_KEY_INFO": "llamenos:server-nostr-signing-info:v1",
+    "LABEL_SERVER_EVENT_ENCRYPTION_KEY": "llamenos:server-event-encryption:v1",
+    "LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO": "llamenos:server-event-encryption-info:v1",
+    "LABEL_HUB_EVENT_EPOCH": "llamenos:hub-event-epoch:v1"
   }
 }

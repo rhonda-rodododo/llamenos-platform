@@ -19,45 +19,68 @@ describe('publishNostrEvent', () => {
   const mockPublish = vi.fn<(event: NostrEvent) => Promise<void>>()
   const mockClose = vi.fn()
   const mockGetNostrPublisher = vi.fn<(...args: unknown[]) => { publish: typeof mockPublish; serverPubkey: string; close: typeof mockClose }>()
-  const mockDeriveHubEventKey = vi.fn<(...args: unknown[]) => Uint8Array>(() => new Uint8Array(32))
+  const mockDeriveServerEventKey = vi.fn<(...args: unknown[]) => Uint8Array>(() => new Uint8Array(32))
   const mockEncryptHubEvent = vi.fn<(...args: unknown[]) => string>(() => 'encrypted-content')
+  const mockGetCurrentEpoch = vi.fn<(...args: unknown[]) => number>(() => 42)
+
+  // Epoch key cache — mirrors the real implementation's cache
+  const epochKeyCache = new Map<number, Uint8Array>()
+  let lastCachedEpoch = -1
+
+  function getOrDeriveEpochKey(serverSecret: string, epoch: number): Uint8Array {
+    const cached = epochKeyCache.get(epoch)
+    if (cached) return cached
+
+    const key = mockDeriveServerEventKey(serverSecret, undefined, epoch)
+    epochKeyCache.set(epoch, key)
+
+    if (epoch > lastCachedEpoch) {
+      lastCachedEpoch = epoch
+      for (const cachedEpoch of epochKeyCache.keys()) {
+        if (cachedEpoch < epoch - 1) {
+          epochKeyCache.delete(cachedEpoch)
+        }
+      }
+    }
+
+    return key
+  }
 
   // Re-implement publishNostrEvent using the same logic as ../../lib/nostr-events.ts
   // to avoid module cache poisoning from other test files' vi.mock calls.
-  const hubEventKeyCache = new Map<string, Uint8Array>()
-
   async function publishNostrEvent(
     env: Record<string, unknown>,
     kind: number,
     content: Record<string, unknown>,
-    hubId: string,
   ): Promise<void> {
     const publisher = mockGetNostrPublisher(env)
+    const createdAt = Math.floor(Date.now() / 1000)
+    const epoch = mockGetCurrentEpoch(createdAt)
 
     let eventContent: string
     if (env.SERVER_NOSTR_SECRET) {
-      const cacheKey = hubId
-      let key = hubEventKeyCache.get(cacheKey)
-      if (!key) {
-        key = mockDeriveHubEventKey(env.SERVER_NOSTR_SECRET, hubId)
-        hubEventKeyCache.set(cacheKey, key)
-      }
-      eventContent = mockEncryptHubEvent(content, key)
+      const eventKey = getOrDeriveEpochKey(env.SERVER_NOSTR_SECRET as string, epoch)
+      eventContent = mockEncryptHubEvent(content, eventKey)
     } else {
       eventContent = JSON.stringify(content)
     }
 
     await publisher.publish({
       kind,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [['d', hubId], ['t', 'llamenos:event']],
+      created_at: createdAt,
+      tags: [
+        ['d', 'global'],
+        ['t', 'llamenos:event'],
+        ['epoch', epoch.toString()],
+      ],
       content: eventContent,
     })
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    hubEventKeyCache.clear()
+    epochKeyCache.clear()
+    lastCachedEpoch = -1
 
     mockPublish.mockResolvedValue(undefined)
     mockGetNostrPublisher.mockReturnValue({
@@ -65,22 +88,23 @@ describe('publishNostrEvent', () => {
       serverPubkey: 'abc123',
       close: mockClose,
     })
+    mockGetCurrentEpoch.mockReturnValue(42)
   })
 
   it('resolves when publisher resolves', async () => {
-    await expect(publishNostrEvent({}, 20001, { type: 'test' }, 'hub-1')).resolves.toBeUndefined()
+    await expect(publishNostrEvent({}, 20001, { type: 'test' })).resolves.toBeUndefined()
     expect(mockPublish).toHaveBeenCalledOnce()
   })
 
   it('rejects when publisher rejects', async () => {
     mockPublish.mockRejectedValue(new Error('relay down'))
-    await expect(publishNostrEvent({}, 20001, { type: 'test' }, 'hub-1')).rejects.toThrow('relay down')
+    await expect(publishNostrEvent({}, 20001, { type: 'test' })).rejects.toThrow('relay down')
   })
 
   it('encrypts content when SERVER_NOSTR_SECRET is set', async () => {
-    await publishNostrEvent({ SERVER_NOSTR_SECRET: 'a'.repeat(64) }, 20001, { type: 'encrypted-test' }, 'hub-1')
+    await publishNostrEvent({ SERVER_NOSTR_SECRET: 'a'.repeat(64) }, 20001, { type: 'encrypted-test' })
 
-    expect(mockDeriveHubEventKey).toHaveBeenCalledWith('a'.repeat(64), 'hub-1')
+    expect(mockDeriveServerEventKey).toHaveBeenCalledWith('a'.repeat(64), undefined, 42)
     expect(mockEncryptHubEvent).toHaveBeenCalledWith(
       { type: 'encrypted-test' },
       expect.any(Uint8Array),
@@ -91,46 +115,49 @@ describe('publishNostrEvent', () => {
   })
 
   it('sends plaintext JSON when no SERVER_NOSTR_SECRET', async () => {
-    await publishNostrEvent({}, 20001, { type: 'plaintext-test', data: 42 }, 'hub-1')
+    await publishNostrEvent({}, 20001, { type: 'plaintext-test', data: 42 })
 
-    expect(mockDeriveHubEventKey).not.toHaveBeenCalled()
+    expect(mockDeriveServerEventKey).not.toHaveBeenCalled()
     expect(mockEncryptHubEvent).not.toHaveBeenCalled()
 
     const publishCall = mockPublish.mock.calls[0][0]
     expect(publishCall.content).toBe(JSON.stringify({ type: 'plaintext-test', data: 42 }))
   })
 
-  it('uses hubId in d-tag instead of global', async () => {
-    await publishNostrEvent({}, 30001, { type: 'tag-test' }, 'hub-42')
+  it('uses global d-tag and includes epoch tag', async () => {
+    await publishNostrEvent({}, 30001, { type: 'tag-test' })
 
     const publishCall = mockPublish.mock.calls[0][0]
     expect(publishCall.kind).toBe(30001)
-    expect(publishCall.tags).toEqual([['d', 'hub-42'], ['t', 'llamenos:event']])
+    expect(publishCall.tags).toEqual([['d', 'global'], ['t', 'llamenos:event'], ['epoch', '42']])
     expect(publishCall.created_at).toBeTypeOf('number')
   })
 
-  it('derives different keys for different hubs', async () => {
+  it('derives different keys for different epochs', async () => {
     const secret = 'b'.repeat(64)
     const key1 = new Uint8Array([1, 2, 3])
     const key2 = new Uint8Array([4, 5, 6])
-    mockDeriveHubEventKey
+    mockDeriveServerEventKey
       .mockReturnValueOnce(key1)
       .mockReturnValueOnce(key2)
 
-    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' }, 'hub-a')
-    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' }, 'hub-b')
+    mockGetCurrentEpoch.mockReturnValueOnce(10)
+    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' })
+    mockGetCurrentEpoch.mockReturnValueOnce(11)
+    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' })
 
-    expect(mockDeriveHubEventKey).toHaveBeenCalledTimes(2)
-    expect(mockDeriveHubEventKey).toHaveBeenCalledWith(secret, 'hub-a')
-    expect(mockDeriveHubEventKey).toHaveBeenCalledWith(secret, 'hub-b')
+    expect(mockDeriveServerEventKey).toHaveBeenCalledTimes(2)
+    expect(mockDeriveServerEventKey).toHaveBeenCalledWith(secret, undefined, 10)
+    expect(mockDeriveServerEventKey).toHaveBeenCalledWith(secret, undefined, 11)
   })
 
-  it('caches per-hub keys — same hub reuses the key', async () => {
+  it('caches epoch keys — same epoch reuses the key', async () => {
     const secret = 'c'.repeat(64)
-    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' }, 'hub-x')
-    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' }, 'hub-x')
+    mockGetCurrentEpoch.mockReturnValue(42)
+    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' })
+    await publishNostrEvent({ SERVER_NOSTR_SECRET: secret }, 20001, { type: 'test' })
 
-    // Key derived only once for the same hub
-    expect(mockDeriveHubEventKey).toHaveBeenCalledOnce()
+    // Key derived only once for the same epoch
+    expect(mockDeriveServerEventKey).toHaveBeenCalledOnce()
   })
 })
