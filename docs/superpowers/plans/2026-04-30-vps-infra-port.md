@@ -2,18 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port the mature VPS deployment infrastructure from V1 (`/home/rikki/projects/llamenos-hotline/`) to V2 (`/media/rikki/recover2/projects/llamenos-plan-vps-infra-port/`), adapting for V2 architecture: RustFS (not MinIO), 1984 Hosting Iceland (not Hetzner), and updated service names.
+**Goal:** Port the mature VPS deployment infrastructure from V1 (`/home/rikki/projects/llamenos-platform/`) to V2 (`/media/rikki/recover2/projects/llamenos-plan-vps-infra-port/`), adapting for V2 architecture: RustFS (not MinIO), 1984 Hosting Iceland (not Hetzner), and updated service names.
 
 **Spec reference:** `docs/superpowers/specs/2026-04-30-desktop-distribution-design.md` (Section 9: Port V1 VPS Infrastructure, Section 3: Serving Infrastructure)
 
 **Source references:**
-- V1 ISO builder: `/home/rikki/projects/llamenos-hotline/scripts/iso-builder/`
-- V1 Ansible: `/home/rikki/projects/llamenos-hotline/deploy/ansible/`
-- V1 Caddy: `/home/rikki/projects/llamenos-hotline/deploy/docker/Caddyfile.production`
-- V1 Backup: `/home/rikki/projects/llamenos-hotline/deploy/ansible/roles/backup/`
-- V1 Production checklist: `/home/rikki/projects/llamenos-hotline/deploy/PRODUCTION_CHECKLIST.md`
-- V1 CI workflows: `/home/rikki/projects/llamenos-hotline/.github/workflows/`
-- V1 OpenTofu: `/home/rikki/projects/llamenos-hotline/deploy/opentofu/`
+- V1 ISO builder: `/home/rikki/projects/llamenos-platform/scripts/iso-builder/`
+- V1 Ansible: `/home/rikki/projects/llamenos-platform/deploy/ansible/`
+- V1 Caddy: `/home/rikki/projects/llamenos-platform/deploy/docker/Caddyfile.production`
+- V1 Backup: `/home/rikki/projects/llamenos-platform/deploy/ansible/roles/backup/`
+- V1 Production checklist: `/home/rikki/projects/llamenos-platform/deploy/PRODUCTION_CHECKLIST.md`
+- V1 CI workflows: `/home/rikki/projects/llamenos-platform/.github/workflows/`
+- V1 OpenTofu: `/home/rikki/projects/llamenos-platform/deploy/opentofu/`
 - V2 deploy: `/media/rikki/recover2/projects/llamenos-plan-vps-infra-port/deploy/`
 
 ---
@@ -924,7 +924,7 @@
 
 ## Task 5: Production Checklist
 
-**V1 source:** `/home/rikki/projects/llamenos-hotline/deploy/PRODUCTION_CHECKLIST.md` (125 points)
+**V1 source:** `/home/rikki/projects/llamenos-platform/deploy/PRODUCTION_CHECKLIST.md` (125 points)
 **V2 already has:** `/media/rikki/recover2/projects/llamenos-plan-vps-infra-port/deploy/PRODUCTION_CHECKLIST.md`
 
 **Modifications:**
@@ -976,8 +976,8 @@
 **V2 destination:** `.github/workflows/`
 
 **Modifications:**
-- Update repository references from `rhonda-rodododo/llamenos-hotline` to `llamenos/llamenos`
-- Update image names from `llamenos-hotline` to `llamenos`
+- Update repository references from `rhonda-rodododo/llamenos-platform` to `llamenos/llamenos`
+- Update image names from `llamenos-platform` to `llamenos`
 - Update path triggers for V2 directory structure
 
 - [ ] Create `.github/workflows/iso-builder.yml`:
@@ -1468,7 +1468,7 @@ Before marking this plan complete, verify:
 
 - [ ] All V1 files have been copied to correct V2 paths
 - [ ] All MinIO references replaced with RustFS
-- [ ] All `llamenos-hotline` branding updated to `llamenos`
+- [ ] All `llamenos-platform` branding updated to `llamenos`
 - [ ] All repository references updated to `llamenos/llamenos`
 - [ ] 1984 Hosting module documented with manual provisioning steps
 - [ ] New Caddy vhosts (downloads, updates) included in both production Caddyfile and Ansible Jinja2 template

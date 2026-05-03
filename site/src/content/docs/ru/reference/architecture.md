@@ -10,7 +10,7 @@ description: Обзор системной архитектуры — репоз
 Llamenos разделён на три репозитория, которые используют общий протокол и криптографическое ядро:
 
 ```
-llamenos              llamenos-core           llamenos-hotline
+llamenos              llamenos-core           llamenos-platform
 (Desktop + API)       (Shared Crypto)         (Mobile App)
 +--------------+      +--------------+        +--------------+
 | Tauri v2     |      | Rust crate   |        | React Native |
@@ -25,7 +25,7 @@ llamenos              llamenos-core           llamenos-hotline
 
 - **llamenos** — Настольное приложение (Tauri v2 с Vite + React webview), бэкенд на Cloudflare Worker и самостоятельно размещённый бэкенд на Node.js. Это основной репозиторий.
 - **llamenos-core** — Общий Rust-крейт, реализующий все криптографические операции: ECIES-шифрование конвертов, подписи Schnorr, получение ключей PBKDF2, HKDF и XChaCha20-Poly1305. Компилируется в нативный код (для Tauri), WASM (для браузера) и привязки UniFFI (для мобильных устройств).
-- **llamenos-hotline** — Мобильное приложение React Native для iOS и Android. Использует привязки UniFFI для вызова того же криптографического кода на Rust.
+- **llamenos-platform** — Мобильное приложение React Native для iOS и Android. Использует привязки UniFFI для вызова того же криптографического кода на Rust.
 
 Все три платформы реализуют одинаковый протокол передачи данных, определённый в `docs/protocol/PROTOCOL.md`.
 
@@ -229,7 +229,7 @@ Update local UI state
 Llamenos разделён на три репозитория, которые используют общий протокол и криптографическое ядро:
 
 ```
-llamenos              llamenos-core           llamenos-hotline
+llamenos              llamenos-core           llamenos-platform
 (Desktop + API)       (Shared Crypto)         (Mobile App)
 +--------------+      +--------------+        +--------------+
 | Tauri v2     |      | Rust crate   |        | React Native |
@@ -244,7 +244,7 @@ llamenos              llamenos-core           llamenos-hotline
 
 - **llamenos** — Настольное приложение (Tauri v2 с Vite + React webview), бэкенд на Cloudflare Worker и самостоятельно размещённый бэкенд на Node.js. Это основной репозиторий.
 - **llamenos-core** — Общий Rust-крейт, реализующий все криптографические операции: ECIES-шифрование конвертов, подписи Schnorr, получение ключей PBKDF2, HKDF и XChaCha20-Poly1305. Компилируется в нативный код (для Tauri), WASM (для браузера) и привязки UniFFI (для мобильных устройств).
-- **llamenos-hotline** — Мобильное приложение React Native для iOS и Android. Использует привязки UniFFI для вызова того же криптографического кода на Rust.
+- **llamenos-platform** — Мобильное приложение React Native для iOS и Android. Использует привязки UniFFI для вызова того же криптографического кода на Rust.
 
 Все три платформы реализуют одинаковый протокол передачи данных, определённый в `docs/protocol/PROTOCOL.md`.
 

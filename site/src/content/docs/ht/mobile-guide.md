@@ -9,7 +9,7 @@ Aplikasyon mobil Llamenos pèmèt volontè reponn apèl, reponn mesaj, ak ekri n
 
 Aplikasyon mobil la se yon konpanyon pou aplikasyon desktop la. Li konekte nan menm backend Llamenos (Cloudflare Workers oswa otojere) epi itilize menm pwotokòl la, konsa volontè ka chanje ant desktop ak mobil san pwoblèm.
 
-Aplikasyon mobil la viv nan yon depo separe (`llamenos-hotline`) men pataje:
+Aplikasyon mobil la viv nan yon depo separe (`llamenos-platform`) men pataje:
 
 - **llamenos-core** — Menm krate Rust pou tout operasyon kriptografik, konpile via UniFFI pou iOS ak Android
 - **Pwotokòl** — Menm fòma fil, pwen final API, ak chema chifman
@@ -21,7 +21,7 @@ Aplikasyon mobil la viv nan yon depo separe (`llamenos-hotline`) men pataje:
 
 Aplikasyon mobil la aktyèlman distribiye kòm APK pou chajman lateral:
 
-1. Telechaje dènye fichye `.apk` soti nan paj [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest) la
+1. Telechaje dènye fichye `.apk` soti nan paj [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-platform/releases/latest) la
 2. Sou aparèy Android ou a, ale nan **Paramèt > Sekirite** epi aktive **Enstale soti nan sous enkoni** (oswa aktive l pou aplikasyon lè yo mande)
 3. Ouvri APK telechaje a epi tape **Enstale**
 4. Yon fwa enstale, ouvri Llamenos soti nan tiwa aplikasyon ou a

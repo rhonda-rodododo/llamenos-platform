@@ -120,7 +120,7 @@ bun run deploy:site     # केवल marketing site डिप्लॉय क�
 Desktop app नए version की जांच के लिए Tauri updater का उपयोग करता है। यदि updates detect नहीं हो रहे:
 
 - अपना internet connection जांचें
-- सत्यापित करें कि update endpoint पहुंच योग्य है: `https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest/download/latest.json`
+- सत्यापित करें कि update endpoint पहुंच योग्य है: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
 - Linux पर, AppImage auto-update के लिए उसकी directory में file को write permissions की आवश्यकता है
 - macOS पर, app को `/Applications` में होना चाहिए (DMG से सीधे नहीं चल रहा)
 
@@ -262,6 +262,6 @@ Llamenos single-instance mode enforce करता है। यदि app क�
 
 यदि आपकी समस्या यहाँ कवर नहीं है:
 
-- ज्ञात bugs और workarounds के लिए [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-hotline/issues) जांचें
+- ज्ञात bugs और workarounds के लिए [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) जांचें
 - नई issue बनाने से पहले मौजूदा issues खोजें
 - bug report करते समय शामिल करें: आपका deployment mode (Cloudflare/Docker/Kubernetes), platform (Desktop/Mobile), और browser console या terminal से कोई भी error messages

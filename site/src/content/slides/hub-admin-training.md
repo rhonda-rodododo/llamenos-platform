@@ -108,7 +108,7 @@ docker compose version  # 2.x
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
 cd llamenos
 
 # 2. Copy and edit environment config
@@ -194,7 +194,7 @@ chmod +x /usr/local/bin/cloudflared
 
 # Authenticate and create tunnel
 cloudflared tunnel login
-cloudflared tunnel create llamenos-hotline
+cloudflared tunnel create llamenos-platform
 
 # Configure: ~/.cloudflared/config.yml
 tunnel: <your-tunnel-id>
@@ -661,8 +661,8 @@ docker compose --profile monitoring up -d
 
 ## Getting Help
 
-- **Self-hosting docs**: `llamenos-hotline.com/docs`
-- **GitHub Issues**: `github.com/rhonda-rodododo/llamenos-hotline/issues`
+- **Self-hosting docs**: `llamenos-platform.com/docs`
+- **GitHub Issues**: `github.com/rhonda-rodododo/llamenos-platform/issues`
 - **Signal group**: Ask during a training session for the group link
 - **CLAUDE.md**: In the repo root — full technical reference for deep dives
 

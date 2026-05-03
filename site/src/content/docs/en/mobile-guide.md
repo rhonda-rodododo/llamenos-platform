@@ -9,7 +9,7 @@ The Llamenos mobile app lets volunteers answer calls, respond to messages, and w
 
 The mobile app is a companion to the desktop application. It connects to the same Llamenos backend (Cloudflare Workers or self-hosted) and uses the same protocol, so volunteers can switch between desktop and mobile seamlessly.
 
-The mobile app lives in a separate repository (`llamenos-hotline`) but shares:
+The mobile app lives in a separate repository (`llamenos-platform`) but shares:
 
 - **llamenos-core** — The same Rust crate for all cryptographic operations, compiled via UniFFI for iOS and Android
 - **Protocol** — The same wire format, API endpoints, and encryption scheme
@@ -21,7 +21,7 @@ The mobile app lives in a separate repository (`llamenos-hotline`) but shares:
 
 The mobile app is currently distributed as an APK for sideloading:
 
-1. Download the latest `.apk` file from the [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-hotline/releases/latest) page
+1. Download the latest `.apk` file from the [GitHub Releases](https://github.com/rhonda-rodododo/llamenos-platform/releases/latest) page
 2. On your Android device, go to **Settings > Security** and enable **Install from unknown sources** (or enable it per-app when prompted)
 3. Open the downloaded APK and tap **Install**
 4. Once installed, open Llamenos from your app drawer

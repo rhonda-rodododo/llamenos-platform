@@ -448,7 +448,7 @@ Copy `~/.claude/skills/supervising-dispatched-sessions/bootstrap.sh` to `plugins
 
 1. `STATUS_DIR="$HOME/tier-overnight-status"` → `STATUS_DIR="$HOME/.skybuild-supervisor/status"`
 2. `PROMPT_DIR="$HOME/tier-prompts"` → `PROMPT_DIR="$HOME/.skybuild-supervisor/prompts"`
-3. Replace hardcoded `cd /media/rikki/recover2/projects/llamenos-hotline` with:
+3. Replace hardcoded `cd /media/rikki/recover2/projects/llamenos-platform` with:
    ```bash
    MAIN_REPO="${DISPATCH_REPO:-$(git rev-parse --show-toplevel 2>/dev/null)}"
    cd "$MAIN_REPO" 2>/dev/null && {
@@ -476,7 +476,7 @@ Copy `~/.claude/skills/supervising-dispatched-sessions/supervisor-template.sh` t
 1. `PROMPT_DIR="$HOME/tier-prompts"` → `PROMPT_DIR="$HOME/.skybuild-supervisor/prompts"`
 2. `STATUS_DIR="$HOME/tier-overnight-status"` → `STATUS_DIR="$HOME/.skybuild-supervisor/status"`
 3. `LOG_FILE="$HOME/${ROUND_NAME}.log"` → `LOG_FILE="$HOME/.skybuild-supervisor/logs/${ROUND_NAME}.log"`
-4. Remove hardcoded `MAIN_REPO="/media/rikki/recover2/projects/llamenos-hotline"`, replace with:
+4. Remove hardcoded `MAIN_REPO="/media/rikki/recover2/projects/llamenos-platform"`, replace with:
    ```bash
    MAIN_REPO="${DISPATCH_REPO:-$(git rev-parse --show-toplevel 2>/dev/null)}"
    ```
@@ -757,8 +757,8 @@ Do NOT attempt workarounds or spend more than 30 minutes stuck.
 Copy `~/.claude/skills/supervising-dispatched-sessions/prompt-template-pr-comments.md` to `plugins/supervisor/templates/prompt-template-pr-comments.md`. Changes:
 
 1. Status file path: `~/tier-overnight-status/` → `~/.skybuild-supervisor/status/`
-2. Remove hardcoded `llamenos-hotline` references — use `<OWNER>/<REPO>` placeholders
-3. Worktree path: `llamenos-hotline-pr<N>-followup` → `<repo>-pr<N>-followup`
+2. Remove hardcoded `llamenos-platform` references — use `<OWNER>/<REPO>` placeholders
+3. Worktree path: `llamenos-platform-pr<N>-followup` → `<repo>-pr<N>-followup`
 4. Add the Communication Protocol section (same as generic template)
 5. Build/test commands: replace hardcoded `bun run typecheck && bun run lint && bun run build` with placeholder: `<project build+test commands from .supervisor-rules.md>`
 

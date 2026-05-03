@@ -225,7 +225,7 @@ helm install llamenos deploy/helm/llamenos/ \
   --set ingress.hosts[0].host=hotline.yourdomain.com
 ```
 
-See the full [self-hosting documentation](https://llamenos-hotline.com/docs/self-hosting) for detailed guides.
+See the full [self-hosting documentation](https://llamenos-platform.com/docs/self-hosting) for detailed guides.
 
 ## Telephony Providers
 

@@ -116,7 +116,7 @@ We may update these Terms from time to time. We will post the updated Terms on t
 
 For questions about these Terms:
 
-**Email:** [legal@llamenos-hotline.com](mailto:legal@llamenos-hotline.com)
+**Email:** [legal@llamenos-platform.com](mailto:legal@llamenos-platform.com)
 
 For privacy-related questions, see our [Privacy Policy](/privacy).
 

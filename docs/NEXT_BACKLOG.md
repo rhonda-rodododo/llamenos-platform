@@ -662,4 +662,4 @@ Complete backend modernization: replace Node.js with Bun runtime, then replace t
 
 ## Low Priority (Post-Launch)
 - [x] Add call recording playback in notes view (on-demand fetch from telephony provider)
-- [x] Marketing site + docs at llamenos-hotline.com (Astro + Cloudflare Pages)
+- [x] Marketing site + docs at llamenos-platform.com (Astro + Cloudflare Pages)

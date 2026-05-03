@@ -17,7 +17,7 @@ Reference: [Google Play Data Safety](https://support.google.com/googleplay/andro
 
 ### Do you provide a way for users to request that their data is deleted?
 
-**Yes** — users can request deletion of their account and all associated data. As an EU-organized project, GDPR Article 17 (right to erasure) applies. Requests are handled via the administrator of the user's hub or via `privacy@llamenos-hotline.com`.
+**Yes** — users can request deletion of their account and all associated data. As an EU-organized project, GDPR Article 17 (right to erasure) applies. Requests are handled via the administrator of the user's hub or via `privacy@llamenos-platform.com`.
 
 ---
 
@@ -140,7 +140,7 @@ Users can request deletion through:
 
 1. **In-app**: Settings → Account → Delete Account (removes all user data from the hub)
 2. **Admin**: Hub administrators can delete volunteer accounts and associated data from the admin panel
-3. **Email**: `privacy@llamenos-hotline.com` — requests processed within 30 days per GDPR Article 17
+3. **Email**: `privacy@llamenos-platform.com` — requests processed within 30 days per GDPR Article 17
 
 **What is deleted:**
 - Account credentials and display name
@@ -170,10 +170,10 @@ Users can request deletion through:
 
 ## Notes for Legal Review Before Submission
 
-- [ ] Confirm privacy policy URL is live: `https://llamenos-hotline.com/privacy`
+- [ ] Confirm privacy policy URL is live: `https://llamenos-platform.com/privacy`
 - [ ] Verify FCM token handling is described accurately (token rotation behavior)
 - [ ] Confirm audit log anonymization behavior matches implementation in `apps/worker/`
 - [ ] Confirm GDPR DPA (Data Processing Agreement) template is available for hub operators
-- [ ] Confirm `privacy@llamenos-hotline.com` is a monitored inbox with 30-day SLA
+- [ ] Confirm `privacy@llamenos-platform.com` is a monitored inbox with 30-day SLA
 - [ ] Review whether any third-party SDKs (crash reporting, analytics) have been added since this document was written — if so, update data sharing section accordingly
 - [ ] Confirm no advertising SDKs are included (verify `apps/android/app/build.gradle.kts` dependencies)

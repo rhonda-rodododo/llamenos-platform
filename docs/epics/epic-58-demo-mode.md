@@ -2,7 +2,7 @@
 
 ## Overview
 
-The production deployment at `demo.llamenos-hotline.com` needs a demo mode that lets potential users explore the app without going through the full setup flow. Demo mode pre-populates the system with realistic test data across all roles (admin, volunteer, reporter) and shows login credentials on the login page so visitors can immediately try the app. The demo instance has real Twilio integration, so calls/SMS actually work.
+The production deployment at `demo.llamenos-platform.com` needs a demo mode that lets potential users explore the app without going through the full setup flow. Demo mode pre-populates the system with realistic test data across all roles (admin, volunteer, reporter) and shows login credentials on the login page so visitors can immediately try the app. The demo instance has real Twilio integration, so calls/SMS actually work.
 
 Demo mode is controlled by an environment variable (`DEMO_MODE=true`), disabled by default, and has zero impact on non-demo deployments.
 
@@ -438,4 +438,4 @@ Tests run against a worker with `DEMO_MODE=true`:
 
 - Twilio account configured on demo deployment (already done)
 - `ADMIN_PUBKEY` set to demo admin's pubkey on demo deployment
-- Marketing site deployed at `llamenos-hotline.com` (already done)
+- Marketing site deployed at `llamenos-platform.com` (already done)

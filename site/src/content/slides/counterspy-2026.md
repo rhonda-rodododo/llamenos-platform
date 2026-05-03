@@ -931,9 +931,9 @@ Active hub in the UI doesn't affect which calls they receive.
 
 ## Get Involved
 
-- **Code**: `github.com/rhonda-rodododo/llamenos-hotline` (AGPL-3.0)
-- **Self-hosting docs**: `llamenos-hotline.com/docs`
-- **This deck**: `llamenos-hotline.com/slides/counterspy-2026/`
+- **Code**: `github.com/rhonda-rodododo/llamenos-platform` (AGPL-3.0)
+- **Self-hosting docs**: `llamenos-platform.com/docs`
+- **This deck**: `llamenos-platform.com/slides/counterspy-2026/`
 - **Signal**: Ask me after the talk
 
 :::fragment
@@ -966,4 +966,4 @@ Likely questions:
 
 *"More Secure Hubs for Your Spokes"*
 
-`llamenos-hotline.com/slides/counterspy-2026/`
+`llamenos-platform.com/slides/counterspy-2026/`

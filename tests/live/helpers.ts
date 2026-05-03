@@ -25,7 +25,7 @@ export function getLiveConfig() {
     testCallerNumber: requireEnv('TWILIO_TEST_CALLER'),
     testSecret: requireEnv('E2E_TEST_SECRET'),
     adminNsec: requireEnv('STAGING_ADMIN_NSEC'),
-    baseURL: process.env.LIVE_BASE_URL || 'https://demo-next.llamenos-hotline.com',
+    baseURL: process.env.LIVE_BASE_URL || 'https://demo-next.llamenos-platform.com',
   }
 }
 

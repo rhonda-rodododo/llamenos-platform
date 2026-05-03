@@ -15,8 +15,8 @@ This guide walks you through deploying Llamenos with Docker Compose on a single 
 ## Quick start (local)
 
 ```bash
-git clone https://github.com/rhonda-rodododo/llamenos-hotline.git
-cd llamenos-hotline
+git clone https://github.com/rhonda-rodododo/llamenos-platform.git
+cd llamenos-platform
 ./scripts/docker-setup.sh
 ```
 

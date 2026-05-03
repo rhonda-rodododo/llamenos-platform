@@ -32,7 +32,7 @@ export function DemoBanner() {
           {resetText}
           {' '}
           <a
-            href="https://llamenos-hotline.com/docs/getting-started"
+            href="https://llamenos-platform.com/docs/getting-started"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-0.5 font-medium text-primary hover:underline"

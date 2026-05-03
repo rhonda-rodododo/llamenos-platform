@@ -14,7 +14,7 @@ Epics 357 (Bun migration) and 358 (DO architecture removal) are complete. The `a
 
 2. **Type pollution in `types.ts`**: The `DOStub`, `DONamespace`, and 9 DO fields in `Env` make the `Env` interface appear to still need CF Worker runtime bindings. This is false — the real backend is Bun+PostgreSQL, not CF Workers. The DO fields only exist to satisfy TypeScript for the dead functions above.
 
-The `wrangler.jsonc` DO bindings exist solely for the `demo.llamenos-hotline.com` CF deployment, which is a separate deployment target from the real backend.
+The `wrangler.jsonc` DO bindings exist solely for the `demo.llamenos-platform.com` CF deployment, which is a separate deployment target from the real backend.
 
 ---
 
@@ -82,7 +82,7 @@ This file exports a `DurableObject` base class stub. It exists to satisfy import
 
 ### 2.7 `wrangler.jsonc`
 
-The 9 DO bindings and the `migrations` block exist for the CF demo deployment. These are not dead in that context — they configure a real (separate) CF deployment at `demo.llamenos-hotline.com`. However, they are misleading when reading the codebase because they make it look like the backend still needs CF DOs.
+The 9 DO bindings and the `migrations` block exist for the CF demo deployment. These are not dead in that context — they configure a real (separate) CF deployment at `demo.llamenos-platform.com`. However, they are misleading when reading the codebase because they make it look like the backend still needs CF DOs.
 
 **Action**: Add a top-of-file comment making the purpose explicit. Do NOT remove the DO bindings — removing them would break the demo deployment. This is documentation-only.
 
@@ -207,7 +207,7 @@ Expected current importers (verify before renaming):
 Add a comment block before the `durable_objects` section:
 
 ```jsonc
-// NOTE: These DO bindings are for the demo.llamenos-hotline.com CF deployment ONLY.
+// NOTE: These DO bindings are for the demo.llamenos-platform.com CF deployment ONLY.
 // The production backend runs as Bun+PostgreSQL (self-hosted via Docker/Helm).
 // The real backend does NOT use Durable Objects — they were removed in Epic 358.
 ```

@@ -9,7 +9,7 @@
 **Source references:**
 - Current bridge: `asterisk-bridge/src/` (5 files)
 - Hardened branch: `lm-asterisk-bridge-hardening` (memory leak fixes)
-- v1 unified bridge: `/media/rikki/recover2/projects/llamenos-hotline-code-review/sip-bridge/src/` (proven BridgeClient + ARI/ESL/Kamailio clients)
+- v1 unified bridge: `/media/rikki/recover2/projects/llamenos-platform-code-review/sip-bridge/src/` (proven BridgeClient + ARI/ESL/Kamailio clients)
 - Worker adapter: `apps/worker/telephony/asterisk.ts`
 - TelephonyAdapter interface: `apps/worker/telephony/adapter.ts`
 
@@ -47,7 +47,7 @@
 
 - [ ] Create `sip-bridge/tsconfig.json` — ESNext target, bundler moduleResolution, strict mode, Bun types
 
-- [ ] Create `sip-bridge/src/bridge-client.ts` — copy from v1 (`/media/rikki/recover2/projects/llamenos-hotline-code-review/sip-bridge/src/bridge-client.ts`), extend `BridgeOptions` with `type: 'mixing' | 'passthrough'` for SFrame E2EE support
+- [ ] Create `sip-bridge/src/bridge-client.ts` — copy from v1 (`/media/rikki/recover2/projects/llamenos-platform-code-review/sip-bridge/src/bridge-client.ts`), extend `BridgeOptions` with `type: 'mixing' | 'passthrough'` for SFrame E2EE support
 
 - [ ] Create `sip-bridge/src/types.ts` — base event types shared across all clients (BridgeEvent union, OriginateParams, BridgeHealthStatus are already in bridge-client.ts; this file holds internal state types: ActiveCall, BridgeConfig, BridgeCommand, WebhookPayload, RecordingCallbackEntry)
 
@@ -99,7 +99,7 @@
 **Files:**
 - Create: `sip-bridge/src/clients/esl-client.ts`
 
-- [ ] Port from v1 (`/media/rikki/recover2/projects/llamenos-hotline-code-review/sip-bridge/src/clients/esl-client.ts`). Key characteristics:
+- [ ] Port from v1 (`/media/rikki/recover2/projects/llamenos-platform-code-review/sip-bridge/src/clients/esl-client.ts`). Key characteristics:
   - TCP connection using `Bun.connect()`
   - Text-based protocol: `Key: Value\n` headers, `\n\n` separator, Content-Length body
   - Auth: `auth <password>\n\n` → expect `+OK`

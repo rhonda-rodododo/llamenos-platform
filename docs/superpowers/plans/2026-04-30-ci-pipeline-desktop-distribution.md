@@ -340,7 +340,7 @@ Replace the current `release` job entirely. In `.github/workflows/tauri-release.
           | macOS (Universal) | [DMG](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_universal.dmg) |
           | Windows (x64) | [NSIS Installer](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_x64-setup.nsis.zip) |
           | Linux (x64) | [AppImage](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_amd64.AppImage) \| [deb](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_amd64.deb) |
-          | Linux (Flatpak) | [Flatpak](https://releases.llamenos.org/desktop/v${VERSION}/llamenos-hotline.flatpak) |
+          | Linux (Flatpak) | [Flatpak](https://releases.llamenos.org/desktop/v${VERSION}/llamenos-platform.flatpak) |
 
           ### Verification
 
