@@ -23,7 +23,7 @@ if (!registeredNumber) {
   console.warn('[signal-notifier] SIGNAL_REGISTERED_NUMBER not set — notifications will fail')
 }
 
-const store = new IdentifierStore(dbPath)
+const store = new IdentifierStore(dbPath, apiKey)
 
 const bridgeCfg: BridgeConfig = { bridgeUrl, bridgeApiKey, registeredNumber }
 

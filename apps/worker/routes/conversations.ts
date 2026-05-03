@@ -3,6 +3,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv, EncryptedMessage } from '../types'
 import type { MessagingChannelType } from '@shared/types'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
+import { routeOutboundMessage } from '../messaging/delivery-router'
 import { checkPermission, requirePermission } from '../middleware/permission-guard'
 import { listConversationsQuerySchema, sendMessageBodySchema, updateConversationBodySchema, conversationResponseSchema, messageResponseSchema, conversationListResponseSchema, messageListResponseSchema } from '@protocol/schemas/conversations'
 import { paginationSchema, okResponseSchema } from '@protocol/schemas/common'
@@ -326,16 +327,9 @@ conversations.post('/:id/messages',
     let externalId: string | undefined
     let failureReason: string | undefined
 
-    // Send via messaging adapter first to get external ID (for external channels)
     let sendFailed = false
     if (plaintextForSending && conv.channelType !== 'web') {
       try {
-        const adapter = await getMessagingAdapterFromService(
-          conv.channelType as 'sms' | 'whatsapp' | 'signal',
-          services.settings,
-          c.env.HMAC_SECRET,
-        )
-        // Fetch the actual contact identifier from the service (server-side only)
         const identifier = await services.conversations.getContactIdentifier(id)
 
         const messagingBreaker = getCircuitBreaker({
@@ -344,13 +338,23 @@ conversations.post('/:id/messages',
           resetTimeoutMs: 30_000,
         })
 
-        const result = await messagingBreaker.execute(() =>
+        const { result } = await messagingBreaker.execute(() =>
           withRetry(
-            () => adapter.sendMessage({
-              recipientIdentifier: identifier,
-              body: plaintextForSending!,
-              conversationId: id,
-            }),
+            () => routeOutboundMessage(
+              {
+                settingsService: services.settings,
+                hmacSecret: c.env.HMAC_SECRET,
+                notifierUrl: c.env.NOTIFIER_URL,
+                notifierApiKey: c.env.NOTIFIER_API_KEY,
+              },
+              {
+                channelType: conv.channelType as 'sms' | 'whatsapp' | 'signal',
+                recipientIdentifier: identifier,
+                identifierHash: conv.contactIdentifierHash,
+                body: plaintextForSending!,
+                conversationId: id,
+              }
+            ),
             {
               maxAttempts: 3,
               baseDelayMs: 300,
@@ -379,8 +383,6 @@ conversations.post('/:id/messages',
         const errMsg = err instanceof Error ? err.message : 'Unknown error'
         const isNotConfigured = errMsg.includes('not configured') || errMsg.includes('not enabled')
         if (isNotConfigured) {
-          // Adapter not configured — accept the message as sent (queued for delivery
-          // when the channel is configured). Not a send failure.
           logger.warn(`${conv.channelType} adapter not configured — message stored as sent`, { conversationId: id })
           status = 'sent'
         } else {
@@ -391,7 +393,6 @@ conversations.post('/:id/messages',
         }
       }
     } else if (conv.channelType === 'web') {
-      // Web channel doesn't need external sending
       status = 'delivered'
     }
 

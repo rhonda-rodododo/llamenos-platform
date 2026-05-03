@@ -163,6 +163,15 @@ export class BlastsService {
     return row ?? null
   }
 
+  async getSubscriberById(id: string): Promise<SubscriberRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(subscribers)
+      .where(eq(subscribers.id, id))
+      .limit(1)
+    return row ?? null
+  }
+
   async listSubscribers(
     filters: SubscriberFilters = {},
   ): Promise<{ subscribers: SubscriberRow[]; total: number }> {
@@ -1058,6 +1067,16 @@ export class BlastsService {
     const { decryptContactIdentifier } = await import('../lib/crypto')
     if (!this.hmacSecret) return null
     return decryptContactIdentifier(row.encryptedIdentifier, this.hmacSecret)
+  }
+
+  async resolveSubscriberIdentifierHash(subscriberId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ identifierHash: subscribers.identifierHash })
+      .from(subscribers)
+      .where(eq(subscribers.id, subscriberId))
+      .limit(1)
+
+    return row?.identifierHash ?? null
   }
 
   // --- Reset (demo/development only) ---

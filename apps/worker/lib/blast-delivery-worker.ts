@@ -19,7 +19,7 @@
 import type { BlastsService } from '../services/blasts'
 import type { SettingsService } from '../services/settings'
 import type { MessagingAdapter, SendResult } from '../messaging/adapter'
-import type { MessagingChannelType, BlastContent, BlastSettings, SubscriberChannel } from '@shared/types'
+import type { MessagingChannelType, BlastContent, BlastSettings } from '@shared/types'
 import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
 import { TokenBucketRateLimiter } from './rate-limiter'
 import { createLogger } from './logger'
@@ -143,6 +143,9 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
   // Get blast settings for rate limit
   const settings = await deps.blastsService.getBlastSettings(hubId)
 
+  const messagingConfig = await deps.settingsService.getMessagingConfig()
+  const smsContentMode = messagingConfig.smsContentMode ?? 'notification-only'
+
   // Get the blast content + opt-out footer
   const blast = await deps.blastsService.getBlast(blastId)
   const content = blast.content as BlastContent
@@ -177,7 +180,6 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
       continue
     }
 
-    // Resolve the messaging adapter for this channel
     const channel = delivery.channel as MessagingChannelType
     const adapter = await deps.resolveAdapter(channel, hubId)
     if (!adapter) {
@@ -189,12 +191,11 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
       continue
     }
 
-    // Rate limit — per channel
     const limiter = getRateLimiter(hubId, channel, settings)
     await limiter.waitForToken()
 
     // Build message body with opt-out footer
-    const messageBody = buildMessageBody(content, channel, optOutFooter)
+    const messageBody = buildMessageBody(content, channel, optOutFooter, smsContentMode)
 
     // Resolve the subscriber's actual identifier (decrypted from encryptedIdentifier)
     const recipientIdentifier = await deps.resolveIdentifier(delivery.subscriberId)
@@ -208,7 +209,6 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
       continue
     }
 
-    // Send through adapter
     try {
       const result: SendResult = content.mediaUrl
         ? await adapter.sendMediaMessage({
@@ -256,11 +256,21 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
 /**
  * Build the message body for a specific channel, with opt-out footer.
  */
-function buildMessageBody(content: BlastContent, channel: MessagingChannelType, optOutFooter: string): string {
+const NOTIFICATION_ONLY_MESSAGE = 'You have a new secure message. Open Llamenos to view it.'
+
+function buildMessageBody(
+  content: BlastContent,
+  channel: MessagingChannelType,
+  optOutFooter: string,
+  smsContentMode: 'full' | 'notification-only' = 'notification-only'
+): string {
   let body: string
   switch (channel) {
     case 'sms':
       body = content.smsText ?? content.text ?? ''
+      if (smsContentMode === 'notification-only') {
+        body = NOTIFICATION_ONLY_MESSAGE
+      }
       break
     default:
       body = content.text ?? ''

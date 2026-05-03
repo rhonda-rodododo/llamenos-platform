@@ -228,6 +228,8 @@ export interface MessagingConfig {
   autoAssign: boolean               // auto-assign to on-shift users
   inactivityTimeout: number         // minutes before auto-close
   maxConcurrentPerUser: number  // conversation limit per user
+  preferSignalDelivery?: boolean
+  smsContentMode?: 'full' | 'notification-only'
 }
 
 export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
@@ -240,6 +242,8 @@ export const DEFAULT_MESSAGING_CONFIG: MessagingConfig = {
   autoAssign: true,
   inactivityTimeout: 60,
   maxConcurrentPerUser: 3,
+  preferSignalDelivery: true,
+  smsContentMode: 'notification-only',
 }
 
 // --- Message Blasts ---
