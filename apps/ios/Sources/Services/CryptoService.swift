@@ -96,6 +96,35 @@ private func ffiGenerateEphemeralKeypair() -> EphemeralKeyPair {
     generateEphemeralKeypairMobile()
 }
 
+// Hub key + server event key management (keys stored in Rust, never in Swift)
+private func ffiMobileSetHubKey(hubId: String, keyHex: String) throws {
+    try mobileSetHubKey(hubId: hubId, keyHex: keyHex)
+}
+
+private func ffiMobileHasHubKey(hubId: String) -> Bool {
+    mobileHasHubKey(hubId: hubId)
+}
+
+private func ffiMobileClearHubKeys() {
+    mobileClearHubKeys()
+}
+
+private func ffiMobileSetServerEventKeys(currentHex: String, previousHex: String?) throws {
+    try mobileSetServerEventKeys(currentHex: currentHex, previousHex: previousHex)
+}
+
+private func ffiMobileDecryptHubEvent(ciphertextHex: String, hubId: String) throws -> String {
+    try mobileDecryptHubEvent(ciphertextHex: ciphertextHex, hubId: hubId)
+}
+
+private func ffiMobileDecryptServerEvent(encryptedHex: String) throws -> String {
+    try mobileDecryptServerEvent(encryptedHex: encryptedHex)
+}
+
+private func ffiMobileDecryptEventWithAttribution(ciphertextHex: String) throws -> [String] {
+    try mobileDecryptEventWithAttribution(ciphertextHex: ciphertextHex)
+}
+
 // MARK: - CryptoService
 
 enum CryptoServiceError: LocalizedError {
@@ -173,11 +202,11 @@ final class CryptoService: @unchecked Sendable {
         return ds
     }
 
-    /// Lock the crypto state — zeroize device secrets in Rust, clear hub keys.
+    /// Lock the crypto state — zeroize device secrets, hub keys, and server event keys in Rust.
     /// Public keys are retained for locked-state UI display ("Locked as ...").
     func lock() {
         ffiMobileLock()
-        clearHubKeys()
+        // mobile_lock() already clears hub keys and server event keys in Rust
     }
 
     // MARK: - Auth Token (Ed25519)
@@ -389,41 +418,17 @@ final class CryptoService: @unchecked Sendable {
         )
     }
 
-    // MARK: - Hub Key Cache
+    // MARK: - Hub Key Management (keys stored in Rust, never in Swift)
 
-    /// In-memory hub key cache. Keys are hex strings of 32-byte symmetric keys. Never written to disk.
-    private var hubKeyCache: [String: String] = [:]  // hubId → keyHex
-    private let hubKeyCacheLock = NSLock()
-
-    /// Total number of hub keys currently cached.
-    var hubKeyCount: Int {
-        hubKeyCacheLock.lock()
-        defer { hubKeyCacheLock.unlock() }
-        return hubKeyCache.count
-    }
-
-    /// Returns true if a key for the given hub is cached.
+    /// Returns true if a key for the given hub is stored in Rust.
     func hasHubKey(hubId: String) -> Bool {
-        hubKeyCacheLock.lock()
-        defer { hubKeyCacheLock.unlock() }
-        return hubKeyCache[hubId] != nil
+        ffiMobileHasHubKey(hubId: hubId)
     }
 
-    /// Returns a copy of the hub key cache (for relay event decryption).
-    func allHubKeys() -> [String: String] {
-        hubKeyCacheLock.lock()
-        defer { hubKeyCacheLock.unlock() }
-        return hubKeyCache
-    }
-
-    /// Unwrap a hub key envelope using HPKE and store in the in-memory cache.
-    /// Uses the device's X25519 key via the Rust mobile state.
+    /// Unwrap a hub key envelope using HPKE and store in Rust CryptoState.
+    /// Hub key never enters Swift memory — goes directly from HPKE open to Rust storage.
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws {
-        hubKeyCacheLock.lock()
-        let alreadyCached = hubKeyCache[hubId] != nil
-        hubKeyCacheLock.unlock()
-        guard !alreadyCached else { return }
-
+        guard !hasHubKey(hubId: hubId) else { return }
         guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
 
         // Build HPKE envelope from the hub key response
@@ -434,30 +439,54 @@ final class CryptoService: @unchecked Sendable {
             ct: envelope.envelope.ephemeralPubkey
         )
 
-        // Use HPKE to unwrap the hub key
+        // Use HPKE to unwrap the hub key, then store directly in Rust
         let keyHex = try ffiMobileHpkeOpenKey(
             envelope: hpkeEnvelope,
             expectedLabel: CryptoLabels.LABEL_HUB_KEY_WRAP,
             aadHex: ""
         )
-
-        hubKeyCacheLock.lock()
-        defer { hubKeyCacheLock.unlock() }
-        hubKeyCache[hubId] = keyHex
+        try ffiMobileSetHubKey(hubId: hubId, keyHex: keyHex)
     }
 
-    /// Evict all hub keys. Must be called on lock and logout.
+    /// Evict all hub keys from Rust memory. Called on lock and logout.
     func clearHubKeys() {
-        hubKeyCacheLock.lock()
-        defer { hubKeyCacheLock.unlock() }
-        hubKeyCache.removeAll()
+        ffiMobileClearHubKeys()
     }
 
-    /// Store a server event encryption key directly for a hub.
+    // MARK: - Hub Event Decryption
+
+    /// Decrypt a hub-encrypted relay event payload in Rust (XChaCha20-Poly1305).
+    /// Hub key is looked up by hub ID in Rust CryptoState — never touches Swift.
+    func decryptHubEvent(ciphertextHex: String, hubId: String) -> String? {
+        return try? ffiMobileDecryptHubEvent(ciphertextHex: ciphertextHex, hubId: hubId)
+    }
+
+    // MARK: - Server Event Keys
+
+    /// Store server event encryption keys in Rust (current + optional previous for epoch rotation).
+    func setServerEventKeys(currentHex: String, previousHex: String? = nil) throws {
+        try ffiMobileSetServerEventKeys(currentHex: currentHex, previousHex: previousHex)
+    }
+
+    /// Decrypt a server-published event using stored server event keys in Rust.
+    /// Tries current key first, falls back to previous key during epoch rotation.
+    func decryptServerEventWithStoredKeys(encryptedHex: String) -> String? {
+        return try? ffiMobileDecryptServerEvent(encryptedHex: encryptedHex)
+    }
+
+    /// Try to decrypt a relay event against all stored hub keys in Rust.
+    /// Returns (hubId, decryptedJson) for the first key that succeeds, or nil.
+    /// Keys never leave Rust memory during this operation.
+    func decryptEventWithAttribution(ciphertextHex: String) -> (hubId: String, json: String)? {
+        guard let result = try? ffiMobileDecryptEventWithAttribution(ciphertextHex: ciphertextHex),
+              result.count == 2 else { return nil }
+        return (hubId: result[0], json: result[1])
+    }
+
+    /// Store a server event key as a hub key for multi-hub key-trial attribution.
+    /// The key goes directly to Rust CryptoState — never stored in Swift memory.
     func storeServerEventKey(hubId: String, keyHex: String) {
-        hubKeyCacheLock.lock()
-        defer { hubKeyCacheLock.unlock() }
-        hubKeyCache[hubId] = keyHex
+        try? ffiMobileSetHubKey(hubId: hubId, keyHex: keyHex)
     }
 
     // MARK: - Hex Utility
@@ -480,11 +509,9 @@ final class CryptoService: @unchecked Sendable {
     // MARK: - Test Support
 
     #if DEBUG
-    /// Store a hub key directly for testing (bypasses FFI envelope decryption).
+    /// Store a hub key directly in Rust for testing (bypasses FFI envelope decryption).
     func storeHubKeyForTesting(hubId: String, keyHex: String) {
-        hubKeyCacheLock.lock()
-        defer { hubKeyCacheLock.unlock() }
-        hubKeyCache[hubId] = keyHex
+        try? ffiMobileSetHubKey(hubId: hubId, keyHex: keyHex)
     }
 
     /// Set up a test identity by generating device keys with a known PIN.

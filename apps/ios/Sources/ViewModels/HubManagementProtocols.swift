@@ -24,12 +24,12 @@ extension APIService: HubAPIServiceProtocol {}
 
 /// Narrow protocol exposing only the hub-key cache operations that HubManagementViewModel needs.
 /// Allows test doubles without subclassing the final CryptoService class.
-/// Real implementations live in CryptoService.swift (hasHubKey, loadHubKey, clearHubKeys, allHubKeys, hubKeyCount).
+/// Real implementations live in CryptoService.swift (hasHubKey, loadHubKey, clearHubKeys). Keys stored in Rust.
 protocol HubCryptoServiceProtocol {
     func hasHubKey(hubId: String) -> Bool
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws
 }
 
 // CryptoService conforms to HubCryptoServiceProtocol via its real implementations
-// in CryptoService.swift (hasHubKey, loadHubKey, clearHubKeys, allHubKeys, hubKeyCount).
+// in CryptoService.swift (hasHubKey, loadHubKey, clearHubKeys). Keys stored in Rust.
 extension CryptoService: HubCryptoServiceProtocol {}

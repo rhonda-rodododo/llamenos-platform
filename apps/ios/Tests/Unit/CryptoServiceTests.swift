@@ -171,7 +171,6 @@ final class CryptoServiceTests: XCTestCase {
 
     func testHubKeyCacheStartsEmpty() {
         let service = CryptoService()
-        XCTAssertEqual(service.hubKeyCount, 0)
         XCTAssertFalse(service.hasHubKey(hubId: "any"))
     }
 
@@ -182,7 +181,6 @@ final class CryptoServiceTests: XCTestCase {
 
         service.clearHubKeys()
         XCTAssertFalse(service.hasHubKey(hubId: "hub1"))
-        XCTAssertEqual(service.hubKeyCount, 0)
     }
 
     // MARK: - Sigchain
