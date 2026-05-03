@@ -1,19 +1,20 @@
 /**
  * Hub-event encryption for Nostr relay events.
  *
- * The hub key is client-side only (ECIES-wrapped per member); the server never
- * holds the raw hub key. For server-published events, we derive a symmetric
- * event encryption key from SERVER_NOSTR_SECRET so that relay content is
- * encrypted at rest. Clients receive this key via the hub key distribution
- * envelope (the admin wraps it alongside the hub key).
+ * Each hub gets its own symmetric event encryption key, derived from
+ * SERVER_NOSTR_SECRET with the hubId as HKDF salt. This ensures a user
+ * with access to one hub cannot decrypt events for other hubs.
  *
- * Derivation:
- *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=empty, info="llamenos:hub-event", 32)
+ * Derivation (per-hub):
+ *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=hubId, info=LABEL_HUB_EVENT_KEY, 32)
  *   nonce = random(24)
  *   ciphertext = XChaCha20-Poly1305(event_key, nonce).encrypt(UTF-8(json))
  *   output = hex(nonce || ciphertext)
  *
- * Clients receive the server's event key via GET /api/auth/me (serverEventKeyHex).
+ * Legacy (global, deprecated — kept for backward compatibility during migration):
+ *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=empty, info=LABEL_HUB_EVENT, 32)
+ *
+ * Clients receive per-hub event keys via GET /api/auth/me (hubEventKeys map).
  */
 
 import { hkdf } from '@noble/hashes/hkdf.js'
@@ -21,14 +22,35 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { LABEL_HUB_EVENT } from '@shared/crypto-labels'
+import { LABEL_HUB_EVENT, LABEL_HUB_EVENT_KEY } from '@shared/crypto-labels'
 
 /**
- * Derive the server event encryption key from SERVER_NOSTR_SECRET.
- * Deterministic — same secret always produces the same key.
+ * Derive a per-hub event encryption key from SERVER_NOSTR_SECRET.
+ * Uses hubId as HKDF salt for domain separation between hubs.
+ * Deterministic — same (secret, hubId) always produces the same key.
+ */
+export function deriveHubEventKey(serverSecret: string, hubId: string): Uint8Array {
+  return hkdf(sha256, hexToBytes(serverSecret), utf8ToBytes(hubId), utf8ToBytes(LABEL_HUB_EVENT_KEY), 32)
+}
+
+/**
+ * @deprecated Use deriveHubEventKey() with a hubId instead.
+ * Kept for backward compatibility during migration — derives the old global key.
  */
 export function deriveServerEventKey(serverSecret: string): Uint8Array {
   return hkdf(sha256, hexToBytes(serverSecret), new Uint8Array(0), utf8ToBytes(LABEL_HUB_EVENT), 32)
+}
+
+/**
+ * Derive event keys for multiple hubs at once.
+ * Returns a map of hubId → hex-encoded key.
+ */
+export function deriveHubEventKeys(serverSecret: string, hubIds: string[]): Record<string, string> {
+  const keys: Record<string, string> = {}
+  for (const hubId of hubIds) {
+    keys[hubId] = bytesToHex(deriveHubEventKey(serverSecret, hubId))
+  }
+  return keys
 }
 
 /**

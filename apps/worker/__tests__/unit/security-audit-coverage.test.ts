@@ -368,10 +368,10 @@ describe('R7 Epic 256: BlastDO HMAC uses HMAC_SECRET', () => {
   })
 })
 
-// ─── Round 8 Epic 258 C2: serverEventKeyHex behind auth ──────────────────────
+// ─── Round 8 Epic 258 C2: event keys behind auth (C1 per-hub keys) ───────────
 
-describe('R8 Epic 258 C2: serverEventKeyHex behind auth', () => {
-  it('public config response must NOT contain serverEventKeyHex', () => {
+describe('R8 Epic 258 C2: event keys behind auth', () => {
+  it('public config response must NOT contain event keys', () => {
     // Simulate the public config endpoint response shape
     const publicConfig = {
       hubName: 'Test Hub',
@@ -380,18 +380,26 @@ describe('R8 Epic 258 C2: serverEventKeyHex behind auth', () => {
       nostrRelayUrl: 'wss://relay.example.com',
     }
     expect(publicConfig).not.toHaveProperty('serverEventKeyHex')
+    expect(publicConfig).not.toHaveProperty('hubEventKeys')
   })
 
-  it('authenticated /auth/me response shape includes serverEventKeyHex', () => {
+  it('authenticated /auth/me response shape includes per-hub event keys', () => {
     const authResponse = {
       pubkey: 'abc123',
       roles: ['role-admin'],
       permissions: ['*'],
-      serverEventKeyHex: 'deadbeef'.repeat(8),
+      hubEventKeys: {
+        '': 'deadbeef'.repeat(8),
+        'hub-1': 'cafebabe'.repeat(8),
+      },
       adminDecryptionPubkey: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
     }
-    expect(authResponse.serverEventKeyHex).toBeDefined()
-    expect(authResponse.serverEventKeyHex.length).toBe(64)
+    expect(authResponse.hubEventKeys).toBeDefined()
+    expect(Object.keys(authResponse.hubEventKeys).length).toBeGreaterThanOrEqual(1)
+    // Each key should be 64 hex chars (32 bytes)
+    for (const key of Object.values(authResponse.hubEventKeys)) {
+      expect(key.length).toBe(64)
+    }
   })
 })
 
