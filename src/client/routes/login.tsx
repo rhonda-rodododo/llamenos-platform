@@ -99,7 +99,7 @@ function LoginPage() {
       return
     }
     if (!keyManager.isValidPin(recoveryPin)) {
-      setValidationError(t('pin.tooShort', { defaultValue: 'PIN must be 6–8 digits' }))
+      setValidationError(t('pin.tooShort', { defaultValue: 'PIN or passphrase must be 8+ characters' }))
       return
     }
     await signIn(nsec.trim(), recoveryPin)
@@ -444,7 +444,7 @@ function LoginPage() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {newPinStep === 'create'
-                      ? t('pin.createDescription', { defaultValue: 'Choose a 6-8 digit PIN to protect your key on this device.' })
+                      ? t('pin.createDescription', { defaultValue: 'Choose a PIN (8+ digits) or passphrase (8+ characters) to protect your key.' })
                       : t('pin.confirmDescription', { defaultValue: 'Enter the same PIN again to confirm.' })}
                   </p>
                   <PinInput
@@ -489,14 +489,12 @@ function LoginPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nsec-pin">{t('pin.createPin', { defaultValue: 'Create PIN (6–8 digits)' })}</Label>
+                  <Label htmlFor="nsec-pin">{t('pin.createPin', { defaultValue: 'Create PIN or passphrase (8+ characters)' })}</Label>
                   <Input
                     id="nsec-pin"
                     type="password"
-                    inputMode="numeric"
-                    maxLength={8}
                     value={recoveryPin}
-                    onChange={(e) => setRecoveryPin(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => setRecoveryPin(e.target.value)}
                     placeholder="000000"
                     autoComplete="new-password"
                   />

@@ -4,7 +4,7 @@ import { bytesToHex } from '@noble/hashes/utils.js'
 import { TestIds, navTestIdMap } from './test-ids'
 
 export const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
-export const TEST_PIN = '123456'
+export const TEST_PIN = '12345678'
 
 /** Decode a bech32 nsec to hex secret key (Node-side). */
 export function nsecToHex(nsec: string): string {

@@ -36,7 +36,7 @@ if (hasPlatform) {
       return 'OK: ' + publicKey;
     }, {
       nsec: 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh',
-      pin: '123456'
+      pin: '12345678'
     });
     console.log('RESULT:', result);
   } catch (e) {

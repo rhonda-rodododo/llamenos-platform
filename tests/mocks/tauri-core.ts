@@ -20,6 +20,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { hmac } from '@noble/hashes/hmac.js'
 import { gcm } from '@noble/ciphers/aes.js'
 import { randomBytes } from '@noble/hashes/utils.js'
+import { argon2id } from '@noble/hashes/argon2.js'
 import { utf8ToBytes, bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -104,26 +105,31 @@ function requireDeviceState(): MockDeviceKeyState {
   return mockDeviceState
 }
 
-// ── PBKDF2 + AES-256-GCM for PIN encryption ────────────────────────
+// ── Argon2id + AES-256-GCM for PIN/passphrase encryption ────────────
+// Parameters match packages/crypto/src/device_keys.rs (KDF_VERSION=2).
+// For test builds we use reduced memory (4 MiB) to keep Playwright fast.
+// This is safe because the mock never interops with Rust ciphertext.
+const ARGON2_M_COST_KIB = 4_096   // 4 MiB (production Rust uses 65_536)
+const ARGON2_T_COST = 3
+const ARGON2_P_COST = 4
 
 async function deriveKek(pin: string, salt: Uint8Array): Promise<Uint8Array> {
-  // Use WebCrypto PBKDF2 (faster than pure JS for 600K iterations)
-  const pinKey = await crypto.subtle.importKey(
-    'raw', utf8ToBytes(pin), 'PBKDF2', false, ['deriveBits'],
-  )
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 600_000, hash: 'SHA-256' },
-    pinKey,
-    256,
-  )
-  return new Uint8Array(bits)
+  return argon2id(utf8ToBytes(pin), salt, {
+    t: ARGON2_T_COST,
+    m: ARGON2_M_COST_KIB,
+    p: ARGON2_P_COST,
+    dkLen: 32,
+  })
 }
 
 async function encryptWithPin(
   signingSeed: Uint8Array,
   encryptionSeed: Uint8Array,
   pin: string,
-): Promise<{ salt: string; iterations: number; nonce: string; ciphertext: string }> {
+): Promise<{
+  kdfVersion: number; salt: string; nonce: string; ciphertext: string
+  argon2MCost: number; argon2TCost: number; argon2PCost: number
+}> {
   const salt = randomBytes(32)
   const nonce = randomBytes(12)
   const kek = await deriveKek(pin, salt)
@@ -136,10 +142,13 @@ async function encryptWithPin(
   const encrypted = cipher.encrypt(plaintext)
 
   return {
+    kdfVersion: 2,
     salt: bytesToHex(salt),
-    iterations: 600_000,
     nonce: bytesToHex(nonce),
     ciphertext: bytesToHex(encrypted),
+    argon2MCost: ARGON2_M_COST_KIB,
+    argon2TCost: ARGON2_T_COST,
+    argon2PCost: ARGON2_P_COST,
   }
 }
 

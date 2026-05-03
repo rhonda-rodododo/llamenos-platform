@@ -97,9 +97,9 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       // Unwrap using the WasmCryptoState
       const state = new wasm.WasmCryptoState()
       // Import key to state (need PIN encryption roundtrip)
-      const importResult = state.importKey(skHex, '123456')
+      const importResult = state.importKey(skHex, '12345678')
       // Unlock with the same PIN
-      state.unlockWithPin(importResult, '123456')
+      state.unlockWithPin(importResult, '12345678')
 
       const unwrapped = state.eciesUnwrapKey(envelopeJson, 'llamenos:note-key')
       state.lock()
@@ -121,8 +121,8 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       await wasm.default()
 
       const state = new wasm.WasmCryptoState()
-      const importResult = state.importKey(skHex, '123456')
-      state.unlockWithPin(importResult, '123456')
+      const importResult = state.importKey(skHex, '12345678')
+      state.unlockWithPin(importResult, '12345678')
 
       // Encrypt a message
       const plaintext = 'Hello from WASM crypto!'
@@ -158,8 +158,8 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
 
       // Encrypt as volunteer
       const state = new wasm.WasmCryptoState()
-      const importResult = state.importKey(skHex, '123456')
-      state.unlockWithPin(importResult, '123456')
+      const importResult = state.importKey(skHex, '12345678')
+      state.unlockWithPin(importResult, '12345678')
 
       const payloadJson = JSON.stringify({ text: 'Test note for WASM interop' })
       const encrypted = state.encryptNote(payloadJson, pubkey, JSON.stringify([adminPubkey]))
@@ -209,8 +209,8 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       await wasm.default()
 
       const state = new wasm.WasmCryptoState()
-      const importResult = state.importKey(skHex, '123456')
-      state.unlockWithPin(importResult, '123456')
+      const importResult = state.importKey(skHex, '12345678')
+      state.unlockWithPin(importResult, '12345678')
 
       const plaintext = 'Draft note in progress...'
       const encrypted = state.encryptDraft(plaintext)

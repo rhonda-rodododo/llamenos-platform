@@ -5,6 +5,7 @@ import Foundation
 enum AuthError: LocalizedError {
     case noStoredKeys
     case pinMismatch
+    case credentialTooShort
     case pinTooShort
     case pinTooLong
     case pinNotNumeric
@@ -17,9 +18,11 @@ enum AuthError: LocalizedError {
         case .noStoredKeys:
             return NSLocalizedString("error_no_stored_keys", comment: "No stored keys found")
         case .pinMismatch:
-            return NSLocalizedString("error_pin_mismatch", comment: "PINs do not match")
+            return NSLocalizedString("error_pin_mismatch", comment: "Credentials do not match")
+        case .credentialTooShort:
+            return NSLocalizedString("error_credential_too_short", comment: "PIN or passphrase must be at least 8 characters")
         case .pinTooShort:
-            return NSLocalizedString("error_pin_too_short", comment: "PIN must be at least 6 digits")
+            return NSLocalizedString("error_pin_too_short", comment: "PIN or passphrase must be at least 8 characters")
         case .pinTooLong:
             return NSLocalizedString("error_pin_too_long", comment: "PIN must be at most 8 digits")
         case .pinNotNumeric:
@@ -186,13 +189,15 @@ final class AuthService {
         hubURL = nil
     }
 
-    // MARK: - PIN Validation
+    // MARK: - Credential Validation
 
-    /// Validate PIN format: 6-8 numeric digits.
-    func validatePIN(_ pin: String) throws {
-        guard pin.count >= 6 else { throw AuthError.pinTooShort }
-        guard pin.count <= 8 else { throw AuthError.pinTooLong }
-        guard pin.allSatisfy(\.isNumber) else { throw AuthError.pinNotNumeric }
+    /// Validate credential format: numeric PIN (8+ digits) or alphanumeric passphrase (8+ chars with at least one letter).
+    func validatePIN(_ credential: String) throws {
+        guard credential.count >= 8 else { throw AuthError.credentialTooShort }
+        // All digits = numeric PIN (valid)
+        if credential.allSatisfy(\.isNumber) { return }
+        // Alphanumeric passphrase: must contain at least one letter
+        guard credential.contains(where: \.isLetter) else { throw AuthError.credentialTooShort }
     }
 
     /// Validate that two PINs match (for set/confirm flow).

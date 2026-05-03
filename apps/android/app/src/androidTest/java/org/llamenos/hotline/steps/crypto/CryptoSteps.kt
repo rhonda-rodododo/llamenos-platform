@@ -36,7 +36,7 @@ class CryptoSteps : BaseSteps() {
     private val cryptoService = CryptoService()
 
     // Default test PIN used for device key generation
-    private val testPin = "123456"
+    private val testPin = "12345678"
 
     // Shared state between When/Then steps
     private var generatedSigningPubkey: String? = null
@@ -542,7 +542,7 @@ class CryptoSteps : BaseSteps() {
         try {
             // V3: key is already encrypted during generateDeviceKeys with testPin
             // Re-generate to ensure encryptedKeyData is set
-            runBlocking { encryptedKeyData = cryptoService.generateDeviceKeys(UUID.randomUUID().toString(), "123456") }
+            runBlocking { encryptedKeyData = cryptoService.generateDeviceKeys(UUID.randomUUID().toString(), "12345678") }
         } catch (_: Throwable) {
             // Encryption may fail without native crypto
         }
@@ -571,7 +571,7 @@ class CryptoSteps : BaseSteps() {
         try {
             runBlocking {
                 cryptoService.lock()
-                cryptoService.unlockWithPin(encryptedKeyData!!, "123456")
+                cryptoService.unlockWithPin(encryptedKeyData!!, "12345678")
                 assertTrue(cryptoService.isUnlocked)
             }
         } catch (_: Throwable) {

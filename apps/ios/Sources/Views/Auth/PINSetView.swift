@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// PIN set screen: user creates a new PIN (enter + confirm) using PINPadView.
+/// PIN/passphrase set screen: user creates a credential (PIN or passphrase) using a secure text field.
 /// This screen is shown during onboarding after identity creation or import.
-/// After successful PIN set and confirmation, the identity is encrypted and
+/// After successful credential set and confirmation, the identity is encrypted and
 /// persisted to the Keychain via PINViewModel.
 struct PINSetView: View {
     @Environment(AppState.self) private var appState
@@ -10,7 +10,6 @@ struct PINSetView: View {
     @State private var pinViewModel: PINViewModel?
     @State private var shakeOnError = false
     @State private var lockRotation: Double = 0
-    @State private var selectedPINLength: Int = 6
 
     var body: some View {
         let vm = resolvedPINViewModel
@@ -42,34 +41,6 @@ struct PINSetView: View {
                     .animation(.easeInOut, value: vm.phase)
             }
 
-            // PIN length selector (only during enter phase, not confirm)
-            if vm.phase == .enter {
-                Picker(
-                    NSLocalizedString("pin_length_label", comment: "PIN Length"),
-                    selection: $selectedPINLength
-                ) {
-                    Text(String(
-                        format: NSLocalizedString("pin_length_option", comment: "%d digits"),
-                        6
-                    ))
-                    .tag(6)
-
-                    Text(String(
-                        format: NSLocalizedString("pin_length_option", comment: "%d digits"),
-                        8
-                    ))
-                    .tag(8)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 40)
-                .accessibilityIdentifier("pin-length-picker")
-                .onChange(of: selectedPINLength) { _, newLength in
-                    // Reset PIN and update maxLength when user changes selection
-                    vm.pin = ""
-                    vm.updateMaxLength(newLength)
-                }
-            }
-
             // Error message
             if let error = vm.errorMessage {
                 Text(error)
@@ -80,18 +51,34 @@ struct PINSetView: View {
                     .accessibilityIdentifier("pin-error")
             }
 
-            // PIN pad
-            PINPadView(
-                pin: Binding(
+            // Credential input (secure text field for PIN or passphrase)
+            SecureField(
+                NSLocalizedString("pin_placeholder", comment: "PIN or passphrase (8+ characters)"),
+                text: Binding(
                     get: { vm.pin },
                     set: { vm.pin = $0 }
-                ),
-                maxLength: vm.maxLength,
-                shake: $shakeOnError,
-                onComplete: { completedPIN in
-                    vm.onPINComplete(completedPIN)
-                }
+                )
             )
+            .textFieldStyle(.roundedBorder)
+            .font(.brand(.title3))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 40)
+            .textContentType(.password)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .accessibilityIdentifier("pin-input")
+            .onSubmit {
+                if vm.pin.count >= 8 {
+                    vm.onPINComplete(vm.pin)
+                }
+            }
+
+            Button(NSLocalizedString("common_continue", comment: "Continue")) {
+                vm.onPINComplete(vm.pin)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(vm.pin.count < 8)
+            .accessibilityIdentifier("pin-submit")
 
             Spacer(minLength: 0)
         }
@@ -133,7 +120,7 @@ struct PINSetView: View {
         let vm = PINViewModel(
             mode: .set,
             authService: appState.authService,
-            maxLength: selectedPINLength,
+            maxLength: 128,
             onSuccess: {
                 appState.didCompleteOnboarding()
             }

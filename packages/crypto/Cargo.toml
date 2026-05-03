@@ -28,6 +28,7 @@ aes-gcm = "0.10"
 # Key derivation
 hkdf = "0.12"
 pbkdf2 = { version = "0.12", features = ["simple"] }
+argon2 = "0.5"
 
 # Hashing
 sha2 = "0.10"

@@ -43,7 +43,7 @@ When('I enter a valid 63-character nsec', async ({ page }) => {
   const pinField = page.locator('#nsec-pin')
   const pinVisible = await pinField.isVisible({ timeout: 1000 }).catch(() => false)
   if (pinVisible) {
-    await pinField.fill('123456')
+    await pinField.fill('12345678')
   }
 })
 

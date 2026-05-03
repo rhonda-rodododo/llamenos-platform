@@ -1203,7 +1203,7 @@
 "error_hub_url_required" = "Hub URL is required";
 "error_identity_exists" = "An identity already exists";
 "error_invalid_nsec" = "The provided nsec key is invalid";
-"error_invalid_pin" = "PIN must be 6-8 digits";
+"error_invalid_pin" = "PIN or passphrase must be at least 8 characters";
 "error_no_hub_url" = "No hub URL configured";
 "error_no_key_loaded" = "No cryptographic key is loaded";
 "error_no_stored_keys" = "No stored keys found";
@@ -1215,7 +1215,7 @@
 "error_pin_mismatch" = "PINs do not match. Try again.";
 "error_pin_not_numeric" = "PIN must contain only digits";
 "error_pin_too_long" = "PIN must be at most 8 digits";
-"error_pin_too_short" = "PIN must be at least 6 digits";
+"error_pin_too_short" = "PIN or passphrase must be at least 8 characters";
 "error_title" = "Error";
 "error_wake_decrypt_failed" = "Wake decrypt failed: %@";
 "error_wake_key_generation" = "Failed to generate wake key";
@@ -1730,7 +1730,7 @@
 "onboarding_no_code" = "No invite code provided";
 "onboarding_npub_label" = "Your Public Key";
 "onboarding_nsec_label" = "Your Secret Key";
-"onboarding_pin_description" = "Choose a 6-digit PIN to protect your key on this device";
+"onboarding_pin_description" = "Choose a PIN (8+ digits) or passphrase (8+ characters) to protect your key";
 "onboarding_pin_mismatch" = "PINs don't match. Try again.";
 "onboarding_recovery_key" = "Your recovery key";
 "onboarding_recovery_key_warning" = "Write this down and store it securely. If you lose your PIN and this key, your account cannot be recovered.";
@@ -1766,7 +1766,7 @@
 "pin_confirm_description" = "Enter your PIN again to confirm";
 "pin_confirm_subtitle" = "Enter the same PIN again to confirm";
 "pin_confirm_title" = "Confirm your PIN";
-"pin_create_description" = "Choose a 6-digit PIN to protect your key on this device";
+"pin_create_description" = "Choose a PIN (8+ digits) or passphrase (8+ characters) to protect your key";
 "pin_create_pin" = "Create a PIN";
 "pin_create_title" = "Create a PIN";
 "pin_dot_empty" = "Empty";
@@ -1778,9 +1778,9 @@
 "pin_lockout_remaining" = "Locked out. Try again in %d seconds.";
 "pin_mismatch" = "PINs don't match. Try again.";
 "pin_set_encrypting" = "Encrypting your key...";
-"pin_set_subtitle" = "Choose a 6-8 digit PIN to protect your key";
+"pin_set_subtitle" = "Choose a PIN (8+ digits) or passphrase (8+ characters) to protect your key";
 "pin_set_title" = "Create a PIN";
-"pin_too_short" = "PIN must be 6 digits";
+"pin_too_short" = "Must be at least 8 characters";
 "pin_unlock_attempts" = "%d of %d attempts used";
 "pin_unlock_subtitle" = "Enter your PIN to unlock";
 "pin_unlock_title" = "Enter your PIN";

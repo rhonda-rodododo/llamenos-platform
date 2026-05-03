@@ -191,8 +191,8 @@ mod tests {
     use crate::device_keys::unlock_device_keys;
 
     fn test_secrets() -> DeviceSecrets {
-        let encrypted = generate_device_keys("test-auth-dev", "123456").unwrap();
-        unlock_device_keys(&encrypted, "123456").unwrap()
+        let encrypted = generate_device_keys("test-auth-dev", "12345678").unwrap();
+        unlock_device_keys(&encrypted, "12345678").unwrap()
     }
 
     #[test]

@@ -125,10 +125,10 @@ pub fn mobile_get_device_state() -> Result<DeviceKeyState, CryptoError> {
         .ok_or_else(|| CryptoError::InvalidInput("Device is locked.".into()))
 }
 
-/// Validate PIN format: 6-8 digits.
+/// Validate credential format: numeric PIN (8+ digits) or alphanumeric passphrase (8+ chars).
 #[uniffi::export]
 pub fn mobile_is_valid_pin(pin: String) -> bool {
-    device_keys::is_valid_pin(&pin)
+    device_keys::is_valid_credential(&pin)
 }
 
 // ── Auth tokens (Ed25519, stateful) ────────────────────────────────
@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn generate_unlock_lock_cycle() {
         // Generate and load
-        let encrypted = mobile_generate_and_load("test-dev".into(), "123456".into()).unwrap();
+        let encrypted = mobile_generate_and_load("test-dev".into(), "12345678".into()).unwrap();
         assert!(mobile_is_unlocked());
 
         let ds = mobile_get_device_state().unwrap();
@@ -460,7 +460,7 @@ mod tests {
         assert!(mobile_get_device_state().is_err());
 
         // Unlock
-        let ds2 = mobile_unlock(encrypted, "123456".into()).unwrap();
+        let ds2 = mobile_unlock(encrypted, "12345678".into()).unwrap();
         assert!(mobile_is_unlocked());
         assert_eq!(ds2.device_id, "test-dev");
         assert_eq!(ds2.signing_pubkey_hex, ds.signing_pubkey_hex);
@@ -471,7 +471,7 @@ mod tests {
 
     #[test]
     fn auth_token_roundtrip() {
-        let _encrypted = mobile_generate_and_load("auth-dev".into(), "123456".into()).unwrap();
+        let _encrypted = mobile_generate_and_load("auth-dev".into(), "12345678".into()).unwrap();
 
         let token =
             mobile_create_auth_token(1708900000000, "GET".into(), "/api/test".into()).unwrap();
@@ -486,7 +486,7 @@ mod tests {
 
     #[test]
     fn hpke_roundtrip_with_state() {
-        let encrypted = mobile_generate_and_load("hpke-dev".into(), "654321".into()).unwrap();
+        let encrypted = mobile_generate_and_load("hpke-dev".into(), "65432100".into()).unwrap();
         let ds = mobile_get_device_state().unwrap();
 
         // Seal to our own encryption pubkey
@@ -521,7 +521,7 @@ mod tests {
 
     #[test]
     fn puk_create_and_rotate() {
-        let _encrypted = mobile_generate_and_load("puk-dev".into(), "123456".into()).unwrap();
+        let _encrypted = mobile_generate_and_load("puk-dev".into(), "12345678".into()).unwrap();
 
         let puk_json = mobile_puk_create().unwrap();
         let puk_value: serde_json::Value = serde_json::from_str(&puk_json).unwrap();
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn sigchain_create_and_verify() {
-        let _encrypted = mobile_generate_and_load("sig-dev".into(), "123456".into()).unwrap();
+        let _encrypted = mobile_generate_and_load("sig-dev".into(), "12345678".into()).unwrap();
 
         let link = mobile_sigchain_create_link(
             "link-1".into(),

@@ -321,8 +321,8 @@ mod tests {
     use crate::device_keys::{generate_device_keys, unlock_device_keys};
 
     fn test_device() -> (DeviceSecrets, String) {
-        let encrypted = generate_device_keys("test-sig-dev", "123456").unwrap();
-        let secrets = unlock_device_keys(&encrypted, "123456").unwrap();
+        let encrypted = generate_device_keys("test-sig-dev", "12345678").unwrap();
+        let secrets = unlock_device_keys(&encrypted, "12345678").unwrap();
         let pubkey = encrypted.state.signing_pubkey_hex.clone();
         (secrets, pubkey)
     }
@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn device_add_expands_set() {
         let (secrets1, pubkey1) = test_device();
-        let encrypted2 = generate_device_keys("dev-2", "654321").unwrap();
+        let encrypted2 = generate_device_keys("dev-2", "65432100").unwrap();
         let pubkey2 = encrypted2.state.signing_pubkey_hex.clone();
 
         let link1 = create_sigchain_link(
@@ -437,7 +437,7 @@ mod tests {
     #[test]
     fn device_remove_shrinks_set() {
         let (secrets1, pubkey1) = test_device();
-        let encrypted2 = generate_device_keys("dev-2", "654321").unwrap();
+        let encrypted2 = generate_device_keys("dev-2", "65432100").unwrap();
         let pubkey2 = encrypted2.state.signing_pubkey_hex.clone();
 
         let link1 = create_sigchain_link(

@@ -121,7 +121,7 @@ describe('Native Crypto IPC', () => {
         const invoke = (window as any).__TAURI_INTERNALS__?.invoke
         if (!invoke) return { success: false, error: 'invoke not available' }
 
-        const testPin = '123456'
+        const testPin = '12345678'
         const testNsec = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
 
         // Need pubkey for encrypt_with_pin — derive from nsec

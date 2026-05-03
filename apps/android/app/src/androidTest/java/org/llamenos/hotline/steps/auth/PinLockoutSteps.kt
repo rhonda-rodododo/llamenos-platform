@@ -66,7 +66,7 @@ class PinLockoutSteps : BaseSteps() {
             if (!keystoreService.contains(KeystoreService.KEY_ENCRYPTED_KEYS)) {
                 runBlocking {
                     val deviceId = java.util.UUID.randomUUID().toString()
-                    val encrypted = cryptoService.generateDeviceKeys(deviceId, "123456")
+                    val encrypted = cryptoService.generateDeviceKeys(deviceId, "12345678")
                     val stored = Json.encodeToString(
                         StoredKeyData(
                             ciphertext = encrypted.ciphertext,

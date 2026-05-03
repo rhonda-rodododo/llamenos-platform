@@ -107,7 +107,7 @@ final class PINViewModel {
         case .set:
             switch phase {
             case .enter:
-                return NSLocalizedString("pin_set_subtitle", comment: "Choose a 6-8 digit PIN to protect your key")
+                return NSLocalizedString("pin_set_subtitle", comment: "Choose a PIN (8+ digits) or passphrase (8+ characters)")
             case .confirm:
                 return NSLocalizedString("pin_confirm_subtitle", comment: "Enter the same PIN again to confirm")
             }

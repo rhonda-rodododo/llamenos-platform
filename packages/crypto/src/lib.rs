@@ -15,7 +15,7 @@
 //! - **Symmetric**: AES-256-GCM (PIN storage, items_key)
 //! - **KDF**: HKDF-SHA256
 //! - **Subkey derivation**: HMAC-SHA256
-//! - **PIN key derivation**: PBKDF2-SHA256 (600K iterations)
+//! - **PIN/passphrase key derivation**: Argon2id (64MB, 3 iterations, 4 parallelism)
 //!
 //! ## Security Design
 //!

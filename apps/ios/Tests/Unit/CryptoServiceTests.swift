@@ -19,7 +19,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testGenerateDeviceKeysProducesPublicKeys() throws {
         let service = CryptoService()
-        let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         XCTAssertEqual(encrypted.state.signingPubkeyHex.count, 64, "Ed25519 pubkey must be 32 bytes / 64 hex chars")
         XCTAssertEqual(encrypted.state.encryptionPubkeyHex.count, 64, "X25519 pubkey must be 32 bytes / 64 hex chars")
@@ -32,7 +32,7 @@ final class CryptoServiceTests: XCTestCase {
         XCTAssertFalse(service.isUnlocked)
         XCTAssertNil(service.signingPubkeyHex)
 
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         XCTAssertTrue(service.isUnlocked)
         XCTAssertNotNil(service.signingPubkeyHex)
@@ -43,8 +43,8 @@ final class CryptoServiceTests: XCTestCase {
     func testGenerateDeviceKeysProducesUniqueKeys() throws {
         let s1 = CryptoService()
         let s2 = CryptoService()
-        _ = try s1.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
-        _ = try s2.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try s1.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
+        _ = try s2.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         XCTAssertNotEqual(s1.signingPubkeyHex, s2.signingPubkeyHex)
         XCTAssertNotEqual(s1.encryptionPubkeyHex, s2.encryptionPubkeyHex)
@@ -64,7 +64,7 @@ final class CryptoServiceTests: XCTestCase {
     func testValidPINFormats() throws {
         let service = CryptoService()
         // 6-, 7-, 8-digit PINs are all valid
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         service.lock()
         _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567")
         service.lock()
@@ -75,7 +75,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testLockClearsUnlockedFlag() throws {
         let service = CryptoService()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         XCTAssertTrue(service.isUnlocked)
 
         service.lock()
@@ -98,7 +98,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testUnlockWithWrongPINThrows() throws {
         let service = CryptoService()
-        let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         service.lock()
 
         XCTAssertThrowsError(try service.unlockWithPin(data: encrypted, pin: "999999"))
@@ -109,7 +109,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testAuthTokenCreation() throws {
         let service = CryptoService()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         let token = try service.createAuthToken(method: "GET", path: "/api/notes")
         XCTAssertEqual(token.pubkey.count, 64)
@@ -126,7 +126,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testNoteEncryptionProducesEnvelopePerRecipient() throws {
         let author = CryptoService()
-        _ = try author.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try author.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         let admin1 = CryptoService()
         let admin1Keys = try admin1.generateDeviceKeys(deviceId: UUID().uuidString, pin: "111111")
@@ -157,7 +157,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testNoteEncryptDecryptRoundTrip() throws {
         let author = CryptoService()
-        _ = try author.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try author.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         let payload = "{\"text\":\"sensitive note\"}"
 
         let result = try author.encryptNote(payload: payload, recipientPubkeys: [author.encryptionPubkeyHex!])
@@ -202,7 +202,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testSigchainLinkSignedByDevice() throws {
         let service = CryptoService()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         let link = try service.createSigchainLink(
             id: "link1",
