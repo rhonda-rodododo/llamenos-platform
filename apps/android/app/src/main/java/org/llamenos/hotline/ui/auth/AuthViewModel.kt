@@ -24,13 +24,16 @@ import javax.inject.Inject
  */
 @Serializable
 data class StoredKeyData(
-    val ciphertext: String,
+    val kdfVersion: UByte = 2u,
     val salt: String,
+    val argon2MCost: UInt = 65_536u,
+    val argon2TCost: UInt = 3u,
+    val argon2PCost: UInt = 4u,
     val nonce: String,
+    val ciphertext: String,
     val signingPubkeyHex: String,
     val encryptionPubkeyHex: String,
     val deviceId: String,
-    val iterations: UInt = 600_000u,
 )
 
 data class AuthUiState(
@@ -182,13 +185,16 @@ class AuthViewModel @Inject constructor(
 
                 // Serialize and store
                 val storedData = StoredKeyData(
-                    ciphertext = encrypted.ciphertext,
+                    kdfVersion = encrypted.kdfVersion,
                     salt = encrypted.salt,
+                    argon2MCost = encrypted.argon2MCost,
+                    argon2TCost = encrypted.argon2TCost,
+                    argon2PCost = encrypted.argon2PCost,
                     nonce = encrypted.nonce,
+                    ciphertext = encrypted.ciphertext,
                     signingPubkeyHex = encrypted.state.signingPubkeyHex,
                     encryptionPubkeyHex = encrypted.state.encryptionPubkeyHex,
                     deviceId = encrypted.state.deviceId,
-                    iterations = encrypted.iterations,
                 )
                 keystoreService.store(
                     KeystoreService.KEY_ENCRYPTED_KEYS,
@@ -268,15 +274,18 @@ class AuthViewModel @Inject constructor(
 
                 val storedData = json.decodeFromString<StoredKeyData>(storedJson)
                 val encryptedData = EncryptedDeviceKeys(
-                    ciphertext = storedData.ciphertext,
+                    kdfVersion = storedData.kdfVersion,
                     salt = storedData.salt,
+                    argon2MCost = storedData.argon2MCost,
+                    argon2TCost = storedData.argon2TCost,
+                    argon2PCost = storedData.argon2PCost,
                     nonce = storedData.nonce,
+                    ciphertext = storedData.ciphertext,
                     state = DeviceKeyState(
                         deviceId = storedData.deviceId,
                         signingPubkeyHex = storedData.signingPubkeyHex,
                         encryptionPubkeyHex = storedData.encryptionPubkeyHex,
                     ),
-                    iterations = storedData.iterations,
                 )
 
                 cryptoService.unlockWithPin(encryptedData, pin)

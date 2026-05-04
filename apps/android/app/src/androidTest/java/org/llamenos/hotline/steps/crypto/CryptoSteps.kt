@@ -289,7 +289,10 @@ class CryptoSteps : BaseSteps() {
     @Then("the iterations should be 600,000")
     fun theIterationsShouldBe600000() {
         try {
-            assertEquals("Iterations should be 600000", 600_000u, encryptedKeyData!!.iterations)
+            // v3 device key model uses Argon2id (kdfVersion=2) instead of PBKDF2.
+            // Verify Argon2id parameters are present and valid.
+            assertEquals("KDF version should be 2 (Argon2id)", 2u, encryptedKeyData!!.kdfVersion)
+            assertTrue("Argon2id time cost should be > 0", encryptedKeyData!!.argon2TCost > 0u)
         } catch (_: Throwable) {
             // Encrypted data may not be available
         }
