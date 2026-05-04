@@ -83,6 +83,9 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
       - name: Generate Xcode project
         working-directory: apps/ios
         run: xcodegen generate
@@ -107,21 +110,34 @@ jobs:
       - name: Build app
         working-directory: apps/ios
         run: |
+          set -o pipefail
           xcodebuild build \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build
+            -derivedDataPath /tmp/llamenos-build \
+            2>&1 | xcbeautify
 
       - name: Run unit tests
         working-directory: apps/ios
         run: |
+          set -o pipefail
+          mkdir -p test-results
           xcodebuild test \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosTests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build
+            -derivedDataPath /tmp/llamenos-build \
+            2>&1 | xcbeautify --report junit --report-path test-results/ios-unit.xml
+
+      - name: Upload iOS test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-test-results
+          path: test-results/
+          retention-days: 7
 
       - name: Start PostgreSQL
         run: |
@@ -204,12 +220,22 @@ jobs:
       - name: Run UI tests
         working-directory: apps/ios
         run: |
+          set -o pipefail
           xcodebuild test \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build
+            -derivedDataPath /tmp/llamenos-build \
+            2>&1 | xcbeautify --report junit --report-path test-results/ios-ui.xml
+
+      - name: Upload iOS UI test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-ui-test-results
+          path: test-results/
+          retention-days: 7
 
       - name: Show backend runtime logs
         if: ${{ !cancelled() }}
