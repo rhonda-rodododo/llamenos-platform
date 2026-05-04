@@ -109,8 +109,7 @@ final class AuthFlowUITests: XCTestCase {
         // Enter first PIN: 123456
         enterPIN("12345678")
 
-        // Enter different PIN for confirmation: 567890
-        enterPIN("567890")
+        enterPIN("56789012")
 
         // Error should be displayed
         let pinError = find("pin-error")

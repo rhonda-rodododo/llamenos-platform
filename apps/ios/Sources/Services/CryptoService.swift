@@ -388,7 +388,7 @@ final class CryptoService: @unchecked Sendable {
     }
 
     func setMockIdentity() {
-        let pin = ProcessInfo.processInfo.environment["XCTEST_MOCK_PIN"] ?? "123456"
+        let pin = ProcessInfo.processInfo.environment["XCTEST_MOCK_PIN"] ?? "12345678"
         let deviceId = "xctest-device-\(UUID().uuidString)"
         do { _ = try generateDeviceKeys(deviceId: deviceId, pin: pin) } catch {
             print("[DEBUG] Mock identity generation failed: \(error)")
@@ -397,7 +397,7 @@ final class CryptoService: @unchecked Sendable {
 
     func setMockVolunteerIdentity() {
         let deviceId = "xctest-volunteer-\(UUID().uuidString)"
-        do { _ = try generateDeviceKeys(deviceId: deviceId, pin: "654321") } catch {
+        do { _ = try generateDeviceKeys(deviceId: deviceId, pin: "65432100") } catch {
             print("[DEBUG] Mock volunteer identity generation failed: \(error)")
         }
     }

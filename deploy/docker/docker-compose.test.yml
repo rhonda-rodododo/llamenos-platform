@@ -84,13 +84,15 @@ services:
     depends_on:
       signal-cli:
         condition: service_started
+      postgres:
+        condition: service_healthy
     environment:
       - PORT=3100
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-test-notifier-key}
       - NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-ci-test-token-secret}
+      - DATABASE_URL=postgres://llamenos:${PG_PASSWORD:-dev}@postgres:5432/llamenos?sslmode=disable
       - SIGNAL_BRIDGE_URL=http://signal-cli:8080
       - SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-+15550000000}
-      - NOTIFIER_DB_PATH=/tmp/notifier-test.db
 
   # ── Asterisk sidecar: test mode ────────────────────────────────────
   # sip-bridge points to the mock ARI endpoint; BRIDGE_SECRET and

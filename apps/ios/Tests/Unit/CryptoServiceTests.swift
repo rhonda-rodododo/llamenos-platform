@@ -24,7 +24,7 @@ final class CryptoServiceTests: XCTestCase {
         XCTAssertEqual(encrypted.state.signingPubkeyHex.count, 64, "Ed25519 pubkey must be 32 bytes / 64 hex chars")
         XCTAssertEqual(encrypted.state.encryptionPubkeyHex.count, 64, "X25519 pubkey must be 32 bytes / 64 hex chars")
         XCTAssertFalse(encrypted.state.deviceId.isEmpty)
-        XCTAssertGreaterThan(encrypted.iterations, 0)
+        XCTAssertGreaterThan(encrypted.argon2MCost, 0)
     }
 
     func testGenerateDeviceKeysSetsServiceState() throws {
@@ -57,18 +57,17 @@ final class CryptoServiceTests: XCTestCase {
         XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345")) { err in
             XCTAssertTrue(err is CryptoServiceError)
         }
-        XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456789"))
+        XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567"))
         XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "abcdef"))
     }
 
     func testValidPINFormats() throws {
         let service = CryptoService()
-        // 6-, 7-, 8-digit PINs are all valid
         _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         service.lock()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456789")
         service.lock()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "00000000")
     }
 
     // MARK: - Lock / Unlock
@@ -86,7 +85,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testUnlockWithCorrectPINRoundTrip() throws {
         let service = CryptoService()
-        let pin = "654321"
+        let pin = "65432100"
         let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: pin)
         let originalSigning = encrypted.state.signingPubkeyHex
         service.lock()
@@ -101,7 +100,7 @@ final class CryptoServiceTests: XCTestCase {
         let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         service.lock()
 
-        XCTAssertThrowsError(try service.unlockWithPin(data: encrypted, pin: "999999"))
+        XCTAssertThrowsError(try service.unlockWithPin(data: encrypted, pin: "99999999"))
         XCTAssertFalse(service.isUnlocked)
     }
 
@@ -129,10 +128,10 @@ final class CryptoServiceTests: XCTestCase {
         _ = try author.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         let admin1 = CryptoService()
-        let admin1Keys = try admin1.generateDeviceKeys(deviceId: UUID().uuidString, pin: "111111")
+        let admin1Keys = try admin1.generateDeviceKeys(deviceId: UUID().uuidString, pin: "11111111")
 
         let admin2 = CryptoService()
-        let admin2Keys = try admin2.generateDeviceKeys(deviceId: UUID().uuidString, pin: "222222")
+        let admin2Keys = try admin2.generateDeviceKeys(deviceId: UUID().uuidString, pin: "22222222")
 
         let recipients = [
             author.encryptionPubkeyHex!,
