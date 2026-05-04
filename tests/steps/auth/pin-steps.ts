@@ -47,7 +47,7 @@ Then('I should see the backspace button', async ({ page }) => {
 
 Then('I should see the PIN dots indicator', async ({ page }) => {
   // Single PIN input field serves as the entry point
-  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+  const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
   await expect(pinInput).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -90,9 +90,8 @@ Then('I should see a PIN mismatch error', async ({ page }) => {
 })
 
 When('I press {string}, {string}', async ({ page }, key1: string, key2: string) => {
-  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
-  await pinInput.click()
-  await page.keyboard.type(key1 + key2, { delay: 50 })
+  const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
+  await pinInput.fill(key1 + key2)
 })
 
 When('I press backspace', async ({ page }) => {
@@ -100,18 +99,21 @@ When('I press backspace', async ({ page }) => {
 })
 
 When('I press {string}, {string}, {string}', async ({ page }, k1: string, k2: string, k3: string) => {
-  await page.keyboard.type(k1 + k2 + k3, { delay: 50 })
+  const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
+  // Append to current value
+  const current = await pinInput.inputValue()
+  await pinInput.fill(current + k1 + k2 + k3)
 })
 
 Then('{int} digits should be entered', async ({ page }, count: number) => {
-  // Verify the expected number of PIN digits are filled
+  // Verify the expected number of characters are entered
   // This is implicit — if 4 digits are entered, we advance to confirmation
   // No explicit assertion needed beyond the title change
 })
 
 Then('the PIN dots should be cleared', async ({ page }) => {
   // After an error, PIN input should be empty
-  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+  const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
   await expect(pinInput).toHaveValue('')
 })
 
