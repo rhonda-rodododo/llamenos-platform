@@ -84,6 +84,9 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
       - name: Generate Xcode project
         working-directory: apps/ios
         run: xcodegen generate
@@ -108,15 +111,19 @@ jobs:
       - name: Build app
         working-directory: apps/ios
         run: |
+          set -o pipefail
           xcodebuild build \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build
+            -derivedDataPath /tmp/llamenos-build \
+            2>&1 | xcbeautify
 
       - name: Run unit tests
         working-directory: apps/ios
         run: |
+          set -o pipefail
+          mkdir -p test-results
           xcodebuild test \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \

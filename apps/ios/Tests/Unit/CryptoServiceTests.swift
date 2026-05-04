@@ -54,20 +54,23 @@ final class CryptoServiceTests: XCTestCase {
 
     func testInvalidPINIsRejected() {
         let service = CryptoService()
+        // Too short (< 8 chars)
         XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345")) { err in
             XCTAssertTrue(err is CryptoServiceError)
         }
         XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567"))
+        // 6 letters — too short
         XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "abcdef"))
     }
 
     func testValidPINFormats() throws {
         let service = CryptoService()
+        // 8+ digit PINs are valid
         _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         service.lock()
         _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456789")
         service.lock()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "00000000")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567890")
     }
 
     // MARK: - Lock / Unlock
