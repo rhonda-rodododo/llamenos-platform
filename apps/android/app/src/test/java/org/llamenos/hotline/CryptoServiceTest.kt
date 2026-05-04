@@ -54,8 +54,11 @@ class CryptoServiceTest {
     @Test(expected = IllegalStateException::class)
     fun `unlockWithPin throws without native lib`(): Unit = runBlocking {
         val data = org.llamenos.hotline.crypto.EncryptedDeviceKeys(
+            kdfVersion = 1u,
             salt = "test",
-            iterations = 600_000u,
+            argon2MCost = 65536u,
+            argon2TCost = 3u,
+            argon2PCost = 4u,
             nonce = "test",
             ciphertext = "test",
             state = org.llamenos.hotline.crypto.DeviceKeyState(
