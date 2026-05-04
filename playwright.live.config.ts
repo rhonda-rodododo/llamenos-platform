@@ -12,7 +12,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1, // Serial — shared Twilio state and staging instance
-  reporter: process.env.CI ? 'github' : 'html',
+  reporter: process.env.CI
+    ? [
+        ['github'],
+        ['json', { outputFile: 'test-results/results.json' }],
+        ['line'],
+      ]
+    : [['list']],
   timeout: 120_000, // Calls take time to connect
   expect: {
     timeout: 30_000,

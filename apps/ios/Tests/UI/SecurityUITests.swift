@@ -75,7 +75,7 @@ final class SecurityUITests: BaseUITest {
             _ = pinPad.waitForExistence(timeout: 5)
         }
         when("I enter the wrong PIN") {
-            enterPIN("999999")
+            enterPIN("99999999")
         }
         then("I should see an error message") {
             let pinError = find("pin-error")
@@ -425,7 +425,7 @@ final class SecurityUITests: BaseUITest {
         }
         when("I enter the wrong PIN 5 times") {
             for _ in 1...5 {
-                enterPIN("999999")
+                enterPIN("99999999")
                 // Brief wait for the error to appear and the PIN pad to reset
                 let pinError = find("pin-error")
                 _ = pinError.waitForExistence(timeout: 3)
@@ -468,7 +468,7 @@ final class SecurityUITests: BaseUITest {
         when("I exceed the lockout threshold with wrong PINs") {
             // Enter wrong PIN 5 times to trigger the 30-second lockout
             for _ in 1...5 {
-                enterPIN("999999")
+                enterPIN("99999999")
                 let pinError = find("pin-error")
                 _ = pinError.waitForExistence(timeout: 3)
             }
@@ -515,7 +515,7 @@ final class SecurityUITests: BaseUITest {
         }
         when("I enter the wrong PIN 10 times to trigger key wipe") {
             for i in 1...10 {
-                enterPIN("999999")
+                enterPIN("99999999")
                 let pinError = find("pin-error")
                 _ = pinError.waitForExistence(timeout: 3)
                 // After lockout kicks in (attempt 5+), we may need to wait for

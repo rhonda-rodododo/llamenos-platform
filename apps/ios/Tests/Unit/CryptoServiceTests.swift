@@ -103,7 +103,7 @@ final class CryptoServiceTests: XCTestCase {
         let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         service.lock()
 
-        XCTAssertThrowsError(try service.unlockWithPin(data: encrypted, pin: "999999"))
+        XCTAssertThrowsError(try service.unlockWithPin(data: encrypted, pin: "99999999"))
         XCTAssertFalse(service.isUnlocked)
     }
 
