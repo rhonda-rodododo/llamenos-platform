@@ -818,15 +818,17 @@ jobs:
       - name: Install dependencies and run codegen
         run: bun install --frozen-lockfile && bun run codegen
 
-      # Cache the XCFramework to avoid a 30-40 min Rust compile on every run.
+      # Cache the XCFramework AND generated Swift bindings together.
+      # Both must come from the same Rust build or checksums will mismatch.
       # Key includes all Rust sources + Cargo manifests + the build script.
-      # On cache miss, the full build runs and populates the cache for next time.
-      - name: Cache crypto XCFramework
+      - name: Cache crypto XCFramework + bindings
         id: xcframework-cache
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: apps/ios/LlamenosCoreFFI.xcframework
-          key: xcframework-ios-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock', 'packages/crypto/scripts/build-mobile.sh') }}
+          path: |
+            apps/ios/LlamenosCoreFFI.xcframework
+            packages/crypto/dist/ios/LlamenosCore.swift
+          key: xcframework-v2-ios-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock', 'packages/crypto/scripts/build-mobile.sh') }}
 
       - name: Install Rust stable (for crypto xcframework)
         if: steps.xcframework-cache.outputs.cache-hit != 'true'
@@ -848,8 +850,7 @@ jobs:
           ./scripts/build-mobile.sh ios
           cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
 
-      - name: Copy fresh UniFFI bindings
-        if: steps.xcframework-cache.outputs.cache-hit != 'true'
+      - name: Copy UniFFI bindings (from build or cache)
         run: |
           cp packages/crypto/dist/ios/LlamenosCore.swift apps/ios/Sources/Generated/LlamenosCore.swift
 
