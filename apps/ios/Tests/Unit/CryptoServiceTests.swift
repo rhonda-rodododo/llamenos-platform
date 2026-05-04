@@ -24,7 +24,7 @@ final class CryptoServiceTests: XCTestCase {
         XCTAssertEqual(encrypted.state.signingPubkeyHex.count, 64, "Ed25519 pubkey must be 32 bytes / 64 hex chars")
         XCTAssertEqual(encrypted.state.encryptionPubkeyHex.count, 64, "X25519 pubkey must be 32 bytes / 64 hex chars")
         XCTAssertFalse(encrypted.state.deviceId.isEmpty)
-        XCTAssertGreaterThan(encrypted.iterations, 0)
+        XCTAssertGreaterThan(encrypted.argon2MCost, 0)
     }
 
     func testGenerateDeviceKeysSetsServiceState() throws {

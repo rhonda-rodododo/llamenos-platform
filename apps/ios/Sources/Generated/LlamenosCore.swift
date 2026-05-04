@@ -732,13 +732,25 @@ public func FfiConverterTypeDevicePukEnvelope_lower(_ value: DevicePukEnvelope) 
  */
 public struct EncryptedDeviceKeys: Equatable, Hashable {
     /**
-     * PBKDF2 salt, hex-encoded (32 bytes)
+     * KDF version (2 = Argon2id)
+     */
+    public let kdfVersion: UInt8
+    /**
+     * Argon2id salt, hex-encoded (32 bytes)
      */
     public let salt: String
     /**
-     * PBKDF2 iteration count
+     * Argon2id memory cost in KiB
      */
-    public let iterations: UInt32
+    public let argon2MCost: UInt32
+    /**
+     * Argon2id time cost (iterations)
+     */
+    public let argon2TCost: UInt32
+    /**
+     * Argon2id parallelism
+     */
+    public let argon2PCost: UInt32
     /**
      * AES-256-GCM nonce, hex-encoded (12 bytes)
      */
@@ -756,22 +768,34 @@ public struct EncryptedDeviceKeys: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * PBKDF2 salt, hex-encoded (32 bytes)
-         */salt: String, 
+         * KDF version (2 = Argon2id)
+         */kdfVersion: UInt8,
         /**
-         * PBKDF2 iteration count
-         */iterations: UInt32, 
+         * Argon2id salt, hex-encoded (32 bytes)
+         */salt: String,
+        /**
+         * Argon2id memory cost in KiB
+         */argon2MCost: UInt32,
+        /**
+         * Argon2id time cost (iterations)
+         */argon2TCost: UInt32,
+        /**
+         * Argon2id parallelism
+         */argon2PCost: UInt32,
         /**
          * AES-256-GCM nonce, hex-encoded (12 bytes)
-         */nonce: String, 
+         */nonce: String,
         /**
          * AES-256-GCM ciphertext of (signing_seed || encryption_seed), hex-encoded
-         */ciphertext: String, 
+         */ciphertext: String,
         /**
          * Device state (public info for identification)
          */state: DeviceKeyState) {
+        self.kdfVersion = kdfVersion
         self.salt = salt
-        self.iterations = iterations
+        self.argon2MCost = argon2MCost
+        self.argon2TCost = argon2TCost
+        self.argon2PCost = argon2PCost
         self.nonce = nonce
         self.ciphertext = ciphertext
         self.state = state
@@ -793,17 +817,23 @@ public struct FfiConverterTypeEncryptedDeviceKeys: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EncryptedDeviceKeys {
         return
             try EncryptedDeviceKeys(
-                salt: FfiConverterString.read(from: &buf), 
-                iterations: FfiConverterUInt32.read(from: &buf), 
-                nonce: FfiConverterString.read(from: &buf), 
-                ciphertext: FfiConverterString.read(from: &buf), 
+                kdfVersion: FfiConverterUInt8.read(from: &buf),
+                salt: FfiConverterString.read(from: &buf),
+                argon2MCost: FfiConverterUInt32.read(from: &buf),
+                argon2TCost: FfiConverterUInt32.read(from: &buf),
+                argon2PCost: FfiConverterUInt32.read(from: &buf),
+                nonce: FfiConverterString.read(from: &buf),
+                ciphertext: FfiConverterString.read(from: &buf),
                 state: FfiConverterTypeDeviceKeyState.read(from: &buf)
         )
     }
 
     public static func write(_ value: EncryptedDeviceKeys, into buf: inout [UInt8]) {
+        FfiConverterUInt8.write(value.kdfVersion, into: &buf)
         FfiConverterString.write(value.salt, into: &buf)
-        FfiConverterUInt32.write(value.iterations, into: &buf)
+        FfiConverterUInt32.write(value.argon2MCost, into: &buf)
+        FfiConverterUInt32.write(value.argon2TCost, into: &buf)
+        FfiConverterUInt32.write(value.argon2PCost, into: &buf)
         FfiConverterString.write(value.nonce, into: &buf)
         FfiConverterString.write(value.ciphertext, into: &buf)
         FfiConverterTypeDeviceKeyState.write(value.state, into: &buf)
