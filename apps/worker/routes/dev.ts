@@ -721,4 +721,31 @@ dev.post('/test-create-hub', async (c) => {
   return c.json({ id: hub.id, name: hub.name })
 })
 
+// ─── Test Hub Deletion (dev/test isolation helper) ──────────────────────────
+// Deletes a hub and all its data — mirror of test-create-hub, bypasses auth.
+// Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
+
+dev.post('/test-delete-hub', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const rawBody = await c.req.json().catch(() => ({}))
+  const hubId = typeof rawBody === 'object' && rawBody !== null && 'id' in rawBody && typeof rawBody.id === 'string'
+    ? rawBody.id
+    : null
+  if (!hubId) {
+    return c.json({ error: 'Missing hub id' }, 400)
+  }
+
+  const services = c.get('services')
+  try {
+    await services.settings.deleteHub(hubId)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to delete hub'
+    return c.json({ error: message }, 500)
+  }
+
+  return c.json({ ok: true })
+})
+
 export default dev
