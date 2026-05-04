@@ -36,13 +36,20 @@ export * from './pages/index'
 
 /**
  * Enter a PIN into the PinInput component.
- * The PinInput is a single password input field — fill the value and press Enter.
+ * Uses keyboard typing since the component auto-advances focus on each digit.
  */
 export async function enterPin(page: Page, pin: string) {
-  const pinInput = page.getByTestId('pin-input').locator('input')
-  await pinInput.waitFor({ state: 'visible', timeout: 10000 })
-  await pinInput.fill(pin)
-  await pinInput.press('Enter')
+  // Focus the PIN input
+  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
+  await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
+  await firstDigit.click()
+  // Type each digit — PinInput auto-advances focus on each keystroke
+  for (const digit of pin) {
+    await page.keyboard.type(digit)
+  }
+  // PinInput has 8 fields but minLength is 6 — if PIN is shorter than 8 digits,
+  // press Enter to trigger onComplete (auto-complete only fires at exactly 8 digits)
+  await page.keyboard.press('Enter')
 }
 
 /**
@@ -65,7 +72,7 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
     await page.goto('/login')
     await page.waitForLoadState('domcontentloaded')
 
-    const pinInput = page.getByTestId('pin-input').locator('input')
+    const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
     const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
 
     if (pinVisible) {
@@ -110,7 +117,7 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
  */
 export async function reenterPinAfterReload(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded')
-  const pinInput = page.getByTestId('pin-input').locator('input')
+  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
   // Use waitFor to actually wait for the PIN input to render after reload.
   // isVisible() is an instant snapshot and returns false if DOM hasn't rendered yet.
   try {
@@ -291,31 +298,6 @@ export function uniquePhone(): string {
   // Use 212 (NYC) area code — 555 numbers fail libphonenumber-js validation
   const suffix = Date.now().toString().slice(-7)
   return `+1212${suffix}`
-}
-
-/**
- * Fill in the call ID field in the new note form.
- * Handles both modes: Input (when no recent calls) and Select (when recent calls exist).
- * In Select mode, selects the "Enter manually" option then fills the manual input.
- */
-export async function fillCallId(page: Page, callId: string): Promise<void> {
-  const callIdInput = page.getByTestId('note-call-id')
-  const callIdSelect = page.getByTestId('call-id-select')
-  const isInput = await callIdInput.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isInput) {
-    await callIdInput.fill(callId)
-    return
-  }
-  // Select mode: choose "Enter manually" then fill
-  const isSelect = await callIdSelect.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isSelect) {
-    await callIdSelect.click()
-    await page.getByRole('option', { name: /enter manually/i }).click()
-    await callIdInput.fill(callId)
-    return
-  }
-  // Last resort: try the input by id
-  await page.locator('#call-id').fill(callId)
 }
 
 const TEST_RESET_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'

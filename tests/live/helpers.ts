@@ -87,10 +87,10 @@ export async function loginAsAdmin(page: Page) {
   await page.reload()
 
   // Enter PIN
-  const pinInput = page.getByTestId('pin-input').locator('input')
-  await pinInput.waitFor({ state: 'visible', timeout: 10000 })
-  await pinInput.fill(STAGING_PIN)
-  await pinInput.press('Enter')
+  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
+  await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
+  await firstDigit.click()
+  await page.keyboard.type(STAGING_PIN, { delay: 50 })
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 })
 }

@@ -2,7 +2,7 @@
  * Login restore step definitions.
  * Matches steps from: packages/test-specs/features/desktop/auth/login-restore.feature
  * Covers fresh install view (nsec input, backup upload, errors),
- * stored key view (PIN input, recovery options),
+ * stored key view (PIN digits, recovery options),
  * and common login elements (language selector, theme toggles, security note).
  */
 import { expect } from '@playwright/test'
@@ -14,17 +14,17 @@ import { Timeouts } from '../../helpers'
 
 Given('I have a stored encrypted key', async ({ page }) => {
   await page.goto('/login')
-  // Inject a fake encrypted key blob to trigger the PIN entry UI.
-  // The Tauri store mock uses prefix `tauri-store:keys.json:` + STORE_KEY `llamenos-encrypted-device-keys`.
+  // Inject a fake encrypted key blob to trigger the PIN entry UI
   await page.evaluate(() => {
     const data = JSON.stringify({
       salt: 'aa'.repeat(16),
       iterations: 600000,
       nonce: 'bb'.repeat(24),
       ciphertext: 'cc'.repeat(32),
-      state: { signingPubkeyHex: 'dd'.repeat(32) },
+      pubkey: 'dd'.repeat(8),
     })
-    localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-device-keys', data)
+    localStorage.setItem('llamenos-encrypted-key', data)
+    localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-key', data)
   })
 })
 
@@ -44,7 +44,7 @@ Then('I should see the backup file upload area', async ({ page }) => {
 
 Then('I should see the PIN digit inputs', async ({ page }) => {
   // Login page does NOT have data-testid="page-title" — check for PIN input directly
-  await expect(page.getByTestId(TestIds.PIN_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.locator('input[aria-label="PIN or passphrase"]')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Common elements ---
