@@ -172,7 +172,16 @@ export async function deleteHubViaApi(
   request: APIRequestContext,
   hubId: string,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/hubs/${hubId}`)
+  // Use the test-delete-hub endpoint (dev.ts) which bypasses permission checks
+  // and only requires the X-Test-Secret header. The authenticated /api/hubs DELETE
+  // requires system:manage-hubs and can fail with 500 if cascading deletes hit
+  // missing FK rules (e.g. files table has ON DELETE no action).
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  const res = await request.post('/api/test-delete-hub', {
+    headers: { 'X-Test-Secret': testSecret, 'Content-Type': 'application/json' },
+    data: { id: hubId },
+  })
+  const status = res.status()
   if (status !== 200 && status !== 204) {
     // Non-fatal: log but don't throw — teardown should not fail tests
     console.warn(`Failed to delete hub ${hubId}: ${status}`)
