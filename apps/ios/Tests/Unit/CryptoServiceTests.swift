@@ -54,21 +54,23 @@ final class CryptoServiceTests: XCTestCase {
 
     func testInvalidPINIsRejected() {
         let service = CryptoService()
+        // Too short (< 8 chars)
         XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345")) { err in
             XCTAssertTrue(err is CryptoServiceError)
         }
-        XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456789"))
+        XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567"))
+        // 6 letters — too short
         XCTAssertThrowsError(try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "abcdef"))
     }
 
     func testValidPINFormats() throws {
         let service = CryptoService()
-        // 6-, 7-, 8-digit PINs are all valid
+        // 8+ digit PINs are valid
         _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
         service.lock()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "123456789")
         service.lock()
-        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
+        _ = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: "1234567890")
     }
 
     // MARK: - Lock / Unlock
@@ -86,7 +88,7 @@ final class CryptoServiceTests: XCTestCase {
 
     func testUnlockWithCorrectPINRoundTrip() throws {
         let service = CryptoService()
-        let pin = "654321"
+        let pin = "65432100"
         let encrypted = try service.generateDeviceKeys(deviceId: UUID().uuidString, pin: pin)
         let originalSigning = encrypted.state.signingPubkeyHex
         service.lock()
@@ -129,10 +131,10 @@ final class CryptoServiceTests: XCTestCase {
         _ = try author.generateDeviceKeys(deviceId: UUID().uuidString, pin: "12345678")
 
         let admin1 = CryptoService()
-        let admin1Keys = try admin1.generateDeviceKeys(deviceId: UUID().uuidString, pin: "111111")
+        let admin1Keys = try admin1.generateDeviceKeys(deviceId: UUID().uuidString, pin: "11111111")
 
         let admin2 = CryptoService()
-        let admin2Keys = try admin2.generateDeviceKeys(deviceId: UUID().uuidString, pin: "222222")
+        let admin2Keys = try admin2.generateDeviceKeys(deviceId: UUID().uuidString, pin: "22222222")
 
         let recipients = [
             author.encryptionPubkeyHex!,
