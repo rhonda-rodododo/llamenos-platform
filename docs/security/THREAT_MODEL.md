@@ -18,7 +18,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | Caller phone numbers | PII / Safety-Critical | Hashed in PostgreSQL | HMAC-SHA256 with operator secret; last 4 digits stored plaintext for display |
 | Call note content | Confidential | Encrypted in PostgreSQL | E2EE: per-note AES-256-GCM, HPKE key wrapping (RFC 9180) |
 | Volunteer identity (name, phone) | PII / Safety-Critical | Encrypted at rest in PostgreSQL | Visible only to admins; never exposed to other users or callers |
-| Device private keys | Secret | Platform secure storage (Tauri Store / iOS Keychain / Android Keystore) | PBKDF2-SHA256 600K iterations + AES-256-GCM; private keys never leave Rust layer |
+| Device private keys | Secret | Platform secure storage (Tauri Store / iOS Keychain / Android Keystore) | Argon2id (64MB/3/4) + AES-256-GCM; private keys never leave Rust layer |
 | Admin device keys | Secret | Operator-managed (platform secure storage, HSM) | Never stored server-side; separate signing and encryption keypairs |
 | Session tokens | Secret | Client memory, PostgreSQL (server) | 256-bit random, 8-hour TTL, revocable |
 | User sigchain | Integrity-Critical | PostgreSQL | Append-only, hash-chained, Ed25519-signed device authorization log |
@@ -38,7 +38,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 **Mitigations**:
 - E2EE notes with forward secrecy — per-note random key, HPKE-wrapped; server compromise reveals nothing
 - Per-device Ed25519/X25519 keys — no single "identity key" to compromise; device deauthorization via sigchain
-- PIN-encrypted device keys — physical seizure requires PIN brute-force (600K PBKDF2 iterations)
+- PIN-encrypted device keys — physical seizure requires PIN brute-force (Argon2id 64MB/3/4 — GPU/ASIC resistant)
 - Auto-lock on idle — limits physical access window
 - 57 domain separation labels — prevents cross-context key reuse (Albrecht defense)
 - HPKE label enforcement at decrypt — label mismatch causes immediate rejection before decryption
@@ -170,7 +170,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | Note confidentiality | AES-256-GCM with random per-note key | 256-bit symmetric |
 | Note integrity | GCM authentication tag | 128-bit |
 | Note forward secrecy | HPKE encapsulation per note + per recipient | X25519 |
-| Key-at-rest confidentiality | PBKDF2-SHA256 (600K iter) + AES-256-GCM | ~20–27 bits PIN + 256-bit key |
+| Key-at-rest confidentiality | Argon2id (64MB/3/4) + AES-256-GCM | ~20–27 bits PIN + 256-bit key; GPU/ASIC resistant |
 | Auth token unforgeability | Ed25519 signatures | 128-bit security level |
 | Session token unpredictability | `crypto.getRandomValues(32)` | 256-bit |
 | Phone hash preimage resistance | HMAC-SHA256 with operator secret | Infeasible without HMAC secret |

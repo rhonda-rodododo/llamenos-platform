@@ -8,6 +8,8 @@ subtitle: Sa ki pwoteje, sa ki vizib, ak sa ki ka jwenn anba sibpena — òganiz
 | Yo KAPAB bay | Yo PA KAPAB bay |
 |------------------|---------------------|
 | Metadata apèl/mesaj (lè, dire) | Kontni nòt, transkripsyon, kò rapò |
+| Evènman an tan reyèl | Wi (pa hub, kle k ap woule) | Non | Sèlman tèks chifre |
+| Chèn User-Agent | SHA-256 hache | Hash sèlman | Hash (pa ranvèsab) |
 | Blòb baz done chifre | Non vòlontè (chifre de-bout-an-bout) |
 | Ki vòlontè ki te aktif ak lè | Dosye repètwa kontak (chifre de-bout-an-bout) |
 | | Kontni mesaj (chifre lè li rive, estoke kòm tèks chifre) |
@@ -41,11 +43,13 @@ Ekspozisyon vi prive ou depann sou ki chanèl ou aktive :
 |---------|-----------------|----------------|-------|
 | SMS | Founisè telefoni ou li tout mesaj | **Chifre** | Founisè kenbe mesaj orijinal yo |
 | WhatsApp | Meta li tout mesaj | **Chifre** | Founisè kenbe mesaj orijinal yo |
-| Signal | Rezo Signal E2EE, men pon dechifre lè li rive | **Chifre** | Pi bon pase SMS, pa zewo-konesans |
+| Signal | Rezo Signal E2EE; pon re-chifre lè li rive | **Chifre** | Wout prefere lè li disponib |
+
+**Livrezon priyo Signal** : Lè yon moun resevwa gen Signal, mesaj yo otomatikman voye pa Signal — founisè telefoni ou pa janm wè kontni a. Pou SMS, yon notifikasyon jenerik "ou gen yon nouvo mesaj" sèlman voye pa defo (san kontni mesaj), konsa rejis founisè ou pa gen kontni sansib.
 
 **Mesaj yo chifre nan moman yo rive sou sèvè ou.** Sèvè a estoke sèlman tèks chifre. Founisè telefoni oswa mesaj ou ka toujou gen mesaj orijinal la — se yon limitasyon nan platfòm sa yo, pa yon bagay nou ka chanje.
 
-**Sibpena founisè mesaj** : Founisè SMS gen kontni mesaj konplè. Meta gen kontni WhatsApp. Mesaj Signal E2EE nan pon, men pon (ki kouri sou sèvè ou) dechifre anvan re-chifre pou estokaj. Nan tout ka, **sèvè ou gen sèlman tèks chifre** — founisè ostaj pa ka li kontni mesaj.
+**Sibpena founisè mesaj** : Founisè SMS yo gen kontni konplè mesaj yo sèlman si ou aktive mòd SMS kontni konplè eksplisitman. Ak mòd notifikasyon sèlman pa defo, kò SMS yo pa gen kontni mesaj. Meta gen kontni WhatsApp. Mesaj Signal E2EE nan pon, men pon (ki kouri sou sèvè ou) dechifre anvan re-chifre pou estokaj. Nan tout ka, **sèvè ou gen sèlman tèks chifre** — founisè ostaj pa ka li kontni mesaj.
 
 ### Nòt, Transkripsyon, ak Rapò
 
@@ -54,10 +58,10 @@ Tout kontni ekri pa vòlontè chifre de-bout-an-bout :
 - Chak nòt itilize yon **kle aléatwa inik** (konfidansyalite pèsistan — konpwomèt yon nòt pa konpwomèt lòt yo)
 - Kle yo vlope separe pou vòlontè ak chak admin
 - Sèvè a estoke sèlman tèks chifre
-- Dechifraj fèt nan navigatè a
+- Dechifraj fèt sou aparèy ou, nan yon kouch sekirize ki pa janm ekspoze kle yo nan entèfas itilizatè a
 - **Chan pèsonalize, kontni rapò, ak atachman fichye tout chifre individyèlman**
 
-**Sezi aparèy** : San PIN ou **ak** aksè nan kont founisè idantite ou, atakan jwenn yon blòb chifre ki enposib pou dechifre. Si ou itilize tou yon kle sekirite materyèl, **twa faktè endepandan** pwoteje done ou.
+**Sezi aparèy** : San PIN ou **ak** aksè nan kont founisè idantite ou, atakan jwenn yon blòb chifre pwoteje pa Argon2id — yon fonksyon derivasyon kle ki reziste memwa ki fè atak fòs-brit ak materèl espesyalize (GPU, ASIC) pi chè pa pliziyè òd grandè pase apwòch tradisyonèl. Si ou itilize tou yon kle sekirite materyèl, **twa faktè endepandan** pwoteje done ou.
 
 ---
 
@@ -81,6 +85,14 @@ Amelyorasyon sa yo disponib jodi a :
 
 | Fonksyon | Benefis vi prive |
 |---------|-----------------|
+| Pwoteksyon kle Argon2id | Kle aparèy ou pwoteje pa yon fonksyon ki reziste memwa ki reziste atak fòs-brit ak GPU ak materèl espesyalize |
+| Routaj mesaj Signal an premye | Mesaj yo otomatikman achemine atravè Signal lè disponib, kenbe kontni deyò jounal fournisè SMS |
+| Mòd SMS notifikasyon sèlman | Destinatè SMS wè sèlman "ou gen yon nouvo mesaj" — pa gen kontni sansib nan jounal fournisè |
+| Rezistans kont analiz trafik | Gwòsè evènman an tan reyèl ranpli pou obsèvatè pa ka distenge mesaj kout ak long |
+| Pa gen nimewo telefòn klè nan baz done | Nimewo moun k ap rele estoke kòm hash irreversib — baz done ou pa janm gen nimewo reyèl la |
+| Chifreman pa hub ak sekrè pwogrèsis | Evènman an tan reyèl chak hub chifre ak kle ki woule chak 24 èdtan — ansyen kle pa ka dechifre nouvo evènman |
+| Kriptografi nan Rust sou tout platfòm | Biwo, iOS, ak Android tout itilize menm bibliyotèk kriptografi Rust odite a — kle pa janm antre nan kòd JavaScript, Swift, oswa Kotlin |
+| Aksè limite nan relè | Relè Nostr ou aksepte evènman sèlman nan sèvè ou — okènn pati deyò pa ka enjekte fo notifikasyon |
 | Estokaj mesaj chifre | Mesaj SMS, WhatsApp ak Signal estoke kòm tèks chifre sou sèvè ou |
 | Transkripsyon sou aparèy | Odyo pa janm kite navigatè ou — trete nèt sou aparèy ou |
 | Pwoteksyon kle milti-faktè | Kle chifraj ou pwoteje pa PIN ou, founisè idantite ou, ak opsyonèlman kle sekirite materyèl |

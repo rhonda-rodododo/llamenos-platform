@@ -361,6 +361,20 @@ The messaging delivery router (`apps/worker/messaging/delivery-router.ts`) suppo
 
 `smsContentMode: 'notification-only'` is the default. This means SMS recipients see "You have a new message" instead of the message body, preventing message content from appearing in SMS provider logs. Set to `'full'` only if you accept provider-side plaintext exposure.
 
+### Signal-Notifier Hardening
+
+The signal-notifier sidecar (`--profile signal`) has been hardened with:
+
+| Feature | Configuration |
+|---------|--------------|
+| **Database** | PostgreSQL (migrated from SQLite) — auto-creates `signal_identifiers` and `signal_audit_log` tables |
+| **Rate limiting** | Sliding window per-IP: `/register-client` 10 req/60s, `/notify` 30 req/60s |
+| **Audit logging** | All actions (register, unregister, notify, rate_limited) logged to `signal_audit_log` with indexed `created_at` and `identifier_hash` |
+| **Auth** | Timing-safe bearer token comparison; supports token rotation (current + previous key for zero-downtime rotation) |
+| **Registration** | HMAC-verified registration tokens with expiry check |
+
+The sidecar connects to the same PostgreSQL instance as the main app. Ensure `SIGNAL_NOTIFIER_BEARER_TOKEN` matches between the app and sidecar configurations.
+
 ### Internal TLS
 
 The `internal-tls` Ansible role generates a self-signed CA and per-host certificates for cross-host service communication (PostgreSQL, RustFS, strfry). Certificates include DNS SAN + IP SAN, valid for 1 year.

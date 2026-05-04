@@ -56,7 +56,7 @@ The server **cannot read** these, even under legal compulsion:
 | Messages (SMS/WhatsApp/Signal) | AES-256-GCM + HPKE wrapping | Yes (per-message key) |
 | CMS contacts/cases | AES-256-GCM + HPKE wrapping | Yes |
 | Draft notes | AES-256-GCM (HKDF-derived key) | No (deterministic key, local-only) |
-| Device private keys | PBKDF2 + AES-256-GCM | N/A (platform secure storage) |
+| Device private keys | Argon2id + AES-256-GCM | N/A (platform secure storage) |
 
 ### Identity Model
 

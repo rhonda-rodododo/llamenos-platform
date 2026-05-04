@@ -170,9 +170,9 @@ Hash-chained for tamper detection.
 
 | Platform | Storage | Key | Classification | Notes |
 |----------|---------|-----|---------------|-------|
-| **Desktop (Tauri)** | Tauri Store (plugin-store) | Device keys (encrypted) | **E2EE** (PIN-encrypted) | PBKDF2 + AES-256-GCM; private keys in Rust CryptoState only |
-| **iOS** | Keychain | Device keys (encrypted) | **E2EE** (PIN-encrypted) | kSecAttrAccessibleWhenUnlockedThisDeviceOnly + Secure Enclave |
-| **Android** | EncryptedSharedPreferences | Device keys (encrypted) | **E2EE** (PIN-encrypted) | Android Keystore-backed |
+| **Desktop (Tauri)** | Tauri Store (plugin-store) | Device keys (encrypted) | **E2EE** (PIN-encrypted) | Argon2id (64MB/3/4) + AES-256-GCM; private keys in Rust CryptoState only |
+| **iOS** | Keychain | Device keys (encrypted) | **E2EE** (PIN-encrypted) | Argon2id + AES-256-GCM + Secure Enclave (kSecAttrAccessibleWhenUnlockedThisDeviceOnly) |
+| **Android** | EncryptedSharedPreferences | Device keys (encrypted) | **E2EE** (PIN-encrypted) | Argon2id + AES-256-GCM + Android Keystore-backed |
 | All platforms | Local/app storage | Draft notes | **E2EE** | HKDF-derived key (local-only, label: `LABEL_DRAFTS`) |
 | All platforms | Local/app storage | UI preferences | Plaintext | Non-sensitive settings |
 | All platforms | Local/app storage | Hub key cache | **E2EE** | Encrypted with device key; zeroed on lock |
@@ -213,10 +213,14 @@ Hash-chained for tamper detection.
 
 #### Signal Notifier Sidecar (port 3100)
 
+Data stored in PostgreSQL (migrated from SQLite for durability and column encryption).
+
 | Data | Classification | Retention | Notes |
 |------|---------------|-----------|-------|
 | Contact identifiers | Hashed (HMAC) | Session only | Zero-knowledge: HMAC-hashed contact resolution |
 | Plaintext phone numbers | **Never stored** | Never | Sidecar never stores plaintext phone numbers |
+| Audit log (`signal_audit_log`) | Plaintext | Configurable | Actions: register, unregister, notify, rate_limited; indexed by `created_at` and `identifier_hash` |
+| Rate limit state | In-memory | Request window | Sliding window per-IP: /register-client 10/60s, /notify 30/60s |
 
 #### Transcription (Client-Side WASM Whisper)
 

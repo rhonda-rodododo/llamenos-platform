@@ -8,6 +8,8 @@ subtitle: O que esta protegido, o que e visivel e o que pode ser obtido sob inti
 | Podem fornecer | NAO podem fornecer |
 |----------------|---------------------|
 | Metadados de chamadas/mensagens (horarios, duracoes) | Conteudo de notas, transcricoes, corpos de reportes |
+| Eventos em tempo real | Sim (por hub, chaves rotativas) | Nao | Apenas texto cifrado |
+| Strings User-Agent | SHA-256 hasheado | Apenas hash | Hash (nao reversivel) |
 | Blobs de banco de dados criptografados | Nomes de voluntarios (criptografia de ponta a ponta) |
 | Quais voluntarios estavam ativos e quando | Registros do diretorio de contatos (criptografia de ponta a ponta) |
 | | Conteudo de mensagens (criptografado na chegada, armazenado como texto cifrado) |
@@ -41,11 +43,13 @@ Sua exposicao de privacidade depende de quais canais voce ativa:
 |-------|-------------------|--------------------------|-------|
 | SMS | Seu provedor de telefonia le todas as mensagens | **Criptografado** | Provedor retem as mensagens originais |
 | WhatsApp | A Meta le todas as mensagens | **Criptografado** | Provedor retem as mensagens originais |
-| Signal | A rede Signal e E2EE, mas o bridge decifra na chegada | **Criptografado** | Melhor que SMS, nao e conhecimento zero |
+| Signal | A rede Signal e E2EE; o bridge re-criptografa na chegada | **Criptografado** | Rota preferida quando disponivel |
+
+**Entrega priorizando Signal**: Quando um destinatario tem Signal, mensagens sao automaticamente roteadas via Signal — seu provedor de telefonia nunca ve o conteudo. Para SMS, apenas uma notificacao generica "voce tem uma nova mensagem" e enviada por padrao (sem conteudo), entao os logs do seu provedor nao contem conteudo sensivel.
 
 **As mensagens sao criptografadas no momento em que chegam ao seu servidor.** O servidor armazena apenas texto cifrado. Seu provedor de telefonia ou mensagens pode ainda ter a mensagem original — isso e uma limitacao dessas plataformas, nao algo que possamos mudar.
 
-**Intimacao ao provedor de mensagens**: O provedor de SMS tem o conteudo completo das mensagens. A Meta tem o conteudo do WhatsApp. Mensagens Signal sao E2EE ate o bridge, mas o bridge (rodando no seu servidor) decifra antes de re-criptografar para armazenamento. Em todos os casos, **seu servidor tem apenas texto cifrado** — o provedor de hospedagem nao pode ler o conteudo das mensagens.
+**Intimacao ao provedor de mensagens**: Provedores de SMS tem o conteudo completo das mensagens apenas se voce habilitar explicitamente o modo SMS de conteudo completo. Com o modo padrao de apenas notificacao, os corpos SMS nao contem conteudo de mensagens. A Meta tem o conteudo do WhatsApp. Mensagens Signal sao E2EE ate o bridge, mas o bridge (rodando no seu servidor) decifra antes de re-criptografar para armazenamento. Em todos os casos, **seu servidor tem apenas texto cifrado** — o provedor de hospedagem nao pode ler o conteudo das mensagens.
 
 ### Notas, transcricoes e reportes
 
@@ -54,10 +58,10 @@ Todo conteudo escrito por voluntarios e criptografado de ponta a ponta:
 - Cada nota usa uma **chave aleatoria unica** (sigilo futuro — comprometer uma nota nao compromete outras)
 - As chaves sao envolvidas separadamente para o voluntario e cada administrador
 - O servidor armazena apenas texto cifrado
-- A decifracao acontece no navegador
+- A decifracao acontece no seu dispositivo, em uma camada segura que nunca expoe chaves a interface do usuario
 - **Campos personalizados, conteudo de reportes e anexos de arquivo sao todos criptografados individualmente**
 
-**Apreensao de dispositivo**: Sem seu PIN **e** acesso a sua conta de provedor de identidade, os atacantes obtem um blob criptografado que e computacionalmente impossivel de decifrar. Se voce tambem usa uma chave de seguranca de hardware, **tres fatores independentes** protegem seus dados.
+**Apreensao de dispositivo**: Sem seu PIN **e** acesso a sua conta de provedor de identidade, os atacantes obtem um blob criptografado protegido por Argon2id — uma funcao de derivacao de chaves resistente a memoria que torna ataques de forca bruta com hardware especializado (GPUs, ASICs) ordens de magnitude mais caros que abordagens tradicionais. Se voce tambem usa uma chave de seguranca de hardware, **tres fatores independentes** protegem seus dados.
 
 ---
 
@@ -81,6 +85,14 @@ Estas melhorias estao disponiveis hoje:
 
 | Funcionalidade | Beneficio de privacidade |
 |----------------|--------------------------|
+| Protecao de chaves Argon2id | As chaves do seu dispositivo sao protegidas por uma funcao resistente a memoria que resiste ataques de forca bruta com GPUs e hardware especializado |
+| Roteamento priorizando Signal | Mensagens sao automaticamente roteadas via Signal quando disponivel, mantendo o conteudo fora dos registros do provedor SMS |
+| Modo SMS apenas notificacao | Destinatarios SMS veem apenas "voce tem uma nova mensagem" — nenhum conteudo sensivel nos registros do provedor |
+| Resistencia a analise de trafego | Tamanhos de eventos em tempo real sao preenchidos para que observadores nao possam distinguir mensagens curtas de longas |
+| Sem numeros de telefone em texto plano no banco | Numeros de chamadores sao armazenados como hashes irreversiveis — seu banco de dados nunca contem o numero real |
+| Criptografia por hub com sigilo futuro | Eventos em tempo real de cada hub sao criptografados com chaves que rotacionam a cada 24 horas — chaves antigas nao podem decifrar novos eventos |
+| Criptografia em Rust em todas as plataformas | Desktop, iOS e Android executam a mesma biblioteca criptografica Rust auditada — chaves nunca entram em codigo JavaScript, Swift ou Kotlin |
+| Acesso restrito ao relay | Seu relay Nostr aceita eventos apenas do seu servidor — nenhum terceiro pode injetar notificacoes falsas |
 | Armazenamento criptografado de mensagens | Mensagens SMS, WhatsApp e Signal armazenadas como texto cifrado no seu servidor |
 | Transcricao no dispositivo | Audio nunca sai do seu navegador — processado inteiramente no seu dispositivo |
 | Protecao de chaves multifator | Suas chaves de criptografia sao protegidas pelo seu PIN, provedor de identidade e opcionalmente chave de seguranca de hardware |

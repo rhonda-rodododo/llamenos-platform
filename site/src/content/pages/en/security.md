@@ -41,11 +41,13 @@ Your privacy exposure depends on which channels you enable:
 |---------|-----------------|----------------|-------|
 | SMS | Your telephony provider reads all messages | **Encrypted** | Provider retains original messages |
 | WhatsApp | Meta reads all messages | **Encrypted** | Provider retains original messages |
-| Signal | Signal network is end-to-end encrypted, but the bridge decrypts on arrival | **Encrypted** | Better than SMS, not zero-knowledge |
+| Signal | Signal network is end-to-end encrypted; bridge re-encrypts on arrival | **Encrypted** | Preferred route when available |
+
+**Signal-first delivery**: When a recipient has Signal, messages are routed through Signal automatically — your telephony provider never sees the content. For SMS, only a generic "you have a new message" notification is sent by default (no message body), so your provider's logs contain no sensitive content.
 
 **Messages are encrypted the moment they arrive at your server.** The server stores only ciphertext. Your telephony or messaging provider may still have the original message — that's a limitation of those platforms, not something we can change.
 
-**Messaging provider subpoena**: SMS providers have full message content. Meta has WhatsApp content. Signal messages are end-to-end encrypted to the bridge, but the bridge (running on your server) decrypts them before re-encrypting for storage. In all cases, **your server only has ciphertext** — the hosting provider cannot read message content.
+**Messaging provider subpoena**: SMS providers have full message content only if you explicitly enable full-content SMS mode. With the default notification-only mode, SMS bodies contain no message content. Meta has WhatsApp content. Signal messages are end-to-end encrypted to the bridge, but the bridge (running on your server) decrypts them before re-encrypting for storage. In all cases, **your server only has ciphertext** — the hosting provider cannot read message content.
 
 ### Notes, transcripts, and reports
 
@@ -54,10 +56,10 @@ All volunteer-written content is end-to-end encrypted:
 - Each note uses a **unique random key** (forward secrecy — compromising one note doesn't compromise others)
 - Keys are wrapped separately for the volunteer and each admin
 - The server stores only ciphertext
-- Decryption happens in the browser
+- Decryption happens on your device, in a secure layer that never exposes keys to the app's user interface
 - **Custom fields, report content, and file attachments are all individually encrypted**
 
-**Device seizure**: Without your PIN **and** access to your identity provider account, attackers get an encrypted blob that is computationally infeasible to decrypt. If you also use a hardware security key, **three independent factors** protect your data.
+**Device seizure**: Without your PIN **and** access to your identity provider account, attackers get an encrypted blob protected by Argon2id — a memory-hard key derivation function that makes brute-force attacks with specialized hardware (GPUs, ASICs) orders of magnitude more expensive than traditional approaches. If you also use a hardware security key, **three independent factors** protect your data.
 
 ---
 
@@ -81,8 +83,16 @@ These improvements are live today:
 
 | Feature | Privacy benefit |
 |---------|-----------------|
+| Argon2id key protection | Your device keys are protected by a memory-hard function that resists brute-force attacks with GPUs and specialized hardware |
+| Signal-first message routing | Messages are automatically routed through Signal when available, keeping content off SMS provider logs |
+| SMS notification-only mode | SMS recipients see only "you have a new message" — no sensitive content in provider logs |
+| Traffic analysis resistance | Real-time event sizes are padded so observers cannot distinguish short messages from long ones |
+| No plaintext phone numbers in database | Caller numbers are stored as irreversible hashes — your database never contains the actual phone number |
+| Per-hub encryption with forward secrecy | Each hub's real-time events are encrypted with keys that rotate every 24 hours — old keys cannot decrypt new events |
+| Cryptography in Rust on all platforms | Desktop, iOS, and Android all run the same audited Rust cryptography library — keys never enter JavaScript, Swift, or Kotlin code |
+| Restricted relay access | Your Nostr relay accepts events only from your server — no outside party can inject fake notifications |
 | Encrypted message storage | SMS, WhatsApp, and Signal messages stored as ciphertext on your server |
-| On-device transcription | Audio never leaves your browser — processed entirely on your device |
+| On-device transcription | Audio never leaves your device — processed entirely on-device using local AI |
 | Multi-factor key protection | Your encryption keys are protected by your PIN, your identity provider, and optionally a hardware security key |
 | Hardware security keys | Physical keys add a third factor that cannot be remotely compromised |
 | Reproducible builds | Verify that deployed code matches the public source |
@@ -109,8 +119,10 @@ These improvements are live today:
 | Team/role metadata | Yes (encrypted) | No | Ciphertext only |
 | Custom field definitions | Yes (encrypted) | No | Ciphertext only |
 | SMS/WhatsApp/Signal content | Yes (on your server) | No | Ciphertext from your server; provider may have original |
+| Real-time events | Yes (per-hub, rotating keys) | No | Ciphertext only |
 | Call metadata | No | Yes | Yes |
 | Caller phone hashes | HMAC hashed | Hash only | Hash (not reversible without your secret) |
+| User-Agent strings | SHA-256 hashed | Hash only | Hash (not reversible) |
 
 ---
 

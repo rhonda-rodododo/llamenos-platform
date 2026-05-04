@@ -8,6 +8,8 @@ subtitle: Những gì được bảo vệ, những gì hiển thị và những 
 | Họ CÓ THỂ cung cấp | Họ KHÔNG THỂ cung cấp |
 |---------------------|----------------------|
 | Metadata cuộc gọi/tin nhắn (thời gian, thời lượng) | Nội dung ghi chú, bản chuyển đổi, nội dung báo cáo |
+| Sự kiện thời gian thực | Có (theo hub, khóa xoay) | Không | Chỉ bản mã |
+| Chuỗi User-Agent | SHA-256 hash | Chỉ hash | Hash (không đảo ngược được) |
 | Blob cơ sở dữ liệu mã hóa | Tên tình nguyện viên (mã hóa đầu cuối) |
 | Tình nguyện viên nào hoạt động khi nào | Bản ghi danh bạ liên hệ (mã hóa đầu cuối) |
 | | Nội dung tin nhắn (mã hóa khi đến, lưu trữ dưới dạng bản mã) |
@@ -41,11 +43,13 @@ Mức độ quyền riêng tư phụ thuộc vào kênh bạn bật:
 |------|----------------------|------------------|---------|
 | SMS | Nhà cung cấp đọc tất cả tin nhắn | **Mã hóa** | Nhà cung cấp giữ lại tin nhắn gốc |
 | WhatsApp | Meta đọc tất cả tin nhắn | **Mã hóa** | Nhà cung cấp giữ lại tin nhắn gốc |
-| Signal | Mạng Signal là E2EE, nhưng cầu nối giải mã khi đến | **Mã hóa** | Tốt hơn SMS, không phải zero-knowledge |
+| Signal | Mạng Signal là E2EE; cầu nối mã hóa lại khi đến | **Mã hóa** | Tuyến ưu tiên khi khả dụng |
+
+**Ưu tiên gửi qua Signal**: Khi người nhận có Signal, tin nhắn tự động được chuyển qua Signal — nhà cung cấp điện thoại của bạn không bao giờ thấy nội dung. Với SMS, chỉ thông báo chung "bạn có tin nhắn mới" được gửi mặc định (không có nội dung), nên nhật ký của nhà cung cấp không chứa nội dung nhạy cảm.
 
 **Tin nhắn được mã hóa ngay khi đến máy chủ của bạn.** Máy chủ chỉ lưu bản mã. Nhà cung cấp điện thoại hoặc tin nhắn của bạn có thể vẫn có tin nhắn gốc — đó là hạn chế của các nền tảng đó, không phải điều chúng tôi có thể thay đổi.
 
-**Trát hầu tòa nhà cung cấp tin nhắn**: Nhà cung cấp SMS có toàn bộ nội dung tin nhắn. Meta có nội dung WhatsApp. Tin nhắn Signal là E2EE đến cầu nối, nhưng cầu nối (chạy trên máy chủ của bạn) giải mã trước khi mã hóa lại để lưu trữ. Trong mọi trường hợp, **máy chủ của bạn chỉ có bản mã** — nhà cung cấp hosting không thể đọc nội dung tin nhắn.
+**Trát hầu tòa nhà cung cấp tin nhắn**: Nhà cung cấp SMS chỉ có toàn bộ nội dung tin nhắn nếu bạn bật chế độ SMS nội dung đầy đủ. Với chế độ chỉ thông báo mặc định, nội dung SMS không chứa nội dung tin nhắn. Meta có nội dung WhatsApp. Tin nhắn Signal là E2EE đến cầu nối, nhưng cầu nối (chạy trên máy chủ của bạn) giải mã trước khi mã hóa lại để lưu trữ. Trong mọi trường hợp, **máy chủ của bạn chỉ có bản mã** — nhà cung cấp hosting không thể đọc nội dung tin nhắn.
 
 ### Ghi chú, bản chuyển đổi và báo cáo
 
@@ -54,10 +58,10 @@ Tất cả nội dung tình nguyện viên viết đều được mã hóa đầ
 - Mỗi ghi chú dùng **khóa ngẫu nhiên duy nhất** (bảo mật chuyển tiếp — xâm phạm một ghi chú không xâm phạm các ghi chú khác)
 - Khóa được bọc riêng cho tình nguyện viên và mỗi quản trị viên
 - Máy chủ chỉ lưu bản mã
-- Giải mã diễn ra trong trình duyệt
+- Giải mã diễn ra trên thiết bị của bạn, trong lớp bảo mật không bao giờ lộ khóa cho giao diện người dùng
 - **Trường tùy chỉnh, nội dung báo cáo và tệp đính kèm đều được mã hóa riêng lẻ**
 
-**Thu giữ thiết bị**: Không có PIN **và** quyền truy cập tài khoản nhà cung cấp danh tính, kẻ tấn công nhận blob mã hóa không thể giải mã về mặt tính toán. Nếu bạn cũng dùng khóa bảo mật phần cứng, **ba yếu tố độc lập** bảo vệ dữ liệu của bạn.
+**Thu giữ thiết bị**: Không có PIN **và** quyền truy cập tài khoản nhà cung cấp danh tính, kẻ tấn công nhận blob mã hóa được bảo vệ bởi Argon2id — một hàm dẫn xuất khóa chống bộ nhớ khiến các cuộc tấn công vét cạn bằng phần cứng chuyên dụng (GPU, ASIC) tốn kém hơn nhiều bậc so với các phương pháp truyền thống. Nếu bạn cũng dùng khóa bảo mật phần cứng, **ba yếu tố độc lập** bảo vệ dữ liệu của bạn.
 
 ---
 
@@ -81,6 +85,14 @@ Các cải tiến này đã hoạt động:
 
 | Tính năng | Lợi ích bảo mật |
 |-----------|-----------------|
+| Bảo vệ khóa Argon2id | Khóa thiết bị được bảo vệ bởi hàm chống bộ nhớ chống lại tấn công vét cạn bằng GPU và phần cứng chuyên dụng |
+| Định tuyến ưu tiên Signal | Tin nhắn tự động định tuyến qua Signal khi khả dụng, giữ nội dung khỏi nhật ký nhà cung cấp SMS |
+| Chế độ SMS chỉ thông báo | Người nhận SMS chỉ thấy "bạn có tin nhắn mới" — không có nội dung nhạy cảm trong nhật ký nhà cung cấp |
+| Kháng phân tích lưu lượng | Kích thước sự kiện thời gian thực được đệm để người quan sát không thể phân biệt tin nhắn ngắn và dài |
+| Không số điện thoại rõ trong cơ sở dữ liệu | Số người gọi được lưu dưới dạng hash không thể đảo ngược — cơ sở dữ liệu không bao giờ chứa số thực |
+| Mã hóa theo hub với bí mật chuyển tiếp | Sự kiện thời gian thực của mỗi hub được mã hóa bằng khóa xoay mỗi 24 giờ — khóa cũ không thể giải mã sự kiện mới |
+| Mật mã học Rust trên mọi nền tảng | Desktop, iOS và Android đều chạy cùng thư viện mật mã Rust đã kiểm toán — khóa không bao giờ vào mã JavaScript, Swift hay Kotlin |
+| Truy cập relay bị hạn chế | Relay Nostr chỉ chấp nhận sự kiện từ máy chủ của bạn — không bên ngoài nào có thể chèn thông báo giả |
 | Lưu trữ tin nhắn mã hóa | SMS, WhatsApp và Signal được lưu dưới dạng bản mã trên máy chủ của bạn |
 | Chuyển đổi trên thiết bị | Âm thanh không bao giờ rời trình duyệt — xử lý hoàn toàn trên thiết bị của bạn |
 | Bảo vệ khóa đa yếu tố | Khóa mã hóa được bảo vệ bởi PIN, nhà cung cấp danh tính và tùy chọn khóa bảo mật phần cứng |
