@@ -39,8 +39,8 @@ export * from './pages/index'
  * Uses keyboard typing since the component auto-advances focus on each digit.
  */
 export async function enterPin(page: Page, pin: string) {
-  // Focus the first PIN digit input
-  const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
+  // Focus the PIN input
+  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
   await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
   await firstDigit.click()
   // Type each digit — PinInput auto-advances focus on each keystroke
@@ -72,7 +72,7 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
     await page.goto('/login')
     await page.waitForLoadState('domcontentloaded')
 
-    const pinInput = page.locator('input[aria-label="PIN digit 1"]')
+    const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
     const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
 
     if (pinVisible) {
@@ -117,7 +117,7 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
  */
 export async function reenterPinAfterReload(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded')
-  const pinInput = page.locator('input[aria-label="PIN digit 1"]')
+  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
   // Use waitFor to actually wait for the PIN input to render after reload.
   // isVisible() is an instant snapshot and returns false if DOM hasn't rendered yet.
   try {

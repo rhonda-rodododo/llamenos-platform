@@ -19,7 +19,7 @@ export { TestIds } from './test-ids'
  * Enter a PIN into the PinInput component.
  */
 export async function enterPin(page: Page, pin: string) {
-  const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
+  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
   await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
   await firstDigit.click()
   await page.keyboard.type(pin, { delay: 50 })
@@ -35,7 +35,7 @@ export async function loginAsAdmin(page: Page) {
   await page.waitForLoadState('domcontentloaded')
 
   // Check if PIN input is available (stored key exists)
-  const pinInput = page.locator('input[aria-label="PIN digit 1"]')
+  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
   const hasPinInput = await pinInput.isVisible({ timeout: 3000 }).catch(() => false)
 
   if (hasPinInput) {

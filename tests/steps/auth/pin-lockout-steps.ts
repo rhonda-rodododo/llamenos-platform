@@ -70,8 +70,8 @@ Then('the lockout duration should be approximately {int} minutes', async ({ page
 })
 
 Then('the PIN pad should be disabled', async ({ page }) => {
-  // After lockout, PIN inputs should be disabled or the error prevents entry
-  const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
+  // After lockout, PIN input should be disabled or the error prevents entry
+  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
   const isDisabled = await firstDigit.isDisabled({ timeout: 2000 }).catch(() => false)
   const errorVisible = await page.locator('text=/locked out/i').isVisible({ timeout: 1000 }).catch(() => false)
   // Either the pad is disabled or the lockout message prevents entry
@@ -115,7 +115,7 @@ Then('I should still see the lockout message', async ({ page }) => {
 })
 
 Then('I should not be able to enter a PIN until lockout expires', async ({ page }) => {
-  const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
+  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
   const isDisabled = await firstDigit.isDisabled({ timeout: 2000 }).catch(() => false)
   const errorVisible = await page.locator('text=/locked out/i').isVisible({ timeout: 1000 }).catch(() => false)
   expect(isDisabled || errorVisible).toBe(true)
