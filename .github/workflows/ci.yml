@@ -553,7 +553,7 @@ jobs:
       - name: Run backend unit tests
         run: |
           mkdir -p test-results
-          bunx vitest run --config vitest.unit.config.ts --reporter=default --reporter=junit --outputFile=test-results/backend-unit.xml
+          bunx vitest run --config vitest.unit.config.ts --reporter=default --reporter=junit --outputFile=test-results/backend-unit.xml 2>&1 | tee /tmp/backend-unit-results.txt; exit ${PIPESTATUS[0]}
 
       - name: Upload test results
         if: always()
@@ -924,6 +924,7 @@ jobs:
           key: deriveddata-ios-${{ runner.os }}-${{ hashFiles('apps/ios/**/*.swift', 'apps/ios/project.yml') }}
           restore-keys: |
             deriveddata-ios-${{ runner.os }}-
+
 
       - name: Generate Xcode project
         working-directory: apps/ios
