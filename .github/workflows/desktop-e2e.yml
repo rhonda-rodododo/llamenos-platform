@@ -125,12 +125,14 @@ jobs:
           PLAYWRIGHT_TEST: "true"
           E2E_TEST_SECRET: "test-reset-secret"
 
-      - name: Upload Playwright report
+      - name: Upload test results
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: ${{ !cancelled() }}
         with:
-          name: desktop-e2e-playwright-report
-          path: playwright-report/
+          name: desktop-e2e-results
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
 
       - name: Tear down Docker Compose
