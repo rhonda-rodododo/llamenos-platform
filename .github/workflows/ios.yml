@@ -128,5 +128,6 @@ jobs:
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosTests \
+            -skip-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build

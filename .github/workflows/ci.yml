@@ -907,6 +907,7 @@ jobs:
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -only-testing:LlamenosTests \
+            -skip-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build \
             2>&1 | xcbeautify --report junit --report-path test-results/ios-unit.xml
