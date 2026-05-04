@@ -27,7 +27,6 @@ aes-gcm = "0.10"
 
 # Key derivation
 hkdf = "0.12"
-pbkdf2 = { version = "0.12", features = ["simple"] }
 argon2 = "0.5"
 
 # Hashing
@@ -70,8 +69,6 @@ js-sys = { version = "0.3", optional = true }
 openmls = { version = "0.8", features = ["openmls_rust_crypto"] }
 openmls_rust_crypto = "0.5"
 openmls_basic_credential = "0.5"
-openmls_memory_storage = "0.5"
-openmls_traits = "0.5"
 
 # Legacy dependencies (kept for legacy.rs during transition — removed in Phase 6)
 k256 = { version = "0.13", features = ["ecdh", "schnorr", "serde"] }
