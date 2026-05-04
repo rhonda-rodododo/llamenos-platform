@@ -380,10 +380,11 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   })
 
   // Publish call ring event (mirrors real telephony flow)
-  publishNostrEvent(c.env, KIND_CALL_RING, {
+  // Await to ensure event is in relay before returning — prevents race conditions in E2E tests
+  await publishNostrEvent(c.env, KIND_CALL_RING, {
     type: 'call:ring',
     callId,
-  }).catch(() => {})
+  })
 
   return c.json({ ok: true, callId, status: 'ringing' })
 })
@@ -404,17 +405,18 @@ dev.post('/test-simulate/answer-call', async (c) => {
   await services.calls.answerCall(call.hubId ?? '', body.callId, body.pubkey)
 
   // Publish call update event (mirrors real telephony flow)
-  publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+  // Await to ensure event is in relay before returning — prevents race conditions in E2E tests
+  await publishNostrEvent(c.env, KIND_CALL_UPDATE, {
     type: 'call:update',
     callId: body.callId,
     status: 'in-progress',
-  }).catch(() => {})
+  })
 
   // Publish presence update (mirrors real telephony flow)
-  publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
+  await publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: body.callId,
-  }).catch(() => {})
+  })
 
   return c.json({ ok: true, callId: body.callId, status: 'in-progress' })
 })
@@ -435,11 +437,11 @@ dev.post('/test-simulate/end-call', async (c) => {
   await services.calls.endCall(call.hubId ?? '', body.callId)
 
   // Publish call update event (mirrors real telephony flow)
-  publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+  await publishNostrEvent(c.env, KIND_CALL_UPDATE, {
     type: 'call:update',
     callId: body.callId,
     status: 'completed',
-  }).catch(() => {})
+  })
 
   return c.json({ ok: true, callId: body.callId, status: 'completed' })
 })
@@ -461,10 +463,10 @@ dev.post('/test-simulate/voicemail', async (c) => {
   await services.calls.endCall(call.hubId ?? '', body.callId)
 
   // Publish voicemail event (mirrors real telephony flow)
-  publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
+  await publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
     type: 'voicemail:new',
     callId: body.callId,
-  }).catch(() => {})
+  })
 
   return c.json({ ok: true, callId: body.callId, status: 'unanswered' })
 })
@@ -495,12 +497,12 @@ dev.post('/test-simulate/incoming-message', async (c) => {
 
   // Publish Nostr event (mirrors real messaging webhook flow)
   // Messaging events use empty hubId — conversations span all hubs
-  publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+  await publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: result.conversationId,
     messageId: result.messageId,
     channelType: channel,
-  }).catch(() => {})
+  })
 
   return c.json({ ok: true, conversationId: result.conversationId, messageId: result.messageId })
 })
