@@ -803,7 +803,7 @@ jobs:
   ios-build-test:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 45
 
     steps:
