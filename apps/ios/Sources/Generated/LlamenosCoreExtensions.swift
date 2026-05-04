@@ -120,14 +120,17 @@ extension HpkeEnvelope: Codable {
 
 extension EncryptedDeviceKeys: Codable {
     enum CodingKeys: String, CodingKey {
-        case salt, iterations, nonce, ciphertext, state
+        case kdfVersion, salt, argon2MCost, argon2TCost, argon2PCost, nonce, ciphertext, state
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
+            kdfVersion: try container.decode(UInt8.self, forKey: .kdfVersion),
             salt: try container.decode(String.self, forKey: .salt),
-            iterations: try container.decode(UInt32.self, forKey: .iterations),
+            argon2MCost: try container.decode(UInt32.self, forKey: .argon2MCost),
+            argon2TCost: try container.decode(UInt32.self, forKey: .argon2TCost),
+            argon2PCost: try container.decode(UInt32.self, forKey: .argon2PCost),
             nonce: try container.decode(String.self, forKey: .nonce),
             ciphertext: try container.decode(String.self, forKey: .ciphertext),
             state: try container.decode(DeviceKeyState.self, forKey: .state)
@@ -136,8 +139,11 @@ extension EncryptedDeviceKeys: Codable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(kdfVersion, forKey: .kdfVersion)
         try container.encode(salt, forKey: .salt)
-        try container.encode(iterations, forKey: .iterations)
+        try container.encode(argon2MCost, forKey: .argon2MCost)
+        try container.encode(argon2TCost, forKey: .argon2TCost)
+        try container.encode(argon2PCost, forKey: .argon2PCost)
         try container.encode(nonce, forKey: .nonce)
         try container.encode(ciphertext, forKey: .ciphertext)
         try container.encode(state, forKey: .state)

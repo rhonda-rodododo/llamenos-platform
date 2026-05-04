@@ -378,7 +378,7 @@ services:
       - "NOTIFIER_API_KEY=${NOTIFIER_API_KEY:?NOTIFIER_API_KEY is required when signal profile is active — generate with openssl rand -hex 32}"
       - NOTIFIER_API_KEY_PREVIOUS=${NOTIFIER_API_KEY_PREVIOUS:-}
       - "NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-${HMAC_SECRET}}"
-      - "DATABASE_URL=postgres://postgres:${PG_PASSWORD}@postgres:5432/llamenos?sslmode=disable"
+      - "DATABASE_URL=postgres://llamenos:${PG_PASSWORD}@postgres:5432/llamenos?sslmode=disable"
       - SIGNAL_BRIDGE_URL=http://signal-cli:8080
       - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
       - "SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:?SIGNAL_REGISTERED_NUMBER is required — your registered Signal phone number}"
