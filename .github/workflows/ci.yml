@@ -368,6 +368,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Install Playwright deps (cached browsers)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium
+
       - name: Create .env for Docker Compose
         run: |
           printf '%s\n' \
