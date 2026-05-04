@@ -70,7 +70,7 @@ jobs:
   ios-e2e:
     needs: changes
     if: needs.changes.outputs.ios_related == 'true'
-    runs-on: macos-latest
+    runs-on: macos-14
     timeout-minutes: 90
 
     strategy:
@@ -134,6 +134,15 @@ jobs:
 
       - name: Install xcodegen
         run: brew install xcodegen
+
+      # Cache DerivedData for incremental Swift builds
+      - name: Cache DerivedData
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: /tmp/llamenos-build
+          key: deriveddata-ios-e2e-${{ runner.os }}-${{ hashFiles('apps/ios/**/*.swift', 'apps/ios/project.yml') }}
+          restore-keys: |
+            deriveddata-ios-e2e-${{ runner.os }}-
 
       - name: Generate Xcode project
         working-directory: apps/ios
@@ -245,7 +254,10 @@ jobs:
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build
+            -derivedDataPath /tmp/llamenos-build \
+            -parallelizeTargets \
+            EAGER_LINKING=YES \
+            DEBUG_INFORMATION_FORMAT=dwarf
 
       # ─── Determine Tests for This Shard ────────────────────────
       - name: Collect UI test classes for this shard

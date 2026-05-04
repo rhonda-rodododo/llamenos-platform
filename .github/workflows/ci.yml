@@ -803,7 +803,7 @@ jobs:
   ios-build-test:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: macos-latest
+    runs-on: macos-14
     timeout-minutes: 45
 
     steps:
@@ -820,7 +820,6 @@ jobs:
 
       # Cache the XCFramework AND generated Swift bindings together.
       # Both must come from the same Rust build or checksums will mismatch.
-      # Key includes all Rust sources + Cargo manifests + the build script.
       - name: Cache crypto XCFramework + bindings
         id: xcframework-cache
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -867,6 +866,15 @@ jobs:
       - name: Install xcbeautify
         run: brew install xcbeautify
 
+      # Cache DerivedData for incremental Swift builds
+      - name: Cache DerivedData
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: /tmp/llamenos-build
+          key: deriveddata-ios-${{ runner.os }}-${{ hashFiles('apps/ios/**/*.swift', 'apps/ios/project.yml') }}
+          restore-keys: |
+            deriveddata-ios-${{ runner.os }}-
+
       - name: Generate Xcode project
         working-directory: apps/ios
         run: xcodegen generate
@@ -888,18 +896,7 @@ jobs:
           echo "device=$SIM" >> "$GITHUB_OUTPUT"
           echo "Using simulator: $SIM"
 
-      - name: Build app
-        working-directory: apps/ios
-        run: |
-          set -o pipefail
-          xcodebuild build \
-            -project Llamenos.xcodeproj \
-            -scheme Llamenos \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build \
-            2>&1 | xcbeautify
-
-      - name: Run unit tests
+      - name: Build and test
         working-directory: apps/ios
         run: |
           set -o pipefail
@@ -911,6 +908,9 @@ jobs:
             -skip-testing:LlamenosUITests \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build \
+            -parallelizeTargets \
+            EAGER_LINKING=YES \
+            DEBUG_INFORMATION_FORMAT=dwarf \
             2>&1 | xcbeautify --report junit --report-path test-results/ios-unit.xml
 
       - name: Upload iOS test results
