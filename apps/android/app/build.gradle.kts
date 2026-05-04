@@ -157,11 +157,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material.icons)
     implementation(libs.compose.navigation)
     implementation(libs.activity.compose)
-    implementation(libs.lifecycle.runtime)
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.core.ktx)
 
@@ -177,7 +175,6 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.play.services.location)
     implementation(libs.security.crypto)
-    implementation(libs.biometric)
 
     implementation(libs.firebase.messaging)
 
@@ -196,7 +193,6 @@ dependencies {
     // Linphone SDK for SIP/VoIP (multi-hub parallel ringing)
     implementation("org.linphone:linphone-sdk-android:5.4.100")
 
-    debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
@@ -213,6 +209,5 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.test.runner)
-    androidTestImplementation(libs.test.rules)
     androidTestImplementation(libs.cucumber.android)
 }
