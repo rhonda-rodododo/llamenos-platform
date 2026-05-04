@@ -131,7 +131,7 @@ Then('they should see a welcome screen with their name', async ({ page }) => {
 When('the volunteer completes the onboarding flow', async ({ page }) => {
   // Complete PIN setup
   const { enterPin } = await import('../../helpers')
-  const pinInput = page.locator('input[aria-label="PIN digit 1"]')
+  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
   if (await pinInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     await enterPin(page, '1234')
     await enterPin(page, '1234')

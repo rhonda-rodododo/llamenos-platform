@@ -46,10 +46,9 @@ Then('I should see the backspace button', async ({ page }) => {
 })
 
 Then('I should see the PIN dots indicator', async ({ page }) => {
-  // PIN input fields serve as the dots indicator
-  const pinInputs = page.locator('input[aria-label^="PIN digit"]')
-  const count = await pinInputs.count()
-  expect(count).toBeGreaterThanOrEqual(4)
+  // Single PIN input field serves as the entry point
+  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+  await expect(pinInput).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the title should change to {string}', async ({ page }, title: string) => {
@@ -91,8 +90,8 @@ Then('I should see a PIN mismatch error', async ({ page }) => {
 })
 
 When('I press {string}, {string}', async ({ page }, key1: string, key2: string) => {
-  const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
-  await firstDigit.click()
+  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+  await pinInput.click()
   await page.keyboard.type(key1 + key2, { delay: 50 })
 })
 
@@ -112,8 +111,8 @@ Then('{int} digits should be entered', async ({ page }, count: number) => {
 
 Then('the PIN dots should be cleared', async ({ page }) => {
   // After an error, PIN input should be empty
-  const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
-  await expect(firstDigit).toHaveValue('')
+  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+  await expect(pinInput).toHaveValue('')
 })
 
 Then('I should see the PIN unlock screen', async ({ page }) => {

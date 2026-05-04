@@ -87,7 +87,7 @@ export async function loginAsAdmin(page: Page) {
   await page.reload()
 
   // Enter PIN
-  const firstDigit = page.locator('input[aria-label="PIN digit 1"]')
+  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
   await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
   await firstDigit.click()
   await page.keyboard.type(STAGING_PIN, { delay: 50 })

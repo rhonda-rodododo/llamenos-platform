@@ -43,10 +43,8 @@ Then('I should see the backup file upload area', async ({ page }) => {
 // --- Stored key assertions ---
 
 Then('I should see the PIN digit inputs', async ({ page }) => {
-  // Login page does NOT have data-testid="page-title" — check for PIN inputs directly
-  for (let i = 1; i <= 6; i++) {
-    await expect(page.locator(`input[aria-label="PIN digit ${i}"]`)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  // Login page does NOT have data-testid="page-title" — check for PIN input directly
+  await expect(page.locator('input[aria-label="PIN or passphrase"]')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Common elements ---
