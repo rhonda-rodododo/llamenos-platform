@@ -1,6 +1,6 @@
 # iOS E2E Tests (XCUITest)
 #
-# Runs XCUITests in 4 parallel shards on macOS runners.
+# Build once, test in 4 parallel shards on macOS runners.
 # Each shard gets its own isolated test hub for proper isolation.
 # Triggered on push to main/desktop and on pull requests.
 
@@ -66,17 +66,15 @@ jobs:
 
           echo "ios_related=$IOS_RELATED" >> "$GITHUB_OUTPUT"
 
-  # ─── iOS E2E Tests (4 Shards) ─────────────────────────────────
-  ios-e2e:
+  # ─── Build App + Backend Once ──────────────────────────────────
+  ios-e2e-build:
     needs: changes
     if: needs.changes.outputs.ios_related == 'true'
     runs-on: macos-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
 
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3]
+    outputs:
+      simulator: ${{ steps.sim.outputs.device }}
 
     steps:
       - name: Checkout
@@ -90,13 +88,16 @@ jobs:
       - name: Install dependencies and run codegen
         run: bun install --frozen-lockfile && bun run codegen
 
-      # Cache the XCFramework to avoid a 30-40 min Rust compile on every run.
-      - name: Cache crypto XCFramework
+      # Cache the XCFramework AND generated Swift bindings together.
+      # Both must come from the same Rust build or checksums will mismatch.
+      - name: Cache crypto XCFramework + bindings
         id: xcframework-cache
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          path: apps/ios/LlamenosCoreFFI.xcframework
-          key: xcframework-ios-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock', 'packages/crypto/scripts/build-mobile.sh') }}
+          path: |
+            apps/ios/LlamenosCoreFFI.xcframework
+            packages/crypto/dist/ios/LlamenosCore.swift
+          key: xcframework-v2-ios-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock', 'packages/crypto/scripts/build-mobile.sh') }}
 
       - name: Install Rust stable (for crypto xcframework)
         if: steps.xcframework-cache.outputs.cache-hit != 'true'
@@ -118,8 +119,7 @@ jobs:
           ./scripts/build-mobile.sh ios
           cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
 
-      - name: Copy fresh UniFFI bindings
-        if: steps.xcframework-cache.outputs.cache-hit != 'true'
+      - name: Copy UniFFI bindings (from build or cache)
         run: |
           cp packages/crypto/dist/ios/LlamenosCore.swift apps/ios/Sources/Generated/LlamenosCore.swift
 
@@ -154,7 +154,113 @@ jobs:
           echo "device=$SIM" >> "$GITHUB_OUTPUT"
           echo "Using simulator: $SIM"
 
+      - name: Build app for testing
+        working-directory: apps/ios
+        run: |
+          xcodebuild build-for-testing \
+            -project Llamenos.xcodeproj \
+            -scheme Llamenos \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath /tmp/llamenos-build \
+            -parallelizeTargets \
+            EAGER_LINKING=YES \
+            DEBUG_INFORMATION_FORMAT=dwarf
+
+      - name: Upload test build artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-e2e-build
+          path: |
+            /tmp/llamenos-build/Build/Products/
+          retention-days: 1
+          compression-level: 1
+
+      - name: Build backend bundle
+        run: bun run build:server
+
+      - name: Download S3-compatible storage binary
+        env:
+          S3_COMPAT_VERSION: "RELEASE.2025-09-07T16-13-09Z"
+          S3_COMPAT_SHA256: "7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
+        run: |
+          URL_PREFIX=$(echo "aHR0cHM6Ly9kbC5taW4uaW8vc2VydmVyL21pbmlvL3JlbGVhc2UvZGFyd2luLWFybTY0L2FyY2hpdmUvbWluaW8u" | base64 -d)
+          curl -sSfL "${URL_PREFIX}${S3_COMPAT_VERSION}" -o .tmp-s3-compat-storage
+          echo "${S3_COMPAT_SHA256}  .tmp-s3-compat-storage" | shasum -a 256 -c -
+          chmod +x .tmp-s3-compat-storage
+
+      - name: Upload backend bundle + tools
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-e2e-backend
+          path: |
+            dist/server/
+            scripts/run-migrations.ts
+            node_modules/
+            bun.lockb
+            package.json
+            .tmp-s3-compat-storage
+          retention-days: 1
+          compression-level: 1
+
+  # ─── Run E2E Tests (4 Shards) ─────────────────────────────────
+  ios-e2e:
+    needs: [changes, ios-e2e-build]
+    if: needs.changes.outputs.ios_related == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - name: Checkout (for test file discovery)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Download test build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ios-e2e-build
+          path: /tmp/llamenos-build/Build/Products/
+
+      - name: Download backend bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ios-e2e-backend
+          path: .
+
+      - name: Detect simulator
+        id: sim
+        run: |
+          SIM=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in sorted(data.get('devices', {}).items(), reverse=True):
+              if 'iOS' in runtime:
+                  for d in devices:
+                      if d.get('isAvailable') and 'iPhone' in d.get('name', ''):
+                          print(d['name'])
+                          sys.exit(0)
+          print('iPhone 16')
+          ")
+          echo "device=$SIM" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $SIM"
+
       # ─── Start Backend Services ────────────────────────────────
+      - name: Cache Homebrew packages
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            /opt/homebrew/Cellar/postgresql@17
+            /opt/homebrew/opt/postgresql@17
+          key: brew-postgresql17-${{ runner.os }}
+
       - name: Start PostgreSQL
         run: |
           brew install postgresql@17
@@ -165,16 +271,10 @@ jobs:
           createuser -s llamenos 2>/dev/null || true
           createdb -O llamenos llamenos 2>/dev/null || true
 
-      - name: Start S3-compatible storage for tests
-        env:
-          S3_COMPAT_VERSION: "RELEASE.2025-09-07T16-13-09Z"
-          S3_COMPAT_SHA256: "7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
+      - name: Start S3-compatible storage (from build artifact)
         run: |
-          URL_PREFIX=$(echo "aHR0cHM6Ly9kbC5taW4uaW8vc2VydmVyL21pbmlvL3JlbGVhc2UvZGFyd2luLWFybTY0L2FyY2hpdmUvbWluaW8u" | base64 -d)
-          curl -sSfL "${URL_PREFIX}${S3_COMPAT_VERSION}" -o /tmp/s3-compat-storage
-          echo "${S3_COMPAT_SHA256}  /tmp/s3-compat-storage" | shasum -a 256 -c -
-          chmod +x /tmp/s3-compat-storage
-          MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup /tmp/s3-compat-storage server /tmp/s3-compat-data &>/tmp/s3-compat.log &
+          chmod +x .tmp-s3-compat-storage
+          MINIO_ROOT_USER=testaccess MINIO_ROOT_PASSWORD=testsecret123456 nohup ./.tmp-s3-compat-storage server /tmp/s3-compat-data &>/tmp/s3-compat.log &
           for i in $(seq 1 15); do
             if curl -sf http://localhost:9000; then echo "S3-compatible storage is ready"; break; fi
             if [ "$i" -eq 15 ]; then echo "::warning::S3-compatible storage did not start"; fi
@@ -203,7 +303,6 @@ jobs:
           STORAGE_BUCKET: llamenos-files
           SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
         run: |
-          bun run build:server
           nohup bun dist/server/index.js &>/tmp/backend.log &
           for i in $(seq 1 30); do
             if curl -sf http://localhost:3000/api/health/live; then echo "Backend is ready"; break; fi
@@ -234,16 +333,6 @@ jobs:
           fi
           echo "hub_id=$HUB_ID" >> "$GITHUB_OUTPUT"
           echo "Created hub $HUB_ID for shard ${{ matrix.shard }}"
-
-      # ─── Build App for Testing ─────────────────────────────────
-      - name: Build app for testing
-        working-directory: apps/ios
-        run: |
-          xcodebuild build-for-testing \
-            -project Llamenos.xcodeproj \
-            -scheme Llamenos \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build
 
       # ─── Determine Tests for This Shard ────────────────────────
       - name: Collect UI test classes for this shard
@@ -276,10 +365,8 @@ jobs:
         working-directory: apps/ios
         run: |
           xcodebuild test-without-building \
-            -project Llamenos.xcodeproj \
-            -scheme LlamenosUITests \
+            -xctestrun $(find /tmp/llamenos-build/Build/Products -name "*.xctestrun" -print -quit) \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
-            -derivedDataPath /tmp/llamenos-build \
             -parallel-testing-enabled NO \
             ${{ steps.shard-tests.outputs.tests }}
         env:
