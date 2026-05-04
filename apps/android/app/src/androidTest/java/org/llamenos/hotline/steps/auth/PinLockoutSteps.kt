@@ -44,7 +44,10 @@ class PinLockoutSteps : BaseSteps() {
         val signingPubkeyHex: String,
         val encryptionPubkeyHex: String,
         val deviceId: String,
-        val iterations: UInt = 600_000u,
+        val kdfVersion: UByte = 2u,
+        val argon2MCost: UInt = 65_536u,
+        val argon2TCost: UInt = 3u,
+        val argon2PCost: UInt = 4u,
     )
 
     /**
@@ -69,13 +72,16 @@ class PinLockoutSteps : BaseSteps() {
                     val encrypted = cryptoService.generateDeviceKeys(deviceId, "12345678")
                     val stored = Json.encodeToString(
                         StoredKeyData(
-                            ciphertext = encrypted.ciphertext,
+                            kdfVersion = encrypted.kdfVersion,
                             salt = encrypted.salt,
+                            argon2MCost = encrypted.argon2MCost,
+                            argon2TCost = encrypted.argon2TCost,
+                            argon2PCost = encrypted.argon2PCost,
                             nonce = encrypted.nonce,
+                            ciphertext = encrypted.ciphertext,
                             signingPubkeyHex = encrypted.state.signingPubkeyHex,
                             encryptionPubkeyHex = encrypted.state.encryptionPubkeyHex,
                             deviceId = encrypted.state.deviceId,
-                            iterations = encrypted.iterations,
                         )
                     )
                     keystoreService.store(KeystoreService.KEY_ENCRYPTED_KEYS, stored)
