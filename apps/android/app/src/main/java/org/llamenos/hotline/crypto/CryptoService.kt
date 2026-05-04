@@ -25,8 +25,11 @@ data class DeviceKeyState(
 )
 
 data class EncryptedDeviceKeys(
+    val kdfVersion: UByte,
     val salt: String,
-    val iterations: UInt,
+    val argon2MCost: UInt,
+    val argon2TCost: UInt,
+    val argon2PCost: UInt,
     val nonce: String,
     val ciphertext: String,
     val state: DeviceKeyState,
@@ -152,8 +155,11 @@ class CryptoService @Inject constructor() {
                 this@CryptoService.encryptionPubkeyHex = state.encryptionPubkeyHex
                 this@CryptoService.deviceId = state.deviceId
                 EncryptedDeviceKeys(
+                    kdfVersion = ffiResult.kdfVersion,
                     salt = ffiResult.salt,
-                    iterations = ffiResult.iterations,
+                    argon2MCost = ffiResult.argon2MCost,
+                    argon2TCost = ffiResult.argon2TCost,
+                    argon2PCost = ffiResult.argon2PCost,
                     nonce = ffiResult.nonce,
                     ciphertext = ffiResult.ciphertext,
                     state = state,
@@ -174,8 +180,11 @@ class CryptoService @Inject constructor() {
 
             try {
                 val ffiData = org.llamenos.core.EncryptedDeviceKeys(
+                    kdfVersion = data.kdfVersion,
                     salt = data.salt,
-                    iterations = data.iterations,
+                    argon2MCost = data.argon2MCost,
+                    argon2TCost = data.argon2TCost,
+                    argon2PCost = data.argon2PCost,
                     nonce = data.nonce,
                     ciphertext = data.ciphertext,
                     state = org.llamenos.core.DeviceKeyState(
