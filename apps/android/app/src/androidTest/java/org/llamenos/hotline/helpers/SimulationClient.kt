@@ -233,11 +233,11 @@ object SimulationClient {
      * Corresponds to `POST /api/test-setup-cms`.
      */
     fun setupCms(pubkey: String? = null, hubId: String? = null): CmsSetupResponse {
-        val fields = mutableListOf<String>()
-        if (pubkey != null) fields.add("\"pubkey\":\"${escapeJson(pubkey)}\"")
-        if (hubId != null) fields.add("\"hubId\":\"${escapeJson(hubId)}\"")
-        val body = "{${fields.joinToString(",")}}"
-        val responseText = post("/api/test-setup-cms", body)
+        val bodyMap = buildMap {
+            if (pubkey != null) put("pubkey", pubkey)
+            if (hubId != null) put("hubId", hubId)
+        }
+        val responseText = post("/api/test-setup-cms", toJson(bodyMap))
         return json.decodeFromString<CmsSetupResponse>(responseText)
     }
 

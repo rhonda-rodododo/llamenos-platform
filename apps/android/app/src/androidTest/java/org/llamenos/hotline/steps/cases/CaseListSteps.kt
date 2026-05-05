@@ -44,7 +44,8 @@ class CaseListSteps : BaseSteps() {
         // Pass hubId so records are created in the scenario's hub (otherwise
         // hub-scoped queries return empty results).
         try {
-            val result = SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+            val setupHubId = ScenarioHooks.currentHubId.ifEmpty { null }
+            val result = SimulationClient.setupCms(hubId = setupHubId)
             Log.d("CaseListSteps", "CMS setup: ok=${result.ok}, entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
         } catch (e: Throwable) {
             Log.w("CaseListSteps", "CMS setup failed: ${e.message}")
@@ -66,7 +67,8 @@ class CaseListSteps : BaseSteps() {
 
                 // Re-run CMS setup with the pubkey so the sample record is assigned
                 // to this user AND scoped to the scenario hub
-                val cmsResult = SimulationClient.setupCms(npub, hubId = hubId.ifEmpty { null })
+                val cmsHubId = ScenarioHooks.currentHubId.ifEmpty { null }
+                val cmsResult = SimulationClient.setupCms(npub, hubId = cmsHubId)
                 Log.d("CaseListSteps", "CMS re-setup with pubkey: ok=${cmsResult.ok}, entityTypes=${cmsResult.entityTypeCount}")
             } catch (e: Throwable) {
                 Log.w("CaseListSteps", "Post-launch setup failed: ${e.message}")
