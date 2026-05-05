@@ -15,7 +15,7 @@ Feature: Hub Management
   @backend
   Scenario: Create hub returns correct data
     When the admin creates a hub with name "Test Hub" and slug "test-hub"
-    Then the response status should be 200
+    Then the response status should be 201
     And the created hub should have name "Test Hub"
     And the created hub should have slug "test-hub"
     And the hub should appear in the list
