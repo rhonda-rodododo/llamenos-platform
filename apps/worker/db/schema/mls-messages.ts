@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { jsonb } from '../bun-jsonb'
 import { devices } from './users'
+// devices import retained for the mlsPendingMessagesRelations soft relation
 
 // ---------------------------------------------------------------------------
 // mls_pending_messages
@@ -28,10 +29,13 @@ export const mlsPendingMessages = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     /** Hub whose MLS group this message belongs to. */
     hubId: text('hub_id').notNull(),
-    /** Device that must receive and process this message. */
-    recipientDeviceId: text('recipient_device_id')
-      .notNull()
-      .references(() => devices.id, { onDelete: 'cascade' }),
+    /**
+     * Device that must receive and process this message.
+     * No FK constraint — MLS device IDs are cryptographic identifiers that may
+     * not have registered for push notifications (devices table). MLS is a separate
+     * protocol layer from device registration.
+     */
+    recipientDeviceId: text('recipient_device_id').notNull(),
     /**
      * MLS message type:
      * 'commit'      — group state advance (fan-out to all members)

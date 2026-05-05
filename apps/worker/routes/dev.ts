@@ -428,7 +428,7 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   await publishNostrEvent(c.env, KIND_CALL_RING, {
     type: 'call:ring',
     callId,
-  })
+  }, hubId)
 
   return c.json({ ok: true, callId, status: 'ringing' })
 })
@@ -454,13 +454,13 @@ dev.post('/test-simulate/answer-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'in-progress',
-  })
+  }, call.hubId ?? undefined)
 
   // Publish presence update (mirrors real telephony flow)
   await publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: body.callId,
-  })
+  }, call.hubId ?? undefined)
 
   return c.json({ ok: true, callId: body.callId, status: 'in-progress' })
 })
@@ -485,7 +485,7 @@ dev.post('/test-simulate/end-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'completed',
-  })
+  }, call.hubId ?? undefined)
 
   return c.json({ ok: true, callId: body.callId, status: 'completed' })
 })
@@ -510,7 +510,7 @@ dev.post('/test-simulate/voicemail', async (c) => {
   await publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
     type: 'voicemail:new',
     callId: body.callId,
-  })
+  }, call.hubId ?? undefined)
 
   return c.json({ ok: true, callId: body.callId, status: 'unanswered' })
 })

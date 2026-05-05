@@ -34,12 +34,14 @@ export class RelayCapture {
     timer: ReturnType<typeof setTimeout>
   }> = []
   private subscriptionId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  private hubId?: string
 
-  private constructor(ws: WebSocket) {
+  private constructor(ws: WebSocket, hubId?: string) {
     this.ws = ws
+    this.hubId = hubId
   }
 
-  static async connect(relayUrl: string): Promise<RelayCapture> {
+  static async connect(relayUrl: string, hubId?: string): Promise<RelayCapture> {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(relayUrl)
       const timeout = setTimeout(() => {
@@ -49,7 +51,7 @@ export class RelayCapture {
 
       ws.on('open', () => {
         clearTimeout(timeout)
-        const capture = new RelayCapture(ws)
+        const capture = new RelayCapture(ws, hubId)
         capture.subscribe()
         capture.listen()
         resolve(capture)
@@ -66,15 +68,17 @@ export class RelayCapture {
     // Use `since` to filter out historical events from prior test runs.
     // Subtract 2 seconds for clock skew tolerance.
     const since = Math.floor(Date.now() / 1000) - 2
-    const req = JSON.stringify([
-      'REQ',
-      this.subscriptionId,
-      {
-        kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
-        '#t': ['llamenos:event'],
-        since,
-      },
-    ])
+    const filter: Record<string, unknown> = {
+      kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
+      '#t': ['llamenos:event'],
+      since,
+    }
+    // Scope subscription to this hub's events to prevent cross-scenario contamination
+    // under parallel test execution (3 workers).
+    if (this.hubId) {
+      filter['#h'] = [this.hubId]
+    }
+    const req = JSON.stringify(['REQ', this.subscriptionId, filter])
     this.ws.send(req)
   }
 

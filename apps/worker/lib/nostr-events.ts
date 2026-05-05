@@ -34,7 +34,7 @@ function getOrDeriveEpochKey(serverSecret: string, epoch: number): Uint8Array {
  * Content is encrypted with an epoch-scoped key for forward secrecy (H5 fix).
  * The epoch tag is included so clients know which key window to use for decryption.
  */
-export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>): Promise<void> {
+export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, content: Record<string, unknown>, hubId?: string): Promise<void> {
   const publisher = getNostrPublisher(env)
   const createdAt = Math.floor(Date.now() / 1000)
   const epoch = getCurrentEpoch(createdAt)
@@ -48,14 +48,19 @@ export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, c
     eventContent = JSON.stringify(content)
   }
 
+  const tags: string[][] = [
+    ['d', 'global'],
+    ['t', 'llamenos:event'],
+    ['epoch', epoch.toString()],
+  ]
+  if (hubId) {
+    tags.push(['h', hubId])
+  }
+
   await publisher.publish({
     kind,
     created_at: createdAt,
-    tags: [
-      ['d', 'global'],
-      ['t', 'llamenos:event'],
-      ['epoch', epoch.toString()],
-    ],
+    tags,
     content: eventContent,
   })
 }

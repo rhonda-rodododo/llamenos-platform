@@ -47,7 +47,9 @@ Given('the test relay is connected and capturing events', async ({ world }) => {
   if (state.relayCapture) {
     state.relayCapture.close()
   }
-  state.relayCapture = await RelayCapture.connect(RELAY_URL)
+  // Pass hubId to scope the subscription — prevents cross-scenario relay event contamination
+  // when 3 Playwright workers run in parallel and events from other hubs leak in.
+  state.relayCapture = await RelayCapture.connect(RELAY_URL, state.hubId ?? undefined)
 })
 
 After(async ({ world }) => {
