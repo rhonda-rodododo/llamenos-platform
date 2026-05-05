@@ -313,7 +313,7 @@ jobs:
         run: bunx bddgen
 
       - name: Run E2E tests
-        run: bunx playwright test
+        run: bunx playwright test --project=bootstrap --project=chromium --project=bdd
         env:
           TEST_HUB_URL: http://localhost:3000
           TEST_RELAY_URL: ws://127.0.0.1:7777

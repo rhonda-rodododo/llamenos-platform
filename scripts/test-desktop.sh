@@ -77,7 +77,7 @@ for _i in $(seq 1 30); do
 done
 
 export PLAYWRIGHT_BASE_URL="http://localhost:8788"
-if reporter_run_step "playwright" bunx playwright test; then
+if reporter_run_step "playwright" bunx playwright test --project=bootstrap --project=chromium --project=bdd; then
   parse_playwright_results "$REPORTER_LOG_FILE"
   reporter_record_suite "playwright" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
 else
