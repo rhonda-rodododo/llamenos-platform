@@ -117,10 +117,10 @@ The app auto-updates when new versions are available.
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (v1.0+)
-- [Rust](https://rustup.rs/) (for Tauri desktop builds)
-- A [Cloudflare](https://cloudflare.com/) account (free tier works for development)
-- A telephony provider account (see [Telephony Providers](#telephony-providers))
+- [Bun](https://bun.sh/) 1.3.5+ — runtime and package manager
+- [Docker](https://docs.docker.com/get-docker/) — local backing services (PostgreSQL, Nostr relay, object storage)
+- [Rust](https://rustup.rs/) — only needed for Tauri desktop or crypto builds
+- A telephony provider account for voice/SMS (see [Telephony Providers](#telephony-providers))
 
 ### 1. Clone and install
 
@@ -128,6 +128,7 @@ The app auto-updates when new versions are available.
 git clone https://github.com/your-org/llamenos.git
 cd llamenos
 bun install
+bash scripts/dev-setup.sh    # checks prerequisites and reports what's missing
 ```
 
 ### 2. Generate an admin keypair
@@ -163,11 +164,15 @@ TWILIO_PHONE_NUMBER=+1234567890
 ### 4. Run locally
 
 ```bash
-bun run dev             # Launch Tauri desktop app (Vite + Rust)
-bun run dev:worker      # Backend dev server (Wrangler)
-```
+# Start backing services (PostgreSQL, object storage, Nostr relay)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-The desktop app launches automatically. The backend runs at `http://localhost:8787`.
+# Start the backend (auto-reloads on code changes)
+bun run dev:server      # runs at http://localhost:3000
+
+# Start the Tauri desktop app (requires Rust toolchain)
+bun run tauri:dev
+```
 
 ### 5. Set up webhooks
 
@@ -255,38 +260,43 @@ All messaging channels flow into a unified **Conversations** view. Enable/disabl
 ## Architecture
 
 ```
+apps/
+  desktop/         # Tauri v2 desktop shell (Rust)
+    src/lib.rs     # Tauri setup, tray, IPC handlers
+    src/crypto.rs  # IPC command wrappers → packages/crypto
+  worker/          # Bun HTTP server (Hono + PostgreSQL)
+    routes/        # API route handlers
+    services/      # Business logic
+    telephony/     # Voice provider adapters (Twilio, SignalWire, Asterisk, …)
+    messaging/     # Messaging adapters (SMS, WhatsApp, Signal, Telegram)
+packages/
+  crypto/          # Shared Rust crypto (native + WASM + UniFFI for iOS/Android)
+  protocol/        # Zod schemas → codegen (TypeScript, Swift, Kotlin)
+  i18n/            # 13-locale JSON → iOS .strings + Android strings.xml
+  shared/          # Cross-boundary TypeScript types
 src/
   client/          # Desktop frontend (Vite + React + TanStack Router)
-    routes/        # File-based routing
-    components/    # shadcn/ui components
-    locales/       # Translation files (13 locales)
-    lib/           # Auth, platform (Tauri IPC), WebRTC, API client
-      platform.ts  # All crypto routes through Rust via Tauri IPC
-  worker/          # Backend (Cloudflare Workers or Node.js)
-    durable-objects/
-    telephony/     # Voice provider adapters
-    messaging/     # Messaging channel adapters
-    routes/        # API route handlers
-  shared/          # Types shared between client and worker
-src-tauri/         # Tauri v2 desktop shell (Rust)
-  src/crypto.rs    # IPC commands delegating to llamenos-core
+    lib/platform.ts  # All crypto routes through Tauri IPC to Rust
+apps/ios/          # Native SwiftUI iOS client
+apps/android/      # Native Kotlin/Compose Android client
 tests/
-  mocks/           # Tauri IPC mock layer for Playwright E2E tests
+  mocks/           # Tauri IPC mock layer for Playwright E2E
 deploy/
-  docker/          # Docker Compose (API-only — desktop clients connect to this)
+  docker/          # Docker Compose (self-hosted backend)
   helm/            # Kubernetes Helm chart
 site/              # Marketing site (Astro, Cloudflare Pages)
 ```
 
 ### Security model
 
-- **Tauri desktop** — secret key (nsec) lives exclusively in the Rust process; the webview never receives it
+- **Tauri desktop** — device private key lives exclusively in the Rust process; the webview never receives it
+- **Ed25519/X25519 device keys** — per-device keypairs authorized via a hash-chained sigchain
 - **Nostr keypairs** — BIP-340 Schnorr signatures for authentication + WebAuthn passkeys
-- **PIN-encrypted key store** — PBKDF2 600K iterations + XChaCha20-Poly1305, stored in Tauri Store
-- **Per-note forward secrecy** — unique random key per note, ECIES-wrapped for each authorized reader
+- **PIN-encrypted key store** — PBKDF2 + XChaCha20-Poly1305, stored in Tauri Store (desktop) / Keychain (iOS) / Keystore (Android)
+- **Per-note forward secrecy** — unique random key per note, HPKE-wrapped (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) for each authorized reader
 - **Zero-knowledge server** — the API never sees plaintext notes, transcriptions, or encryption keys
 - **Hash-chained audit log** — SHA-256 chain for tamper detection
-- **Device linking** — Signal-style QR provisioning via ephemeral ECDH key exchange
+- **Device linking** — QR provisioning via ephemeral ECDH key exchange, authorized by sigchain
 
 ## CI/CD
 
@@ -303,13 +313,24 @@ Every push to `main` triggers the CI pipeline:
 ## Development
 
 ```bash
-bun run dev              # Launch Tauri desktop dev (Vite + Rust)
-bun run dev:vite         # Vite-only for quick frontend iteration
-bun run dev:worker       # Backend dev server
+bun run dev:server       # Backend dev server (Bun + PostgreSQL)
+bun run tauri:dev        # Tauri desktop dev (Vite + Rust)
+bun run dev:vite         # Vite-only for quick frontend iteration (no Rust needed)
 bun run test             # Playwright E2E tests (with Tauri IPC mocks)
-bun run test:desktop     # Desktop integration tests (WebdriverIO)
 bun run typecheck        # TypeScript type checking
-cd ../llamenos-core && cargo test  # Rust crypto tests
+bun run crypto:test      # Rust crypto tests (packages/crypto/)
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, development workflows,
+coding standards, and how to add new features across the monorepo.
+
+```bash
+# Quick contributor path
+bun install
+bash scripts/dev-setup.sh    # prerequisite check
+bun run dev:server            # start backend
 ```
 
 ## License
