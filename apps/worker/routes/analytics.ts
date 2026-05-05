@@ -6,20 +6,19 @@
  */
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { AnalyticsService } from '../services/analytics'
 import { authErrors } from '../openapi/helpers'
+import {
+  analyticsDateRangeQuerySchema,
+  callMetricsResponseSchema,
+  conversationMetricsResponseSchema,
+  shiftMetricsResponseSchema,
+  analyticsSystemHealthResponseSchema,
+} from '@protocol/schemas/analytics'
 
 const analytics = new Hono<AppEnv>()
-
-// ── Shared query schema ──
-
-const dateRangeQuerySchema = z.object({
-  from: z.string().datetime({ offset: true }).optional(),
-  to: z.string().datetime({ offset: true }).optional(),
-})
 
 function parseDateRange(query: { from?: string; to?: string }): {
   from?: Date
@@ -36,73 +35,6 @@ async function getAnalyticsService(): Promise<AnalyticsService> {
   return new AnalyticsService(getDb())
 }
 
-// ── Response schemas (used for OpenAPI docs) ──
-
-const callMetricsSchema = z.object({
-  totalCalls: z.number(),
-  answeredCalls: z.number(),
-  unansweredCalls: z.number(),
-  abandonedCalls: z.number(),
-  answerRate: z.number(),
-  avgDurationSeconds: z.number(),
-  byPeriod: z.array(
-    z.object({
-      period: z.string(),
-      total: z.number(),
-      answered: z.number(),
-      unanswered: z.number(),
-      abandoned: z.number(),
-    }),
-  ),
-})
-
-const conversationMetricsSchema = z.object({
-  totalConversations: z.number(),
-  activeConversations: z.number(),
-  waitingConversations: z.number(),
-  closedConversations: z.number(),
-  totalMessages: z.number(),
-  avgMessagesPerConversation: z.number(),
-  avgResponseTimeSeconds: z.number().nullable(),
-  byChannel: z.array(
-    z.object({
-      channel: z.string(),
-      total: z.number(),
-      active: z.number(),
-      messages: z.number(),
-    }),
-  ),
-})
-
-const shiftMetricsSchema = z.object({
-  totalShifts: z.number(),
-  totalVolunteersScheduled: z.number(),
-  weeklyHoursCovered: z.number(),
-  coverageSlots: z.array(
-    z.object({
-      date: z.string(),
-      dayOfWeek: z.number(),
-      startTime: z.string(),
-      endTime: z.string(),
-      volunteerCount: z.number(),
-      isCovered: z.boolean(),
-    }),
-  ),
-})
-
-const systemHealthSchema = z.object({
-  activeCallCount: z.number(),
-  waitingConversationCount: z.number(),
-  activeVolunteerCount: z.number(),
-  services: z.array(
-    z.object({
-      name: z.string(),
-      status: z.enum(['ok', 'degraded', 'unknown']),
-      detail: z.string().optional(),
-    }),
-  ),
-})
-
 // ── GET /api/analytics/calls ──
 
 analytics.get(
@@ -113,13 +45,13 @@ analytics.get(
     responses: {
       200: {
         description: 'Call metrics for the requested date range',
-        content: { 'application/json': { schema: resolver(callMetricsSchema) } },
+        content: { 'application/json': { schema: resolver(callMetricsResponseSchema) } },
       },
       ...authErrors,
     },
   }),
   requirePermission('audit:read'),
-  validator('query', dateRangeQuerySchema),
+  validator('query', analyticsDateRangeQuerySchema),
   async (c) => {
     const hubId = c.get('hubId') ?? ''
     const service = await getAnalyticsService()
@@ -138,13 +70,13 @@ analytics.get(
     responses: {
       200: {
         description: 'Conversation metrics for the requested date range',
-        content: { 'application/json': { schema: resolver(conversationMetricsSchema) } },
+        content: { 'application/json': { schema: resolver(conversationMetricsResponseSchema) } },
       },
       ...authErrors,
     },
   }),
   requirePermission('audit:read'),
-  validator('query', dateRangeQuerySchema),
+  validator('query', analyticsDateRangeQuerySchema),
   async (c) => {
     const hubId = c.get('hubId') ?? ''
     const service = await getAnalyticsService()
@@ -163,7 +95,7 @@ analytics.get(
     responses: {
       200: {
         description: 'Shift coverage metrics',
-        content: { 'application/json': { schema: resolver(shiftMetricsSchema) } },
+        content: { 'application/json': { schema: resolver(shiftMetricsResponseSchema) } },
       },
       ...authErrors,
     },
@@ -186,7 +118,7 @@ analytics.get(
     responses: {
       200: {
         description: 'Current system health snapshot',
-        content: { 'application/json': { schema: resolver(systemHealthSchema) } },
+        content: { 'application/json': { schema: resolver(analyticsSystemHealthResponseSchema) } },
       },
       ...authErrors,
     },
