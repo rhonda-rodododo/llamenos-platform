@@ -4,10 +4,34 @@ import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import wasm from 'vite-plugin-wasm'
 import path from 'path'
-import { readFileSync } from 'fs'
+import { readFileSync, createReadStream, existsSync } from 'fs'
 
 // Test builds: mock Tauri IPC so Playwright can run in a regular browser
 const isTestBuild = !!process.env.PLAYWRIGHT_TEST
+
+// Plugin to serve WASM crypto module at /packages/crypto/dist/wasm/ for
+// crypto-interop-wasm.spec.ts. Applies to both dev and preview servers.
+const serveWasmPlugin = (): import('vite').Plugin => {
+  const wasmDir = path.resolve(__dirname, 'packages/crypto/dist/wasm')
+  const wasmPrefix = '/packages/crypto/dist/wasm/'
+
+  const handler = (req: import('http').IncomingMessage, res: import('http').ServerResponse, next: () => void) => {
+    if (!req.url?.startsWith(wasmPrefix)) return next()
+    const relPath = req.url.slice(wasmPrefix.length).split('?')[0]
+    const filePath = path.join(wasmDir, relPath)
+    if (!existsSync(filePath)) return next()
+    const ext = path.extname(filePath)
+    res.setHeader('Content-Type', ext === '.wasm' ? 'application/wasm' : 'application/javascript; charset=utf-8')
+    res.statusCode = 200
+    createReadStream(filePath).pipe(res)
+  }
+
+  return {
+    name: 'serve-wasm-crypto',
+    configureServer(server) { server.middlewares.use(handler) },
+    configurePreviewServer(server) { server.middlewares.use(handler) },
+  }
+}
 
 // Build-time constants for reproducible builds (Epic 79)
 // CI sets SOURCE_DATE_EPOCH from git commit timestamp; dev builds use current time
@@ -28,6 +52,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     wasm(),
+    serveWasmPlugin(),
   ],
   root: '.',
   publicDir: 'public',

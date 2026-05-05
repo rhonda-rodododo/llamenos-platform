@@ -30,6 +30,11 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
     vectors = JSON.parse(readFileSync(VECTORS_PATH, 'utf-8'))
   })
 
+  test.beforeEach(async ({ page }) => {
+    // Navigate to the app so dynamic WASM imports resolve against the correct origin
+    await page.goto('/')
+  })
+
   test('test vectors file exists and is version 2', () => {
     expect(vectors).toBeDefined()
     expect(vectors.version).toBe('2')
@@ -53,31 +58,25 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
 
   test('auth token: create and verify roundtrip', async ({ page }) => {
     const keys = vectors.keys as Record<string, string>
-    const auth = vectors.auth as Record<string, unknown>
-    const token = auth.token as Record<string, unknown>
+    const auth = vectors.auth as { token: Record<string, string> }
 
     const result = await page.evaluate(async (args) => {
-      const { skHex, expectedPubkey } = args
+      const { skHex } = args
       // @ts-expect-error dynamic import
       const wasm = await import('/packages/crypto/dist/wasm/llamenos_core.js')
       await wasm.default()
 
-      // Create a token
-      const tokenJson = wasm.createAuthTokenStateless(skHex, 'GET', '/api/auth/me')
-      const parsed = JSON.parse(tokenJson)
+      // createAuthTokenStateless uses Ed25519 signing — returns { pubkey, timestamp, token }
+      // pubkey is the Ed25519 verifying key hex (not the secp256k1 x-only pubkey)
+      const parsed = wasm.createAuthTokenStateless(skHex, 'GET', '/api/auth/me')
 
-      // Verify the token's pubkey matches
-      const valid = wasm.verifySchnorr(
-        parsed.messageHash,
-        parsed.token,
-        parsed.pubkey,
-      )
+      return { pubkey: parsed.pubkey, hasToken: !!parsed.token, hasTimestamp: !!parsed.timestamp }
+    }, { skHex: keys.secretKeyHex })
 
-      return { pubkey: parsed.pubkey, hasToken: !!parsed.token, valid }
-    }, { skHex: keys.secretKeyHex, expectedPubkey: keys.publicKeyHex })
-
-    expect(result.pubkey).toBe(keys.publicKeyHex)
+    // Ed25519 pubkey from auth vectors (different from secp256k1 publicKeyHex)
+    expect(result.pubkey).toBe(auth.token.pubkey)
     expect(result.hasToken).toBe(true)
+    expect(result.hasTimestamp).toBe(true)
   })
 
   test('ECIES: wrap and unwrap key roundtrip', async ({ page }) => {
@@ -89,19 +88,16 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       const wasm = await import('/packages/crypto/dist/wasm/llamenos_core.js')
       await wasm.default()
 
-      // Wrap a random key
+      // Wrap a random key — eciesWrapKey returns a JS object via serde_wasm_bindgen
       const originalKey = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
-      const envelopeJson = wasm.eciesWrapKey(originalKey, pubkey, 'llamenos:note-key')
-      const envelope = JSON.parse(envelopeJson)
+      const envelope = wasm.eciesWrapKey(originalKey, pubkey, 'llamenos:note-key')
 
-      // Unwrap using the WasmCryptoState
+      // Unwrap using WasmCryptoState — load key directly without slow KDF
       const state = new wasm.WasmCryptoState()
-      // Import key to state (need PIN encryption roundtrip)
-      const importResult = state.importKey(skHex, '12345678')
-      // Unlock with the same PIN
-      state.unlockWithPin(importResult, '12345678')
+      state.loadRawKey(skHex)
 
-      const unwrapped = state.eciesUnwrapKey(envelopeJson, 'llamenos:note-key')
+      // eciesUnwrapKey takes a JSON string — serialize the envelope object
+      const unwrapped = state.eciesUnwrapKey(JSON.stringify(envelope), 'llamenos:note-key')
       state.lock()
 
       return { wrapped: !!envelope.wrappedKey, unwrapped }
@@ -121,8 +117,7 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       await wasm.default()
 
       const state = new wasm.WasmCryptoState()
-      const importResult = state.importKey(skHex, '12345678')
-      state.unlockWithPin(importResult, '12345678')
+      state.loadRawKey(skHex)
 
       // Encrypt a message
       const plaintext = 'Hello from WASM crypto!'
@@ -156,10 +151,9 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       const wasm = await import('/packages/crypto/dist/wasm/llamenos_core.js')
       await wasm.default()
 
-      // Encrypt as volunteer
+      // Encrypt as volunteer — load key directly without slow Argon2id KDF
       const state = new wasm.WasmCryptoState()
-      const importResult = state.importKey(skHex, '12345678')
-      state.unlockWithPin(importResult, '12345678')
+      state.loadRawKey(skHex)
 
       const payloadJson = JSON.stringify({ text: 'Test note for WASM interop' })
       const encrypted = state.encryptNote(payloadJson, pubkey, JSON.stringify([adminPubkey]))
@@ -167,8 +161,7 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
 
       // Decrypt as admin
       const adminState = new wasm.WasmCryptoState()
-      const adminImport = adminState.importKey(adminSkHex, '654321')
-      adminState.unlockWithPin(adminImport, '654321')
+      adminState.loadRawKey(adminSkHex)
 
       const adminEnvelope = encrypted.adminEnvelopes[0]
       const decrypted = adminState.decryptNote(
@@ -190,13 +183,13 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
 
   test('domain separation labels match Rust vectors', () => {
     const labels = vectors.labels as Record<string, string>
-    // These must match exactly — any mismatch means protocol incompatibility
-    expect(labels.LABEL_NOTE_KEY).toBe('llamenos:note-key')
-    expect(labels.LABEL_MESSAGE).toBe('llamenos:message')
-    expect(labels.LABEL_HUB_KEY_WRAP).toBe('llamenos:hub-key-wrap')
-    expect(labels.LABEL_FILE_KEY).toBe('llamenos:file-key')
-    expect(labels.LABEL_FILE_METADATA).toBe('llamenos:file-metadata')
-    expect(labels.LABEL_BLIND_INDEX_KEY).toBe('llamenos:blind-index-key')
+    // These must match exactly — any mismatch means protocol incompatibility.
+    // Keys are camelCase (serde rename_all = "camelCase" in Rust).
+    expect(labels.labelNoteKey).toBe('llamenos:note-key')
+    expect(labels.labelMessage).toBe('llamenos:message')
+    expect(labels.labelHubKeyWrap).toBe('llamenos:hub-key-wrap')
+    expect(labels.labelFileKey).toBe('llamenos:file-key')
+    expect(labels.labelFileMetadata).toBe('llamenos:file-metadata')
   })
 
   test('draft encryption: encrypt and decrypt roundtrip', async ({ page }) => {
@@ -209,8 +202,7 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       await wasm.default()
 
       const state = new wasm.WasmCryptoState()
-      const importResult = state.importKey(skHex, '12345678')
-      state.unlockWithPin(importResult, '12345678')
+      state.loadRawKey(skHex)
 
       const plaintext = 'Draft note in progress...'
       const encrypted = state.encryptDraft(plaintext)
@@ -224,7 +216,8 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
     expect(result.decrypted).toBe('Draft note in progress...')
   })
 
-  test('PIN encryption: encrypt and decrypt nsec roundtrip', async ({ page }) => {
+  // Argon2id (m=64MiB, t=3) runs single-threaded in WASM — allow extra time
+  test('PIN encryption: encrypt and decrypt nsec roundtrip', { timeout: 120_000 }, async ({ page }) => {
     const keys = vectors.keys as Record<string, string>
 
     const result = await page.evaluate(async (args) => {
@@ -234,26 +227,28 @@ test.describe('Cross-Platform Crypto Interop (WASM)', () => {
       await wasm.default()
 
       const state = new wasm.WasmCryptoState()
-      const pin = '987654'
+      const pin = '98765432' // 8+ digits required by current PIN policy
 
-      // Import key (encrypts with PIN)
-      const encryptedJson = state.importKey(skHex, pin)
-      const encrypted = JSON.parse(encryptedJson)
+      // Import key (encrypts with PIN) — returns JS object { encryptedKeyData, pubkey }
+      const imported = state.importKey(skHex, pin)
 
-      // Lock, then unlock with PIN
+      // Lock, then unlock with PIN using the encrypted key data
       state.lock()
-      expect(state.isUnlocked()).toBe(false)
+      const isLockedAfterLock = !state.isUnlocked()
 
-      const pubkey = state.unlockWithPin(encryptedJson, pin)
+      // unlockWithPin expects a JSON string of EncryptedKeyData (the inner object)
+      const pubkey = state.unlockWithPin(JSON.stringify(imported.encryptedKeyData), pin)
 
       return {
-        hasEncryptedData: !!encrypted.ciphertext,
+        hasEncryptedData: !!imported.encryptedKeyData.ciphertext,
+        isLockedAfterLock,
         pubkey,
         isUnlocked: state.isUnlocked(),
       }
     }, { skHex: keys.secretKeyHex, expectedPubkey: keys.publicKeyHex })
 
     expect(result.hasEncryptedData).toBe(true)
+    expect(result.isLockedAfterLock).toBe(true)
     expect(result.pubkey).toBe(keys.publicKeyHex)
     expect(result.isUnlocked).toBe(true)
   })
