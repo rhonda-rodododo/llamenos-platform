@@ -1,15 +1,21 @@
 # Llamenos E2EE Architecture Overview
 
-> **Authoritative Reference:** For precise wire formats, cryptographic algorithms, domain separation constants, and API endpoint specifications, see [`docs/protocol/PROTOCOL.md`](../protocol/PROTOCOL.md). This document describes the architectural vision, implementation history, and security analysis. Where this document and PROTOCOL.md conflict, PROTOCOL.md is authoritative.
+> **⚠ HISTORICAL DOCUMENT**: This document describes the E2EE architecture as of Epics 74–79. The implementation has since evolved significantly. **Do not use this as the current reference.**
 >
-> **Key changes since this document was written:**
-> - ECIES (secp256k1 + XChaCha20-Poly1305) has been replaced by **HPKE (RFC 9180, X25519 + AES-256-GCM)** for all new envelope encryption
-> - Single nsec-per-user has been replaced by **per-device Ed25519/X25519 keypairs** (Phase 6)
-> - Auth uses **Ed25519 signatures** (with Schnorr fallback for legacy)
+> **Current references:**
+> - [`docs/security/CRYPTO_ARCHITECTURE.md`](../security/CRYPTO_ARCHITECTURE.md) — current primitives, key hierarchy, HPKE envelopes, sigchain, PUK, MLS, SFrame
+> - [`docs/protocol/PROTOCOL.md`](../protocol/PROTOCOL.md) — authoritative wire formats, crypto algorithms, API contracts
+> - [`docs/security/README.md`](../security/README.md) — index of all security documentation
+>
+> **What changed since this document was written:**
+> - ECIES (secp256k1 + XChaCha20-Poly1305) replaced by **HPKE (RFC 9180, X25519 + AES-256-GCM)** for all envelope encryption
+> - Single nsec-per-user replaced by **per-device Ed25519/X25519 keypairs** with sigchain authorization
+> - Auth uses **Ed25519 signatures** (Schnorr retained for Nostr event signing only)
 > - Backend is **Bun + PostgreSQL** (not Cloudflare Workers / Durable Objects)
-> - Mobile clients are **native SwiftUI (iOS) and Kotlin/Compose (Android)**, not React Native
-> - Domain separation constants expanded from 25 to **57 labels** (source of truth: `packages/protocol/crypto-labels.json`)
-> - Crypto crate absorbed into monorepo as `packages/crypto/` (formerly external `llamenos-core` repo)
+> - Mobile clients are **native SwiftUI (iOS) and Kotlin/Compose (Android)** (not React Native)
+> - Domain separation constants expanded from 25 to **57 labels** (`packages/protocol/crypto-labels.json`)
+> - Crypto crate absorbed into monorepo as `packages/crypto/` (was external `llamenos-core` repo)
+> - PBKDF2 replaced by **Argon2id** (64MB/3/4) for PIN/passphrase key derivation
 
 ## Vision
 

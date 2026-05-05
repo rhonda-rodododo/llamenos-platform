@@ -12,5 +12,5 @@ files directly.
 | `late-command.sh` | Runs in installer chroot before reboot — stages SSH key, hardens sshd, calls dropbear-setup |
 | `dropbear-setup.sh` | Runs in installer chroot — configures dropbear-initramfs for remote LUKS unlock |
 
-See `docs/deployment/iso-install.md` for the operator guide and
-`docs/superpowers/specs/2026-04-09-fde-iso-builder-design.md` for the design rationale.
+See `docs/superpowers/specs/2026-04-09-fde-iso-builder-design.md` for the design rationale.
+An operator install guide (`docs/deployment/iso-install.md`) has not yet been written.
