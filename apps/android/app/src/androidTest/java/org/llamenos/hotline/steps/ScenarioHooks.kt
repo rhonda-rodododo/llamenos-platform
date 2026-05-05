@@ -2,16 +2,14 @@ package org.llamenos.hotline.steps
 
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
 import io.cucumber.java.After
 import io.cucumber.java.Before
 import kotlinx.coroutines.runBlocking
 import org.llamenos.hotline.LlamenosApp
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
+import org.llamenos.hotline.di.ActiveHubEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.hub.ActiveHubState
 
@@ -27,19 +25,6 @@ import org.llamenos.hotline.hub.ActiveHubState
  * @After: Close activity, wipe local identity.
  */
 class ScenarioHooks {
-
-    /**
-     * Hilt entry point to access ActiveHubState from test code.
-     *
-     * ScenarioHooks uses direct instantiation (not @AndroidEntryPoint injection),
-     * so we access Hilt singletons via EntryPointAccessors — the same pattern
-     * used by CaseListSteps to access CryptoService.
-     */
-    @EntryPoint
-    @InstallIn(SingletonComponent::class)
-    interface ActiveHubEntryPoint {
-        fun activeHubState(): ActiveHubState
-    }
 
     companion object {
         /**

@@ -1,5 +1,6 @@
 package org.llamenos.hotline.steps
 
+import android.util.Log
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -59,6 +60,7 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
      * 2. Returning user → PIN unlock screen → enter PIN → dashboard
      */
     protected fun navigateToMainScreen() {
+        Log.d(TAG, "navigateToMainScreen: launching activity")
         activityScenarioHolder.launch()
         // Wait for either the login screen or PIN unlock screen (10s for Activity startup + animation)
         composeRule.waitUntil(10_000) {
@@ -69,29 +71,38 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
         // Check which screen appeared
         val hasDashboard = composeRule.onAllNodesWithTag("dashboard-title").fetchSemanticsNodes().isNotEmpty()
         if (hasDashboard) {
-            // Already on dashboard (e.g., auto-unlock)
+            Log.d(TAG, "navigateToMainScreen: already on dashboard")
             return
         }
         val hasLogin = composeRule.onAllNodesWithTag("create-identity").fetchSemanticsNodes().isNotEmpty()
+        Log.d(TAG, "navigateToMainScreen: hasLogin=$hasLogin")
         if (hasLogin) {
             // Fresh install flow — enter hub URL before creating identity
             val hubUrlNodes = composeRule.onAllNodesWithTag("hub-url-input").fetchSemanticsNodes()
             if (hubUrlNodes.isNotEmpty()) {
+                Log.d(TAG, "navigateToMainScreen: entering hub URL: $TEST_HUB_URL")
                 onNodeWithTag("hub-url-input").performTextInput(TEST_HUB_URL)
                 composeRule.waitForIdle()
             }
+            Log.d(TAG, "navigateToMainScreen: clicking create-identity")
             onNodeWithTag("create-identity").performClick()
             // v3 device key model: Login → PINSet directly (no Onboarding/confirm-backup step)
+            Log.d(TAG, "navigateToMainScreen: waiting for pin-pad")
             waitForNode("pin-pad", timeoutMillis = 10_000)
+            Log.d(TAG, "navigateToMainScreen: entering PIN (first)")
             enterPin("12345678")
+            Log.d(TAG, "navigateToMainScreen: entering PIN (confirm)")
             enterPin("12345678")
+            Log.d(TAG, "navigateToMainScreen: PIN entry complete, waiting for dashboard")
         } else {
             // Returning user — enter PIN to unlock
+            Log.d(TAG, "navigateToMainScreen: returning user, entering PIN")
             enterPin("12345678")
         }
-        // Key generation (Argon2id) + navigation can be slow on CI emulators with
-        // software rendering — allow up to 15s for the dashboard to appear.
-        waitForNode("dashboard-title", timeoutMillis = 15_000)
+        // Key generation (Argon2id: 64MB, 3 iterations, 4 lanes) + navigation can be
+        // very slow on CI emulators with software rendering (swiftshader). Real devices
+        // complete in 2-4s, but emulators may need 30-60s. Allow 120s to avoid flakes.
+        waitForNode("dashboard-title", timeoutMillis = 120_000)
         onNodeWithTag("dashboard-title").assertIsDisplayed()
     }
 
@@ -209,6 +220,8 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
     }
 
     companion object {
+        private const val TAG = "BaseSteps"
+
         /**
          * Hub URL for the test backend.
          *

@@ -9,16 +9,13 @@ import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import org.llamenos.hotline.LlamenosApp
-import org.llamenos.hotline.crypto.CryptoService
+import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 
@@ -33,13 +30,6 @@ import org.llamenos.hotline.steps.BaseSteps
  * hub list contains two entries to switch between.
  */
 class HubSwitchSteps : BaseSteps() {
-
-    /** Hilt entry point to access CryptoService for reading the signing pubkey. */
-    @EntryPoint
-    @InstallIn(SingletonComponent::class)
-    interface CryptoEntryPoint {
-        fun cryptoService(): CryptoService
-    }
 
     // ---- Given ----
 
