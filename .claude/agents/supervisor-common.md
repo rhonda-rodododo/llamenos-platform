@@ -66,11 +66,28 @@ WORKTREE_BASE=/media/rikki/recover2/projects \
 - Shared: `shared-<task>`
 - Infra: `infra-<task>`
 
-**Model routing** (see `~/.claude/skills/supervising-dispatched-sessions/model-routing.md`):
-- Research/exploration: `sonnet`
-- Implementation (1-2 files): `sonnet`
-- Complex multi-file changes: `opus`
-- Simple mechanical tasks: `haiku`
+**Available models** (full details in `~/.claude/skills/supervising-dispatched-sessions/model-routing.md`):
+
+| Model | CLI | When to use |
+|---|---|---|
+| `opus` | `claude --model opus` | Hard fixes, unknown bugs, release-adjacent, risky merges, anything where a wrong call costs >30 min |
+| `sonnet` | `claude --model sonnet` | Mid-tier fixes, routine refactors, clear-spec features with known patterns |
+| `haiku` | `claude --model haiku` | PR-comment triage, status sweeps, quick classifications, typos, dep bumps |
+| `kimi` | `opencode run --model kimi-for-coding/k2p5` | Long-context exploration, bulk migrations, scaffolding from clear spec, frontend-heavy |
+| `kimi-thinking` | `opencode run --model kimi-for-coding/kimi-k2-thinking` | Same as kimi but with extended thinking/reasoning for harder problems |
+| `opencode:<model>` | `opencode run --model <provider/model>` | Any opencode model (e.g., `opencode:opencode/gpt-5-nano`, `opencode:vultr/DeepSeek-V3.2`) for free/cheap grunt work |
+
+**Heuristic:**
+- Release PR, revert, or security fix? → `opus`
+- Crosses >10 files or needs >100k context? → `kimi`
+- <5 files with tests to verify? → `sonnet`
+- Read-and-classify/reply? → `haiku`
+- Routine: rename, lint, dep bump? → `haiku` or `kimi`
+- Unsure what's wrong? → `opus`
+
+**Parallel queues:** Claude (opus/sonnet/haiku) and opencode (kimi/DeepSeek/etc.) use independent quotas. Run both concurrently to double throughput.
+
+**Kimi caveats:** Does not read `~/.claude/skills/` — inline all rules into the prompt. Times out at ~100 tool calls. Weak on multi-constraint loops (merge+conflict+CI). Good for shape-heavy mechanical work.
 
 ## Writing Worker Prompts
 
