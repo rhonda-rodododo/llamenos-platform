@@ -33,6 +33,7 @@ const EXCLUDED_SCHEMAS = new Set([
   'listReportsQuerySchema',
   'listSubscribersQuerySchema',
   'callHistoryQuerySchema',
+  'analyticsDateRangeQuerySchema',
 
   // Primitive validator schemas — string refinements, not standalone types
   'pubkeySchema',
@@ -43,6 +44,12 @@ const EXCLUDED_SCHEMAS = new Set([
 
   // Overly generic response schemas
   'okResponseSchema',
+
+  // Analytics sub-component schemas (inlined in parent response schemas)
+  'callPeriodMetricsSchema',
+  'channelMetricsSchema',
+  'coverageSlotSchema',
+  'analyticsServiceStatusSchema',
 
   // Bare enum schemas used as building blocks (already inlined in parent schemas)
   'channelTypeSchema',

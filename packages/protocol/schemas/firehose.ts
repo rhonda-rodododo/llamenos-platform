@@ -84,6 +84,24 @@ export const bufferEnvelopeJsonSchema = z.object({
 })
 export type BufferEnvelopeJson = z.infer<typeof bufferEnvelopeJsonSchema>
 
+// --- List response schemas ---
+
+export const firehoseConnectionListResponseSchema = z.object({
+  connections: z.array(firehoseConnectionSchema),
+})
+
+export const firehoseConnectionHealthListResponseSchema = z.object({
+  statuses: z.array(firehoseConnectionHealthSchema),
+})
+
+export const firehoseBufferStatusResponseSchema = z.object({
+  connectionId: z.string(),
+  bufferSize: z.number(),
+  agentRunning: z.boolean(),
+  extractionIntervalSec: z.number(),
+  bufferTtlDays: z.number(),
+})
+
 // --- Notification Opt-out ---
 
 export const firehoseOptoutSchema = z.object({
