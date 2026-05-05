@@ -151,11 +151,14 @@ When('the admin revokes the invite', async ({ request, world }) => {
 
 When('a client floods invite validation {int} times', async ({ request, world }, count: number) => {
   const s = getS(world)
+  const shared = getSharedState(world)
+  shared.floodResponses = []
   for (let i = 0; i < count; i++) {
     const res = await request.get(`${BASE_URL}/api/invites/validate/${crypto.randomUUID()}`, {
       headers: { 'Content-Type': 'application/json' },
     })
     s.rateLimitResponses.push(res.status())
+    shared.floodResponses.push(res.status())
   }
   setLastResponse(world, { status: s.rateLimitResponses[s.rateLimitResponses.length - 1], data: null })
 })
