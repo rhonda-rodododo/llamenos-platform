@@ -2,7 +2,7 @@
  * Login restore step definitions.
  * Matches steps from: packages/test-specs/features/desktop/auth/login-restore.feature
  * Covers fresh install view (nsec input, backup upload, errors),
- * stored key view (PIN digits, recovery options),
+ * stored key view (PIN input, recovery options),
  * and common login elements (language selector, theme toggles, security note).
  */
 import { expect } from '@playwright/test'
@@ -44,7 +44,7 @@ Then('I should see the backup file upload area', async ({ page }) => {
 
 Then('I should see the PIN digit inputs', async ({ page }) => {
   // Login page does NOT have data-testid="page-title" — check for PIN input directly
-  await expect(page.locator('input[aria-label="PIN or passphrase"]')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.PIN_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Common elements ---

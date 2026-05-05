@@ -33,7 +33,7 @@ When('I pull to refresh the dashboard', async ({ page }) => {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   // Re-enter PIN if needed
-  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+  const pinInput = page.getByTestId('pin-input').locator('input')
   const pinVisible = await pinInput.isVisible({ timeout: 2000 }).catch(() => false)
   if (pinVisible) {
     const { enterPin, TEST_PIN } = await import('../../helpers')
