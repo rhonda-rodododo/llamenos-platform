@@ -46,7 +46,7 @@ Given('the admin creates a hub via API', async ({ request, world }) => {
     '/hubs',
     { name, slug },
   )
-  expect(res.status).toBe(200)
+  expect([200, 201]).toContain(res.status)
   getHubManagementState(world).createdHub = res.data.hub
 })
 

@@ -136,7 +136,7 @@ Given('a test note exists', async ({ request, world }) => {
   if (!getPermMatrixState(world).testNoteId) {
     // Create a note as admin (super-admin has notes:* via wildcard)
     const keypair = generateTestKeypair()
-    const { data, status } = await apiPost<{ id: string }>(request, '/notes', {
+    const { data, status } = await apiPost<{ note?: { id?: string } }>(request, '/notes', {
       encryptedContent: 'test-encrypted-content',
       callId: `pm-test-note-${Date.now()}`,
       authorEnvelope: {
@@ -145,7 +145,7 @@ Given('a test note exists', async ({ request, world }) => {
       },
     })
     if (status === 200 || status === 201) {
-      getPermMatrixState(world).testNoteId = data.id
+      getPermMatrixState(world).testNoteId = data.note?.id
     }
   }
 })

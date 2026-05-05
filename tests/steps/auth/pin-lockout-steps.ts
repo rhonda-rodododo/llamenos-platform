@@ -13,10 +13,25 @@ import { Given, When, Then } from '../fixtures'
 import { enterPin, Timeouts } from '../../helpers'
 
 /**
- * Invoke a Tauri IPC mock command via the browser's Symbol-keyed window entry.
- * Uses Symbol.for('llamenos_test_invoke') which is accessible across VM contexts.
+ * Invoke a Tauri IPC mock command via the browser's test platform shim.
+ *
+ * The tauri-core mock module is lazily loaded (dynamic import inside platform.ts).
+ * We trigger it by calling isCryptoUnlocked() on __TEST_PLATFORM, which forces
+ * the tauri-core chunk to load and register Symbol.for('llamenos_test_invoke').
  */
 async function testInvoke(page: import('@playwright/test').Page, cmd: string, args?: Record<string, unknown>) {
+  // Ensure __TEST_PLATFORM is available and trigger tauri-core lazy load
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
+
+  // Trigger tauri-core chunk load by calling a platform function
+  await page.evaluate(async () => {
+    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+      isCryptoUnlocked: () => Promise<boolean>
+    }
+    await platform.isCryptoUnlocked()
+  })
+
+  // Now the symbol is guaranteed to be on window
   return page.evaluate(async ({ cmd, args }) => {
     const sym = Symbol.for('llamenos_test_invoke')
     const invoke = (window as Record<symbol, unknown>)[sym] as
@@ -41,8 +56,9 @@ Then('I should not see a lockout timer', async ({ page }) => {
 })
 
 Given('I have {int} failed PIN attempts', async ({ page }, count: number) => {
-  // Seed the mock with N failed attempts
-  await page.waitForFunction(() => !!(window as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')], { timeout: 10000 })
+  // Seed the mock with N failed attempts.
+  // Wait for __TEST_PLATFORM which is set in the same module that registers the test invoke symbol.
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
   await seedFailedAttempts(page, count)
 })
 
@@ -80,13 +96,16 @@ Then('the PIN pad should be disabled', async ({ page }) => {
 
 Then('the stored keys should be wiped', async ({ page }) => {
   // After 10 failed attempts, keys are wiped from storage
+  // Wait for the wipe to take effect (UI may redirect to login/setup)
+  await page.waitForTimeout(1000)
   const hasKey = await page.evaluate(() => {
     return (
-      localStorage.getItem('llamenos-encrypted-key') !== null ||
-      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-key') !== null
+      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-device-keys') !== null ||
+      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null ||
+      localStorage.getItem('llamenos-encrypted-key') !== null
     )
   })
-  // Keys may be wiped (false) or the wipe message shown
+  // Keys should be wiped OR the wipe message shown
   const wipeText = page.locator('text=/wiped/i')
   const wipeVisible = await wipeText.isVisible({ timeout: 5000 }).catch(() => false)
   expect(!hasKey || wipeVisible).toBe(true)
@@ -110,6 +129,9 @@ Given('I see the lockout message', async ({ page }) => {
 })
 
 Then('I should still see the lockout message', async ({ page }) => {
+  // After app restart, the lockout message only appears when a PIN attempt is made.
+  // Enter a dummy PIN to trigger the lockout check.
+  await enterPin(page, '00000000')
   const lockoutText = page.locator('text=/locked out/i')
   await expect(lockoutText.first()).toBeVisible({ timeout: Timeouts.AUTH })
 })
@@ -122,9 +144,8 @@ Then('I should not be able to enter a PIN until lockout expires', async ({ page 
 })
 
 Given('the lockout has expired', async ({ page }) => {
-  // Reset lockout timer to allow retry
-  await testInvoke(page, 'reset_pin_lockout')
-  // Re-seed the attempts but clear the lockout time
-  await testInvoke(page, 'set_pin_failed_attempts', { count: 5 })
-  // The lockoutUntil is reset to 0, so retry is allowed
+  // Wait for test platform to be ready
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
+  // Clear the lockout timer (simulates timer expiry) — keeps attempt count unchanged
+  await testInvoke(page, 'expire_pin_lockout')
 })
