@@ -1,0 +1,59 @@
+# mise configuration — https://mise.jdx.dev/
+#
+# Run `mise install` once to activate the correct tool versions.
+# Run `mise run --list` to see available tasks.
+#
+# Rust is NOT pinned here — apps/desktop/rust-toolchain.toml (1.85.0) and
+# packages/crypto/rust-toolchain.toml (stable) handle per-workspace pinning,
+# which mise respects automatically via rustup.
+
+[tools]
+bun  = "1.3.5"          # Keep in sync with .github/workflows/ci.yml bun-version
+java = "temurin-17.0"   # Required for Android builds (AGP 9.1 + Kotlin 2.3)
+
+[env]
+ENVIRONMENT = "development"
+
+# ── Tasks ──────────────────────────────────────────────────────────────────
+# These tasks are discovery helpers for new contributors.
+# All bun run scripts in package.json continue to work unchanged.
+# CI uses bun run directly — mise tasks are not required for CI.
+
+[tasks.setup]
+description = "Check prerequisites and install dependencies"
+run         = "bash scripts/dev-setup.sh"
+
+[tasks.dev]
+description = "Start local backend (PostgreSQL + backing services + Bun server)"
+run         = [
+  "docker compose -f deploy/docker/docker-compose.dev.yml up -d",
+  "bun run dev:server",
+]
+
+[tasks."dev:desktop"]
+description = "Start Tauri desktop app (Vite + Rust — requires Rust toolchain)"
+run         = "bun run tauri:dev"
+
+[tasks.test]
+description = "Run Playwright E2E tests (desktop)"
+run         = "bun run test"
+
+[tasks."test:backend"]
+description = "Run backend BDD tests (requires local backend running)"
+run         = "bun run test:backend:bdd"
+
+[tasks.typecheck]
+description = "TypeScript type check (no emit)"
+run         = "bun run typecheck"
+
+[tasks.build]
+description = "Vite production build"
+run         = "bun run build"
+
+[tasks.codegen]
+description = "Regenerate TypeScript/Swift/Kotlin types from Zod schemas"
+run         = "bun run codegen"
+
+[tasks.lint]
+description = "Run ESLint across client and worker"
+run         = "bun run lint"

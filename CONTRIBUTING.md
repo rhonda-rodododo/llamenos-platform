@@ -1,114 +1,230 @@
 # Contributing to Llamenos
 
-## Development Setup
+Llamenos is a monorepo containing the backend (Bun + PostgreSQL), Tauri desktop app,
+iOS and Android clients, shared Rust crypto, and protocol codegen. Pick the area you
+want to work on — you don't need to set up all platforms.
 
-### Clone all three repos
+---
+
+## Prerequisites
+
+**All contributors:**
+- [Bun](https://bun.sh/) 1.3.5+ (`curl -fsSL https://bun.sh/install | bash`)
+- [Docker](https://docs.docker.com/get-docker/) (for local backing services)
+- Git
+
+**Desktop (Tauri) or Crypto (Rust):**
+- [Rust](https://rustup.rs/) — toolchain version is managed by `rust-toolchain.toml` per workspace
+
+**Android:**
+- JDK 17 (Temurin recommended)
+- Android SDK with NDK r27
+
+**iOS (macOS only):**
+- Xcode 16+
+- `xcodegen` (`brew install xcodegen`)
+
+### With mise (optional but recommended)
+
+[mise](https://mise.jdx.dev/) is a polyglot version manager. If you use it:
 
 ```bash
-# All repos must be siblings in the same parent directory
-git clone git@github.com:rhonda-rodododo/llamenos.git
-git clone git@github.com:rhonda-rodododo/llamenos-core.git
-git clone git@github.com:rhonda-rodododo/llamenos-mobile.git
+mise install     # Installs Bun 1.3.5 and JDK 17 as declared in .mise.toml
 ```
 
-### Prerequisites
+Rust is managed by `rust-toolchain.toml` files in each workspace — mise respects these automatically.
 
-**Desktop (llamenos)**:
-- Rust 1.85+, Bun, platform-specific WebKit deps
-- Run: `cd llamenos && ./scripts/dev-setup.sh`
+---
 
-**Crypto core (llamenos-core)**:
-- Rust 1.85+, optional: cargo-ndk (Android), wasm-pack (WASM)
-- Run: `cd llamenos-core && ./scripts/dev-setup.sh`
+## Quick Setup
 
-**Mobile (llamenos-mobile)**:
-- Bun, JDK 17, Android SDK/NDK, Xcode (macOS)
-- Run: `cd llamenos-mobile && ./scripts/dev-setup.sh`
+```bash
+git clone git@github.com:your-org/llamenos.git
+cd llamenos
+bun install
+bash scripts/dev-setup.sh    # prerequisite check + troubleshooting hints
+```
 
-## Coding Standards
+`dev-setup.sh` checks your toolchain and tells you exactly what's missing.
 
-### TypeScript
+---
 
-- Strict mode, no `any` unless absolutely necessary
-- Use `@shared/*` imports for cross-boundary types
-- All user-facing strings must use i18next (`t()`)
+## Development Areas
 
-### Rust
+### Backend
 
-- `cargo clippy --all-features -- -D warnings` must pass
-- All sensitive data uses `Zeroize` trait
-- New crypto operations must add a domain separation label to `labels.rs`
+The backend is a Bun HTTP server (Hono + PostgreSQL) in `apps/worker/`.
 
-### React Native
+```bash
+# Start backing services (PostgreSQL, object storage, Nostr relay)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-- NativeWind for styling (Tailwind classes)
-- `testID` props on all interactive elements
-- Never import crypto directly — use `crypto-provider.ts`
+# Start the backend with file watching
+bun run dev:server            # runs at http://localhost:3000
+
+# Run BDD tests
+bun run test:backend:bdd
+```
+
+### Desktop (Tauri)
+
+The desktop app is a Tauri v2 shell (`apps/desktop/`) with a React frontend (`src/client/`).
+Rust 1.85.0 is required — `rustup` will install the right version from `apps/desktop/rust-toolchain.toml`.
+
+```bash
+bun run tauri:dev             # starts Vite + Tauri dev app
+bun run typecheck             # TypeScript check
+bun run test                  # Playwright E2E (uses Tauri IPC mocks — no Rust needed)
+```
+
+### iOS
+
+iOS requires a Mac with Xcode 16+. All `ios:*` commands SSH to a configured Mac if you're on Linux.
+
+```bash
+bun run ios:status            # Check Xcode, Rust, xcodegen status
+bun run ios:setup             # First-time: install Rust targets, xcodegen
+bun run ios:build             # Build the iOS app
+bun run ios:test              # Run unit tests
+```
+
+See `docs/ios/` for Mac SSH setup.
+
+### Android
+
+```bash
+bun run android:sdk:setup     # First-time: install Android SDK + NDK
+bun run test:android          # Unit tests + lint
+bun run test:android:e2e      # Cucumber BDD E2E on device/emulator
+```
+
+### Crypto (Rust)
+
+The shared crypto crate lives in `packages/crypto/`. The `packages/crypto/rust-toolchain.toml`
+pins `stable` with additional targets for iOS, Android, and WASM.
+
+```bash
+bun run crypto:test           # cargo test
+bun run crypto:clippy         # cargo clippy
+bun run crypto:fmt            # cargo fmt --check
+```
+
+---
+
+## Protocol Codegen
+
+Zod schemas in `packages/protocol/schemas/` are the single source of truth for all
+types across TypeScript, Swift, and Kotlin. Run codegen after any schema change:
+
+```bash
+bun run codegen               # generate TS/Swift/Kotlin types
+bun run codegen:check         # CI check (fails if output is stale)
+```
+
+Regenerated output in `packages/protocol/generated/` is gitignored — always run codegen
+before committing schema changes.
+
+---
 
 ## Adding a New Crypto Operation
 
-1. **Add label** to `llamenos-core/src/labels.rs` AND `llamenos/src/shared/crypto-labels.ts` AND `llamenos-mobile/src/lib/crypto-labels.ts`
-2. **Implement in Rust** in the appropriate module (`ecies.rs`, `encryption.rs`, etc.)
-3. **Add FFI wrapper** in `llamenos-core/src/ffi.rs` if needed for mobile
-4. **Add tests** in the Rust module
-5. **Update interop tests** in `llamenos-core/tests/interop.rs`
-6. **Update platform.ts** in `llamenos/src/client/lib/platform.ts` (desktop IPC)
-7. **Update crypto.ts** in `llamenos-mobile/src/lib/crypto.ts` (mobile JS fallback)
-8. Run `cargo test` in llamenos-core, `bun run test` in llamenos
+Cryptographic operations are implemented once in Rust (`packages/crypto/`) and compiled
+to native (Tauri), WASM, and UniFFI (iOS/Android).
+
+1. **Add a domain separation label** to `packages/protocol/crypto-labels.json`
+2. Run `bun run codegen` to propagate the label to TS/Swift/Kotlin constants
+3. **Implement in Rust** in the appropriate module under `packages/crypto/src/`
+4. **Add tests** in the Rust module (`cargo test`)
+5. **Add FFI wrapper** in `packages/crypto/src/lib.rs` if needed for mobile
+6. **Update `src/client/lib/platform.ts`** (desktop Tauri IPC command)
+7. **Update iOS crypto service** in `apps/ios/Sources/Services/CryptoService.swift`
+8. **Update Android crypto service** in `apps/android/app/src/main/kotlin/*/crypto/`
+9. Run `bun run crypto:test:mobile` to verify FFI bindings
+
+All crypto uses HPKE (RFC 9180 X25519-HKDF-SHA256-AES256-GCM). Never use raw secp256k1 ECIES for new operations.
+
+---
 
 ## Adding a New API Endpoint
 
-1. **Add handler** in `llamenos/src/worker/api/`
-2. **Add route** in the appropriate Durable Object's `DORouter`
-3. **Add types** in `llamenos/src/shared/types.ts`
-4. **Add client method** in `llamenos/src/client/lib/api.ts`
-5. **Add mobile client method** in `llamenos-mobile/src/lib/api-client.ts`
-6. **Add E2E tests** in `llamenos/tests/` (Playwright)
+1. **Add Zod schemas** in `packages/protocol/schemas/` — these generate types for all platforms
+2. Run `bun run codegen`
+3. **Add route handler** in `apps/worker/routes/`
+4. **Add service method** in `apps/worker/services/`
+5. **Add client method** in `src/client/lib/api.ts`
+6. **Add BDD scenarios** in `tests/features/` (see `bdd-feature-development` skill)
+7. **Add iOS/Android client calls** if the feature is needed on mobile
 
-## Adding E2E Tests
+---
 
-### Desktop (Playwright)
+## Testing
 
-```bash
-bun run test:ui                          # Interactive UI mode
-bun run test -- --grep "my test"         # Run specific test
+| Platform | Command | Requirements |
+|----------|---------|-------------|
+| Backend BDD | `bun run test:backend:bdd` | Backend running (`bun run dev:server`) |
+| Desktop E2E | `bun run test` | None (uses Tauri IPC mocks) |
+| Typecheck | `bun run typecheck` | None |
+| Crypto | `bun run crypto:test` | Rust toolchain |
+| iOS unit | `bun run ios:test` | Mac + Xcode |
+| Android unit | `bun run test:android` | JDK 17 + Android SDK |
+
+Run `bun run test:all` to orchestrate across all available platforms.
+
+---
+
+## Code Standards
+
+### TypeScript
+
+- Strict mode everywhere — no `any`, no `as` type assertions
+- Use `z.infer<typeof Schema>` for types, not manual interfaces that duplicate schemas
+- All user-facing strings use `t()` (i18next) — run `bun run i18n:validate:desktop` to check
+- Path aliases: `@/*` → `src/client/`, `@worker/*` → `apps/worker/`, `@protocol/*` → `packages/protocol/`
+
+### Rust
+
+- `cargo clippy -- -D warnings` must pass before committing
+- All sensitive data implements the `Zeroize` trait
+- Every new crypto operation needs a domain separation label from `packages/protocol/crypto-labels.json`
+- Never use secp256k1 ECIES — use HPKE (RFC 9180) for all new key wrapping
+
+### Tests
+
+- Assertions test **behavior** (API responses, DB state) — not UI element existence
+- Use `data-testid` attributes for Playwright selectors — never `getByRole('button', { name: /.../ })` for fragile matches
+- Per-test DB isolation — each test creates its own hub/schema, no shared state
+- No `waitForTimeout()` — use `waitFor()` with explicit conditions
+
+---
+
+## Commit Conventions
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat(worker): add ban list pagination
+fix(crypto): correct HKDF label for hub key wrap
+docs: update contributing guide for monorepo
+test(bdd): add scenario for volunteer shift overlap
 ```
 
-- Use `data-testid` selectors (never `getByRole` for fragile matches)
-- Create unique resources per test (use `Date.now()` in names)
-- Use helpers from `tests/helpers.ts`
+Version bumps are managed by `knope` automatically — never manually edit `package.json`,
+`Cargo.toml`, or platform version files for version bumps.
 
-### Mobile (Detox)
+---
 
-```bash
-bun run e2e:build:ios && bun run e2e:test:ios
-bun run e2e:build:android && bun run e2e:test:android
-```
+## Security Rules
 
-- Use `testID` props for element selection
-- Tests run serially (max 1 worker)
-- 120s timeout per test
+- **Never commit secrets** — `.dev.vars`, `.env`, and all `.env.*` files are gitignored.
+  A pre-commit hook blocks staging them. Even placeholder values look like secrets in git
+  history, which is permanent.
+- **No raw string literals for crypto contexts** — always use constants from
+  `packages/protocol/crypto-labels.json` (generated to TS/Swift/Kotlin via codegen).
+- **No secp256k1 ECIES** in new code — use HPKE.
+- Private keys never enter the webview — all crypto operations route through Tauri IPC
+  to Rust. Always import from `src/client/lib/platform.ts`, never from `@tauri-apps/*` directly.
 
-## Cutting a Release
-
-1. Ensure all tests pass in all three repos
-2. Bump version: `cd llamenos && bun run version:bump patch "description"`
-3. Push: `git push && git push --tags`
-4. CI builds desktop installers and publishes to GitHub Releases
-5. For mobile: tag the mobile repo and CI produces APK + iOS sim build
-
-## Secrets and Environment Variables
-
-**Never commit `.env` files** from `deploy/docker/`. These files may contain secrets
-or appear to contain secrets (even test placeholders). Git history is permanent.
-
-Operators provision secrets via their orchestration layer:
-- **Ansible**: use Ansible Vault for sensitive vars
-- **Docker Compose**: set env vars in the shell or via secrets management (not `.env` in git)
-- **Helm/Kubernetes**: use Helm secrets or Kubernetes Secrets objects
-
-The `deploy/docker/.env*` paths are `.gitignore`d. A pre-commit hook in `lefthook.yml`
-also blocks staging them as a safety net.
+---
 
 ## License
 

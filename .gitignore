@@ -3,6 +3,7 @@ dist/
 .dev.vars
 .wrangler/
 *.local
+.mise.local.toml
 .env
 .env.*
 !.env.example
