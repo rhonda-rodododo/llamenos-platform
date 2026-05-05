@@ -61,14 +61,14 @@ final class TrackingHubCryptoService: HubCryptoServiceProtocol, @unchecked Senda
 
 private func makeHub(id: String, slug: String = "hub") -> Hub {
     Hub(
+        createdAt: "2026-01-01T00:00:00Z",
+        createdBy: "pub001",
+        description: nil,
         id: id,
         name: "Hub \(id)",
-        slug: slug,
-        description: nil,
-        status: .active,
         phoneNumber: nil,
-        createdBy: "pub001",
-        createdAt: "2026-01-01T00:00:00Z",
+        slug: slug,
+        status: .active,
         updatedAt: "2026-01-01T00:00:00Z"
     )
 }

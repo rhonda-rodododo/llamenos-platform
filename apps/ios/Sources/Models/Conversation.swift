@@ -1,6 +1,8 @@
 import Foundation
 
 // MARK: - ClientChannelType
+// Client-only: UI display properties (iconName, displayName, badgeColorName).
+// Generated `ChannelType` enum has same cases but no UI properties.
 
 /// Messaging channel types supported by the platform (client-side enum with UI properties).
 /// Named `ClientChannelType` to avoid conflict with generated `ChannelType` from protocol.
@@ -38,6 +40,8 @@ enum ClientChannelType: String, Codable, Sendable, CaseIterable {
 }
 
 // MARK: - ConversationStatus
+// Client-only: UI display properties. Generated `ProtocolConversationStatus`
+// has same cases but no displayName.
 
 /// Conversation lifecycle states.
 enum ConversationStatus: String, Codable, Sendable, CaseIterable {
@@ -55,10 +59,11 @@ enum ConversationStatus: String, Codable, Sendable, CaseIterable {
 }
 
 // MARK: - AppConversation
+// Client-only: generated `ConversationListResponseConversation` has different fields
+// (contactIdentifierHash, messageCount, metadata, etc.) and uses Double for counts.
 
 /// A messaging conversation (SMS/WhatsApp/Signal) from the API.
 /// Named `AppConversation` to avoid conflict with generated `Conversation` from protocol codegen.
-/// Matches the protocol spec wire format for conversations with client-specific field names.
 struct AppConversation: Codable, Identifiable, Sendable {
     let id: String
     let channelType: String
@@ -107,6 +112,8 @@ struct AppConversation: Codable, Identifiable, Sendable {
 }
 
 // MARK: - ConversationMessage
+// Client-only: generated `Message` uses `MessageDirection` enum and
+// `MessageReaderEnvelope` instead of `RecipientEnvelope`.
 
 /// An encrypted message within a conversation, matching the wire format.
 struct ConversationMessage: Codable, Identifiable, Sendable {

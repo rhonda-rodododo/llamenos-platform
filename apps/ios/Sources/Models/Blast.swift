@@ -1,10 +1,12 @@
 import SwiftUI
 
 // MARK: - AppBlast
+// Client-only: generated `Blast` uses structured `BlastContent` and `BlastStats`
+// nested types, while this client model uses inline `[String: [String: String]]`
+// for content (matching the actual API response shape for multi-language/channel).
 
 /// Client-side blast model with UI-specific fields and computed properties.
 /// Named `AppBlast` to avoid conflict with generated `Blast` from protocol codegen.
-/// The generated `Blast` has a different shape (structured content, typed status enum).
 struct AppBlast: Identifiable, Codable, Sendable {
     let id: String
     let name: String
@@ -38,6 +40,8 @@ struct AppBlastsListResponse: Codable, Sendable {
 }
 
 // MARK: - Blast Status
+// Client-only: UI display properties (icon, color, displayName).
+// Generated `ProtocolBlastStatus` has the same cases plus `sending`.
 
 enum BlastStatus: String, CaseIterable, Sendable {
     case draft
@@ -90,6 +94,7 @@ struct ScheduleBlastRequest: Codable, Sendable {
 }
 
 // MARK: - Subscriber Stats
+// Generated `SubscriberStatsResponse` available but has different field shapes.
 
 struct BlastSubscriberStats: Codable, Sendable {
     let total: Int

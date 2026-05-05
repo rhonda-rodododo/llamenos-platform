@@ -1,6 +1,9 @@
 import SwiftUI
 
 // MARK: - Contact Summary
+// Client-only: generated `ContactTimelineListResponseContact` uses `Double` for counts
+// and `contactHash` as identifier. This client model uses `Int` for counts and provides
+// UI computed properties (displayIdentifier, totalInteractions).
 
 struct ContactSummary: Identifiable, Codable, Sendable {
     var id: String { contactHash }
@@ -29,6 +32,8 @@ struct ContactsListResponse: Codable, Sendable {
 }
 
 // MARK: - Timeline Event
+// Client-only: generated `ContactTimelineDetailResponse` uses `[[String: JSONAny]]`
+// for unstructured event data. This client model has typed fields.
 
 struct ContactTimelineEvent: Identifiable, Codable, Sendable {
     let id: String
@@ -47,6 +52,8 @@ struct ContactTimelineResponse: Codable, Sendable {
 }
 
 // MARK: - Contact Detail
+// Client-only: generated `Contact` has encrypted PII/summary fields and envelope arrays.
+// This client model is the decrypted/simplified view for display.
 
 /// Full contact profile including linked cases and identifiers.
 struct ContactDetail: Codable, Sendable {
@@ -92,6 +99,7 @@ struct ContactDetailResponse: Codable, Sendable {
 }
 
 // MARK: - Contact Relationship
+// Client-only: generated `ContactRelationship` has different field structure.
 
 /// A relationship between two contacts.
 struct AppContactRelationship: Codable, Identifiable, Sendable {
@@ -119,6 +127,7 @@ struct ContactSearchResponse: Codable, Sendable {
 }
 
 // MARK: - Event Type
+// Client-only: UI display properties (icon, color, displayName).
 
 enum ContactEventType: String, CaseIterable, Sendable {
     case call

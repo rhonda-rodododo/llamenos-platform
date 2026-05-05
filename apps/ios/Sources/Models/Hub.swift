@@ -1,18 +1,16 @@
 import Foundation
 
-// MARK: - Hub
+// MARK: - Hub (from protocol codegen)
+// `HubResponse` is generated from packages/protocol/generated/swift/Types.swift.
+// We typealias it as `Hub` for convenience throughout the iOS app.
 
-/// A hub (organization/hotline) that the user belongs to.
-struct Hub: Codable, Identifiable, Sendable, Equatable {
-    let id: String
-    let name: String
-    let slug: String
-    let description: String?
-    let status: HubStatus
-    let phoneNumber: String?
-    let createdBy: String
-    let createdAt: String
-    let updatedAt: String
+typealias Hub = HubResponse
+
+extension HubResponse: Identifiable {}
+extension HubResponse: Equatable {
+    public static func == (lhs: HubResponse, rhs: HubResponse) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - HubStatus display extensions
@@ -40,6 +38,8 @@ extension HubStatus {
 
 // MARK: - API Responses
 
+/// API response wrapper for the hubs list.
+/// Uses `Hub` (= `HubResponse`) for each hub entry.
 struct HubsListResponse: Codable, Sendable {
     let hubs: [Hub]
 }

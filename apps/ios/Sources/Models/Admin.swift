@@ -1,6 +1,9 @@
 import Foundation
 
 // MARK: - UserRole
+// Client-only: UI display properties (displayName, badgeColor) not in protocol codegen.
+// Generated `UserListResponseUser` uses `roles: [String]` (array of role names) —
+// fundamentally different shape from this single-role enum.
 
 /// Roles in the system, matching the protocol spec.
 enum UserRole: String, Codable, Sendable, CaseIterable {
@@ -23,6 +26,8 @@ enum UserRole: String, Codable, Sendable, CaseIterable {
 }
 
 // MARK: - ClientUserStatus
+// Client-only: UI display properties. Generated `UserListResponseUser` uses
+// `active: Bool` — different representation.
 
 /// User account status (client-side enum with UI properties).
 /// Named `ClientUserStatus` to avoid conflict with generated `UserStatus`.
@@ -41,6 +46,9 @@ enum ClientUserStatus: String, Codable, Sendable, CaseIterable {
 }
 
 // MARK: - ClientUser
+// Client-only: different shape from generated `UserListResponseUser` which has
+// `active: Bool`, `roles: [String]`, `name: String` (non-optional) — our client
+// model uses `displayName: String?`, `role: String` (single), `status: String`.
 
 /// A user/admin member from the API (client-side model with UI properties).
 /// Named `ClientUser` to avoid conflict with generated `User`.
@@ -78,15 +86,13 @@ struct ClientUser: Codable, Identifiable, Sendable {
 
     /// Parsed creation date.
     var createdDate: Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: createdAt) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: createdAt)
+        DateFormatting.parseISO(createdAt)
     }
 }
 
 // MARK: - AppBanEntry
+// Client-only: generated `Ban` has different fields (phone, bannedAt, bannedBy)
+// vs our (id, identifierHash, reason?, createdBy, createdAt).
 
 /// A ban list entry from the API (client-side model with UI properties).
 /// Named `AppBanEntry` to avoid conflict with generated `Ban`/`BanResponse`.
@@ -111,15 +117,13 @@ struct AppBanEntry: Codable, Identifiable, Sendable {
 
     /// Parsed creation date.
     var createdDate: Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: createdAt) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: createdAt)
+        DateFormatting.parseISO(createdAt)
     }
 }
 
 // MARK: - AppAuditEntry
+// Client-only: generated `Entry`/`AuditEntryResponse` uses `details: [String: JSONAny]`
+// while this client model uses `details: String?`.
 
 /// A hash-chained audit log entry from the API (client-side model with UI properties).
 /// Named `AppAuditEntry` to avoid conflict with generated `AuditEntryResponse`/`Entry`.
@@ -146,11 +150,7 @@ struct AppAuditEntry: Codable, Identifiable, Sendable {
 
     /// Parsed timestamp.
     var timestampDate: Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: timestamp) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: timestamp)
+        DateFormatting.parseISO(timestamp)
     }
 
     /// Human-readable action description.
@@ -160,6 +160,8 @@ struct AppAuditEntry: Codable, Identifiable, Sendable {
 }
 
 // MARK: - AppInvite
+// Client-only: generated `Invite` has different fields (name, phone, roleIDs)
+// vs our (code, role, createdBy, claimedBy, expiresAt).
 
 /// An invite code from the API (client-side model with UI properties).
 /// Named `AppInvite` to avoid conflict with generated `Invite` from protocol codegen.
@@ -191,20 +193,12 @@ struct AppInvite: Codable, Identifiable, Sendable {
 
     /// Parsed expiry date.
     var expiresDate: Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: expiresAt) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: expiresAt)
+        DateFormatting.parseISO(expiresAt)
     }
 
     /// Parsed creation date.
     var createdDate: Date? {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: createdAt) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: createdAt)
+        DateFormatting.parseISO(createdAt)
     }
 
     /// Truncated creator pubkey.
@@ -257,6 +251,7 @@ struct UpdateRoleRequest: Encodable, Sendable {
 }
 
 // MARK: - Report Category
+// Client-only: generated `ReportTypeListResponseReportType` has a different shape.
 
 /// A report category from the API.
 struct ReportCategory: Codable, Identifiable, Sendable {
@@ -267,11 +262,7 @@ struct ReportCategory: Codable, Identifiable, Sendable {
     /// Parsed creation date.
     var createdDate: Date? {
         guard let createdAt else { return nil }
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = isoFormatter.date(from: createdAt) { return date }
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        return isoFormatter.date(from: createdAt)
+        return DateFormatting.parseISO(createdAt)
     }
 }
 
@@ -286,6 +277,7 @@ struct CreateReportCategoryRequest: Encodable, Sendable {
 }
 
 // MARK: - Client Telephony Provider
+// Client-only: UI display properties (displayName) for provider selection.
 
 /// Supported telephony providers (client-side enum with UI properties).
 /// Named `ClientTelephonyProvider` to avoid conflict with generated `TelephonyProvider`.
@@ -322,6 +314,7 @@ struct TelephonySettings: Codable, Sendable {
 }
 
 // MARK: - Client Call Settings
+// Client-only: generated `CallSettings` has different fields (maxDuration: Double, etc.).
 
 /// Call routing configuration from the API (client-side model).
 /// Named `ClientCallSettings` to avoid conflict with generated `CallSettings`.
@@ -332,6 +325,8 @@ struct ClientCallSettings: Codable, Sendable {
 }
 
 // MARK: - Client IVR Languages
+// Client-only: generated `IvrLanguages` has `languages: [String]?` while
+// the client uses `[String: Bool]` (language code → enabled/disabled map).
 
 /// IVR language configuration from the API (client-side model).
 /// Named `ClientIvrLanguages` to avoid conflict with generated `IvrLanguages`.
@@ -340,18 +335,18 @@ struct ClientIvrLanguages: Codable, Sendable {
 }
 
 // MARK: - Client Transcription Settings
+// Client-only: no matching generated type.
 
 /// Transcription configuration from the API (client-side model).
-/// Named `ClientTranscriptionSettings` to avoid conflict with generated `TranscriptionSettings`.
 struct ClientTranscriptionSettings: Codable, Sendable {
     var enabled: Bool
     var allowVolunteerOptOut: Bool
 }
 
 // MARK: - Client Spam Settings
+// Client-only: no matching generated type.
 
 /// Spam mitigation configuration from the API (client-side model).
-/// Named `ClientSpamSettings` to avoid conflict with generated `SpamSettings`.
 struct ClientSpamSettings: Codable, Sendable {
     var maxCallsPerHour: Int
     var voiceCaptchaEnabled: Bool
@@ -359,6 +354,7 @@ struct ClientSpamSettings: Codable, Sendable {
 }
 
 // MARK: - System Health
+// Client-only: generated `HealthResponse` has different shape (checks array, not named services).
 
 /// System health dashboard data from the API.
 struct SystemHealth: Codable, Sendable {

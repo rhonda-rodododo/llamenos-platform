@@ -1,6 +1,9 @@
 import Foundation
 
 // MARK: - ClientReportTypeDefinition
+// Client-only: generated `CMSReportTypeListResponseReportType` uses `TypeEnum` for category,
+// `ReportTypeField` with generated sub-types, and non-optional fields where this client
+// model uses optionals. Kept manual for iOS form rendering compatibility.
 
 /// Client-side report type definition for runtime use. Named `Client*` to avoid
 /// conflict with the generated `ReportTypeDefinition` from protocol codegen
@@ -40,6 +43,9 @@ struct ClientReportTypeDefinition: Codable, Identifiable, Equatable, Sendable {
 }
 
 // MARK: - ClientReportFieldDefinition
+// Client-only: generated `ReportTypeField` uses `JoinFieldType` enum, `FieldValue`
+// for defaults, `FieldOperator` for showWhen, and `AccessLevel` enum. This client
+// model uses raw strings for flexibility in form rendering.
 
 /// Client-side field definition for runtime use. Named `Client*` to avoid
 /// conflict with the generated `ReportFieldDefinition` from protocol codegen.
@@ -112,6 +118,8 @@ struct ClientReportFieldDefinition: Codable, Identifiable, Equatable, Sendable {
 }
 
 // MARK: - ReportFieldType
+// Client-only: mirrors generated `JoinFieldType` but without `location` case.
+// Kept as separate enum for switch exhaustivity in form rendering.
 
 /// Supported field types for report form rendering.
 enum ReportFieldType: String, Sendable {
@@ -126,6 +134,8 @@ enum ReportFieldType: String, Sendable {
 }
 
 // MARK: - FieldOption
+// Client-only: structurally identical to generated `PurpleOption`/`CunningOption`
+// but kept with a clean name for readability.
 
 /// Key-label pair for select and multiselect field options.
 struct FieldOption: Codable, Equatable, Sendable {
@@ -134,6 +144,9 @@ struct FieldOption: Codable, Equatable, Sendable {
 }
 
 // MARK: - FieldDefaultValue
+// Structurally identical to generated `FieldValue` (same Codable shape).
+// Kept as separate type because call sites use `FieldDefaultValue` extensively
+// and the generated name `FieldValue` would conflict with other uses.
 
 /// Type-erased default value for a field definition. Matches the backend's
 /// `defaultValue` which can be a string, number, or boolean.
@@ -169,6 +182,8 @@ enum FieldDefaultValue: Codable, Equatable, Sendable {
 }
 
 // MARK: - FieldValidation
+// Client-only: generated `PurpleValidation` uses `Double?` for all fields.
+// This uses `Double?` too, matching.
 
 /// Validation constraints for a field definition.
 struct FieldValidation: Codable, Equatable, Sendable {
@@ -180,6 +195,8 @@ struct FieldValidation: Codable, Equatable, Sendable {
 }
 
 // MARK: - FieldShowWhen
+// Client-only: generated `PurpleShowWhen` uses `FieldOperator` enum and `FieldValue`
+// for the value. This uses raw strings for the operator and `FieldDefaultValue`.
 
 /// Conditional visibility rule for a field. The field is shown only when
 /// the referenced field's value satisfies the operator/value condition.
@@ -196,6 +213,8 @@ struct FieldShowWhen: Codable, Equatable, Sendable {
 }
 
 // MARK: - StatusOption
+// Structurally identical to generated `ReportTypeStatus` / `ReportTypeDefinitionStatus`.
+// Kept with `Identifiable` + `Equatable` conformances for SwiftUI compatibility.
 
 /// Status option with display metadata, used in report type definitions.
 struct StatusOption: Codable, Identifiable, Equatable, Sendable {

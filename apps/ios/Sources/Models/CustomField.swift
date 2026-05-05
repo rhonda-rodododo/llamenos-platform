@@ -1,6 +1,10 @@
 import Foundation
 
 // MARK: - CustomFieldDefinition
+// Client-only: generated `ProtocolCustomFieldDefinition` uses `CustomFieldDefinitionType`
+// for type, `Context` for context, `Double` for order/maxFiles/maxFileSize, and
+// `editableByUsers`/`visibleToUsers` (vs our `editableByVolunteers`/`visibleToVolunteers`).
+// Uses nested enums for type safety.
 
 /// Definition of a custom field attached to notes, matching the protocol spec (Appendix B).
 /// Fetched from `GET /api/settings/custom-fields`.
@@ -21,6 +25,8 @@ struct CustomFieldDefinition: Codable, Identifiable, Sendable {
     let createdAt: String?
 
     // MARK: - FieldType
+    // Client-only: generated `CustomFieldDefinitionType` has same cases plus `file`
+    // and `location`. This client enum is a subset for custom field forms.
 
     enum FieldType: String, Codable, Sendable {
         case text
@@ -31,6 +37,8 @@ struct CustomFieldDefinition: Codable, Identifiable, Sendable {
     }
 
     // MARK: - FieldContext
+    // Client-only: generated `Context` enum has `all`, `callNotes`, `conversationNotes`,
+    // `reports`. This client enum uses `both` instead of `all`.
 
     enum FieldContext: String, Codable, Sendable {
         case callNotes = "call-notes"
