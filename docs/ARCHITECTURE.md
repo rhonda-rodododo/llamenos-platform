@@ -9,7 +9,7 @@ apps/desktop/       Tauri v2 desktop shell (Rust backend + webview frontend)
 apps/worker/        Bun HTTP server (Hono + PostgreSQL)
 apps/ios/           Native SwiftUI iOS client
 apps/android/       Native Kotlin/Compose Android client
-apps/sip-bridge/    Protocol-agnostic SIP bridge (PBX_TYPE selects ARI/ESL/Kamailio)
+sip-bridge/         Protocol-agnostic SIP bridge (PBX_TYPE selects ARI/ESL/Kamailio)
 packages/crypto/    Shared Rust crypto crate (native + WASM + UniFFI)
 packages/protocol/  JSON Schema definitions + codegen (TS/Swift/Kotlin)
 packages/shared/    Cross-boundary TypeScript types and config

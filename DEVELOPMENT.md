@@ -2,211 +2,230 @@
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) (v1.0+) — runtime and package manager
-- [Wrangler](https://developers.cloudflare.com/workers/wrangler/) — Cloudflare Workers CLI (installed via `bun install`)
-- [Playwright](https://playwright.dev/) — E2E testing (installed via `bun install`)
+| Tool | Install |
+|------|---------|
+| [Bun](https://bun.sh/) (v1.0+) | `curl -fsSL https://bun.sh/install \| bash` |
+| [Rust](https://rustup.rs/) (1.85+) | Required for desktop and crypto crate |
+| [Docker + Docker Compose](https://docs.docker.com/engine/install/) | Required for backend development |
 
-## Setup
+**Linux WebKit (for Tauri desktop):**
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
+  libayatana-appindicator3-dev librsvg2-dev
+```
+
+**iOS (requires Mac M4 with Xcode 26+):** See `docs/DEVELOPMENT_SETUP.md`.
+
+## Initial Setup
 
 ```bash
 bun install
-bun run bootstrap-admin    # Generate admin keypair
-cp .dev.vars.example .dev.vars   # Configure env vars
+cp .dev.vars.example .dev.vars   # Configure Twilio creds + ADMIN_PUBKEY
+bun run bootstrap-admin          # Generate admin keypair
 ```
 
-## Commands
+## Running the Backend
+
+Always use the dev compose for backing services + `bun run dev:server` for the app:
 
 ```bash
-bun run dev          # Vite dev server (frontend only, hot reload)
-bun run dev:worker   # Wrangler dev server (full app with Workers + DOs)
-bun run build        # Vite build → dist/client/
-bun run deploy       # Build + wrangler deploy
-bun run typecheck    # TypeScript type checking (tsc --noEmit)
-bunx playwright test # Run all E2E tests
-bunx playwright test tests/smoke.spec.ts  # Run a single test file
-bun run test:ui      # Playwright UI mode
+# 1. Start PostgreSQL, RustFS, strfry relay
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
+
+# 2. Start the Bun HTTP server with file watching
+bun run dev:server
+```
+
+**Never** use the production compose (`deploy/docker/docker-compose.yml`) for local development — it bundles the app into a Docker image and won't reflect code changes.
+
+## Common Commands
+
+```bash
+# Backend
+bun run dev:server               # Bun HTTP server with file watching
+
+# Desktop
+bun run tauri:dev                # Tauri desktop app (Vite + Rust)
+bun run tauri:build              # Release build
+
+# Build & Type Check
+bun run build                    # Vite build → dist/client/
+bun run typecheck                # TypeScript type check (tsc --noEmit)
+bun run codegen                  # Generate TS/Swift/Kotlin types from Zod schemas
+
+# Testing
+bun run test                     # Playwright E2E tests (desktop, uses Tauri IPC mocks)
+bun run test:ui                  # Playwright UI mode
+bun run test:backend:bdd         # Backend BDD tests against local backend
+bun run test:all                 # All platforms (codegen + build + test)
+bun run test:changed             # Only platforms affected by git changes
+
+# iOS (run from Mac via ssh mac or bun run mac:run)
+bun run ios:build
+bun run ios:test
+bun run ios:uitest
+
+# Android
+bun run test:android             # Unit tests + lint + build androidTest APK
+bun run test:android:e2e         # Cucumber BDD E2E on connected device/emulator
+
+# Crypto (Rust)
+bun run crypto:test              # cargo test on packages/crypto
+bun run crypto:clippy            # cargo clippy
 ```
 
 ## Project Structure
 
 ```
+apps/
+  desktop/            # Tauri v2 desktop shell
+    src/lib.rs        # Tauri setup (IPC handlers, plugins, tray)
+    src/crypto.rs     # IPC command wrappers → packages/crypto
+    tauri.conf.json   # Tauri config (CSP, window, capabilities)
+  worker/             # Bun HTTP server (Hono + PostgreSQL)
+    routes/           # Hono API route handlers
+    db/               # Drizzle ORM schemas + migrations
+    services/         # Business logic
+    telephony/        # TelephonyAdapter + 8 provider adapters
+    messaging/        # MessagingAdapter + SMS/WhatsApp/Signal/Telegram/RCS adapters
+    lib/              # Auth, crypto, webauthn utilities
+  ios/                # Native SwiftUI iOS client (iOS 17+)
+  android/            # Native Kotlin/Compose Android client
+  sip-bridge/         # Protocol-agnostic SIP bridge (PBX_TYPE selects ARI/ESL/Kamailio)
+packages/
+  crypto/             # Shared Rust crypto crate (native + WASM + UniFFI)
+  protocol/           # JSON Schema definitions + codegen (TS/Swift/Kotlin)
+    schemas/          # 80+ Zod schema files — source of truth for all types
+    crypto-labels.json # 57 domain separation constants
+  shared/             # Cross-boundary TypeScript types and config
+  i18n/               # Localization files + iOS/Android string codegen
 src/
-  client/              # Frontend SPA
-    routes/            # TanStack Router file-based routes
-      setup.tsx        # Admin setup wizard (first-login flow)
-      conversations.tsx # Threaded messaging conversations
-      reports.tsx      # Reporter submission + admin review
-      help.tsx         # In-app FAQ and role-specific guides
-      link-device.tsx  # Device linking page (standalone, no auth required)
-    components/        # App components + ui/ (shadcn primitives)
-    lib/               # Client utilities
-      api.ts           # REST API client
-      auth.tsx         # Auth context (Nostr + WebAuthn)
-      key-manager.ts   # PIN-encrypted local key store (closure-based)
-      provisioning.ts  # Device linking (QR/code provisioning protocol)
-      crypto.ts        # E2EE encryption/decryption (notes, reports, export)
-      webrtc.ts        # WebRTC call handling
-      ws.ts            # WebSocket connection
-      backup.ts        # Encrypted backup/recovery key generation
-    locales/           # 13 locale JSON files
-  worker/              # Cloudflare Worker backend
-    routes/            # Hono API route handlers
-    durable-objects/   # 6 singleton DOs
-      identity-do.ts       # Auth, WebSocket, presence, device provisioning
-      settings-do.ts       # Settings, custom fields, IVR audio, messaging config
-      records-do.ts        # Audit log, call history, recordings
-      shift-manager.ts     # Shifts, volunteers, invites
-      call-router.ts       # Calls, notes, active call state
-      conversation-do.ts   # Threaded messaging conversations
-    telephony/         # Voice provider adapters
-      adapter.ts       # TelephonyAdapter interface
-      twilio.ts        # Twilio implementation
-      signalwire.ts    # SignalWire (extends Twilio)
-      vonage.ts        # Vonage (NCCO format)
-      plivo.ts         # Plivo (Plivo XML format)
-      asterisk.ts      # Asterisk ARI (JSON commands)
-      webrtc-tokens.ts # WebRTC token generation
-    messaging/         # Messaging channel adapters
-      adapter.ts       # MessagingAdapter interface
-      sms/             # SMS adapters (Twilio, SignalWire, Vonage, Plivo)
-      whatsapp.ts      # WhatsApp Business Cloud API (Meta Graph API v21.0)
-      signal.ts        # Signal via signal-cli-rest-api bridge
-    lib/               # Server utilities
-  shared/              # Cross-boundary code
-    types.ts           # Shared types (UserRole, ConversationMessage, ReportPayload, etc.)
-    languages.ts       # Language config (codes, labels, voice IDs)
-tests/                 # Playwright E2E tests (214+ tests)
-site/                  # Marketing site (Astro + Tailwind)
-sip-bridge/            # PBX bridge service (Asterisk/FreeSWITCH/Kamailio)
+  client/             # Frontend SPA (Vite + React + TanStack Router)
+    routes/           # File-based routes
+    components/       # App components + ui/ (shadcn primitives)
+    lib/
+      platform.ts     # Platform abstraction — routes crypto to Rust IPC
+      auth.tsx        # Auth context (Ed25519 device keys + WebAuthn)
+      ws.ts           # WebSocket / Nostr relay connection
+tests/
+  mocks/              # Tauri IPC mock layer for Playwright test builds
+docs/                 # Guides, protocol spec, security docs
 ```
+
+**`sip-bridge/`** is at the repository root (not inside `apps/`).
 
 ## Path Aliases
 
-Configured in both `tsconfig.json` and `vite.config.ts`:
+Configured in `tsconfig.json` and `vite.config.ts`:
 
-- `@/*` → `./src/client/*`
-- `@worker/*` → `./src/worker/*`
-- `@shared/*` → `./src/shared/*`
+| Alias | Target |
+|-------|--------|
+| `@/*` | `./src/client/*` |
+| `@worker/*` | `./apps/worker/*` |
+| `@shared/*` | `./packages/shared/*` |
+| `@protocol/*` | `./packages/protocol/*` |
+| `@llamenos/i18n` | `./packages/i18n/index.ts` |
 
 ## Key Config Files
 
-- `wrangler.jsonc` — Worker config, DO bindings, env vars
 - `playwright.config.ts` — E2E test config
 - `.dev.vars` — Local secrets (gitignored): Twilio creds, ADMIN_PUBKEY
 - `vite.config.ts` — Frontend build config
 - `tsconfig.json` — TypeScript config
+- `site/wrangler.jsonc` — Cloudflare Pages config (marketing site only — **no** wrangler config in `apps/worker/`)
 
 ## Architecture
 
-### Durable Objects
+### Backend (Bun HTTP + PostgreSQL)
 
-Six singleton DOs accessed via `idFromName()`:
+The backend runs as a Bun HTTP server with Hono routing and PostgreSQL persistence. It is **not** a Cloudflare Worker.
 
-| DO | ID | Purpose |
-|----|-----|---------|
-| IdentityDO | `global-identity` | Auth, WebSocket, presence, device provisioning |
-| SettingsDO | `global-settings` | Settings, custom fields, IVR audio, messaging config |
-| RecordsDO | `global-records` | Audit log, call history, recordings |
-| ShiftManagerDO | `global-shifts` | Shifts, volunteers, invites |
-| CallRouterDO | `global-calls` | Calls, notes, active call state |
-| ConversationDO | `global-conversations` | Threaded messaging conversations (SMS, WhatsApp, Signal) |
-
-> **Note:** The original `SessionManagerDO` was split into IdentityDO, SettingsDO, and RecordsDO (Epics 37-41) for separation of concerns.
-
-### Authentication
-
-Dual auth modes:
-1. **Schnorr signatures** — `Authorization: Bearer {timestamp}:{hex-signature}` (BIP-340)
-2. **WebAuthn sessions** — `Authorization: Session {token}` (256-bit random, 8hr expiry)
-
-### Key Management
-
-Client-side key protection via `src/client/lib/key-manager.ts`:
-
-- **PIN-encrypted local store** — nsec encrypted with PBKDF2 (600K iterations) + XChaCha20-Poly1305, stored in localStorage
-- **In-memory closure** — decrypted nsec held in a closure variable only, never in sessionStorage or any browser API
-- **Auto-lock** — key zeroed on idle timeout or `document.hidden`; components show "Enter PIN" overlay when locked
-- **Two-tier access** — "authenticated but locked" (session token) vs "authenticated and unlocked" (PIN entered, full crypto)
-- **Device linking** — Signal-style QR provisioning via ephemeral ECDH key exchange through IdentityDO relay rooms (5-min TTL)
-- **Recovery keys** — 128-bit Base32 recovery keys with mandatory encrypted backup download during onboarding
-
-### Telephony (Voice)
-
-The `TelephonyAdapter` interface abstracts provider-specific voice APIs. All adapters implement the same interface for call flow (IVR, CAPTCHA, queueing, ringing, recording, voicemail).
-
-Provider responses vary:
-- **Twilio/SignalWire**: TwiML (XML)
-- **Vonage**: NCCO (JSON)
-- **Plivo**: Plivo XML
-- **Asterisk**: JSON commands (via ARI bridge)
-
-### Messaging (SMS, WhatsApp, Signal)
-
-The `MessagingAdapter` interface abstracts text messaging across channels. Each adapter implements `sendMessage()`, `sendMediaMessage()`, `parseInboundWebhook()`, and `validateWebhook()`.
-
-| Channel | Adapter | Webhook Endpoint |
-|---------|---------|-----------------|
-| SMS | Per-provider (Twilio, SignalWire, Vonage, Plivo) | `POST /api/messaging/sms/webhook` |
-| WhatsApp | Meta Graph API v21.0 | `POST /api/messaging/whatsapp/webhook` |
-| Signal | signal-cli-rest-api bridge | `POST /api/messaging/signal/webhook` |
-
-All inbound messages are routed to the ConversationDO and broadcast via WebSocket (`conversation:new`, `message:new`).
-
-### Roles
-
-Four user roles defined in `src/shared/types.ts` (`UserRole`):
-
-| Role | Permissions |
-|------|------------|
-| `admin` | Full access: settings, volunteers, shifts, notes, calls, conversations, reports, audit |
-| `volunteer` | Answer calls, write notes, respond to conversations, view own data |
-| `reporter` | Submit encrypted reports with file attachments, view own reports |
-
-The `reporter` role has restricted navigation (reports + help only). Reporters are invited via the same invite flow as volunteers, with a role selector.
+| Service | Responsibility |
+|---------|---------------|
+| Identity service | Users, pubkeys, roles, device registry, sigchain |
+| Settings service | Hub settings, telephony config, spam rules |
+| Records service | Call records, notes, audit log |
+| Shift service | Shift schedules, assignments |
+| Call router | Active call routing, parallel ringing |
+| Conversation service | SMS/WhatsApp/Signal messaging threads |
+| CMS services | Contacts, cases, reports, evidence |
 
 ### Encryption
 
-- **Notes**: Per-note forward secrecy — each note encrypted with unique random 32-byte key (XChaCha20-Poly1305), key wrapped via ECIES for each reader (author + admin envelopes). Compromising identity key does not reveal past notes.
-- **Transcriptions**: ECIES — ephemeral ECDH (secp256k1) + XChaCha20-Poly1305, dual-encrypted for volunteer + admin
-- **Reports**: ECIES encrypted body + encrypted file attachments, dual-encrypted for reporter + admin
-- **Data export**: Notes export encrypted with user's key (XChaCha20-Poly1305, .enc format)
-- **Key derivation**: HKDF-SHA256 with application salt (`llamenos:hkdf-salt:v1`)
+All crypto is implemented in `packages/crypto/` (Rust), compiled to:
+- Native library — Tauri desktop (linked via `apps/desktop/Cargo.toml`)
+- UniFFI XCFramework — iOS
+- UniFFI JNI `.so` — Android
+- WASM — browser test builds only
+
+**Primitives:**
+- **Envelope encryption**: HPKE RFC 9180 (X25519 + HKDF-SHA256 + AES-256-GCM)
+- **Symmetric**: XChaCha20-Poly1305 (hub events)
+- **KDF**: HKDF-SHA-256, Argon2id (PINs, 64MB/3/4)
+- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (Nostr identity only)
+- **Domain separation**: 57 labeled contexts in `packages/protocol/crypto-labels.json`
+
+**Key model**: Each device has its own Ed25519 (signing) + X25519 (encryption) keypair. Device keys never enter the webview — all crypto calls go through Rust via Tauri IPC. The `platform.ts` abstraction is the only correct way to invoke crypto from the frontend.
+
+### Authentication
+
+```
+Authorization: Bearer <Ed25519 signed JSON>
+Authorization: Session <WebAuthn token>
+```
+
+### Real-Time Sync
+
+Nostr relay (strfry, self-hosted). All event content is encrypted with the hub key. Generic tags (`["t", "llamenos:event"]`) — relay cannot distinguish event types.
 
 ## Testing
 
-E2E tests only (no unit tests). Tests run against the Wrangler dev server.
+### E2E / Desktop (Playwright)
+
+Tests run against a mock Tauri IPC layer — no Rust backend needed:
 
 ```bash
-# Full suite
-bunx playwright test
-
-# Single file
-bunx playwright test tests/smoke.spec.ts
-
-# UI mode (interactive)
-bun run test:ui
-
-# Debug mode
-bunx playwright test --debug
+PLAYWRIGHT_TEST=true bun run test:build   # Build with mocks
+bun run test                              # Run all E2E tests
+bun run test:ui                           # Playwright UI mode
 ```
 
-Test helpers in `tests/helpers.ts` provide `loginAsAdmin()`, `loginAsVolunteer()`, `loginAsReporter()`, `resetTestState()`.
+Test helpers in `tests/helpers.ts`: `loginAsAdmin()`, `createUserAndGetNsec()`, `dismissNsecCard()`.
 
 ### Writing Tests
 
-- Always reset state in `beforeAll` or `beforeEach`
-- Use `{ exact: true }` for heading/text matchers to avoid ambiguity
-- For Settings navigation: `page.getByRole('link', { name: 'Settings' }).last()` (`.first()` matches "Admin Settings")
-- `PhoneInput` onBlur can swallow clicks — `await input.blur()` before clicking Save
-- Playwright runs with `workers: 1` for serial execution
+- Use `data-testid` attributes for selectors — never `getByRole(...)` with fragile name matches
+- Playwright runs with `workers: 3` (parallel)
+- Per-test isolation: create unique resources using `Date.now()` in names
+- `resetTestState()` belongs only in `tests/global-setup.ts` — not in individual test files
+
+### Backend BDD
+
+```bash
+bun run test:backend:bdd
+```
+
+Run against a local dev server. Requires the dev compose stack and `bun run dev:server`.
+
+## Schemas
+
+All Zod schemas live in `packages/protocol/schemas/`. The `apps/worker/schemas/` path is **gone** — worker routes import from `@protocol/schemas`.
+
+After any schema change:
+```bash
+bun run codegen    # Regenerate TS/Swift/Kotlin types
+bun run typecheck  # Verify no type errors
+```
 
 ## Common Gotchas
 
 - `@noble/ciphers` and `@noble/hashes` require `.js` extension in imports
 - `schnorr` is a separate named export: `import { schnorr } from '@noble/curves/secp256k1.js'`
 - Nostr pubkeys are x-only (32 bytes) — prepend `"02"` for ECDH
-- `secp256k1.getSharedSecret()` returns 33 bytes — extract x-coord with `.slice(1, 33)`
-- Workbox `navigateFallbackDenylist` excludes `/api/` and `/telephony/` routes
+- Never use raw string literals for crypto contexts — always use generated label constants from `@protocol/crypto-labels`
+- `PLAYWRIGHT_TEST=true` enables Vite aliases that swap Tauri IPC for JS mocks in `tests/mocks/`
+- **wrangler.jsonc is only at `site/wrangler.jsonc`** — do not run `wrangler` from the repo root
+- Zod schemas: always use `.optional().default(value)`, never bare `.default(value)` — Zod 4 produces wrong JSON Schema output otherwise
 
 ## Marketing Site
 
@@ -217,7 +236,5 @@ cd site
 bun install
 bun run dev         # Local dev server
 bun run build       # Build static site
-bunx wrangler pages deploy dist --project-name llamenos-site  # Deploy
+bun run deploy:site # Deploy (from repo root — do NOT run wrangler directly)
 ```
-
-Content collections in `site/src/content/docs/` for documentation pages (en + es).
