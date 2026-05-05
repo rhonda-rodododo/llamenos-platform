@@ -118,6 +118,7 @@ export const PERMISSION_CATALOG = {
   'files:upload': 'Upload files',
   'files:download-own': 'Download own/authorized files',
   'files:download-all': 'Download any file',
+  'files:manage-all': 'Manage any file (admin upload/status override)',
   'files:share': 'Re-encrypt/share files with others',
 
   // Cases / Records (CMS)

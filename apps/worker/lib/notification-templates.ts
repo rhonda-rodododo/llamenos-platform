@@ -19,7 +19,7 @@ export function renderStatusChangeNotification(
   entityTypeLabel: string,
   newStatus: string,
 ): string {
-  if (caseNumber) {
+  if (caseNumber && caseNumber.trim()) {
     return `Update on ${entityTypeLabel} ${caseNumber}: Status changed to ${newStatus}.`
   }
   return `Update: Status changed to ${newStatus}.`

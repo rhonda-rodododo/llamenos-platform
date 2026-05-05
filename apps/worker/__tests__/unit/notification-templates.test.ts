@@ -14,7 +14,7 @@ describe('renderStatusChangeNotification', () => {
 
   it('renders generic message when case number is whitespace-only', () => {
     const result = renderStatusChangeNotification('   ', 'incident', 'Open')
-    expect(result).toBe('Update on incident    : Status changed to Open.')
+    expect(result).toBe('Update: Status changed to Open.')
   })
 
   it('handles different entity types', () => {

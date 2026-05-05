@@ -102,7 +102,7 @@ uploads.put('/:id/chunks/:chunkIndex',
 
     // Verify ownership before accepting chunk
     const fileRecord = await services.conversations.getFile(uploadId)
-    if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:download-all')) {
+    if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:manage-all')) {
       return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -172,7 +172,7 @@ uploads.post('/:id/complete',
     // Verify all chunks are uploaded
     const fileRecord = await services.conversations.getFile(uploadId)
 
-    if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:download-all')) {
+    if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:manage-all')) {
       return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -286,7 +286,7 @@ uploads.get('/:id/status',
     const fileRecord = await services.conversations.getFile(uploadId)
 
     // Only allow the uploader or users with download-all to check status
-    if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:download-all')) {
+    if (fileRecord.uploadedBy !== pubkey && !checkPermission(permissions, 'files:manage-all')) {
       return c.json({ error: 'Upload not found' }, 404)
     }
     return c.json({
