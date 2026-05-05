@@ -15,7 +15,7 @@ import org.llamenos.hotline.model.ShiftsListResponse
 import org.llamenos.hotline.ui.notes.DecryptedNote
 import org.llamenos.hotline.ui.notes.NotesUiState
 import org.llamenos.hotline.ui.notes.displayValue
-import org.llamenos.protocol.ShiftResponse
+import org.llamenos.protocol.Shift
 
 /**
  * Unit tests for model serialization and data class behavior.
@@ -25,12 +25,12 @@ class ModelTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    // --- ShiftResponse Serialization (generated type) ---
+    // --- Shift Serialization (generated type) ---
 
     @Test
-    fun `ShiftResponse deserializes from JSON`() {
+    fun `Shift deserializes from JSON`() {
         val input = """{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0,3.0,5.0],"userPubkeys":[],"createdAt":"2026-03-01"}"""
-        val shift = json.decodeFromString<ShiftResponse>(input)
+        val shift = json.decodeFromString<Shift>(input)
 
         assertEquals("s1", shift.id)
         assertEquals("Morning", shift.name)
@@ -41,9 +41,9 @@ class ModelTest {
     }
 
     @Test
-    fun `ShiftResponse deserializes with userPubkeys`() {
+    fun `Shift deserializes with userPubkeys`() {
         val input = """{"id":"s2","name":"Evening","startTime":"18:00","endTime":"02:00","days":[0.0],"userPubkeys":["pk1","pk2"],"createdAt":"2026-03-01"}"""
-        val shift = json.decodeFromString<ShiftResponse>(input)
+        val shift = json.decodeFromString<Shift>(input)
 
         assertEquals(listOf("pk1", "pk2"), shift.userPubkeys)
     }
@@ -79,12 +79,11 @@ class ModelTest {
     }
 
     @Test
-    fun `ShiftsListResponse deserializes with total count`() {
-        val input = """{"shifts":[{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0],"userPubkeys":[],"createdAt":"2026-03-01"}],"total":42}"""
+    fun `ShiftsListResponse deserializes shifts array`() {
+        val input = """{"shifts":[{"id":"s1","name":"Morning","startTime":"09:00","endTime":"17:00","days":[1.0],"userPubkeys":[],"createdAt":"2026-03-01"}]}"""
         val response = json.decodeFromString<ShiftsListResponse>(input)
 
         assertEquals(1, response.shifts.size)
-        assertEquals(42, response.total)
     }
 
     // --- NotePayload Serialization ---

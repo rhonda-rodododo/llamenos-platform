@@ -62,10 +62,12 @@ import org.llamenos.hotline.ui.theme.LlamenosTheme
 import org.llamenos.hotline.ui.triage.TriageScreen
 import org.llamenos.hotline.ui.triage.TriageUiState
 import org.llamenos.hotline.ui.triage.TriageViewModel
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.llamenos.protocol.ActiveCallResponseStatus
-import org.llamenos.protocol.CallRecordResponse
+import org.llamenos.protocol.CallHistoryResponseCall
 import org.llamenos.protocol.Record
-import org.llamenos.protocol.ShiftResponse
+import org.llamenos.protocol.Shift
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -133,7 +135,7 @@ class ScreenshotTests {
     )
 
     private val sampleCallRecords = listOf(
-        CallRecordResponse(
+        CallHistoryResponseCall(
             id = "call-001",
             startedAt = sampleTimestamp,
             status = ActiveCallResponseStatus.Completed,
@@ -141,7 +143,7 @@ class ScreenshotTests {
             duration = 185.0,
             callerLast4 = "7890",
         ),
-        CallRecordResponse(
+        CallHistoryResponseCall(
             id = "call-002",
             startedAt = sampleTimestamp2,
             status = ActiveCallResponseStatus.Completed,
@@ -149,7 +151,7 @@ class ScreenshotTests {
             duration = 423.0,
             callerLast4 = "3456",
         ),
-        CallRecordResponse(
+        CallHistoryResponseCall(
             id = "call-003",
             startedAt = "2026-04-28T22:10:00Z",
             status = ActiveCallResponseStatus.Unanswered,
@@ -157,7 +159,7 @@ class ScreenshotTests {
             duration = null,
             callerLast4 = "1122",
         ),
-        CallRecordResponse(
+        CallHistoryResponseCall(
             id = "call-004",
             startedAt = "2026-04-28T18:45:00Z",
             status = ActiveCallResponseStatus.Completed,
@@ -279,7 +281,7 @@ class ScreenshotTests {
     )
 
     private val sampleShifts = listOf(
-        ShiftResponse(
+        Shift(
             createdAt = "2026-04-01T00:00:00Z",
             days = listOf(1.0, 3.0, 5.0),
             endTime = "22:00",
@@ -288,7 +290,7 @@ class ScreenshotTests {
             startTime = "18:00",
             userPubkeys = listOf(samplePubkey, samplePubkey2),
         ),
-        ShiftResponse(
+        Shift(
             createdAt = "2026-04-01T00:00:00Z",
             days = listOf(6.0, 0.0),
             endTime = "08:00",
@@ -297,7 +299,7 @@ class ScreenshotTests {
             startTime = "22:00",
             userPubkeys = listOf(samplePubkey2),
         ),
-        ShiftResponse(
+        Shift(
             createdAt = "2026-04-01T00:00:00Z",
             days = listOf(1.0, 2.0, 3.0, 4.0, 5.0),
             endTime = "14:00",
@@ -373,45 +375,40 @@ class ScreenshotTests {
 
     private val sampleUsers = listOf(
         User(
-            id = "user-001",
+            active = true,
+            name = "Sarah Chen",
             pubkey = samplePubkey,
-            displayName = "Sarah Chen",
-            role = "volunteer",
-            status = "active",
+            roles = listOf("role-volunteer"),
             createdAt = "2026-01-15T00:00:00Z",
         ),
         User(
-            id = "user-002",
+            active = true,
+            name = "Marcus Rivera",
             pubkey = samplePubkey2,
-            displayName = "Marcus Rivera",
-            role = "volunteer",
-            status = "active",
+            roles = listOf("role-volunteer"),
             createdAt = "2026-02-01T00:00:00Z",
         ),
         User(
-            id = "user-003",
+            active = true,
+            name = "Jordan Lee",
             pubkey = "npub1admin000000000000000000000000000000000000000000000000000000ad",
-            displayName = "Jordan Lee",
-            role = "admin",
-            status = "active",
+            roles = listOf("role-admin"),
             createdAt = "2025-12-01T00:00:00Z",
         ),
     )
 
     private val sampleBans = listOf(
         BanEntry(
-            id = "ban-001",
-            identifierHash = "ban-hash-abc",
+            bannedAt = "2026-04-15T10:00:00Z",
+            bannedBy = samplePubkey,
+            phone = "ban-hash-abc",
             reason = "Repeated abusive calls targeting volunteers",
-            createdBy = samplePubkey,
-            createdAt = "2026-04-15T10:00:00Z",
         ),
         BanEntry(
-            id = "ban-002",
-            identifierHash = "ban-hash-def",
+            bannedAt = "2026-04-10T14:30:00Z",
+            bannedBy = samplePubkey2,
+            phone = "ban-hash-def",
             reason = "Spam calls",
-            createdBy = samplePubkey2,
-            createdAt = "2026-04-10T14:30:00Z",
         ),
     )
 
@@ -420,28 +417,28 @@ class ScreenshotTests {
             id = "audit-001",
             action = "call.answered",
             actorPubkey = samplePubkey,
-            details = "Call ID: call-001, Duration: 3m 5s",
+            details = JsonObject(mapOf("description" to JsonPrimitive("Call ID: call-001, Duration: 3m 5s"))),
             entryHash = "sha256-001",
             previousEntryHash = null,
-            timestamp = sampleTimestamp,
+            createdAt = sampleTimestamp,
         ),
         AuditEntry(
             id = "audit-002",
             action = "note.created",
             actorPubkey = samplePubkey,
-            details = "Note ID: note-001",
+            details = JsonObject(mapOf("description" to JsonPrimitive("Note ID: note-001"))),
             entryHash = "sha256-002",
             previousEntryHash = "sha256-001",
-            timestamp = sampleTimestamp2,
+            createdAt = sampleTimestamp2,
         ),
         AuditEntry(
             id = "audit-003",
             action = "user.created",
             actorPubkey = "npub1admin000000000000000000000000000000000000000000000000000000ad",
-            details = "New volunteer: Sarah Chen",
+            details = JsonObject(mapOf("description" to JsonPrimitive("New volunteer: Sarah Chen"))),
             entryHash = "sha256-003",
             previousEntryHash = "sha256-002",
-            timestamp = "2026-04-01T09:00:00Z",
+            createdAt = "2026-04-01T09:00:00Z",
         ),
     )
 
@@ -497,7 +494,7 @@ class ScreenshotTests {
                     callerNumber = "+1 (555) 123-****",
                     answeredBy = samplePubkey,
                     startedAt = sampleTimestamp,
-                    status = "in-progress",
+                    status = ActiveCallResponseStatus.InProgress,
                 ),
             )
         )

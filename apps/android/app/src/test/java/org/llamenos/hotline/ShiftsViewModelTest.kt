@@ -98,7 +98,7 @@ class ShiftsViewModelTest {
         assertNull(cleared.error)
     }
 
-    private fun mockShift(id: String) = org.llamenos.protocol.ShiftResponse(
+    private fun mockShift(id: String) = org.llamenos.protocol.Shift(
         id = id,
         name = "Test Shift",
         startTime = "09:00",

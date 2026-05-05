@@ -3,25 +3,18 @@ package org.llamenos.hotline.model
 import kotlinx.serialization.Serializable
 
 /**
- * Admin-defined custom field definition for notes.
+ * Client-side custom field definition with String type/context fields.
  *
- * Custom fields allow organizations to capture structured data alongside
- * free-text notes. The [type] determines the input widget:
- * - "text" -> single-line text field
- * - "number" -> numeric input
- * - "select" -> dropdown with [options]
- * - "checkbox" -> toggle switch
- * - "textarea" -> multi-line text area
- * - "file" -> file attachment (not yet implemented on mobile)
+ * The generated CustomFieldDefinition (org.llamenos.protocol.CustomFieldDefinition)
+ * uses enum types (Context, CustomFieldDefinitionType) and has different field names
+ * (editableByUsers vs editableByVolunteers). This client type uses String for the
+ * type and context fields to simplify UI construction.
  *
- * [context] determines where the field appears (e.g., "note", "call").
- *
- * Note: The generated CustomFieldResponse covers the API response shape.
- * This client type extends it with additional client-specific fields
- * (id, validation, editableByVolunteers) for local UI usage.
+ * Renamed from CustomFieldDefinition to CustomFieldDef to avoid collision with
+ * the generated type.
  */
 @Serializable
-data class CustomFieldDefinition(
+data class CustomFieldDef(
     val id: String,
     val name: String,
     val label: String,

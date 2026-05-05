@@ -46,6 +46,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.AuditEntry
+import org.llamenos.hotline.model.detailsString
+import org.llamenos.hotline.model.displayName
+import org.llamenos.hotline.model.role
+import org.llamenos.hotline.model.status
+import org.llamenos.hotline.model.timestamp
 
 /**
  * Volunteer detail/profile screen for admins.
@@ -369,9 +374,10 @@ private fun ActivityRow(
                 },
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (entry.details != null) {
+            val detailsText = entry.detailsString
+            if (detailsText != null) {
                 Text(
-                    text = entry.details,
+                    text = detailsText,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     maxLines = 1,

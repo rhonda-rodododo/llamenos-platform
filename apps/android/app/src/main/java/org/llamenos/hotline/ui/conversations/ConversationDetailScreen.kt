@@ -65,6 +65,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.DecryptedMessage
+import org.llamenos.hotline.model.displayName
+import org.llamenos.hotline.model.role
 
 /**
  * Conversation detail screen showing message bubbles and reply input.

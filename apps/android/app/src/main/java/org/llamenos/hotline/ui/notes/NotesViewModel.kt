@@ -21,7 +21,7 @@ import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.hub.ActiveHubState
-import org.llamenos.hotline.model.CustomFieldDefinition
+import org.llamenos.hotline.model.CustomFieldDef
 import org.llamenos.hotline.model.NotePayload
 import org.llamenos.hotline.model.NoteRepliesResponse
 import org.llamenos.hotline.model.NoteReply
@@ -31,6 +31,7 @@ import org.llamenos.protocol.CreateNoteBodyAdminEnvelope
 import org.llamenos.protocol.CreateNoteBodyAuthorEnvelope
 import org.llamenos.protocol.CreateReplyBody
 import org.llamenos.protocol.CreateReplyBodyReaderEnvelope
+import org.llamenos.protocol.Note
 import org.llamenos.protocol.NoteResponse
 import org.llamenos.protocol.RecipientEnvelope
 import javax.inject.Inject
@@ -74,7 +75,7 @@ data class NotesUiState(
     val searchQuery: String = "",
 
     // Note creation / editing
-    val customFields: List<CustomFieldDefinition> = emptyList(),
+    val customFields: List<CustomFieldDef> = emptyList(),
     val isSaving: Boolean = false,
     val saveError: String? = null,
     val saveSuccess: Boolean = false,
@@ -149,8 +150,8 @@ class NotesViewModel @Inject constructor(
                         isLoading = false,
                         isRefreshing = false,
                         currentPage = page,
-                        totalNotes = response.total,
-                        hasMorePages = allNotes.size < response.total,
+                        totalNotes = response.total.toInt(),
+                        hasMorePages = allNotes.size < response.total.toInt(),
                     )
                 }
             } catch (e: Exception) {
@@ -187,7 +188,7 @@ class NotesViewModel @Inject constructor(
     private fun loadCustomFields() {
         viewModelScope.launch {
             try {
-                val fields = apiService.request<List<CustomFieldDefinition>>(
+                val fields = apiService.request<List<CustomFieldDef>>(
                     "GET",
                     "/api/settings/custom-fields",
                 )
@@ -507,10 +508,24 @@ class NotesViewModel @Inject constructor(
      */
     private suspend fun decryptReply(reply: NoteReply): DecryptedReply? {
         val ourPubkey = cryptoService.encryptionPubkeyHex ?: return null
-        val envelope = reply.readerEnvelopes.find { it.pubkey == ourPubkey } ?: return null
-        val hpkeEnvelope = org.llamenos.hotline.crypto.HpkeEnvelope(
-            v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey,
-        )
+
+        val hpkeEnvelope: org.llamenos.hotline.crypto.HpkeEnvelope =
+            if (reply.authorPubkey == ourPubkey && reply.authorEnvelope != null) {
+                org.llamenos.hotline.crypto.HpkeEnvelope(
+                    v = 3, labelId = 0,
+                    enc = reply.authorEnvelope!!.ephemeralPubkey,
+                    ct = reply.authorEnvelope!!.wrappedKey,
+                )
+            } else {
+                reply.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
+                    org.llamenos.hotline.crypto.HpkeEnvelope(
+                        v = 3, labelId = 0,
+                        enc = adminEnv.ephemeralPubkey,
+                        ct = adminEnv.wrappedKey,
+                    )
+                } ?: return null
+            }
+
         return try {
             val payload = cryptoService.decryptNote(reply.encryptedContent, hpkeEnvelope)
             if (payload != null) {
@@ -531,7 +546,7 @@ class NotesViewModel @Inject constructor(
     /**
      * Decrypt a single note by finding our HPKE envelope and calling CryptoService.
      */
-    private suspend fun decryptNote(note: NoteResponse): DecryptedNote? {
+    private suspend fun decryptNote(note: Note): DecryptedNote? {
         val ourPubkey = cryptoService.encryptionPubkeyHex ?: return null
 
         // Build HPKE envelope from wire format: check authorEnvelope first (if we're

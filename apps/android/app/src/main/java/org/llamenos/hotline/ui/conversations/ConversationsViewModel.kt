@@ -26,6 +26,7 @@ import org.llamenos.hotline.model.MessagesListResponse
 import org.llamenos.hotline.model.SendMessageRequest
 import org.llamenos.hotline.model.User
 import org.llamenos.hotline.model.UsersListResponse
+import org.llamenos.hotline.model.status
 import javax.inject.Inject
 
 /**

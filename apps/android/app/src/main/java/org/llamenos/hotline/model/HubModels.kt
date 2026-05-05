@@ -2,71 +2,46 @@ package org.llamenos.hotline.model
 
 import kotlinx.serialization.Serializable
 
+// ── Generated response types ────────────────────────────────────────────────
+
 /**
  * A hub representing a hotline operation.
- *
- * Client-specific shape — the generated HubResponse uses enum status
- * (HubResponseStatus) and has optional slug/createdAt/updatedAt, while
- * this type uses String status with non-nullable defaults for createdBy,
- * createdAt, updatedAt (fields not in the generated type).
+ * Uses the generated HubResponse type. Extension properties in Extensions.kt
+ * provide statusString (HubStatus enum → String).
  */
-@Serializable
-data class Hub(
-    val id: String,
-    val name: String,
-    val slug: String,
-    val description: String? = null,
-    val status: String = "active",
-    val phoneNumber: String? = null,
-    val createdBy: String = "",
-    val createdAt: String = "",
-    val updatedAt: String = "",
-)
+typealias Hub = org.llamenos.protocol.HubListResponseHub
 
 /**
  * Response from GET /api/hubs.
- * Client-side wrapper that uses the client Hub type.
  */
-@Serializable
-data class HubsListResponse(
-    val hubs: List<Hub>,
-)
+typealias HubsListResponse = org.llamenos.protocol.HubListResponse
+
+// ── Client-specific types ───────────────────────────────────────────────────
 
 /**
  * Response from POST /api/hubs.
  */
 @Serializable
 data class CreateHubResponse(
-    val hub: Hub,
+    val hub: org.llamenos.protocol.HubListResponseHub,
 )
 
 /**
  * Request body for POST /api/hubs.
- * Client-specific simplified shape — matches CreateHubBody but without slug.
+ * Uses the generated CreateHubBody.
  */
-@Serializable
-data class CreateHubRequest(
-    val name: String,
-    val description: String? = null,
-    val phoneNumber: String? = null,
-)
+typealias CreateHubRequest = org.llamenos.protocol.CreateHubBody
 
 /**
  * Response from PATCH /api/hubs/:id.
  */
 @Serializable
 data class UpdateHubResponse(
-    val hub: Hub,
+    val hub: org.llamenos.protocol.HubListResponseHub,
 )
 
 /**
  * Request body for PATCH /api/hubs/:id.
- * Client-specific simplified shape — matches UpdateHubBody but without
- * slug and status (enum) fields.
+ * Uses the generated UpdateHubBody.
  */
-@Serializable
-data class UpdateHubRequest(
-    val name: String? = null,
-    val description: String? = null,
-    val phoneNumber: String? = null,
-)
+typealias UpdateHubRequest = org.llamenos.protocol.UpdateHubBody

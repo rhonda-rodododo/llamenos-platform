@@ -56,6 +56,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.AuditEntry
+import org.llamenos.hotline.model.detailsString
+import org.llamenos.hotline.model.timestamp
 
 /**
  * Audit log tab in the admin panel.
@@ -322,10 +324,11 @@ private fun AuditEntryCard(
                 )
 
                 // Optional details
-                if (entry.details != null) {
+                val detailsText = entry.detailsString
+                if (detailsText != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = entry.details,
+                        text = detailsText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         maxLines = 2,

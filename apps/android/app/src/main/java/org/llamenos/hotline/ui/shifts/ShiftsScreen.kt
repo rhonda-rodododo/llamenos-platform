@@ -46,7 +46,7 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.model.dayIndices
 import org.llamenos.hotline.model.displayStatus
 import org.llamenos.hotline.util.DateFormatUtils
-import org.llamenos.protocol.ShiftResponse
+import org.llamenos.hotline.model.ShiftResponse
 
 /**
  * Shifts screen showing clock in/out toggle and available shifts.
