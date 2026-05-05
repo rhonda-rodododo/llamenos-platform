@@ -70,32 +70,40 @@ class ActiveCallSteps : BaseSteps() {
             Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}", e)
         }
 
-        // Navigate to dashboard and wait for the active call card to appear.
-        // The card arrives via WebSocket/Nostr relay event — give it time to deliver.
+        // Navigate to dashboard and trigger pull-to-refresh to fetch the active call.
+        // WebSocket/relay events are unreliable in E2E tests — explicit refresh ensures
+        // DashboardViewModel.fetchActiveCall() runs after the simulation completes.
         navigateToTab(NAV_DASHBOARD)
         composeRule.waitForIdle()
+
+        // Swipe down on the PullToRefreshBox to trigger ViewModel.refresh()
+        try {
+            onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
+            composeRule.waitForIdle()
+        } catch (e: Throwable) {
+            Log.w("ActiveCallSteps", "Pull-to-refresh swipe failed: ${e.message}")
+        }
+
         val appearedViaRelay = try {
-            composeRule.waitUntil(15_000) {
+            composeRule.waitUntil(10_000) {
                 composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
             }
             true
         } catch (_: Throwable) {
-            Log.w("ActiveCallSteps", "active-call-card did not appear within 15 s — trying pull-to-refresh")
+            Log.w("ActiveCallSteps", "active-call-card did not appear within 10 s — trying pull-to-refresh retry")
             false
         }
 
         if (!appearedViaRelay) {
-            // Trigger pull-to-refresh to fetch the active call from the API directly.
+            // Retry refresh once — the first swipe may have been too early
             try {
-                composeRule.onNodeWithTag("dashboard-title").performTouchInput { swipeDown() }
+                onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
                 composeRule.waitForIdle()
-                Thread.sleep(2000) // Allow network round-trip
                 composeRule.waitUntil(10_000) {
                     composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
                 }
-                Log.d("ActiveCallSteps", "active-call-card appeared after pull-to-refresh")
             } catch (_: Throwable) {
-                Log.w("ActiveCallSteps", "active-call-card still not present after pull-to-refresh")
+                Log.w("ActiveCallSteps", "active-call-card did not appear after pull-to-refresh")
             }
         }
     }
