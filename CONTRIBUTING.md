@@ -8,31 +8,40 @@ want to work on — you don't need to set up all platforms.
 
 ## Prerequisites
 
-**All contributors:**
-- [Bun](https://bun.sh/) 1.3.5+ (`curl -fsSL https://bun.sh/install | bash`)
-- [Docker](https://docs.docker.com/get-docker/) (for local backing services)
+**All contributors need:**
+- [mise](https://mise.jdx.dev/) — polyglot version manager (`curl https://mise.run | sh`)
+- [Docker](https://docs.docker.com/get-docker/) — for local backing services (PostgreSQL, object storage, Nostr relay)
 - Git
 
 **Desktop (Tauri) or Crypto (Rust):**
-- [Rust](https://rustup.rs/) — toolchain version is managed by `rust-toolchain.toml` per workspace
+- [Rust](https://rustup.rs/) — install rustup; toolchain version is managed per workspace by `rust-toolchain.toml`
 
 **Android:**
-- JDK 17 (Temurin recommended)
-- Android SDK with NDK r27
+- Android SDK with NDK r27 — install via Android Studio SDK Manager
 
 **iOS (macOS only):**
-- Xcode 16+
+- Xcode 16+ — install from the App Store
 - `xcodegen` (`brew install xcodegen`)
 
-### With mise (optional but recommended)
+### mise manages: Bun, JDK 17, Ruby (Fastlane)
 
-[mise](https://mise.jdx.dev/) is a polyglot version manager. If you use it:
+After installing mise, one command installs all pinned versions:
 
 ```bash
-mise install     # Installs Bun 1.3.5 and JDK 17 as declared in .mise.toml
+mise install     # installs Bun 1.3.5, JDK 17, Ruby 3.3
 ```
 
-Rust is managed by `rust-toolchain.toml` files in each workspace — mise respects these automatically.
+**Ruby / Fastlane:** both `apps/ios/fastlane` and `apps/android/fastlane` use Fastlane for
+App Store / Play Store delivery. After `mise install`, install the Fastlane gems:
+
+```bash
+cd apps/ios && bundle install    # installs Fastlane into apps/ios/vendor/bundle/
+```
+
+**Rust:** mise does _not_ pin Rust — `apps/desktop/rust-toolchain.toml` (1.85.0) and
+`packages/crypto/rust-toolchain.toml` (stable) handle per-workspace pinning via rustup.
+
+**Swift:** macOS-only; managed by Xcode. The project targets swift-tools-version 5.9 / iOS 17+.
 
 ---
 
@@ -41,7 +50,8 @@ Rust is managed by `rust-toolchain.toml` files in each workspace — mise respec
 ```bash
 git clone git@github.com:your-org/llamenos.git
 cd llamenos
-bun install
+mise install          # Bun + JDK + Ruby
+bun install           # JS/TS dependencies
 bash scripts/dev-setup.sh    # prerequisite check + troubleshooting hints
 ```
 
