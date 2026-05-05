@@ -653,12 +653,8 @@ describe('CallsService', () => {
     })
   })
 
-  describe('BUG: reportSpam ignores pubkey parameter', () => {
-    it('reportSpam accepts pubkey but does not store it — documenting the gap', async () => {
-      // This test documents that reportSpam takes a pubkey param
-      // but the current implementation only sets status='spam'
-      // without recording WHO reported it. This is a data gap
-      // that may be needed for audit logging.
+  describe('reportSpam stores reporter pubkey', () => {
+    it('sets status to spam and records reportedBy', async () => {
       const updateSet = vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
       })
@@ -671,10 +667,8 @@ describe('CallsService', () => {
       const result = await svc.reportSpam('hub-1', 'call-1', 'reporter-pk')
 
       expect(result).toEqual({ ok: true })
-      // Verify that only status is set — pubkey is ignored
       const setCall = updateSet.mock.calls[0][0]
-      expect(setCall).toEqual({ status: 'spam' })
-      expect(setCall).not.toHaveProperty('reportedBy')
+      expect(setCall).toEqual({ status: 'spam', reportedBy: 'reporter-pk' })
     })
   })
 

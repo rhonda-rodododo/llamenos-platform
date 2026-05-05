@@ -446,12 +446,11 @@ export class CallsService {
     return { ok: true }
   }
 
-  /** Report a call as spam */
+  /** Report a call as spam, recording who reported it for audit trail */
   async reportSpam(hubId: string, callId: string, pubkey: string): Promise<{ ok: true }> {
-    // Mark the call as spam in the active calls table
     await this.db
       .update(activeCalls)
-      .set({ status: 'spam' })
+      .set({ status: 'spam', reportedBy: pubkey })
       .where(
         and(
           eq(activeCalls.callId, callId),

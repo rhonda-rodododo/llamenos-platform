@@ -252,9 +252,7 @@ describe('startParallelRinging', () => {
     ).resolves.toBeUndefined()
   })
 
-  it('BUG: createCallToken gets empty string when vol.pubkey is falsy', async () => {
-    // If a user row has a falsy pubkey (shouldn't happen, but test the code path),
-    // createCallToken receives '' for volunteerPubkey due to `vol.pubkey ?? ''`
+  it('skips volunteers with empty pubkey — no token created', async () => {
     const services = makeServices({
       onShiftPubkeys: [''],
       allUsers: [makeUser({ pubkey: '', active: true, phone: '+15551111111' })],
@@ -262,10 +260,7 @@ describe('startParallelRinging', () => {
 
     await startParallelRinging('CA-10', '+15551234567', 'http://localhost', makeEnv(), services, 'hub-1')
 
-    // Token should be created with empty pubkey — documents the gap
-    if ((services.calls.createCallToken as ReturnType<typeof vi.fn>).mock.calls.length > 0) {
-      const tokenArgs = (services.calls.createCallToken as ReturnType<typeof vi.fn>).mock.calls[0][0]
-      expect(tokenArgs.volunteerPubkey).toBe('')
-    }
+    // Volunteers with falsy pubkeys are filtered out before token creation
+    expect(services.calls.createCallToken).not.toHaveBeenCalled()
   })
 })

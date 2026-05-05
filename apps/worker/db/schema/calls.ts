@@ -29,6 +29,7 @@ export const activeCalls = pgTable(
     hasVoicemail: boolean('has_voicemail').default(false),
     hasRecording: boolean('has_recording').default(false),
     recordingSid: text('recording_sid'),
+    reportedBy: text('reported_by'),
     startedAt: timestamp('started_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
