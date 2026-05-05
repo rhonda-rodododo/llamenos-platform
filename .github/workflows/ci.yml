@@ -377,7 +377,7 @@ jobs:
 
   # ─── Backend BDD Tests ─────────────────────────────────────
   backend-bdd:
-    needs: [changes, build]
+    needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
