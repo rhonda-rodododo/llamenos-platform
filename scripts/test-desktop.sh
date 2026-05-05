@@ -60,6 +60,18 @@ if ! reporter_run_step "test:build" bun run build; then
 fi
 reporter_record_suite "build" 1 0 0
 
+# Step 3.5: Generate crypto interop test vectors (enables crypto-interop.spec.ts)
+# Vectors are gitignored (non-deterministic nonces) so must be generated at test time.
+# Non-fatal: if cargo is unavailable or compilation fails, the 32 interop tests are skipped.
+if command -v cargo &>/dev/null; then
+  if reporter_run_step "crypto:interop-vectors" \
+      cargo test --manifest-path packages/crypto/Cargo.toml --test interop; then
+    reporter_record_suite "crypto:interop-vectors" 1 0 0
+  else
+    echo "WARNING: crypto interop vector generation failed — interop tests will be skipped" >&2
+  fi
+fi
+
 # Step 4: Start vite preview server and run Playwright E2E tests
 # Start the server in the background — set PLAYWRIGHT_BASE_URL so Playwright
 # skips its own webServer (which uses Unix env-var syntax incompatible with Windows).
@@ -77,7 +89,7 @@ for _i in $(seq 1 30); do
 done
 
 export PLAYWRIGHT_BASE_URL="http://localhost:8788"
-if reporter_run_step "playwright" bunx playwright test; then
+if reporter_run_step "playwright" bunx playwright test --project=bootstrap --project=chromium --project=bdd; then
   parse_playwright_results "$REPORTER_LOG_FILE"
   reporter_record_suite "playwright" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
 else

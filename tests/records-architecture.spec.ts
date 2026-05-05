@@ -8,7 +8,7 @@
  * - Custom field context filtering (call-notes, conversation-notes, reports)
  */
 import { test, expect, type Page } from '@playwright/test'
-import { loginAsAdmin, loginAsVolunteer, createUserAndGetNsec, dismissNsecCard, navigateAfterLogin, TestIds, Navigation, uniquePhone } from './helpers'
+import { loginAsAdmin, loginAsVolunteer, createUserAndGetNsec, dismissNsecCard, navigateAfterLogin, TestIds, Navigation, uniquePhone, Timeouts } from './helpers'
 
 /**
  * Fill the call-id field in the new note form.
@@ -56,7 +56,7 @@ test.describe('Records Architecture', () => {
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 
     // Note should appear
-    await expect(page.locator('p').filter({ hasText: 'Note for threading test' })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId(TestIds.NOTE_DETAIL_TEXT).filter({ hasText: 'Note for threading test' }).first()).toBeVisible({ timeout: 10000 })
 
     // Reply button should be visible
     await expect(page.getByTestId(TestIds.NOTE_REPLY_BTN).first()).toBeVisible()
@@ -72,7 +72,7 @@ test.describe('Records Architecture', () => {
     await fillCallId(page, callId)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Note with reply')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await expect(page.locator('p').filter({ hasText: 'Note with reply' })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId(TestIds.NOTE_DETAIL_TEXT).filter({ hasText: 'Note with reply' }).first()).toBeVisible({ timeout: 10000 })
 
     // Click reply button
     await page.getByTestId(TestIds.NOTE_REPLY_BTN).first().click()
@@ -94,8 +94,9 @@ test.describe('Records Architecture', () => {
     // Wait for the reply to be sent
 
     // The reply button text should now show "1 replies"
+    // Wait for the async send (encrypt → API → state update) to complete
     const replyBtn = page.getByTestId(TestIds.NOTE_REPLY_BTN).first()
-    await expect(replyBtn).toContainText(/1 repl/i)
+    await expect(replyBtn).toContainText(/1 repl/i, { timeout: Timeouts.API })
   })
 
   test('reply button shows count after collapse and re-expand', async ({ page }) => {
@@ -108,7 +109,7 @@ test.describe('Records Architecture', () => {
     await fillCallId(page, callId)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Note for collapse test')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await expect(page.locator('p').filter({ hasText: 'Note for collapse test' })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId(TestIds.NOTE_DETAIL_TEXT).filter({ hasText: 'Note for collapse test' }).first()).toBeVisible({ timeout: 10000 })
 
     // Expand thread and send reply
     await page.getByTestId(TestIds.NOTE_REPLY_BTN).first().click()
@@ -117,6 +118,9 @@ test.describe('Records Architecture', () => {
     await expect(replyTextarea).toBeVisible({ timeout: 5000 })
     await replyTextarea.fill('Reply to collapse test')
     await page.getByTestId(TestIds.NOTE_REPLY_SEND).click()
+
+    // Wait for the reply to be registered before collapsing
+    await expect(page.getByTestId(TestIds.NOTE_REPLY_BTN).first()).toContainText(/1 repl/i, { timeout: Timeouts.API })
 
     // Collapse thread
     await page.getByTestId(TestIds.NOTE_REPLY_BTN).first().click()
@@ -236,14 +240,14 @@ test.describe('Records Architecture', () => {
     await fillCallId(page, callId)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Grouped note A')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await expect(page.locator('p').filter({ hasText: 'Grouped note A' })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId(TestIds.NOTE_DETAIL_TEXT).filter({ hasText: 'Grouped note A' }).first()).toBeVisible({ timeout: 10000 })
 
     await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
     await expect(page.getByTestId(TestIds.NOTE_FORM)).toBeVisible()
     await fillCallId(page, callId)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Grouped note B')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-    await expect(page.locator('p').filter({ hasText: 'Grouped note B' })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId(TestIds.NOTE_DETAIL_TEXT).filter({ hasText: 'Grouped note B' }).first()).toBeVisible({ timeout: 10000 })
 
     // Both should be grouped under the same card
     const callCard = page.locator('div').filter({ hasText: callId.slice(0, 12) }).first()
@@ -259,10 +263,8 @@ test.describe('Records Architecture', () => {
 
     await Navigation.goToReports(page)
 
-    // The report list or a report card should be visible
-    const reportContent = page.getByTestId(TestIds.REPORT_CARD).first()
-      .or(page.getByTestId(TestIds.REPORT_NEW_BTN))
-    await expect(reportContent).toBeVisible({ timeout: 10000 })
+    // At least one report card or the new-report button should be visible
+    await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: 10000 })
 
     // Conversation list element must NOT appear on the reports page
     await expect(page.getByTestId(TestIds.CONVERSATION_LIST)).not.toBeVisible()

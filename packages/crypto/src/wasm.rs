@@ -74,6 +74,23 @@ impl WasmCryptoState {
         }
     }
 
+    /// Load a raw secret key (hex or nsec bech32) directly into state without PIN encryption.
+    ///
+    /// This is intended for testing and provisioning flows where the key is already
+    /// available in plaintext (e.g., freshly generated keypair, device provisioning
+    /// before PIN setup). Returns the public key hex.
+    ///
+    /// Note: The key is held unencrypted in WASM memory for the session lifetime.
+    #[wasm_bindgen(js_name = "loadRawKey")]
+    pub fn load_raw_key(&mut self, nsec_or_hex: &str) -> Result<String, JsError> {
+        let sk_hex = nsec_to_hex(nsec_or_hex)?;
+        let pubkey = keys::get_public_key(&sk_hex).map_err(to_js_err)?;
+        let sk_bytes = hex::decode(&sk_hex).map_err(to_js_err)?;
+        self.secret_key = Some(Zeroizing::new(sk_bytes));
+        self.public_key = Some(pubkey.clone());
+        Ok(pubkey)
+    }
+
     /// Decrypt the nsec from PIN-encrypted storage, store in state.
     /// Returns the public key hex — nsec never leaves the WASM module.
     #[wasm_bindgen(js_name = "unlockWithPin")]
