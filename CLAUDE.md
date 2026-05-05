@@ -28,6 +28,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 ## Tech Stack
 
 - **Runtime/Package Manager**: Bun (monorepo with `workspaces`)
+- **Tooling**: [mise](https://mise.jdx.dev/) — polyglot version manager; pins Bun 1.3.5, JDK 17, Ruby 3.3. Rust/Swift are NOT mise-managed (handled by `rust-toolchain.toml` / Xcode). Run `mise install` once after cloning.
 - **Desktop**: Tauri v2 + Vite + TanStack Router + shadcn/ui — native Rust backend with webview frontend
 - **iOS**: Native SwiftUI (iOS 17+, `@Observable`, SPM)
 - **Android**: Native Kotlin 2.3/Compose (minSdk 26, Material 3, Hilt DI + KSP, AGP 9.1, Gradle 9.4)
@@ -175,8 +176,20 @@ docs/
 - **Android JNI**: Build with `packages/crypto/scripts/build-mobile.sh android`, place `.so` files in `apps/android/app/src/main/jniLibs/`. Placeholder mock crypto active until native libs are linked.
 - **Zod `.optional().default()` pattern**: Always use `.optional().default(value)` for fields with defaults in `packages/protocol/schemas/`. Never use bare `.default(value)` — it produces wrong JSON Schema output in Zod 4, breaking Kotlin/Swift codegen defaults. The Kotlin post-processor in `codegen.ts` reads `"default"` values from JSON Schema and injects them into generated `@Serializable` data classes.
 - **Schemas moved to protocol**: All Zod schemas live in `packages/protocol/schemas/` (moved from `apps/worker/schemas/`). Worker routes import from `@protocol/schemas`. Old epic docs may reference the old path — the new path is canonical.
+- **mise version management**: `.mise.toml` pins Bun, JDK 17, Ruby. Rust is NOT pinned in mise — `rust-toolchain.toml` files handle it via rustup. Swift is NOT pinned — managed by Xcode. Use `.mise.local.toml` for personal overrides; never edit `.mise.toml` for local preferences.
+- **Run `mise install` after pulling**: Tool versions in `.mise.toml` may change between commits.
 
 ## Development Commands
+
+### First-Time Setup
+
+```bash
+mise install          # Install pinned Bun, JDK 17, Ruby — run once after cloning or pulling
+mise run --list       # Discover all available mise tasks (discovery helpers for new contributors)
+                      # All `bun run` scripts continue to work unchanged; mise tasks are wrappers
+```
+
+After `mise install`, install Ruby gems for Fastlane: `cd apps/ios && bundle install`
 
 ### Local Backend Setup (REQUIRED for backend development and testing)
 
