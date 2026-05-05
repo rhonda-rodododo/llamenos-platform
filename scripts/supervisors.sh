@@ -67,7 +67,7 @@ CMD=(gnome-terminal)
 
 for entry in "${SUPERVISORS[@]}"; do
   IFS=: read -r name agent <<< "$entry"
-  CMD+=(--tab --title="$name" --working-directory="$PROJECT_DIR" -e "bash -c 'claude --dangerously-skip-permissions --agent $agent --name $name; exec bash'")
+  CMD+=(--tab --title="$name" --working-directory="$PROJECT_DIR" -e "bash -c 'claude --dangerously-skip-permissions --rc --remote-control-session-name-prefix $agent --agent $agent --name $name; exec zsh'")
 done
 
 echo "Launching 6 supervisor tabs in gnome-terminal..."

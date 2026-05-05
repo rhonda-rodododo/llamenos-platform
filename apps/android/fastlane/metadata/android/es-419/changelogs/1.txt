@@ -1,0 +1,9 @@
+Versión inicial de Llamenos para Android.
+
+• Notas e informes de llamadas con cifrado de extremo a extremo
+• Gestión de turnos y enrutamiento de llamadas en paralelo
+• Gestión de casos basada en plantillas
+• Transcripción en el dispositivo (el audio nunca abandona su dispositivo)
+• Compatibilidad con 13 idiomas
+• Claves de cifrado respaldadas por Android Keystore
+• Autoalojado — sus datos permanecen en su infraestructura
