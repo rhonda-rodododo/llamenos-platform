@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { describeRoute } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/service-factories'
 import type { TelephonyAdapter } from '../telephony/adapter'
@@ -62,7 +63,17 @@ telephony.use('*', async (c, next) => {
 })
 
 // --- Step 1: Incoming call -> hub lookup -> ban check -> language menu ---
-telephony.post('/incoming', async (c) => {
+telephony.post('/incoming',
+  describeRoute({
+    tags: ['Telephony Webhooks'],
+    summary: 'Incoming call — provider webhook (step 1)',
+    description: 'Receives incoming call from telephony provider, resolves hub, checks ban list, returns TwiML language menu.',
+    responses: {
+      200: { description: 'TwiML response (application/xml)' },
+      403: { description: 'Webhook signature invalid' },
+    },
+  }),
+  async (c) => {
   const services = c.get('services')
   const globalAdapter = (await getTelephonyFromService(c.env, services.settings))!
   const { callSid, callerNumber, calledNumber } = await globalAdapter.parseIncomingWebhook(c.req.raw)
@@ -101,7 +112,17 @@ telephony.post('/incoming', async (c) => {
 })
 
 // --- Step 2: Language selected -> spam check -> greeting + hold/captcha ---
-telephony.post('/language-selected', async (c) => {
+telephony.post('/language-selected',
+  describeRoute({
+    tags: ['Telephony Webhooks'],
+    summary: 'Language digit collected — provider webhook (step 2)',
+    description: 'Receives DTMF digit from language menu gather. Applies spam/captcha checks and returns TwiML greeting or hold.',
+    responses: {
+      200: { description: 'TwiML response (application/xml)' },
+      403: { description: 'Webhook signature invalid' },
+    },
+  }),
+  async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
@@ -163,7 +184,17 @@ telephony.post('/language-selected', async (c) => {
 })
 
 // --- Step 3: CAPTCHA response ---
-telephony.post('/captcha', async (c) => {
+telephony.post('/captcha',
+  describeRoute({
+    tags: ['Telephony Webhooks'],
+    summary: 'CAPTCHA digit response — provider webhook (step 3)',
+    description: 'Receives DTMF digit from voice CAPTCHA gather. Validates against server-stored expected digits, returns TwiML.',
+    responses: {
+      200: { description: 'TwiML response (application/xml)' },
+      403: { description: 'Webhook signature invalid' },
+    },
+  }),
+  async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
@@ -186,7 +217,17 @@ telephony.post('/captcha', async (c) => {
 })
 
 // --- Step 4: User answered -> bridge via queue ---
-telephony.post('/user-answer', async (c) => {
+telephony.post('/user-answer',
+  describeRoute({
+    tags: ['Telephony Webhooks'],
+    summary: 'Volunteer answered — provider webhook (step 4)',
+    description: 'Provider calls this when a volunteer picks up. Resolves opaque call token, bridges caller ↔ volunteer, returns TwiML.',
+    responses: {
+      200: { description: 'TwiML response (application/xml)' },
+      403: { description: 'Invalid or expired call token' },
+    },
+  }),
+  async (c) => {
   const url = new URL(c.req.url)
   const services = c.get('services')
 
@@ -230,7 +271,17 @@ telephony.post('/user-answer', async (c) => {
 })
 
 // --- Step 5: Call status callback ---
-telephony.post('/call-status', async (c) => {
+telephony.post('/call-status',
+  describeRoute({
+    tags: ['Telephony Webhooks'],
+    summary: 'Call status callback — provider webhook (step 5)',
+    description: 'Receives call status updates (completed, no-answer, busy, failed) from telephony provider. Updates call records and publishes Nostr events.',
+    responses: {
+      200: { description: 'OK — status recorded' },
+      403: { description: 'Webhook signature invalid' },
+    },
+  }),
+  async (c) => {
   const url = new URL(c.req.url)
   const services = c.get('services')
 

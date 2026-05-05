@@ -11,6 +11,20 @@ import { caseInteractionSchema } from '@protocol/schemas/interactions'
 import { reportTypeDefinitionSchema } from '@protocol/schemas/report-types'
 import { createEntityTypeBodySchema, templateSummarySchema } from '@protocol/schemas/entity-schema'
 import { contactRelationshipResponseSchema, contactGroupResponseSchema } from '@protocol/schemas/contact-relationships'
+import type {
+  SignalRegistrationState,
+  SignalAccountInfo,
+} from '@protocol/schemas/setup'
+import type {
+  FirehoseConnection,
+  FirehoseConnectionHealth,
+} from '@protocol/schemas/firehose'
+import type {
+  SecurityPrefs,
+  SignalIdentityRecord,
+  SignalQueueStats,
+  SignalContactRecord,
+} from '@protocol/schemas/signal-notification'
 
 // Protocol types used in function signatures within this file.
 // Re-exported to consumers via `export type { ... }` statements inline below.
@@ -1962,13 +1976,7 @@ export async function verifyEvidenceIntegrity(evidenceId: string, currentHash: s
 
 // --- Signal Registration & Management ---
 
-export interface SignalRegistrationState {
-  step: 'idle' | 'pending_verification' | 'verified' | 'failed'
-  number?: string
-  error?: string
-  bridgeUrl?: string
-  startedAt?: string
-}
+export type { SignalRegistrationState }
 
 export async function signalRegister(data: {
   bridgeUrl: string
@@ -2006,26 +2014,13 @@ export async function signalUnregister(data: {
   })
 }
 
-export interface SignalAccountInfo {
-  registered: boolean
-  number: string
-  uuid?: string
-  devices?: Array<{ id: number; name?: string }>
-  error?: string
-}
+export type { SignalAccountInfo }
 
 export async function getSignalAccountInfo() {
   return request<SignalAccountInfo>('/setup/signal/account')
 }
 
-export interface SignalIdentityRecord {
-  id: string
-  number: string
-  uuid: string
-  trustLevel: string
-  keyChangeCount: number
-  lastSeenAt: string
-}
+export type { SignalIdentityRecord }
 
 export async function getSignalIdentities() {
   return request<{ identities: SignalIdentityRecord[] }>(hp('/messaging/signal/identities'))
@@ -2038,48 +2033,14 @@ export async function updateSignalIdentityTrust(uuid: string, trustLevel: string
   })
 }
 
-export interface SignalQueueStats {
-  pending: number
-  processing: number
-  failed: number
-  dead: number
-  sent: number
-}
+export type { SignalQueueStats }
 
 export async function getSignalQueueStats() {
   return request<SignalQueueStats>(hp('/messaging/signal/queue/stats'))
 }
 // --- Firehose ---
 
-export interface FirehoseConnection {
-  id: string
-  hubId: string
-  signalGroupId: string | null
-  displayName: string
-  encryptedDisplayName?: string
-  reportTypeId: string
-  agentPubkey: string
-  geoContext: string | null
-  geoContextCountryCodes: string[] | null
-  inferenceEndpoint: string | null
-  extractionIntervalSec: number
-  systemPromptSuffix: string | null
-  bufferTtlDays: number
-  notifyViaSignal: boolean
-  status: 'pending' | 'active' | 'paused' | 'disabled'
-  createdAt: string
-  updatedAt: string
-}
-
-export interface FirehoseConnectionHealth {
-  id: string
-  status: 'pending' | 'active' | 'paused' | 'disabled'
-  lastMessageReceived: string | null
-  lastReportSubmitted: string | null
-  bufferSize: number
-  extractionCount: number
-  inferenceHealthMs: number | null
-}
+export type { FirehoseConnection, FirehoseConnectionHealth }
 
 export async function listFirehoseConnections() {
   return request<{ connections: FirehoseConnection[] }>(hp('/firehose'))
@@ -2166,24 +2127,7 @@ export async function optinFirehoseNotifications(id: string) {
 }
 // --- Signal Notification API ---
 
-export interface SecurityPrefs {
-  notificationChannel: 'web_push' | 'signal'
-  disappearingTimerDays: number
-  digestCadence: 'off' | 'daily' | 'weekly'
-  alertOnNewDevice: boolean
-  alertOnPasskeyChange: boolean
-  alertOnPinChange: boolean
-  updatedAt: string
-}
-
-export interface SignalContactRecord {
-  identifierHash: string
-  identifierCiphertext: string
-  identifierEnvelope: { recipientPubkey: string; encryptedKey: string }[]
-  identifierType: 'phone' | 'username'
-  verifiedAt: string | null
-  updatedAt: string
-}
+export type { SecurityPrefs, SignalContactRecord }
 
 export async function getSignalContact(): Promise<SignalContactRecord | null> {
   try {

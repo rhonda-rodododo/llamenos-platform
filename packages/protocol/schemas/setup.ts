@@ -55,6 +55,8 @@ export const signalRegistrationResponseSchema = z.object({
   startedAt: z.string().optional(),
 })
 
+export type SignalRegistrationState = z.infer<typeof signalRegistrationResponseSchema>
+
 export const signalAccountInfoResponseSchema = z.object({
   registered: z.boolean(),
   number: z.string(),
@@ -65,3 +67,5 @@ export const signalAccountInfoResponseSchema = z.object({
   })).optional(),
   error: z.string().optional(),
 })
+
+export type SignalAccountInfo = z.infer<typeof signalAccountInfoResponseSchema>
