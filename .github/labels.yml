@@ -1,0 +1,47 @@
+- name: "good first issue"
+  color: "7057ff"
+  description: "Good for newcomers"
+
+- name: "bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+
+- name: "enhancement"
+  color: "a2eeef"
+  description: "New feature or request"
+
+- name: "documentation"
+  color: "0075ca"
+  description: "Improvements or additions to documentation"
+
+- name: "platform:desktop"
+  color: "e4e669"
+  description: "Tauri desktop app (Rust + React)"
+
+- name: "platform:ios"
+  color: "0052cc"
+  description: "iOS app (SwiftUI)"
+
+- name: "platform:android"
+  color: "3ddc84"
+  description: "Android app (Kotlin/Compose)"
+
+- name: "platform:backend"
+  color: "f9d0c4"
+  description: "Backend server (Bun/Hono/PostgreSQL)"
+
+- name: "crypto"
+  color: "b60205"
+  description: "Cryptography — packages/crypto or E2EE protocol"
+
+- name: "security"
+  color: "ee0701"
+  description: "Security vulnerability or hardening"
+
+- name: "dx"
+  color: "c2e0c6"
+  description: "Developer experience — tooling, CI, onboarding"
+
+- name: "ci"
+  color: "fef2c0"
+  description: "Continuous integration / GitHub Actions"
