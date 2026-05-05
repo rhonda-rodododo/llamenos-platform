@@ -34,6 +34,7 @@ apps/android/*.jks
 apps/android/*.keystore
 apps/android/app/*.jks
 apps/android/app/*.keystore
+apps/android/google-play-key.json
 
 
 # iOS build
