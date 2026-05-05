@@ -24,7 +24,13 @@ interface DeviceTestState {
 const STATE_KEY = 'device_lifecycle_test'
 
 function getS(world: Record<string, unknown>): DeviceTestState {
-  return getState<DeviceTestState>(world, STATE_KEY)
+  const s = getState<DeviceTestState>(world, STATE_KEY)
+  // Fall back to shared user set by "a registered user with a known keypair" step
+  if (!s.user) {
+    const sharedUser = getSharedState(world).sharedUser
+    if (sharedUser) s.user = sharedUser
+  }
+  return s
 }
 
 Before(async ({ world }) => {

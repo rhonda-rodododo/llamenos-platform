@@ -23,7 +23,13 @@ interface WebAuthnTestState {
 const STATE_KEY = 'webauthn_test'
 
 function getS(world: Record<string, unknown>): WebAuthnTestState {
-  return getState<WebAuthnTestState>(world, STATE_KEY)
+  const s = getState<WebAuthnTestState>(world, STATE_KEY)
+  // Fall back to shared user set by "a registered user with a known keypair" step
+  if (!s.user) {
+    const sharedUser = getSharedState(world).sharedUser
+    if (sharedUser) s.user = sharedUser
+  }
+  return s
 }
 
 Before(async ({ world }) => {

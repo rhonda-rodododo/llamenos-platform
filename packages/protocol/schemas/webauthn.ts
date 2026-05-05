@@ -8,7 +8,7 @@ export const authenticateBodySchema = z.looseObject({
 })
 
 export const addCredentialBodySchema = z.looseObject({
-  label: z.string().min(1).max(100),
+  label: z.string().min(1).max(100).optional(),
 })
 
 export const registerCredentialBodySchema = z.looseObject({
