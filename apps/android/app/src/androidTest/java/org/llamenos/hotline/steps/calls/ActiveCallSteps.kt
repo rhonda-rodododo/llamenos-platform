@@ -5,6 +5,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -51,16 +53,35 @@ class ActiveCallSteps : BaseSteps() {
             Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}")
         }
 
-        // Navigate to dashboard and wait for the active call card to appear.
-        // The card arrives via WebSocket/Nostr relay event — give it time to deliver.
+        // Navigate to dashboard and trigger pull-to-refresh to fetch the active call.
+        // WebSocket/relay events are unreliable in E2E tests — explicit refresh ensures
+        // DashboardViewModel.fetchActiveCall() runs after the simulation completes.
         navigateToTab(NAV_DASHBOARD)
         composeRule.waitForIdle()
+
+        // Swipe down on the PullToRefreshBox to trigger ViewModel.refresh()
         try {
-            composeRule.waitUntil(15_000) {
+            onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
+            composeRule.waitForIdle()
+        } catch (e: Throwable) {
+            Log.w("ActiveCallSteps", "Pull-to-refresh swipe failed: ${e.message}")
+        }
+
+        try {
+            composeRule.waitUntil(10_000) {
                 composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
             }
         } catch (_: Throwable) {
-            Log.w("ActiveCallSteps", "active-call-card did not appear within 15 s — relay event may be delayed")
+            // Retry refresh once — the first swipe may have been too early
+            try {
+                onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
+                composeRule.waitForIdle()
+                composeRule.waitUntil(10_000) {
+                    composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch (_: Throwable) {
+                Log.w("ActiveCallSteps", "active-call-card did not appear after pull-to-refresh")
+            }
         }
     }
 

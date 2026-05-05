@@ -166,7 +166,8 @@ fun DashboardScreen(
             },
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(paddingValues)
+                .testTag("dashboard-pull-refresh"),
         ) {
             Column(
                 modifier = Modifier

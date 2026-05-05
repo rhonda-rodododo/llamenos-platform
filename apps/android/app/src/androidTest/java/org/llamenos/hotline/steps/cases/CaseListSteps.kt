@@ -92,8 +92,10 @@ class CaseListSteps : BaseSteps() {
                         activity.applicationContext,
                         CaseListSteps.NpubEntryPoint::class.java
                     )
-                    npubText = entryPoint.cryptoService().encryptionPubkeyHex
-                    Log.d("CaseListSteps", "Read npub via EntryPoint: ${npubText?.take(20)}...")
+                    // Use signingPubkeyHex — this is the Ed25519 key used in auth headers.
+                    // The backend identifies users by their signing pubkey, not encryption pubkey.
+                    npubText = entryPoint.cryptoService().signingPubkeyHex
+                    Log.d("CaseListSteps", "Read signing pubkey via EntryPoint: ${npubText?.take(20)}...")
                 } catch (e: Throwable) {
                     Log.w("CaseListSteps", "EntryPoint access failed: ${e.message}")
                 }
