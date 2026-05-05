@@ -1,6 +1,9 @@
 import Foundation
 
 // MARK: - CaseRecord
+// Client-only: generated `RecordListResponseRecord` uses `Double` for counts,
+// `BlindIndex` enum for blind indexes, and quicktype envelope names. This client
+// model uses `Int` for counts and `String` for identifiers.
 
 /// A case record from the CMS — an encrypted, structured entity stored in CaseDO.
 /// Summary tier is decryptable by assigned volunteers; fields/PII by admins only.
@@ -34,6 +37,9 @@ struct CaseRecord: Codable, Identifiable, Sendable {
 }
 
 // MARK: - CaseEnvelope
+// Client-only: structurally identical to many generated envelope types
+// (PurpleFieldEnvelope, StickyPiiEnvelope, etc.) but we keep one canonical
+// name for all case-related envelopes.
 
 /// ECIES envelope for a record reader (pubkey + wrapped symmetric key + ephemeral pubkey).
 struct CaseEnvelope: Codable, Sendable {
@@ -43,6 +49,8 @@ struct CaseEnvelope: Codable, Sendable {
 }
 
 // MARK: - EntityTypeDefinition
+// Client-only: generated `EntityTypeDefinition` uses quicktype naming for nested
+// types and different field types. This client model has iOS-specific optionality.
 
 /// Template-driven schema defining a case type: fields, statuses, severities, numbering.
 struct CaseEntityTypeDefinition: Codable, Identifiable, Sendable {
@@ -83,6 +91,7 @@ struct CaseEntityTypeDefinition: Codable, Identifiable, Sendable {
 }
 
 // MARK: - CaseEnumOption
+// Client-only: similar to generated `ReportTypeStatus` but with optional `order`.
 
 /// An option for status, severity, category, or contact role enums.
 struct CaseEnumOption: Codable, Identifiable, Equatable, Sendable {
@@ -99,6 +108,8 @@ struct CaseEnumOption: Codable, Identifiable, Equatable, Sendable {
 }
 
 // MARK: - CaseFieldDefinition
+// Client-only: generated `EntityTypeDefinitionField` uses `JoinFieldType` enum
+// and different optionality patterns.
 
 /// A field within an entity type schema.
 struct CaseFieldDefinition: Codable, Identifiable, Sendable {
@@ -149,14 +160,14 @@ struct CaseFieldValidation: Codable, Sendable {
     let pattern: String?
 }
 
-// CaseInteraction and Interaction are defined in the generated Types.swift (protocol codegen).
-// Add Identifiable conformance for SwiftUI ForEach compatibility.
+// MARK: - Generated type extensions
+// CaseInteraction, Interaction, Evidence, and RecordContact are defined
+// in the generated Types.swift (protocol codegen).
+
 extension CaseInteraction: Identifiable {}
 extension Interaction: Identifiable {}
 extension Evidence: Identifiable {}
 
-// RecordContact is defined in generated Types.swift (protocol codegen).
-// Add Identifiable conformance and convenience accessors for SwiftUI compatibility.
 extension RecordContact: Identifiable {
     var id: String { contactID }
 
@@ -165,6 +176,8 @@ extension RecordContact: Identifiable {
 }
 
 // MARK: - EvidenceItem
+// Client-only: generated `Evidence` uses typed enums (`EvidenceClassification`,
+// `HashAlgorithm`) while this client model uses raw strings for flexibility.
 
 /// Evidence metadata for a file attached to a case.
 struct EvidenceItem: Codable, Identifiable, Sendable {

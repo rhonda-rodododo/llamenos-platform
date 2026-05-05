@@ -1,6 +1,10 @@
 import Foundation
 
 // MARK: - AppCaseEvent
+// Client-only: generated `ProtocolEvent`/`EventElement` use `BlindIndex` enum for
+// blind indexes, `Precision` enum for locationPrecision, `Double` for counts,
+// and `EventDetailEnvelope` for envelopes. This client model uses `AnyCodable` for
+// blind indexes and raw strings for simplicity.
 
 /// An event from the CMS — stored in CaseDO as a record with category='event'.
 /// Contains cleartext metadata (dates, location) plus E2EE encrypted details.
@@ -38,6 +42,7 @@ struct AppCaseEvent: Codable, Identifiable, Sendable {
 }
 
 // MARK: - AnyCodable (flexible JSON value)
+// Client-only: used for heterogeneous blind index values.
 
 /// Minimal wrapper for heterogeneous JSON values in blind indexes.
 struct AnyCodable: Codable, Sendable {
@@ -118,6 +123,7 @@ struct UpdateEventRequest: Codable, Sendable {
 }
 
 // MARK: - Linked Records/Reports
+// Client-only: generated link types use different field names and CodingKeys.
 
 struct AppCaseEventLink: Codable, Sendable {
     let recordId: String
