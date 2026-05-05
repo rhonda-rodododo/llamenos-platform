@@ -50,8 +50,13 @@ Use `dispatch-one.sh` — the canonical one-shot dispatch helper:
 ```bash
 DISPATCH_REPO=/media/rikki/recover2/projects/llamenos \
 WORKTREE_BASE=/media/rikki/recover2/projects \
-  ~/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh <name> <prompt-file> [timeout] [model]
+  ~/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh <name> <prompt-file> [timeout-sec] [model]
 ```
+
+**Timeout is in SECONDS** (default 5400 = 90 min). Common values:
+- Quick research/exploration: `1800` (30 min)
+- Standard implementation: `5400` (90 min)
+- Complex multi-file work: `7200` (2 hours)
 
 **Naming convention:** Prefix worker names with your domain abbreviation:
 - iOS: `ios-<task>`
