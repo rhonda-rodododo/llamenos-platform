@@ -97,20 +97,35 @@ case "$(uname -s)" in
     ;;
 esac
 
-# Check llamenos-core sibling
+# Check packages/crypto (in-repo Rust crate — absorbed from llamenos-core in Epic 201)
 echo ""
-echo "Checking llamenos-core:"
+echo "Checking packages/crypto:"
 
-CORE_PATH="$(cd "$(dirname "$0")/../.." && pwd)/llamenos-core"
-if [[ -d "$CORE_PATH" ]]; then
-  ok "Found at $CORE_PATH"
-  if [[ -f "$CORE_PATH/Cargo.toml" ]]; then
+CRYPTO_PATH="$(cd "$(dirname "$0")/.." && pwd)/packages/crypto"
+if [[ -d "$CRYPTO_PATH" ]]; then
+  ok "packages/crypto present"
+  if [[ -f "$CRYPTO_PATH/Cargo.toml" ]]; then
     ok "Cargo.toml present"
   else
-    fail "Cargo.toml missing in llamenos-core"
+    fail "packages/crypto/Cargo.toml missing"
   fi
 else
-  fail "llamenos-core not found at $CORE_PATH — clone it as a sibling directory"
+  fail "packages/crypto not found — ensure you cloned the full monorepo"
+fi
+
+# Ruby / Fastlane (optional — required for iOS/Android app store delivery)
+echo ""
+echo "Checking Ruby / Fastlane (optional — for app store delivery):"
+if command -v ruby &>/dev/null; then
+  RUBY_VER=$(ruby --version 2>/dev/null | awk '{print $2}')
+  ok "Ruby $RUBY_VER"
+  if command -v bundle &>/dev/null; then
+    ok "Bundler $(bundle --version 2>/dev/null | awk '{print $3}')"
+  else
+    warn "Bundler not found — run: gem install bundler"
+  fi
+else
+  warn "Ruby not found — run: mise install (or install Ruby 3.3+ manually)"
 fi
 
 # --- Install ---
