@@ -130,7 +130,7 @@ routes.post('/',
       }
     }
 
-    return c.json({ hub })
+    return c.json({ hub }, 201)
   },
 )
 
