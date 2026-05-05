@@ -84,7 +84,10 @@ else
   CIDR="${STATIC_IP#*/}"
   NETMASK="$(cidr_to_netmask "${CIDR}")"
   # klibc 7-field syntax: ip=<client>::<gw>:<netmask>::<iface>:off
-  IP_LINE="ip=${IP_ADDR}::${GATEWAY}:${NETMASK}::eth0:off"
+  # Leave <iface> empty so the kernel auto-detects the primary interface.
+  # Hardcoding eth0 breaks on KVM providers that use ens3, enp1s0, etc.
+  # Discovered during T14 on 1984 Hosting where the interface is ens3 (2026-04-19).
+  IP_LINE="ip=${IP_ADDR}::${GATEWAY}:${NETMASK}:::off"
   echo "IP=${IP_LINE}" >> /etc/initramfs-tools/initramfs.conf
 fi
 
