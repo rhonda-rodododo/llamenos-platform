@@ -39,7 +39,7 @@ Before({ tags: '@backend' }, async ({ world }) => {
 Given('a new note is created', async ({request, world}) => {
   // Create a note via the API — must send encryptedContent (notes are always encrypted)
   const callId = `test-call-${Date.now()}`
-  const { status, data } = await apiPost<Record<string, unknown>>(
+  const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
@@ -48,12 +48,12 @@ Given('a new note is created', async ({request, world}) => {
     },
   )
   expect([200, 201]).toContain(status)
-  getNoteTestState(world).envelope = data
+  getNoteTestState(world).envelope = data.note
 })
 
 Given('a note created by a volunteer', async ({request, world}) => {
   // Notes must be created by a registered volunteer
-  const { status, data } = await apiPost<Record<string, unknown>>(
+  const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
@@ -62,7 +62,7 @@ Given('a note created by a volunteer', async ({request, world}) => {
     },
   )
   if (status === 200 || status === 201) {
-    getNoteTestState(world).envelope = data
+    getNoteTestState(world).envelope = data.note
   }
 })
 
@@ -74,7 +74,7 @@ Given('a hub with {int} admins', async ({request, world}, count: number) => {
 })
 
 Given('an encrypted note envelope', async ({request, world}) => {
-  const { status, data } = await apiPost<Record<string, unknown>>(
+  const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
@@ -83,14 +83,14 @@ Given('an encrypted note envelope', async ({request, world}) => {
     },
   )
   if (status === 200 || status === 201) {
-    getNoteTestState(world).envelope = data
+    getNoteTestState(world).envelope = data.note
   }
 })
 
 Given('two notes created by the same volunteer', async ({request, world}) => {
   getNoteTestState(world).envelopes = []
   for (let i = 0; i < 2; i++) {
-    const { status, data } = await apiPost<Record<string, unknown>>(
+    const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
       request,
       '/notes',
       {
@@ -99,7 +99,7 @@ Given('two notes created by the same volunteer', async ({request, world}) => {
       },
     )
     if (status === 200 || status === 201) {
-      getNoteTestState(world).envelopes.push(data)
+      getNoteTestState(world).envelopes.push(data.note ?? {})
     }
   }
 })
@@ -112,7 +112,7 @@ When('a note is created', async ({request, world}) => {
     ephemeralPubkey: kp.pubkey,
   }))
 
-  const { status, data } = await apiPost<Record<string, unknown>>(
+  const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
@@ -122,7 +122,7 @@ When('a note is created', async ({request, world}) => {
     },
   )
   if (status === 200 || status === 201) {
-    getNoteTestState(world).envelope = data
+    getNoteTestState(world).envelope = data.note
   }
 })
 
