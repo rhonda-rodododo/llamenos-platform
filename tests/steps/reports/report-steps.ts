@@ -169,60 +169,40 @@ Then('I should see the reports title', async ({ page }) => {
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toContainText(/reports/i)
 })
 
-Then('I should see the {string} report status filter', async ({ page }, filterName: string) => {
+Then('I should see the {string} report status filter', async ({ page, backendRequest }, filterName: string) => {
   // Filters are only visible when reports exist (not in empty state)
   // If no reports exist, the filter area won't be visible — seed a report first
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
   let filterVisible = await filterArea.isVisible({ timeout: 3000 }).catch(() => false)
 
   if (!filterVisible) {
-    // Seed a report via page.request, then reload
-    try {
-      await createReportViaApi(page.request, { title: `Seed for filter ${Date.now()}` })
-      await page.getByTestId(TestIds.NAV_DASHBOARD).click()
-      await page.getByTestId(TestIds.NAV_REPORTS).click()
-      filterVisible = await filterArea.isVisible({ timeout: 3000 }).catch(() => false)
-    } catch {
-      // API may not support seeding in this env
-    }
+    // Seed a report via backend API, then re-navigate
+    await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}` })
+    await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+    await page.getByTestId(TestIds.NAV_REPORTS).click()
   }
 
-  if (!filterVisible) {
-    // Still not visible — empty state, no reports API. Skip assertion.
-    return
-  }
+  await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // Filters use a Select dropdown — click to open and check for the option
+  // Filters use a Select dropdown — wait for stability then click to open
   const selectTrigger = filterArea.locator('button[role="combobox"]').first()
-  if (await selectTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await selectTrigger.click()
-    const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
-    await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await page.keyboard.press('Escape')
-  } else {
-    await expect(filterArea.getByText(new RegExp(filterName, 'i'))).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  await expect(selectTrigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await selectTrigger.waitFor({ state: 'attached' })
+  await selectTrigger.click()
+  const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
+  await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await page.keyboard.press('Escape')
 })
 
 When('I tap the {string} report status filter', async ({ page }, filterName: string) => {
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
-  // Status filter is a Select dropdown — click trigger, then select option
+  // Status filter is a Select dropdown — wait for stability then click trigger
   const selectTrigger = filterArea.locator('button[role="combobox"]').first()
-  if (await selectTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await selectTrigger.click()
-    // Map filter names to Select option values
-    const valueMap: Record<string, string> = {
-      'All': 'all',
-      'Active': 'active',
-      'Waiting': 'waiting',
-      'Closed': 'closed',
-    }
-    const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
-    await option.click()
-  } else {
-    // Fallback: direct text click
-    await filterArea.getByText(new RegExp(filterName, 'i')).click()
-  }
+  await expect(selectTrigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await selectTrigger.waitFor({ state: 'attached' })
+  await selectTrigger.click()
+  const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
+  await option.click()
 })
 
 Then('the {string} report status filter should be selected', async ({ page }, filterName: string) => {
