@@ -87,13 +87,17 @@ When('they tap the break button', async ({ page }) => {
 // --- Invite onboarding ---
 
 When('I create an invite for a new volunteer', async ({ page }) => {
-  await page.getByTestId(TestIds.VOLUNTEER_ADD_BTN).click()
+  // Click the "Invite Volunteer" button (not "Add Volunteer" which generates nsec directly)
+  const inviteBtn = page.getByRole('button', { name: /invite volunteer/i })
+  await inviteBtn.click()
   const name = `InviteVol ${Date.now()}`
   await page.getByLabel('Name').fill(name)
   const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel('Phone Number').fill(phone)
   await page.getByLabel('Phone Number').blur()
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+  // Wait for the invite link card to appear
+  await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_invite_vol_name = n
   }, name)

@@ -87,6 +87,85 @@ type KeyType = 'ed25519' | 'secp256k1'
 let currentKeyType: KeyType = 'ed25519'
 let schnorrSecretBytes: Uint8Array | null = null // secp256k1 secret for Schnorr auth
 
+// ── PIN lockout tracking ─────────────────────────────────────────────
+// Mirrors Rust-side lockout logic: escalating lockouts at thresholds, wipe at 10.
+// Persisted to localStorage to survive page reloads (simulates Rust-side vault storage).
+interface PinLockoutState {
+  failedAttempts: number
+  lockoutUntil: number // ms timestamp, 0 = no lockout
+}
+
+const LOCKOUT_STORAGE_KEY = '__test_pin_lockout_state'
+
+function loadLockoutState(): PinLockoutState {
+  try {
+    const raw = localStorage.getItem(LOCKOUT_STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return { failedAttempts: 0, lockoutUntil: 0 }
+}
+
+function saveLockoutState(): void {
+  try {
+    localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(pinLockoutState))
+  } catch { /* ignore */ }
+}
+
+let pinLockoutState: PinLockoutState = loadLockoutState()
+
+// Lockout thresholds: attempt count → lockout duration in ms
+const LOCKOUT_THRESHOLDS: Array<{ attempts: number; durationMs: number }> = [
+  { attempts: 5, durationMs: 30_000 },    // 30 seconds
+  { attempts: 7, durationMs: 120_000 },   // 2 minutes
+  { attempts: 9, durationMs: 600_000 },   // 10 minutes
+]
+const WIPE_THRESHOLD = 10
+
+function checkPinLockout(): void {
+  // Reload from storage (state may have been set before a page reload)
+  pinLockoutState = loadLockoutState()
+  if (pinLockoutState.lockoutUntil > Date.now()) {
+    const remainingSec = Math.ceil((pinLockoutState.lockoutUntil - Date.now()) / 1000)
+    throw new Error(`Locked out for ${remainingSec} seconds`)
+  }
+}
+
+function recordFailedPinAttempt(): void {
+  pinLockoutState.failedAttempts++
+
+  if (pinLockoutState.failedAttempts >= WIPE_THRESHOLD) {
+    // Wipe keys
+    mockSecrets = null
+    mockDeviceState = null
+    mockEncryptedKeys = null
+    pinLockoutState = { failedAttempts: 0, lockoutUntil: 0 }
+    saveLockoutState()
+    throw new Error('Keys wiped after too many failed attempts')
+  }
+
+  // Find the highest threshold that applies (tiered lockout)
+  let lockoutDuration = 0
+  for (const threshold of LOCKOUT_THRESHOLDS) {
+    if (pinLockoutState.failedAttempts >= threshold.attempts) {
+      lockoutDuration = threshold.durationMs
+    }
+  }
+
+  if (lockoutDuration > 0) {
+    pinLockoutState.lockoutUntil = Date.now() + lockoutDuration
+    saveLockoutState()
+    const remainingSec = Math.ceil(lockoutDuration / 1000)
+    throw new Error(`Locked out for ${remainingSec} seconds`)
+  }
+
+  saveLockoutState()
+}
+
+function resetPinLockout(): void {
+  pinLockoutState = { failedAttempts: 0, lockoutUntil: 0 }
+  saveLockoutState()
+}
+
 function deriveEd25519Pubkey(seed: Uint8Array): Uint8Array {
   return ed25519.getPublicKey(seed)
 }
@@ -283,8 +362,26 @@ const commands: Record<string, CommandHandler> = {
     }
     if (!data) throw new Error('No key stored. Complete onboarding first.')
 
+    // Check lockout before attempting
+    checkPinLockout()
+
     const pin = a.pin as string
-    const { signingSeed, encryptionSeed } = await decryptWithPin(data, pin)
+    let signingSeed: Uint8Array
+    let encryptionSeed: Uint8Array
+
+    try {
+      const result = await decryptWithPin(data, pin)
+      signingSeed = result.signingSeed
+      encryptionSeed = result.encryptionSeed
+    } catch {
+      // Wrong PIN — record failed attempt (may throw lockout/wipe)
+      recordFailedPinAttempt()
+      // If recordFailedPinAttempt didn't throw, it's a simple wrong PIN
+      throw new Error('Wrong PIN')
+    }
+
+    // Success — reset lockout counter
+    resetPinLockout()
 
     mockSecrets = { signingSeed, encryptionSeed }
     mockDeviceState = data.state
@@ -706,6 +803,33 @@ const commands: Record<string, CommandHandler> = {
       encryptionPubkeyHex: state.encryptionPubkeyHex,
       encryptedPayload: bytesToHex(secrets.signingSeed), // Mock: not actually encrypted
     })
+  },
+
+  // --- Test-only commands (PIN lockout seeding) ---
+
+  set_pin_failed_attempts: (a) => {
+    const count = a.count as number
+    pinLockoutState.failedAttempts = count
+    // Never set lockout timer from seeding — the step "I have N failed attempts"
+    // means N attempts were made and any lockout has already expired.
+    // The next wrong PIN will trigger the appropriate lockout/wipe.
+    pinLockoutState.lockoutUntil = 0
+    saveLockoutState()
+  },
+
+  get_pin_lockout_state: () => {
+    // Reload from storage in case of page reload
+    pinLockoutState = loadLockoutState()
+    return { failedAttempts: pinLockoutState.failedAttempts, lockoutUntil: pinLockoutState.lockoutUntil }
+  },
+
+  reset_pin_lockout: () => {
+    resetPinLockout()
+  },
+
+  expire_pin_lockout: () => {
+    pinLockoutState.lockoutUntil = 0
+    saveLockoutState()
   },
 }
 

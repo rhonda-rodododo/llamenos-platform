@@ -14,17 +14,17 @@ import { Timeouts } from '../../helpers'
 
 Given('I have a stored encrypted key', async ({ page }) => {
   await page.goto('/login')
-  // Inject a fake encrypted key blob to trigger the PIN entry UI
+  // Inject a fake encrypted key blob to trigger the PIN entry UI.
+  // The Tauri store mock uses prefix `tauri-store:keys.json:` + STORE_KEY `llamenos-encrypted-device-keys`.
   await page.evaluate(() => {
     const data = JSON.stringify({
       salt: 'aa'.repeat(16),
       iterations: 600000,
       nonce: 'bb'.repeat(24),
       ciphertext: 'cc'.repeat(32),
-      pubkey: 'dd'.repeat(8),
+      state: { signingPubkeyHex: 'dd'.repeat(32) },
     })
-    localStorage.setItem('llamenos-encrypted-key', data)
-    localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-key', data)
+    localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-device-keys', data)
   })
 })
 
