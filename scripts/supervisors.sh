@@ -42,8 +42,7 @@ kill_supervisors() {
   local found=0
   for entry in "${SUPERVISORS[@]}"; do
     IFS=: read -r name agent <<< "$entry"
-    local pids
-    pids=$(pgrep -f "claude --agent $agent" 2>/dev/null || true)
+    local pids=$(pgrep -f "claude --agent $agent" 2>/dev/null || true)
     if [[ -n "$pids" ]]; then
       echo "  Killing $name supervisor (PIDs: $pids)"
       echo "$pids" | xargs kill 2>/dev/null || true
@@ -68,7 +67,7 @@ CMD=(gnome-terminal)
 
 for entry in "${SUPERVISORS[@]}"; do
   IFS=: read -r name agent <<< "$entry"
-  CMD+=(--tab --title="$name" --dangerously-skip-permissions --working-directory="$PROJECT_DIR" -e "bash -c 'claude --agent $agent --name $name; exec bash'")
+  CMD+=(--tab --title="$name" --working-directory="$PROJECT_DIR" -e "bash -c 'claude --dangerously-skip-permissions --agent $agent --name $name; exec bash'")
 done
 
 echo "Launching 6 supervisor tabs in gnome-terminal..."

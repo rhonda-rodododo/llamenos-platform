@@ -91,7 +91,9 @@
     "load:mixed": "tests/load/run.sh mixed",
     "load:burst": "tests/load/run.sh burst",
     "load:all": "tests/load/run.sh all",
-    "lint": "eslint src/ apps/worker/"
+    "lint": "eslint src/ apps/worker/",
+    "supervisors": "scripts/supervisors.sh",
+    "supervisors:kill": "scripts/supervisors.sh --kill"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
