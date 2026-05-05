@@ -1,5 +1,6 @@
 package org.llamenos.hotline.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -15,7 +16,7 @@ typealias CallRecord = org.llamenos.protocol.CallRecordResponse
  */
 @Serializable
 data class ActiveCall(
-    val id: String,
+    @SerialName("callId") val id: String,
     val callerNumber: String? = null,
     val answeredBy: String? = null,
     val startedAt: String,

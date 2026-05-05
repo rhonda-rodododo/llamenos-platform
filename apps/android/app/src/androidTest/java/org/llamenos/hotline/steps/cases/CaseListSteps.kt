@@ -17,6 +17,7 @@ import io.cucumber.java.en.When
 import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Step definitions for the CMS case list screen.
@@ -37,7 +38,8 @@ class CaseListSteps : BaseSteps() {
         // This enables CMS, applies jail-support template, grants the default
         // volunteer role cases:read permission, and creates a sample record.
         try {
-            val result = SimulationClient.setupCms()
+            val hubId = ScenarioHooks.currentHubId.ifEmpty { null }
+            val result = SimulationClient.setupCms(hubId = hubId)
             Log.d("CaseListSteps", "CMS setup: ok=${result.ok}, entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
         } catch (e: Throwable) {
             Log.w("CaseListSteps", "CMS setup failed: ${e.message}")
@@ -58,7 +60,8 @@ class CaseListSteps : BaseSteps() {
                 Log.d("CaseListSteps", "Promote to admin: ok=${promoteResult.ok}, error=${promoteResult.error}")
 
                 // Re-run CMS setup with the pubkey so the sample record is assigned
-                val cmsResult = SimulationClient.setupCms(npub)
+                val cmsHubId = ScenarioHooks.currentHubId.ifEmpty { null }
+                val cmsResult = SimulationClient.setupCms(npub, hubId = cmsHubId)
                 Log.d("CaseListSteps", "CMS re-setup with pubkey: ok=${cmsResult.ok}, entityTypes=${cmsResult.entityTypeCount}")
             } catch (e: Throwable) {
                 Log.w("CaseListSteps", "Post-launch setup failed: ${e.message}")
