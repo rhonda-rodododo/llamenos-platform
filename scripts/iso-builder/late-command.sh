@@ -4,9 +4,10 @@
 #
 # This script:
 #   1. Stages the operator's SSH key for the deploy user
-#   2. Drops a hardened sshd_config baseline (full hardening happens in Ansible)
-#   3. Runs dropbear-setup.sh if --unlock=dropbear was selected
-#   4. Writes a /etc/motd with next-step instructions
+#   2. Creates a NOPASSWD sudoers entry for the deploy user
+#   3. Drops a hardened sshd_config baseline (full hardening happens in Ansible)
+#   4. Runs dropbear-setup.sh if --unlock=dropbear was selected
+#   5. Writes a /etc/motd with next-step instructions
 set -eu
 
 USERNAME="$1"
@@ -26,7 +27,15 @@ chmod 700 "${USER_HOME}/.ssh"
 chmod 600 "${USER_HOME}/.ssh/authorized_keys"
 chown -R "${USERNAME}:${USERNAME}" "${USER_HOME}/.ssh"
 
-# 2. Hardened sshd baseline (full hardening happens in Ansible)
+# 2. Passwordless sudo for the deploy user
+# The preseed locks the account password (passwd/user-password-crypted = '!')
+# for key-only SSH access. Without NOPASSWD, sudo prompts for a password that
+# doesn't exist — a catch-22 that locks the operator out of admin operations.
+# Discovered during T14 on 1984 Hosting (2026-04-19).
+echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}"
+chmod 440 "/etc/sudoers.d/${USERNAME}"
+
+# 3. Hardened sshd baseline (full hardening happens in Ansible)
 mkdir -p /etc/ssh/sshd_config.d
 cat > /etc/ssh/sshd_config.d/00-llamenos-baseline.conf <<'EOF'
 PermitRootLogin no
@@ -58,20 +67,20 @@ FAILMOTD
   exit 1
 }
 
-# 3. Set up dropbear-initramfs if requested
+# 4. Set up dropbear-initramfs if requested
 if [ "${UNLOCK_MODE}" = "dropbear" ]; then
   /tmp/dropbear-setup.sh "${SSH_PUBKEY}" "${STATIC_IP}" "${GATEWAY}" || \
     fail_sentinel "dropbear-setup.sh failed"
 fi
 
-# 4. Ensure NTP is on (chrony will replace this in Ansible)
+# 5. Ensure NTP is on (chrony will replace this in Ansible)
 systemctl enable systemd-timesyncd 2>&1 || echo "WARNING: systemd-timesyncd enable failed (non-fatal)" >&2
 
-# 5. Write success sentinel
+# 6. Write success sentinel
 touch /var/lib/llamenos-iso-build-ok
 chmod 644 /var/lib/llamenos-iso-build-ok
 
-# 6. First-boot welcome banner with next steps
+# 7. First-boot welcome banner with next steps
 cat > /etc/motd <<EOF
 
   Llamenos — fresh install (Debian 13)

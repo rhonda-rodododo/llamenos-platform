@@ -167,14 +167,24 @@ mkdir -p "$INITRD_WORK"
 # --- 6. Patch boot menus to auto-load preseed ---
 echo "==> Patching boot menus"
 # isolinux (BIOS)
+# Replace txt.cfg with our single preseeded entry and remove all alternative
+# boot config files (gtk.cfg, spkgtk.cfg, adgtk.cfg, adtxt.cfg, etc.) so that
+# the only menu entry is ours. Without this cleanup, the speech-synthesis entry
+# in spkgtk.cfg can win the `menu default` race and auto-boot into the wrong
+# mode. Discovered during T14 on 1984 Hosting (2026-04-19).
 if [ -f "${WORK_DIR}/iso-root/isolinux/txt.cfg" ]; then
   cat > "${WORK_DIR}/iso-root/isolinux/txt.cfg" <<'EOF'
 default install
 label install
+  menu default
   menu label ^Install Llamenos (Debian 13 + LUKS)
   kernel /install.amd/vmlinuz
   append vga=788 initrd=/install.amd/initrd.gz auto=true priority=critical preseed/file=/preseed.cfg --- quiet
 EOF
+  # Remove alternative boot entries that compete with ours
+  for alt in gtk.cfg spkgtk.cfg adgtk.cfg adtxt.cfg spk.cfg; do
+    rm -f "${WORK_DIR}/iso-root/isolinux/${alt}"
+  done
 fi
 
 # GRUB (UEFI)
