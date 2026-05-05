@@ -22,7 +22,13 @@ interface PukTestState {
 const STATE_KEY = 'puk_test'
 
 function getS(world: Record<string, unknown>): PukTestState {
-  return getState<PukTestState>(world, STATE_KEY)
+  const s = getState<PukTestState>(world, STATE_KEY)
+  // Fall back to shared user set by "a registered user with a known keypair" step
+  if (!s.user) {
+    const sharedUser = getSharedState(world).sharedUser
+    if (sharedUser) s.user = sharedUser
+  }
+  return s
 }
 
 Before(async ({ world }) => {
@@ -41,7 +47,7 @@ async function registerDevice(
 ) {
   const wakeKey = '02' + bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
   const pushToken = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
-  await apiPost(request, '/devices/register', { platform: 'ios', pushToken, wakeKeyPublic: wakeKey }, nsec)
+  return apiPost(request, '/devices/register', { platform: 'ios', pushToken, wakeKeyPublic: wakeKey }, nsec)
 }
 
 // ── Given ───────────────────────────────────────────────────────────
@@ -49,11 +55,15 @@ async function registerDevice(
 Given('the user has a registered device {string}', async ({ request, world }, _label: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  await registerDevice(request, s.user!.nsec)
+  const regRes = await registerDevice(request, s.user!.nsec)
+  expect(regRes.status).toBe(204)
   const listRes = await apiGet<{ devices: Array<{ id: string }> }>(request, '/devices', s.user!.nsec)
   expect(listRes.status).toBe(200)
   const latestDevice = listRes.data.devices[listRes.data.devices.length - 1]
+  expect(latestDevice).toBeDefined()
   s.deviceIds.push(latestDevice.id)
+  // Also write to shared state so MLS step namespace can access device IDs
+  getSharedState(world).sharedDeviceIds.push(latestDevice.id)
 })
 
 Given('PUK envelopes are distributed for generation {int}', async ({ request, world }, generation: number) => {

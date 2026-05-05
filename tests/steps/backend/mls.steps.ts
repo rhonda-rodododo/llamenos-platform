@@ -25,7 +25,18 @@ interface MlsTestState {
 const STATE_KEY = 'mls_test'
 
 function getS(world: Record<string, unknown>): MlsTestState {
-  return getState<MlsTestState>(world, STATE_KEY)
+  const s = getState<MlsTestState>(world, STATE_KEY)
+  // Fall back to shared user set by "a registered user with a known keypair" step
+  if (!s.user) {
+    const sharedUser = getSharedState(world).sharedUser
+    if (sharedUser) s.user = sharedUser
+  }
+  // Fall back to shared device IDs registered by puk step's "the user has a registered device"
+  if (s.deviceIds.length === 0) {
+    const sharedIds = getSharedState(world).sharedDeviceIds
+    if (sharedIds.length > 0) s.deviceIds = [...sharedIds]
+  }
+  return s
 }
 
 Before(async ({ world }) => {

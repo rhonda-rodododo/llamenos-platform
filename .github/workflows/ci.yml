@@ -528,7 +528,7 @@ jobs:
       - name: Run backend unit tests
         run: |
           mkdir -p test-results
-          bunx vitest run --config vitest.unit.config.ts --reporter=junit --outputFile=test-results/backend-unit.xml 2>&1 | tee /tmp/backend-unit-results.txt; exit ${PIPESTATUS[0]}
+          bunx vitest run --config vitest.unit.config.ts --reporter=default --reporter=junit --outputFile=test-results/backend-unit.xml
 
       - name: Upload test results
         if: always()

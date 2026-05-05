@@ -75,7 +75,7 @@ Given('a hub with {int} admins with known keypairs', async ({request, world}, co
 
 When('the volunteer encrypts a note {string}', async ({request, world}, noteText: string) => {
   // Create a note via API — notes are stored encrypted, send mock ciphertext
-  const { status, data } = await apiPost<{ note: { id: string; encryptedContent: string } }>(
+  const { status, data } = await apiPost<{ id: string; encryptedContent: string }>(
     request,
     '/notes',
     {
@@ -84,8 +84,8 @@ When('the volunteer encrypts a note {string}', async ({request, world}, noteText
     },
   )
   if (status === 200 || status === 201) {
-    getSecTestState(world).noteId = data.note.id
-    getSecTestState(world).encryptedEnvelope = data.note as unknown as Record<string, unknown>
+    getSecTestState(world).noteId = data.id
+    getSecTestState(world).encryptedEnvelope = data as unknown as Record<string, unknown>
   }
 })
 
@@ -177,7 +177,7 @@ Then('the admin can decrypt the message to {string}', async ({ request, world },
 })
 
 When('a volunteer encrypts a note {string}', async ({request, world}, noteText: string) => {
-  const { status, data } = await apiPost<{ note: { id: string } }>(
+  const { status, data } = await apiPost<{ id: string }>(
     request,
     '/notes',
     {
@@ -186,7 +186,7 @@ When('a volunteer encrypts a note {string}', async ({request, world}, noteText: 
     },
   )
   if (status === 200 || status === 201) {
-    getSecTestState(world).noteId = data.note.id
+    getSecTestState(world).noteId = data.id
   }
 })
 

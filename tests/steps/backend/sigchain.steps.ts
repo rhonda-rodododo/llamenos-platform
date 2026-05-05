@@ -4,7 +4,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { setLastResponse } from './shared-state'
+import { setLastResponse, getSharedState } from './shared-state'
 import {
   apiGet,
   apiPost,
@@ -64,7 +64,10 @@ async function appendLink(
 
 Given('a registered user with a known keypair', async ({ request, world }) => {
   const user = await createUserViaApi(request, { name: `Sigchain User ${Date.now()}` })
-  getS(world).user = { nsec: user.nsec, pubkey: user.pubkey }
+  const userData = { nsec: user.nsec, pubkey: user.pubkey }
+  getS(world).user = userData
+  // Also write to shared state so PUK/WebAuthn step namespaces can access it
+  getSharedState(world).sharedUser = userData
 })
 
 Given('the user has a genesis sigchain link', async ({ request, world }) => {

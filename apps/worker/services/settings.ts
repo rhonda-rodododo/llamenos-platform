@@ -2676,6 +2676,11 @@ export class SettingsService {
   // Test Reset (demo/development only)
   // =========================================================================
 
+  /** Clear all rate limit counters — used in BDD tests to prevent cross-scenario bleed. */
+  async clearRateLimits(): Promise<void> {
+    await this.db.delete(rateLimits)
+  }
+
   async reset(env: {
     DEMO_MODE?: string
     ENVIRONMENT?: string

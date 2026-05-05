@@ -8,7 +8,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
 import type { AppEnv } from '../types'
-import { requirePermission, checkPermission } from '../middleware/permission-guard'
+import { checkPermission } from '../middleware/permission-guard'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { CryptoKeyError } from '../services/crypto-keys'
 
@@ -67,7 +67,8 @@ sigchainRoutes.get('/',
       ...authErrors,
     },
   }),
-  requirePermission('users:read'),
+  // No requirePermission here — the route has inline access control:
+  // users may read their own sigchain, admins may read any sigchain.
   async (c) => {
     const callerPubkey = c.get('pubkey')
     const permissions = c.get('permissions')

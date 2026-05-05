@@ -94,7 +94,7 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
       const volEnv = wrapKeyForRecipient(contentKey, volKp.pubkey, volKp.skHex, LABEL_NOTE_KEY)
       const adminEnv = wrapKeyForRecipient(contentKey, adminPubkey, adminSkHex, LABEL_NOTE_KEY)
 
-      const { status, data } = await apiPost<{ note: Record<string, unknown> }>(
+      const { status, data } = await apiPost<Record<string, unknown>>(
         request,
         '/notes',
         {
@@ -106,8 +106,8 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
         volKp.nsec,
       )
       expect([200, 201]).toContain(status)
-      getStorageIntegrityState(world).entityIds.set(entityType, data.note.id as string)
-      getStorageIntegrityState(world).apiResponses.set(entityType, data.note)
+      getStorageIntegrityState(world).entityIds.set(entityType, data.id as string)
+      getStorageIntegrityState(world).apiResponses.set(entityType, data)
       break
     }
 
@@ -319,7 +319,7 @@ When('the volunteer creates a note with real ECIES envelopes', async ({ request,
   getStorageIntegrityState(world).submittedAuthorEnvelope = authorEnv
   getStorageIntegrityState(world).submittedEnvelopes = [{ pubkey: getStorageIntegrityState(world).adminPubkey!, ...adminEnv }]
 
-  const { status, data } = await apiPost<{ note: Record<string, unknown> }>(
+  const { status, data } = await apiPost<Record<string, unknown>>(
     request,
     '/notes',
     {
@@ -331,8 +331,8 @@ When('the volunteer creates a note with real ECIES envelopes', async ({ request,
     getStorageIntegrityState(world).volunteerKp!.nsec,
   )
   expect([200, 201]).toContain(status)
-  getStorageIntegrityState(world).entityIds.set('envelope-note', data.note.id as string)
-  getStorageIntegrityState(world).apiResponses.set('envelope-note', data.note)
+  getStorageIntegrityState(world).entityIds.set('envelope-note', data.id as string)
+  getStorageIntegrityState(world).apiResponses.set('envelope-note', data)
 })
 
 When('the note is fetched via the API', async ({ request, world }) => {

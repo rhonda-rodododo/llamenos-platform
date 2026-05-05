@@ -60,6 +60,7 @@ export interface CreateReplyInput {
 export interface AddBanInput {
   hubId?: string
   phone: string
+  phonePlain?: string
   reason: string
   bannedBy: string
 }
@@ -257,6 +258,7 @@ export class RecordsService {
       .values({
         hubId: input.hubId || null,  // normalize empty string to null
         phone: input.phone,
+        phonePlain: input.phonePlain ?? null,
         reason: input.reason,
         bannedBy: input.bannedBy,
       })
@@ -265,7 +267,7 @@ export class RecordsService {
     return ban
   }
 
-  async listBans(hubId?: string): Promise<{ bans: BanRow[] }> {
+  async listBans(hubId?: string): Promise<{ bans: Array<{ phone: string; reason: string | null; bannedBy: string | null; bannedAt: Date }> }> {
     const rows = hubId
       ? await this.db
           .select()
@@ -276,7 +278,14 @@ export class RecordsService {
           .select()
           .from(bans)
           .orderBy(desc(bans.bannedAt))
-    return { bans: rows }
+    return {
+      bans: rows.map(r => ({
+        phone: r.phonePlain ?? r.phone,  // return plain phone for display; fall back to hash
+        reason: r.reason,
+        bannedBy: r.bannedBy,
+        bannedAt: r.bannedAt,
+      })),
+    }
   }
 
   async bulkAddBans(
@@ -284,6 +293,7 @@ export class RecordsService {
     reason: string,
     bannedBy: string,
     hubId?: string,
+    plainPhones?: string[],
   ): Promise<number> {
     // Get existing phones to avoid duplicates
     const existingRows = await this.db
@@ -298,9 +308,11 @@ export class RecordsService {
     const existingPhones = new Set(existingRows.map((r) => r.phone))
     // Deduplicate within the input array AND exclude already-banned phones
     const seen = new Set<string>()
-    const newPhones = phones.filter((p) => {
+    const newIndices: number[] = []
+    const newPhones = phones.filter((p, i) => {
       if (existingPhones.has(p) || seen.has(p)) return false
       seen.add(p)
+      newIndices.push(i)
       return true
     })
 
@@ -309,9 +321,10 @@ export class RecordsService {
     await this.db
       .insert(bans)
       .values(
-        newPhones.map((phone) => ({
+        newPhones.map((phone, idx) => ({
           hubId: hubId || null,  // normalize empty string to null
           phone,
+          phonePlain: plainPhones ? (plainPhones[newIndices[idx]] ?? null) : null,
           reason,
           bannedBy,
         })),
