@@ -68,21 +68,17 @@ export class RelayCapture {
     // Use `since` to filter out historical events from prior test runs.
     // Subtract 2 seconds for clock skew tolerance.
     const since = Math.floor(Date.now() / 1000) - 2
-
-    // Subscribe to all llamenos events regardless of hub. Tests run serially
-    // (--workers=1) so cross-scenario event leakage is not a concern.
-    // Published events DO carry ['h', hubId] tags for client-side routing, but
-    // the relay subscription does not filter by hub to keep tests simple and
-    // compatible with all strfry versions.
-    const filters: Record<string, unknown>[] = [
-      {
-        kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
-        '#t': ['llamenos:event'],
-        since,
-      },
-    ]
-
-    const req = JSON.stringify(['REQ', this.subscriptionId, ...filters])
+    const filter: Record<string, unknown> = {
+      kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
+      '#t': ['llamenos:event'],
+      since,
+    }
+    // Scope subscription to this hub's events to prevent cross-scenario contamination
+    // under parallel test execution (3 workers).
+    if (this.hubId) {
+      filter['#h'] = [this.hubId]
+    }
+    const req = JSON.stringify(['REQ', this.subscriptionId, filter])
     this.ws.send(req)
   }
 
