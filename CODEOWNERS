@@ -1,0 +1,19 @@
+# CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+
+*                                   @rhonda-rodododo
+
+apps/desktop/                       @rhonda-rodododo
+apps/worker/                        @rhonda-rodododo
+apps/ios/                           @rhonda-rodododo
+apps/android/                       @rhonda-rodododo
+apps/sip-bridge/                    @rhonda-rodododo
+apps/signal-notifier/               @rhonda-rodododo
+
+packages/crypto/                    @rhonda-rodododo
+packages/protocol/                  @rhonda-rodododo
+packages/shared/                    @rhonda-rodododo
+packages/i18n/                      @rhonda-rodododo
+
+.github/                            @rhonda-rodododo
+deploy/                             @rhonda-rodododo

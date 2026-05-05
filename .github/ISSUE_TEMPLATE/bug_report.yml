@@ -1,0 +1,32 @@
+name: Bug report
+description: Something isn't working
+labels: [bug]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Desktop, iOS, Android, Backend/API, Other]
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and how to reproduce it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Environment
+      description: OS version, app version, Rust/Bun/Xcode versions if relevant.
