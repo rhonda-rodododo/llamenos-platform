@@ -7,6 +7,10 @@ useDefault = true
 [allowlist]
 description = "Documentation examples and development-only credential defaults"
 
+# Fake HMAC_SECRET in unit test — introduced in c840e6a7 before gitleaks:allow comment was added.
+# The value is not a real secret; subsequent commit added the allow annotation.
+commits = ["c840e6a7e38041a457eade36f60cab4ae8356fa0"]
+
 # Translated deployment docs contain placeholder/example credentials
 paths = [
   '''site/src/content/docs/.*/deploy.*\.md$''',
