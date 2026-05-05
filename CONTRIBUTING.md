@@ -8,40 +8,31 @@ want to work on — you don't need to set up all platforms.
 
 ## Prerequisites
 
-**All contributors need:**
-- [mise](https://mise.jdx.dev/) — polyglot version manager (`curl https://mise.run | sh`)
-- [Docker](https://docs.docker.com/get-docker/) — for local backing services (PostgreSQL, object storage, Nostr relay)
+**All contributors:**
+- [Bun](https://bun.sh/) 1.3.5+ (`curl -fsSL https://bun.sh/install | bash`)
+- [Docker](https://docs.docker.com/get-docker/) (for local backing services)
 - Git
 
 **Desktop (Tauri) or Crypto (Rust):**
-- [Rust](https://rustup.rs/) — install rustup; toolchain version is managed per workspace by `rust-toolchain.toml`
+- [Rust](https://rustup.rs/) — toolchain version is managed by `rust-toolchain.toml` per workspace
 
 **Android:**
-- Android SDK with NDK r27 — install via Android Studio SDK Manager
+- JDK 17 (Temurin recommended)
+- Android SDK with NDK r27
 
 **iOS (macOS only):**
-- Xcode 16+ — install from the App Store
+- Xcode 16+
 - `xcodegen` (`brew install xcodegen`)
 
-### mise manages: Bun, JDK 17, Ruby (Fastlane)
+### With mise (optional but recommended)
 
-After installing mise, one command installs all pinned versions:
-
-```bash
-mise install     # installs Bun 1.3.5, JDK 17, Ruby 3.3
-```
-
-**Ruby / Fastlane:** both `apps/ios/fastlane` and `apps/android/fastlane` use Fastlane for
-App Store / Play Store delivery. After `mise install`, install the Fastlane gems:
+[mise](https://mise.jdx.dev/) is a polyglot version manager. If you use it:
 
 ```bash
-cd apps/ios && bundle install    # installs Fastlane into apps/ios/vendor/bundle/
+mise install     # Installs Bun 1.3.5 and JDK 17 as declared in .mise.toml
 ```
 
-**Rust:** mise does _not_ pin Rust — `apps/desktop/rust-toolchain.toml` (1.85.0) and
-`packages/crypto/rust-toolchain.toml` (stable) handle per-workspace pinning via rustup.
-
-**Swift:** macOS-only; managed by Xcode. The project targets swift-tools-version 5.9 / iOS 17+.
+Rust is managed by `rust-toolchain.toml` files in each workspace — mise respects these automatically.
 
 ---
 
@@ -50,8 +41,7 @@ cd apps/ios && bundle install    # installs Fastlane into apps/ios/vendor/bundle
 ```bash
 git clone git@github.com:your-org/llamenos.git
 cd llamenos
-mise install          # Bun + JDK + Ruby
-bun install           # JS/TS dependencies
+bun install
 bash scripts/dev-setup.sh    # prerequisite check + troubleshooting hints
 ```
 
