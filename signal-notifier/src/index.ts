@@ -89,14 +89,15 @@ app.get('/health', async (c) => {
 const notifierRoutes = buildRoutes(authConfig, tokenSecret, store, bridgeCfg, audit)
 app.route('/api', notifierRoutes)
 
-// Run migration then start server
+// Run migration first, then start server — prevents health check from querying
+// tables that don't exist yet (race condition if server started before migration).
 migrate()
   .then(() => {
     console.log(`[signal-notifier] tables ready, starting on port ${port}`)
+    Bun.serve({ port, fetch: app.fetch })
+    console.log(`[signal-notifier] listening on port ${port}`)
   })
   .catch((err) => {
     console.error('[signal-notifier] migration failed:', err)
     process.exit(1)
   })
-
-export default { port, fetch: app.fetch }
