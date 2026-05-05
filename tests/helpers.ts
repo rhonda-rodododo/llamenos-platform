@@ -36,20 +36,13 @@ export * from './pages/index'
 
 /**
  * Enter a PIN into the PinInput component.
- * Uses keyboard typing since the component auto-advances focus on each digit.
+ * The PinInput is a single password input field — fill the value and press Enter.
  */
 export async function enterPin(page: Page, pin: string) {
-  // Focus the PIN input
-  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
-  await firstDigit.waitFor({ state: 'visible', timeout: 10000 })
-  await firstDigit.click()
-  // Type each digit — PinInput auto-advances focus on each keystroke
-  for (const digit of pin) {
-    await page.keyboard.type(digit)
-  }
-  // PinInput has 8 fields but minLength is 6 — if PIN is shorter than 8 digits,
-  // press Enter to trigger onComplete (auto-complete only fires at exactly 8 digits)
-  await page.keyboard.press('Enter')
+  const pinInput = page.getByTestId('pin-input').locator('input')
+  await pinInput.waitFor({ state: 'visible', timeout: 10000 })
+  await pinInput.fill(pin)
+  await pinInput.press('Enter')
 }
 
 /**
@@ -72,7 +65,7 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
     await page.goto('/login')
     await page.waitForLoadState('domcontentloaded')
 
-    const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+    const pinInput = page.getByTestId('pin-input').locator('input')
     const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
 
     if (pinVisible) {
@@ -117,7 +110,7 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
  */
 export async function reenterPinAfterReload(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded')
-  const pinInput = page.locator('input[aria-label="PIN or passphrase"]')
+  const pinInput = page.getByTestId('pin-input').locator('input')
   // Use waitFor to actually wait for the PIN input to render after reload.
   // isVisible() is an instant snapshot and returns false if DOM hasn't rendered yet.
   try {

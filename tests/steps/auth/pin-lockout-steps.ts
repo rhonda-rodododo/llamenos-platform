@@ -71,7 +71,7 @@ Then('the lockout duration should be approximately {int} minutes', async ({ page
 
 Then('the PIN pad should be disabled', async ({ page }) => {
   // After lockout, PIN input should be disabled or the error prevents entry
-  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
+  const firstDigit = page.getByTestId('pin-input').locator('input')
   const isDisabled = await firstDigit.isDisabled({ timeout: 2000 }).catch(() => false)
   const errorVisible = await page.locator('text=/locked out/i').isVisible({ timeout: 1000 }).catch(() => false)
   // Either the pad is disabled or the lockout message prevents entry
@@ -104,7 +104,7 @@ Then('the failed attempt counter should be reset', async ({ page }) => {
 
 Given('I see the lockout message', async ({ page }) => {
   // Enter a wrong PIN to trigger lockout (attempts already seeded)
-  await enterPin(page, '000000')
+  await enterPin(page, '00000000')
   const lockoutText = page.locator('text=/locked out/i')
   await expect(lockoutText.first()).toBeVisible({ timeout: Timeouts.AUTH })
 })
@@ -115,7 +115,7 @@ Then('I should still see the lockout message', async ({ page }) => {
 })
 
 Then('I should not be able to enter a PIN until lockout expires', async ({ page }) => {
-  const firstDigit = page.locator('input[aria-label="PIN or passphrase"]')
+  const firstDigit = page.getByTestId('pin-input').locator('input')
   const isDisabled = await firstDigit.isDisabled({ timeout: 2000 }).catch(() => false)
   const errorVisible = await page.locator('text=/locked out/i').isVisible({ timeout: 1000 }).catch(() => false)
   expect(isDisabled || errorVisible).toBe(true)

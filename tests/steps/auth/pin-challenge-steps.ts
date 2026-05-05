@@ -43,14 +43,14 @@ Then('I should see the unmasked phone number', async ({ page }) => {
 })
 
 When('I enter a wrong PIN three times', async ({ page }) => {
-  await enterPin(page, '999999')
+  await enterPin(page, '99999999')
   const errorMsg = page.getByTestId(TestIds.PIN_CHALLENGE_ERROR)
   await expect(errorMsg).toBeVisible({ timeout: 5000 })
 
-  await enterPin(page, '888888')
+  await enterPin(page, '88888888')
   await expect(errorMsg).toBeVisible({ timeout: 5000 })
 
-  await enterPin(page, '777777')
+  await enterPin(page, '77777777')
 })
 
 Then('I should still be on the volunteers page', async ({ page }) => {
