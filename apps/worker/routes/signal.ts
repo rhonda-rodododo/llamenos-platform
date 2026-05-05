@@ -6,18 +6,42 @@
  */
 
 import { Hono } from 'hono'
+import { describeRoute, resolver, validator } from 'hono-openapi'
+import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { SignalIdentityService } from '../messaging/signal/identity'
 import { SignalMessageQueue } from '../messaging/signal/queue'
 import { getDb } from '../db'
 import { audit } from '../services/audit'
+import {
+  signalIdentityRecordSchema,
+  signalQueueStatsSchema,
+  signalTrustLevelSchema,
+} from '@protocol/schemas/signal-notification'
+import { authErrors } from '../openapi/helpers'
 
 const signal = new Hono<AppEnv>()
 
 // --- Identity Trust Management ---
 
-signal.get('/identities', requirePermission('settings:manage-messaging'),
+signal.get('/identities',
+  describeRoute({
+    tags: ['Signal'],
+    summary: 'List all Signal identity records for a hub',
+    responses: {
+      200: {
+        description: 'Identity records with trust levels',
+        content: {
+          'application/json': {
+            schema: resolver(z.object({ identities: z.array(signalIdentityRecordSchema) })),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage-messaging'),
   async (c) => {
     const hubId = c.req.query('hub') || ''
     const db = getDb()
@@ -26,7 +50,23 @@ signal.get('/identities', requirePermission('settings:manage-messaging'),
     return c.json({ identities })
   })
 
-signal.get('/identities/untrusted', requirePermission('settings:manage-messaging'),
+signal.get('/identities/untrusted',
+  describeRoute({
+    tags: ['Signal'],
+    summary: 'List untrusted Signal identity records requiring review',
+    responses: {
+      200: {
+        description: 'Untrusted identity records',
+        content: {
+          'application/json': {
+            schema: resolver(z.object({ identities: z.array(signalIdentityRecordSchema) })),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage-messaging'),
   async (c) => {
     const hubId = c.req.query('hub') || ''
     const db = getDb()
@@ -35,20 +75,30 @@ signal.get('/identities/untrusted', requirePermission('settings:manage-messaging
     return c.json({ identities })
   })
 
-signal.post('/identities/trust', requirePermission('settings:manage-messaging'),
+const trustBodySchema = z.object({
+  uuid: z.string().min(1),
+  trustLevel: signalTrustLevelSchema,
+  hubId: z.string().optional(),
+})
+
+signal.post('/identities/trust',
+  describeRoute({
+    tags: ['Signal'],
+    summary: 'Set trust level for a Signal identity',
+    responses: {
+      200: {
+        description: 'Trust level updated',
+        content: { 'application/json': { schema: resolver(z.object({ success: z.boolean() })) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage-messaging'),
+  validator('json', trustBodySchema),
   async (c) => {
-    const body = await c.req.json<{ uuid: string; trustLevel: string; hubId?: string }>()
+    const body = c.req.valid('json')
     const { uuid, trustLevel, hubId } = body
     const user = c.get('user')
-
-    if (!uuid || !trustLevel) {
-      return c.json({ error: 'uuid and trustLevel are required' }, 400)
-    }
-
-    const validLevels = ['UNTRUSTED', 'TRUSTED_UNVERIFIED', 'TRUSTED_VERIFIED']
-    if (!validLevels.includes(trustLevel)) {
-      return c.json({ error: `trustLevel must be one of: ${validLevels.join(', ')}` }, 400)
-    }
 
     const services = c.get('services')
     const db = getDb()
@@ -57,7 +107,7 @@ signal.post('/identities/trust', requirePermission('settings:manage-messaging'),
     const success = await identityService.setTrustLevel({
       hubId: hubId || '',
       uuid,
-      trustLevel: trustLevel as 'UNTRUSTED' | 'TRUSTED_UNVERIFIED' | 'TRUSTED_VERIFIED',
+      trustLevel,
       verifierPubkey: user.pubkey,
     })
 
@@ -73,7 +123,19 @@ signal.post('/identities/trust', requirePermission('settings:manage-messaging'),
 
 // --- Message Queue Monitoring ---
 
-signal.get('/queue/stats', requirePermission('settings:manage-messaging'),
+signal.get('/queue/stats',
+  describeRoute({
+    tags: ['Signal'],
+    summary: 'Get Signal message queue statistics',
+    responses: {
+      200: {
+        description: 'Queue counts by status',
+        content: { 'application/json': { schema: resolver(signalQueueStatsSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage-messaging'),
   async (c) => {
     const hubId = c.req.query('hub') || undefined
     const db = getDb()
@@ -82,7 +144,19 @@ signal.get('/queue/stats', requirePermission('settings:manage-messaging'),
     return c.json(stats)
   })
 
-signal.get('/queue/dead-letters', requirePermission('settings:manage-messaging'),
+signal.get('/queue/dead-letters',
+  describeRoute({
+    tags: ['Signal'],
+    summary: 'List dead-letter Signal messages that exceeded retry limit',
+    responses: {
+      200: {
+        description: 'Dead-letter queue entries',
+        content: { 'application/json': { schema: resolver(z.object({ deadLetters: z.array(z.unknown()) })) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage-messaging'),
   async (c) => {
     const hubId = c.req.query('hub') || undefined
     const db = getDb()
@@ -91,7 +165,19 @@ signal.get('/queue/dead-letters', requirePermission('settings:manage-messaging')
     return c.json({ deadLetters })
   })
 
-signal.post('/queue/retry/:id', requirePermission('settings:manage-messaging'),
+signal.post('/queue/retry/:id',
+  describeRoute({
+    tags: ['Signal'],
+    summary: 'Retry a dead-letter Signal message',
+    responses: {
+      200: {
+        description: 'Retry enqueued',
+        content: { 'application/json': { schema: resolver(z.object({ success: z.boolean() })) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage-messaging'),
   async (c) => {
     const messageId = c.req.param('id')
     const services = c.get('services')

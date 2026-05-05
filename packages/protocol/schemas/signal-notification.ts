@@ -89,3 +89,60 @@ export const hmacKeyResponseSchema = z.object({
 })
 
 export type HmacKeyResponse = z.infer<typeof hmacKeyResponseSchema>
+
+// ---------------------------------------------------------------------------
+// Signal identity record — returned by GET /messaging/signal/identities
+// ---------------------------------------------------------------------------
+
+export const signalTrustLevelSchema = z.enum(['UNTRUSTED', 'TRUSTED_UNVERIFIED', 'TRUSTED_VERIFIED'])
+export type SignalTrustLevel = z.infer<typeof signalTrustLevelSchema>
+
+export const signalIdentityRecordSchema = z.object({
+  id: z.string(),
+  hubId: z.string(),
+  number: z.string(),
+  uuid: z.string(),
+  fingerprint: z.string(),
+  trustLevel: signalTrustLevelSchema,
+  verifiedBy: z.string().nullable(),
+  verifiedAt: z.string().nullable(),
+  firstSeenAt: z.string(),
+  lastSeenAt: z.string(),
+  keyChangeCount: z.number(),
+})
+
+export type SignalIdentityRecord = z.infer<typeof signalIdentityRecordSchema>
+
+// ---------------------------------------------------------------------------
+// Signal queue stats — returned by GET /messaging/signal/queue/stats
+// ---------------------------------------------------------------------------
+
+export const signalQueueStatsSchema = z.object({
+  pending: z.number(),
+  processing: z.number(),
+  failed: z.number(),
+  dead: z.number(),
+  sent: z.number(),
+})
+
+export type SignalQueueStats = z.infer<typeof signalQueueStatsSchema>
+
+// ---------------------------------------------------------------------------
+// Signal contact record — returned by GET /signal-notification/contact
+// ---------------------------------------------------------------------------
+
+export const signalContactRecordSchema = z.object({
+  identifierHash: z.string(),
+  identifierCiphertext: z.string(),
+  identifierEnvelope: z.array(
+    z.object({
+      recipientPubkey: z.string(),
+      encryptedKey: z.string(),
+    })
+  ),
+  identifierType: z.enum(['phone', 'username']),
+  verifiedAt: z.string().nullable(),
+  updatedAt: z.string(),
+})
+
+export type SignalContactRecord = z.infer<typeof signalContactRecordSchema>
