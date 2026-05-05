@@ -53,7 +53,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.CustomFieldDefinition
+import org.llamenos.hotline.model.CustomFieldDef
 import org.llamenos.hotline.service.TranscriptionService
 import org.llamenos.hotline.ui.components.LoadingOverlay
 
@@ -277,7 +277,7 @@ fun NoteCreateScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomFieldInput(
-    definition: CustomFieldDefinition,
+    definition: CustomFieldDef,
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,

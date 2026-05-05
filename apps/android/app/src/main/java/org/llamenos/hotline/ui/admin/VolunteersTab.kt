@@ -51,6 +51,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.User
+import org.llamenos.hotline.model.displayName
+import org.llamenos.hotline.model.id
+import org.llamenos.hotline.model.role
+import org.llamenos.hotline.model.status
 
 /**
  * Volunteers management tab in the admin panel.

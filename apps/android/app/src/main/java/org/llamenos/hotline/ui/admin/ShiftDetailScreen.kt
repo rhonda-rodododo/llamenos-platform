@@ -46,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.User
+import org.llamenos.hotline.model.displayName
+import org.llamenos.hotline.model.id
+import org.llamenos.hotline.model.role
 import org.llamenos.hotline.util.DateFormatUtils
 
 /**

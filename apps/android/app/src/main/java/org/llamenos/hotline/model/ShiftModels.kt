@@ -2,24 +2,22 @@ package org.llamenos.hotline.model
 
 import kotlinx.serialization.Serializable
 
-// ---- Re-exports of generated types ----
+// ── Generated re-exports ────────────────────────────────────────────────────
+
+typealias ShiftResponse = org.llamenos.protocol.Shift
 
 /**
- * Re-export generated ShiftResponse from protocol package.
- * The generated type includes the full API shape (id, name, startTime, endTime,
- * days as List<Double>, userPubkeys, createdAt).
+ * Shifts list response from GET /api/shifts.
+ * Uses the generated ShiftListResponse.
  */
-typealias ShiftResponse = org.llamenos.protocol.ShiftResponse
+typealias ShiftsListResponse = org.llamenos.protocol.ShiftListResponse
 
-// ---- Client-specific types ----
+// ── Client-specific types ───────────────────────────────────────────────────
 
 /**
  * Current shift status for the authenticated volunteer.
  * Client-specific shape for the /api/shifts/status endpoint.
- *
- * Note: The generated MyStatusResponse has a different shape (nested
- * currentShift/nextShift objects with onShift boolean). This client type
- * uses flat fields matching the app's UI expectations.
+ * The generated MyStatusResponse has a different shape (nested objects).
  */
 @Serializable
 data class ShiftStatusResponse(
@@ -40,15 +38,4 @@ data class ShiftStatusResponse(
 data class ClockResponse(
     val success: Boolean,
     val shiftId: String? = null,
-)
-
-/**
- * Paginated shifts list response from GET /api/shifts.
- * Client-side wrapper — the generated ShiftListResponse uses a nested
- * Shift type and Double for total. This uses ShiftResponse and Int.
- */
-@Serializable
-data class ShiftsListResponse(
-    val shifts: List<org.llamenos.protocol.ShiftResponse>,
-    val total: Int,
 )

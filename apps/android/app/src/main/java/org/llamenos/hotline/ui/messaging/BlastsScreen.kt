@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
+import org.llamenos.hotline.model.displayName
 
 /**
  * Blasts screen for sending broadcast messages to volunteers.

@@ -54,6 +54,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.Invite
+import org.llamenos.hotline.model.claimedBy
+import org.llamenos.hotline.model.id
+import org.llamenos.hotline.model.role
 import org.llamenos.hotline.util.DateFormatUtils
 
 /**

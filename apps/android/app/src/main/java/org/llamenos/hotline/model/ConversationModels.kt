@@ -2,31 +2,16 @@ package org.llamenos.hotline.model
 
 import kotlinx.serialization.Serializable
 
-// ---- Re-exports of generated types ----
+// ── Generated re-exports ────────────────────────────────────────────────────
 
-/**
- * Request body for sending an encrypted reply.
- * Uses the generated SendMessageBody type.
- */
 typealias SendMessageRequest = org.llamenos.protocol.SendMessageBody
-
-/**
- * Envelope structure for the send-message request body.
- * Uses the generated SendMessageBodyReaderEnvelope type.
- */
 typealias CreateMessageEnvelope = org.llamenos.protocol.SendMessageBodyReaderEnvelope
 
-// ---- Client-specific types ----
+// ── Client-specific types ───────────────────────────────────────────────────
+// The generated conversation types use different field names
+// (contactIdentifierHash, assignedTo, messageCount as Double).
+// These client types use UI-friendly names (contactHash, unreadCount, etc.).
 
-/**
- * A messaging conversation between a contact and the hotline.
- *
- * Client-specific shape optimized for local UI. The generated
- * ConversationResponse (org.llamenos.protocol.ConversationResponse) represents
- * the full API shape with different field names (contactIdentifierHash,
- * assignedTo, messageCount as Double). This type uses UI-friendly field names
- * (contactHash, assignedVolunteerPubkey, unreadCount).
- */
 @Serializable
 data class Conversation(
     val id: String,
@@ -39,14 +24,6 @@ data class Conversation(
     val createdAt: String,
 )
 
-/**
- * An encrypted message within a conversation.
- *
- * Client-specific shape — the generated MessageResponse uses
- * conversationID (with @SerialName), has authorPubkey/status fields,
- * and uses MessageResponseReaderEnvelope. This type uses different
- * field names (channelType, readAt) for UI convenience.
- */
 @Serializable
 data class ConversationMessage(
     val id: String,
@@ -59,18 +36,12 @@ data class ConversationMessage(
     val readAt: String? = null,
 )
 
-/**
- * Paginated response from GET /api/conversations.
- */
 @Serializable
 data class ConversationsListResponse(
     val conversations: List<Conversation>,
     val total: Int,
 )
 
-/**
- * Paginated response from GET /api/conversations/:id/messages.
- */
 @Serializable
 data class MessagesListResponse(
     val messages: List<ConversationMessage>,
@@ -79,9 +50,7 @@ data class MessagesListResponse(
 
 /**
  * Decrypted message for UI display.
- *
- * This is the client-side representation after ECIES unwrap + XChaCha20-Poly1305
- * decryption. It is never serialized or sent over the wire.
+ * Client-only — never serialized or sent over the wire.
  */
 data class DecryptedMessage(
     val id: String,

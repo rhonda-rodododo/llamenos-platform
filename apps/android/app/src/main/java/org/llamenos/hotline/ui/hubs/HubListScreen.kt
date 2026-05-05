@@ -48,6 +48,7 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.model.Hub
 import org.llamenos.hotline.ui.components.EmptyState
 import org.llamenos.hotline.util.DateFormatUtils
+import org.llamenos.protocol.HubStatus
 
 /**
  * Hub list screen showing all hubs with status indicators.
@@ -192,10 +193,9 @@ private fun HubCard(
     modifier: Modifier = Modifier,
 ) {
     val statusColor = when (hub.status) {
-        "active" -> MaterialTheme.colorScheme.primary
-        "suspended" -> MaterialTheme.colorScheme.tertiary
-        "archived" -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        HubStatus.Active -> MaterialTheme.colorScheme.primary
+        HubStatus.Suspended -> MaterialTheme.colorScheme.tertiary
+        HubStatus.Archived -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     }
 
     Card(
@@ -298,7 +298,7 @@ private fun HubCard(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = hub.status.replaceFirstChar { it.uppercase() },
+                        text = hub.status.value.replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.labelSmall,
                         color = statusColor,
                         modifier = Modifier.testTag("hub-status"),

@@ -62,7 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.CallRecord
+import org.llamenos.hotline.model.CallHistoryRecord
 import org.llamenos.protocol.ActiveCallResponseStatus
 import org.llamenos.hotline.model.durationSeconds
 import org.llamenos.hotline.model.hasRecordingFlag
@@ -220,7 +220,7 @@ fun CallHistoryScreen(
                                 items = uiState.calls,
                                 key = { it.id },
                             ) { call ->
-                                CallRecordCard(
+                                CallHistoryRecordCard(
                                     call = call,
                                     onAddNote = { onNavigateToNoteCreate(call.id) },
                                 )
@@ -264,8 +264,8 @@ fun CallHistoryScreen(
  * duration, and metadata badges.
  */
 @Composable
-private fun CallRecordCard(
-    call: CallRecord,
+private fun CallHistoryRecordCard(
+    call: CallHistoryRecord,
     onAddNote: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {

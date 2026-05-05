@@ -13,12 +13,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.hotline.model.CallHistoryRecord
 import org.llamenos.hotline.model.CallHistoryResponse
-import org.llamenos.hotline.model.CallRecord
 import javax.inject.Inject
 
 data class CallHistoryUiState(
-    val calls: List<CallRecord> = emptyList(),
+    val calls: List<CallHistoryRecord> = emptyList(),
     val total: Int = 0,
     val currentPage: Int = 1,
     val isLoading: Boolean = false,
@@ -92,7 +92,7 @@ class CallHistoryViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         calls = if (page == 1) response.calls else it.calls + response.calls,
-                        total = response.total,
+                        total = response.total.toInt(),
                         currentPage = page,
                         isLoading = false,
                         isRefreshing = false,

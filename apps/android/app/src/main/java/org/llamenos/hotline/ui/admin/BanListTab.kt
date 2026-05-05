@@ -46,6 +46,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.BanEntry
+import org.llamenos.hotline.model.createdAt
+import org.llamenos.hotline.model.id
+import org.llamenos.hotline.model.identifierHash
 
 /**
  * Ban list management tab in the admin panel.

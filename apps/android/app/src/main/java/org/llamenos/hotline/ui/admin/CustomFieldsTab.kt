@@ -55,7 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.CustomFieldDefinition
+import org.llamenos.hotline.model.CustomFieldDef
 
 /**
  * Custom fields administration tab in the admin panel.
@@ -179,7 +179,7 @@ fun CustomFieldsTab(
 
 @Composable
 private fun CustomFieldCard(
-    field: CustomFieldDefinition,
+    field: CustomFieldDef,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -247,9 +247,9 @@ private fun CustomFieldCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomFieldDialog(
-    existingField: CustomFieldDefinition?,
+    existingField: CustomFieldDef?,
     onDismiss: () -> Unit,
-    onSave: (CustomFieldDefinition) -> Unit,
+    onSave: (CustomFieldDef) -> Unit,
 ) {
     var label by remember { mutableStateOf(existingField?.label ?: "") }
     var type by remember { mutableStateOf(existingField?.type ?: "text") }
@@ -406,7 +406,7 @@ private fun CustomFieldDialog(
             TextButton(
                 onClick = {
                     val slug = label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
-                    val field = CustomFieldDefinition(
+                    val field = CustomFieldDef(
                         id = existingField?.id ?: slug,
                         name = existingField?.name ?: slug,
                         label = label,

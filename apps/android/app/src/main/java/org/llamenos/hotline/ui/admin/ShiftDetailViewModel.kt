@@ -14,6 +14,7 @@ import org.llamenos.hotline.model.AdminShiftsListResponse
 import org.llamenos.hotline.model.CreateShiftRequest
 import org.llamenos.hotline.model.User
 import org.llamenos.hotline.model.UsersListResponse
+import org.llamenos.hotline.model.id
 import javax.inject.Inject
 
 data class ShiftDetailUiState(

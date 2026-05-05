@@ -22,7 +22,7 @@ import org.llamenos.hotline.model.CreateReportCategoryRequest
 import org.llamenos.hotline.model.CreateShiftRequest
 import org.llamenos.hotline.model.CreateUserRequest
 import org.llamenos.hotline.model.CreateUserResponse
-import org.llamenos.hotline.model.CustomFieldDefinition
+import org.llamenos.hotline.model.CustomFieldDef
 import org.llamenos.hotline.model.CustomFieldsResponse
 import org.llamenos.hotline.model.FallbackGroupRequest
 import org.llamenos.hotline.model.Invite
@@ -41,6 +41,7 @@ import org.llamenos.hotline.model.TelephonySettingsResponse
 import org.llamenos.hotline.model.UpdateCustomFieldsRequest
 import org.llamenos.hotline.model.User
 import org.llamenos.hotline.model.UsersListResponse
+import org.llamenos.hotline.model.displayName
 import javax.inject.Inject
 
 /**
@@ -95,11 +96,11 @@ data class AdminUiState(
     val createdInviteCode: String? = null,
 
     // Custom fields
-    val customFields: List<CustomFieldDefinition> = emptyList(),
+    val customFields: List<CustomFieldDef> = emptyList(),
     val isLoadingFields: Boolean = false,
     val fieldsError: String? = null,
     val showCreateFieldDialog: Boolean = false,
-    val editingField: CustomFieldDefinition? = null,
+    val editingField: CustomFieldDef? = null,
 
     // Admin shifts
     val adminShifts: List<AdminShiftDetail> = emptyList(),
@@ -329,8 +330,8 @@ class AdminViewModel @Inject constructor(
                         auditEntries = allEntries,
                         isLoadingAudit = false,
                         auditPage = page,
-                        auditTotal = response.total,
-                        hasMoreAuditPages = allEntries.size < response.total,
+                        auditTotal = response.total.toInt(),
+                        hasMoreAuditPages = allEntries.size < response.total.toInt(),
                     )
                 }
             } catch (e: Exception) {
@@ -538,7 +539,7 @@ class AdminViewModel @Inject constructor(
         _uiState.update { it.copy(showCreateFieldDialog = true, editingField = null) }
     }
 
-    fun showEditFieldDialog(field: CustomFieldDefinition) {
+    fun showEditFieldDialog(field: CustomFieldDef) {
         _uiState.update { it.copy(showCreateFieldDialog = true, editingField = field) }
     }
 
@@ -546,7 +547,7 @@ class AdminViewModel @Inject constructor(
         _uiState.update { it.copy(showCreateFieldDialog = false, editingField = null) }
     }
 
-    fun saveCustomField(field: CustomFieldDefinition) {
+    fun saveCustomField(field: CustomFieldDef) {
         viewModelScope.launch {
             _uiState.update { it.copy(showCreateFieldDialog = false, editingField = null, fieldsError = null) }
             try {

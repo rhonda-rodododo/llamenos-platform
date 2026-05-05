@@ -10,33 +10,19 @@ import org.llamenos.protocol.Record
 import org.llamenos.protocol.RecordContact
 import org.llamenos.protocol.UpdateRecordBody
 
-// ---- Type aliases for codegen types with different names ----
+// ── Type aliases for codegen types with different names ──────────────────────
 
-/** Alias: codegen [Record] corresponds to the old hand-written CaseRecord. */
 typealias CaseRecord = Record
-
-/** Alias: codegen [Evidence] corresponds to the old hand-written EvidenceItem. */
 typealias EvidenceItem = Evidence
-
-/** Alias: codegen [AssignBody] corresponds to the old hand-written AssignRecordRequest. */
 typealias AssignRecordRequest = AssignBody
-
-/** Alias: codegen [CreateRecordBody] corresponds to the old hand-written CreateRecordRequest. */
 typealias CreateRecordRequest = CreateRecordBody
-
-/** Alias: codegen [UpdateRecordBody] corresponds to the old hand-written UpdateRecordRequest. */
 typealias UpdateRecordRequest = UpdateRecordBody
-
-/** Alias: codegen [CreateInteractionBody] corresponds to the old hand-written CreateInteractionRequest. */
 typealias CreateInteractionRequest = CreateInteractionBody
 
-// ---- Lenient entity type definition ----
-// The codegen EntityTypeDefinition now has defaults on all fields (Epic 354: Zod schemas
-// updated with .optional().default() + Kotlin post-processor enhanced for enum/SerialName defaults).
-// These hand-written versions remain because they use simple String for enums (vs codegen's
-// EntityCategory/DefaultAccessLevel enum classes) and Int for order (vs codegen's Long).
-// A full migration would require updating all consuming screens to handle enum types.
-// Future: migrate consuming code to use codegen types directly, then delete these.
+// ── Entity type definitions ─────────────────────────────────────────────────
+// The generated EntityTypeDefinition uses enum types (CreateEntityTypeBodyCategoryEnum,
+// DefaultAccessLevel, AccessLevel) and Long for order. These client types use
+// String for enums and Int for order for simpler UI construction.
 
 @Serializable
 data class EntityTypeDefinition(
@@ -98,13 +84,8 @@ data class EntityFieldDefinition(
     val accessLevel: String = "all",
 )
 
-// ---- API Response Wrappers ----
-// These wrap codegen types for API response deserialization.
-// The codegen does not generate paginated list wrappers for all endpoints.
+// ── API Response Wrappers ───────────────────────────────────────────────────
 
-/**
- * Paginated records list response from GET /api/records.
- */
 @Serializable
 data class RecordsListResponse(
     val records: List<Record>,
@@ -114,18 +95,11 @@ data class RecordsListResponse(
     val hasMore: Boolean = false,
 )
 
-/**
- * Entity types list response from GET /api/settings/cms/entity-types.
- */
 @Serializable
 data class EntityTypesResponse(
     val entityTypes: List<EntityTypeDefinition>,
 )
 
-/**
- * Interactions list response from GET /api/records/:id/interactions.
- * Uses the codegen [Interaction] type (the list response variant).
- */
 @Serializable
 data class InteractionsResponse(
     val interactions: List<Interaction>,
@@ -135,17 +109,11 @@ data class InteractionsResponse(
     val hasMore: Boolean = false,
 )
 
-/**
- * Contacts linked to a record from GET /api/records/:id/contacts.
- */
 @Serializable
 data class RecordContactsResponse(
     val contacts: List<RecordContact>,
 )
 
-/**
- * Response from POST /api/records/:id/assign and POST /api/records/:id/unassign.
- */
 @Serializable
 data class AssignResponse(
     val assignedTo: List<String>,

@@ -2,62 +2,40 @@ package org.llamenos.hotline.model
 
 import kotlinx.serialization.Serializable
 
-/**
- * Re-export generated CallRecordResponse from protocol package.
- */
+// ── Generated response types ────────────────────────────────────────────────
+
 typealias CallRecord = org.llamenos.protocol.CallRecordResponse
+typealias CallHistoryRecord = org.llamenos.protocol.CallHistoryResponseCall
 
 /**
- * Active call — a call currently ringing or in progress.
- * Client-only type — not part of the generated API surface.
- * The generated ActiveCallsResponseCall has a different shape (callerLast4 instead of callerNumber,
- * includes hasRecording/hasTranscription/hasVoicemail/duration/endedAt which are not needed here).
+ * Active call. Uses the generated ActiveCallsResponseCall which is a superset
+ * (includes callerLast4, hasRecording, etc.). Extension properties in
+ * Extensions.kt provide backward-compatible accessors.
  */
-@Serializable
-data class ActiveCall(
-    val id: String,
-    val callerNumber: String? = null,
-    val answeredBy: String? = null,
-    val startedAt: String,
-    val status: String,
-)
+typealias ActiveCall = org.llamenos.protocol.ActiveCallsResponseCall
 
 /**
- * Paginated call history response from GET /calls/history.
- * Client-side wrapper — the generated CallHistoryResponse uses Double for pagination fields
- * and a nested CallHistoryResponseCall type. This uses Int and the generated CallRecordResponse.
+ * Call history response from GET /calls/history.
+ * Uses the generated CallHistoryResponse. Pagination fields are Double.
  */
-@Serializable
-data class CallHistoryResponse(
-    val calls: List<org.llamenos.protocol.CallRecordResponse>,
-    val total: Int,
-)
+typealias CallHistoryResponse = org.llamenos.protocol.CallHistoryResponse
 
 /**
  * Today's call count response from GET /calls/today-count.
- * Client-only type using Int instead of the generated TodayCountResponse (Double).
+ * Uses the generated TodayCountResponse. Count is Double.
  */
-@Serializable
-data class CallCountResponse(
-    val count: Int,
-)
+typealias CallCountResponse = org.llamenos.protocol.TodayCountResponse
 
 /**
- * Response from GET /api/calls/active — list of the volunteer's active calls.
- * Client-only type — the generated ActiveCallsResponse uses ActiveCallsResponseCall
- * which has a different shape from our client ActiveCall.
+ * Response from GET /api/calls/active.
+ * Uses the generated ActiveCallsResponse.
  */
-@Serializable
-data class ActiveCallsResponse(
-    val calls: List<ActiveCall>,
-)
+typealias ActiveCallsResponse = org.llamenos.protocol.ActiveCallsResponse
+
+// ── Client-specific request types ───────────────────────────────────────────
 
 /**
  * Request body for POST /api/calls/{callId}/ban.
- * Client-specific shape — uses 'reason: String' (non-nullable) vs the generated
- * BanCallerBody which has 'reason: String? = null'.
+ * Uses the generated BanCallerBody.
  */
-@Serializable
-data class BanRequest(
-    val reason: String,
-)
+typealias BanRequest = org.llamenos.protocol.BanCallerBody

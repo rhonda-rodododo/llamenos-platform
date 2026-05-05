@@ -50,6 +50,17 @@ import org.llamenos.hotline.model.ServiceStatus
 import org.llamenos.hotline.model.StorageInfo
 import org.llamenos.hotline.model.SystemHealth
 import org.llamenos.hotline.model.UserInfo
+import org.llamenos.hotline.model.activeInt
+import org.llamenos.hotline.model.avgResponseSecondsInt
+import org.llamenos.hotline.model.missedInt
+import org.llamenos.hotline.model.onShiftInt
+import org.llamenos.hotline.model.onlineNowInt
+import org.llamenos.hotline.model.shiftCoverageInt
+import org.llamenos.hotline.model.statusString
+import org.llamenos.hotline.model.todayInt
+import org.llamenos.hotline.model.totalActiveInt
+import org.llamenos.hotline.model.uptimeSeconds
+import org.llamenos.hotline.model.volunteers
 
 /**
  * System health dashboard tab showing server status, services, call metrics,
@@ -209,11 +220,11 @@ private fun ServerHealthCard(
         testTag = "health-server-card",
         modifier = modifier,
     ) {
-        StatusBadge(status = server.status)
+        StatusBadge(status = server.statusString)
         Spacer(Modifier.height(8.dp))
         HealthMetricRow(
             label = stringResource(R.string.admin_system_uptime),
-            value = formatUptime(server.uptime),
+            value = formatUptime(server.uptimeSeconds),
         )
         HealthMetricRow(
             label = stringResource(R.string.admin_system_version),
@@ -255,7 +266,7 @@ private fun ServicesCard(
                         )
                     }
                 }
-                StatusBadge(status = service.status)
+                StatusBadge(status = service.statusString)
             }
             if (index < services.lastIndex) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -277,19 +288,19 @@ private fun CallMetricsCard(
     ) {
         HealthMetricRow(
             label = stringResource(R.string.admin_system_calls_today),
-            value = calls.today.toString(),
+            value = calls.todayInt.toString(),
         )
         HealthMetricRow(
             label = stringResource(R.string.admin_system_active_calls),
-            value = calls.active.toString(),
+            value = calls.activeInt.toString(),
         )
         HealthMetricRow(
             label = stringResource(R.string.admin_system_avg_response),
-            value = stringResource(R.string.admin_seconds_unit, calls.avgResponseSeconds),
+            value = stringResource(R.string.admin_seconds_unit, calls.avgResponseSecondsInt),
         )
         HealthMetricRow(
             label = stringResource(R.string.admin_system_missed_calls),
-            value = calls.missed.toString(),
+            value = calls.missedInt.toString(),
         )
     }
 }
@@ -355,19 +366,19 @@ private fun VolunteerActivityCard(
     ) {
         HealthMetricRow(
             label = stringResource(R.string.admin_system_total_active),
-            value = volunteers.totalActive.toString(),
+            value = volunteers.totalActiveInt.toString(),
         )
         HealthMetricRow(
             label = stringResource(R.string.admin_system_online_now),
-            value = volunteers.onlineNow.toString(),
+            value = volunteers.onlineNowInt.toString(),
         )
         HealthMetricRow(
             label = stringResource(R.string.admin_system_on_shift),
-            value = volunteers.onShift.toString(),
+            value = volunteers.onShiftInt.toString(),
         )
         HealthMetricRow(
             label = stringResource(R.string.admin_system_shift_coverage),
-            value = "${volunteers.shiftCoverage}%",
+            value = "${volunteers.shiftCoverageInt}%",
         )
     }
 }
