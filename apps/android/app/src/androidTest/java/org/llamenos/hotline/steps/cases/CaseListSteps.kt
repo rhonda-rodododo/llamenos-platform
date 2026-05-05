@@ -9,15 +9,12 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import dagger.hilt.EntryPoint
-import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
-import dagger.hilt.components.SingletonComponent
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.llamenos.hotline.crypto.CryptoService
+import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 
@@ -31,13 +28,6 @@ import org.llamenos.hotline.steps.BaseSteps
  * not just element existence.
  */
 class CaseListSteps : BaseSteps() {
-
-    /** Hilt entry point to access CryptoService from test code. */
-    @EntryPoint
-    @InstallIn(SingletonComponent::class)
-    interface NpubEntryPoint {
-        fun cryptoService(): CryptoService
-    }
 
     // ---- Background / Given ----
 
@@ -90,10 +80,12 @@ class CaseListSteps : BaseSteps() {
                 try {
                     val entryPoint = EntryPointAccessors.fromApplication(
                         activity.applicationContext,
-                        CaseListSteps.NpubEntryPoint::class.java
+                        CryptoEntryPoint::class.java
                     )
-                    npubText = entryPoint.cryptoService().encryptionPubkeyHex
-                    Log.d("CaseListSteps", "Read npub via EntryPoint: ${npubText?.take(20)}...")
+                    // Use signingPubkeyHex — this is the Ed25519 key used in auth headers.
+                    // The backend identifies users by their signing pubkey, not encryption pubkey.
+                    npubText = entryPoint.cryptoService().signingPubkeyHex
+                    Log.d("CaseListSteps", "Read signing pubkey via EntryPoint: ${npubText?.take(20)}...")
                 } catch (e: Throwable) {
                     Log.w("CaseListSteps", "EntryPoint access failed: ${e.message}")
                 }

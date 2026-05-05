@@ -249,26 +249,55 @@ dev.post('/test-setup-cms', async (c) => {
     })
   } catch { /* ignore entity type creation failures */ }
 
+  // 2b. Create an event entity type so EventsViewModel (category === 'event') has data
+  const eventEntityTypeId = crypto.randomUUID()
+  try {
+    await services.settings.createEntityType({
+      id: eventEntityTypeId,
+      name: 'protest_event',
+      label: 'Protest Event',
+      labelPlural: 'Protest Events',
+      description: 'BDD test event entity type',
+      category: 'event',
+      color: '#3b82f6',
+      statuses: [
+        { value: 'planned', label: 'Planned', color: '#f59e0b', order: 1 },
+        { value: 'active', label: 'Active', color: '#22c55e', order: 2 },
+        { value: 'completed', label: 'Completed', color: '#6b7280', order: 3, isClosed: true },
+      ],
+      defaultStatus: 'planned',
+      closedStatuses: ['completed'],
+      fields: [
+        { id: crypto.randomUUID(), name: 'event_date', label: 'Event Date', type: 'date', required: true, order: 1, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+        { id: crypto.randomUUID(), name: 'location', label: 'Location', type: 'text', required: false, order: 2, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+      ],
+      numberPrefix: 'EVT',
+      numberingEnabled: true,
+    })
+  } catch { /* ignore event entity type creation failures */ }
+
   // 3. Get entity types to verify creation
   const { entityTypes } = await services.settings.getEntityTypes()
 
-  // 4. Create a sample record if entity types exist
+  // 4. Create sample records for both case and event entity types
   let recordId: string | null = null
-  if (entityTypes.length > 0) {
-    const et = entityTypes[0]
-    const assignedTo = pubkey ? [pubkey] : []
+  const assignedTo = pubkey ? [pubkey] : []
+  for (const et of entityTypes) {
     try {
+      const isEvent = et.category === 'event'
       const record = await services.cases.create({
         entityTypeId: et.id,
-        statusHash: et.defaultStatus || 'reported',
+        statusHash: et.defaultStatus || (isEvent ? 'planned' : 'reported'),
         assignedTo,
         blindIndexes: {},
-        encryptedSummary: btoa('{"title":"Test Case","summary":"BDD test case"}'),
+        encryptedSummary: btoa(isEvent
+          ? '{"title":"Test Event","summary":"BDD test event"}'
+          : '{"title":"Test Case","summary":"BDD test case"}'),
         summaryEnvelopes: [],
         createdBy: pubkey ?? '',
         hubId: '',
       })
-      recordId = record.id
+      if (!recordId) recordId = record.id
     } catch { /* ignore record creation failures */ }
   }
 

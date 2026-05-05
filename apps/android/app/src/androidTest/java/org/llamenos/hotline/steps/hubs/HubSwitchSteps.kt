@@ -1,5 +1,6 @@
 package org.llamenos.hotline.steps.hubs
 
+import android.util.Log
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.filter
 import androidx.compose.ui.test.hasTestTag
@@ -8,10 +9,13 @@ import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import dagger.hilt.android.EntryPointAccessors
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import org.llamenos.hotline.LlamenosApp
+import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 
@@ -34,8 +38,27 @@ class HubSwitchSteps : BaseSteps() {
         // ScenarioHooks @Before(order = 1) already created the first hub.
         // Create a second hub so the list has two entries.
         SimulationClient.createTestHub("android-test-hub-2-${System.currentTimeMillis()}")
-        // Launch the app (navigates through auth to dashboard).
+        // Launch the app (creates identity and navigates to dashboard).
         navigateToMainScreen()
+
+        // Promote the test user to super-admin so GET /api/hubs returns ALL hubs
+        // (non-super-admin users only see hubs they are members of, and
+        // test-create-hub doesn't add members).
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                LlamenosApp.instance,
+                CryptoEntryPoint::class.java,
+            )
+            val signingPubkey = entryPoint.cryptoService().signingPubkeyHex
+            if (signingPubkey != null) {
+                val result = SimulationClient.promoteToAdmin(signingPubkey)
+                Log.d("HubSwitchSteps", "Promoted to admin: ok=${result.ok}, error=${result.error}")
+            } else {
+                Log.w("HubSwitchSteps", "No signing pubkey available for admin promotion")
+            }
+        } catch (e: Throwable) {
+            Log.w("HubSwitchSteps", "Admin promotion failed: ${e.message}")
+        }
     }
 
     @Given("I am on the hub management screen")
