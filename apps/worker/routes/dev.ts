@@ -222,6 +222,8 @@ dev.post('/test-setup-cms', async (c) => {
         // Note: contacts:view intentionally omitted — volunteers are denied contacts per permission-matrix spec
         'cases:create', 'cases:read-all', 'cases:update', 'cases:assign',
         'events:read', 'events:create', 'evidence:upload', 'evidence:download',
+        // Hub permissions: volunteers need hubs:read to access their hub key envelope (CRIT-H1)
+        'hubs:read',
       ],
     })
     roleOk = true
