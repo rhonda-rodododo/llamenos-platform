@@ -17,12 +17,7 @@ import {
   uniqueCallerNumber,
 } from '../../simulation-helpers'
 import { verifyEvent } from 'nostr-tools/pure'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
-import { hexToBytes } from '@noble/hashes/utils.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { LABEL_HUB_EVENT } from '@shared/crypto-labels'
+import { deriveServerEventKey, decryptHubEvent, getCurrentEpoch } from '../../helpers/relay-crypto'
 
 const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:7777'
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
@@ -242,20 +237,11 @@ function decryptEventContent(event: CapturedEvent): Record<string, unknown> | nu
   }
 
   try {
-    const eventKey = hkdf(
-      sha256,
-      hexToBytes(secret),
-      new Uint8Array(0),
-      utf8ToBytes(LABEL_HUB_EVENT),
-      32,
-    )
-    const packed = hexToBytes(event.content)
-    const nonce = packed.slice(0, 24)
-    const ciphertext = packed.slice(24)
-    const cipher = xchacha20poly1305(eventKey, nonce)
-    const plaintext = cipher.decrypt(ciphertext)
-    const text = new TextDecoder().decode(plaintext)
-    return JSON.parse(text) as Record<string, unknown>
+    // Extract epoch from event tags — server embeds ['epoch', epochNum] for forward secrecy
+    const epochTag = event.tags.find(t => t[0] === 'epoch')
+    const epoch = epochTag ? parseInt(epochTag[1], 10) : getCurrentEpoch()
+    const eventKey = deriveServerEventKey(secret, undefined, epoch)
+    return decryptHubEvent(event.content, eventKey)
   } catch (err) {
     console.warn('[relay.steps] Failed to decrypt event content:', err)
     return null

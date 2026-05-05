@@ -126,6 +126,21 @@ dev.post('/test-reset-records', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Rate Limit Reset (BDD test helper) ─────────────────────────────────────
+// Clears all rate limit counters — prevents cross-scenario bleed in BDD tests.
+
+dev.delete('/test-rate-limits', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const services = c.get('services')
+  await services.settings.clearRateLimits()
+  return c.json({ ok: true })
+})
+
 // ─── Identity Promotion (E2E test helpers) ──────────────────────────────────
 // Promotes a test identity to admin role so mobile E2E tests can access all features.
 

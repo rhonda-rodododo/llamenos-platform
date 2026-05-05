@@ -33,8 +33,15 @@ function getS(world: Record<string, unknown>): InviteTestState {
   return getState<InviteTestState>(world, STATE_KEY)
 }
 
-Before(async ({ world }) => {
+Before(async ({ request, world }) => {
   setState<InviteTestState>(world, STATE_KEY, { rateLimitResponses: [] })
+  // Clear rate limits before each scenario to prevent cross-scenario bleed.
+  // The invite validate endpoint rate-limits by IP; tests use 'unknown' IP, so
+  // without a reset, the 5/min limit gets exhausted across multiple scenarios.
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  await request.delete(`${BASE_URL}/api/test-rate-limits`, {
+    headers: { 'X-Test-Secret': testSecret },
+  }).catch(() => {}) // Ignore errors if endpoint not available
 })
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
