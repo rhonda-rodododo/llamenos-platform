@@ -13,11 +13,45 @@ import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 /**
- * Try to click an element by nav test ID, then role-based lookup, then text.
- * No static button map — uses Playwright's role-based selectors which are
- * resilient to text changes and automatically match accessible names.
+ * Map from feature-file button text to data-testid values.
+ * Resolves mismatches between human-readable Gherkin text and actual button
+ * accessible names (e.g., "New Report" → button text is "New" with testid).
+ */
+const buttonTextToTestIdMap: Record<string, string> = {
+  'New Report': TestIds.REPORT_NEW_BTN,
+  'New Note': 'note-new-btn',
+  'Submit': TestIds.REPORT_SUBMIT_BTN,
+  'Submit Report': TestIds.REPORT_SUBMIT_BTN,
+  'Send': 'conv-send-btn',
+  'Create Hub': 'create-hub-btn',
+  'Save': TestIds.FORM_SAVE_BTN,
+  'Save Provider': TestIds.FORM_SAVE_BTN,
+  'Cancel': TestIds.FORM_CANCEL_BTN,
+  'Test Connection': 'test-connection-btn',
+  'New Contact': 'contact-new-btn',
+  'New Event': 'event-new-btn',
+  'New Case': 'case-new-btn',
+  'Add Field': 'custom-field-add-btn',
+  'Log In': 'login-submit-btn',
+  'Log in': 'login-submit-btn',
+}
+
+/**
+ * Try to click an element by testid map, nav test ID, role-based lookup, then text.
+ * Uses buttonTextToTestIdMap first for feature-file text that doesn't match
+ * the actual button accessible name.
  */
 async function clickByTextOrTestId(page: import('@playwright/test').Page, text: string): Promise<void> {
+  // 0. Check button-text-to-testid map — resolves Gherkin text → data-testid
+  const buttonTestId = buttonTextToTestIdMap[text]
+  if (buttonTestId) {
+    const el = page.getByTestId(buttonTestId)
+    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+      await expect(el).toBeEnabled({ timeout: Timeouts.ELEMENT })
+      await el.click()
+      return
+    }
+  }
   // 1. Check nav test ID map — deterministic, wait longer
   const navTestId = navTestIdMap[text]
   if (navTestId) {
