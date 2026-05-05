@@ -244,13 +244,14 @@ describe('ShiftsService', () => {
     it('returns onShift=false when not in any shift', async () => {
       const { db, service } = setup()
       db.$setSelectResult([makeShift({
-        days: [1, 2, 3],
+        days: [1, 2, 3, 4, 5, 6, 0],
         startTime: '08:00',
         endTime: '12:00',
         userPubkeys: ['pk1'],
       })])
 
-      const result = await service.getMyStatus('hub-1', 'pk1')
+      // pk2 is not in any shift, so should always return onShift=false regardless of time
+      const result = await service.getMyStatus('hub-1', 'pk2')
       expect(result.onShift).toBe(false)
       expect(result.currentShift).toBeNull()
     })

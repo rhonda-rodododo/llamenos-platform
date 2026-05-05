@@ -81,12 +81,19 @@ try {
       } catch (err: unknown) {
         // Fallback: tolerate "already exists" / "does not exist" from statements
         // that makeIdempotent() couldn't patch (ALTER TABLE ADD COLUMN, etc.)
+        // Also tolerate FK violations on ADD CONSTRAINT (23503): when re-running
+        // older migrations after a later migration changed the FK target, the
+        // old ADD CONSTRAINT may fail because existing rows reference the new
+        // table, not the old one. The correct FK is preserved by later migrations.
         const msg = err instanceof Error ? err.message : String(err)
+        const code = (err as Record<string, unknown>)?.errno ?? (err as Record<string, unknown>)?.code
         if (
           msg.includes('already exists') ||
           msg.includes('does not exist') ||
           msg.includes('duplicate key') ||
-          msg.includes('duplicate column')
+          msg.includes('duplicate column') ||
+          msg.includes('multiple primary keys') ||
+          code === '23503' // foreign_key_violation — ADD CONSTRAINT can't be applied; handled by later migration
         ) {
           console.log(`[migrate] ${file}: skipped (${msg.slice(0, 80)})`)
         } else {

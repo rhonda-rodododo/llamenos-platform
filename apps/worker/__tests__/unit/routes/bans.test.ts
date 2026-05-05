@@ -137,6 +137,7 @@ describe('bans routes', () => {
       expect(addBanSpy).toHaveBeenCalledWith({
         hubId: 'hub-1',
         phone: hashPhone('+12125551234', TEST_HMAC_SECRET),
+        phonePlain: '+12125551234',
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
       })
@@ -194,6 +195,7 @@ describe('bans routes', () => {
       expect(bulkAddBansSpy).toHaveBeenCalledWith(
         [hashPhone('+12125551234', TEST_HMAC_SECRET), hashPhone('+12125555678', TEST_HMAC_SECRET)],
         'Spam', 'a'.repeat(64), 'hub-1',
+        ['+12125551234', '+12125555678'],
       )
       expect(auditLogSpy).toHaveBeenCalledOnce()
     })

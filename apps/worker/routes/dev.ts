@@ -126,6 +126,21 @@ dev.post('/test-reset-records', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Rate Limit Reset (BDD test helper) ─────────────────────────────────────
+// Clears all rate limit counters — prevents cross-scenario bleed in BDD tests.
+
+dev.delete('/test-rate-limits', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const services = c.get('services')
+  await services.settings.clearRateLimits()
+  return c.json({ ok: true })
+})
+
 // ─── Identity Promotion (E2E test helpers) ──────────────────────────────────
 // Promotes a test identity to admin role so mobile E2E tests can access all features.
 
@@ -413,7 +428,7 @@ dev.post('/test-simulate/incoming-call', async (c) => {
   await publishNostrEvent(c.env, KIND_CALL_RING, {
     type: 'call:ring',
     callId,
-  })
+  }, hubId)
 
   return c.json({ ok: true, callId, status: 'ringing' })
 })
@@ -439,13 +454,13 @@ dev.post('/test-simulate/answer-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'in-progress',
-  })
+  }, call.hubId ?? undefined)
 
   // Publish presence update (mirrors real telephony flow)
   await publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: body.callId,
-  })
+  }, call.hubId ?? undefined)
 
   return c.json({ ok: true, callId: body.callId, status: 'in-progress' })
 })
@@ -470,7 +485,7 @@ dev.post('/test-simulate/end-call', async (c) => {
     type: 'call:update',
     callId: body.callId,
     status: 'completed',
-  })
+  }, call.hubId ?? undefined)
 
   return c.json({ ok: true, callId: body.callId, status: 'completed' })
 })
@@ -495,7 +510,7 @@ dev.post('/test-simulate/voicemail', async (c) => {
   await publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
     type: 'voicemail:new',
     callId: body.callId,
-  })
+  }, call.hubId ?? undefined)
 
   return c.json({ ok: true, callId: body.callId, status: 'unanswered' })
 })

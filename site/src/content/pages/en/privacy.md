@@ -100,7 +100,7 @@ Llámenos is developed by an EU-based organization. If you are in the European E
 
 - **Right of access** — request a copy of personal data held about you
 - **Right to rectification** — correct inaccurate data
-- **Right to erasure** — request deletion of your account and associated data
+- **Right to erasure** — request deletion of your account and associated data (see our [Data Deletion page](/data-deletion) for full details)
 - **Right to data portability** — receive your data in a structured, machine-readable format
 - **Right to object** — object to processing based on legitimate interests
 - **Right to restrict processing** — request that processing be limited

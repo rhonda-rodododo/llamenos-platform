@@ -23,7 +23,13 @@ interface WebAuthnTestState {
 const STATE_KEY = 'webauthn_test'
 
 function getS(world: Record<string, unknown>): WebAuthnTestState {
-  return getState<WebAuthnTestState>(world, STATE_KEY)
+  const s = getState<WebAuthnTestState>(world, STATE_KEY)
+  // Fall back to shared user set by "a registered user with a known keypair" step
+  if (!s.user) {
+    const sharedUser = getSharedState(world).sharedUser
+    if (sharedUser) s.user = sharedUser
+  }
+  return s
 }
 
 Before(async ({ world }) => {
@@ -81,12 +87,15 @@ When('the client submits a fabricated login assertion', async ({ request, world 
 
 When('a client floods WebAuthn login options {int} times', async ({ request, world }, count: number) => {
   const s = getS(world)
+  const shared = getSharedState(world)
+  shared.floodResponses = []
   for (let i = 0; i < count; i++) {
     const res = await request.post(`${BASE_URL}/api/webauthn/login/options`, {
       headers: { 'Content-Type': 'application/json' },
       data: {},
     })
     s.rateLimitResponses.push(res.status())
+    shared.floodResponses.push(res.status())
   }
   setLastResponse(world, { status: s.rateLimitResponses[s.rateLimitResponses.length - 1], data: null })
 })
@@ -117,7 +126,7 @@ Then('{int} WebAuthn credentials are listed', async ({ world }, count: number) =
 })
 
 Then('at least one response is {int}', async ({ world }, expectedStatus: number) => {
-  const s = getS(world)
-  expect(s.rateLimitResponses.length).toBeGreaterThan(0)
-  expect(s.rateLimitResponses.some(st => st === expectedStatus)).toBe(true)
+  const shared = getSharedState(world)
+  expect(shared.floodResponses.length).toBeGreaterThan(0)
+  expect(shared.floodResponses.some(st => st === expectedStatus)).toBe(true)
 })

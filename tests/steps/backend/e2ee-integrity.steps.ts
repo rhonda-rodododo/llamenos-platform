@@ -153,7 +153,7 @@ When(
     const [, volKp] = [...getE2EEIntegrityState(world).keypairs.entries()][0]
     const volEnvelope = getE2EEIntegrityState(world).envelopes.get(volKp.pubkey)
 
-    const { status, data } = await apiPost<{ note: Record<string, unknown> }>(
+    const { status, data } = await apiPost<Record<string, unknown>>(
       request,
       '/notes',
       {
@@ -165,8 +165,8 @@ When(
       volKp.nsec,
     )
     expect([200, 201]).toContain(status)
-    getE2EEIntegrityState(world).noteId = data.note.id as string
-    getE2EEIntegrityState(world).apiNote = data.note
+    getE2EEIntegrityState(world).noteId = data.id as string
+    getE2EEIntegrityState(world).apiNote = data
   },
 )
 
@@ -202,7 +202,7 @@ When('the encrypted note is submitted via the API by {string}', async ({ request
 
   const volEnvelope = getE2EEIntegrityState(world).envelopes.get(volKp.pubkey)
 
-  const { status, data } = await apiPost<{ note: Record<string, unknown> }>(
+  const { status, data } = await apiPost<Record<string, unknown>>(
     request,
     '/notes',
     {
@@ -214,8 +214,8 @@ When('the encrypted note is submitted via the API by {string}', async ({ request
     volKp.nsec,
   )
   expect([200, 201]).toContain(status)
-  getE2EEIntegrityState(world).noteId = data.note.id as string
-  getE2EEIntegrityState(world).apiNote = data.note
+  getE2EEIntegrityState(world).noteId = data.id as string
+  getE2EEIntegrityState(world).apiNote = data
 })
 
 When('volunteer {string} fetches the note', async ({ request, world }, volName: string) => {
@@ -281,7 +281,7 @@ When(
 
     const volEnvelope = getE2EEIntegrityState(world).envelopes.get(kp.pubkey)
 
-    const { status, data } = await apiPost<{ note: Record<string, unknown> }>(
+    const { status, data } = await apiPost<Record<string, unknown>>(
       request,
       '/notes',
       {
@@ -293,8 +293,8 @@ When(
       kp.nsec,
     )
     expect([200, 201]).toContain(status)
-    getE2EEIntegrityState(world).noteId = data.note.id as string
-    getE2EEIntegrityState(world).apiNote = data.note
+    getE2EEIntegrityState(world).noteId = data.id as string
+    getE2EEIntegrityState(world).apiNote = data
   },
 )
 
@@ -329,7 +329,7 @@ When('the encrypted note is submitted via the API with real envelopes', async ({
 
   const volEnvelope = getE2EEIntegrityState(world).envelopes.get(volKp.pubkey)
 
-  const { status, data } = await apiPost<{ note: Record<string, unknown> }>(
+  const { status, data } = await apiPost<Record<string, unknown>>(
     request,
     '/notes',
     {
@@ -341,8 +341,8 @@ When('the encrypted note is submitted via the API with real envelopes', async ({
     volKp.nsec,
   )
   expect([200, 201]).toContain(status)
-  getE2EEIntegrityState(world).noteId = data.note.id as string
-  getE2EEIntegrityState(world).apiNote = data.note
+  getE2EEIntegrityState(world).noteId = data.id as string
+  getE2EEIntegrityState(world).apiNote = data
 })
 
 // ── When: Decryption ────────────────────────────────────────────────
