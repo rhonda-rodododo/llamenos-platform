@@ -114,7 +114,7 @@ Given(
     // Create resources as this user
     if (role === 'volunteer') {
       // Create a note
-      const noteRes = await apiPost<{ id: string }>(
+      const noteRes = await apiPost<{ note?: { id?: string }; id?: string }>(
         request,
         '/notes',
         {
@@ -124,7 +124,8 @@ Given(
         vol.nsec,
       )
       if (noteRes.status === 200 || noteRes.status === 201) {
-        user.noteIds.push(noteRes.data.id)
+        const noteId = noteRes.data.note?.id ?? noteRes.data.id
+        if (noteId) user.noteIds.push(noteId)
       }
 
       // Create a record (if CMS enabled)
@@ -261,7 +262,7 @@ When(
   async ({ request, world }, volName: string, _hubName: string) => {
     const user = getIsolationState(world).users.get(volName)
     expect(user).toBeTruthy()
-    const res = await apiPost<{ id: string }>(
+    const res = await apiPost<{ note?: { id?: string }; id?: string }>(
       request,
       '/notes',
       {
@@ -271,7 +272,8 @@ When(
       user!.nsec,
     )
     if (res.status === 200 || res.status === 201) {
-      user!.noteIds.push(res.data.id)
+      const noteId = res.data.note?.id ?? res.data.id
+      if (noteId) user!.noteIds.push(noteId)
     }
   },
 )

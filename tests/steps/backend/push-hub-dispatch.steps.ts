@@ -164,8 +164,11 @@ When('the backend dispatches a push notification to the volunteer in the hub', a
     `test-conv-${Date.now()}`,
   )
 
-  // Capture log entries for Then-step assertions
-  push.capturedEntries = await fetchPushLog(request, 1)
+  // Capture log entries for Then-step assertions, filtering to entries from THIS hub
+  // to avoid contamination from background push dispatches (e.g. call simulations
+  // from concurrently-running scenarios in other feature files).
+  const allEntries = await fetchPushLog(request, 1)
+  push.capturedEntries = allEntries.filter(e => e.wakePayload.hubId === testHubId)
 })
 
 // ── Then ──────────────────────────────────────────────────────────

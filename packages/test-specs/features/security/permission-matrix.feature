@@ -664,7 +664,7 @@ Feature: Permission Matrix
 
     Examples:
       | role         | expected  | status |
-      | super-admin  | has       | 200    |
+      | super-admin  | has       | 201    |
       | hub-admin    | denied    | 403    |
       | reviewer     | denied    | 403    |
       | volunteer    | denied    | 403    |

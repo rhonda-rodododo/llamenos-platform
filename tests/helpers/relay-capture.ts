@@ -69,18 +69,35 @@ export class RelayCapture {
     // Subtract 2 seconds for clock skew tolerance.
     const since = Math.floor(Date.now() / 1000) - 2
 
-    // Subscribe to all llamenos events regardless of hub. Tests run serially
-    // (--workers=1) so cross-scenario event leakage is not a concern.
-    // Published events DO carry ['h', hubId] tags for client-side routing, but
-    // the relay subscription does not filter by hub to keep tests simple and
-    // compatible with all strfry versions.
-    const filters: Record<string, unknown>[] = [
-      {
-        kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
-        '#t': ['llamenos:event'],
-        since,
-      },
-    ]
+    let filters: Record<string, unknown>[]
+    if (this.hubId) {
+      // Nostr REQ supports multiple filter objects (OR semantics per NIP-01).
+      // Call/presence events carry an ['h', hubId] tag — scope them to prevent
+      // cross-scenario contamination under parallel Playwright worker execution.
+      // Messaging events (1010, 1011) are hub-agnostic (they span all hubs) so
+      // they use a separate unscoped filter.
+      filters = [
+        {
+          kinds: [1000, 1001, 1002, 20000, 20001],
+          '#t': ['llamenos:event'],
+          '#h': [this.hubId],
+          since,
+        },
+        {
+          kinds: [1010, 1011],
+          '#t': ['llamenos:event'],
+          since,
+        },
+      ]
+    } else {
+      filters = [
+        {
+          kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
+          '#t': ['llamenos:event'],
+          since,
+        },
+      ]
+    }
 
     const req = JSON.stringify(['REQ', this.subscriptionId, ...filters])
     this.ws.send(req)

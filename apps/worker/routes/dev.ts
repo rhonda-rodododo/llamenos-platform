@@ -218,10 +218,12 @@ dev.post('/test-setup-cms', async (c) => {
         'shifts:read-own', 'bans:report',
         'reports:read-assigned', 'reports:send-message',
         'files:upload', 'files:download-own',
-        // CMS permissions for E2E testing: full access to cases + contacts
+        // CMS permissions for E2E testing: full access to cases
+        // Note: contacts:view intentionally omitted — volunteers are denied contacts per permission-matrix spec
         'cases:create', 'cases:read-all', 'cases:update', 'cases:assign',
-        'contacts:view', 'contacts:create', 'contacts:edit',
         'events:read', 'events:create', 'evidence:upload', 'evidence:download',
+        // Hub permissions: volunteers need hubs:read to access their hub key envelope (CRIT-H1)
+        'hubs:read',
       ],
     })
     roleOk = true

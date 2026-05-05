@@ -331,8 +331,9 @@ When('the volunteer creates a note with real ECIES envelopes', async ({ request,
     getStorageIntegrityState(world).volunteerKp!.nsec,
   )
   expect([200, 201]).toContain(status)
-  getStorageIntegrityState(world).entityIds.set('envelope-note', data.id as string)
-  getStorageIntegrityState(world).apiResponses.set('envelope-note', data)
+  const noteData = (data.note as Record<string, unknown> | undefined) ?? data
+  getStorageIntegrityState(world).entityIds.set('envelope-note', noteData.id as string)
+  getStorageIntegrityState(world).apiResponses.set('envelope-note', noteData)
 })
 
 When('the note is fetched via the API', async ({ request, world }) => {
