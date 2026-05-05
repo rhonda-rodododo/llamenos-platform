@@ -48,7 +48,7 @@ Given('a new note is created', async ({request, world}) => {
     },
   )
   expect([200, 201]).toContain(status)
-  getNoteTestState(world).envelope = data.note
+  getNoteTestState(world).envelope = data
 })
 
 Given('a note created by a volunteer', async ({request, world}) => {
@@ -62,7 +62,7 @@ Given('a note created by a volunteer', async ({request, world}) => {
     },
   )
   if (status === 200 || status === 201) {
-    getNoteTestState(world).envelope = data.note
+    getNoteTestState(world).envelope = data
   }
 })
 
@@ -83,7 +83,7 @@ Given('an encrypted note envelope', async ({request, world}) => {
     },
   )
   if (status === 200 || status === 201) {
-    getNoteTestState(world).envelope = data.note
+    getNoteTestState(world).envelope = data
   }
 })
 
@@ -122,7 +122,7 @@ When('a note is created', async ({request, world}) => {
     },
   )
   if (status === 200 || status === 201) {
-    getNoteTestState(world).envelope = data.note
+    getNoteTestState(world).envelope = data
   }
 })
 
