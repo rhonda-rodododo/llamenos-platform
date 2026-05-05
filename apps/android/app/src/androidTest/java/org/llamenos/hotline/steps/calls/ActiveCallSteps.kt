@@ -7,10 +7,14 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
+import dagger.hilt.android.EntryPointAccessors
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import kotlinx.coroutines.runBlocking
+import org.llamenos.hotline.LlamenosApp
+import org.llamenos.hotline.di.ActiveHubEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
@@ -53,34 +57,29 @@ class ActiveCallSteps : BaseSteps() {
             Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}")
         }
 
-        // Navigate to dashboard and trigger pull-to-refresh to fetch the active call.
-        // WebSocket/relay events are unreliable in E2E tests — explicit refresh ensures
-        // DashboardViewModel.fetchActiveCall() runs after the simulation completes.
-        navigateToTab(NAV_DASHBOARD)
-        composeRule.waitForIdle()
+        // Force DashboardViewModel to re-fetch active calls.
+        // DashboardViewModel subscribes to activeHubId changes and calls refresh().
+        // Re-setting the hub ID (via null → hubId toggle) triggers a new emission
+        // from the StateFlow, which forces refresh() → fetchActiveCall().
+        // PullToRefreshBox swipeDown() is unreliable in Compose UI tests —
+        // the gesture threshold may not be met consistently.
+        triggerHubRefresh()
 
-        // Swipe down on the PullToRefreshBox to trigger ViewModel.refresh()
+        // Wait for the active call card to appear
         try {
-            onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
-            composeRule.waitForIdle()
-        } catch (e: Throwable) {
-            Log.w("ActiveCallSteps", "Pull-to-refresh swipe failed: ${e.message}")
-        }
-
-        try {
-            composeRule.waitUntil(10_000) {
+            composeRule.waitUntil(15_000) {
                 composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
             }
         } catch (_: Throwable) {
-            // Retry refresh once — the first swipe may have been too early
+            // Retry: trigger another hub refresh cycle
+            Log.d("ActiveCallSteps", "active-call-card not found, retrying with hub refresh")
+            triggerHubRefresh()
             try {
-                onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
-                composeRule.waitForIdle()
-                composeRule.waitUntil(10_000) {
+                composeRule.waitUntil(15_000) {
                     composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
                 }
             } catch (_: Throwable) {
-                Log.w("ActiveCallSteps", "active-call-card did not appear after pull-to-refresh")
+                Log.w("ActiveCallSteps", "active-call-card did not appear after retry")
             }
         }
     }
@@ -169,5 +168,41 @@ class ActiveCallSteps : BaseSteps() {
             composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
         }
         val found = assertAnyTagDisplayed("quick-note-button", "active-call-card", "dashboard-title")
+    }
+
+    // ---- Helpers ----
+
+    /**
+     * Force DashboardViewModel.refresh() by toggling the active hub ID.
+     *
+     * DashboardViewModel subscribes to [ActiveHubState.activeHubId] via
+     * `filterNotNull().onEach { refresh() }`. StateFlow only emits distinct values,
+     * so re-setting the same ID is a no-op. To force a new emission:
+     *   1. Set hub to a dummy value
+     *   2. Set hub back to the real test hub ID
+     * Both emissions trigger refresh(), but the second one is the one that matters
+     * (it sets the correct hub scope for API calls).
+     */
+    private fun triggerHubRefresh() {
+        val hubId = ScenarioHooks.currentHubId
+        if (hubId.isEmpty()) return
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                LlamenosApp.instance,
+                ActiveHubEntryPoint::class.java,
+            )
+            val hubState = entryPoint.activeHubState()
+            runBlocking {
+                hubState.setActiveHub("__refresh__")
+                hubState.setActiveHub(hubId)
+            }
+            Log.d("ActiveCallSteps", "triggerHubRefresh: toggled hub to force refresh")
+            composeRule.waitForIdle()
+            // Give the ViewModel a moment to process the hub change and make the API call
+            Thread.sleep(2000)
+            composeRule.waitForIdle()
+        } catch (e: Throwable) {
+            Log.w("ActiveCallSteps", "triggerHubRefresh failed: ${e.message}")
+        }
     }
 }
