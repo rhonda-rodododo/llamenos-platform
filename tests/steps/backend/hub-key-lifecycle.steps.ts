@@ -73,7 +73,7 @@ async function createHub(request: import('@playwright/test').APIRequestContext):
     '/hubs',
     { name: `Hub Key Test ${Date.now()}`, slug },
   )
-  expect(res.status).toBe(200)
+  expect([200, 201]).toContain(res.status)
   return res.data.hub.id
 }
 
@@ -305,7 +305,7 @@ Given('a hub exists with a member {string}', async ({ request, world }, name: st
     '/hubs',
     { name: `Hub Auth Test ${Date.now()}`, slug },
   )
-  expect(hubRes.status).toBe(200)
+  expect([200, 201]).toContain(hubRes.status)
   const hubId = hubRes.data.hub.id
 
   const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })

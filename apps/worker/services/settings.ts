@@ -1924,6 +1924,7 @@ export class SettingsService {
     enabled: boolean
   }): Promise<{ enabled: boolean }> {
     const enabled = !!data.enabled
+    await getSettings(this.db) // ensure singleton row exists before UPDATE
     await this.db
       .update(systemSettings)
       .set({ crossHubSharingEnabled: enabled })
