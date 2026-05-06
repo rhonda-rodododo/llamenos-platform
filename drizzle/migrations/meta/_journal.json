@@ -8,6 +8,90 @@
       "when": 1773708416650,
       "tag": "0000_bouncy_morlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0001_rename_volunteers_to_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0002_case_number_sequences_hub_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0003_case_records_hub_scoped_case_number",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0004_add_call_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0005_add_geocoding_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0006_add_firehose_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0007_blast_schema_fixes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0008_metadata_reduction",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0009_drop_stale_volunteers_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0010_drop_mls_device_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0011_add_missing_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0012_add_missing_columns",
+      "breakpoints": true
     }
   ]
 }

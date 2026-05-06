@@ -57,6 +57,7 @@
     "i18n:validate:all": "bun run packages/i18n/tools/validate-strings.ts all",
     "codegen": "bun run packages/protocol/tools/codegen.ts",
     "codegen:check": "bun run packages/protocol/tools/codegen.ts --check",
+    "migration:check": "bun scripts/check-migration-drift.ts",
     "test-specs:validate": "bun packages/test-specs/tools/validate-coverage.ts",
     "mac:run": "bash scripts/mac-run.sh",
     "ios:status": "bash scripts/ios-build.sh status",

@@ -1045,7 +1045,7 @@ jobs:
 
   # ─── CI Status Gate ─────────────────────────────────────────
   ci-status:
-    needs: [build, audit, crypto-tests, wasm-build, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails]
+    needs: [build, audit, crypto-tests, wasm-build, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift]
     if: always()
     runs-on: ubuntu-latest
 
@@ -1069,6 +1069,7 @@ jobs:
           check_job "android-e2e" "${{ needs.android-e2e.result }}"
           check_job "ios-build-test" "${{ needs.ios-build-test.result }}"
           check_job "crypto-guardrails" "${{ needs.crypto-guardrails.result }}"
+          check_job "migration-drift" "${{ needs.migration-drift.result }}"
 
           if [[ -n "$FAILED" ]]; then
             echo "Failed jobs:$FAILED"
