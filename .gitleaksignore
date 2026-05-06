@@ -10,4 +10,11 @@ ad08192d6d0e891b126b38eb6542ae3e41ba46fb:apps/worker/__tests__/unit/vonage-sms-a
 ad08192d6d0e891b126b38eb6542ae3e41ba46fb:apps/worker/__tests__/unit/telegram-adapter.test.ts:generic-api-key:5
 ad08192d6d0e891b126b38eb6542ae3e41ba46fb:apps/worker/__tests__/unit/whatsapp-adapter.test.ts:generic-api-key:6
 
-# PR #207: lib test credentials - fingerprints updated after rebase below
+# PR #207: lib/auth.test.ts - opaque token format string for parseSessionHeader test
+b077eaf65145531b2ffdb3b758fa0aeebefaf4c6:apps/worker/lib/auth.test.ts:generic-api-key:136
+
+# PR #207: lib/crypto.test.ts - fake S3 key for encryptStorageCredential round-trip test
+b077eaf65145531b2ffdb3b758fa0aeebefaf4c6:apps/worker/lib/crypto.test.ts:generic-api-key:381
+
+# PR #207: crypto-utils.test.ts - secp256k1 generator point pubkey (well-known constant)
+8dc21ffe36a7e6f3a5765099bc9c3a0afe3980ea:apps/worker/__tests__/unit/crypto-utils.test.ts:generic-api-key:256
