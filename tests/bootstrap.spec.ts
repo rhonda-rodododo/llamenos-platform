@@ -100,7 +100,7 @@ async function bootstrapAdmin(page: import('@playwright/test').Page) {
   await enterBootstrapPin(page, TEST_PIN)
 
   // Wait for confirm step to render
-  await page.getByText(/confirm/i).waitFor({ state: 'visible', timeout: 10000 })
+  await page.getByRole('heading', { name: /confirm your pin/i }).waitFor({ state: 'visible', timeout: 10000 })
 
   // Confirm PIN
   await enterBootstrapPin(page, TEST_PIN)
@@ -116,7 +116,7 @@ async function bootstrapAdmin(page: import('@playwright/test').Page) {
   console.log(`[SETUP] Backup downloaded: ${download.suggestedFilename()}`)
 
   // Acknowledge backup saved
-  await page.getByText(/stored my recovery key/i).click()
+  await page.getByText(/saved my recovery key/i).click()
   console.log('[SETUP] Backup acknowledged')
 
   // Continue to setup wizard
@@ -151,10 +151,11 @@ async function bootstrapAdmin(page: import('@playwright/test').Page) {
   for (let i = 0; i < 3; i++) {
     const skipBtn = page.getByTestId(TestIds.SETUP_SKIP_BTN)
     const nextBtn = page.getByTestId(TestIds.SETUP_NEXT_BTN)
-    await skipBtn.or(nextBtn).waitFor({ state: 'visible', timeout: 10000 })
+    // Both may be visible — prefer Skip when available
+    await nextBtn.waitFor({ state: 'visible', timeout: 10000 })
     if (await skipBtn.isVisible().catch(() => false)) {
       await skipBtn.click()
-    } else if (await nextBtn.isVisible().catch(() => false)) {
+    } else {
       await nextBtn.click()
     }
     await page.waitForTimeout(500)
@@ -165,21 +166,44 @@ async function bootstrapAdmin(page: import('@playwright/test').Page) {
   await launchBtn.waitFor({ state: 'visible', timeout: 10000 })
   await launchBtn.click()
 
-  // Wait for dashboard or profile-setup
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
+  // After launch, the wizard calls completeSetup() then navigates to /.
+  // The root auth guard may show: dashboard, profile-setup, or login/PIN screen.
+  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
   const profileSetupBtn = page.getByRole('button', { name: /complete setup/i })
+  const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
+  const loginPage = page.getByText(/sign in/i)
 
   const destination = await Promise.race([
-    pageTitle.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'dashboard' as const),
-    profileSetupBtn.waitFor({ state: 'visible', timeout: 30000 }).then(() => 'profile-setup' as const),
+    sidebar.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'dashboard' as const),
+    profileSetupBtn.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'profile-setup' as const),
+    pinInput.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'pin' as const),
+    loginPage.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'login' as const),
   ])
+  console.log(`[SETUP] After launch: landed on ${destination} (URL: ${page.url()})`)
 
-  if (destination === 'profile-setup') {
+  if (destination === 'pin') {
+    await enterPin(page, TEST_PIN)
+    // Wait for dashboard or profile-setup after PIN
+    const afterPin = await Promise.race([
+      sidebar.waitFor({ state: 'visible', timeout: Timeouts.AUTH }).then(() => 'dashboard' as const),
+      profileSetupBtn.waitFor({ state: 'visible', timeout: Timeouts.AUTH }).then(() => 'profile-setup' as const),
+    ])
+    if (afterPin === 'profile-setup') {
+      await completeProfileSetup(page)
+    }
+  } else if (destination === 'profile-setup') {
     await completeProfileSetup(page)
+  } else if (destination === 'login') {
+    // Key was lost — need to re-enter PIN after login redirect
+    const pinVisibleAfterLogin = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
+    if (pinVisibleAfterLogin) {
+      await enterPin(page, TEST_PIN)
+    }
+    await sidebar.waitFor({ state: 'visible', timeout: Timeouts.AUTH })
   }
 
   // Confirm we're on the authenticated dashboard
-  await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+  await sidebar.waitFor({ state: 'visible', timeout: Timeouts.AUTH })
 }
 
 /**
@@ -221,8 +245,13 @@ async function createRoleAccount(
     if (await roleTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
       await roleTrigger.click()
       await adminPage.waitForTimeout(300)
-      // Select the role option by value
-      await adminPage.locator(`[role="option"]`).filter({ hasText: new RegExp(opts.roleId.replace('role-', ''), 'i') }).click()
+      // Role names are human-readable (e.g., "Hub Admin", "Reviewer", "Reporter")
+      const roleName = opts.roleId
+        .replace('role-', '')
+        .split('-')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ')
+      await adminPage.locator(`[role="option"]`).filter({ hasText: roleName }).click()
     }
   }
 
@@ -268,7 +297,7 @@ async function createRoleAccount(
     await enterBootstrapPin(userPage, TEST_PIN)
 
     // Wait for confirm step
-    await userPage.getByText(/confirm/i).waitFor({ state: 'visible', timeout: 10000 })
+    await userPage.getByRole('heading', { name: /confirm your pin/i }).waitFor({ state: 'visible', timeout: 10000 })
 
     // Confirm PIN
     await enterBootstrapPin(userPage, TEST_PIN)
@@ -283,7 +312,7 @@ async function createRoleAccount(
     await userDownload
 
     // Acknowledge backup
-    await userPage.getByText(/stored my recovery key/i).click()
+    await userPage.getByText(/saved my recovery key/i).click()
 
     // Continue (complete onboarding)
     const continueBtn = userPage.getByRole('button', { name: /continue/i }).last()
