@@ -210,4 +210,26 @@ describe('verifyAuthToken', () => {
     })
     expect(result).toBe(false)
   })
+
+  it('rejects token signed by key A when presented with pubkey B (replay attack)', async () => {
+    // Key A signs a valid token
+    const timestamp = Date.now()
+    const tokenFromA = createSignedToken(timestamp, 'GET', '/api/notes')
+
+    // Generate a different keypair (key B)
+    const privKeyB = hexToBytes('b'.repeat(64).replace(/^b/, '2'))
+    const pubkeyB = bytesToHex(schnorr.getPublicKey(privKeyB))
+
+    // Present key A's signature with key B's pubkey — must reject
+    const result = await verifyAuthToken({ pubkey: pubkeyB, timestamp, token: tokenFromA }, 'GET', '/api/notes')
+    expect(result).toBe(false)
+  })
+
+  it('rejects token with swapped method (cross-endpoint replay)', async () => {
+    const timestamp = Date.now()
+    const token = createSignedToken(timestamp, 'POST', '/api/notes')
+    // Replay the POST token on a GET endpoint
+    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')
+    expect(result).toBe(false)
+  })
 })

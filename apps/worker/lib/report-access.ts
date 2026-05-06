@@ -29,7 +29,9 @@ export function verifyReportAccess(
 /** Verify that a conversation is actually a report. Returns false if not. */
 export function isReport(report: ReportLike): boolean {
   let meta = report.metadata as { type?: string } | string | undefined
-  // Drizzle bun-sql may double-serialize JSONB, returning a string
+  // String guard: raw SQL queries (e.g., tx.execute(sql`...`)) bypass Drizzle's
+  // mapFromDriverValue and may return JSONB values as strings. The custom bun-jsonb
+  // type prevents double-serialization for ORM queries, but raw SQL remains unguarded.
   if (typeof meta === 'string') {
     try { meta = JSON.parse(meta) as { type?: string } } catch { return false }
   }

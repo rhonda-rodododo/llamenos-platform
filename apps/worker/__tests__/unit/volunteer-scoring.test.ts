@@ -130,4 +130,18 @@ describe('scoreVolunteers', () => {
     expect(result[0].pubkey).toBe('high')
     expect(result[0].score).toBeGreaterThan(result[1].score)
   })
+
+  it('handles undefined spokenLanguages without crashing', () => {
+    const vol = makeUser({ pubkey: 'no-langs', spokenLanguages: undefined as unknown as string[] })
+    const result = scoreVolunteers(makeInput({
+      allUsers: [vol],
+      onShiftPubkeys: ['no-langs'],
+      languageNeed: 'es',
+    }))
+    // Should still be scored (no language bonus) without throwing
+    expect(result).toHaveLength(1)
+    expect(result[0].pubkey).toBe('no-langs')
+    // Base 50 + workload 30 = 80 (no language bonus)
+    expect(result[0].score).toBe(80)
+  })
 })

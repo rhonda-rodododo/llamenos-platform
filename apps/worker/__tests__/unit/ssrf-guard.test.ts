@@ -184,4 +184,18 @@ describe('validateExternalUrl', () => {
     expect(validateExternalUrl('https://api.twilio.com/2010-04-01')).toBeNull()
     expect(validateExternalUrl('https://hooks.slack.com/services/T00/B00/xxx')).toBeNull()
   })
+
+  // DNS rebinding / redirect defense note:
+  // validateExternalUrl checks the hostname at URL parse time only. If the caller follows
+  // HTTP redirects (e.g., fetch with redirect: 'follow'), a public URL could redirect to
+  // an internal address AFTER the guard passes. Callers that follow redirects MUST either:
+  //   1. Re-validate the final resolved URL after redirect, or
+  //   2. Use fetch({ redirect: 'manual' }) and validate each hop.
+  // This guard does NOT protect against post-redirect SSRF — that is the caller's responsibility.
+  it('only validates the initial URL, not redirect targets (caller responsibility)', () => {
+    // A public URL that could hypothetically redirect to 169.254.169.254 passes the guard
+    expect(validateExternalUrl('https://evil-redirect.example.com/bounce')).toBeNull()
+    // The internal target itself is still caught when validated directly
+    expect(validateExternalUrl('http://169.254.169.254/latest/meta-data/')).not.toBeNull()
+  })
 })
