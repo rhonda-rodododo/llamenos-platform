@@ -3,8 +3,8 @@
  *
  * Tests: size limits, ownership checks, chunk validation, completion logic.
  *
- * Bug found: chunk upload uses `files:download-all` to gate admin overrides,
- * semantically wrong for an upload operation.
+ * Bug fixed: chunk upload previously used `files:download-all` to gate admin overrides,
+ * now correctly uses `files:manage-all`.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
@@ -247,13 +247,10 @@ describe('PUT /uploads/:id/chunks/:chunkIndex', () => {
     expect(res.status).toBe(403)
   })
 
-  // Bug: The upload chunk endpoint uses `files:download-all` permission to grant
-  // admin access, but upload operations should use an upload-related permission.
-  // This test documents and detects the bug.
-  it('BUG: allows files:download-all (not upload-all) to bypass ownership check', async () => {
+  it('allows files:manage-all to bypass ownership check on chunks', async () => {
     const { request } = makeApp({
       pubkey: 'admin-pub',
-      permissions: ['files:upload', 'files:download-all'], // should be files:upload-all or files:admin
+      permissions: ['files:upload', 'files:manage-all'],
       fileRecord: {
         id: 'upload-1',
         uploadedBy: 'someone-else',
@@ -267,9 +264,27 @@ describe('PUT /uploads/:id/chunks/:chunkIndex', () => {
       method: 'PUT',
       body: new Uint8Array([1, 2, 3]),
     })
-    // The route passes with files:download-all — this is semantically wrong
-    // (using a download permission to gate an upload operation) but is current behavior
     expect(res.status).toBe(200)
+  })
+
+  it('rejects files:download-all from bypassing upload ownership', async () => {
+    const { request } = makeApp({
+      pubkey: 'admin-pub',
+      permissions: ['files:upload', 'files:download-all'],
+      fileRecord: {
+        id: 'upload-1',
+        uploadedBy: 'someone-else',
+        status: 'uploading',
+        completedChunks: 0,
+        totalChunks: 1,
+        totalSize: 100,
+      },
+    })
+    const res = await request('/upload-1/chunks/0', {
+      method: 'PUT',
+      body: new Uint8Array([1, 2, 3]),
+    })
+    expect(res.status).toBe(403)
   })
 
   it('accepts valid chunk from owner', async () => {
