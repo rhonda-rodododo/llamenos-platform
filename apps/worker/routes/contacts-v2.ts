@@ -221,11 +221,12 @@ contactsV2.get('/groups/:groupId',
     const groupId = c.req.param('groupId')
     const services = c.get('services')
 
-    const [group, members] = await Promise.all([
-      services.contacts.getGroup(groupId),
-      services.contacts.listMembers(groupId),
-    ])
+    const group = await services.contacts.getGroup(groupId)
+    if (!group) {
+      return c.json({ error: 'Group not found' }, 404)
+    }
 
+    const members = await services.contacts.listMembers(groupId)
     return c.json({ ...group, members })
   },
 )
@@ -252,6 +253,9 @@ contactsV2.patch('/groups/:groupId',
     const body = c.req.valid('json')
 
     const updated = await services.contacts.updateGroup(groupId, body)
+    if (!updated) {
+      return c.json({ error: 'Group not found' }, 404)
+    }
 
     await audit(services.audit, 'groupUpdated', c.get('pubkey'), { groupId })
     return c.json(updated)
@@ -392,6 +396,9 @@ contactsV2.patch('/:id',
     const body = c.req.valid('json')
 
     const updated = await services.contacts.update(id, body)
+    if (!updated) {
+      return c.json({ error: 'Contact not found' }, 404)
+    }
 
     await audit(services.audit, 'contactUpdated', c.get('pubkey'), { contactId: id })
     return c.json(updated)
@@ -558,6 +565,9 @@ contactsV2.get('/:id',
     const id = c.req.param('id')
     const services = c.get('services')
     const contact = await services.contacts.get(id)
+    if (!contact) {
+      return c.json({ error: 'Contact not found' }, 404)
+    }
     return c.json(contact)
   },
 )

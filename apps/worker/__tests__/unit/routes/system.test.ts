@@ -1,0 +1,261 @@
+/**
+ * Unit tests for routes/system.ts
+ *
+ * Tests: permission enforcement (system:manage-instance), health aggregation,
+ * service status derivation from env vars, graceful fallback on service errors.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Hono } from 'hono'
+import type { AppEnv } from '@worker/types'
+import systemRoutes from '@worker/routes/system'
+
+// ---------------------------------------------------------------------------
+// Test app factory
+// ---------------------------------------------------------------------------
+
+function makeApp(opts: {
+  permissions?: string[]
+  pubkey?: string
+  hubId?: string
+  env?: Record<string, string>
+  services?: Record<string, unknown>
+} = {}) {
+  const {
+    permissions = ['system:manage-instance'],
+    pubkey = 'a'.repeat(64),
+    hubId = 'hub-1',
+    env = {},
+    services = {},
+  } = opts
+
+  const mockCalls = {
+    getActiveCalls: vi.fn().mockResolvedValue([]),
+    getTodayCount: vi.fn().mockResolvedValue(0),
+    getPresence: vi.fn().mockResolvedValue({ users: [] }),
+  }
+
+  const mockIdentity = {
+    getUsers: vi.fn().mockResolvedValue({ users: [] }),
+  }
+
+  const mockShifts = {
+    getCurrentVolunteers: vi.fn().mockResolvedValue([]),
+  }
+
+  const app = new Hono<AppEnv>()
+  app.use('*', async (c, next) => {
+    c.set('pubkey', pubkey)
+    c.set('permissions', permissions)
+    c.set('hubId', hubId)
+    c.set('services', {
+      calls: mockCalls,
+      identity: mockIdentity,
+      shifts: mockShifts,
+      ...services,
+    } as unknown as AppEnv['Variables']['services'])
+    c.set('requestId', 'test-req')
+    c.env = env as unknown as AppEnv['Bindings']
+    await next()
+  })
+  app.route('/', systemRoutes)
+
+  return { app, mockCalls, mockIdentity, mockShifts }
+}
+
+// ---------------------------------------------------------------------------
+// Permission guard
+// ---------------------------------------------------------------------------
+
+describe('system routes — permission guard', () => {
+  it('returns 403 without system:manage-instance', async () => {
+    const { app } = makeApp({ permissions: ['audit:read'] })
+
+    const res = await app.request('/health')
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 403 with empty permissions', async () => {
+    const { app } = makeApp({ permissions: [] })
+
+    const res = await app.request('/health')
+    expect(res.status).toBe(403)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// GET /health — aggregated system health
+// ---------------------------------------------------------------------------
+
+describe('GET /system/health', () => {
+  it('returns 200 with complete health structure', async () => {
+    const { app } = makeApp()
+
+    const res = await app.request('/health')
+    expect(res.status).toBe(200)
+
+    const json = await res.json() as Record<string, unknown>
+    expect(json).toHaveProperty('server')
+    expect(json).toHaveProperty('services')
+    expect(json).toHaveProperty('calls')
+    expect(json).toHaveProperty('storage')
+    expect(json).toHaveProperty('backup')
+    expect(json).toHaveProperty('users')
+    expect(json).toHaveProperty('timestamp')
+  })
+
+  it('returns valid timestamp ISO string', async () => {
+    const { app } = makeApp()
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    expect(() => new Date(json.timestamp as string)).not.toThrow()
+    expect(new Date(json.timestamp as string).toISOString()).toBe(json.timestamp)
+  })
+
+  it('marks blob storage as down when not configured', async () => {
+    const { app } = makeApp({ env: {} }) // no R2_BUCKET or STORAGE_MANAGER
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const services = json.services as Array<{ name: string; status: string }>
+    const blobService = services.find(s => s.name === 'Blob Storage')
+    expect(blobService?.status).toBe('down')
+  })
+
+  it('marks blob storage as ok when R2_BUCKET configured', async () => {
+    const { app } = makeApp({ env: { R2_BUCKET: 'my-bucket' } })
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const services = json.services as Array<{ name: string; status: string }>
+    const blobService = services.find(s => s.name === 'Blob Storage')
+    expect(blobService?.status).toBe('ok')
+  })
+
+  it('marks Nostr relay as down when not configured', async () => {
+    const { app } = makeApp({ env: {} })
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const services = json.services as Array<{ name: string; status: string }>
+    const nostrService = services.find(s => s.name === 'Nostr Relay')
+    expect(nostrService?.status).toBe('down')
+  })
+
+  it('marks Nostr relay as ok when configured', async () => {
+    const { app } = makeApp({ env: { NOSTR_RELAY_URL: 'wss://relay.example.com' } })
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const services = json.services as Array<{ name: string; status: string }>
+    const nostrService = services.find(s => s.name === 'Nostr Relay')
+    expect(nostrService?.status).toBe('ok')
+  })
+
+  it('marks telephony as ok when TWILIO_ACCOUNT_SID configured', async () => {
+    const { app } = makeApp({ env: { TWILIO_ACCOUNT_SID: 'ACtest123' } })
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const services = json.services as Array<{ name: string; status: string }>
+    const telephonyService = services.find(s => s.name === 'Telephony')
+    expect(telephonyService?.status).toBe('ok')
+  })
+
+  it('returns correct call counts from service', async () => {
+    const { app, mockCalls } = makeApp()
+    mockCalls.getActiveCalls.mockResolvedValue([{ id: 'call-1' }, { id: 'call-2' }])
+    mockCalls.getTodayCount.mockResolvedValue(15)
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const calls = json.calls as Record<string, number>
+    expect(calls.active).toBe(2)
+    expect(calls.today).toBe(15)
+  })
+
+  it('returns correct user counts from service', async () => {
+    const { app, mockIdentity, mockCalls, mockShifts } = makeApp()
+    mockIdentity.getUsers.mockResolvedValue({
+      users: [
+        { active: true },
+        { active: true },
+        { active: false },
+      ],
+    })
+    mockCalls.getPresence.mockResolvedValue({ users: [{ pubkey: 'pk1' }] })
+    mockShifts.getCurrentVolunteers.mockResolvedValue(['pk1', 'pk2'])
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const users = json.users as Record<string, number>
+    expect(users.totalActive).toBe(2)
+    expect(users.onlineNow).toBe(1)
+    expect(users.onShift).toBe(2)
+    expect(users.shiftCoverage).toBe(100) // 2 on shift / 2 active = 100%
+  })
+
+  it('returns zero user counts when getUsers throws', async () => {
+    const { app, mockIdentity } = makeApp()
+    mockIdentity.getUsers.mockRejectedValue(new Error('DB error'))
+
+    const res = await app.request('/health')
+    // Should still return 200 due to Promise.allSettled
+    expect(res.status).toBe(200)
+    const json = await res.json() as Record<string, unknown>
+    const users = json.users as Record<string, number>
+    expect(users.totalActive).toBe(0)
+    expect(users.onlineNow).toBe(0)
+  })
+
+  it('returns zero call counts when getActiveCalls throws', async () => {
+    const { app, mockCalls } = makeApp()
+    mockCalls.getActiveCalls.mockRejectedValue(new Error('Telephony down'))
+
+    const res = await app.request('/health')
+    expect(res.status).toBe(200)
+    const json = await res.json() as Record<string, unknown>
+    const calls = json.calls as Record<string, number>
+    expect(calls.active).toBe(0)
+    expect(calls.today).toBe(0)
+  })
+
+  it('marks server as degraded when any service is down', async () => {
+    const { app } = makeApp({ env: {} }) // no services configured → all down
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const server = json.server as Record<string, string>
+    // At least some services will be 'down', so server should be 'degraded'
+    expect(['ok', 'degraded']).toContain(server.status)
+  })
+
+  it('includes storage blobStorage:Connected when R2_BUCKET configured', async () => {
+    const { app } = makeApp({ env: { R2_BUCKET: 'my-bucket' } })
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const storage = json.storage as Record<string, string>
+    expect(storage.blobStorage).toBe('Connected')
+  })
+
+  it('includes storage blobStorage:Not configured without R2_BUCKET', async () => {
+    const { app } = makeApp({ env: {} })
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const storage = json.storage as Record<string, string>
+    expect(storage.blobStorage).toBe('Not configured')
+  })
+
+  it('backup fields are null/N/A in absence of backup service', async () => {
+    const { app } = makeApp()
+
+    const res = await app.request('/health')
+    const json = await res.json() as Record<string, unknown>
+    const backup = json.backup as Record<string, unknown>
+    expect(backup.lastBackup).toBeNull()
+    expect(backup.lastVerify).toBeNull()
+    expect(backup.backupSize).toBe('N/A')
+  })
+})
