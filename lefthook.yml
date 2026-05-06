@@ -7,6 +7,9 @@ pre-commit:
     codegen-freshness:
       glob: "packages/protocol/schemas/*.ts"
       run: bun run codegen && git diff --exit-code packages/protocol/generated/
+    migration-drift:
+      glob: "apps/worker/db/schema/*.ts"
+      run: bun scripts/check-migration-drift.ts
     block-env-files:
       run: |
         # Block actual .env files (which may contain secrets) but allow .env.example (template)
@@ -22,3 +25,5 @@ pre-push:
   commands:
     check-codegen-drift:
       run: bun run codegen:check
+    check-migration-drift:
+      run: bun scripts/check-migration-drift.ts
