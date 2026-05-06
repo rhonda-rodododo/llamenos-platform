@@ -447,19 +447,19 @@ When('I complete the entire setup wizard', async ({ page }) => {
 
 // --- Reports ---
 
-Given('at least one report exists', async ({ page }) => {
+Given('at least one report exists', async ({ backendRequest, workerHub }) => {
   const { listReportsViaApi, createReportViaApi } = await import('../../api-helpers')
-  const result = await listReportsViaApi(page.request)
+  const result = await listReportsViaApi(backendRequest, { hubId: workerHub })
   if (result.conversations.length === 0) {
-    await createReportViaApi(page.request, { title: `Seed report ${Date.now()}` })
+    await createReportViaApi(backendRequest, { title: `Seed report ${Date.now()}`, hubId: workerHub })
   }
 })
 
-Given('a report exists', async ({ page }) => {
+Given('a report exists', async ({ backendRequest, workerHub }) => {
   const { listReportsViaApi, createReportViaApi } = await import('../../api-helpers')
-  const result = await listReportsViaApi(page.request)
+  const result = await listReportsViaApi(backendRequest, { hubId: workerHub })
   if (result.conversations.length === 0) {
-    await createReportViaApi(page.request, { title: `Seed report ${Date.now()}` })
+    await createReportViaApi(backendRequest, { title: `Seed report ${Date.now()}`, hubId: workerHub })
   }
 })
 

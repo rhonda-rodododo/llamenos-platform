@@ -617,10 +617,10 @@ export async function createReportViaApi(
   // If caller wants a specific status, update it
   if (options?.status && options.status !== 'waiting') {
     if (options.status === 'active') {
-      await assignReportViaApi(request, report.id, pubkey)
+      await assignReportViaApi(request, report.id, pubkey, options?.hubId)
     } else if (options.status === 'closed') {
-      await assignReportViaApi(request, report.id, pubkey)
-      await updateReportStatusViaApi(request, report.id, 'closed')
+      await assignReportViaApi(request, report.id, pubkey, options?.hubId)
+      await updateReportStatusViaApi(request, report.id, 'closed', options?.hubId)
     }
   }
   return report
@@ -630,8 +630,10 @@ export async function assignReportViaApi(
   request: APIRequestContext,
   reportId: string,
   pubkey: string,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPost(request, `/reports/${reportId}/assign`, { assignedTo: pubkey })
+  const path = hubPath(`/reports/${reportId}/assign`, hubId)
+  const { status } = await apiPost(request, path, { assignedTo: pubkey })
   if (status !== 200) throw new Error(`Failed to assign report: ${status}`)
 }
 
@@ -639,8 +641,10 @@ export async function updateReportStatusViaApi(
   request: APIRequestContext,
   reportId: string,
   newStatus: string,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPatch(request, `/reports/${reportId}`, { status: newStatus })
+  const path = hubPath(`/reports/${reportId}`, hubId)
+  const { status } = await apiPatch(request, path, { status: newStatus })
   if (status !== 200) throw new Error(`Failed to update report status: ${status}`)
 }
 
