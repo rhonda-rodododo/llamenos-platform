@@ -1,9 +1,7 @@
-# Gitleaks ignore file — fingerprints of confirmed false positives in PR #206.
+# Gitleaks ignore file — fingerprints of confirmed false positives.
 # See: https://github.com/gitleaks/gitleaks#gitleaksignore
 
-# Commit ad08192d introduced fake test credentials; subsequent commit (c42c5aed)
-# added gitleaks:allow inline annotations. Fingerprints cover the original commit.
-
+# PR #206: messaging adapter test credentials (ad08192d)
 ad08192d6d0e891b126b38eb6542ae3e41ba46fb:apps/worker/__tests__/unit/plivo-sms-adapter.test.ts:generic-api-key:4
 ad08192d6d0e891b126b38eb6542ae3e41ba46fb:apps/worker/__tests__/unit/twilio-sms-adapter.test.ts:generic-api-key:4
 ad08192d6d0e891b126b38eb6542ae3e41ba46fb:apps/worker/__tests__/unit/rcs-adapter.test.ts:generic-api-key:6
