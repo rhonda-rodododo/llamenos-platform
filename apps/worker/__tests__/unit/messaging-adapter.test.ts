@@ -6,7 +6,6 @@ import type {
   WhatsAppConfig,
   SignalConfig,
   RCSConfig,
-  DEFAULT_MESSAGING_CONFIG,
 } from '@shared/types'
 import {
   CHANNEL_SECURITY,
@@ -120,84 +119,7 @@ describe('MessagingAdapter types', () => {
     })
   })
 
-  describe('adapter interface shapes', () => {
-    it('IncomingMessage has required fields', () => {
-      const msg = {
-        channelType: 'sms' as MessagingChannelType,
-        externalId: 'msg-123',
-        senderIdentifier: '+15551234567',
-        senderIdentifierHash: 'hash123',
-        timestamp: new Date().toISOString(),
-      }
-      expect(msg.channelType).toBe('sms')
-      expect(msg.externalId).toBeTruthy()
-    })
-
-    it('IncomingMessage supports optional fields', () => {
-      const msg = {
-        channelType: 'whatsapp' as MessagingChannelType,
-        externalId: 'wam-456',
-        senderIdentifier: '+15551234567',
-        senderIdentifierHash: 'hash456',
-        body: 'Hello',
-        mediaUrls: ['https://example.com/image.jpg'],
-        mediaTypes: ['image/jpeg'],
-        timestamp: new Date().toISOString(),
-        metadata: { profileName: 'John' },
-      }
-      expect(msg.body).toBe('Hello')
-      expect(msg.mediaUrls).toHaveLength(1)
-    })
-
-    it('SendMessageParams shape', () => {
-      const params = {
-        recipientIdentifier: '+15551234567',
-        body: 'Your case has been updated',
-        conversationId: 'conv-123',
-      }
-      expect(params.recipientIdentifier).toMatch(/^\+/)
-    })
-
-    it('SendResult success shape', () => {
-      const result = { success: true, externalId: 'msg-789' }
-      expect(result.success).toBe(true)
-      expect(result.externalId).toBeTruthy()
-    })
-
-    it('SendResult failure shape', () => {
-      const result = { success: false, error: 'Number is unreachable' }
-      expect(result.success).toBe(false)
-      expect(result.error).toBeTruthy()
-    })
-
-    it('ChannelStatus connected shape', () => {
-      const status = { connected: true, details: { version: '2.0' } }
-      expect(status.connected).toBe(true)
-    })
-
-    it('ChannelStatus error shape', () => {
-      const status = { connected: false, error: 'Authentication failed' }
-      expect(status.connected).toBe(false)
-      expect(status.error).toBeTruthy()
-    })
-
-    it('MessageStatusUpdate shape', () => {
-      const update = {
-        externalId: 'msg-123',
-        status: 'delivered' as const,
-        timestamp: new Date().toISOString(),
-      }
-      expect(update.status).toBe('delivered')
-    })
-
-    it('MessageStatusUpdate failure shape', () => {
-      const update = {
-        externalId: 'msg-456',
-        status: 'failed' as const,
-        timestamp: new Date().toISOString(),
-        failureReason: 'Number not registered on WhatsApp',
-      }
-      expect(update.failureReason).toBeTruthy()
-    })
-  })
+  // Adapter interface shape tests removed — they only tested literal object construction,
+  // not actual adapter behavior. Real behavioral tests are in the per-adapter test files
+  // (twilio-sms-adapter.test.ts, vonage-sms-adapter.test.ts, plivo-sms-adapter.test.ts, etc.)
 })

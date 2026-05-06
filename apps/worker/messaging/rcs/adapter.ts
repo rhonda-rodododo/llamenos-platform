@@ -12,6 +12,9 @@ import { timingSafeEqual } from 'node:crypto'
 import { HMAC_PHONE_PREFIX } from '@shared/crypto-labels'
 import type { RCSConfig } from '@shared/types'
 import { hashPhone } from '../../lib/crypto'
+import { createLogger } from '../../lib/logger'
+
+const logger = createLogger('messaging.rcs')
 import type {
   MessagingAdapter,
   IncomingMessage,
@@ -103,7 +106,7 @@ export class RCSAdapter implements MessagingAdapter {
    */
   async validateWebhook(request: Request): Promise<boolean> {
     if (!this.config.webhookSecret) {
-      // No secret configured — accept all webhooks (not recommended for production)
+      logger.warn('Accepting unauthenticated RCS webhook — no webhookSecret configured')
       return true
     }
 

@@ -2,6 +2,9 @@ import { timingSafeEqual } from 'node:crypto'
 import { HMAC_PHONE_PREFIX } from '@shared/crypto-labels'
 import type { TelegramConfig } from '@shared/types'
 import { hashPhone } from '../../lib/crypto'
+import { createLogger } from '../../lib/logger'
+
+const logger = createLogger('messaging.telegram')
 import type {
   MessagingAdapter,
   IncomingMessage,
@@ -115,7 +118,7 @@ export class TelegramAdapter implements MessagingAdapter {
    */
   async validateWebhook(request: Request): Promise<boolean> {
     if (!this.webhookSecret) {
-      // No secret configured — accept all webhooks (not recommended for production)
+      logger.warn('Accepting unauthenticated Telegram webhook — no webhookSecret configured')
       return true
     }
 

@@ -73,9 +73,9 @@ export class TwilioSMSAdapter implements MessagingAdapter {
 
     // Build the data string: full URL + sorted form key-value pairs concatenated
     let dataString = url.toString()
-    const sortedKeys = Array.from(params.keys()).sort()
-    for (const key of sortedKeys) {
-      dataString += key + params.get(key)
+    const sortedEntries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))
+    for (const [key, value] of sortedEntries) {
+      dataString += key + value
     }
 
     const encoder = new TextEncoder()
