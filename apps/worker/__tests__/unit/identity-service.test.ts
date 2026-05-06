@@ -447,6 +447,24 @@ describe('IdentityService — User CRUD', () => {
         svc.updateUser('nonexistent', { name: 'x' } as never, true),
       ).rejects.toThrow('Not found')
     })
+
+    it('non-admin cannot deactivate a user — throws 403', async () => {
+      const existingRow = makeUserRow({ pubkey: 'pk-1', active: true })
+      const db = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([existingRow]),
+            }),
+          }),
+        }),
+      }
+
+      const svc = new IdentityService(db as never)
+      await expect(
+        svc.updateUser('pk-1', { active: false } as never, false),
+      ).rejects.toMatchObject({ status: 403 })
+    })
   })
 })
 
@@ -836,31 +854,37 @@ describe('IdentityService — Reset', () => {
     ).rejects.toThrow('Reset not allowed')
   })
 
-  it('allows reset in development mode', async () => {
+  it('allows reset in development mode and deletes all identity tables', async () => {
+    let txDelete: ReturnType<typeof vi.fn>
     const txFn = vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
-      const tx = {
-        delete: vi.fn().mockReturnValue(Promise.resolve()),
-      }
+      txDelete = vi.fn().mockResolvedValue(undefined)
+      const tx = { delete: txDelete }
       return fn(tx)
     })
     const db = { transaction: txFn }
     const svc = new IdentityService(db as never)
 
     await svc.reset(false, 'development')
+
     expect(txFn).toHaveBeenCalled()
+    // 7 tables must be cleared: devices, webauthnCredentials, webauthnChallenges,
+    // sessions, provisionRooms, inviteCodes, users
+    expect(txDelete!).toHaveBeenCalledTimes(7)
   })
 
-  it('allows reset in demo mode regardless of environment', async () => {
+  it('allows reset in demo mode and deletes all identity tables', async () => {
+    let txDelete: ReturnType<typeof vi.fn>
     const txFn = vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
-      const tx = {
-        delete: vi.fn().mockReturnValue(Promise.resolve()),
-      }
+      txDelete = vi.fn().mockResolvedValue(undefined)
+      const tx = { delete: txDelete }
       return fn(tx)
     })
     const db = { transaction: txFn }
     const svc = new IdentityService(db as never)
 
     await svc.reset(true, 'production')
+
     expect(txFn).toHaveBeenCalled()
+    expect(txDelete!).toHaveBeenCalledTimes(7)
   })
 })
