@@ -351,6 +351,9 @@ export class IdentityService {
 
     for (const [key, value] of Object.entries(data)) {
       if (key === 'pubkey') continue // never overwrite PK
+      if (key === 'active' && !isAdmin) {
+        throw new ServiceError(403, 'Only admins can change user active status')
+      }
       if (isAdmin || VOLUNTEER_SAFE_FIELDS.has(key)) {
         applyField(key, value)
       }

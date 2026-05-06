@@ -206,8 +206,14 @@ describe('CasesService — CRUD', () => {
         authorPubkey: 'pk-admin',
       })
 
-      // A status_change interaction should have been created
+      // A status_change interaction should have been created with correct fields
       expect(insertInteraction).toHaveBeenCalled()
+      const insertedValues = insertInteraction.mock.results[0].value.values.mock.calls[0][0]
+      expect(insertedValues.interactionType).toBe('status_change')
+      expect(insertedValues.caseId).toBe('case-1')
+      expect(insertedValues.authorPubkey).toBe('pk-admin')
+      expect(insertedValues.previousStatusHash).toBe('hash-open')
+      expect(insertedValues.newStatusHash).toBe('hash-closed')
     })
 
     it('does NOT create interaction when status is unchanged', async () => {
@@ -542,21 +548,23 @@ describe('CasesService — Reset safety', () => {
     ).rejects.toThrow('Reset not allowed')
   })
 
-  it('allows reset in demo mode', async () => {
-    const deleteFn = vi.fn().mockResolvedValue(undefined)
-    const db = { delete: vi.fn().mockReturnValue(deleteFn()) }
+  it('allows reset in demo mode and deletes all case tables', async () => {
+    const db = { delete: vi.fn().mockResolvedValue(undefined) }
     const svc = new CasesService(db as never)
 
     await svc.reset({ DEMO_MODE: 'true', ENVIRONMENT: 'production' })
-    // Should not throw
+
+    // 9 tables must be cleared: custodyEntries, evidence, caseInteractions,
+    // reportCases, reportEvents, caseEvents, caseContacts, events, caseRecords
+    expect(db.delete).toHaveBeenCalledTimes(9)
   })
 
-  it('allows reset in development environment', async () => {
-    const deleteFn = vi.fn().mockResolvedValue(undefined)
-    const db = { delete: vi.fn().mockReturnValue(deleteFn()) }
+  it('allows reset in development environment and deletes all case tables', async () => {
+    const db = { delete: vi.fn().mockResolvedValue(undefined) }
     const svc = new CasesService(db as never)
 
     await svc.reset({ DEMO_MODE: 'false', ENVIRONMENT: 'development' })
-    // Should not throw
+
+    expect(db.delete).toHaveBeenCalledTimes(9)
   })
 })

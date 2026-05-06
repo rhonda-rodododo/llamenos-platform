@@ -558,12 +558,32 @@ describe('settings route', () => {
   })
 
   describe('geocoding', () => {
-    it('GET /geocoding returns config for any authenticated user', async () => {
-      const app = createTestApp()
+    it('GET /geocoding calls safe method (no apiKey) for any authenticated user', async () => {
+      const getGeocodingConfig = vi.fn().mockResolvedValue({ provider: 'opencage', countries: ['US'], enabled: true })
+      const getGeocodingConfigAdmin = vi.fn().mockResolvedValue({ provider: 'opencage', apiKey: 'secret', countries: ['US'], enabled: true })
+      const app = createTestApp({
+        services: { settings: { getGeocodingConfig, getGeocodingConfigAdmin } },
+      })
       const res = await app.request('/geocoding')
       expect(res.status).toBe(200)
-      const body = await res.json()
-      expect(body.provider).toBe('google')
+      const body = await res.json() as Record<string, unknown>
+      expect(body.provider).toBe('opencage')
+      // Safe method called — not admin method
+      expect(getGeocodingConfig).toHaveBeenCalled()
+      expect(getGeocodingConfigAdmin).not.toHaveBeenCalled()
+      // API key must not be exposed to regular users
+      expect(body.apiKey).toBeUndefined()
+    })
+
+    it('GET /geocoding/admin calls admin method (with apiKey) for privileged user', async () => {
+      const getGeocodingConfigAdmin = vi.fn().mockResolvedValue({ provider: 'opencage', apiKey: 'secret', countries: ['US'], enabled: true })
+      const app = createTestApp({
+        permissions: ['settings:manage'],
+        services: { settings: { getGeocodingConfigAdmin } },
+      })
+      const res = await app.request('/geocoding/test')
+      // /geocoding/test uses getGeocodingConfigAdmin to look up the API key
+      expect(getGeocodingConfigAdmin).toHaveBeenCalled()
     })
 
     it('PUT /geocoding requires settings:manage', async () => {
