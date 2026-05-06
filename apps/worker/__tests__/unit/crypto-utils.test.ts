@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { hashPhone, hashIP, hashAuditEntry, encryptMessageForStorage, encryptCallRecordForStorage } from '@worker/lib/crypto'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { hashPhone, hashIP, hashAuditEntry, stableJsonStringify, encryptMessageForStorage, encryptCallRecordForStorage } from '@worker/lib/crypto'
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { secp256k1 } from '@noble/curves/secp256k1.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { LABEL_MESSAGE } from '@shared/crypto-labels'
 
 // Test HMAC secret (64 hex chars = 32 bytes)
 const TEST_SECRET = 'a'.repeat(64)
@@ -129,9 +133,20 @@ describe('hashAuditEntry', () => {
 
   it('matches manual SHA-256 computation', () => {
     const entry = baseEntry
-    const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${JSON.stringify(entry.details)}:`
+    const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${stableJsonStringify(entry.details ?? {})}:`
     const expected = bytesToHex(sha256(utf8ToBytes(content)))
     expect(hashAuditEntry(entry)).toBe(expected)
+  })
+
+  it('produces same hash regardless of key insertion order in details', () => {
+    const entry1 = { ...baseEntry, details: { z: 1, a: 2, m: 3 } }
+    const entry2 = { ...baseEntry, details: { a: 2, m: 3, z: 1 } }
+    const entry3 = { ...baseEntry, details: { m: 3, z: 1, a: 2 } }
+    const hash1 = hashAuditEntry(entry1)
+    const hash2 = hashAuditEntry(entry2)
+    const hash3 = hashAuditEntry(entry3)
+    expect(hash1).toBe(hash2)
+    expect(hash2).toBe(hash3)
   })
 })
 
@@ -230,5 +245,74 @@ describe('encryptCallRecordForStorage', () => {
       [validPubkey, pubkey2],
     )
     expect(result.adminEnvelopes.length).toBe(2)
+  })
+})
+
+describe('encryptMessageForStorage decrypt round-trip', () => {
+  // Use a known private key and derive pubkey for full round-trip
+  const privKeyHex = '0000000000000000000000000000000000000000000000000000000000000001'
+  const privKey = hexToBytes(privKeyHex)
+  // secp256k1 generator point x-coordinate (pubkey of privkey=1)
+  const pubkeyHex = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+
+  function eciesUnwrapKey(
+    wrappedKeyHex: string,
+    ephemeralPubkeyHex: string,
+    recipientPrivKey: Uint8Array,
+    label: string,
+  ): Uint8Array {
+    const packed = hexToBytes(wrappedKeyHex)
+    const version = packed[0]
+    expect(version).toBe(0x02) // v2
+
+    const nonce = packed.slice(1, 25)
+    const ciphertext = packed.slice(25)
+
+    // Derive shared secret: ECDH(recipientPrivKey, ephemeralPubkey)
+    const ephemeralCompressed = hexToBytes(ephemeralPubkeyHex)
+    const shared = secp256k1.getSharedSecret(recipientPrivKey, ephemeralCompressed)
+    const sharedX = shared.slice(1, 33)
+
+    // Derive symmetric key via HKDF (same as eciesWrapKeyServer)
+    const symmetricKey = hkdf(sha256, sharedX, new Uint8Array(0), utf8ToBytes(label), 32)
+
+    const cipher = xchacha20poly1305(symmetricKey, nonce)
+    return cipher.decrypt(ciphertext)
+  }
+
+  it('encrypts then decrypts to original plaintext', () => {
+    const plaintext = 'Hello, this is a secret message!'
+    const result = encryptMessageForStorage(plaintext, [pubkeyHex])
+
+    // Unwrap the message key from the envelope
+    const envelope = result.readerEnvelopes[0]
+    const messageKey = eciesUnwrapKey(
+      envelope.wrappedKey,
+      envelope.ephemeralPubkey,
+      privKey,
+      LABEL_MESSAGE,
+    )
+
+    // Decrypt the content using the unwrapped message key
+    const contentBytes = hexToBytes(result.encryptedContent)
+    const nonce = contentBytes.slice(0, 24)
+    const ciphertext = contentBytes.slice(24)
+    const cipher = xchacha20poly1305(messageKey, nonce)
+    const decrypted = new TextDecoder().decode(cipher.decrypt(ciphertext))
+
+    expect(decrypted).toBe(plaintext)
+  })
+
+  it('decryption fails with wrong private key', () => {
+    const plaintext = 'Secret data'
+    const result = encryptMessageForStorage(plaintext, [pubkeyHex])
+    const envelope = result.readerEnvelopes[0]
+
+    // Use a different private key
+    const wrongPrivKey = hexToBytes('0000000000000000000000000000000000000000000000000000000000000002')
+
+    expect(() => {
+      eciesUnwrapKey(envelope.wrappedKey, envelope.ephemeralPubkey, wrongPrivKey, LABEL_MESSAGE)
+    }).toThrow()
   })
 })

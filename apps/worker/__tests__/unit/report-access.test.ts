@@ -84,12 +84,14 @@ describe('isReport', () => {
     expect(isReport({ contactIdentifierHash: '' })).toBe(false)
   })
 
-  it('handles double-serialized JSONB (string metadata)', () => {
+  // String metadata occurs when raw SQL queries (tx.execute) bypass Drizzle's
+  // mapFromDriverValue — bun-jsonb only protects ORM-level reads.
+  it('handles string metadata from raw SQL queries', () => {
     const json = JSON.stringify({ type: 'report' })
     expect(isReport({ contactIdentifierHash: '', metadata: json })).toBe(true)
   })
 
-  it('returns false for double-serialized non-report JSONB', () => {
+  it('returns false for string metadata with non-report type', () => {
     const json = JSON.stringify({ type: 'call' })
     expect(isReport({ contactIdentifierHash: '', metadata: json })).toBe(false)
   })

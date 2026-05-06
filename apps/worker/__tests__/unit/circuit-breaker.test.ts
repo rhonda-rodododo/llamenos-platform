@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { CircuitBreaker, CircuitOpenError } from '@worker/lib/circuit-breaker'
+import { CircuitBreaker, CircuitOpenError, getCircuitBreaker, resetAllCircuitBreakers } from '@worker/lib/circuit-breaker'
 
 describe('CircuitBreaker', () => {
   beforeEach(() => {
@@ -112,5 +112,32 @@ describe('CircuitBreaker', () => {
 
     const metrics = breaker.getMetrics()
     expect(metrics.totalRejections).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('getCircuitBreaker global registry', () => {
+  afterEach(() => {
+    resetAllCircuitBreakers()
+  })
+
+  it('returns same instance for same name (singleton)', () => {
+    const a = getCircuitBreaker({ name: 'singleton-test' })
+    const b = getCircuitBreaker({ name: 'singleton-test' })
+    expect(a).toBe(b)
+  })
+
+  it('returns different instances for different names', () => {
+    const a = getCircuitBreaker({ name: 'breaker-a' })
+    const b = getCircuitBreaker({ name: 'breaker-b' })
+    expect(a).not.toBe(b)
+  })
+
+  it('resetAllCircuitBreakers resets all to closed', async () => {
+    const cb = getCircuitBreaker({ name: 'reset-test', failureThreshold: 1, resetTimeoutMs: 999_999 })
+    await cb.execute(() => Promise.reject(new Error('fail'))).catch(() => {})
+    expect(cb.getState()).toBe('open')
+
+    resetAllCircuitBreakers()
+    expect(cb.getState()).toBe('closed')
   })
 })
