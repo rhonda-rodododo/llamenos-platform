@@ -352,6 +352,49 @@ describe('POST /uploads/:id/complete', () => {
     expect(res.status).toBe(403)
   })
 
+  it('allows files:manage-all to bypass ownership check on complete', async () => {
+    const chunk0 = new Uint8Array([1, 2])
+    R2_STUB.get.mockResolvedValueOnce({ arrayBuffer: () => Promise.resolve(chunk0.buffer) })
+    R2_STUB.put.mockResolvedValue(undefined)
+    R2_STUB.delete.mockResolvedValue(undefined)
+
+    const { request } = makeApp({
+      pubkey: 'admin-pub',
+      permissions: ['files:upload', 'files:manage-all'],
+      fileRecord: {
+        id: 'upload-1',
+        uploadedBy: 'someone-else',
+        status: 'uploading',
+        completedChunks: 1,
+        totalChunks: 1,
+        totalSize: 2,
+        recipientEnvelopes: [],
+        encryptedMetadata: [],
+      },
+    })
+    const res = await request('/upload-1/complete', { method: 'POST' })
+    expect(res.status).toBe(200)
+  })
+
+  it('rejects files:download-all from bypassing ownership on complete', async () => {
+    const { request } = makeApp({
+      pubkey: 'admin-pub',
+      permissions: ['files:upload', 'files:download-all'],
+      fileRecord: {
+        id: 'upload-1',
+        uploadedBy: 'someone-else',
+        status: 'uploading',
+        completedChunks: 2,
+        totalChunks: 2,
+        totalSize: 200,
+        recipientEnvelopes: [],
+        encryptedMetadata: [],
+      },
+    })
+    const res = await request('/upload-1/complete', { method: 'POST' })
+    expect(res.status).toBe(403)
+  })
+
   it('returns 500 when a chunk is missing in R2', async () => {
     R2_STUB.get.mockResolvedValueOnce(null) // chunk 0 is missing
     const { request } = makeApp({
@@ -429,6 +472,42 @@ describe('GET /uploads/:id/status', () => {
     const { request } = makeApp({
       pubkey: 'stranger',
       permissions: ['files:upload'],
+      fileRecord: {
+        id: 'upload-1',
+        uploadedBy: 'someone-else',
+        status: 'uploading',
+        completedChunks: 1,
+        totalChunks: 3,
+        totalSize: 300,
+      },
+    })
+    const res = await request('/upload-1/status')
+    expect(res.status).toBe(404)
+  })
+
+  it('allows files:manage-all to bypass ownership check on status', async () => {
+    const { request } = makeApp({
+      pubkey: 'admin-pub',
+      permissions: ['files:upload', 'files:manage-all'],
+      fileRecord: {
+        id: 'upload-1',
+        uploadedBy: 'someone-else',
+        status: 'uploading',
+        completedChunks: 2,
+        totalChunks: 3,
+        totalSize: 300,
+      },
+    })
+    const res = await request('/upload-1/status')
+    expect(res.status).toBe(200)
+    const body = await res.json() as { status: string }
+    expect(body.status).toBe('uploading')
+  })
+
+  it('rejects files:download-all from bypassing ownership on status', async () => {
+    const { request } = makeApp({
+      pubkey: 'admin-pub',
+      permissions: ['files:upload', 'files:download-all'],
       fileRecord: {
         id: 'upload-1',
         uploadedBy: 'someone-else',

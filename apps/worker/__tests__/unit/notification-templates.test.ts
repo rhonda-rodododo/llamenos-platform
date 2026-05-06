@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderStatusChangeNotification } from '@worker/lib/notification-templates'
+import { renderStatusChangeNotification } from '../../lib/notification-templates'
 
 describe('renderStatusChangeNotification', () => {
   it('renders message with case number', () => {
