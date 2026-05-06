@@ -9,6 +9,7 @@ dist/
 !.env.example
 !.env.live.example
 test-results/
+tests/storage/
 
 playwright-report/
 .playwright-mcp/
