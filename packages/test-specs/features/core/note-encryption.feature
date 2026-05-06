@@ -95,7 +95,7 @@ Feature: Note Encryption & Management
     And I should see the creation date
     And I should see the author pubkey
 
-  @desktop @ios @android @regression
+  @ios @android @regression
   Scenario: Note detail back navigation
     Given I am authenticated
     And at least one note exists
@@ -103,7 +103,7 @@ Feature: Note Encryption & Management
     And I tap the back button
     Then I should return to the notes list
 
-  @desktop @ios @android @regression
+  @ios @android @regression
   Scenario: Note detail shows copy button
     Given I am authenticated
     And at least one note exists

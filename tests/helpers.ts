@@ -293,6 +293,31 @@ export function uniquePhone(): string {
   return `+1212${suffix}`
 }
 
+/**
+ * Fill in the call ID field in the new note form.
+ * Handles both modes: Input (when no recent calls) and Select (when recent calls exist).
+ * In Select mode, selects the "Enter manually" option then fills the manual input.
+ */
+export async function fillCallId(page: Page, callId: string): Promise<void> {
+  const callIdInput = page.getByTestId('note-call-id')
+  const callIdSelect = page.getByTestId('call-id-select')
+  const isInput = await callIdInput.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isInput) {
+    await callIdInput.fill(callId)
+    return
+  }
+  // Select mode: choose "Enter manually" then fill
+  const isSelect = await callIdSelect.isVisible({ timeout: 2000 }).catch(() => false)
+  if (isSelect) {
+    await callIdSelect.click()
+    await page.getByRole('option', { name: /enter manually/i }).click()
+    await callIdInput.fill(callId)
+    return
+  }
+  // Last resort: try the input by id
+  await page.locator('#call-id').fill(callId)
+}
+
 const TEST_RESET_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
 
 export async function resetTestState(request: APIRequestContext) {

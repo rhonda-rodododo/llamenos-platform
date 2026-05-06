@@ -13,7 +13,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts } from '../../helpers'
+import { Timeouts, fillCallId } from '../../helpers'
 import { listNotesViaApi, getCustomFieldsViaApi } from '../../api-helpers'
 
 // --- Note navigation ---
@@ -104,20 +104,16 @@ Given('at least one note exists', async ({ page, backendRequest: request, worker
     const { Navigation } = await import('../../pages/index')
     await Navigation.goToNotes(page)
     await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
-    // Fill call ID if the field exists (may be required)
-    const callIdInput = page.getByTestId(TestIds.NOTE_CALL_ID)
-    if (await callIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await callIdInput.fill(`CALL-${Date.now()}`)
-    }
+    await fillCallId(page, `CALL-${Date.now()}`)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created test note')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   }
 })
 
 When('I navigate to a note\'s detail view', async ({ page }) => {
-  const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-  await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await noteCard.click()
+  // On desktop, notes are displayed inline (no separate detail page).
+  // Just ensure a note card is visible — that IS the detail view on desktop.
+  await expect(page.getByTestId(TestIds.NOTE_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the full note text', async ({ page }) => {
@@ -149,9 +145,8 @@ Then('I should see the author pubkey', async ({ page }) => {
 })
 
 When('I am on a note detail view', async ({ page }) => {
-  const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-  await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await noteCard.click()
+  // On desktop, notes are inline — the note card IS the detail view.
+  await expect(page.getByTestId(TestIds.NOTE_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('a copy button should be visible in the top bar', async ({ page }) => {
@@ -184,10 +179,7 @@ Given('I open a note', async ({ page, backendRequest: request, workerHub }) => {
     const newBtn = page.getByTestId(TestIds.NOTE_NEW_BTN)
     await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
     await newBtn.click()
-    const callIdInput = page.getByTestId(TestIds.NOTE_CALL_ID)
-    if (await callIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await callIdInput.fill(`CALL-${Date.now()}`)
-    }
+    await fillCallId(page, `CALL-${Date.now()}`)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created note for test')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   }
