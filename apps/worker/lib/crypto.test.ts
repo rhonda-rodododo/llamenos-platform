@@ -378,7 +378,7 @@ describe('hashAuditEntry', () => {
 
 describe('encryptStorageCredential / decryptStorageCredential', () => {
   it('round-trips a secret key', () => {
-    const secretKey = 'my-s3-secret-key-12345'
+    const secretKey = 'my-s3-secret-key-12345' // gitleaks:allow
     const enc = encryptStorageCredential(secretKey, SECRET)
     expect(decryptStorageCredential(enc, SECRET)).toBe(secretKey)
   })

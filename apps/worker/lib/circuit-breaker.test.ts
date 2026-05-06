@@ -126,10 +126,13 @@ describe('CircuitBreaker — half_open → closed', () => {
   })
 
   it('transitions back to open when probe fails in half_open', async () => {
-    const cb = new CircuitBreaker({ name: 'half-fail', failureThreshold: 1, resetTimeoutMs: 1 })
+    // Use a large resetTimeoutMs so getState() doesn't auto-transition back to half_open
+    // after the failed probe re-opens the circuit
+    const cb = new CircuitBreaker({ name: 'half-fail', failureThreshold: 1, resetTimeoutMs: 60_000 })
     await cb.execute(() => Promise.reject(new Error('x'))).catch(() => {})
 
-    await new Promise(r => setTimeout(r, 10))
+    // Force to half_open to simulate the reset timeout elapsing
+    cb.forceState('half_open')
 
     await cb.execute(() => Promise.reject(new Error('probe failed'))).catch(() => {})
     expect(cb.getState()).toBe('open')

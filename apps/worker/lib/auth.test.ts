@@ -133,7 +133,7 @@ describe('parseSessionHeader', () => {
   })
 
   it('handles opaque token strings with hyphens, underscores, dots', () => {
-    const token = 'abc-def_ghi.123'
+    const token = 'abc-def_ghi.123' // gitleaks:allow
     expect(parseSessionHeader(`Session ${token}`)).toBe(token)
   })
 })
