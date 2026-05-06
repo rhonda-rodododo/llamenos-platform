@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { TwilioSMSAdapter } from '@worker/messaging/sms/twilio'
 
-const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
+const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' // gitleaks:allow
 
 describe('TwilioSMSAdapter', () => {
   let adapter: TwilioSMSAdapter
@@ -380,7 +380,7 @@ describe('TwilioSMSAdapter', () => {
         new Response(JSON.stringify({ message: 'Message not found' }), { status: 404 }),
       )
 
-      await expect(adapter.deleteMessage('SM-nonexistent')).rejects.toThrow('Message not found')
+      await expect(adapter.deleteMessage('SM-nonexistent')).rejects.toThrow('Failed to delete message SM-nonexistent: Twilio API returned 404')
     })
 
     it('throws on network failure', async () => {

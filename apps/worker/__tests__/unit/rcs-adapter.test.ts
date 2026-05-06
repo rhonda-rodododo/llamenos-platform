@@ -3,14 +3,14 @@ import { RCSAdapter } from '@worker/messaging/rcs/adapter'
 import { RBMClient } from '@worker/messaging/rcs/rbm-client'
 import type { RCSConfig } from '@shared/types'
 
-const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
+const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' // gitleaks:allow
 
 // Minimal valid-looking service account key (for JSON.parse — never used for real signing)
 const FAKE_SERVICE_ACCOUNT = JSON.stringify({
   type: 'service_account',
   project_id: 'test-project',
   private_key_id: 'key-id',
-  private_key: '-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n',
+  private_key: '-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n', // gitleaks:allow
   client_email: 'test@test-project.iam.gserviceaccount.com',
   client_id: '123456789',
   auth_uri: 'https://accounts.google.com/o/oauth2/auth',

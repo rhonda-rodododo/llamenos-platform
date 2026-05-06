@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { VonageSMSAdapter } from '@worker/messaging/sms/vonage'
 
-const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
+const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' // gitleaks:allow
 
 describe('VonageSMSAdapter', () => {
   let adapter: VonageSMSAdapter

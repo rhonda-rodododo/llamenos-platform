@@ -3,7 +3,7 @@ import { WhatsAppAdapter } from '@worker/messaging/whatsapp/adapter'
 import { TwilioWhatsAppClient } from '@worker/messaging/whatsapp/twilio-client'
 import type { WhatsAppConfig } from '@shared/types'
 
-const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
+const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' // gitleaks:allow
 
 // --- Test fixtures ---
 
