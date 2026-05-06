@@ -107,16 +107,23 @@ export class TwilioSMSAdapter implements MessagingAdapter {
       Body: params.body,
     })
 
-    const res = await this.twilioMessagesApi(body)
-    if (res.ok) {
-      const data = await res.json() as { sid: string }
-      return { success: true, externalId: data.sid }
-    }
+    try {
+      const res = await this.twilioMessagesApi(body)
+      if (res.ok) {
+        const data = await res.json() as { sid: string }
+        return { success: true, externalId: data.sid }
+      }
 
-    const errorData = await res.json().catch(() => null) as { message?: string } | null
-    return {
-      success: false,
-      error: errorData?.message ?? `Twilio SMS API returned ${res.status}`,
+      const errorData = await res.json().catch(() => null) as { message?: string } | null
+      return {
+        success: false,
+        error: errorData?.message ?? `Twilio SMS API returned ${res.status}`,
+      }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error sending Twilio SMS',
+      }
     }
   }
 
@@ -128,16 +135,23 @@ export class TwilioSMSAdapter implements MessagingAdapter {
       MediaUrl: params.mediaUrl,
     })
 
-    const res = await this.twilioMessagesApi(body)
-    if (res.ok) {
-      const data = await res.json() as { sid: string }
-      return { success: true, externalId: data.sid }
-    }
+    try {
+      const res = await this.twilioMessagesApi(body)
+      if (res.ok) {
+        const data = await res.json() as { sid: string }
+        return { success: true, externalId: data.sid }
+      }
 
-    const errorData = await res.json().catch(() => null) as { message?: string } | null
-    return {
-      success: false,
-      error: errorData?.message ?? `Twilio SMS API returned ${res.status}`,
+      const errorData = await res.json().catch(() => null) as { message?: string } | null
+      return {
+        success: false,
+        error: errorData?.message ?? `Twilio SMS API returned ${res.status}`,
+      }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error sending Twilio MMS',
+      }
     }
   }
 
@@ -181,9 +195,10 @@ export class TwilioSMSAdapter implements MessagingAdapter {
 
   /**
    * Delete a message from Twilio logs (for provider-side cleanup).
+   * Throws if the deletion request fails.
    */
   async deleteMessage(messageSid: string): Promise<void> {
-    await fetch(
+    const res = await fetch(
       `${this.getApiBaseUrl()}/Messages/${messageSid}.json`,
       {
         method: 'DELETE',
@@ -192,6 +207,9 @@ export class TwilioSMSAdapter implements MessagingAdapter {
         },
       }
     )
+    if (!res.ok) {
+      throw new Error(`Failed to delete message ${messageSid}: Twilio API returned ${res.status}`)
+    }
   }
 
   /**
