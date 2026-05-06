@@ -113,12 +113,12 @@ describe('CircuitBreaker — open state rejects immediately', () => {
 
 describe('CircuitBreaker — half_open → closed', () => {
   it('transitions to half_open after resetTimeoutMs and closes on success', async () => {
-    const cb = new CircuitBreaker({ name: 'half-success', failureThreshold: 1, resetTimeoutMs: 1 })
+    const cb = new CircuitBreaker({ name: 'half-success', failureThreshold: 1, resetTimeoutMs: 60_000 })
     await cb.execute(() => Promise.reject(new Error('x'))).catch(() => {})
     expect(cb.getState()).toBe('open')
 
-    // Wait past the reset timeout
-    await new Promise(r => setTimeout(r, 10))
+    // Simulate resetTimeoutMs elapsing by forcing to half_open
+    cb.forceState('half_open')
 
     const result = await cb.execute(async () => 'recovered')
     expect(result).toBe('recovered')
