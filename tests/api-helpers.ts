@@ -1868,3 +1868,21 @@ export async function createCaseFromReportViaApi(
   const linkData = data as Record<string, unknown>
   return { recordId, linkId: (linkData.id ?? linkData.caseId ?? recordId) as string }
 }
+
+/**
+ * Enable messaging channels (SMS by default) via the settings API.
+ * This is needed so the conversations page renders the conversation list
+ * instead of the "No messaging channels enabled" empty state.
+ */
+export async function enableMessagingViaApi(
+  request: APIRequestContext,
+  channels: string[] = ['sms'],
+  nsec = ADMIN_NSEC,
+): Promise<void> {
+  const { status } = await apiPatch(request, '/settings/messaging', {
+    enabledChannels: channels,
+  }, nsec)
+  if (status !== 200) {
+    throw new Error(`Failed to enable messaging channels: ${status}`)
+  }
+}
