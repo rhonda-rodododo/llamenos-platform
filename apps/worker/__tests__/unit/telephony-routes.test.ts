@@ -373,7 +373,15 @@ describe('Telephony routes', () => {
         contentType: 'text/xml',
         body: '<Response><Hangup/></Response>',
       })
-  })
+      const app = await createTestApp(adapter, services)
+      const res = await app.request('/api/telephony/captcha?hub=hub-1&callSid=CA-captcha&lang=en', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'Digits=0000&From=%2B15551111111',
+      })
+      expect(res.status).toBe(200)
+      expect(await res.text()).toContain('<Hangup')
+    })
 
     it('starts parallel ringing on correct CAPTCHA', async () => {
       services.settings.verifyCaptcha = vi.fn().mockResolvedValue({ match: true, expected: '1234' })

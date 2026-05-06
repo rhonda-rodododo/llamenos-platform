@@ -106,16 +106,21 @@ export async function startParallelRinging(
 
       // CRIT-W2: Generate opaque single-use call tokens per volunteer.
       // Tokens are embedded in callback URLs instead of raw pubkeys.
+      // Filter out any volunteers with missing pubkeys — creating tokens
+      // with empty pubkeys would break callback resolution.
+      const ringableVolunteers = toRingPhone.filter(vol => vol.pubkey)
       const volunteersWithTokens = await Promise.all(
-        toRingPhone.map(async (vol) => {
+        ringableVolunteers.map(async (vol) => {
           const callToken = await services.calls.createCallToken({
             callSid,
-            volunteerPubkey: vol.pubkey ?? '',
+            volunteerPubkey: vol.pubkey,
             hubId,
           })
           return { phone: vol.phone as string, callToken }
         }),
       )
+
+      if (volunteersWithTokens.length === 0) return
 
       const breaker = getCircuitBreaker({
         name: 'telephony:ringVolunteers',
