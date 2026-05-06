@@ -269,6 +269,21 @@ describe('PATCH /contacts/:id', () => {
     expect(auditLog).toHaveBeenCalledOnce()
   })
 
+  it('returns 404 when contact not found', async () => {
+    const { app, mockContacts } = makeApp({ permissions: ['contacts:edit'] })
+    mockContacts.update.mockResolvedValue(null)
+
+    const res = await app.request('/contact-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encryptedSummary: 'x' }),
+    })
+
+    expect(res.status).toBe(404)
+    const json = await res.json() as Record<string, unknown>
+    expect(json.error).toBe('Contact not found')
+  })
+
   it('returns 403 without contacts:edit', async () => {
     const { app } = makeApp({ permissions: ['contacts:view'] })
 
@@ -320,6 +335,16 @@ describe('GET /contacts/:id', () => {
     const json = await res.json() as Record<string, unknown>
     expect(json.id).toBe('contact-1')
     expect(mockContacts.get).toHaveBeenCalledWith('contact-1')
+  })
+
+  it('returns 404 when contact not found', async () => {
+    const { app, mockContacts } = makeApp({ permissions: ['contacts:view'] })
+    mockContacts.get.mockResolvedValue(null)
+
+    const res = await app.request('/nonexistent-id')
+    expect(res.status).toBe(404)
+    const json = await res.json() as Record<string, unknown>
+    expect(json.error).toBe('Contact not found')
   })
 
   it('returns 403 without contacts:view', async () => {
@@ -497,6 +522,17 @@ describe('GET /contacts/groups/:groupId — get group', () => {
     expect(mockContacts.getGroup).toHaveBeenCalledWith('grp-1')
     expect(mockContacts.listMembers).toHaveBeenCalledWith('grp-1')
   })
+
+  it('returns 404 when group not found', async () => {
+    const { app, mockContacts } = makeApp({ permissions: ['contacts:view'] })
+    mockContacts.getGroup.mockResolvedValue(null)
+
+    const res = await app.request('/groups/nonexistent')
+    expect(res.status).toBe(404)
+    const json = await res.json() as Record<string, unknown>
+    expect(json.error).toBe('Group not found')
+    expect(mockContacts.listMembers).not.toHaveBeenCalled()
+  })
 })
 
 describe('PATCH /contacts/groups/:groupId — update group', () => {
@@ -514,6 +550,21 @@ describe('PATCH /contacts/groups/:groupId — update group', () => {
     expect(res.status).toBe(200)
     expect(mockContacts.updateGroup).toHaveBeenCalledWith('grp-1', expect.any(Object))
     expect(auditLog).toHaveBeenCalledOnce()
+  })
+
+  it('returns 404 when group not found', async () => {
+    const { app, mockContacts } = makeApp({ permissions: ['contacts:manage-groups'] })
+    mockContacts.updateGroup.mockResolvedValue(null)
+
+    const res = await app.request('/groups/grp-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encryptedDetails: 'new-details' }),
+    })
+
+    expect(res.status).toBe(404)
+    const json = await res.json() as Record<string, unknown>
+    expect(json.error).toBe('Group not found')
   })
 })
 
