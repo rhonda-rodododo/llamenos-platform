@@ -503,6 +503,31 @@ describe('WhatsAppAdapter', () => {
         expect(result.mediaUrls).toEqual(['https://example.com/photo.jpg'])
         expect(result.mediaTypes).toEqual(['image/jpeg'])
       })
+
+      it('parses more than 3 media attachments (Twilio WhatsApp supports up to 10)', async () => {
+        const form = new URLSearchParams({
+          MessageSid: 'SM-WA-MEDIA-005',
+          AccountSid: 'AC-acct-123',
+          From: 'whatsapp:+15559876543',
+          To: 'whatsapp:+15551234567',
+          Body: 'Multiple images',
+          NumMedia: '5',
+        })
+        for (let i = 0; i < 5; i++) {
+          form.set(`MediaUrl${i}`, `https://example.com/image${i}.jpg`)
+          form.set(`MediaContentType${i}`, 'image/jpeg')
+        }
+        const request = new Request('https://example.com/webhook', {
+          method: 'POST',
+          body: form.toString(),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+
+        const result = await adapter.parseIncomingMessage(request)
+        expect(result.mediaUrls).toHaveLength(5)
+        expect(result.mediaTypes).toHaveLength(5)
+        expect(result.mediaUrls![4]).toBe('https://example.com/image4.jpg')
+      })
     })
 
     describe('sendMessage', () => {

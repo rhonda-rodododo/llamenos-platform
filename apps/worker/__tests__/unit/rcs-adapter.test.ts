@@ -185,17 +185,21 @@ describe('RCSAdapter', () => {
   // --- validateWebhook ---
 
   describe('validateWebhook', () => {
-    it('returns true when no webhookSecret is configured', async () => {
+    it('returns true and logs warning when no webhookSecret is configured', async () => {
       const adapterNoSecret = new RCSAdapter(
         { ...rcsConfig, webhookSecret: undefined },
         HMAC_SECRET,
       )
+      const consoleSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
       const request = new Request('https://example.com/webhook', {
         method: 'POST',
         body: '{}',
         headers: { 'Content-Type': 'application/json' },
       })
       expect(await adapterNoSecret.validateWebhook(request)).toBe(true)
+      const output = consoleSpy.mock.calls.map(c => String(c[0])).join('')
+      expect(output).toContain('unauthenticated RCS webhook')
+      consoleSpy.mockRestore()
     })
 
     it('rejects missing Authorization header', async () => {

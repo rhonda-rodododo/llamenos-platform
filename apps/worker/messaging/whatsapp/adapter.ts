@@ -459,14 +459,12 @@ export class WhatsAppAdapter implements MessagingAdapter {
     const mediaTypes: string[] = []
     const numMedia = parseInt(data.NumMedia || '0', 10)
 
-    for (let i = 0; i < numMedia && i < 3; i++) {
-      const urlKey = `MediaUrl${i}` as keyof TwilioWhatsAppInbound
-      const typeKey = `MediaContentType${i}` as keyof TwilioWhatsAppInbound
-      const url = data[urlKey]
-      const mimeType = data[typeKey]
-      if (url && typeof url === 'string') {
+    for (let i = 0; i < numMedia && i < 10; i++) {
+      const url = formData.get(`MediaUrl${i}`) as string | null
+      const mimeType = formData.get(`MediaContentType${i}`) as string | null
+      if (url) {
         mediaUrls.push(url)
-        if (mimeType && typeof mimeType === 'string') {
+        if (mimeType) {
           mediaTypes.push(mimeType)
         }
       }

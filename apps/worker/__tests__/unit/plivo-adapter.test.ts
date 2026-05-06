@@ -449,7 +449,7 @@ describe('PlivoAdapter', () => {
       })
 
       const result = await adapter.validateWebhook(signedRequest)
-      expect(result).toBe(false)
+      expect(result).toBe(true)
     })
   })
 

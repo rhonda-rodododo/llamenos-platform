@@ -145,9 +145,9 @@ describe('TwilioSMSAdapter', () => {
       const params = new URLSearchParams(bodyStr)
 
       let dataString = url
-      const sortedKeys = Array.from(params.keys()).sort()
-      for (const key of sortedKeys) {
-        dataString += key + params.get(key)
+      const sortedEntries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))
+      for (const [key, value] of sortedEntries) {
+        dataString += key + value
       }
 
       const encoder = new TextEncoder()
@@ -164,6 +164,42 @@ describe('TwilioSMSAdapter', () => {
       const request = new Request(url, {
         method: 'POST',
         body: bodyStr,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Twilio-Signature': signature,
+        },
+      })
+      const result = await adapter.validateWebhook(request)
+      expect(result).toBe(true)
+    })
+
+    it('handles multi-value parameters correctly in signature', async () => {
+      const url = 'https://example.com/api/sms/incoming'
+      const params = new URLSearchParams()
+      params.append('Body', 'Hello')
+      params.append('From', '+15559876543')
+      params.append('From', '+15551111111')
+
+      let dataString = url
+      const sortedEntries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))
+      for (const [key, value] of sortedEntries) {
+        dataString += key + value
+      }
+
+      const encoder = new TextEncoder()
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(authToken),
+        { name: 'HMAC', hash: 'SHA-1' },
+        false,
+        ['sign'],
+      )
+      const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(dataString))
+      const signature = btoa(String.fromCharCode(...new Uint8Array(sig)))
+
+      const request = new Request(url, {
+        method: 'POST',
+        body: params.toString(),
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'X-Twilio-Signature': signature,

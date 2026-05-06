@@ -156,9 +156,9 @@ describe('PlivoSMSAdapter', () => {
       // Build validation string: origin + pathname + sorted params + '.' + nonce
       const parsedUrl = new URL(url)
       let dataString = parsedUrl.origin + parsedUrl.pathname
-      const sortedKeys = Array.from(params.keys()).sort()
-      for (const key of sortedKeys) {
-        dataString += key + params.get(key)
+      const sortedEntries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))
+      for (const [key, value] of sortedEntries) {
+        dataString += key + value
       }
       dataString += '.' + nonce
 

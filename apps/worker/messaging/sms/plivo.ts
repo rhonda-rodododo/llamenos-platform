@@ -75,9 +75,9 @@ export class PlivoSMSAdapter implements MessagingAdapter {
 
     // Build validation string: URL (origin + pathname) + sorted params + nonce
     let dataString = url.origin + url.pathname
-    const sortedKeys = Array.from(params.keys()).sort()
-    for (const key of sortedKeys) {
-      dataString += key + params.get(key)
+    const sortedEntries = Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))
+    for (const [key, value] of sortedEntries) {
+      dataString += key + value
     }
     dataString += '.' + nonce
 
