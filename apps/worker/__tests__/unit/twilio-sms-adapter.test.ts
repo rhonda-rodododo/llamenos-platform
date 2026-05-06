@@ -217,18 +217,32 @@ describe('TwilioSMSAdapter', () => {
       expect(result.error).toBe('Invalid phone number')
     })
 
-    it('propagates network errors (no try/catch in sendMessage)', async () => {
+    it('returns error on network failure', async () => {
       fetchMock.mockRejectedValue(new Error('Network timeout'))
 
-      // TwilioSMSAdapter.sendMessage does not wrap fetch in try/catch —
-      // network errors propagate to the caller.
-      await expect(
-        adapter.sendMessage({
-          recipientIdentifier: '+15559876543',
-          body: 'Test',
-          conversationId: 'conv-1',
-        }),
-      ).rejects.toThrow('Network timeout')
+      const result = await adapter.sendMessage({
+        recipientIdentifier: '+15559876543',
+        body: 'Test',
+        conversationId: 'conv-1',
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Network timeout')
+    })
+
+    it('returns error on network failure for sendMediaMessage', async () => {
+      fetchMock.mockRejectedValue(new Error('Connection reset'))
+
+      const result = await adapter.sendMediaMessage({
+        recipientIdentifier: '+15559876543',
+        body: 'Test',
+        mediaUrl: 'https://example.com/photo.jpg',
+        mediaType: 'image/jpeg',
+        conversationId: 'conv-1',
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Connection reset')
     })
   })
 
@@ -308,6 +322,35 @@ describe('TwilioSMSAdapter', () => {
       const status = await adapter.getChannelStatus()
       expect(status.connected).toBe(false)
       expect(status.error).toBe('Connection refused')
+    })
+  })
+
+  // --- deleteMessage ---
+
+  describe('deleteMessage', () => {
+    it('calls DELETE on Twilio Messages API', async () => {
+      fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+
+      await adapter.deleteMessage('SM-del-123')
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(url).toContain(`/Accounts/${accountSid}/Messages/SM-del-123.json`)
+      expect(init?.method).toBe('DELETE')
+    })
+
+    it('throws when API returns error status', async () => {
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ message: 'Message not found' }), { status: 404 }),
+      )
+
+      await expect(adapter.deleteMessage('SM-nonexistent')).rejects.toThrow('Message not found')
+    })
+
+    it('throws on network failure', async () => {
+      fetchMock.mockRejectedValue(new Error('Network error'))
+
+      await expect(adapter.deleteMessage('SM-123')).rejects.toThrow('Network error')
     })
   })
 
