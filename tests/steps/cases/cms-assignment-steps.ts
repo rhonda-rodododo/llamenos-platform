@@ -7,6 +7,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
+  ADMIN_NSEC,
   createRecordViaApi,
   listEntityTypesViaApi,
   listRecordsViaApi,
@@ -20,12 +21,12 @@ Given('volunteers with different profiles exist', async () => {
   // Volunteers are seeded by the test environment; accept current state
 })
 
-Given('an unassigned arrest case exists', async ({ backendRequest: request, casesWorld }) => {
-  const entityTypes = await listEntityTypesViaApi(request)
+Given('an unassigned arrest case exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
-  const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
+  const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
   casesWorld.lastRecordId = (record as { id: string }).id
 })
 
@@ -41,12 +42,12 @@ Given('a volunteer has reached their max case assignments', async () => {
   // Accept current state — would need to assign max cases to a volunteer
 })
 
-Given('an arrest case with a Spanish-speaking contact exists', async ({ backendRequest: request, casesWorld }) => {
-  const entityTypes = await listEntityTypesViaApi(request)
+Given('an arrest case with a Spanish-speaking contact exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
-  const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
+  const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
   casesWorld.lastRecordId = (record as { id: string }).id
 })
 
@@ -62,9 +63,9 @@ Given('volunteer B has {int} active cases', async () => {
   // Accept current state
 })
 
-Given('a case assigned to a volunteer exists', async ({ backendRequest: request, casesWorld }) => {
+Given('a case assigned to a volunteer exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const { assignRecordViaApi } = await import('../../api-helpers')
-  const entityTypes = await listEntityTypesViaApi(request)
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
@@ -73,10 +74,11 @@ Given('a case assigned to a volunteer exists', async ({ backendRequest: request,
   const record = await createRecordViaApi(request, etId, {
     statusHash: 'reported',
     assignedTo: [adminPubkey],
+    hubId: workerHub,
   })
   casesWorld.lastRecordId = (record as { id: string }).id
   // Also assign via the explicit endpoint to be sure
-  await assignRecordViaApi(request, casesWorld.lastRecordId, [adminPubkey]).catch(() => {})
+  await assignRecordViaApi(request, casesWorld.lastRecordId, [adminPubkey], ADMIN_NSEC, workerHub).catch(() => {})
 })
 
 Given('auto-assignment is enabled', async () => {
@@ -85,7 +87,7 @@ Given('auto-assignment is enabled', async () => {
 
 // --- Suggest assignees API ---
 
-When('I request assignment suggestions for the case', async ({ backendRequest: request, casesWorld }) => {
+When('I request assignment suggestions for the case', async ({ backendRequest: request, casesWorld, workerHub }) => {
   // API test — would call GET /records/:id/suggest-assignees
   void request
 })
@@ -203,12 +205,12 @@ Then('the auto-assignment indicator should be visible', async ({ page }) => {
   }
 })
 
-When('a new arrest case is created via API', async ({ backendRequest: request, casesWorld }) => {
-  const entityTypes = await listEntityTypesViaApi(request)
+When('a new arrest case is created via API', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
-  const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
+  const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
   casesWorld.lastRecordId = (record as { id: string }).id
 })
 

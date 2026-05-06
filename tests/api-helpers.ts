@@ -568,12 +568,13 @@ export interface ReportRecord {
 
 export async function listReportsViaApi(
   request: APIRequestContext,
-  params?: { status?: string },
+  params?: { status?: string; hubId?: string },
 ): Promise<{ conversations: ReportRecord[]; total: number }> {
   const qs = new URLSearchParams()
   if (params?.status) qs.set('status', params.status)
   const qsStr = qs.toString()
-  const path = `/reports${qsStr ? `?${qsStr}` : ''}`
+  const basePath = hubPath('/reports', params?.hubId)
+  const path = basePath + (qsStr ? `?${qsStr}` : '')
   const { status, data } = await apiGet<{ conversations: ReportRecord[]; total: number }>(request, path)
   if (status !== 200) throw new Error(`Failed to list reports: ${status}`)
   return data
@@ -585,7 +586,7 @@ export async function listReportsViaApi(
  */
 export async function createReportViaApi(
   request: APIRequestContext,
-  options?: { title?: string; category?: string; status?: string; reportTypeId?: string; nsec?: string },
+  options?: { title?: string; category?: string; status?: string; reportTypeId?: string; nsec?: string; hubId?: string },
 ): Promise<ReportRecord> {
   const nsec = options?.nsec ?? ADMIN_NSEC
   const skHex = nsecToSkHex(nsec)
@@ -607,7 +608,7 @@ export async function createReportViaApi(
   }
   if (options?.reportTypeId) body.reportTypeId = options.reportTypeId
 
-  const { status, data } = await apiPost<ReportRecord>(request, '/reports', body, nsec)
+  const { status, data } = await apiPost<ReportRecord>(request, hubPath('/reports', options?.hubId), body, nsec)
   if (status !== 201 && status !== 200) {
     throw new Error(`Failed to create report: ${status} ${JSON.stringify(data)}`)
   }
@@ -763,8 +764,9 @@ export async function enableCaseManagementViaApi(
   request: APIRequestContext,
   enabled = true,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ enabled: boolean }> {
-  const { status, data } = await apiPut<{ enabled: boolean }>(request, '/settings/cms/case-management', { enabled }, nsec)
+  const { status, data } = await apiPut<{ enabled: boolean }>(request, hubPath('/settings/cms/case-management', hubId), { enabled }, nsec)
   if (status !== 200) throw new Error(`Failed to toggle case management: ${status}`)
   return data
 }
@@ -772,8 +774,9 @@ export async function enableCaseManagementViaApi(
 export async function getCaseManagementEnabledViaApi(
   request: APIRequestContext,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ enabled: boolean }> {
-  const { data } = await apiGet<{ enabled: boolean }>(request, '/settings/cms/case-management', nsec)
+  const { data } = await apiGet<{ enabled: boolean }>(request, hubPath('/settings/cms/case-management', hubId), nsec)
   return data
 }
 
@@ -846,8 +849,9 @@ export async function updateEntityTypeViaApi(
   id: string,
   updates: Record<string, unknown>,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/settings/cms/entity-types/${id}`, updates, nsec)
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, hubPath(`/settings/cms/entity-types/${id}`, hubId), updates, nsec)
   if (status !== 200) throw new Error(`Failed to update entity type: ${status}`)
   return data
 }
@@ -856,8 +860,9 @@ export async function deleteEntityTypeViaApi(
   request: APIRequestContext,
   id: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/settings/cms/entity-types/${id}`, nsec)
+  const { status } = await apiDelete(request, hubPath(`/settings/cms/entity-types/${id}`, hubId), nsec)
   if (status !== 200) throw new Error(`Failed to delete entity type: ${status}`)
 }
 
@@ -875,7 +880,7 @@ export async function createRelationshipTypeViaApi(
 ): Promise<Record<string, unknown>> {
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    '/settings/cms/relationship-types',
+    hubPath('/settings/cms/relationship-types', options.hubId),
     {
       sourceEntityTypeId: options.sourceEntityTypeId,
       targetEntityTypeId: options.targetEntityTypeId,
@@ -923,8 +928,9 @@ export interface TemplateSummary {
 export async function listTemplatesViaApi(
   request: APIRequestContext,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<TemplateSummary[]> {
-  const { status, data } = await apiGet<{ templates: TemplateSummary[] }>(request, '/settings/cms/templates', nsec)
+  const { status, data } = await apiGet<{ templates: TemplateSummary[] }>(request, hubPath('/settings/cms/templates', hubId), nsec)
   if (status !== 200) throw new Error(`Failed to list templates: ${status}`)
   return data.templates
 }
@@ -933,8 +939,9 @@ export async function getTemplateViaApi(
   request: APIRequestContext,
   templateId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/settings/cms/templates/${templateId}`, nsec)
+  const { status, data } = await apiGet<Record<string, unknown>>(request, hubPath(`/settings/cms/templates/${templateId}`, hubId), nsec)
   if (status !== 200) throw new Error(`Failed to get template: ${status}`)
   return data
 }
@@ -947,7 +954,7 @@ export async function applyTemplateViaApi(
 ): Promise<{ status: number; data: Record<string, unknown> }> {
   const body: Record<string, unknown> = { templateId }
   if (hubId) body.hubId = hubId
-  return apiPost<Record<string, unknown>>(request, '/settings/cms/templates/apply', body, nsec)
+  return apiPost<Record<string, unknown>>(request, hubPath('/settings/cms/templates/apply', hubId), body, nsec)
 }
 
 // ── Case Management: CMS Report Types (Epic 343) ────────────────
@@ -966,8 +973,9 @@ export async function getCmsReportTypeViaApi(
   request: APIRequestContext,
   id: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiGet<Record<string, unknown>>(request, `/settings/cms/report-types/${id}`, nsec)
+  const { status, data } = await apiGet<Record<string, unknown>>(request, hubPath(`/settings/cms/report-types/${id}`, hubId), nsec)
   if (status !== 200) throw new Error(`Failed to get CMS report type: ${status}`)
   return data
 }
@@ -1033,8 +1041,9 @@ export async function updateCmsReportTypeViaApi(
   id: string,
   updates: Record<string, unknown>,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<Record<string, unknown>> {
-  const { status, data } = await apiPatch<Record<string, unknown>>(request, `/settings/cms/report-types/${id}`, updates, nsec)
+  const { status, data } = await apiPatch<Record<string, unknown>>(request, hubPath(`/settings/cms/report-types/${id}`, hubId), updates, nsec)
   if (status !== 200) throw new Error(`Failed to update CMS report type: ${status}`)
   return data
 }
@@ -1043,8 +1052,9 @@ export async function deleteCmsReportTypeViaApi(
   request: APIRequestContext,
   id: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiDelete(request, `/settings/cms/report-types/${id}`, nsec)
+  const { status } = await apiDelete(request, hubPath(`/settings/cms/report-types/${id}`, hubId), nsec)
   if (status !== 200) throw new Error(`Failed to archive CMS report type: ${status}`)
 }
 
@@ -1058,7 +1068,7 @@ export async function deleteCmsReportTypeViaApi(
 export async function createContactByNameViaApi(
   request: APIRequestContext,
   displayName: string,
-  extraOptions?: { contactTypeHash?: string },
+  extraOptions?: { contactTypeHash?: string; hubId?: string },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
   const contactType = extraOptions?.contactTypeHash ?? 'individual'
@@ -1076,6 +1086,7 @@ export async function createContactByNameViaApi(
     contactTypeHash: contactType,
     nameHash,
     trigramTokens: trigrams,
+    hubId: extraOptions?.hubId,
   }, nsec)
 }
 
@@ -1247,10 +1258,11 @@ export async function linkContactToRecordViaApi(
   contactId: string,
   role: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<Record<string, unknown>> {
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    `/records/${recordId}/contacts`,
+    hubPath(`/records/${recordId}/contacts`, hubId),
     { contactId, role },
     nsec,
   )
@@ -1262,8 +1274,9 @@ export async function listRecordContactsViaApi(
   request: APIRequestContext,
   recordId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ contacts: Record<string, unknown>[] }> {
-  const { status, data } = await apiGet<{ contacts: Record<string, unknown>[] }>(request, `/records/${recordId}/contacts`, nsec)
+  const { status, data } = await apiGet<{ contacts: Record<string, unknown>[] }>(request, hubPath(`/records/${recordId}/contacts`, hubId), nsec)
   if (status !== 200) throw new Error(`Failed to list record contacts: ${status}`)
   return data
 }
@@ -1273,8 +1286,9 @@ export async function assignRecordViaApi(
   recordId: string,
   pubkeys: string[],
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPost(request, `/records/${recordId}/assign`, { pubkeys }, nsec)
+  const { status } = await apiPost(request, hubPath(`/records/${recordId}/assign`, hubId), { pubkeys }, nsec)
   if (status !== 200) throw new Error(`Failed to assign record: ${status}`)
 }
 
@@ -1289,13 +1303,14 @@ export async function createEventViaApi(
     eventTypeHash?: string
     statusHash?: string
     parentEventId?: string
+    hubId?: string
   },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
   const envelope = dummyEnvelope(nsec)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    '/events',
+    hubPath('/events', options?.hubId),
     {
       entityTypeId,
       startDate: options?.startDate ?? new Date().toISOString(),
@@ -1319,8 +1334,9 @@ export async function linkRecordToEventViaApi(
   eventId: string,
   recordId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPost(request, `/events/${eventId}/records`, { recordId }, nsec)
+  const { status } = await apiPost(request, hubPath(`/events/${eventId}/records`, hubId), { recordId }, nsec)
   if (status !== 201 && status !== 200) throw new Error(`Failed to link record to event: ${status}`)
 }
 
@@ -1329,8 +1345,9 @@ export async function linkReportToEventViaApi(
   eventId: string,
   reportId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<void> {
-  const { status } = await apiPost(request, `/events/${eventId}/reports`, { reportId }, nsec)
+  const { status } = await apiPost(request, hubPath(`/events/${eventId}/reports`, hubId), { reportId }, nsec)
   if (status !== 201 && status !== 200) throw new Error(`Failed to link report to event: ${status}`)
 }
 
@@ -1338,8 +1355,9 @@ export async function listEventRecordsViaApi(
   request: APIRequestContext,
   eventId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ links: Record<string, unknown>[] }> {
-  const { status, data } = await apiGet<{ links: Record<string, unknown>[] }>(request, `/events/${eventId}/records`, nsec)
+  const { status, data } = await apiGet<{ links: Record<string, unknown>[] }>(request, hubPath(`/events/${eventId}/records`, hubId), nsec)
   if (status !== 200) throw new Error(`Failed to list event records: ${status}`)
   return data
 }
@@ -1348,8 +1366,9 @@ export async function listEventReportsViaApi(
   request: APIRequestContext,
   eventId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ links: Record<string, unknown>[] }> {
-  const { status, data } = await apiGet<{ links: Record<string, unknown>[] }>(request, `/events/${eventId}/reports`, nsec)
+  const { status, data } = await apiGet<{ links: Record<string, unknown>[] }>(request, hubPath(`/events/${eventId}/reports`, hubId), nsec)
   if (status !== 200) throw new Error(`Failed to list event reports: ${status}`)
   return data
 }
@@ -1366,6 +1385,7 @@ export async function createInteractionViaApi(
     interactionTypeHash?: string
     previousStatusHash?: string
     newStatusHash?: string
+    hubId?: string
   },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
@@ -1392,7 +1412,7 @@ export async function createInteractionViaApi(
 
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    `/records/${caseId}/interactions`,
+    hubPath(`/records/${caseId}/interactions`, options.hubId),
     body,
     nsec,
   )
@@ -1403,7 +1423,7 @@ export async function createInteractionViaApi(
 export async function listInteractionsViaApi(
   request: APIRequestContext,
   caseId: string,
-  params?: { page?: number; limit?: number; interactionTypeHash?: string },
+  params?: { page?: number; limit?: number; interactionTypeHash?: string; hubId?: string },
   nsec = ADMIN_NSEC,
 ): Promise<{ interactions: Record<string, unknown>[]; total: number }> {
   const qs = new URLSearchParams()
@@ -1411,7 +1431,7 @@ export async function listInteractionsViaApi(
   if (params?.limit) qs.set('limit', String(params.limit))
   if (params?.interactionTypeHash) qs.set('interactionTypeHash', params.interactionTypeHash)
   const qsStr = qs.toString()
-  const path = `/records/${caseId}/interactions${qsStr ? `?${qsStr}` : ''}`
+  const path = `${hubPath(`/records/${caseId}/interactions`, params?.hubId)}${qsStr ? `?${qsStr}` : ''}`
   const { status, data } = await apiGet<{ interactions: Record<string, unknown>[]; total: number }>(request, path, nsec)
   if (status !== 200) throw new Error(`Failed to list interactions: ${status}`)
   return data
@@ -1429,13 +1449,14 @@ export async function uploadEvidenceViaApi(
     sizeBytes?: number
     classification?: string
     integrityHash?: string
+    hubId?: string
   },
   nsec = ADMIN_NSEC,
 ): Promise<Record<string, unknown>> {
   const hash = options?.integrityHash ?? 'a'.repeat(64)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    `/records/${caseId}/evidence`,
+    hubPath(`/records/${caseId}/evidence`, options?.hubId),
     {
       fileId: options?.fileId ?? `file_${Date.now()}`,
       filename: options?.filename ?? `test_evidence_${Date.now()}.jpg`,
@@ -1455,10 +1476,11 @@ export async function getEvidenceCustodyViaApi(
   request: APIRequestContext,
   evidenceId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ custodyChain: Record<string, unknown>[]; total: number }> {
   const { status, data } = await apiGet<{ custodyChain: Record<string, unknown>[]; total: number }>(
     request,
-    `/evidence/${evidenceId}/custody`,
+    hubPath(`/evidence/${evidenceId}/custody`, hubId),
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to get custody chain: ${status}`)
@@ -1470,10 +1492,11 @@ export async function verifyEvidenceIntegrityViaApi(
   evidenceId: string,
   currentHash: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ valid: boolean; originalHash: string; currentHash: string }> {
   const { status, data } = await apiPost<{ valid: boolean; originalHash: string; currentHash: string }>(
     request,
-    `/evidence/${evidenceId}/verify`,
+    hubPath(`/evidence/${evidenceId}/verify`, hubId),
     { currentHash },
     nsec,
   )
@@ -1527,10 +1550,11 @@ export async function enableCrossHubSharingViaApi(
   request: APIRequestContext,
   enabled: boolean,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ enabled: boolean }> {
   const { status, data } = await apiPut<{ enabled: boolean }>(
     request,
-    '/settings/cms/cross-hub',
+    hubPath('/settings/cms/cross-hub', hubId),
     { enabled },
     nsec,
   )
@@ -1541,10 +1565,11 @@ export async function enableCrossHubSharingViaApi(
 export async function getCrossHubSharingViaApi(
   request: APIRequestContext,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ enabled: boolean }> {
   const { data } = await apiGet<{ enabled: boolean }>(
     request,
-    '/settings/cms/cross-hub',
+    hubPath('/settings/cms/cross-hub', hubId),
     nsec,
   )
   return data
@@ -1646,10 +1671,11 @@ export async function createRelationshipViaApi(
   relationshipType: string,
   direction: 'a_to_b' | 'b_to_a' | 'bidirectional' = 'bidirectional',
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<RelationshipResult> {
   const { status, data } = await apiPost<RelationshipResult>(
     request,
-    `/directory/${contactIdA}/relationships`,
+    hubPath(`/directory/${contactIdA}/relationships`, hubId),
     { contactIdB, relationshipType, direction },
     nsec,
   )
@@ -1661,10 +1687,11 @@ export async function listRelationshipsViaApi(
   request: APIRequestContext,
   contactId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<RelationshipListResult> {
   const { status, data } = await apiGet<RelationshipListResult>(
     request,
-    `/directory/${contactId}/relationships`,
+    hubPath(`/directory/${contactId}/relationships`, hubId),
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to list relationships: ${status}`)
@@ -1676,10 +1703,11 @@ export async function deleteRelationshipViaApi(
   contactId: string,
   relId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<void> {
   const { status } = await apiDelete(
     request,
-    `/directory/${contactId}/relationships/${relId}`,
+    hubPath(`/directory/${contactId}/relationships/${relId}`, hubId),
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to delete relationship: ${status}`)
@@ -1690,6 +1718,7 @@ export async function createAffinityGroupViaApi(
   name: string,
   initialMembers: Array<{ contactId: string; role?: string; isPrimary?: boolean }> = [],
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<GroupResult> {
   const envelope = dummyEnvelope(nsec)
   // The group body requires at least one member. If none provided, the caller
@@ -1702,7 +1731,7 @@ export async function createAffinityGroupViaApi(
   }))
   const { status, data } = await apiPost<GroupResult>(
     request,
-    '/directory/groups',
+    hubPath('/directory/groups', hubId),
     {
       encryptedDetails: btoa(JSON.stringify({ name })),
       detailEnvelopes: [envelope],
@@ -1720,10 +1749,11 @@ export async function addGroupMemberViaApi(
   contactId: string,
   role?: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ added: boolean; memberCount: number }> {
   const { status, data } = await apiPost<{ added: boolean; memberCount: number }>(
     request,
-    `/directory/groups/${groupId}/members`,
+    hubPath(`/directory/groups/${groupId}/members`, hubId),
     { contactId, role, isPrimary: false },
     nsec,
   )
@@ -1736,10 +1766,11 @@ export async function removeGroupMemberViaApi(
   groupId: string,
   contactId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<void> {
   const { status } = await apiDelete(
     request,
-    `/directory/groups/${groupId}/members/${contactId}`,
+    hubPath(`/directory/groups/${groupId}/members/${contactId}`, hubId),
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to remove group member: ${status}`)
@@ -1749,10 +1780,11 @@ export async function listGroupMembersViaApi(
   request: APIRequestContext,
   groupId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ members: GroupMemberResult[] }> {
   const { status, data } = await apiGet<{ members: GroupMemberResult[] }>(
     request,
-    `/directory/groups/${groupId}/members`,
+    hubPath(`/directory/groups/${groupId}/members`, hubId),
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to list group members: ${status}`)
@@ -1763,10 +1795,11 @@ export async function getAffinityGroupViaApi(
   request: APIRequestContext,
   groupId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<GroupResult & { members: GroupMemberResult[] }> {
   const { status, data } = await apiGet<GroupResult & { members: GroupMemberResult[] }>(
     request,
-    `/directory/groups/${groupId}`,
+    hubPath(`/directory/groups/${groupId}`, hubId),
     nsec,
   )
   if (status !== 200) throw new Error(`Failed to get affinity group: ${status}`)
@@ -1777,12 +1810,12 @@ export async function getAffinityGroupViaApi(
 
 export async function listTriageQueueViaApi(
   request: APIRequestContext,
-  params?: { conversionStatus?: string },
+  params?: { conversionStatus?: string; hubId?: string },
   nsec = ADMIN_NSEC,
 ): Promise<{ conversations: Record<string, unknown>[]; total: number }> {
   const qs = new URLSearchParams({ conversionEnabled: 'true' })
   if (params?.conversionStatus) qs.set('conversionStatus', params.conversionStatus)
-  const path = `/reports?${qs}`
+  const path = `${hubPath('/reports', params?.hubId)}?${qs}`
   const { status, data } = await apiGet<{ conversations: Record<string, unknown>[]; total: number }>(request, path, nsec)
   if (status !== 200) throw new Error(`Failed to list triage queue: ${status}`)
   return data
@@ -1793,10 +1826,11 @@ export async function updateReportConversionStatusViaApi(
   reportId: string,
   conversionStatus: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<Record<string, unknown>> {
   const { status, data } = await apiPatch<Record<string, unknown>>(
     request,
-    `/reports/${reportId}`,
+    hubPath(`/reports/${reportId}`, hubId),
     { conversionStatus },
     nsec,
   )
@@ -1809,18 +1843,20 @@ export async function createCaseFromReportViaApi(
   reportId: string,
   entityTypeId: string,
   nsec = ADMIN_NSEC,
+  hubId?: string,
 ): Promise<{ recordId: string; linkId: string }> {
   const envelope = dummyEnvelope(nsec)
   // Create the record first
   const record = await createRecordViaApi(request, entityTypeId, {
     statusHash: 'status_open_hash',
+    hubId,
   }, nsec)
   const recordId = (record as { id: string }).id
 
   // Link it to the report
   const { status, data } = await apiPost<{ id?: string; reportId?: string; caseId?: string }>(
     request,
-    `/reports/${reportId}/records`,
+    hubPath(`/reports/${reportId}/records`, hubId),
     {
       caseId: recordId,
       encryptedNotes: 'dGVzdCBsaW5r',

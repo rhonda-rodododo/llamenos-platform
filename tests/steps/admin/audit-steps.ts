@@ -11,7 +11,7 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listAuditLogViaApi } from '../../api-helpers'
 
-Then('audit entries should be visible with date information', async ({ page, request }) => {
+Then('audit entries should be visible with date information', async ({ page, backendRequest: request, workerHub }) => {
   const auditEntry = page.getByTestId(TestIds.AUDIT_ENTRY)
   await expect(auditEntry.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Verify date-like content within entries
@@ -20,7 +20,7 @@ Then('audit entries should be visible with date information', async ({ page, req
   expect(entryText!.length).toBeGreaterThan(0)
 
   // Cross-check with API: audit log should have entries
-  const result = await listAuditLogViaApi(request)
+  const result = await listAuditLogViaApi(request, { hubId: workerHub })
   expect(result.entries.length).toBeGreaterThan(0)
   // Verify API entries have timestamps
   const firstEntry = result.entries[0]
@@ -57,13 +57,13 @@ When('I filter by {string} event type', async ({ page }, eventType: string) => {
   await option.first().click()
 })
 
-Then('only {string} events should be visible', async ({ page, request }, eventType: string) => {
+Then('only {string} events should be visible', async ({ page, backendRequest: request, workerHub }, eventType: string) => {
   // Verify UI shows filtered results
   const auditEntries = page.getByTestId(TestIds.AUDIT_ENTRY)
   await expect(auditEntries.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // Cross-check with API: filter by event type
-  const result = await listAuditLogViaApi(request, { eventType })
+  const result = await listAuditLogViaApi(request, { eventType, hubId: workerHub })
   expect(result.entries.length).toBeGreaterThan(0)
   // All returned entries should match the filter
   for (const entry of result.entries) {
@@ -105,7 +105,7 @@ Then('the {string} badge should have the purple color class', async ({ page }, t
   expect(badgeCount).toBeGreaterThanOrEqual(1)
 })
 
-Then('the audit log should have at least {int} entries', async ({ request }, count: number) => {
-  const result = await listAuditLogViaApi(request)
+Then('the audit log should have at least {int} entries', async ({ backendRequest: request, workerHub }, count: number) => {
+  const result = await listAuditLogViaApi(request, { hubId: workerHub })
   expect(result.entries.length).toBeGreaterThanOrEqual(count)
 })

@@ -10,11 +10,11 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listShiftsViaApi, createShiftViaApi } from '../../api-helpers'
 
-When('I tap a shift card', async ({ page, request }) => {
+When('I tap a shift card', async ({ page, backendRequest: request, workerHub }) => {
   // Ensure at least one shift exists so the tap has something to click.
-  const existingShifts = await listShiftsViaApi(request).catch(() => [])
+  const existingShifts = await listShiftsViaApi(request, workerHub).catch(() => [])
   if (existingShifts.length === 0) {
-    await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}` })
+    await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}`, hubId: workerHub })
     // SPA-navigate away and back to refresh the shift list, avoiding a full
     // page reload (which would trigger PIN re-entry)
     await page.evaluate(() => {

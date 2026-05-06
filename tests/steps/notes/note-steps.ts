@@ -37,7 +37,7 @@ Then('the create note FAB should be visible', async ({ page }) => {
   await expect(page.getByTestId(TestIds.NOTE_NEW_BTN)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('custom fields are configured for notes', async ({ request }) => {
+Given('custom fields are configured for notes', async ({ backendRequest: request }) => {
   // Verify custom fields exist via API — create a default one if none exist
   const fields = await getCustomFieldsViaApi(request)
   if (fields.length === 0) {
@@ -96,9 +96,9 @@ Then('the back button should be visible', async ({ page }) => {
 
 // --- Note detail steps ---
 
-Given('at least one note exists', async ({ page, request }) => {
+Given('at least one note exists', async ({ page, backendRequest: request, workerHub }) => {
   // Verify via API that notes exist, create one if needed
-  const { notes } = await listNotesViaApi(request)
+  const { notes } = await listNotesViaApi(request, { hubId: workerHub })
   if (notes.length === 0) {
     // Create a note through the UI
     const { Navigation } = await import('../../pages/index')
@@ -170,11 +170,11 @@ Then('a copy button should be visible in the top bar', async ({ page }) => {
 
 // --- Note edit steps (note-edit.feature) ---
 
-Given('I open a note', async ({ page, request }) => {
+Given('I open a note', async ({ page, backendRequest: request, workerHub }) => {
   // Ensure a note exists first
   let hasNotes = false
   try {
-    const { notes } = await listNotesViaApi(request)
+    const { notes } = await listNotesViaApi(request, { hubId: workerHub })
     hasNotes = notes.length > 0
   } catch {
     // API may not be available
@@ -296,7 +296,7 @@ Then('the note should show the call ID {string}', async ({ page }, callId: strin
   await expect(noteCard.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('the note should exist in the API response', async ({ request }) => {
-  const { notes } = await listNotesViaApi(request)
+Then('the note should exist in the API response', async ({ backendRequest: request, workerHub }) => {
+  const { notes } = await listNotesViaApi(request, { hubId: workerHub })
   expect(notes.length).toBeGreaterThan(0)
 })

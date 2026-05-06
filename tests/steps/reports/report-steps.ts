@@ -84,12 +84,12 @@ Then('the report submit button should be disabled', async ({ page }) => {
 
 // --- Report detail / viewing ---
 
-When('I tap the first report card', async ({ page, request }) => {
+When('I tap the first report card', async ({ page, backendRequest: request, workerHub }) => {
   // Ensure at least one report exists so the tap has something to click.
   // If the list is empty, create a report via API so the step has data to work with.
-  const existingReports = await listReportsViaApi(request).catch(() => ({ conversations: [], total: 0 }))
+  const existingReports = await listReportsViaApi(request, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
   if (existingReports.conversations.length === 0) {
-    await createReportViaApi(request, { title: `Auto-seeded Report ${Date.now()}` })
+    await createReportViaApi(request, { title: `Auto-seeded Report ${Date.now()}`, hubId: workerHub })
     // SPA-navigate away and back to refresh without a full reload
     // (reload triggers PIN re-entry which this step doesn't handle)
     await page.evaluate(() => {
@@ -126,15 +126,15 @@ When('I tap the back button on report detail', async ({ page }) => {
   await backBtn.click()
 })
 
-Given('I am viewing a report with status {string}', async ({ page, request }, status: string) => {
+Given('I am viewing a report with status {string}', async ({ page, backendRequest: request, workerHub }, status: string) => {
   const { Navigation } = await import('../../pages/index')
 
   // Ensure a report with the desired status exists
-  let result = await listReportsViaApi(request, { status })
+  let result = await listReportsViaApi(request, { status, hubId: workerHub })
   if (result.conversations.length === 0) {
     // Create one with the right status
-    await createReportViaApi(request, { title: `Seed ${status} report ${Date.now()}`, status })
-    result = await listReportsViaApi(request, { status })
+    await createReportViaApi(request, { title: `Seed ${status} report ${Date.now()}`, status, hubId: workerHub })
+    result = await listReportsViaApi(request, { status, hubId: workerHub })
   }
   expect(result.conversations.length).toBeGreaterThan(0)
 
@@ -169,7 +169,7 @@ Then('I should see the reports title', async ({ page }) => {
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toContainText(/reports/i)
 })
 
-Then('I should see the {string} report status filter', async ({ page, backendRequest }, filterName: string) => {
+Then('I should see the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
   // Filters are only visible when reports exist (not in empty state)
   // If no reports exist, the filter area won't be visible — seed a report first
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
@@ -177,7 +177,7 @@ Then('I should see the {string} report status filter', async ({ page, backendReq
 
   if (!filterVisible) {
     // Seed a report via backend API, then re-navigate
-    await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}` })
+    await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
     await page.getByTestId(TestIds.NAV_DASHBOARD).click()
     await page.getByTestId(TestIds.NAV_REPORTS).click()
   }
@@ -265,13 +265,13 @@ Then('I should not see the report close button', async ({ page }) => {
 
 // --- Report lifecycle verification via API ---
 
-Then('the report should exist in the API', async ({ request }) => {
-  const result = await listReportsViaApi(request)
+Then('the report should exist in the API', async ({ backendRequest: request, workerHub }) => {
+  const result = await listReportsViaApi(request, { hubId: workerHub })
   expect(result.conversations.length).toBeGreaterThan(0)
 })
 
-Then('the report count should increase', async ({ request }) => {
-  const result = await listReportsViaApi(request)
+Then('the report count should increase', async ({ backendRequest: request, workerHub }) => {
+  const result = await listReportsViaApi(request, { hubId: workerHub })
   expect(result.total).toBeGreaterThan(0)
 })
 

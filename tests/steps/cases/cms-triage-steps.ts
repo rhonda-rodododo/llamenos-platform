@@ -10,6 +10,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
+  ADMIN_NSEC,
   enableCaseManagementViaApi,
   applyTemplateViaApi,
   listTemplatesViaApi,
@@ -24,36 +25,39 @@ import {
 
 // --- Given steps for triage data setup ---
 
-Given('a CMS report type with case conversion exists', async ({ backendRequest: request, casesWorld }) => {
+Given('a CMS report type with case conversion exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const rt = await createCmsReportTypeViaApi(request, {
     name: `triage_type_${Date.now()}`,
     label: 'Triage Report',
     labelPlural: 'Triage Reports',
     allowCaseConversion: true,
+    hubId: workerHub,
   })
   casesWorld.triageReportTypeId = (rt as { id: string }).id
 })
 
-Given('a triage-eligible report exists', async ({ backendRequest: request, casesWorld }) => {
+Given('a triage-eligible report exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const report = await createReportViaApi(request, {
     title: `Triage Report ${Date.now()}`,
     reportTypeId: casesWorld.triageReportTypeId,
+    hubId: workerHub,
   })
   casesWorld.triageReportId = report.id
 })
 
-Given('a triage-eligible report with a linked case exists', async ({ backendRequest: request, casesWorld }) => {
+Given('a triage-eligible report with a linked case exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const report = await createReportViaApi(request, {
     title: `Triage Linked ${Date.now()}`,
     reportTypeId: casesWorld.triageReportTypeId,
+    hubId: workerHub,
   })
   casesWorld.triageReportId = report.id
 
   // Create and link a case
-  const entityTypes = await listEntityTypesViaApi(request)
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
   if (entityTypes.length > 0) {
     const etId = (entityTypes[0] as { id: string }).id
-    await createCaseFromReportViaApi(request, casesWorld.triageReportId, etId)
+    await createCaseFromReportViaApi(request, casesWorld.triageReportId, etId, ADMIN_NSEC, workerHub)
   }
 })
 
