@@ -12,11 +12,11 @@ import { Timeouts } from '../../helpers'
 import { Navigation } from '../../pages/index'
 import { listNotesViaApi } from '../../api-helpers'
 
-Given('I am on the note detail screen', async ({ page, request }) => {
+Given('I am on the note detail screen', async ({ page, backendRequest: request, workerHub }) => {
   // Try API to check for existing notes
   let hasNotes = false
   try {
-    const { notes } = await listNotesViaApi(request)
+    const { notes } = await listNotesViaApi(request, { hubId: workerHub })
     hasNotes = notes.length > 0
   } catch {
     // API not available — will check UI

@@ -346,14 +346,26 @@ jobs:
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
-          # backend-bdd tests query PostgreSQL directly via db-helpers.ts
+          DEV_RESET_SECRET: test-reset-secret
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
 
       - name: Smoke check sidecar health endpoints
-        if: ${{ !cancelled() }}
+        if: always()
         run: |
           curl -sf http://localhost:3000/api/health/ready || echo "::warning::app health check failed"
           curl -sf http://localhost:3100/health || echo "::warning::signal-notifier health check failed"
+
+      - name: Summarize test failures
+        if: always()
+        run: |
+          if [ -f test-results/results.json ]; then
+            node -e "
+              const r = JSON.parse(require('fs').readFileSync('test-results/results.json','utf8'));
+              const s = r.stats || {};
+              console.log('E2E: ' + (s.expected||0) + ' passed, ' + (s.unexpected||0) + ' failed, ' + (s.flaky||0) + ' flaky, ' + (s.skipped||0) + ' skipped');
+              if (s.unexpected > 0) process.stdout.write('::warning::' + s.unexpected + ' E2E test(s) failed\n');
+            " || true
+          fi
 
       - name: Upload test results
         if: always()
@@ -491,6 +503,7 @@ jobs:
           TEST_RELAY_URL: ws://127.0.0.1:7777
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
+          DEV_RESET_SECRET: test-reset-secret
           PBX_TYPE: ari
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
           # Must match SERVER_NOSTR_SECRET in .env (fixed value = relay.steps DEV fallback)

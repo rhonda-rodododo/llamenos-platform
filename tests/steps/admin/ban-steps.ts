@@ -40,7 +40,7 @@ When('I fill in the phone number with {string}', async ({ page }, phone: string)
   await page.getByLabel(/phone/i).blur()
 })
 
-Then('the phone number should appear in the ban list', async ({ page, request }) => {
+Then('the phone number should appear in the ban list', async ({ page, backendRequest: request, workerHub }) => {
   const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
 
@@ -50,7 +50,7 @@ Then('the phone number should appear in the ban list', async ({ page, request })
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: ban exists in backend
-  const bans = await listBansViaApi(request)
+  const bans = await listBansViaApi(request, workerHub)
   const found = bans.find(b => b.phone === phone)
   expect(found).toBeTruthy()
 })
@@ -73,7 +73,7 @@ Then('the ban entry should contain the current year', async ({ page }) => {
   await expect(banRow.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('a ban exists', async ({ page, request }) => {
+Given('a ban exists', async ({ page, backendRequest: request, workerHub }) => {
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()
   const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel(/phone/i).fill(phone)
@@ -87,7 +87,7 @@ Given('a ban exists', async ({ page, request }) => {
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // Verify it was persisted to backend
-  const bans = await listBansViaApi(request)
+  const bans = await listBansViaApi(request, workerHub)
   const found = bans.find(b => b.phone === phone)
   expect(found).toBeTruthy()
 
@@ -129,7 +129,7 @@ Then('the dialog should close', async ({ page }) => {
   await expect(page.getByTestId(TestIds.CONFIRM_DIALOG)).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('the ban should no longer appear in the list', async ({ page, request }) => {
+Then('the ban should no longer appear in the list', async ({ page, backendRequest: request, workerHub }) => {
   const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
 
@@ -139,12 +139,12 @@ Then('the ban should no longer appear in the list', async ({ page, request }) =>
   ).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: ban is gone from backend
-  const bans = await listBansViaApi(request)
+  const bans = await listBansViaApi(request, workerHub)
   const found = bans.find(b => b.phone === phone)
   expect(found).toBeUndefined()
 })
 
-Then('the ban should still appear in the list', async ({ page, request }) => {
+Then('the ban should still appear in the list', async ({ page, backendRequest: request, workerHub }) => {
   const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
 
@@ -154,7 +154,7 @@ Then('the ban should still appear in the list', async ({ page, request }) => {
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: ban still exists
-  const bans = await listBansViaApi(request)
+  const bans = await listBansViaApi(request, workerHub)
   const found = bans.find(b => b.phone === phone)
   expect(found).toBeTruthy()
 })
@@ -198,7 +198,7 @@ When('I add two bans with different phone numbers', async ({ page }) => {
   )
 })
 
-Then('both phone numbers should appear in the ban list', async ({ page, request }) => {
+Then('both phone numbers should appear in the ban list', async ({ page, backendRequest: request, workerHub }) => {
   const phones = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phones)) as string[] | undefined
   if (!phones || phones.length === 0) {
     // Prior step didn't create bans — just verify ban page is loaded
@@ -215,7 +215,7 @@ Then('both phone numbers should appear in the ban list', async ({ page, request 
   }
 
   // API verification
-  const bans = await listBansViaApi(request)
+  const bans = await listBansViaApi(request, workerHub)
   for (const phone of phones) {
     const found = bans.find(b => b.phone === phone)
     expect(found).toBeTruthy()

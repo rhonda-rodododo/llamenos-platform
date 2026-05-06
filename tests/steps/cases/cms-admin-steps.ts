@@ -12,6 +12,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Timeouts } from '../../helpers'
 import {
+  ADMIN_NSEC,
   listEntityTypesViaApi,
   createEntityTypeViaApi,
   updateEntityTypeViaApi,
@@ -182,9 +183,9 @@ Then('the apply button on the applied template should be disabled', async ({ pag
   await expect(applyBtn).toBeDisabled()
 })
 
-Given('no entity types have been created', async ({ backendRequest: request }) => {
+Given('no entity types have been created', async ({ backendRequest: request, workerHub }) => {
   // Accept current state for template application test
-  const types = await listEntityTypesViaApi(request).catch(() => [])
+  const types = await listEntityTypesViaApi(request, workerHub).catch(() => [])
   void types
 })
 
@@ -232,8 +233,8 @@ Then('each entity type row should show field and status counts', async ({ page }
   expect(count).toBeGreaterThanOrEqual(2)
 })
 
-Given('an entity type with a color exists', async ({ backendRequest: request }) => {
-  const types = await listEntityTypesViaApi(request)
+Given('an entity type with a color exists', async ({ backendRequest: request, workerHub }) => {
+  const types = await listEntityTypesViaApi(request, workerHub)
   const withColor = types.find(et => (et as { color?: string }).color)
   if (!withColor) {
     // Create one with a color
@@ -242,6 +243,7 @@ Given('an entity type with a color exists', async ({ backendRequest: request }) 
       label: 'Color Test Type',
       category: 'case',
       color: '#ef4444',
+      hubId: workerHub,
     })
   }
 })
@@ -414,8 +416,8 @@ Then('the add option button should be visible', async ({ page }) => {
 
 // --- Field reorder and delete ---
 
-Given('an entity type with multiple fields exists', async ({ backendRequest: request }) => {
-  const types = await listEntityTypesViaApi(request)
+Given('an entity type with multiple fields exists', async ({ backendRequest: request, workerHub }) => {
+  const types = await listEntityTypesViaApi(request, workerHub)
   const withFields = types.find(et => {
     const fields = (et as { fields?: unknown[] }).fields
     return fields && fields.length >= 3
@@ -425,6 +427,7 @@ Given('an entity type with multiple fields exists', async ({ backendRequest: req
     await createEntityTypeViaApi(request, {
       name: `multi_field_type_${Date.now()}`,
       label: 'Multi Field Type',
+      hubId: workerHub,
       fields: [
         { name: 'field_a', label: 'Field A', type: 'text', order: 0 },
         { name: 'field_b', label: 'Field B', type: 'text', order: 1 },
@@ -434,8 +437,8 @@ Given('an entity type with multiple fields exists', async ({ backendRequest: req
   }
 })
 
-Given('an entity type with fields exists', async ({ backendRequest: request }) => {
-  const types = await listEntityTypesViaApi(request)
+Given('an entity type with fields exists', async ({ backendRequest: request, workerHub }) => {
+  const types = await listEntityTypesViaApi(request, workerHub)
   const withFields = types.find(et => {
     const fields = (et as { fields?: unknown[] }).fields
     return fields && fields.length >= 1
@@ -444,6 +447,7 @@ Given('an entity type with fields exists', async ({ backendRequest: request }) =
     await createEntityTypeViaApi(request, {
       name: `field_type_${Date.now()}`,
       label: 'Field Type',
+      hubId: workerHub,
       fields: [
         { name: 'field_one', label: 'Field One', type: 'text', order: 0 },
         { name: 'field_two', label: 'Field Two', type: 'text', order: 1 },
@@ -556,13 +560,14 @@ Then('the add contact role button should be visible', async ({ page }) => {
 
 // --- Archive and delete ---
 
-Given('an entity type {string} exists', async ({ backendRequest: request }, name: string) => {
-  const types = await listEntityTypesViaApi(request)
+Given('an entity type {string} exists', async ({ backendRequest: request, workerHub }, name: string) => {
+  const types = await listEntityTypesViaApi(request, workerHub)
   const found = types.find(et => (et as { name?: string }).name === name)
   if (!found) {
     await createEntityTypeViaApi(request, {
       name,
       label: name.replace(/_/g, ' '),
+      hubId: workerHub,
     })
   }
 })
@@ -595,15 +600,16 @@ Then('{string} should appear in the archived section', async ({ page }, name: st
   await expect(archived.getByText(new RegExp(label, 'i')).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('an archived entity type exists', async ({ backendRequest: request }) => {
-  const types = await listEntityTypesViaApi(request)
+Given('an archived entity type exists', async ({ backendRequest: request, workerHub }) => {
+  const types = await listEntityTypesViaApi(request, workerHub)
   const archived = types.find(et => (et as { isArchived?: boolean }).isArchived)
   if (!archived) {
     const et = await createEntityTypeViaApi(request, {
       name: `archive_test_${Date.now()}`,
       label: 'Archive Test',
+      hubId: workerHub,
     })
-    await updateEntityTypeViaApi(request, (et as { id: string }).id, { isArchived: true })
+    await updateEntityTypeViaApi(request, (et as { id: string }).id, { isArchived: true }, ADMIN_NSEC, workerHub)
   }
 })
 

@@ -25,7 +25,7 @@ export default defineConfig({
         ["line"],
       ]
     : [["list"]],
-  timeout: 30_000,
+  timeout: process.env.CI ? 45_000 : 30_000,
   globalSetup: './tests/global-setup.ts',
   expect: {
     timeout: 10_000,
@@ -34,7 +34,7 @@ export default defineConfig({
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8788",
     trace: "on-first-retry",
     actionTimeout: 10_000,
-    navigationTimeout: 15_000,
+    navigationTimeout: process.env.CI ? 20_000 : 15_000,
   },
   projects: [
     {

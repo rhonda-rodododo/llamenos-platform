@@ -15,6 +15,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
+  ADMIN_NSEC,
   listEntityTypesViaApi,
   createEntityTypeViaApi,
   createRecordViaApi,
@@ -42,10 +43,11 @@ import type { APIRequestContext } from '@playwright/test'
 async function ensureEventEntityType(
   request: APIRequestContext,
   casesWorld: { eventEntityTypeId?: string },
+  workerHub?: string,
 ): Promise<string> {
   if (casesWorld.eventEntityTypeId) return casesWorld.eventEntityTypeId
 
-  const types = await listEntityTypesViaApi(request)
+  const types = await listEntityTypesViaApi(request, workerHub)
   const eventType = types.find(et => {
     const cat = (et as { category?: string }).category
     const name = (et as { name?: string }).name
@@ -53,11 +55,13 @@ async function ensureEventEntityType(
   })
   const id = eventType
     ? (eventType as { id: string }).id
-    : ((await createEntityTypeViaApi(request, 'event', {
+    : ((await createEntityTypeViaApi(request, {
+        name: 'event',
         category: 'event',
+        hubId: workerHub,
         statuses: [
-          { value: 'active', label: 'Active', color: '#3b82f6', order: 0 },
-          { value: 'concluded', label: 'Concluded', color: '#22c55e', order: 1, isClosed: true },
+          { value: 'active', label: 'Active', order: 0 },
+          { value: 'concluded', label: 'Concluded', order: 1, isClosed: true },
         ],
       })) as { id: string }).id
 
@@ -67,8 +71,8 @@ async function ensureEventEntityType(
 
 // --- Background: event entity type exists ---
 
-Given('an event entity type exists', async ({ backendRequest: request, casesWorld }) => {
-  await ensureEventEntityType(request, casesWorld)
+Given('an event entity type exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  await ensureEventEntityType(request, casesWorld, workerHub)
 })
 
 // --- Events page ---
@@ -80,18 +84,18 @@ Then('the new event button should be visible', async ({ page }) => {
   await expect(btn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('no events have been created', async ({ backendRequest: request, casesWorld }) => {
-  await ensureEventEntityType(request, casesWorld)
-  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId! })
+Given('no events have been created', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  await ensureEventEntityType(request, casesWorld, workerHub)
+  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId!, hubId: workerHub })
   // Accept current state — we just need the empty state to be possible
   void records
 })
 
-Given('events exist', async ({ backendRequest: request, casesWorld }) => {
-  const entityTypeId = await ensureEventEntityType(request, casesWorld)
-  const records = await listRecordsViaApi(request, { entityTypeId })
+Given('events exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
+  const records = await listRecordsViaApi(request, { entityTypeId, hubId: workerHub })
   if (records.records.length === 0) {
-    const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
+    const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
     casesWorld.lastEventId = (event as { id: string }).id
   } else {
     casesWorld.lastEventId = (records.records[0] as { id: string }).id
@@ -156,9 +160,9 @@ Then('the new event should appear in the event list', async ({ page }) => {
 
 // --- Event detail ---
 
-Given('an event {string} exists', async ({ backendRequest: request, casesWorld },eventName: string) => {
-  const entityTypeId = await ensureEventEntityType(request, casesWorld)
-  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
+Given('an event {string} exists', async ({ backendRequest: request, casesWorld, workerHub }, eventName: string) => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
   casesWorld.lastEventName = eventName
 })
@@ -183,54 +187,54 @@ Then('the event start date should be displayed', async ({ page }) => {
   await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('an event with linked cases exists', async ({ backendRequest: request, casesWorld }) => {
-  const entityTypeId = await ensureEventEntityType(request, casesWorld)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active' }).catch(async () => {
+Given('an event with linked cases exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
+  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
     // Fallback: create as a record
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
+    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   })
   casesWorld.lastEventId = (event as { id: string }).id
 
   // Create and link a case
-  const entityTypes = await listEntityTypesViaApi(request)
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (arrestType) {
     const etId = (arrestType as { id: string }).id
-    const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-    await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id).catch(() => {})
+    const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
+    await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id, ADMIN_NSEC, workerHub).catch(() => {})
   }
 })
 
-Given('an event with {int} linked cases exists', async ({ backendRequest: request, casesWorld },count: number) => {
-  const entityTypeId = await ensureEventEntityType(request, casesWorld)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active' }).catch(async () => {
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
+Given('an event with {int} linked cases exists', async ({ backendRequest: request, casesWorld, workerHub }, count: number) => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
+  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
+    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   })
   casesWorld.lastEventId = (event as { id: string }).id
 
-  const entityTypes = await listEntityTypesViaApi(request)
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (arrestType) {
     const etId = (arrestType as { id: string }).id
     for (let i = 0; i < count; i++) {
-      const record = await createRecordViaApi(request, etId, { statusHash: 'reported' })
-      await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id).catch(() => {})
+      const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
+      await linkRecordToEventViaApi(request, casesWorld.lastEventId!, (record as { id: string }).id, ADMIN_NSEC, workerHub).catch(() => {})
     }
   }
 })
 
-Given('an event with linked reports exists', async ({ backendRequest: request, casesWorld }) => {
-  const entityTypeId = await ensureEventEntityType(request, casesWorld)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active' }).catch(async () => {
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
+Given('an event with linked reports exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
+  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
+    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   })
   casesWorld.lastEventId = (event as { id: string }).id
 
-  const report = await createReportViaApi(request, { title: `Event Report ${Date.now()}` })
-  await linkReportToEventViaApi(request, casesWorld.lastEventId!, (report as { id: string }).id).catch(() => {})
+  const report = await createReportViaApi(request, { title: `Event Report ${Date.now()}`, hubId: workerHub })
+  await linkReportToEventViaApi(request, casesWorld.lastEventId!, (report as { id: string }).id, ADMIN_NSEC, workerHub).catch(() => {})
 })
 
-When('I view the event detail', async ({ page, backendRequest: request, casesWorld }) => {
+When('I view the event detail', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
   await navigateAfterLogin(page, '/events')
   // Click first case card (event) to open detail
   const card = page.getByTestId('case-card').first()
@@ -274,11 +278,11 @@ Then('linked reports should be visible', async ({ page }) => {
 
 // --- Link cases to events ---
 
-Given('an event exists', async ({ backendRequest: request, casesWorld }) => {
-  const entityTypeId = await ensureEventEntityType(request, casesWorld)
-  const records = await listRecordsViaApi(request, { entityTypeId })
+Given('an event exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
+  const records = await listRecordsViaApi(request, { entityTypeId, hubId: workerHub })
   if (records.records.length === 0) {
-    const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active' })
+    const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
     casesWorld.lastEventId = (event as { id: string }).id
   } else {
     casesWorld.lastEventId = (records.records[0] as { id: string }).id
@@ -321,9 +325,9 @@ Then('the report should appear in the event\'s linked reports', async ({ page })
 
 // --- Event status ---
 
-Given('an event with status {string} exists', async ({ backendRequest: request, casesWorld },status: string) => {
-  const entityTypeId = await ensureEventEntityType(request, casesWorld)
-  const event = await createRecordViaApi(request, entityTypeId, { statusHash: status })
+Given('an event with status {string} exists', async ({ backendRequest: request, casesWorld, workerHub }, status: string) => {
+  const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: status, hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 })
 

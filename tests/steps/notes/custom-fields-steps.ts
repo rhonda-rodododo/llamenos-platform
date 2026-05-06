@@ -167,9 +167,9 @@ Then('both notes should appear under a single call header', async ({ page }) => 
   await expect(note2).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Given('a note exists', async ({ page, request }) => {
+Given('a note exists', async ({ page, backendRequest: request, workerHub }) => {
   // Verify via API first
-  const { notes } = await listNotesViaApi(request)
+  const { notes } = await listNotesViaApi(request, { hubId: workerHub })
   if (notes.length === 0) {
     await Navigation.goToNotes(page)
     await page.getByTestId(TestIds.NOTE_NEW_BTN).click()

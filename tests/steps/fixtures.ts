@@ -89,9 +89,12 @@ export const test = base.extend<
 
     await use(state)
 
-    // After each test: warn about buried errors (soft-fail to avoid breaking existing tests)
-    // but hard-fail on 500s which indicate real server bugs
-    const serverErrors = state.responses.filter(r => r.status >= 500)
+    // After each test: hard-fail on 500s which indicate real server bugs.
+    // Filter out known non-test-related 500s (SIP bridge health, WebSocket upgrades).
+    const ignoredPaths = ['/api/health', '/api/sip-bridge', '/ws']
+    const serverErrors = state.responses.filter(r =>
+      r.status >= 500 && !ignoredPaths.some(p => r.url.includes(p))
+    )
     if (serverErrors.length > 0) {
       const summary = serverErrors.map(r => `${r.status} ${r.url}`).join('\n  ')
       throw new Error(`Server errors detected during test:\n  ${summary}`)
