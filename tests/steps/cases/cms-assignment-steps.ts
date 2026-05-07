@@ -70,7 +70,7 @@ Given('a case assigned to a volunteer exists', async ({ backendRequest: request,
   if (!arrestType) return
   const etId = (arrestType as { id: string }).id
   // Create a new case and assign the admin to it so the Unassign button appears
-  const adminPubkey = process.env.ADMIN_PUBKEY || 'ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228'
+  const adminPubkey = process.env.ADMIN_PUBKEY || '79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183'
   const record = await createRecordViaApi(request, etId, {
     statusHash: 'reported',
     assignedTo: [adminPubkey],

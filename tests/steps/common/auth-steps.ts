@@ -56,15 +56,15 @@ Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
   await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Import key via test platform shim: persists encrypted keys then locks — leaving the
+  // Import Ed25519 seed via test platform shim: persists encrypted keys then locks — leaving the
   // app in the "locked, PIN required" state that these scenarios test.
   await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
-      legacyImportNsec: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
+      deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
       persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
       lockCrypto: () => Promise<void>
     }
-    const encrypted = await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
   }, { secretHex, pin })
@@ -104,7 +104,7 @@ Given('I am on the login screen', async ({ page }) => {
 Given('I have a stored identity with PIN {string}', async ({ page }, pin: string) => {
   // Pre-load an encrypted key for the given PIN using the test platform shim.
   // Normalize to 8 characters (PinInput component requires minLength=8 before Enter triggers onComplete).
-  // Uses legacyImportNsec so the admin nsec is stored and locked — leaving the app in the
+  // Uses deviceImportAndLoad so the Ed25519 seed is stored and locked — leaving the app in the
   // "locked, PIN required" state that PIN setup/unlock scenarios test.
   const normalizedPin = pin.padEnd(8, '0')
   const secretHex = ADMIN_SEED
@@ -122,11 +122,11 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
 
   await page.evaluate(async ({ secretHex, normalizedPin }) => {
     const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
-      legacyImportNsec: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
+      deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
       persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
       lockCrypto: () => Promise<void>
     }
-    const encrypted = await platform.legacyImportNsec(secretHex, normalizedPin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, normalizedPin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, normalizedPin)
     await platform.lockCrypto()
   }, { secretHex, normalizedPin })

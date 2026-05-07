@@ -136,10 +136,10 @@ export async function loginAsAdmin(page: Page) {
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
   await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Import the secp256k1 secret via legacy_import_nsec, persist encrypted keys
+  // Import the Ed25519 seed via deviceImportAndLoad, persist encrypted keys
   await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const encrypted = await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
   }, { secretHex, pin: TEST_PIN })
@@ -164,11 +164,7 @@ export async function loginAsAdmin(page: Page) {
  * Login as user (volunteer): imports key material via IPC mock,
  * persists to store, then enters PIN to unlock.
  *
- * Accepts either:
- * - A bech32 nsec string (e.g. "nsec1...") — decoded and imported via
- *   legacyImportNsec (secp256k1 Schnorr key, as returned by createUserViaApi
- *   or createUserAndGetNsec)
- * - A raw Ed25519 signing seed hex string — imported via deviceImportAndLoad
+ * Accepts a raw Ed25519 signing seed hex string — imported via deviceImportAndLoad.
  */
 export async function loginAsVolunteer(page: Page, nsecOrSeedHex: string) {
   const secretHex = nsecOrSeedHex
@@ -186,15 +182,13 @@ export async function loginAsVolunteer(page: Page, nsecOrSeedHex: string) {
   // Wait for __TEST_PLATFORM to be loaded
   await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Import key: legacy secp256k1 (nsec) or Ed25519 seed
-  await page.evaluate(async ({ secretHex, isNsec, pin }) => {
+  // Import Ed25519 seed, persist encrypted keys
+  await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const encrypted = isNsec
-      ? await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
-      : await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
-  }, { secretHex, isNsec, pin: TEST_PIN })
+  }, { secretHex, pin: TEST_PIN })
 
   // Reload to trigger PIN screen
   await page.reload()
@@ -228,11 +222,12 @@ export async function logout(page: Page) {
  * The displayed nsec (bech32 "nsec1...") is only for user display. Internally,
  * the volunteer was created with an Ed25519 keypair. We return the raw seedHex
  * so that `loginAsVolunteer` uses `deviceImportAndLoad` (Ed25519), not
- * `legacyImportNsec` (secp256k1), which would derive a different pubkey and
+ * `legacyImportNsec`, which would derive a different (secp256k1) pubkey and
  * break auth.
  *
  * The seedHex is stored in `window.__last_vol_seed_hex` by users.tsx after
- * calling generateEphemeralKeypair().
+ * calling generateEphemeralKeypair(). Falls back to bech32 nsec from DOM
+ * if seedHex is not available.
  */
 export async function createUserAndGetNsec(page: Page, name: string, phone: string): Promise<string> {
   await page.getByTestId(TestIds.NAV_VOLUNTEERS).click()

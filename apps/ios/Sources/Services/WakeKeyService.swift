@@ -110,17 +110,10 @@ final class WakeKeyService: @unchecked Sendable {
     func ensureKeypairExists() throws {
         if publicKeyHex != nil { return }
 
-        // Generate 32 random bytes for the wake private key (X25519)
-        var privateKeyBytes = [UInt8](repeating: 0, count: 32)
-        let status = SecRandomCopyBytes(kSecRandomDefault, 32, &privateKeyBytes)
-        guard status == errSecSuccess else {
-            throw WakeKeyError.keyGenerationFailed
-        }
-
-        let privateKeyHex = privateKeyBytes.map { String(format: "%02x", $0) }.joined()
-
-        // Derive X25519 public key from private key
-        let publicKey = try deriveX25519PublicKey(from: privateKeyHex)
+        // Generate an X25519 keypair via CryptoService (delegates to Rust FFI)
+        let keypair = cryptoService.generateEphemeralKeypair()
+        let privateKeyHex = keypair.secretHex
+        let publicKey = keypair.publicHex
 
         // Store private key with kSecAttrAccessibleAfterFirstUnlock
         try storeWakePrivateKey(privateKeyHex)
@@ -248,13 +241,6 @@ final class WakeKeyService: @unchecked Sendable {
             throw WakeKeyError.decryptionFailed("Invalid UTF-8 in decrypted payload")
         }
         return result
-    }
-
-    // MARK: - Key Derivation
-
-    /// Derive an X25519 public key from a private key hex string.
-    private func deriveX25519PublicKey(from privateKeyHex: String) throws -> String {
-        try getPublicKey(secretKeyHex: privateKeyHex)
     }
 
     // MARK: - Cleanup

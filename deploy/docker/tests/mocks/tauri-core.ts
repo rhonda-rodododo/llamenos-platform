@@ -1,147 +1,931 @@
 /**
- * Mock @tauri-apps/api/core for Playwright test builds.
- * Implements crypto via @noble/curves so tests exercise real algorithms.
+ * Mock @tauri-apps/api/core for Playwright test builds (v3 crypto API).
+ *
+ * Implements Ed25519/X25519/HPKE mock operations using @noble/curves
+ * and @noble/hashes for test-mode crypto that mirrors the Rust desktop IPC.
+ *
+ * Aliased via vite.config.ts when PLAYWRIGHT_TEST=true.
  */
 
+// Production guard: prevent test mocks from loading in production builds.
+if (!import.meta.env.PLAYWRIGHT_TEST) {
+  throw new Error('FATAL: Tauri IPC mock loaded outside test environment.')
+}
+
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { x25519 } from '@noble/curves/ed25519.js'
 import { schnorr } from '@noble/curves/secp256k1.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
-import { pbkdf2 } from '@noble/hashes/pbkdf2.js'
+import { hmac } from '@noble/hashes/hmac.js'
 import { gcm } from '@noble/ciphers/aes.js'
-import { randomBytes, utf8ToBytes } from '@noble/ciphers/utils.js'
-import { bech32 } from '@scure/base'
+import { randomBytes } from '@noble/hashes/utils.js'
+import { argon2id } from '@noble/hashes/argon2.js'
+import { utf8ToBytes, bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 
-let secretKeyHex: string | null = null
-let publicKeyHex: string | null = null
+// ── Helpers ──────────────────────────────────────────────────────────
 
-function requireUnlocked(): string {
-  if (!secretKeyHex) throw new Error('CryptoState is locked')
-  return secretKeyHex
+function base64urlEncode(bytes: Uint8Array): string {
+  const b64 = btoa(String.fromCharCode(...bytes))
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-function pubFromSk(sk: string): string {
-  return bytesToHex(schnorr.getPublicKey(sk))
+function base64urlDecode(str: string): Uint8Array {
+  const padded = str.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - (str.length % 4)) % 4)
+  const binary = atob(padded)
+  return Uint8Array.from(binary, c => c.charCodeAt(0))
 }
 
-function nsecEncode(sk: string): string {
-  return bech32.encode('nsec', bech32.toWords(hexToBytes(sk)), 1500)
+// ── Label registry (matches Rust labels.rs) ─────────────────────────
+
+// Labels must match packages/protocol/crypto-labels.json exactly.
+// Index order matches LABEL_REGISTRY in packages/crypto/src/labels.rs.
+const LABEL_MAP: Record<string, number> = {
+  'llamenos:note-key': 0,
+  'llamenos:file-key': 1,
+  'llamenos:file-metadata': 2,
+  'llamenos:hub-key-wrap': 3,
+  'llamenos:transcription': 4,
+  'llamenos:message': 5,
+  'llamenos:call-meta': 6,
+  'llamenos:shift-schedule': 7,
+  'llamenos:puk:sign:v1': 41,
+  'llamenos:puk:dh:v1': 42,
+  'llamenos:puk:secretbox:v1': 43,
+  'llamenos:puk:wrap:device:v1': 44,
+  'llamenos:device-auth:v1': 46,
+  'llamenos:sframe-call-secret:v1': 50,
+  'llamenos:sframe-base-key:v1': 51,
+  'llamenos:mls-provision:v1': 52,
 }
 
-function nsecDecode(nsec: string): string {
-  const { prefix, words } = bech32.decode(nsec, 1500)
-  if (prefix !== 'nsec') throw new Error('Invalid nsec')
-  return bytesToHex(bech32.fromWords(words))
+function labelToId(label: string): number {
+  const id = LABEL_MAP[label]
+  if (id === undefined) throw new Error(`Unknown label: ${label}`)
+  return id
 }
 
-function npubEncode(pk: string): string {
-  return bech32.encode('npub', bech32.toWords(hexToBytes(pk)), 1500)
+// ── Mock device key state ───────────────────────────────────────────
+
+interface MockDeviceSecrets {
+  signingSeed: Uint8Array    // 32 bytes
+  encryptionSeed: Uint8Array // 32 bytes
 }
 
-function eciesWrap(keyHex: string, _recipientPubkey: string) {
-  const ephSk = bytesToHex(randomBytes(32))
-  const ephPk = pubFromSk(ephSk)
-  const ikm = sha256(hexToBytes(ephSk + _recipientPubkey))
+interface MockDeviceKeyState {
+  deviceId: string
+  signingPubkeyHex: string
+  encryptionPubkeyHex: string
+}
+
+let mockSecrets: MockDeviceSecrets | null = null
+let mockDeviceState: MockDeviceKeyState | null = null
+let mockEncryptedKeys: unknown = null
+
+// Key type tracking for auth token generation
+type KeyType = 'ed25519' | 'secp256k1'
+let currentKeyType: KeyType = 'ed25519'
+let schnorrSecretBytes: Uint8Array | null = null // secp256k1 secret for Schnorr auth
+
+// ── PIN lockout tracking ─────────────────────────────────────────────
+// Mirrors Rust-side lockout logic: escalating lockouts at thresholds, wipe at 10.
+// Persisted to localStorage to survive page reloads (simulates Rust-side vault storage).
+interface PinLockoutState {
+  failedAttempts: number
+  lockoutUntil: number // ms timestamp, 0 = no lockout
+}
+
+const LOCKOUT_STORAGE_KEY = '__test_pin_lockout_state'
+
+function loadLockoutState(): PinLockoutState {
+  try {
+    const raw = localStorage.getItem(LOCKOUT_STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return { failedAttempts: 0, lockoutUntil: 0 }
+}
+
+function saveLockoutState(): void {
+  try {
+    localStorage.setItem(LOCKOUT_STORAGE_KEY, JSON.stringify(pinLockoutState))
+  } catch { /* ignore */ }
+}
+
+let pinLockoutState: PinLockoutState = loadLockoutState()
+
+// Lockout thresholds: attempt count → lockout duration in ms
+const LOCKOUT_THRESHOLDS: Array<{ attempts: number; durationMs: number }> = [
+  { attempts: 5, durationMs: 30_000 },    // 30 seconds
+  { attempts: 7, durationMs: 120_000 },   // 2 minutes
+  { attempts: 9, durationMs: 600_000 },   // 10 minutes
+]
+const WIPE_THRESHOLD = 10
+
+function checkPinLockout(): void {
+  // Reload from storage (state may have been set before a page reload)
+  pinLockoutState = loadLockoutState()
+  if (pinLockoutState.lockoutUntil > Date.now()) {
+    const remainingSec = Math.ceil((pinLockoutState.lockoutUntil - Date.now()) / 1000)
+    throw new Error(`Locked out for ${remainingSec} seconds`)
+  }
+}
+
+function recordFailedPinAttempt(): void {
+  pinLockoutState.failedAttempts++
+
+  if (pinLockoutState.failedAttempts >= WIPE_THRESHOLD) {
+    // Wipe keys
+    mockSecrets = null
+    mockDeviceState = null
+    mockEncryptedKeys = null
+    pinLockoutState = { failedAttempts: 0, lockoutUntil: 0 }
+    saveLockoutState()
+    throw new Error('Keys wiped after too many failed attempts')
+  }
+
+  // Find the highest threshold that applies (tiered lockout)
+  let lockoutDuration = 0
+  for (const threshold of LOCKOUT_THRESHOLDS) {
+    if (pinLockoutState.failedAttempts >= threshold.attempts) {
+      lockoutDuration = threshold.durationMs
+    }
+  }
+
+  if (lockoutDuration > 0) {
+    pinLockoutState.lockoutUntil = Date.now() + lockoutDuration
+    saveLockoutState()
+    const remainingSec = Math.ceil(lockoutDuration / 1000)
+    throw new Error(`Locked out for ${remainingSec} seconds`)
+  }
+
+  saveLockoutState()
+}
+
+function resetPinLockout(): void {
+  pinLockoutState = { failedAttempts: 0, lockoutUntil: 0 }
+  saveLockoutState()
+}
+
+function deriveEd25519Pubkey(seed: Uint8Array): Uint8Array {
+  return ed25519.getPublicKey(seed)
+}
+
+function deriveX25519Pubkey(seed: Uint8Array): Uint8Array {
+  return x25519.getPublicKey(seed)
+}
+
+function requireSecrets(): MockDeviceSecrets {
+  if (!mockSecrets) throw new Error('Device key is locked. Enter PIN to unlock.')
+  return mockSecrets
+}
+
+function requireDeviceState(): MockDeviceKeyState {
+  if (!mockDeviceState) throw new Error('Device key is locked. Enter PIN to unlock.')
+  return mockDeviceState
+}
+
+// ── Argon2id + AES-256-GCM for PIN/passphrase encryption ────────────
+// Parameters match packages/crypto/src/device_keys.rs (KDF_VERSION=2).
+// For test builds we use reduced memory (4 MiB) to keep Playwright fast.
+// This is safe because the mock never interops with Rust ciphertext.
+const ARGON2_M_COST_KIB = 4_096   // 4 MiB (production Rust uses 65_536)
+const ARGON2_T_COST = 3
+const ARGON2_P_COST = 4
+
+async function deriveKek(pin: string, salt: Uint8Array): Promise<Uint8Array> {
+  return argon2id(utf8ToBytes(pin), salt, {
+    t: ARGON2_T_COST,
+    m: ARGON2_M_COST_KIB,
+    p: ARGON2_P_COST,
+    dkLen: 32,
+  })
+}
+
+async function encryptWithPin(
+  signingSeed: Uint8Array,
+  encryptionSeed: Uint8Array,
+  pin: string,
+): Promise<{
+  kdfVersion: number; salt: string; nonce: string; ciphertext: string
+  argon2MCost: number; argon2TCost: number; argon2PCost: number
+}> {
+  const salt = randomBytes(32)
   const nonce = randomBytes(12)
-  const ct = gcm(ikm, nonce).encrypt(hexToBytes(keyHex))
-  return { enc: ephPk, ct: bytesToHex(nonce) + bytesToHex(ct) }
+  const kek = await deriveKek(pin, salt)
+
+  const plaintext = new Uint8Array(64)
+  plaintext.set(signingSeed)
+  plaintext.set(encryptionSeed, 32)
+
+  const cipher = gcm(kek, nonce)
+  const encrypted = cipher.encrypt(plaintext)
+
+  return {
+    kdfVersion: 2,
+    salt: bytesToHex(salt),
+    nonce: bytesToHex(nonce),
+    ciphertext: bytesToHex(encrypted),
+    argon2MCost: ARGON2_M_COST_KIB,
+    argon2TCost: ARGON2_T_COST,
+    argon2PCost: ARGON2_P_COST,
+  }
 }
 
-function pinEncrypt(nsec: string, pin: string, pubkey: string) {
-  const sk = nsecDecode(nsec)
-  const salt = randomBytes(16)
-  const kek = pbkdf2(sha256, utf8ToBytes(pin), salt, { c: 100, dkLen: 32 })
-  const nonce = randomBytes(12)
-  const ct = gcm(kek, nonce).encrypt(hexToBytes(sk))
-  secretKeyHex = sk
-  publicKeyHex = pubkey
-  return { salt: bytesToHex(salt), iterations: 600_000, nonce: bytesToHex(nonce), ciphertext: bytesToHex(ct), pubkey }
+async function decryptWithPin(
+  encrypted: { salt: string; nonce: string; ciphertext: string },
+  pin: string,
+): Promise<{ signingSeed: Uint8Array; encryptionSeed: Uint8Array }> {
+  const salt = hexToBytes(encrypted.salt)
+  const nonce = hexToBytes(encrypted.nonce)
+  const ciphertext = hexToBytes(encrypted.ciphertext)
+  const kek = await deriveKek(pin, salt)
+
+  const cipher = gcm(kek, nonce)
+  const plaintext = cipher.decrypt(ciphertext)
+
+  if (plaintext.length !== 64) throw new Error('Invalid decrypted device key blob')
+
+  return {
+    signingSeed: plaintext.slice(0, 32),
+    encryptionSeed: plaintext.slice(32),
+  }
 }
 
-function pinDecrypt(data: { salt: string; nonce: string; ciphertext: string; pubkey: string }, pin: string): string {
-  const kek = pbkdf2(sha256, utf8ToBytes(pin), hexToBytes(data.salt), { c: 100, dkLen: 32 })
-  const sk = gcm(kek, hexToBytes(data.nonce)).decrypt(hexToBytes(data.ciphertext))
-  secretKeyHex = bytesToHex(sk)
-  publicKeyHex = data.pubkey
-  return data.pubkey
+// ── HPKE mock (X25519 + HKDF-SHA256 + AES-256-GCM) ─────────────────
+
+function hpkeSealMock(
+  plaintext: Uint8Array,
+  recipientPubkeyHex: string,
+  label: string,
+  aad: Uint8Array,
+): { v: number; labelId: number; enc: string; ct: string } {
+  const labelId = labelToId(label)
+
+  // Generate ephemeral X25519 keypair
+  const ephSeed = randomBytes(32)
+  const ephPub = x25519.getPublicKey(ephSeed)
+  const recipientPub = hexToBytes(recipientPubkeyHex)
+
+  // ECDH shared secret
+  const sharedSecret = x25519.getSharedSecret(ephSeed, recipientPub)
+
+  // HKDF extract + expand
+  const info = utf8ToBytes(`hpke-v3:${label}`)
+  const derived = hkdf(sha256, sharedSecret, new Uint8Array(0), info, 44)
+
+  const aesKey = derived.slice(0, 32)
+  const nonce = derived.slice(32, 44)
+
+  // AES-256-GCM encrypt with AAD
+  const cipher = gcm(aesKey, nonce, aad)
+  const ct = cipher.encrypt(plaintext)
+
+  return {
+    v: 3,
+    labelId,
+    enc: base64urlEncode(ephPub),
+    ct: base64urlEncode(ct),
+  }
 }
+
+function hpkeOpenMock(
+  envelope: { v: number; labelId: number; enc: string; ct: string },
+  recipientSecretHex: string,
+  expectedLabel: string,
+  aad: Uint8Array,
+): Uint8Array {
+  if (envelope.v !== 3) throw new Error(`Unsupported HPKE version: ${envelope.v}`)
+  const expectedId = labelToId(expectedLabel)
+  if (envelope.labelId !== expectedId) {
+    throw new Error(`Label mismatch: expected ${expectedId}, got ${envelope.labelId}`)
+  }
+
+  const ephPub = base64urlDecode(envelope.enc)
+  const ct = base64urlDecode(envelope.ct)
+  const recipientSecret = hexToBytes(recipientSecretHex)
+
+  // ECDH shared secret
+  const sharedSecret = x25519.getSharedSecret(recipientSecret, ephPub)
+
+  // HKDF extract + expand
+  const info = utf8ToBytes(`hpke-v3:${expectedLabel}`)
+  const derived = hkdf(sha256, sharedSecret, new Uint8Array(0), info, 44)
+
+  const aesKey = derived.slice(0, 32)
+  const nonce = derived.slice(32, 44)
+
+  // AES-256-GCM decrypt with AAD
+  const cipher = gcm(aesKey, nonce, aad)
+  return cipher.decrypt(ct)
+}
+
+// ── Types ─────────────────────────────────────────────────────────────
 
 type Args = Record<string, unknown>
-const commands: Record<string, (a: Args) => unknown> = {
-  generate_keypair: () => {
-    const sk = bytesToHex(randomBytes(32))
-    const pk = pubFromSk(sk)
-    return { secretKeyHex: sk, publicKey: pk, nsec: nsecEncode(sk), npub: npubEncode(pk) }
+type CommandHandler = (a: Args) => unknown | Promise<unknown>
+
+// ── Command handlers ──────────────────────────────────────────────────
+
+const commands: Record<string, CommandHandler> = {
+  // --- Device key management ---
+
+  device_generate_and_load: async (a) => {
+    const pin = a.pin as string
+    const deviceId = a.deviceId as string
+
+    const signingSeed = randomBytes(32)
+    const encryptionSeed = randomBytes(32)
+    const signingPubkey = deriveEd25519Pubkey(signingSeed)
+    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
+
+    const state: MockDeviceKeyState = {
+      deviceId,
+      signingPubkeyHex: bytesToHex(signingPubkey),
+      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
+    }
+
+    const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
+
+    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
+    mockSecrets = { signingSeed, encryptionSeed }
+    mockDeviceState = state
+    mockEncryptedKeys = result
+    currentKeyType = 'ed25519'
+    schnorrSecretBytes = null
+
+    return result
   },
-  get_public_key: (a) => pubFromSk(a.secretKeyHex as string),
-  get_public_key_from_state: () => publicKeyHex,
-  is_valid_nsec: (a) => { try { nsecDecode(a.nsec as string); return true } catch { return false } },
-  key_pair_from_nsec: (a) => {
-    try { const sk = nsecDecode(a.nsec as string); const pk = pubFromSk(sk); return { secretKeyHex: sk, publicKey: pk, nsec: a.nsec, npub: npubEncode(pk) } }
-    catch { return null }
+
+  unlock_with_pin: async (a) => {
+    const data = (mockEncryptedKeys ?? a.data) as {
+      salt: string; nonce: string; ciphertext: string; state: MockDeviceKeyState; _keyType?: string
+    }
+    if (!data) throw new Error('No key stored. Complete onboarding first.')
+
+    // Check lockout before attempting
+    checkPinLockout()
+
+    const pin = a.pin as string
+    let signingSeed: Uint8Array
+    let encryptionSeed: Uint8Array
+
+    try {
+      const result = await decryptWithPin(data, pin)
+      signingSeed = result.signingSeed
+      encryptionSeed = result.encryptionSeed
+    } catch {
+      // Wrong PIN — record failed attempt (may throw lockout/wipe)
+      recordFailedPinAttempt()
+      // If recordFailedPinAttempt didn't throw, it's a simple wrong PIN
+      throw new Error('Wrong PIN')
+    }
+
+    // Success — reset lockout counter
+    resetPinLockout()
+
+    mockSecrets = { signingSeed, encryptionSeed }
+    mockDeviceState = data.state
+
+    // Restore key type for auth token generation
+    if (data._keyType === 'secp256k1') {
+      currentKeyType = 'secp256k1'
+      schnorrSecretBytes = signingSeed
+    } else {
+      currentKeyType = 'ed25519'
+      schnorrSecretBytes = null
+    }
+
+    return data.state
   },
-  import_key_to_state: (a) => pinEncrypt(a.nsec as string, a.pin as string, a.pubkeyHex as string),
-  unlock_with_pin: (a) => pinDecrypt(a.data as { salt: string; nonce: string; ciphertext: string; pubkey: string }, a.pin as string),
+
+  lock_crypto: () => {
+    mockSecrets = null
+    mockDeviceState = null
+  },
+
+  is_crypto_unlocked: () => mockSecrets !== null,
+
+  get_device_pubkeys: () => {
+    return requireDeviceState()
+  },
+
+  // --- Auth tokens (Ed25519) ---
+
   create_auth_token_from_state: (a) => {
-    const sk = requireUnlocked()
-    const msg = `${a.timestamp}:${a.method}:${a.path}`
-    const sig = schnorr.sign(sha256(utf8ToBytes(msg)), sk)
-    return `${publicKeyHex}:${a.timestamp}:${bytesToHex(sig)}`
+    const timestamp = a.timestamp as number
+    const method = a.method as string
+    const path = a.path as string
+
+    if (currentKeyType === 'secp256k1' && schnorrSecretBytes) {
+      // Schnorr auth (secp256k1) for legacy nsec import
+      const pubkey = bytesToHex(schnorr.getPublicKey(schnorrSecretBytes))
+      const msgStr = `llamenos:auth:${pubkey}:${timestamp}:${method}:${path}`
+      const msgHash = sha256(utf8ToBytes(msgStr))
+      const sig = schnorr.sign(msgHash, schnorrSecretBytes)
+      return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
+    }
+
+    // Ed25519 auth (v3 device keys)
+    const secrets = requireSecrets()
+    const pubkey = bytesToHex(deriveEd25519Pubkey(secrets.signingSeed))
+    const msgStr = `llamenos:auth:${pubkey}:${timestamp}:${method}:${path}`
+    const msgHash = sha256(utf8ToBytes(msgStr))
+    const sig = ed25519.sign(msgHash, secrets.signingSeed)
+    return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
   },
-  create_auth_token: (a) => {
-    const sk = a.secretKeyHex as string; const pk = pubFromSk(sk)
-    const msg = `${a.timestamp}:${a.method}:${a.path}`
-    const sig = schnorr.sign(sha256(utf8ToBytes(msg)), sk)
-    return `${pk}:${a.timestamp}:${bytesToHex(sig)}`
+
+  // --- Ed25519 signing/verification ---
+
+  ed25519_sign_from_state: (a) => {
+    const secrets = requireSecrets()
+    const message = hexToBytes(a.messageHex as string)
+    const sig = ed25519.sign(message, secrets.signingSeed)
+    return bytesToHex(sig)
   },
-  verify_schnorr: (a) => { try { return schnorr.verify(a.signature as string, sha256(utf8ToBytes(a.message as string)), a.pubkey as string) } catch { return false } },
-  ecies_wrap_key: (a) => eciesWrap(a.keyHex as string, a.recipientPubkey as string),
-  ecies_unwrap_key_from_state: () => bytesToHex(randomBytes(32)),
-  encrypt_note: (a) => {
-    const nk = bytesToHex(randomBytes(32)); const n = randomBytes(12)
-    const ct = gcm(hexToBytes(nk), n).encrypt(utf8ToBytes(a.payloadJson as string))
-    return { encryptedContent: bytesToHex(n) + bytesToHex(ct), authorEnvelope: eciesWrap(nk, a.authorPubkey as string), adminEnvelopes: (a.adminPubkeys as string[]).map(pk => ({ pubkey: pk, ...eciesWrap(nk, pk) })) }
+
+  ed25519_verify: (a) => {
+    try {
+      const message = hexToBytes(a.messageHex as string)
+      const signature = hexToBytes(a.signatureHex as string)
+      const pubkey = hexToBytes(a.pubkeyHex as string)
+      return ed25519.verify(signature, message, pubkey)
+    } catch {
+      return false
+    }
   },
-  decrypt_note_from_state: () => '{"text":"mock note","customFields":{}}',
-  decrypt_legacy_note_from_state: () => '{"text":"mock note","customFields":{}}',
-  encrypt_message: (a) => {
-    const k = bytesToHex(randomBytes(32)); const n = randomBytes(12)
-    const ct = gcm(hexToBytes(k), n).encrypt(utf8ToBytes(a.plaintext as string))
-    return { encryptedContent: bytesToHex(n) + bytesToHex(ct), readerEnvelopes: (a.readerPubkeys as string[]).map(pk => ({ pubkey: pk, ...eciesWrap(k, pk) })) }
+
+  // --- HPKE envelope encryption ---
+
+  hpke_seal: (a) => {
+    const plaintext = hexToBytes(a.plaintextHex as string)
+    const recipientPubkeyHex = a.recipientPubkeyHex as string
+    const label = a.label as string
+    const aad = hexToBytes(a.aadHex as string)
+    return hpkeSealMock(plaintext, recipientPubkeyHex, label, aad)
   },
-  decrypt_message_from_state: () => 'mock message',
-  decrypt_call_record_from_state: () => '{"answeredBy":null,"callerNumber":"+1234567890"}',
-  decrypt_transcription_from_state: () => 'mock transcription',
-  encrypt_draft_from_state: (a) => btoa(a.plaintext as string),
-  decrypt_draft_from_state: (a) => atob(a.packed as string),
-  encrypt_export_from_state: (a) => btoa(a.jsonString as string),
-  sign_nostr_event_from_state: (a) => {
-    const sk = requireUnlocked(); const pk = publicKeyHex!
-    const ser = JSON.stringify([0, pk, a.createdAt, a.kind, a.tags, a.content])
-    const id = bytesToHex(sha256(utf8ToBytes(ser)))
-    const sig = bytesToHex(schnorr.sign(hexToBytes(id), sk))
-    return { id, pubkey: pk, created_at: a.createdAt, kind: a.kind, tags: a.tags, content: a.content, sig }
+
+  hpke_open_from_state: (a) => {
+    const secrets = requireSecrets()
+    const envelope = a.envelope as { v: number; labelId: number; enc: string; ct: string }
+    const expectedLabel = a.expectedLabel as string
+    const aad = hexToBytes(a.aadHex as string)
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+    const plaintext = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
+    return bytesToHex(plaintext)
   },
-  decrypt_file_metadata_from_state: () => '{}',
-  unwrap_file_key_from_state: () => bytesToHex(randomBytes(32)),
-  unwrap_hub_key_from_state: () => bytesToHex(randomBytes(32)),
-  rewrap_file_key_from_state: (a) => ({ pubkey: a.newRecipientPubkeyHex, ...eciesWrap(bytesToHex(randomBytes(32)), a.newRecipientPubkeyHex as string) }),
-  generate_provisioning_ephemeral: () => bytesToHex(randomBytes(32)),
-  encrypt_nsec_for_provisioning: (a) => ({ encryptedHex: bytesToHex(randomBytes(64)), sasCode: '0000' }),
-  decrypt_provisioned_nsec: () => ({ nsec: nsecEncode(requireUnlocked()), sasCode: '0000' }),
-  lock_crypto: () => { secretKeyHex = null },
-  is_crypto_unlocked: () => secretKeyHex !== null,
+
+  hpke_seal_key: (a) => {
+    const keyBytes = hexToBytes(a.keyHex as string)
+    if (keyBytes.length !== 32) throw new Error('Key must be 32 bytes')
+    const recipientPubkeyHex = a.recipientPubkeyHex as string
+    const label = a.label as string
+    const aad = hexToBytes(a.aadHex as string)
+    return hpkeSealMock(keyBytes, recipientPubkeyHex, label, aad)
+  },
+
+  hpke_open_key_from_state: (a) => {
+    const secrets = requireSecrets()
+    const envelope = a.envelope as { v: number; labelId: number; enc: string; ct: string }
+    const expectedLabel = a.expectedLabel as string
+    const aad = hexToBytes(a.aadHex as string)
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+    const plaintext = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
+    if (plaintext.length !== 32) throw new Error('Unwrapped key must be 32 bytes')
+    return bytesToHex(plaintext)
+  },
+
+  // --- PUK (Per-User Key) ---
+
+  puk_create_from_state: () => {
+    const ds = requireDeviceState()
+
+    // Generate random seed
+    const seed = randomBytes(32)
+
+    // Derive PUK subkeys (labels match crypto-labels.json)
+    const signSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk:sign:v1\x00\x00\x00\x01'))
+    const dhSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk:dh:v1\x00\x00\x00\x01'))
+
+    const pukState = {
+      generation: 1,
+      signPubkeyHex: bytesToHex(deriveEd25519Pubkey(signSubkey)),
+      dhPubkeyHex: bytesToHex(deriveX25519Pubkey(dhSubkey)),
+    }
+
+    // HPKE seal the seed to the device's encryption pubkey
+    const envelope = hpkeSealMock(
+      seed,
+      ds.encryptionPubkeyHex,
+      'llamenos:puk:wrap:device:v1',
+      new Uint8Array(0),
+    )
+
+    return {
+      pukState,
+      seedHex: bytesToHex(seed),
+      envelope,
+    }
+  },
+
+  puk_rotate: (a) => {
+    const oldSeedBytes = hexToBytes(a.oldSeedHex as string)
+    const oldGen = a.oldGen as number
+    const remainingDevices = JSON.parse(a.remainingDevicesJson as string) as Array<[string, string]>
+    const newGen = oldGen + 1
+
+    // Generate new seed
+    const newSeed = randomBytes(32)
+
+    // Derive new PUK subkeys
+    const genBuf = new Uint8Array(4)
+    new DataView(genBuf.buffer).setUint32(0, newGen, false) // big-endian
+
+    const signLabel = new Uint8Array([...utf8ToBytes('llamenos:puk:sign:v1'), ...genBuf])
+    const dhLabel = new Uint8Array([...utf8ToBytes('llamenos:puk:dh:v1'), ...genBuf])
+
+    const signSubkey = hmac(sha256, newSeed, signLabel)
+    const dhSubkey = hmac(sha256, newSeed, dhLabel)
+
+    const state = {
+      generation: newGen,
+      signPubkeyHex: bytesToHex(deriveEd25519Pubkey(signSubkey)),
+      dhPubkeyHex: bytesToHex(deriveX25519Pubkey(dhSubkey)),
+    }
+
+    // HPKE seal new seed to each remaining device
+    const deviceEnvelopes = remainingDevices.map(([deviceId, encPubkeyHex]) => ({
+      deviceId,
+      envelope: hpkeSealMock(
+        newSeed,
+        encPubkeyHex,
+        'llamenos:puk:wrap:device:v1',
+        new Uint8Array(0),
+      ),
+    }))
+
+    // CLKR: encrypt old seed under new generation's secretbox key
+    const sbLabel = new Uint8Array([...utf8ToBytes('llamenos:puk:secretbox:v1'), ...genBuf])
+    const secretboxKey = hmac(sha256, newSeed, sbLabel)
+    const clkrNonce = randomBytes(12)
+    const clkrCipher = gcm(secretboxKey, clkrNonce)
+    const clkrCt = clkrCipher.encrypt(oldSeedBytes)
+
+    const clkrChainLinkHex = bytesToHex(new Uint8Array([...clkrNonce, ...clkrCt]))
+
+    return { state, deviceEnvelopes, clkrChainLinkHex }
+  },
+
+  puk_unwrap_seed_from_state: (a) => {
+    const secrets = requireSecrets()
+    const envelope = a.envelope as { v: number; labelId: number; enc: string; ct: string }
+    const expectedLabel = a.expectedLabel as string
+    const aad = hexToBytes(a.aadHex as string)
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+    const seed = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
+    if (seed.length !== 32) throw new Error('PUK seed must be 32 bytes')
+    return bytesToHex(seed)
+  },
+
+  // --- Sigchain ---
+
+  sigchain_create_link_from_state: (a) => {
+    const secrets = requireSecrets()
+    const ds = requireDeviceState()
+    const id = a.id as string
+    const seq = a.seq as number
+    const prevHash = a.prevHash as string | null
+    const timestamp = a.timestamp as string
+    const payloadJson = a.payloadJson as string
+
+    // Canonical hash: JSON with sorted keys
+    const canonical: Record<string, unknown> = {
+      payload: payloadJson,
+      prevHash: prevHash ?? null,
+      seq,
+      signerDeviceId: ds.deviceId,
+      signerPubkey: ds.signingPubkeyHex,
+      timestamp,
+    }
+    const canonicalJson = JSON.stringify(canonical, Object.keys(canonical).sort())
+    const entryHash = bytesToHex(sha256(utf8ToBytes(canonicalJson)))
+
+    // Ed25519 sign the entry hash
+    const sig = ed25519.sign(hexToBytes(entryHash), secrets.signingSeed)
+
+    return {
+      id,
+      seq,
+      prevHash: prevHash ?? null,
+      entryHash,
+      signerDeviceId: ds.deviceId,
+      signerPubkey: ds.signingPubkeyHex,
+      signature: bytesToHex(sig),
+      timestamp,
+      payloadJson,
+    }
+  },
+
+  sigchain_verify: (a) => {
+    const links = JSON.parse(a.linksJson as string) as Array<{
+      seq: number
+      prevHash: string | null
+      entryHash: string
+      signerDeviceId: string
+      signerPubkey: string
+      signature: string
+      timestamp: string
+      payloadJson: string
+    }>
+
+    if (links.length === 0) throw new Error('Empty sigchain')
+
+    const activeDevicePubkeys = new Set<string>()
+
+    for (let i = 0; i < links.length; i++) {
+      const link = links[i]
+      if (link.seq !== i + 1) throw new Error(`Sequence mismatch at index ${i}`)
+
+      if (i === 0 && link.prevHash !== null) throw new Error('First link must have null prevHash')
+      if (i > 0 && link.prevHash !== links[i - 1].entryHash) {
+        throw new Error(`prevHash mismatch at seq ${link.seq}`)
+      }
+
+      // Verify Ed25519 signature
+      const valid = ed25519.verify(
+        hexToBytes(link.signature),
+        hexToBytes(link.entryHash),
+        hexToBytes(link.signerPubkey),
+      )
+      if (!valid) throw new Error(`Invalid signature at seq ${link.seq}`)
+
+      // Process payload for device set
+      try {
+        const payload = JSON.parse(link.payloadJson)
+        if (payload.type === 'user_init' || payload.type === 'device_add') {
+          activeDevicePubkeys.add(payload.devicePubkey ?? link.signerPubkey)
+        } else if (payload.type === 'device_remove') {
+          activeDevicePubkeys.delete(payload.devicePubkey)
+        }
+      } catch { /* non-device payloads */ }
+    }
+
+    const last = links[links.length - 1]
+    return {
+      verifiedCount: links.length,
+      headSeq: last.seq,
+      headHash: last.entryHash,
+      activeDevicePubkeys: Array.from(activeDevicePubkeys),
+    }
+  },
+
+  sigchain_verify_link: (a) => {
+    try {
+      const link = JSON.parse(a.linkJson as string) as {
+        entryHash: string; signature: string
+      }
+      const expectedPubkey = a.expectedSignerPubkey as string
+      return ed25519.verify(
+        hexToBytes(link.signature),
+        hexToBytes(link.entryHash),
+        hexToBytes(expectedPubkey),
+      )
+    } catch {
+      return false
+    }
+  },
+
+  // --- SFrame key derivation ---
+
+  sframe_derive_key: (a) => {
+    const exporterSecret = hexToBytes(a.exporterSecretHex as string)
+    const callId = a.callId as string
+    const participantIndex = a.participantIndex as number
+
+    // derive_sframe_key: exporter → base_key → send_key
+    const baseKey = hkdf(sha256, exporterSecret, new Uint8Array(0),
+      utf8ToBytes(`llamenos:sframe-base-key:v1:${callId}`), 32)
+
+    const indexBuf = new Uint8Array(4)
+    new DataView(indexBuf.buffer).setUint32(0, participantIndex, false)
+    const sendKey = hkdf(sha256, baseKey, new Uint8Array(0), indexBuf, 32)
+
+    return bytesToHex(sendKey)
+  },
+
+  // --- Device import (known Ed25519 seed) ---
+
+  device_import_and_load: async (a) => {
+    const signingSecretHex = a.signingSecretHex as string
+    const pin = a.pin as string
+    const deviceId = a.deviceId as string
+
+    const signingSeed = hexToBytes(signingSecretHex)
+    // Derive encryption seed from signing seed via HKDF (matches Rust)
+    const encryptionSeed = hkdf(sha256, signingSeed, new Uint8Array(0),
+      utf8ToBytes('llamenos:device-encryption-seed:v1'), 32)
+
+    const signingPubkey = deriveEd25519Pubkey(signingSeed)
+    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
+
+    const state: MockDeviceKeyState = {
+      deviceId,
+      signingPubkeyHex: bytesToHex(signingPubkey),
+      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
+    }
+
+    const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
+    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
+
+    mockSecrets = { signingSeed, encryptionSeed }
+    mockDeviceState = state
+    mockEncryptedKeys = result
+    currentKeyType = 'ed25519'
+    schnorrSecretBytes = null
+
+    return result
+  },
+
+  // --- Legacy nsec import (secp256k1 secret for Schnorr auth) ---
+
+  legacy_import_nsec: async (a) => {
+    const nsecHex = a.nsecHex as string
+    const pin = a.pin as string
+    const deviceId = a.deviceId as string
+
+    const secretBytes = hexToBytes(nsecHex)
+    const xOnlyPubkey = schnorr.getPublicKey(secretBytes)
+
+    // For secp256k1 legacy keys, we store the secret as "signingSeed"
+    // and derive a dummy encryption seed (not used for HPKE in legacy mode)
+    const encryptionSeed = hkdf(sha256, secretBytes, new Uint8Array(0),
+      utf8ToBytes('llamenos:legacy-encryption-seed:v1'), 32)
+    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
+
+    const state: MockDeviceKeyState = {
+      deviceId,
+      signingPubkeyHex: bytesToHex(xOnlyPubkey),
+      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
+    }
+
+    const encrypted = await encryptWithPin(secretBytes, encryptionSeed, pin)
+    const result = { ...encrypted, state, _keyType: 'secp256k1' as string }
+
+    mockSecrets = { signingSeed: secretBytes, encryptionSeed }
+    mockDeviceState = state
+    mockEncryptedKeys = result
+    currentKeyType = 'secp256k1'
+    schnorrSecretBytes = secretBytes
+
+    return result
+  },
+
+  // --- Ephemeral Ed25519 keypair (for admin-created users) ---
+
+  generate_ephemeral_ed25519: () => {
+    const seed = randomBytes(32)
+    const pubkey = deriveEd25519Pubkey(seed)
+    return {
+      signingPubkeyHex: bytesToHex(pubkey),
+      seedHex: bytesToHex(seed),
+    }
+  },
+
+  // --- Backup generation ---
+
+  generate_backup_from_state: (_a) => {
+    const secrets = requireSecrets()
+    const state = requireDeviceState()
+    // Return a mock backup JSON — real Rust would encrypt with recovery key
+    return JSON.stringify({
+      v: 3,
+      deviceId: state.deviceId,
+      signingPubkeyHex: state.signingPubkeyHex,
+      encryptionPubkeyHex: state.encryptionPubkeyHex,
+      encryptedPayload: bytesToHex(secrets.signingSeed), // Mock: not actually encrypted
+    })
+  },
+
+  // --- Low-level crypto primitives ---
+
+  sha256_hash: (a) => {
+    const input = hexToBytes(a.inputHex as string)
+    return bytesToHex(sha256(input))
+  },
+
+  aes_gcm_encrypt_raw: (a) => {
+    const key = hexToBytes(a.keyHex as string)
+    const nonce = hexToBytes(a.nonceHex as string)
+    const plaintext = hexToBytes(a.plaintextHex as string)
+    const aadHex = a.aadHex as string
+    const aad = aadHex ? hexToBytes(aadHex) : undefined
+    const cipher = aad ? gcm(key, nonce, aad) : gcm(key, nonce)
+    const ct = cipher.encrypt(plaintext)
+    return bytesToHex(ct)
+  },
+
+  aes_gcm_decrypt_raw: (a) => {
+    const key = hexToBytes(a.keyHex as string)
+    const nonce = hexToBytes(a.nonceHex as string)
+    const ciphertext = hexToBytes(a.ciphertextHex as string)
+    const aadHex = a.aadHex as string
+    const aad = aadHex ? hexToBytes(aadHex) : undefined
+    const cipher = aad ? gcm(key, nonce, aad) : gcm(key, nonce)
+    const pt = cipher.decrypt(ciphertext)
+    return bytesToHex(pt)
+  },
+
+  hkdf_sha256: (a) => {
+    const ikm = hexToBytes(a.ikmHex as string)
+    const saltHex = a.saltHex as string
+    const salt = saltHex ? hexToBytes(saltHex) : new Uint8Array(0)
+    const infoHex = a.infoHex as string
+    const info = infoHex ? hexToBytes(infoHex) : new Uint8Array(0)
+    const length = a.lengthBytes as number
+    const derived = hkdf(sha256, ikm, salt, info, length)
+    return bytesToHex(derived)
+  },
+
+  x25519_get_public_key: (a) => {
+    const secret = hexToBytes(a.secretKeyHex as string)
+    return bytesToHex(x25519.getPublicKey(secret))
+  },
+
+  x25519_shared_secret: (a) => {
+    const ourSecret = hexToBytes(a.ourSecretKeyHex as string)
+    const theirPub = hexToBytes(a.theirPublicKeyHex as string)
+    return bytesToHex(x25519.getSharedSecret(ourSecret, theirPub))
+  },
+
+  // --- Test-only commands (PIN lockout seeding) ---
+
+  set_pin_failed_attempts: (a) => {
+    const count = a.count as number
+    pinLockoutState.failedAttempts = count
+    // Never set lockout timer from seeding — the step "I have N failed attempts"
+    // means N attempts were made and any lockout has already expired.
+    // The next wrong PIN will trigger the appropriate lockout/wipe.
+    pinLockoutState.lockoutUntil = 0
+    saveLockoutState()
+  },
+
+  get_pin_lockout_state: () => {
+    // Reload from storage in case of page reload
+    pinLockoutState = loadLockoutState()
+    return { failedAttempts: pinLockoutState.failedAttempts, lockoutUntil: pinLockoutState.lockoutUntil }
+  },
+
+  reset_pin_lockout: () => {
+    resetPinLockout()
+  },
+
+  expire_pin_lockout: () => {
+    pinLockoutState.lockoutUntil = 0
+    saveLockoutState()
+  },
 }
+
+// ── Public API ────────────────────────────────────────────────────────
 
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const handler = commands[cmd]
   if (!handler) throw new Error(`Unknown Tauri command: ${cmd}`)
-  return handler(args || {}) as T
+  return await handler(args || {}) as T
+}
+
+// Expose invoke on window using a Symbol key (not a guessable string).
+export const __TEST_INVOKE_SYMBOL = Symbol.for('llamenos_test_invoke')
+
+if (typeof window !== 'undefined' && import.meta.env.PLAYWRIGHT_TEST) {
+  (window as Record<symbol, unknown>)[__TEST_INVOKE_SYMBOL] = invoke
 }
 
 export function convertFileSrc(path: string): string { return path }
 export function isTauri(): boolean { return false }
-export class Resource { #rid: number; get rid() { return this.#rid }; constructor(rid: number) { this.#rid = rid }; async close() {} }
-export class Channel<T = unknown> { id = 0; #onmessage: (m: T) => void = () => {}; set onmessage(h: (m: T) => void) { this.#onmessage = h }; get onmessage() { return this.#onmessage }; toJSON() { return `__CHANNEL__:${this.id}` } }
-export class PluginListener { constructor(public plugin: string, public event: string, public channelId: number) {}; async unregister() {} }
-export async function addPluginListener(plugin: string, event: string, _cb: (p: unknown) => void): Promise<PluginListener> { return new PluginListener(plugin, event, 0) }
+
+export class Resource {
+  #rid: number
+  get rid() { return this.#rid }
+  constructor(rid: number) { this.#rid = rid }
+  async close() {}
+}
+
+export class Channel<T = unknown> {
+  id = 0
+  #onmessage: (m: T) => void = () => {}
+  set onmessage(h: (m: T) => void) { this.#onmessage = h }
+  get onmessage() { return this.#onmessage }
+  toJSON() { return `__CHANNEL__:${this.id}` }
+}
+
+export class PluginListener {
+  constructor(public plugin: string, public event: string, public channelId: number) {}
+  async unregister() {}
+}
+
+export async function addPluginListener(
+  plugin: string, event: string, _cb: (p: unknown) => void,
+): Promise<PluginListener> {
+  return new PluginListener(plugin, event, 0)
+}
+
 export const SERIALIZE_TO_IPC_FN = Symbol('serializeToIpc')
