@@ -68,8 +68,11 @@ export function validateConfig(env: ConfigInput = process.env): void {
   // --- Required vars ---
   assertDatabaseUrl(env)
   assertHex64(env, 'HMAC_SECRET')
-  // SERVER_SECRET is the canonical name; SERVER_NOSTR_SECRET is the legacy alias
-  const serverSecretKey = env['SERVER_SECRET']?.trim() ? 'SERVER_SECRET' : 'SERVER_NOSTR_SECRET'
+  // SERVER_SECRET is the canonical name; SERVER_NOSTR_SECRET is the legacy alias.
+  // Prefer SERVER_SECRET; fall back to SERVER_NOSTR_SECRET only if it has a value.
+  const hasCanonical = !!env['SERVER_SECRET']?.trim()
+  const hasLegacy = !!env['SERVER_NOSTR_SECRET']?.trim()
+  const serverSecretKey = hasCanonical ? 'SERVER_SECRET' : hasLegacy ? 'SERVER_NOSTR_SECRET' : 'SERVER_SECRET'
   assertHex64(env, serverSecretKey)
 
   // ADMIN_PUBKEY: 64 hex chars (Nostr pubkey, x-only compressed)
