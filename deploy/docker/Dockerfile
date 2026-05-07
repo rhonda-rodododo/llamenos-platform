@@ -17,6 +17,7 @@ COPY package.json bun.lockb ./
 # workspace packages. Without the lockfile, some @aws-sdk versions freshly downloaded
 # from npm carry workspace:^ refs for @smithy deps, which fail to resolve in a non-monorepo
 # Docker context. Using --frozen-lockfile with these stubs avoids re-resolution entirely.
+COPY packages/crypto/package.json packages/crypto/package.json
 COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/protocol/package.json packages/protocol/package.json
 COPY packages/test-specs/package.json packages/test-specs/package.json

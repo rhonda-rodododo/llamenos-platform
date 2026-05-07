@@ -38,6 +38,7 @@ WORKDIR /build
 COPY package.json bun.lockb ./
 COPY site/package.json site/
 COPY apps/worker/package.json apps/worker/
+COPY packages/crypto/package.json packages/crypto/
 COPY packages/i18n/package.json packages/i18n/
 COPY packages/protocol/package.json packages/protocol/
 COPY packages/test-specs/package.json packages/test-specs/
