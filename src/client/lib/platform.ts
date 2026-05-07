@@ -132,7 +132,7 @@ export async function deviceImportAndLoad(
 
 /**
  * @deprecated Use deviceImportAndLoad instead.
- * Import a legacy secp256k1 secret key (nsec hex) as device keys.
+ * Import a secret key (hex) as device keys.
  * Kept only for Playwright test helpers during transition.
  */
 export async function legacyImportNsec(
@@ -665,7 +665,7 @@ export async function clearStoredKey(): Promise<void> {
 
 // ══════════════════════════════════════════════════════════════════════
 // Backward-compatibility layer — transitional exports for callers that
-// still use the v2 (secp256k1/ECIES/Schnorr) API names.
+// still use the v2 API names.
 //
 // These will be removed once all callers are migrated to the v3 API.
 // Functions that cannot be meaningfully mapped throw at runtime.
