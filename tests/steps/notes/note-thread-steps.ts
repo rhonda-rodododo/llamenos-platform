@@ -8,7 +8,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts } from '../../helpers'
+import { Timeouts, fillCallId } from '../../helpers'
 import { Navigation } from '../../pages/index'
 import { listNotesViaApi } from '../../api-helpers'
 
@@ -29,11 +29,8 @@ Given('I am on the note detail screen', async ({ page, backendRequest: request, 
     const newBtn = page.getByTestId(TestIds.NOTE_NEW_BTN)
     await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
     await newBtn.click()
-    // Fill call ID if the field exists (required for save button to enable)
-    const callIdInput = page.getByTestId(TestIds.NOTE_CALL_ID)
-    if (await callIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await callIdInput.fill(`CALL-${Date.now()}`)
-    }
+    // Fill call ID — either Input (no recent calls) or Select (has recent calls)
+    await fillCallId(page, `CALL-${Date.now()}`)
     const contentField = page.getByTestId(TestIds.NOTE_CONTENT)
     await expect(contentField).toBeVisible({ timeout: Timeouts.ELEMENT })
     await contentField.fill('Test note for thread')
@@ -42,10 +39,10 @@ Given('I am on the note detail screen', async ({ page, backendRequest: request, 
     await saveBtn.click({ timeout: Timeouts.ELEMENT })
   }
 
-  // Open first note
-  const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-  await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await noteCard.click()
+  // Open first note's thread by clicking the reply button
+  const replyBtn = page.getByTestId(TestIds.NOTE_REPLY_BTN).first()
+  await expect(replyBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await replyBtn.click()
 })
 
 Given('the note has no replies', async () => {
@@ -72,29 +69,18 @@ Then('I should see the reply input field', async ({ page }) => {
 Then('I should see the no replies message', async ({ page }) => {
   const threadSection = page.getByTestId(TestIds.NOTE_THREAD)
   await expect(threadSection).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Look for empty state or "no replies" text within the thread section
-  const emptyState = threadSection.locator(`[data-testid="${TestIds.EMPTY_STATE}"]`)
-  const noRepliesText = threadSection.getByText(/no replies|no comments|be the first/i).first()
-  const isEmpty = await emptyState.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isEmpty) return
-  const isNoReplies = await noRepliesText.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isNoReplies) return
-  // Thread section visible with no reply items is also acceptable
-  const replyItems = threadSection.locator('[data-testid*="reply"]')
-  const count = await replyItems.count()
-  expect(count).toBe(0)
+  // The ConversationThread component shows "No messages yet" when empty
+  const noMessagesText = threadSection.getByText(/no messages|no replies|no comments|be the first/i).first()
+  await expect(noMessagesText).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the reply count in the thread header', async ({ page }) => {
-  const threadSection = page.getByTestId(TestIds.NOTE_THREAD)
-  await expect(threadSection).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Reply count shows as "N replies" or "N comments" in the thread header
-  const replyCount = threadSection.getByText(/\d+\s*(repl|comment)/i).first()
-  const hasCount = await replyCount.isVisible({ timeout: 2000 }).catch(() => false)
-  if (hasCount) return
-  // Thread header visible is acceptable if no replies yet
-  const threadHeader = threadSection.locator('h3, h4, [class*="header"]').first()
-  await expect(threadHeader).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Reply count is displayed on the reply button (note-reply-btn), not inside the thread
+  const replyBtn = page.getByTestId(TestIds.NOTE_REPLY_BTN).first()
+  await expect(replyBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // The button shows either "Reply" (0 replies) or "N replies"
+  const text = await replyBtn.textContent()
+  expect(text).toBeTruthy()
 })
 
 Then('I should see the send reply button', async ({ page }) => {

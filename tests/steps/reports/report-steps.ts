@@ -1,15 +1,11 @@
 /**
  * Report step definitions.
  * Matches steps from:
- *   - packages/test-specs/features/reports/report-list.feature
- *   - packages/test-specs/features/reports/report-detail.feature
- *   - packages/test-specs/features/reports/report-create.feature
- *   - packages/test-specs/features/reports/report-claim.feature
- *   - packages/test-specs/features/reports/report-close.feature
+ *   - packages/test-specs/features/core/reports.feature
  *
  * Behavioral depth: Hard assertions on report-specific elements. No .or(PAGE_TITLE)
  * fallbacks that silently pass when the real element is missing. Report lifecycle
- * verified via API where possible.
+ * verified via API where possible. All API seeding is hub-scoped.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
@@ -64,7 +60,6 @@ Then('I should see the report body input', async ({ page }) => {
 })
 
 Then('I should see the report submit button', async ({ page }) => {
-  // Check for submit button first, then fallback to generic save button
   const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
   const isSubmit = await submitBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isSubmit) return
@@ -72,7 +67,6 @@ Then('I should see the report submit button', async ({ page }) => {
 })
 
 Then('the report submit button should be disabled', async ({ page }) => {
-  // Check submit button first, then generic save button
   const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
   const isSubmit = await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)
   if (isSubmit) {
@@ -84,21 +78,19 @@ Then('the report submit button should be disabled', async ({ page }) => {
 
 // --- Report detail / viewing ---
 
-When('I tap the first report card', async ({ page, backendRequest: request, workerHub }) => {
+When('I tap the first report card', async ({ page, backendRequest, workerHub }) => {
   // Ensure at least one report exists so the tap has something to click.
-  // If the list is empty, create a report via API so the step has data to work with.
-  const existingReports = await listReportsViaApi(request, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
+  const existingReports = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
   if (existingReports.conversations.length === 0) {
-    await createReportViaApi(request, { title: `Auto-seeded Report ${Date.now()}`, hubId: workerHub })
+    await createReportViaApi(backendRequest, { title: `Auto-seeded Report ${Date.now()}`, hubId: workerHub })
     // SPA-navigate away and back to refresh without a full reload
-    // (reload triggers PIN re-entry which this step doesn't handle)
     await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
+      const router = (window as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
       if (router) router.navigate({ to: '/' })
     })
     await page.waitForURL(u => !u.toString().includes('/reports'), { timeout: 5000 }).catch(() => {})
     await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
+      const router = (window as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
       if (router) router.navigate({ to: '/reports' })
     })
     await page.waitForURL(/\/reports/, { timeout: 5000 }).catch(() => {})
@@ -126,34 +118,31 @@ When('I tap the back button on report detail', async ({ page }) => {
   await backBtn.click()
 })
 
-Given('I am viewing a report with status {string}', async ({ page, backendRequest: request, workerHub }, status: string) => {
+Given('I am viewing a report with status {string}', async ({ page, backendRequest, workerHub }, status: string) => {
   const { Navigation } = await import('../../pages/index')
 
-  // Ensure a report with the desired status exists
-  let result = await listReportsViaApi(request, { status, hubId: workerHub })
+  // Ensure a report with the desired status exists in the worker's hub
+  let result = await listReportsViaApi(backendRequest, { status, hubId: workerHub })
   if (result.conversations.length === 0) {
-    // Create one with the right status
-    await createReportViaApi(request, { title: `Seed ${status} report ${Date.now()}`, status, hubId: workerHub })
-    result = await listReportsViaApi(request, { status, hubId: workerHub })
+    await createReportViaApi(backendRequest, { title: `Seed ${status} report ${Date.now()}`, status, hubId: workerHub })
+    result = await listReportsViaApi(backendRequest, { status, hubId: workerHub })
   }
   expect(result.conversations.length).toBeGreaterThan(0)
 
-  // Navigate to reports with the correct status filter
+  // Navigate to reports
   await Navigation.goToReports(page)
 
-  // If status filter exists, apply it
-  const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
-  const hasFilter = await filterArea.isVisible({ timeout: 2000 }).catch(() => false)
+  // If status filter exists, apply it to show only matching reports
+  const statusFilter = page.getByTestId('report-status-filter')
+  const hasFilter = await statusFilter.isVisible({ timeout: 3000 }).catch(() => false)
   if (hasFilter && status !== 'all') {
-    const selectTrigger = filterArea.locator('button[role="combobox"]').first()
-    if (await selectTrigger.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await selectTrigger.click()
-      const option = page.getByRole('option', { name: new RegExp(status, 'i') })
-      if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await option.click()
-      } else {
-        await page.keyboard.press('Escape')
-      }
+    await statusFilter.click()
+    const option = page.getByTestId(`report-status-option-${status}`)
+    const hasOption = await option.isVisible({ timeout: 3000 }).catch(() => false)
+    if (hasOption) {
+      await option.click()
+    } else {
+      await page.keyboard.press('Escape')
     }
   }
 
@@ -170,52 +159,68 @@ Then('I should see the reports title', async ({ page }) => {
 })
 
 Then('I should see the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
-  // Filters are only visible when reports exist (not in empty state)
-  // If no reports exist, the filter area won't be visible — seed a report first
-  const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
-  let filterVisible = await filterArea.isVisible({ timeout: 3000 }).catch(() => false)
-
-  if (!filterVisible) {
-    // Seed a report via backend API, then re-navigate
+  // Filters only render when reports exist (not in empty state) and user is admin.
+  // Always ensure at least one report exists BEFORE checking visibility — the filter area
+  // is briefly visible during loading then disappears if no reports exist.
+  const existing = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
+  if (existing.conversations.length === 0) {
     await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
-    await page.getByTestId(TestIds.NAV_DASHBOARD).click()
-    await page.getByTestId(TestIds.NAV_REPORTS).click()
   }
 
+  // DEBUG: Check crypto state and try creating an auth token
+  const debugInfo = await page.evaluate(async () => {
+    const w = window as Record<string, unknown>
+    const km = w.__TEST_KEY_MANAGER as { isUnlocked?: () => boolean } | undefined
+    const platform = w.__TEST_PLATFORM as { createAuthToken?: (ts: number, m: string, p: string) => Promise<string> } | undefined
+    let authTokenResult = 'not-tried'
+    if (km?.isUnlocked?.()) {
+      try {
+        const token = await platform!.createAuthToken!(Date.now(), 'GET', '/api/reports')
+        authTokenResult = `ok:${token.slice(0, 20)}...`
+      } catch (e: unknown) {
+        authTokenResult = `error:${(e as Error).message}`
+      }
+    }
+    return {
+      url: window.location.pathname,
+      kmUnlocked: km?.isUnlocked?.(),
+      authTokenResult,
+    }
+  }).catch((e) => ({ url: 'eval-failed', kmUnlocked: 'eval-failed', authTokenResult: `catch:${e}` }))
+  console.log(`[report-filter-debug] workerHub=${workerHub} page=${JSON.stringify(debugInfo)}`)
+
+  // SPA re-navigate to refresh the reports list
+  await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+  await page.getByTestId(TestIds.NAV_REPORTS).click()
+
+  const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // Filters use a Select dropdown — wait for stability then click to open
-  const selectTrigger = filterArea.locator('button[role="combobox"]').first()
-  await expect(selectTrigger).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await selectTrigger.waitFor({ state: 'attached' })
-  await selectTrigger.click()
-  const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
+  // Click the status filter trigger to open dropdown and verify the option exists
+  const statusFilter = page.getByTestId('report-status-filter')
+  await expect(statusFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await statusFilter.click()
+
+  // Verify the specific filter option is visible
+  const optionSlug = filterName.toLowerCase()
+  const option = page.getByTestId(`report-status-option-${optionSlug}`)
   await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
   await page.keyboard.press('Escape')
 })
 
 When('I tap the {string} report status filter', async ({ page }, filterName: string) => {
-  const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
-  // Status filter is a Select dropdown — wait for stability then click trigger
-  const selectTrigger = filterArea.locator('button[role="combobox"]').first()
-  await expect(selectTrigger).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await selectTrigger.waitFor({ state: 'attached' })
-  await selectTrigger.click()
-  const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
+  const statusFilter = page.getByTestId('report-status-filter')
+  await expect(statusFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await statusFilter.click()
+
+  const optionSlug = filterName.toLowerCase()
+  const option = page.getByTestId(`report-status-option-${optionSlug}`)
   await option.click()
 })
 
 Then('the {string} report status filter should be selected', async ({ page }, filterName: string) => {
-  const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
-  // With Select dropdown, the selected value is shown in the trigger
-  const selectTrigger = filterArea.locator('button[role="combobox"]').first()
-  if (await selectTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
-    // Verify the trigger shows the selected filter name
-    await expect(selectTrigger).toContainText(new RegExp(filterName, 'i'), { timeout: Timeouts.ELEMENT })
-  } else {
-    const activeFilter = filterArea.getByText(new RegExp(filterName, 'i'))
-    await expect(activeFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  const statusFilter = page.getByTestId('report-status-filter')
+  await expect(statusFilter).toContainText(new RegExp(filterName, 'i'), { timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the reports content or empty state', async ({ page }) => {
@@ -265,43 +270,34 @@ Then('I should not see the report close button', async ({ page }) => {
 
 // --- Report lifecycle verification via API ---
 
-Then('the report should exist in the API', async ({ backendRequest: request, workerHub }) => {
-  const result = await listReportsViaApi(request, { hubId: workerHub })
+Then('the report should exist in the API', async ({ backendRequest, workerHub }) => {
+  const result = await listReportsViaApi(backendRequest, { hubId: workerHub })
   expect(result.conversations.length).toBeGreaterThan(0)
 })
 
-Then('the report count should increase', async ({ backendRequest: request, workerHub }) => {
-  const result = await listReportsViaApi(request, { hubId: workerHub })
+Then('the report count should increase', async ({ backendRequest, workerHub }) => {
+  const result = await listReportsViaApi(backendRequest, { hubId: workerHub })
   expect(result.total).toBeGreaterThan(0)
 })
 
 // --- Template-driven report types (desktop) ---
 
 Then('I should see the report type tabs', async ({ page }) => {
-  // After template application, the reports page shows filter area OR the page title
-  // (filter area only renders when reports exist and report types are loaded)
   const filterArea = page.getByTestId('report-filter-area')
   const pageTitle = page.getByTestId('page-title')
-  // Accept either: filter area visible (reports exist) or page title with "Reports"
   const filterVisible = await filterArea.isVisible({ timeout: 5000 }).catch(() => false)
   if (filterVisible) return
-  // Fallback: just verify we're on the reports page
   await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
   await expect(pageTitle).toContainText(/reports/i)
 })
 
 Then('the report type tabs should include template-defined types', async ({ page }) => {
-  // After applying jail-support template, the category filter dropdown
-  // should include template-defined report types (if reports exist).
-  // If no reports exist yet, the filter area won't be visible — accept page loaded.
   const filterArea = page.getByTestId('report-filter-area')
   const filterVisible = await filterArea.isVisible({ timeout: 5000 }).catch(() => false)
   if (!filterVisible) {
-    // Create a report to make filter area appear
     const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
     if (await newBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await newBtn.click()
-      // Fill minimal fields and submit to create a report
       const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
       if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
         await titleInput.fill(`Seed Report ${Date.now()}`)
@@ -315,7 +311,6 @@ Then('the report type tabs should include template-defined types', async ({ page
         await submitBtn.click()
       }
     }
-    // After creating, the filter should appear
     await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 })
@@ -327,30 +322,23 @@ Then('the report type selector should be visible', async ({ page }) => {
 })
 
 Then('the report type selector should list template-defined types', async ({ page }) => {
-  // The selector should show template-defined types from the applied template
   const selector = page.getByTestId('report-type-select')
     .or(page.getByTestId('report-type-picker'))
   await expect(selector.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Click the select trigger to open the dropdown and verify options exist
   await selector.first().click()
-  // Radix Select renders options in a portal — look globally
   const options = page.locator('[role="option"]')
   const count = await options.count()
-  // Template types should have at least one option plus "Default"
   expect(count).toBeGreaterThanOrEqual(1)
-  // Close the dropdown
   await page.keyboard.press('Escape')
 })
 
 When('I select the first template report type', async ({ page }) => {
   const selector = page.getByTestId('report-type-select')
   if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
-    // Radix Select: click trigger, then click the first non-default option
     await selector.click()
     const options = page.locator('[role="option"]')
     const count = await options.count()
     if (count > 1) {
-      // Skip "Default" (index 0) and pick the first template type
       await options.nth(1).click()
     } else if (count === 1) {
       await options.first().click()
@@ -358,7 +346,6 @@ When('I select the first template report type', async ({ page }) => {
       await page.keyboard.press('Escape')
     }
   } else {
-    // Card/button picker fallback
     const option = page.getByTestId('report-type-option').first()
     if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
       await option.click()
@@ -367,7 +354,6 @@ When('I select the first template report type', async ({ page }) => {
 })
 
 Then('the report form should show dynamic schema fields', async ({ page }) => {
-  // After selecting a template report type, the form should show schema-driven fields
   const form = page.getByTestId('report-schema-form')
     .or(page.getByTestId('report-form'))
     .or(page.getByTestId(TestIds.REPORT_BODY_INPUT))
@@ -375,17 +361,14 @@ Then('the report form should show dynamic schema fields', async ({ page }) => {
 })
 
 When('I fill in the required report fields', async ({ page }) => {
-  // Fill in the title if visible
   const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
   if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     await titleInput.fill(`Template Report ${Date.now()}`)
   }
-  // Fill in the body if visible
   const bodyInput = page.getByTestId(TestIds.REPORT_BODY_INPUT)
   if (await bodyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     await bodyInput.fill('Template-driven report test body content')
   }
-  // Fill any required schema fields (text inputs in the form)
   const schemaInputs = page.getByTestId('report-schema-form').locator('input[required], textarea[required]')
   const count = await schemaInputs.count().catch(() => 0)
   for (let i = 0; i < count; i++) {
@@ -398,10 +381,7 @@ When('I fill in the required report fields', async ({ page }) => {
   }
 })
 
-// 'the report should appear in the reports list' is defined in admin/desktop-admin-steps.ts
-
 Then('the submitted report should appear in the list', async ({ page }) => {
-  // After submission, the reports list should reload and show the new report
   const reportList = page.getByTestId(TestIds.REPORT_LIST)
     .or(page.getByTestId(TestIds.REPORT_CARD))
   await expect(reportList.first()).toBeVisible({ timeout: Timeouts.ELEMENT })

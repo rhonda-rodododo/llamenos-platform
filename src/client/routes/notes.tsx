@@ -379,7 +379,7 @@ function NotesPage() {
       ) : (
         <div className="space-y-4" data-testid="note-list">
           {Object.entries(notesByCall).map(([cId, callNotes]) => (
-            <Card key={cId}>
+            <Card key={cId} data-testid="note-group">
               <CardHeader className="border-b py-3">
                 <CardTitle className="text-sm">
                   {(() => {

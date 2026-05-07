@@ -178,7 +178,7 @@ async function request<T>(path: string, options: RequestInit & { retries?: numbe
           const body = await res.text()
           throw new ApiError(res.status, body)
         }
-        if (res.status === 401 && !path.startsWith('/auth/')) {
+        if (res.status === 401 && !path.startsWith('/auth/') && keyManager.isUnlocked()) {
           onAuthExpired?.()
         }
         const body = await res.text()
