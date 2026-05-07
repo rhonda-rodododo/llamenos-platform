@@ -53,7 +53,6 @@ COPY packages/shared/ packages/shared/
 COPY packages/i18n/ packages/i18n/
 COPY packages/protocol/ packages/protocol/
 COPY packages/crypto/ffi.ts packages/crypto/ffi.ts
-COPY packages/crypto/ffi-bun.ts packages/crypto/ffi-bun.ts
 COPY tsconfig.json ./
 
 # Copy native crypto library from Rust build
