@@ -220,14 +220,11 @@ async function createRoleAccount(
     storageFile: string
   }
 ) {
-  // Navigate to Users page — wait for the page title, not networkidle
-  // (background polling like Nostr relay and blast-worker prevent networkidle from resolving)
+  // Navigate to Users page — wait for invite-btn (users-page-specific) rather than
+  // generic page-title which may match the departing route during transition.
   await adminPage.getByTestId(TestIds.NAV_VOLUNTEERS).click()
-  await expect(adminPage.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: 10000 })
-
-  // Click "Invite" button (the outline button with mail icon)
-  const inviteBtn = adminPage.getByRole('button', { name: /invite/i })
-  await inviteBtn.waitFor({ state: 'visible', timeout: 10000 })
+  const inviteBtn = adminPage.getByTestId('invite-btn')
+  await inviteBtn.waitFor({ state: 'visible', timeout: 20000 })
   await inviteBtn.click()
 
   // Fill invite form
@@ -256,10 +253,10 @@ async function createRoleAccount(
   }
 
   // Create invite
-  await adminPage.getByRole('button', { name: /create invite/i }).click()
+  await adminPage.getByTestId('create-invite-btn').click()
 
   // Wait for invite link to appear (green card with the link)
-  const inviteLinkCard = adminPage.locator('code').filter({ hasText: /onboarding\?code=/ })
+  const inviteLinkCard = adminPage.getByTestId('invite-link-code')
   await expect(inviteLinkCard).toBeVisible({ timeout: 15000 })
   const inviteLink = await inviteLinkCard.textContent()
   if (!inviteLink) throw new Error(`Failed to get invite link for ${opts.name}`)
